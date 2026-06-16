@@ -3931,7 +3931,7 @@ const PartyManagement: React.FC = () => {
       {/* City Customers Popup Modal */}
       {selectedCityName && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-500 bg-opacity-75 overflow-y-auto">
-          <div className="relative bg-white rounded-xl max-w-3xl w-full shadow-2xl flex flex-col max-h-[85vh] border border-gray-150 animate-in fade-in zoom-in-95 duration-150">
+          <div className="relative bg-white rounded-xl max-w-4xl w-full shadow-2xl flex flex-col max-h-[85vh] border border-gray-150 animate-in fade-in zoom-in-95 duration-150">
             {/* Header */}
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-xl flex justify-between items-center">
               <div>
@@ -3994,7 +3994,7 @@ const PartyManagement: React.FC = () => {
                   }
 
                   return (
-                    <div className="border border-gray-150 rounded-xl overflow-hidden shadow-xs">
+                    <div className="border border-gray-150 rounded-xl overflow-x-auto shadow-xs">
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead>
                           <tr className="bg-gray-50">
@@ -4008,7 +4008,7 @@ const PartyManagement: React.FC = () => {
                         <tbody className="divide-y divide-gray-100 bg-white">
                           {filtered.map((cust) => (
                             <tr key={cust._id} className="hover:bg-gray-50/50 transition-colors">
-                              <td className="px-4 py-3 whitespace-nowrap">
+                              <td className="px-4 py-3">
                                 <div className="flex flex-col">
                                   <span className="font-semibold text-gray-900 text-sm">{cust.firmName || '-'}</span>
                                   {cust.ownerName && (
