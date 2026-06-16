@@ -6,6 +6,7 @@ exports.getRoutes = async (req, res) => {
   try {
     const filter = {};
     if (req.query.status) filter.status = req.query.status;
+    if (req.query.company) filter.company = req.query.company;
 
     // Secure sorting with whitelist validation
     const allowedSortFields = ['name', 'status', 'assignedAgent', 'createdAt'];

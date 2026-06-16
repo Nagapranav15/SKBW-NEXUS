@@ -102,6 +102,12 @@ exports.getParties = async (req, res) => {
   try {
     const filter = {};
     if (req.query.type) filter.type = req.query.type;
+    if (req.query.company) {
+      filter.$or = [
+        { company: req.query.company },
+        { companies: req.query.company }
+      ];
+    }
 
     if (req.query.status) {
       const vals = req.query.status.split(',').map(v => v.trim());

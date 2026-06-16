@@ -162,6 +162,7 @@ const PartyManagement: React.FC = () => {
   const [expandedRouteId, setExpandedRouteId] = useState<string | null>(null);
   const [showColumnSelector, setShowColumnSelector] = useState(false);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [showSortSelector, setShowSortSelector] = useState(false);
 
   // Pagination
   const [page, setPage] = useState(1);
@@ -357,6 +358,9 @@ const PartyManagement: React.FC = () => {
     setFormData(getEmptyFormData());
     setAgentCheckedRoutes([]);
     setSelectedIds([]);
+    setShowSortSelector(false);
+    setShowColumnSelector(false);
+    setShowFilterPanel(false);
 
     // Reset sort field based on type
     if (currentType === 'route') {
@@ -826,11 +830,23 @@ const PartyManagement: React.FC = () => {
   };
 
   // Selection Handlers
+  const isAllOnPageSelected = parties.length > 0 && parties.every(p => selectedIds.includes(p._id));
+  const isSomeOnPageSelected = parties.length > 0 && parties.some(p => selectedIds.includes(p._id)) && !isAllOnPageSelected;
+
   const handleSelectAll = () => {
-    if (selectedIds.length === parties.length) {
-      setSelectedIds([]);
+    const allPageIds = parties.map(p => p._id);
+    if (isAllOnPageSelected) {
+      setSelectedIds(prev => prev.filter(id => !allPageIds.includes(id)));
     } else {
-      setSelectedIds(parties.map(p => p._id));
+      setSelectedIds(prev => {
+        const next = [...prev];
+        allPageIds.forEach(id => {
+          if (!next.includes(id)) {
+            next.push(id);
+          }
+        });
+        return next;
+      });
     }
   };
 
@@ -1289,7 +1305,7 @@ const PartyManagement: React.FC = () => {
               {selectedIds.length > 0 && (
                 <button
                   onClick={handleBulkDelete}
-                  className="flex items-center space-x-2 px-4 py-2.5 bg-red-650 hover:bg-red-750 text-white rounded-lg transition-colors font-medium shadow-sm font-semibold animate-pulse"
+                  className="flex items-center space-x-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-semibold shadow-md animate-pulse"
                 >
                   <Trash2 className="w-4 h-4" />
                   <span>Delete Selected ({selectedIds.length})</span>
@@ -1369,14 +1385,82 @@ const PartyManagement: React.FC = () => {
                   </span>
                 )}
               </button>
-              <button
-                className="flex items-center space-x-1.5 px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm font-medium transition-colors"
-                title="Sorting by Firm Name Ascending"
-              >
-                <Clock className="w-4 h-4 transform rotate-180" />
-                <span>Sort</span>
-                <span className="ml-1 px-1.5 py-0.5 text-xs font-semibold bg-blue-600 text-white rounded-full">1</span>
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setShowSortSelector(!showSortSelector)}
+                  className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    showSortSelector ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  <ArrowUpDown className="w-4 h-4 text-gray-450" />
+                  <span>Sort By</span>
+                  <span className="ml-1 px-1.5 py-0.5 text-xs font-semibold bg-blue-600 text-white rounded-full">
+                    {(() => {
+                      const displayField = sortField === 'name' && currentType === 'route' ? 'firmName' : sortField;
+                      const matchedEntry = Object.entries(allColumns).find(([k]) => k === displayField);
+                      return matchedEntry ? matchedEntry[1] : (sortField === 'createdAt' ? 'Date Created' : 'Default');
+                    })()}
+                  </span>
+                </button>
+                
+                {showSortSelector && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-2 space-y-1">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2 py-1">Sort Field</p>
+                    {Object.entries(allColumns).map(([key, label]) => {
+                      const dbField = key === 'firmName' && currentType === 'route' ? 'name' : key;
+                      const isCurrent = sortField === dbField;
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => {
+                            setSortField(dbField);
+                            setPage(1);
+                          }}
+                          className={`w-full text-left px-2 py-1.5 text-xs rounded-md transition-colors flex items-center justify-between ${
+                            isCurrent ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-750 hover:bg-gray-50'
+                          }`}
+                        >
+                          <span>{label}</span>
+                          {isCurrent && <span className="text-[10px] uppercase font-bold text-blue-600">{sortOrder}</span>}
+                        </button>
+                      );
+                    })}
+                    <button
+                      onClick={() => {
+                        setSortField('createdAt');
+                        setPage(1);
+                      }}
+                      className={`w-full text-left px-2 py-1.5 text-xs rounded-md transition-colors flex items-center justify-between ${
+                        sortField === 'createdAt' ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-750 hover:bg-gray-50'
+                      }`}
+                    >
+                      <span>Date Created</span>
+                      {sortField === 'createdAt' && <span className="text-[10px] uppercase font-bold text-blue-600">{sortOrder}</span>}
+                    </button>
+                    <div className="border-t border-gray-100 my-1 pt-1">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2 py-1">Sort Order</p>
+                      <div className="flex space-x-1 p-1">
+                        <button
+                          onClick={() => { setSortOrder('asc'); setPage(1); }}
+                          className={`flex-1 py-1 text-center text-xs rounded-md border font-medium transition-colors ${
+                            sortOrder === 'asc' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          Ascending
+                        </button>
+                        <button
+                          onClick={() => { setSortOrder('desc'); setPage(1); }}
+                          className={`flex-1 py-1 text-center text-xs rounded-md border font-medium transition-colors ${
+                            sortOrder === 'desc' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          Descending
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
               <button
                 onClick={() => setShowColumnSelector(!showColumnSelector)}
                 className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -1450,23 +1534,23 @@ const PartyManagement: React.FC = () => {
               <div>
                 <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">City / Town</label>
                 <div className="space-y-1 max-h-24 overflow-y-auto border border-gray-150 rounded-lg p-2 bg-gray-50/50">
-                  {allMarkets.map(m => {
-                    const isChecked = filters.city?.includes(m.firmName);
+                  {allCities.map(c => {
+                    const isChecked = filters.city?.includes(c);
                     return (
-                      <label key={m._id} className="flex items-center space-x-2 text-xs text-gray-600 cursor-pointer hover:text-gray-900">
+                      <label key={c} className="flex items-center space-x-2 text-xs text-gray-600 cursor-pointer hover:text-gray-900">
                         <input
                           type="checkbox"
                           checked={isChecked}
                           onChange={() => {
                             setFilters((prev: any) => ({
                               ...prev,
-                              city: isChecked ? prev.city.filter((x: any) => x !== m.firmName) : [...(prev.city || []), m.firmName]
+                              city: isChecked ? prev.city.filter((x: any) => x !== c) : [...(prev.city || []), c]
                             }));
                             setPage(1);
                           }}
                           className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 border-gray-300"
                         />
-                        <span>{m.firmName}</span>
+                        <span>{c}</span>
                       </label>
                     );
                   })}
@@ -1593,7 +1677,10 @@ const PartyManagement: React.FC = () => {
                   <th className="px-4 py-3 text-left w-10">
                     <input
                       type="checkbox"
-                      checked={parties.length > 0 && selectedIds.length === parties.length}
+                      checked={isAllOnPageSelected}
+                      ref={el => {
+                        if (el) el.indeterminate = isSomeOnPageSelected;
+                      }}
                       onChange={handleSelectAll}
                       className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 border-gray-300 cursor-pointer"
                     />
@@ -1641,20 +1728,17 @@ const PartyManagement: React.FC = () => {
                 ) : (
                   parties.map((item, idx) => {
                     const rowNum = startItem + idx;
-                    const citiesUnderRoute = currentType === 'route' ? allMarkets.filter(m => m.route === item.name) : [];
+                    const isSelectedRow = viewingCustomer && viewingCustomer._id === item._id;
                     return (
                       <React.Fragment key={item._id}>
                         <tr
-                          className="hover:bg-blue-50/20 transition-colors cursor-pointer"
+                          className={`transition-colors cursor-pointer ${
+                            isSelectedRow 
+                              ? 'bg-blue-50/50 hover:bg-blue-50 text-blue-900 font-semibold' 
+                              : 'hover:bg-gray-50 text-gray-700'
+                          }`}
                           onClick={() => {
-                            if (currentType === 'customer') {
-                              setViewingCustomer(item);
-                            } else if (currentType === 'route') {
-                              setExpandedRouteId(expandedRouteId === item._id ? null : item._id);
-                              setCitySearchText('');
-                            } else {
-                              handleEdit(item);
-                            }
+                            setViewingCustomer(item);
                           }}
                         >
                           <td className="px-4 py-3.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
@@ -1669,7 +1753,7 @@ const PartyManagement: React.FC = () => {
                           {Object.entries(visibleColumns).map(([col, visible]) => {
                             if (!visible || !allColumns[col]) return null;
                             return (
-                              <td key={col} className="px-5 py-3.5 whitespace-nowrap text-sm text-gray-700 font-medium">
+                              <td key={col} className="px-5 py-3.5 whitespace-nowrap text-sm font-medium text-gray-700">
                                 {col === 'firmName' ? (
                                   <div className="flex flex-col">
                                     <span className="font-semibold text-gray-955">{item.firmName || '-'}</span>
@@ -1678,7 +1762,7 @@ const PartyManagement: React.FC = () => {
                                     )}
                                   </div>
                                 ) : col === 'contactName' ? (
-                                  <span className="font-semibold text-gray-950">{item.contactName || item.ownerName || '-'}</span>
+                                  <span className="font-semibold text-gray-955">{item.contactName || item.ownerName || '-'}</span>
                                 ) : col === 'name' ? (
                                   <div className="flex flex-col">
                                     <span className="font-semibold text-gray-955">{item.name || '-'}</span>
@@ -1709,7 +1793,7 @@ const PartyManagement: React.FC = () => {
                                   ) : <span className="text-gray-400">-</span>
                                 ) : col === 'assignedAgent' ? (
                                   item.assignedAgent ? (
-                                    <span className="inline-flex px-2.5 py-1 text-xs font-medium rounded-md bg-purple-50 text-purple-700">
+                                    <span className="inline-flex px-2.5 py-1 text-xs font-medium rounded-md bg-purple-50 text-purple-775">
                                       {item.assignedAgent}
                                     </span>
                                   ) : <span className="text-gray-400">Not Assigned</span>
@@ -1718,7 +1802,7 @@ const PartyManagement: React.FC = () => {
                                 ) : col === 'citiesCount' || col === 'customersCount' || col === 'customerCount' ? (
                                   <span className="font-medium text-gray-900">{item[col] !== undefined ? item[col] : 0}</span>
                                 ) : col === 'creditLimit' ? (
-                                  <span className="font-medium text-gray-950">₹{(item.creditLimit || 0).toLocaleString('en-IN')}</span>
+                                  <span className="font-medium text-gray-955">₹{(item.creditLimit || 0).toLocaleString('en-IN')}</span>
                                 ) : col === 'outstanding' ? (
                                   <span className={`font-semibold ${(item.outstanding || 0) > 0 ? 'text-red-650' : 'text-green-655'}`}>
                                     ₹{(item.outstanding || 0).toLocaleString('en-IN')}
@@ -1749,14 +1833,12 @@ const PartyManagement: React.FC = () => {
                           })}
                           <td className="px-5 py-3.5 whitespace-nowrap text-right text-sm" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-end space-x-2 text-xs">
-                              {currentType === 'customer' && (
-                                <button
-                                  onClick={() => setViewingCustomer(item)}
-                                  className="px-2.5 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors font-semibold shadow-xs"
-                                >
-                                  Profile
-                                </button>
-                              )}
+                              <button
+                                onClick={() => setViewingCustomer(item)}
+                                className="px-2.5 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors font-semibold shadow-xs"
+                              >
+                                Profile
+                              </button>
                               <button
                                 onClick={() => handleEdit(item)}
                                 className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded bg-gray-50 hover:bg-blue-50 text-gray-700 hover:text-blue-700 border border-gray-200 hover:border-blue-200 transition-colors font-semibold shadow-xs"
@@ -1766,7 +1848,7 @@ const PartyManagement: React.FC = () => {
                               </button>
                               <button
                                 onClick={() => handleDelete(item._id)}
-                                className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded bg-red-50 hover:bg-red-100 text-red-650 hover:text-red-700 border border-red-200 hover:border-red-300 transition-colors font-semibold shadow-xs"
+                                className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 transition-colors font-semibold shadow-xs"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                                 <span>Delete</span>
@@ -3017,25 +3099,25 @@ const PartyManagement: React.FC = () => {
       )}
 
       {/* Customer Details Right-Side Drawer */}
-      {viewingCustomer && (
+      {viewingCustomer && !showForm && (
         <div className="fixed top-0 right-0 h-full w-[520px] bg-white shadow-2xl border-l border-gray-200 z-40 flex flex-col transition-all duration-300 animate-in slide-in-from-right">
           {/* Header */}
           <div className="flex items-center justify-between p-5 border-b border-gray-200 bg-gray-50">
             <div className="flex-1 min-w-0 pr-4">
               <div className="flex items-center space-x-2">
                 <h2 className="text-xl font-bold text-gray-900 truncate">
-                  {viewingCustomer.firmName}
+                  {currentType === 'route' ? viewingCustomer.name : (viewingCustomer.firmName || viewingCustomer.contactName)}
                 </h2>
                 <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full uppercase border ${
                   viewingCustomer.status === 'active' ? 'bg-green-50 border-green-200 text-green-700' :
                   viewingCustomer.status === 'inactive' ? 'bg-red-50 border-red-200 text-red-700' :
                   'bg-yellow-50 border-yellow-200 text-yellow-755'
                 }`}>
-                  {viewingCustomer.status}
+                  {viewingCustomer.status || 'active'}
                 </span>
               </div>
               <p className="text-xs text-gray-500 font-mono mt-1">
-                Customer Code: <span className="font-semibold text-blue-600">{viewingCustomer.code || 'N/A'}</span>
+                {typeLabel} Code: <span className="font-semibold text-blue-600">{viewingCustomer.code || viewingCustomer._id?.slice(-6).toUpperCase() || 'N/A'}</span>
               </p>
             </div>
             <button
@@ -3056,7 +3138,6 @@ const PartyManagement: React.FC = () => {
                 <button
                   onClick={() => {
                     handleEdit(viewingCustomer);
-                    setViewingCustomer(null);
                   }}
                   className="flex items-center justify-center space-x-2 p-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-xs rounded-lg border border-blue-200 transition-colors"
                 >
@@ -3064,254 +3145,622 @@ const PartyManagement: React.FC = () => {
                   <span>Edit Profile</span>
                 </button>
                 <button
-                  onClick={() => alert('Customer History / Visit feature is coming soon!')}
-                  className="flex items-center justify-center space-x-2 p-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 font-semibold text-xs rounded-lg border border-gray-200 transition-colors"
+                  onClick={() => handleDelete(viewingCustomer._id)}
+                  className="flex items-center justify-center space-x-2 p-2.5 bg-red-50 hover:bg-red-100 text-red-600 font-semibold text-xs rounded-lg border border-red-200 transition-colors"
                 >
-                  <History className="w-4 h-4 text-gray-450" />
-                  <span>History / Visit</span>
+                  <Trash2 className="w-4 h-4 text-red-600" />
+                  <span>Delete</span>
                 </button>
-                <button
-                  onClick={() => alert('Ledger report will be generated shortly!')}
-                  className="flex items-center justify-center space-x-2 p-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 font-semibold text-xs rounded-lg border border-gray-200 transition-colors"
-                >
-                  <BookOpen className="w-4 h-4 text-gray-450" />
-                  <span>Ledger</span>
-                </button>
-                <button
-                  onClick={() => alert('Record Payment feature is coming soon!')}
-                  className="flex items-center justify-center space-x-2 p-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 font-semibold text-xs rounded-lg border border-gray-200 transition-colors"
-                >
-                  <CreditCard className="w-4 h-4 text-gray-450" />
-                  <span>Payment</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setViewingCustomer(null);
-                    navigate(`/sales/quotes?customerId=${viewingCustomer._id}`);
-                  }}
-                  className="flex items-center justify-center space-x-2 p-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 font-semibold text-xs rounded-lg border border-gray-200 transition-colors"
-                >
-                  <FileText className="w-4 h-4 text-gray-450" />
-                  <span>Quotation</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setViewingCustomer(null);
-                    navigate(`/sales/orders?customerId=${viewingCustomer._id}`);
-                  }}
-                  className="flex items-center justify-center space-x-2 p-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 font-semibold text-xs rounded-lg border border-gray-200 transition-colors"
-                >
-                  <ShoppingCart className="w-4 h-4 text-gray-450" />
-                  <span>Sale Order</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Basic Info Section */}
-            <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
-              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
-                <User className="w-4 h-4 text-gray-500" /> Basic Information
-              </h3>
-              <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm">
-                <div>
-                  <span className="block text-xs text-gray-400 font-medium">Contact Person</span>
-                  <span className="font-semibold text-gray-900">{viewingCustomer.contactName || viewingCustomer.ownerName || '-'}</span>
-                </div>
-                <div>
-                  <span className="block text-xs text-gray-400 font-medium">Mobile Number</span>
-                  <div className="flex items-center">
-                    {viewingCustomer.phone ? (
-                      <a
-                        href={`tel:${viewingCustomer.phone.replace(/\D/g, '')}`}
-                        className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
-                        title={`Call ${viewingCustomer.phone}`}
-                      >
-                        {viewingCustomer.phone}
-                      </a>
-                    ) : (
-                      <span className="font-semibold text-gray-900">-</span>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <span className="block text-xs text-gray-400 font-medium">Alternate Mobile</span>
-                  <span className="font-semibold text-gray-900">{viewingCustomer.altPhone || '-'}</span>
-                </div>
-                <div>
-                  <span className="block text-xs text-gray-400 font-medium">Email Address</span>
-                  <span className="font-semibold text-gray-900 truncate block" title={viewingCustomer.email}>{viewingCustomer.email || '-'}</span>
-                </div>
-                <div className="col-span-2 pt-2 border-t border-gray-200/60">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-gray-400 font-medium">Tax Details</span>
-                    <div className="flex items-center space-x-3 text-xs">
-                      <label className="flex items-center space-x-1 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="docViewRadio"
-                          checked={docView === 'gst'}
-                          onChange={() => setDocView('gst')}
-                          className="text-blue-600 focus:ring-blue-500 w-3 h-3"
-                        />
-                        <span>GSTIN</span>
-                      </label>
-                      <label className="flex items-center space-x-1 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="docViewRadio"
-                          checked={docView === 'aadhar'}
-                          onChange={() => setDocView('aadhar')}
-                          className="text-blue-600 focus:ring-blue-500 w-3 h-3"
-                        />
-                        <span>Aadhar</span>
-                      </label>
-                    </div>
-                  </div>
-                  {docView === 'gst' ? (
-                    <div className="bg-white px-3 py-2 border rounded-lg flex items-center justify-between">
-                      <span className="text-xs font-mono text-gray-500">GSTIN</span>
-                      <span className="font-mono font-bold text-gray-950 uppercase">{viewingCustomer.gstNumber || 'Not Provided'}</span>
-                    </div>
-                  ) : (
-                    <div className="bg-white px-3 py-2 border rounded-lg flex items-center justify-between">
-                      <span className="text-xs font-mono text-gray-500">Aadhar No</span>
-                      <span className="font-mono font-bold text-gray-950">{viewingCustomer.aadharNumber || 'Not Provided'}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Address Info Section */}
-            <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
-              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
-                <MapPin className="w-4 h-4 text-gray-500" /> Address Information
-              </h3>
-              <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm">
-                <div>
-                  <span className="block text-xs text-gray-400 font-medium">Door / Shop No</span>
-                  <span className="font-semibold text-gray-900">{viewingCustomer.doorNo || '-'}</span>
-                </div>
-                <div>
-                  <span className="block text-xs text-gray-400 font-medium">Street Name</span>
-                  <span className="font-semibold text-gray-900">{viewingCustomer.streetName || '-'}</span>
-                </div>
-                <div className="col-span-2">
-                  <span className="block text-xs text-gray-400 font-medium">Address Line</span>
-                  <span className="font-semibold text-gray-900">{viewingCustomer.address1 || '-'}</span>
-                </div>
-                <div>
-                  <span className="block text-xs text-gray-400 font-medium">Area / Locality</span>
-                  <span className="font-semibold text-gray-900">{viewingCustomer.area || '-'}</span>
-                </div>
-                <div>
-                  <span className="block text-xs text-gray-400 font-medium">Landmark</span>
-                  <span className="font-semibold text-gray-900">{viewingCustomer.landmark || '-'}</span>
-                </div>
-                <div>
-                  <span className="block text-xs text-gray-400 font-medium">City / Town</span>
-                  <span className="font-semibold text-gray-900">{viewingCustomer.city || '-'}</span>
-                </div>
-                <div>
-                  <span className="block text-xs text-gray-400 font-medium">District</span>
-                  <span className="font-semibold text-gray-900">{viewingCustomer.district || '-'}</span>
-                </div>
-                <div>
-                  <span className="block text-xs text-gray-400 font-medium">State</span>
-                  <span className="font-semibold text-gray-900">{viewingCustomer.state || '-'}</span>
-                </div>
-                <div>
-                  <span className="block text-xs text-gray-400 font-medium">Pincode</span>
-                  <span className="font-semibold text-gray-900">{viewingCustomer.pincode || '-'}</span>
-                </div>
                 
-                {/* GPS Location Button */}
-                <div className="col-span-2 pt-2 border-t border-gray-200/60">
-                  {viewingCustomer.gpsLocation ? (
-                    <a
-                      href={viewingCustomer.gpsLocation}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center justify-center space-x-2 w-full p-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg border border-blue-200 text-xs font-semibold transition-colors"
+                {currentType === 'customer' && (
+                  <>
+                    <button
+                      onClick={() => alert('Customer History / Visit feature is coming soon!')}
+                      className="flex items-center justify-center space-x-2 p-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 font-semibold text-xs rounded-lg border border-gray-200 transition-colors"
                     >
-                      <MapPin className="w-4 h-4 text-blue-600" />
-                      <span>Open Location on Google Maps</span>
-                    </a>
-                  ) : (
-                    <a
-                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                        `${viewingCustomer.firmName || ''} ${viewingCustomer.streetName || ''} ${viewingCustomer.city || ''} ${viewingCustomer.pincode || ''}`.trim()
-                      )}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center justify-center space-x-2 w-full p-2 bg-gray-50 hover:bg-gray-100 text-gray-600 rounded-lg border border-gray-200 text-xs font-semibold transition-colors"
+                      <History className="w-4 h-4 text-gray-450" />
+                      <span>History / Visit</span>
+                    </button>
+                    <button
+                      onClick={() => alert('Ledger report will be generated shortly!')}
+                      className="flex items-center justify-center space-x-2 p-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 font-semibold text-xs rounded-lg border border-gray-200 transition-colors"
                     >
-                      <MapPin className="w-4 h-4 text-gray-500" />
-                      <span>Search Address on Google Maps</span>
-                    </a>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Business Info Section */}
-            <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
-              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
-                <Building className="w-4 h-4 text-gray-500" /> Business Details
-              </h3>
-              <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm">
-                <div>
-                  <span className="block text-xs text-gray-400 font-medium">Assigned Route</span>
-                  <span className="inline-flex px-2 py-0.5 mt-0.5 text-xs font-semibold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-150">
-                    {viewingCustomer.route || 'No Route'}
-                  </span>
-                </div>
-                <div>
-                  <span className="block text-xs text-gray-400 font-medium">Assigned Agent</span>
-                  <span className="font-semibold text-gray-900">{viewingCustomer.agentAssigned || 'No Agent'}</span>
-                </div>
-                <div>
-                  <span className="block text-xs text-gray-400 font-medium">Credit Days Limit</span>
-                  <span className="font-semibold text-gray-900">{viewingCustomer.creditDays || 0} Days</span>
-                </div>
-                <div>
-                  <span className="block text-xs text-gray-400 font-medium">Credit Limit</span>
-                  <span className="font-semibold text-gray-900">₹{(viewingCustomer.creditLimit || 0).toLocaleString('en-IN')}</span>
-                </div>
-                <div className="col-span-2">
-                  <span className="block text-xs text-gray-400 font-medium">Preferred Transport</span>
-                  <span className="font-semibold text-gray-900">{viewingCustomer.preferredTransport || 'Direct Delivery'}</span>
-                </div>
-                <div className="col-span-2">
-                  <span className="block text-xs text-gray-400 font-medium">Customer Grade</span>
-                  {viewingCustomer.customerGrade ? (
-                    <span className={`inline-flex px-2.5 py-0.5 text-xs font-bold rounded uppercase mt-0.5 ${
-                      viewingCustomer.customerGrade.includes('Grade A') ? 'bg-purple-100 text-purple-755' :
-                      viewingCustomer.customerGrade.includes('Grade B') ? 'bg-indigo-100 text-indigo-755' :
-                      'bg-amber-100 text-amber-755'
-                    }`}>
-                      {viewingCustomer.customerGrade}
-                    </span>
-                  ) : (
-                    <span className="text-gray-400">-</span>
-                  )}
-                </div>
-                {viewingCustomer.remarks && (
-                  <div className="col-span-2">
-                    <span className="block text-xs text-gray-400 font-medium">Remarks / Special Instructions</span>
-                    <p className="text-xs text-gray-600 bg-white border border-gray-150 rounded-lg p-2 mt-1 leading-relaxed whitespace-pre-line font-medium">
-                      {viewingCustomer.remarks}
-                    </p>
-                  </div>
+                      <BookOpen className="w-4 h-4 text-gray-450" />
+                      <span>Ledger</span>
+                    </button>
+                    <button
+                      onClick={() => alert('Record Payment feature is coming soon!')}
+                      className="flex items-center justify-center space-x-2 p-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 font-semibold text-xs rounded-lg border border-gray-200 transition-colors"
+                    >
+                      <CreditCard className="w-4 h-4 text-gray-450" />
+                      <span>Payment</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigate(`/sales/quotes?customerId=${viewingCustomer._id}`);
+                      }}
+                      className="flex items-center justify-center space-x-2 p-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 font-semibold text-xs rounded-lg border border-gray-200 transition-colors"
+                    >
+                      <FileText className="w-4 h-4 text-gray-450" />
+                      <span>Quotation</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigate(`/sales/orders?customerId=${viewingCustomer._id}`);
+                      }}
+                      className="flex items-center justify-center space-x-2 p-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 font-semibold text-xs rounded-lg border border-gray-200 transition-colors"
+                    >
+                      <ShoppingCart className="w-4 h-4 text-gray-450" />
+                      <span>Sale Order</span>
+                    </button>
+                  </>
                 )}
               </div>
             </div>
 
+            {/* 1. CUSTOMER CARD VIEW */}
+            {currentType === 'customer' && (
+              <>
+                {/* Basic Info Section */}
+                <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
+                    <User className="w-4 h-4 text-gray-500" /> Basic Information
+                  </h3>
+                  <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm">
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Contact Person</span>
+                      <span className="font-semibold text-gray-900">{viewingCustomer.contactName || viewingCustomer.ownerName || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Mobile Number</span>
+                      <div className="flex items-center">
+                        {viewingCustomer.phone ? (
+                          <a
+                            href={`tel:${viewingCustomer.phone.replace(/\D/g, '')}`}
+                            className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                            title={`Call ${viewingCustomer.phone}`}
+                          >
+                            {viewingCustomer.phone}
+                          </a>
+                        ) : (
+                          <span className="font-semibold text-gray-900">-</span>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Alternate Mobile</span>
+                      <span className="font-semibold text-gray-900">{viewingCustomer.altPhone || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Email ID</span>
+                      <span className="font-semibold text-gray-900 truncate block" title={viewingCustomer.email}>{viewingCustomer.email || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">GST Number</span>
+                      <span className="font-semibold text-gray-900">{viewingCustomer.gstNumber || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Aadhar Number</span>
+                      <span className="font-semibold text-gray-900">{viewingCustomer.aadharNumber || '-'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Address Section */}
+                <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4 text-gray-500" /> Address Information
+                  </h3>
+                  <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm">
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Door / Flat No.</span>
+                      <span className="font-semibold text-gray-900">{viewingCustomer.doorNo || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Street Name</span>
+                      <span className="font-semibold text-gray-900">{viewingCustomer.streetName || '-'}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="block text-xs text-gray-400 font-medium">Address Line 1</span>
+                      <span className="font-semibold text-gray-900">{viewingCustomer.address1 || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Area / Locality</span>
+                      <span className="font-semibold text-gray-900">{viewingCustomer.area || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Landmark</span>
+                      <span className="font-semibold text-gray-900">{viewingCustomer.landmark || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">City / Town</span>
+                      <span className="font-semibold text-gray-900">{viewingCustomer.city || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">District</span>
+                      <span className="font-semibold text-gray-900">{viewingCustomer.district || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">State</span>
+                      <span className="font-semibold text-gray-900">{viewingCustomer.state || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Pincode</span>
+                      <span className="font-semibold text-gray-900">{viewingCustomer.pincode || '-'}</span>
+                    </div>
+                    <div className="col-span-2 pt-2 border-t border-gray-200/60">
+                      {viewingCustomer.gpsLocation ? (
+                        <a
+                          href={viewingCustomer.gpsLocation}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center justify-center space-x-2 w-full p-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg border border-blue-200 text-xs font-semibold transition-colors"
+                        >
+                          <MapPin className="w-4 h-4 text-blue-600" />
+                          <span>Open Location on Google Maps</span>
+                        </a>
+                      ) : (
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                            `${viewingCustomer.firmName || ''} ${viewingCustomer.streetName || ''} ${viewingCustomer.city || ''} ${viewingCustomer.pincode || ''}`.trim()
+                          )}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center justify-center space-x-2 w-full p-2 bg-gray-50 hover:bg-gray-100 text-gray-600 rounded-lg border border-gray-200 text-xs font-semibold transition-colors"
+                        >
+                          <MapPin className="w-4 h-4 text-gray-500" />
+                          <span>Search Address on Google Maps</span>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Business Details Section */}
+                <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
+                    <Building className="w-4 h-4 text-gray-500" /> Business Details
+                  </h3>
+                  <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm">
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Assigned Route</span>
+                      <span className="inline-flex px-2 py-0.5 mt-0.5 text-xs font-semibold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-150">
+                        {viewingCustomer.route || 'No Route'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Assigned Agent</span>
+                      <span className="font-semibold text-gray-905">{viewingCustomer.agentAssigned || 'No Agent'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Credit Days Limit</span>
+                      <span className="font-semibold text-gray-905">{viewingCustomer.creditDays || 0} Days</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Credit Limit</span>
+                      <span className="font-semibold text-gray-905">₹{(viewingCustomer.creditLimit || 0).toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="block text-xs text-gray-400 font-medium">Preferred Transport</span>
+                      <span className="font-semibold text-gray-905">{viewingCustomer.preferredTransport || 'Direct Delivery'}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="block text-xs text-gray-400 font-medium">Customer Grade</span>
+                      {viewingCustomer.customerGrade ? (
+                        <span className={`inline-flex px-2.5 py-0.5 text-xs font-bold rounded uppercase mt-0.5 ${
+                          viewingCustomer.customerGrade.includes('Grade A') ? 'bg-purple-100 text-purple-755' :
+                          viewingCustomer.customerGrade.includes('Grade B') ? 'bg-indigo-100 text-indigo-755' :
+                          'bg-amber-100 text-amber-755'
+                        }`}>
+                          {viewingCustomer.customerGrade}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </div>
+                    {viewingCustomer.remarks && (
+                      <div className="col-span-2">
+                        <span className="block text-xs text-gray-400 font-medium">Remarks / Special Instructions</span>
+                        <p className="text-xs text-gray-605 bg-white border border-gray-150 rounded-lg p-2 mt-1 leading-relaxed whitespace-pre-line font-medium">
+                          {viewingCustomer.remarks}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Attached Photos */}
+                {(viewingCustomer.customerPhoto || viewingCustomer.shopPhoto) && (
+                  <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
+                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
+                      <Camera className="w-4 h-4 text-gray-500" /> Attached Photos
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      {viewingCustomer.customerPhoto && (
+                        <div className="space-y-1">
+                          <span className="block text-xs text-gray-400 font-medium">Customer Photo</span>
+                          <div className="border border-gray-200 rounded-lg p-1.5 bg-white">
+                            <img src={viewingCustomer.customerPhoto} alt="Customer" className="max-h-32 mx-auto rounded object-cover" />
+                          </div>
+                        </div>
+                      )}
+                      {viewingCustomer.shopPhoto && (
+                        <div className="space-y-1">
+                          <span className="block text-xs text-gray-400 font-medium">Shop Photo</span>
+                          <div className="border border-gray-200 rounded-lg p-1.5 bg-white">
+                            <img src={viewingCustomer.shopPhoto} alt="Shop" className="max-h-32 mx-auto rounded object-cover" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* 2. VENDOR CARD VIEW */}
+            {currentType === 'vendor' && (
+              <>
+                {/* Basic Info Section */}
+                <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
+                    <User className="w-4 h-4 text-gray-500" /> Basic Information
+                  </h3>
+                  <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm">
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Contact Person</span>
+                      <span className="font-semibold text-gray-900">{viewingCustomer.contactName || viewingCustomer.ownerName || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Mobile Number</span>
+                      <div className="flex items-center">
+                        {viewingCustomer.phone ? (
+                          <a
+                            href={`tel:${viewingCustomer.phone.replace(/\D/g, '')}`}
+                            className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                            title={`Call ${viewingCustomer.phone}`}
+                          >
+                            {viewingCustomer.phone}
+                          </a>
+                        ) : (
+                          <span className="font-semibold text-gray-900">-</span>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Alternate Mobile</span>
+                      <span className="font-semibold text-gray-900">{viewingCustomer.altPhone || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Email ID</span>
+                      <span className="font-semibold text-gray-900 truncate block" title={viewingCustomer.email}>{viewingCustomer.email || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">GST Number</span>
+                      <span className="font-semibold text-gray-900">{viewingCustomer.gstNumber || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Aadhar Number</span>
+                      <span className="font-semibold text-gray-900">{viewingCustomer.aadharNumber || '-'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Address Section */}
+                <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4 text-gray-500" /> Address Information
+                  </h3>
+                  <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm">
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Door / Flat No.</span>
+                      <span className="font-semibold text-gray-900">{viewingCustomer.doorNo || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Street Name</span>
+                      <span className="font-semibold text-gray-900">{viewingCustomer.streetName || '-'}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="block text-xs text-gray-400 font-medium">Address Line 1</span>
+                      <span className="font-semibold text-gray-900">{viewingCustomer.address1 || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Area / Locality</span>
+                      <span className="font-semibold text-gray-900">{viewingCustomer.area || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Landmark</span>
+                      <span className="font-semibold text-gray-900">{viewingCustomer.landmark || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">City / Town</span>
+                      <span className="font-semibold text-gray-900">{viewingCustomer.city || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">District</span>
+                      <span className="font-semibold text-gray-900">{viewingCustomer.district || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">State</span>
+                      <span className="font-semibold text-gray-900">{viewingCustomer.state || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Pincode</span>
+                      <span className="font-semibold text-gray-900">{viewingCustomer.pincode || '-'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Business Details Section */}
+                <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
+                    <Building className="w-4 h-4 text-gray-500" /> Business Details
+                  </h3>
+                  <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm">
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Opening Balance</span>
+                      <span className="font-semibold text-gray-905">₹{(viewingCustomer.openingBalance || 0).toLocaleString('en-IN')}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Outstanding Balance</span>
+                      <span className={`font-semibold ${(viewingCustomer.outstanding || 0) > 0 ? 'text-red-650' : 'text-green-655'}`}>
+                        ₹{(viewingCustomer.outstanding || 0).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                    {viewingCustomer.remarks && (
+                      <div className="col-span-2">
+                        <span className="block text-xs text-gray-400 font-medium">Remarks / Instructions</span>
+                        <p className="text-xs text-gray-605 bg-white border border-gray-150 rounded-lg p-2 mt-1 leading-relaxed whitespace-pre-line font-medium">
+                          {viewingCustomer.remarks}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* 3. AGENT CARD VIEW */}
+            {currentType === 'agent' && (
+              <>
+                {/* Basic Info Section */}
+                <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
+                    <User className="w-4 h-4 text-gray-500" /> Basic Information
+                  </h3>
+                  <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm">
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Agent Name</span>
+                      <span className="font-semibold text-gray-905">{viewingCustomer.firmName || viewingCustomer.contactName || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Mobile Number</span>
+                      <div className="flex items-center">
+                        {viewingCustomer.phone ? (
+                          <a
+                            href={`tel:${viewingCustomer.phone.replace(/\D/g, '')}`}
+                            className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                            title={`Call ${viewingCustomer.phone}`}
+                          >
+                            {viewingCustomer.phone}
+                          </a>
+                        ) : (
+                          <span className="font-semibold text-gray-905">-</span>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Alternate Mobile</span>
+                      <span className="font-semibold text-gray-905">{viewingCustomer.altPhone || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Email ID</span>
+                      <span className="font-semibold text-gray-905 truncate block" title={viewingCustomer.email}>{viewingCustomer.email || '-'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Assigned Routes Section */}
+                <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4 text-gray-500" /> Assigned Regions / Routes
+                  </h3>
+                  <div className="pt-1">
+                    {getAgentRoutesBadges(viewingCustomer.firmName || viewingCustomer.contactName)}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* 4. ROUTE (Region) CARD VIEW */}
+            {currentType === 'route' && (
+              <>
+                {/* Basic Info Section */}
+                <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4 text-gray-500" /> Region Details
+                  </h3>
+                  <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm">
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Region Name</span>
+                      <span className="font-semibold text-gray-905">{viewingCustomer.name || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Region Code</span>
+                      <span className="font-semibold text-gray-905">{viewingCustomer.code || '-'}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="block text-xs text-gray-400 font-medium">Assigned Agent</span>
+                      {viewingCustomer.assignedAgent ? (
+                        <span className="inline-flex px-2.5 py-1 text-xs font-medium rounded-md bg-purple-50 text-purple-755 border border-purple-100 mt-1">
+                          {viewingCustomer.assignedAgent}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 font-semibold block mt-1">Not Assigned</span>
+                      )}
+                    </div>
+                    {viewingCustomer.description && (
+                      <div className="col-span-2">
+                        <span className="block text-xs text-gray-400 font-medium">Description</span>
+                        <p className="text-xs text-gray-605 bg-white border border-gray-150 rounded-lg p-2 mt-1 leading-relaxed">
+                          {viewingCustomer.description}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Cities in Region Section */}
+                <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
+                    <Building className="w-4 h-4 text-gray-500" /> Cities in Region ({allMarkets.filter(m => m.route === viewingCustomer.name).length})
+                  </h3>
+                  <div className="space-y-2 max-h-60 overflow-y-auto pt-1">
+                    {(() => {
+                      const citiesUnderRoute = allMarkets.filter(m => m.route === viewingCustomer.name);
+                      if (citiesUnderRoute.length === 0) {
+                        return <p className="text-xs text-gray-400 italic">No cities mapped to this region yet.</p>;
+                      }
+                      return citiesUnderRoute.map((city) => (
+                        <div
+                          key={city._id}
+                          onClick={() => openCityCustomersPopup(city.firmName)}
+                          className="p-2.5 border border-gray-250 hover:border-blue-450 rounded-lg bg-white flex items-center justify-between transition-colors cursor-pointer group"
+                          title={`Click to view customers in ${city.firmName}`}
+                        >
+                          <div>
+                            <span className="font-semibold text-gray-909 text-sm group-hover:text-blue-600 transition-colors">{city.firmName}</span>
+                            <span className="text-xs text-gray-450 block">{city.district || '-'}, {city.state || '-'}</span>
+                          </div>
+                          <span className="inline-flex px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-50 text-blue-700 border border-blue-100 group-hover:bg-blue-100 transition-colors">
+                            {city.customerCount || 0} Custs
+                          </span>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* 5. CITY (Market) CARD VIEW */}
+            {currentType === 'market' && (
+              <>
+                {/* Basic Info Section */}
+                <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
+                    <Building className="w-4 h-4 text-gray-500" /> City Details
+                  </h3>
+                  <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm">
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">City Name</span>
+                      <span className="font-semibold text-gray-905">{viewingCustomer.firmName || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">District</span>
+                      <span className="font-semibold text-gray-905">{viewingCustomer.district || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">State</span>
+                      <span className="font-semibold text-gray-905">{viewingCustomer.state || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Assigned Route</span>
+                      <span className="inline-flex px-2 py-0.5 mt-0.5 text-xs font-semibold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-150">
+                        {viewingCustomer.route || 'No Region'}
+                      </span>
+                    </div>
+                    {viewingCustomer.agentAssigned && (
+                      <div className="col-span-2">
+                        <span className="block text-xs text-gray-400 font-medium">Assigned Agent</span>
+                        <span className="inline-flex px-2.5 py-1 text-xs font-medium rounded-md bg-purple-50 text-purple-755 border border-purple-100 mt-1">
+                          {viewingCustomer.agentAssigned}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Customer Information Section */}
+                <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
+                    <Users className="w-4 h-4 text-gray-500" /> Mapped Customers
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-650 font-medium">Total Customers in City:</span>
+                      <span className="font-bold text-gray-909 text-lg">{viewingCustomer.customerCount || 0}</span>
+                    </div>
+                    <button
+                      onClick={() => openCityCustomersPopup(viewingCustomer.firmName)}
+                      className="flex items-center justify-center space-x-2 w-full p-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg border border-blue-200 text-xs font-semibold transition-colors"
+                    >
+                      <Users className="w-4 h-4 text-blue-600" />
+                      <span>View Customers in {viewingCustomer.firmName}</span>
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* 6. TRANSPORTER CARD VIEW */}
+            {currentType === 'transporter' && (
+              <>
+                {/* Basic Info Section */}
+                <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
+                    <User className="w-4 h-4 text-gray-500" /> Transporter Details
+                  </h3>
+                  <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm">
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Transporter Name</span>
+                      <span className="font-semibold text-gray-905">{viewingCustomer.firmName || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Contact Person</span>
+                      <span className="font-semibold text-gray-905">{viewingCustomer.contactName || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Mobile Number</span>
+                      <div className="flex items-center">
+                        {viewingCustomer.phone ? (
+                          <a
+                            href={`tel:${viewingCustomer.phone.replace(/\D/g, '')}`}
+                            className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                            title={`Call ${viewingCustomer.phone}`}
+                          >
+                            {viewingCustomer.phone}
+                          </a>
+                        ) : (
+                          <span className="font-semibold text-gray-905">-</span>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Email Address</span>
+                      <span className="font-semibold text-gray-905 truncate block" title={viewingCustomer.email}>{viewingCustomer.email || '-'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Location Information Section */}
+                <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4 text-gray-500" /> Location Information
+                  </h3>
+                  <div className="text-sm">
+                    <span className="block text-xs text-gray-400 font-medium">City / Town</span>
+                    <span className="font-semibold text-gray-905">{viewingCustomer.city || '-'}</span>
+                  </div>
+                </div>
+              </>
+            )}
+
             {/* Timestamps */}
-            <div className="text-[10px] text-gray-400 text-center space-x-4">
-              <span>Created: {new Date(viewingCustomer.createdAt).toLocaleString()}</span>
-              <span>•</span>
-              <span>Updated: {new Date(viewingCustomer.updatedAt).toLocaleString()}</span>
+            <div className="text-[10px] text-gray-400 text-center space-x-4 pt-4 border-t">
+              {viewingCustomer.createdAt && <span>Created: {new Date(viewingCustomer.createdAt).toLocaleString()}</span>}
+              {viewingCustomer.createdAt && viewingCustomer.updatedAt && <span>•</span>}
+              {viewingCustomer.updatedAt && <span>Updated: {new Date(viewingCustomer.updatedAt).toLocaleString()}</span>}
             </div>
           </div>
         </div>
