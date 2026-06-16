@@ -74,6 +74,143 @@ interface ActivityLog {
   createdAt: string;
 }
 
+interface SearchableDropdownProps {
+  value: string;
+  onChange: (val: string) => void;
+  options: { label: string; value: string }[];
+  placeholder: string;
+  addNewOption?: {
+    label: string;
+    onClick: () => void;
+  };
+  required?: boolean;
+  className?: string;
+}
+
+const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
+  value,
+  onChange,
+  options,
+  placeholder,
+  addNewOption,
+  required = false,
+  className = ""
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredOptions = options.filter(opt =>
+    (opt.label || "").toLowerCase().includes(search.toLowerCase())
+  );
+
+  const selectedOption = options.find(opt => opt.value === value);
+
+  return (
+    <div className={`relative ${className}`} ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => {
+          setIsOpen(!isOpen);
+          setSearch("");
+        }}
+        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-left flex items-center justify-between cursor-pointer"
+      >
+        <span className={selectedOption ? "text-gray-900 font-semibold" : "text-gray-400"}>
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <span className="text-gray-400 ml-2">
+          {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </span>
+      </button>
+
+      {/* Hidden inputs to trigger required validity */}
+      <input
+        type="text"
+        value={value}
+        onChange={() => {}}
+        required={required}
+        className="absolute inset-0 opacity-0 pointer-events-none w-full h-full"
+        tabIndex={-1}
+      />
+
+      {isOpen && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-250 rounded-lg shadow-xl flex flex-col max-h-60 overflow-hidden animate-in fade-in duration-100">
+          <div className="p-2 border-b border-gray-150 bg-gray-50 flex items-center gap-1.5">
+            <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+            <input
+              type="text"
+              placeholder="Search..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-transparent border-0 p-0 text-xs focus:ring-0 focus:outline-none text-gray-900"
+              autoFocus
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="text-gray-400 hover:text-gray-650"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
+          <div className="overflow-y-auto flex-1 divide-y divide-gray-50">
+            {addNewOption && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsOpen(false);
+                  addNewOption.onClick();
+                }}
+                className="w-full text-left px-3 py-2.5 text-xs font-bold text-blue-600 hover:bg-blue-50 transition-colors border-b border-gray-100 flex items-center gap-1"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>{addNewOption.label}</span>
+              </button>
+            )}
+
+            {filteredOptions.length === 0 ? (
+              <div className="px-3 py-3 text-xs text-gray-450 text-center italic">
+                No matches found
+              </div>
+            ) : (
+              filteredOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt.value);
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left px-3 py-2.5 text-xs hover:bg-gray-100 transition-colors flex items-center justify-between ${
+                    value === opt.value ? "bg-blue-50 text-blue-700 font-semibold" : "text-gray-700 font-medium"
+                  }`}
+                >
+                  <span>{opt.label}</span>
+                  {value === opt.value && <CheckCircle className="w-3.5 h-3.5 text-blue-600" />}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const PartyManagement: React.FC = () => {
   const { selectedCompany } = useAuth();
   const location = useLocation();
@@ -176,6 +313,13 @@ const PartyManagement: React.FC = () => {
 
   // Cities search under regions
   const [citySearchText, setCitySearchText] = useState('');
+  const [regionCitySearchText, setRegionCitySearchText] = useState('');
+
+  // Clear region city search when selected region/customer changes
+  useEffect(() => {
+    setRegionCitySearchText('');
+  }, [viewingCustomer]);
+
 
   // City customers popup modal state
   const [selectedCityName, setSelectedCityName] = useState<string | null>(null);
@@ -352,6 +496,7 @@ const PartyManagement: React.FC = () => {
     setViewingCustomer(null);
     setExpandedRouteId(null);
     setCitySearchText('');
+    setRegionCitySearchText('');
     setSelectedCityName(null);
     setShowForm(false);
     setEditingItem(null);
@@ -2165,31 +2310,25 @@ const PartyManagement: React.FC = () => {
 
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">City <span className="text-red-500">*</span></label>
-                      <select
+                      <SearchableDropdown
                         value={formData.city || ''}
-                        onChange={e => {
-                          if (e.target.value === 'ADD_NEW_CITY') {
-                            openInlineModal('market');
-                          } else {
-                            // Find the selected market and automatically copy district & state
-                            const selectedMarket = allMarkets.find(m => m.firmName === e.target.value);
-                            setFormData({ 
-                              ...formData, 
-                              city: e.target.value,
-                              district: selectedMarket?.district || formData.district || '',
-                              state: selectedMarket?.state || formData.state || 'Andhra Pradesh'
-                            });
-                          }
+                        onChange={val => {
+                          const selectedMarket = allMarkets.find(m => m.firmName === val);
+                          setFormData({ 
+                            ...formData, 
+                            city: val,
+                            district: selectedMarket?.district || formData.district || '',
+                            state: selectedMarket?.state || formData.state || 'Andhra Pradesh'
+                          });
                         }}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                        options={allMarkets.map(m => ({ label: m.firmName, value: m.firmName }))}
+                        placeholder="Select City"
+                        addNewOption={{
+                          label: "+ Add New City",
+                          onClick: () => openInlineModal('market')
+                        }}
                         required
-                      >
-                        <option value="">Select City</option>
-                        <option value="ADD_NEW_CITY" className="text-blue-600 font-semibold text-left" style={{ color: '#2563eb' }}>+ Add New City</option>
-                        {allMarkets.map(m => (
-                          <option key={m._id} value={m.firmName}>{m.firmName}</option>
-                        ))}
-                      </select>
+                      />
                     </div>
 
                     <div>
@@ -2210,66 +2349,45 @@ const PartyManagement: React.FC = () => {
                     
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Region / Line <span className="text-red-500">*</span></label>
-                      <select
+                      <SearchableDropdown
                         value={formData.route || ''}
-                        onChange={e => {
-                          if (e.target.value === 'ADD_NEW_ROUTE') {
-                            openInlineModal('route');
-                          } else {
-                            setFormData({ ...formData, route: e.target.value });
-                          }
+                        onChange={val => setFormData({ ...formData, route: val })}
+                        options={allRoutes.map(r => ({ label: r.name, value: r.name }))}
+                        placeholder="Select Region"
+                        addNewOption={{
+                          label: "+ Add New Region",
+                          onClick: () => openInlineModal('route')
                         }}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
                         required
-                      >
-                        <option value="">Select Region</option>
-                        <option value="ADD_NEW_ROUTE" className="text-blue-600 font-semibold" style={{ color: '#2563eb' }}>+ Add New Region</option>
-                        {allRoutes.map(r => (
-                          <option key={r._id} value={r.name}>{r.name}</option>
-                        ))}
-                      </select>
+                      />
                     </div>
 
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Assigned Agent</label>
-                      <select
+                      <SearchableDropdown
                         value={formData.agentAssigned || ''}
-                        onChange={e => {
-                          if (e.target.value === 'ADD_NEW_AGENT') {
-                            openInlineModal('agent');
-                          } else {
-                            setFormData({ ...formData, agentAssigned: e.target.value });
-                          }
+                        onChange={val => setFormData({ ...formData, agentAssigned: val })}
+                        options={allAgents.map(a => ({ label: a.firmName, value: a.firmName }))}
+                        placeholder="Select Agent"
+                        addNewOption={{
+                          label: "+ Add New Agent",
+                          onClick: () => openInlineModal('agent')
                         }}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                      >
-                        <option value="">Select Agent</option>
-                        <option value="ADD_NEW_AGENT" className="text-blue-600 font-semibold" style={{ color: '#2563eb' }}>+ Add New Agent</option>
-                        {allAgents.map(a => (
-                          <option key={a._id} value={a.firmName}>{a.firmName}</option>
-                        ))}
-                      </select>
+                      />
                     </div>
 
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Preferred Transport</label>
-                      <select
+                      <SearchableDropdown
                         value={formData.preferredTransport || ''}
-                        onChange={e => {
-                          if (e.target.value === 'ADD_NEW_TRANSPORTER') {
-                            openInlineModal('transporter');
-                          } else {
-                            setFormData({ ...formData, preferredTransport: e.target.value });
-                          }
+                        onChange={val => setFormData({ ...formData, preferredTransport: val })}
+                        options={allTransporters.map(t => ({ label: t.firmName, value: t.firmName }))}
+                        placeholder="Select Transporter"
+                        addNewOption={{
+                          label: "+ Add New Transporter",
+                          onClick: () => openInlineModal('transporter')
                         }}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                      >
-                        <option value="">Select Transporter</option>
-                        <option value="ADD_NEW_TRANSPORTER" className="text-blue-600 font-semibold" style={{ color: '#2563eb' }}>+ Add New Transporter</option>
-                        {allTransporters.map(t => (
-                          <option key={t._id} value={t.firmName}>{t.firmName}</option>
-                        ))}
-                      </select>
+                      />
                     </div>
                   </div>
 
@@ -2458,10 +2576,13 @@ const PartyManagement: React.FC = () => {
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1">State*</label>
-                        <select value={formData.state || ''} onChange={e => setFormData({ ...formData, state: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
-                          <option value="">Select State</option>
-                          {statesList.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
+                        <SearchableDropdown
+                          value={formData.state || ''}
+                          onChange={val => setFormData({ ...formData, state: val })}
+                          options={statesList.map(s => ({ label: s, value: s }))}
+                          placeholder="Select State"
+                          required
+                        />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1">Pincode*</label>
@@ -2554,12 +2675,12 @@ const PartyManagement: React.FC = () => {
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1">Assigned Agent</label>
-                        <select value={formData.assignedAgent || ''} onChange={e => setFormData({ ...formData, assignedAgent: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                          <option value="">Select Agent</option>
-                          {allAgents.map(agent => (
-                            <option key={agent._id} value={agent.firmName}>{agent.firmName}</option>
-                          ))}
-                        </select>
+                        <SearchableDropdown
+                          value={formData.assignedAgent || ''}
+                          onChange={val => setFormData({ ...formData, assignedAgent: val })}
+                          options={allAgents.map(agent => ({ label: agent.firmName, value: agent.firmName }))}
+                          placeholder="Select Agent"
+                        />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1">Description</label>
@@ -2590,12 +2711,12 @@ const PartyManagement: React.FC = () => {
                       </div>
                       <div className="col-span-2">
                         <label className="block text-xs font-medium text-gray-500 mb-1">Assigned Route</label>
-                        <select value={formData.route || ''} onChange={e => setFormData({ ...formData, route: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                          <option value="">Select Route</option>
-                          {allRoutes.map(r => (
-                            <option key={r._id} value={r.name}>{r.name}</option>
-                          ))}
-                        </select>
+                        <SearchableDropdown
+                          value={formData.route || ''}
+                          onChange={val => setFormData({ ...formData, route: val })}
+                          options={allRoutes.map(r => ({ label: r.name, value: r.name }))}
+                          placeholder="Select Route"
+                        />
                       </div>
                     </div>
                   </div>
@@ -2910,16 +3031,12 @@ const PartyManagement: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Assigned Agent</label>
-                    <select
+                    <SearchableDropdown
                       value={inlineRouteData.assignedAgent}
-                      onChange={e => setInlineRouteData({ ...inlineRouteData, assignedAgent: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white transition-colors"
-                    >
-                      <option value="">Select Agent</option>
-                      {allAgents.map(agent => (
-                        <option key={agent._id} value={agent.firmName}>{agent.firmName}</option>
-                      ))}
-                    </select>
+                      onChange={val => setInlineRouteData({ ...inlineRouteData, assignedAgent: val })}
+                      options={allAgents.map(agent => ({ label: agent.firmName, value: agent.firmName }))}
+                      placeholder="Select Agent"
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Description</label>
@@ -2970,30 +3087,22 @@ const PartyManagement: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">Region / Line <span className="text-red-500">*</span></label>
-                    <select
+                    <SearchableDropdown
                       value={inlineMarketData.route}
-                      onChange={e => setInlineMarketData({ ...inlineMarketData, route: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white transition-colors"
+                      onChange={val => setInlineMarketData({ ...inlineMarketData, route: val })}
+                      options={allRoutes.map(r => ({ label: r.name, value: r.name }))}
+                      placeholder="Select Region"
                       required
-                    >
-                      <option value="">Select Region</option>
-                      {allRoutes.map(r => (
-                        <option key={r._id} value={r.name}>{r.name}</option>
-                      ))}
-                    </select>
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">Assigned Agent</label>
-                    <select
+                    <SearchableDropdown
                       value={inlineMarketData.agentAssigned}
-                      onChange={e => setInlineMarketData({ ...inlineMarketData, agentAssigned: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white transition-colors"
-                    >
-                      <option value="">Select Agent</option>
-                      {allAgents.map(a => (
-                        <option key={a._id} value={a.firmName}>{a.firmName}</option>
-                      ))}
-                    </select>
+                      onChange={val => setInlineMarketData({ ...inlineMarketData, agentAssigned: val })}
+                      options={allAgents.map(a => ({ label: a.firmName, value: a.firmName }))}
+                      placeholder="Select Agent"
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">Status</label>
@@ -3603,7 +3712,7 @@ const PartyManagement: React.FC = () => {
                       <div className="col-span-2">
                         <span className="block text-xs text-gray-400 font-medium">Description</span>
                         <p className="text-xs text-gray-605 bg-white border border-gray-150 rounded-lg p-2 mt-1 leading-relaxed">
-                          {viewingCustomer.description}
+                      {viewingCustomer.description}
                         </p>
                       </div>
                     )}
@@ -3612,31 +3721,84 @@ const PartyManagement: React.FC = () => {
 
                 {/* Cities in Region Section */}
                 <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
-                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
-                    <Building className="w-4 h-4 text-gray-500" /> Cities in Region ({allMarkets.filter(m => m.route === viewingCustomer.name).length})
-                  </h3>
-                  <div className="space-y-2 max-h-60 overflow-y-auto pt-1">
+                  <div className="flex justify-between items-center border-b pb-1.5">
+                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Building className="w-4 h-4 text-gray-500" /> Cities in Region
+                    </h3>
+                    <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2.5 py-0.5 rounded-full">
+                      {allMarkets.filter(m => m.route === viewingCustomer.name).length} Total
+                    </span>
+                  </div>
+
+                  {/* Search Input for cities in this region */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-3.5 h-3.5" />
+                    <input
+                      type="text"
+                      placeholder="Search cities in this region..."
+                      value={regionCitySearchText}
+                      onChange={(e) => setRegionCitySearchText(e.target.value)}
+                      className="w-full pl-9 pr-8 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white transition-colors"
+                    />
+                    {regionCitySearchText && (
+                      <button
+                        type="button"
+                        onClick={() => setRegionCitySearchText('')}
+                        className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-650"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="max-h-[340px] overflow-y-auto pr-1">
                     {(() => {
                       const citiesUnderRoute = allMarkets.filter(m => m.route === viewingCustomer.name);
+                      const filteredCities = citiesUnderRoute.filter(c =>
+                        (c.firmName || '').toLowerCase().includes(regionCitySearchText.toLowerCase())
+                      );
+
                       if (citiesUnderRoute.length === 0) {
-                        return <p className="text-xs text-gray-400 italic">No cities mapped to this region yet.</p>;
+                        return <p className="text-xs text-gray-400 italic text-center py-4">No cities mapped to this region yet.</p>;
                       }
-                      return citiesUnderRoute.map((city) => (
-                        <div
-                          key={city._id}
-                          onClick={() => openCityCustomersPopup(city.firmName)}
-                          className="p-2.5 border border-gray-250 hover:border-blue-450 rounded-lg bg-white flex items-center justify-between transition-colors cursor-pointer group"
-                          title={`Click to view customers in ${city.firmName}`}
-                        >
-                          <div>
-                            <span className="font-semibold text-gray-909 text-sm group-hover:text-blue-600 transition-colors">{city.firmName}</span>
-                            <span className="text-xs text-gray-450 block">{city.district || '-'}, {city.state || '-'}</span>
-                          </div>
-                          <span className="inline-flex px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-50 text-blue-700 border border-blue-100 group-hover:bg-blue-100 transition-colors">
-                            {city.customerCount || 0} Custs
-                          </span>
+
+                      if (filteredCities.length === 0) {
+                        return <p className="text-xs text-gray-400 italic text-center py-4">No matching cities found.</p>;
+                      }
+
+                      return (
+                        <div className="grid grid-cols-2 gap-2">
+                          {filteredCities.map((city) => (
+                            <div
+                              key={city._id}
+                              onClick={() => openCityCustomersPopup(city.firmName)}
+                              className="p-3 border border-gray-200 hover:border-blue-400 rounded-xl bg-white flex flex-col justify-between hover:shadow-xs hover:bg-blue-50/5 transition-all cursor-pointer group"
+                              title={`Click to view customers in ${city.firmName}`}
+                            >
+                              <div className="mb-2">
+                                <span className="font-bold text-gray-955 text-sm block group-hover:text-blue-600 transition-colors truncate">
+                                  {city.firmName}
+                                </span>
+                                <span className="text-[11px] text-gray-450 font-medium block truncate mt-0.5">
+                                  {city.district || '-'}, {city.state || '-'}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between mt-1 pt-1.5 border-t border-gray-50 shrink-0">
+                                <span className={`inline-flex px-1.5 py-0.5 text-[9px] font-bold uppercase rounded ${
+                                  city.status === 'active'
+                                    ? 'bg-green-50 text-green-755 border border-green-150'
+                                    : 'bg-gray-100 text-gray-500'
+                                }`}>
+                                  {city.status || 'active'}
+                                </span>
+                                <span className="inline-flex px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-50 text-blue-700 border border-blue-100 group-hover:bg-blue-100 transition-colors">
+                                  {city.customerCount || 0} Custs
+                                </span>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      ));
+                      );
                     })()}
                   </div>
                 </div>
