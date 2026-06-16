@@ -1655,20 +1655,18 @@ const PartyManagement: React.FC = () => {
                                     )}
                                   </div>
                                 ) : col === 'phone' ? (
-                                  <div className="flex items-center space-x-1">
-                                    <span className="text-blue-600 font-medium">{item.phone || '-'}</span>
-                                    {currentType === 'customer' && item.phone && (
+                                  <div className="flex items-center">
+                                    {item.phone ? (
                                       <a
-                                        href={`https://wa.me/91${item.phone.replace(/\D/g, '')}`}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="text-green-500 hover:text-green-600 ml-1 flex items-center"
+                                        href={`tel:${item.phone.replace(/\D/g, '')}`}
+                                        className="text-blue-600 hover:text-blue-800 hover:underline font-semibold"
                                         onClick={e => e.stopPropagation()}
-                                        title="Chat on WhatsApp"
+                                        title={`Call ${item.phone}`}
                                       >
-                                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full inline-block animate-ping mr-0.5" />
-                                        <Users className="w-3.5 h-3.5 text-green-500 fill-current" />
+                                        {item.phone}
                                       </a>
+                                    ) : (
+                                      <span className="text-gray-400">-</span>
                                     )}
                                   </div>
                                 ) : col === 'route' ? (
@@ -1718,26 +1716,28 @@ const PartyManagement: React.FC = () => {
                             );
                           })}
                           <td className="px-5 py-3.5 whitespace-nowrap text-right text-sm" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex items-center justify-end space-x-3 text-xs font-semibold">
+                            <div className="flex items-center justify-end space-x-2 text-xs">
                               {currentType === 'customer' && (
                                 <button
                                   onClick={() => setViewingCustomer(item)}
-                                  className="text-gray-500 hover:text-blue-600 transition-colors"
+                                  className="px-2.5 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors font-semibold shadow-xs"
                                 >
                                   Profile
                                 </button>
                               )}
                               <button
                                 onClick={() => handleEdit(item)}
-                                className="text-gray-500 hover:text-blue-600 transition-colors"
+                                className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded bg-gray-50 hover:bg-blue-50 text-gray-700 hover:text-blue-700 border border-gray-200 hover:border-blue-200 transition-colors font-semibold shadow-xs"
                               >
-                                Edit
+                                <Edit className="w-3.5 h-3.5" />
+                                <span>Edit</span>
                               </button>
                               <button
                                 onClick={() => handleDelete(item._id)}
-                                className="text-gray-500 hover:text-red-650 transition-colors"
+                                className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded bg-red-50 hover:bg-red-100 text-red-650 hover:text-red-700 border border-red-200 hover:border-red-300 transition-colors font-semibold shadow-xs"
                               >
-                                Delete
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Delete</span>
                               </button>
                             </div>
                           </td>
@@ -3061,22 +3061,17 @@ const PartyManagement: React.FC = () => {
                 </div>
                 <div>
                   <span className="block text-xs text-gray-400 font-medium">Mobile Number</span>
-                  <div className="flex items-center space-x-1">
-                    <span className="font-semibold text-gray-900">{viewingCustomer.phone || '-'}</span>
-                    {viewingCustomer.phone && (
+                  <div className="flex items-center">
+                    {viewingCustomer.phone ? (
                       <a
-                        href={`https://wa.me/91${viewingCustomer.phone.replace(/\D/g, '')}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-green-500 hover:text-green-600 ml-1.5 flex items-center"
-                        onClick={e => e.stopPropagation()}
-                        title="Chat on WhatsApp"
+                        href={`tel:${viewingCustomer.phone.replace(/\D/g, '')}`}
+                        className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                        title={`Call ${viewingCustomer.phone}`}
                       >
-                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full inline-block animate-ping mr-0.5" />
-                        <svg className="w-4 h-4 text-green-500 fill-current" viewBox="0 0 24 24">
-                          <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.42 9.863-9.864.001-2.63-1.023-5.101-2.885-6.964C16.584 1.912 14.116.887 11.487.887c-5.442 0-9.866 4.418-9.869 9.866-.001 1.745.485 3.396 1.402 4.873L2.04 21.8l6.607-1.646zm12.188-7.06c-.328-.164-1.945-.96-2.247-1.07-.301-.109-.52-.164-.739.164-.219.329-.848 1.07-1.039 1.29-.192.218-.383.245-.71.081-.329-.164-1.386-.51-2.64-1.627-.975-.87-1.633-1.946-1.824-2.274-.192-.329-.02-.507.143-.67.147-.146.329-.384.493-.575.164-.192.219-.329.329-.548.11-.219.055-.411-.027-.575-.082-.164-.739-1.78-.1012-2.437-.267-.648-.523-.625-.717-.633-.186-.008-.4-.01-.613-.01-.213 0-.56.08-.853.4-.293.32-1.12 1.096-1.12 2.673 0 1.578 1.147 3.1 1.307 3.311.16.212 2.259 3.45 5.474 4.839.764.33 1.36.527 1.824.674.767.244 1.467.21 2.02.128.618-.092 1.945-.795 2.218-1.57.273-.775.273-1.437.191-1.57-.081-.132-.301-.213-.628-.377z" />
-                        </svg>
+                        {viewingCustomer.phone}
                       </a>
+                    ) : (
+                      <span className="font-semibold text-gray-900">-</span>
                     )}
                   </div>
                 </div>
