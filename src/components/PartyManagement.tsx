@@ -317,6 +317,7 @@ const PartyManagement: React.FC = () => {
 
   // Custom Alert and Highlighting States
   const [customAlert, setCustomAlert] = useState<{ message: string; type: 'info' | 'success' | 'warning' | 'error' } | null>(null);
+  const [customConfirm, setCustomConfirm] = useState<{ message: string; onConfirm: () => void } | null>(null);
   const [highlightedRowIndex, setHighlightedRowIndex] = useState<number>(-1);
 
   const showAlert = (message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
@@ -335,6 +336,23 @@ const PartyManagement: React.FC = () => {
     window.addEventListener('keydown', handleAlertKeyDown);
     return () => window.removeEventListener('keydown', handleAlertKeyDown);
   }, [customAlert]);
+
+  // Handle custom confirm keydown (Enter to confirm, Escape to cancel)
+  useEffect(() => {
+    if (!customConfirm) return;
+    const handleConfirmKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        customConfirm.onConfirm();
+        setCustomConfirm(null);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setCustomConfirm(null);
+      }
+    };
+    window.addEventListener('keydown', handleConfirmKeyDown);
+    return () => window.removeEventListener('keydown', handleConfirmKeyDown);
+  }, [customConfirm]);
 
   // Reset highlighted row index when parties list changes
   useEffect(() => {
@@ -517,8 +535,8 @@ const PartyManagement: React.FC = () => {
   // Global Keyboard Navigation (Tally-like controls)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // 1. If custom alert is open, let its own listener handle Escape/Enter
-      if (customAlert) return;
+      // 1. If custom alert or custom confirm is open, let their own listeners handle keys
+      if (customAlert || customConfirm) return;
 
       const isInput = document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA';
 
@@ -528,6 +546,15 @@ const PartyManagement: React.FC = () => {
         setShowForm(true);
         setEditingItem(null);
         setFormData(getEmptyFormData());
+        return;
+      }
+
+      // 2.5 Alt + E: Edit currently viewed customer
+      if (e.altKey && (e.key === 'e' || e.key === 'E')) {
+        e.preventDefault();
+        if (viewingCustomer) {
+          handleEdit(viewingCustomer);
+        }
         return;
       }
 
@@ -582,7 +609,7 @@ const PartyManagement: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [parties, highlightedRowIndex, viewingCustomer, showForm, selectedCityName, customAlert]);
+  }, [parties, highlightedRowIndex, viewingCustomer, showForm, selectedCityName, customAlert, customConfirm]);
 
   // Form Field Navigation: Enter key acts as Tab
   const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
@@ -1070,20 +1097,26 @@ const PartyManagement: React.FC = () => {
 
   // Trigger Delete
   const handleDelete = async (id: string) => {
-    if (window.confirm(`Delete this ${typeLabel}?`)) {
-      try {
-        if (currentType === 'route') {
-          await deleteRoute(id);
-        } else {
-          await deletePartyApi(id);
+    setCustomConfirm({
+      message: `Delete this ${typeLabel}?`,
+      onConfirm: async () => {
+        try {
+          if (currentType === 'route') {
+            await deleteRoute(id);
+          } else {
+            await deletePartyApi(id);
+          }
+          if (viewingCustomer && viewingCustomer._id === id) {
+            setViewingCustomer(null);
+          }
+          fetchMainData();
+          fetchStatsCounts();
+          fetchDropdownOptions();
+        } catch (err) {
+          console.error('Error deleting item:', err);
         }
-        fetchMainData();
-        fetchStatsCounts();
-        fetchDropdownOptions();
-      } catch (err) {
-        console.error('Error deleting item:', err);
       }
-    }
+    });
   };
 
   const resetForm = () => {
@@ -1128,29 +1161,32 @@ const PartyManagement: React.FC = () => {
 
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
-    if (window.confirm(`Are you sure you want to bulk delete the ${selectedIds.length} selected ${typeLabelPlural.toLowerCase()}?`)) {
-      try {
-        setLoading(true);
-        if (currentType === 'route') {
-          await Promise.all(selectedIds.map(id => deleteRoute(id)));
-        } else {
-          await Promise.all(selectedIds.map(id => deletePartyApi(id)));
+    setCustomConfirm({
+      message: `Are you sure you want to bulk delete the ${selectedIds.length} selected ${typeLabelPlural.toLowerCase()}?`,
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          if (currentType === 'route') {
+            await Promise.all(selectedIds.map(id => deleteRoute(id)));
+          } else {
+            await Promise.all(selectedIds.map(id => deletePartyApi(id)));
+          }
+          setSelectedIds([]);
+          showAlert(`Successfully deleted selected entries.`, 'success');
+          fetchMainData();
+          fetchStatsCounts();
+          fetchDropdownOptions();
+        } catch (err) {
+          console.error('Error during bulk delete:', err);
+          showAlert('An error occurred during bulk delete. Some items might not have been deleted.', 'error');
+          fetchMainData();
+          fetchStatsCounts();
+          fetchDropdownOptions();
+        } finally {
+          setLoading(false);
         }
-        setSelectedIds([]);
-        showAlert(`Successfully deleted selected entries.`, 'success');
-        fetchMainData();
-        fetchStatsCounts();
-        fetchDropdownOptions();
-      } catch (err) {
-        console.error('Error during bulk delete:', err);
-        showAlert('An error occurred during bulk delete. Some items might not have been deleted.', 'error');
-        fetchMainData();
-        fetchStatsCounts();
-        fetchDropdownOptions();
-      } finally {
-        setLoading(false);
       }
-    }
+    });
   };
 
   const handleImageUpload = (field: 'customerPhoto' | 'shopPhoto', e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1251,21 +1287,24 @@ const PartyManagement: React.FC = () => {
   };
 
   const deleteDuplicateItem = async (id: string) => {
-    if (window.confirm('Delete this duplicate record?')) {
-      try {
-        if (currentType === 'route') {
-          await deleteRoute(id);
-        } else {
-          await deletePartyApi(id);
+    setCustomConfirm({
+      message: 'Delete this duplicate record?',
+      onConfirm: async () => {
+        try {
+          if (currentType === 'route') {
+            await deleteRoute(id);
+          } else {
+            await deletePartyApi(id);
+          }
+          await fetchMainData();
+          await fetchStatsCounts();
+          // Refresh duplicate scan
+          await handleFindDuplicates();
+        } catch (err) {
+          console.error('Delete failed:', err);
         }
-        await fetchMainData();
-        await fetchStatsCounts();
-        // Refresh duplicate scan
-        await handleFindDuplicates();
-      } catch (err) {
-        console.error('Delete failed:', err);
       }
-    }
+    });
   };
 
   // Import / Export Logic
@@ -1575,6 +1614,7 @@ const PartyManagement: React.FC = () => {
                 >
                   <Trash2 className="w-4 h-4" />
                   <span>Delete Selected ({selectedIds.length})</span>
+                  <kbd className="ml-1.5 px-1.5 py-0.5 text-[10px] font-mono font-bold text-red-100 bg-red-800 rounded border border-red-700 shadow-xs select-none pointer-events-none">Alt+D</kbd>
                 </button>
               )}
               <button
@@ -1597,6 +1637,7 @@ const PartyManagement: React.FC = () => {
               >
                 <Plus className="w-4 h-4" />
                 <span>Add {currentType === 'market' ? 'City' : typeLabel}</span>
+                <kbd className="ml-1.5 px-1.5 py-0.5 text-[10px] font-mono font-bold text-blue-100 bg-blue-800 rounded border border-blue-700 shadow-xs select-none pointer-events-none">Alt+C</kbd>
               </button>
             </div>
           </div>
@@ -2920,9 +2961,10 @@ const PartyManagement: React.FC = () => {
             <button
               type="button"
               onClick={resetForm}
-              className="px-6 py-2.5 border border-gray-300 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors font-medium text-sm"
+              className="px-6 py-2.5 border border-gray-300 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors font-medium text-sm flex items-center justify-center gap-1.5"
             >
               Cancel
+              <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold text-gray-500 bg-gray-100 rounded border border-gray-200 shadow-xs select-none pointer-events-none">Esc</kbd>
             </button>
           </div>
         </div>
@@ -3377,6 +3419,7 @@ const PartyManagement: React.FC = () => {
                 >
                   <Edit className="w-4 h-4" />
                   <span>Edit Profile</span>
+                  <kbd className="ml-1 px-1.5 py-0.5 text-[9px] font-mono font-bold text-blue-500 bg-blue-100 rounded border border-blue-200 select-none pointer-events-none">Alt+E</kbd>
                 </button>
                 <button
                   onClick={() => handleDelete(viewingCustomer._id)}
@@ -3384,6 +3427,7 @@ const PartyManagement: React.FC = () => {
                 >
                   <Trash2 className="w-4 h-4 text-red-600" />
                   <span>Delete</span>
+                  <kbd className="ml-1 px-1.5 py-0.5 text-[9px] font-mono font-bold text-red-500 bg-red-100 rounded border border-red-200 select-none pointer-events-none">Alt+D</kbd>
                 </button>
                 
                 {currentType === 'customer' && (
@@ -4204,6 +4248,47 @@ const PartyManagement: React.FC = () => {
         </div>
       )}
 
+      {/* Custom Confirm Modal Popup (Keyboard/Mouse controlled) */}
+      {customConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-500 bg-opacity-75 overflow-y-auto animate-in fade-in duration-100">
+          <div className="relative bg-white rounded-xl max-w-md w-full shadow-2xl p-6 border border-gray-150 animate-in fade-in zoom-in-95 duration-150 text-center space-y-4">
+            <AlertTriangle className="w-12 h-12 text-red-500 mx-auto animate-bounce" />
+
+            <div>
+              <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider">
+                Confirm Action
+              </h3>
+              <p className="text-sm text-gray-600 mt-2 font-medium leading-relaxed whitespace-pre-wrap">{customConfirm.message}</p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setCustomConfirm(null);
+                }}
+                className="flex-1 py-2.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-semibold text-sm shadow-xs focus:ring-2 focus:ring-gray-350 focus:outline-none cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                Cancel
+                <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold text-gray-500 bg-gray-100 rounded border border-gray-200 shadow-xs select-none pointer-events-none">Esc</kbd>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  customConfirm.onConfirm();
+                  setCustomConfirm(null);
+                }}
+                className="flex-1 py-2.5 bg-red-650 hover:bg-red-700 text-white rounded-lg transition-colors font-semibold text-sm shadow-xs focus:ring-2 focus:ring-red-500 focus:outline-none cursor-pointer flex items-center justify-center gap-1.5"
+                autoFocus
+              >
+                Delete
+                <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold text-red-100 bg-red-800 rounded border border-red-700 shadow-xs select-none pointer-events-none">Enter</kbd>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Custom Alert Modal Popup (Tally-like enter button close) */}
       {customAlert && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-500 bg-opacity-75 overflow-y-auto animate-in fade-in duration-100">
@@ -4223,10 +4308,11 @@ const PartyManagement: React.FC = () => {
             <button
               type="button"
               onClick={() => setCustomAlert(null)}
-              className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-semibold text-sm shadow-xs focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer"
+              className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-semibold text-sm shadow-xs focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer flex items-center justify-center gap-1.5"
               autoFocus
             >
-              OK (Enter)
+              OK
+              <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold text-blue-100 bg-blue-800 rounded border border-blue-700 shadow-xs select-none pointer-events-none">Enter</kbd>
             </button>
           </div>
         </div>
