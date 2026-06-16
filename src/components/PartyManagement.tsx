@@ -173,6 +173,15 @@ const PartyManagement: React.FC = () => {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
+  // Cities search under regions
+  const [citySearchText, setCitySearchText] = useState('');
+
+  // City customers popup modal state
+  const [selectedCityName, setSelectedCityName] = useState<string | null>(null);
+  const [cityCustomers, setCityCustomers] = useState<any[]>([]);
+  const [cityCustomersLoading, setCityCustomersLoading] = useState(false);
+  const [cityCustomersSearchText, setCityCustomersSearchText] = useState('');
+
   // Persisted Filters state
   const [filters, setFilters] = useState<any>({
     status: [],
@@ -341,6 +350,8 @@ const PartyManagement: React.FC = () => {
     setDebouncedSearch('');
     setViewingCustomer(null);
     setExpandedRouteId(null);
+    setCitySearchText('');
+    setSelectedCityName(null);
     setShowForm(false);
     setEditingItem(null);
     setFormData(getEmptyFormData());
@@ -477,6 +488,26 @@ const PartyManagement: React.FC = () => {
       }
     }
   }, [editingItem, allCities]);
+
+  // Fetch customers in a city and open popup modal
+  const openCityCustomersPopup = async (cityName: string) => {
+    setSelectedCityName(cityName);
+    setCityCustomersSearchText('');
+    try {
+      setCityCustomersLoading(true);
+      const res = await getParties({
+        type: 'customer',
+        city: cityName,
+        company: selectedCompany?._id,
+        limit: 1000
+      } as any);
+      setCityCustomers(res.data.parties || []);
+    } catch (err) {
+      console.error('Error fetching customers in city:', err);
+    } finally {
+      setCityCustomersLoading(false);
+    }
+  };
 
   const openInlineModal = (type: 'agent' | 'route' | 'market' | 'transporter') => {
     setInlineAgentData({ name: '', phone: '' });
@@ -1620,6 +1651,7 @@ const PartyManagement: React.FC = () => {
                               setViewingCustomer(item);
                             } else if (currentType === 'route') {
                               setExpandedRouteId(expandedRouteId === item._id ? null : item._id);
+                              setCitySearchText('');
                             } else {
                               handleEdit(item);
                             }
@@ -1748,49 +1780,75 @@ const PartyManagement: React.FC = () => {
                           <tr className="bg-gray-50/50" onClick={(e) => e.stopPropagation()}>
                             <td colSpan={Object.values(visibleColumns).filter(Boolean).length + 3} className="px-8 py-4 border-t border-b border-gray-100/60">
                               <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm max-w-4xl mx-auto">
-                                <div className="flex items-center justify-between mb-4 border-b pb-2">
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 border-b pb-3">
                                   <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center">
                                     <MapPin className="w-3.5 h-3.5 text-blue-500 mr-1.5" />
                                     Cities/Towns in {item.name} Line ({citiesUnderRoute.length})
                                   </h4>
-                                  <button
-                                    onClick={() => openInlineModal('market')}
-                                    className="text-xs text-blue-600 hover:text-blue-700 font-semibold flex items-center space-x-1"
-                                  >
-                                    <Plus className="w-3 h-3" />
-                                    <span>Add New City</span>
-                                  </button>
+                                  
+                                  <div className="flex items-center gap-3">
+                                    {/* Search input for cities inside the region */}
+                                    <div className="relative">
+                                      <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 w-3.5 h-3.5" />
+                                      <input
+                                        type="text"
+                                        placeholder="Search city..."
+                                        value={citySearchText}
+                                        onChange={(e) => setCitySearchText(e.target.value)}
+                                        className="pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 focus:bg-white transition-colors w-40"
+                                      />
+                                    </div>
+                                    <button
+                                      onClick={() => openInlineModal('market')}
+                                      className="text-xs text-blue-600 hover:text-blue-700 font-semibold flex items-center space-x-1 whitespace-nowrap bg-blue-50/50 hover:bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-100 transition-colors"
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                      <span>Add New City</span>
+                                    </button>
+                                  </div>
                                 </div>
                                 
                                 {citiesUnderRoute.length === 0 ? (
                                   <p className="text-xs text-gray-500 italic py-2">No cities mapped to this region yet.</p>
-                                ) : (
-                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                    {citiesUnderRoute.map((city) => (
-                                      <div
-                                        key={city._id}
-                                        className="p-3.5 border border-gray-100 rounded-lg bg-gray-50/30 flex items-center justify-between hover:border-blue-200 hover:shadow-xs transition-all"
-                                      >
-                                        <div>
-                                          <span className="font-semibold text-gray-950 text-sm block">{city.firmName}</span>
-                                          <span className="text-xs text-gray-400 font-medium">{city.district || '-'}, {city.state || '-'}</span>
+                                ) : (() => {
+                                  const filtered = citiesUnderRoute.filter(c => 
+                                    c.firmName.toLowerCase().includes(citySearchText.toLowerCase())
+                                  );
+                                  
+                                  if (filtered.length === 0) {
+                                    return <p className="text-xs text-gray-500 italic py-2">No cities matching "{citySearchText}" found.</p>;
+                                  }
+
+                                  return (
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                      {filtered.map((city) => (
+                                        <div
+                                          key={city._id}
+                                          onClick={() => openCityCustomersPopup(city.firmName)}
+                                          className="p-3.5 border border-gray-100 rounded-lg bg-gray-50/30 flex items-center justify-between hover:border-blue-300 hover:bg-blue-50/10 hover:shadow-xs transition-all cursor-pointer group"
+                                          title={`Click to view customers in ${city.firmName}`}
+                                        >
+                                          <div>
+                                            <span className="font-semibold text-gray-950 text-sm block group-hover:text-blue-600 transition-colors">{city.firmName}</span>
+                                            <span className="text-xs text-gray-400 font-medium">{city.district || '-'}, {city.state || '-'}</span>
+                                          </div>
+                                          <div className="text-right flex flex-col items-end">
+                                            <span className="inline-flex px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-50 text-blue-700 border border-blue-100 mb-1 group-hover:bg-blue-100 group-hover:text-blue-800 transition-colors">
+                                              {city.customerCount || 0} Custs
+                                            </span>
+                                            <span className={`inline-flex px-1.5 py-0.5 text-[9px] font-bold uppercase rounded ${
+                                              city.status === 'active'
+                                                ? 'bg-green-50 text-green-700 border border-green-100'
+                                                : 'bg-gray-100 text-gray-500'
+                                            }`}>
+                                              {city.status}
+                                            </span>
+                                          </div>
                                         </div>
-                                        <div className="text-right flex flex-col items-end">
-                                          <span className="inline-flex px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-50 text-blue-700 border border-blue-100 mb-1">
-                                            {city.customerCount || 0} Custs
-                                          </span>
-                                          <span className={`inline-flex px-1.5 py-0.5 text-[9px] font-bold uppercase rounded ${
-                                            city.status === 'active'
-                                              ? 'bg-green-50 text-green-700 border border-green-100'
-                                              : 'bg-gray-100 text-gray-500'
-                                          }`}>
-                                            {city.status}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
+                                      ))}
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             </td>
                           </tr>
@@ -3255,7 +3313,157 @@ const PartyManagement: React.FC = () => {
               <span>•</span>
               <span>Updated: {new Date(viewingCustomer.updatedAt).toLocaleString()}</span>
             </div>
+          </div>
+        </div>
+      )}
 
+      {/* City Customers Popup Modal */}
+      {selectedCityName && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-500 bg-opacity-75 overflow-y-auto">
+          <div className="relative bg-white rounded-xl max-w-3xl w-full shadow-2xl flex flex-col max-h-[85vh] border border-gray-150 animate-in fade-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-xl flex justify-between items-center">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <Users className="w-5 h-5 text-blue-600" />
+                  Customers in {selectedCityName}
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">Showing customers registered under this city</p>
+              </div>
+              <button
+                onClick={() => setSelectedCityName(null)}
+                className="text-gray-400 hover:text-gray-650 transition-colors p-1 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search Bar */}
+            <div className="p-4 border-b border-gray-100 bg-white">
+              <div className="relative max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search customer by name, phone, agent..."
+                  value={cityCustomersSearchText}
+                  onChange={(e) => setCityCustomersSearchText(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 focus:bg-white transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* Content Body */}
+            <div className="p-6 overflow-y-auto flex-1 bg-white">
+              {cityCustomersLoading ? (
+                <div className="flex flex-col justify-center items-center h-48 text-gray-400">
+                  <RefreshCw className="w-8 h-8 animate-spin text-blue-500 mb-2" />
+                  <span>Loading customers...</span>
+                </div>
+              ) : (
+                (() => {
+                  const filtered = cityCustomers.filter(c => {
+                    const search = cityCustomersSearchText.toLowerCase();
+                    return (
+                      (c.firmName || '').toLowerCase().includes(search) ||
+                      (c.contactName || '').toLowerCase().includes(search) ||
+                      (c.ownerName || '').toLowerCase().includes(search) ||
+                      (c.phone || '').toLowerCase().includes(search) ||
+                      (c.agentAssigned || '').toLowerCase().includes(search)
+                    );
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="text-center py-12 text-gray-450">
+                        <Users className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                        <p className="font-semibold text-gray-800">No customers found</p>
+                        <p className="text-sm text-gray-400 mt-1">Try updating your search query or check data files.</p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="border border-gray-150 rounded-xl overflow-hidden shadow-xs">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead>
+                          <tr className="bg-gray-50">
+                            <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Firm Name</th>
+                            <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Mobile Number</th>
+                            <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Route / Region</th>
+                            <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Agent Assigned</th>
+                            <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 bg-white">
+                          {filtered.map((cust) => (
+                            <tr key={cust._id} className="hover:bg-gray-50/50 transition-colors">
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <div className="flex flex-col">
+                                  <span className="font-semibold text-gray-900 text-sm">{cust.firmName || '-'}</span>
+                                  {cust.ownerName && (
+                                    <span className="text-xs text-gray-450 font-normal">{cust.ownerName}</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                                {cust.phone ? (
+                                  <a
+                                    href={`tel:${cust.phone.replace(/\D/g, '')}`}
+                                    className="text-blue-600 hover:text-blue-800 hover:underline font-semibold"
+                                    title={`Call ${cust.phone}`}
+                                  >
+                                    {cust.phone}
+                                  </a>
+                                ) : (
+                                  <span className="text-gray-400">-</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-700">
+                                {cust.route ? (
+                                  <span className="inline-flex px-2 py-0.5 font-semibold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                    {cust.route}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-455">-</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-700">
+                                {cust.agentAssigned ? (
+                                  <span className="inline-flex px-2 py-0.5 font-semibold rounded-full bg-purple-50 text-purple-700 border border-purple-100">
+                                    {cust.agentAssigned}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-455">None</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <span className={`inline-flex px-2 py-0.5 text-[10px] font-bold rounded uppercase border ${
+                                  cust.status === 'active' ? 'bg-green-50 border-green-200 text-green-700' :
+                                  cust.status === 'inactive' ? 'bg-gray-50 border-gray-200 text-gray-500' :
+                                  'bg-yellow-50 border-yellow-250 text-yellow-755'
+                                }`}>
+                                  {cust.status}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-xl text-right">
+              <button
+                onClick={() => setSelectedCityName(null)}
+                className="px-5 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 font-medium text-sm transition-colors shadow-xs"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
