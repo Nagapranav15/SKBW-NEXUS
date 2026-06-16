@@ -161,7 +161,7 @@ const Layout: React.FC = () => {
               >
                 <div className="flex items-center space-x-3">
                   <Warehouse className="w-5 h-5 text-blue-600" />
-                  {sidebarOpen && <span className="font-semibold text-gray-900 text-xs tracking-wider uppercase">MASTERS</span>}
+                  {sidebarOpen && <span className="font-semibold text-gray-900">Masters</span>}
                 </div>
                 {sidebarOpen && (
                   <ChevronDown className={`w-4 h-4 transition-transform ${masterDropdownOpen ? 'rotate-180' : ''}`} />
