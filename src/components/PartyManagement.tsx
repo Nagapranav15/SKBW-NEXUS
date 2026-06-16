@@ -315,6 +315,32 @@ const PartyManagement: React.FC = () => {
   const [citySearchText, setCitySearchText] = useState('');
   const [regionCitySearchText, setRegionCitySearchText] = useState('');
 
+  // Custom Alert and Highlighting States
+  const [customAlert, setCustomAlert] = useState<{ message: string; type: 'info' | 'success' | 'warning' | 'error' } | null>(null);
+  const [highlightedRowIndex, setHighlightedRowIndex] = useState<number>(-1);
+
+  const showAlert = (message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
+    setCustomAlert({ message, type });
+  };
+
+  // Close custom alert dialog on Enter or Escape keypress
+  useEffect(() => {
+    if (!customAlert) return;
+    const handleAlertKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === 'Escape') {
+        e.preventDefault();
+        setCustomAlert(null);
+      }
+    };
+    window.addEventListener('keydown', handleAlertKeyDown);
+    return () => window.removeEventListener('keydown', handleAlertKeyDown);
+  }, [customAlert]);
+
+  // Reset highlighted row index when parties list changes
+  useEffect(() => {
+    setHighlightedRowIndex(-1);
+  }, [parties]);
+
   // Clear region city search when selected region/customer changes
   useEffect(() => {
     setRegionCitySearchText('');
@@ -488,6 +514,99 @@ const PartyManagement: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
+  // Global Keyboard Navigation (Tally-like controls)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // 1. If custom alert is open, let its own listener handle Escape/Enter
+      if (customAlert) return;
+
+      const isInput = document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA';
+
+      // 2. Alt + C: Open Create Form
+      if (e.altKey && (e.key === 'c' || e.key === 'C')) {
+        e.preventDefault();
+        setShowForm(true);
+        setEditingItem(null);
+        setFormData(getEmptyFormData());
+        return;
+      }
+
+      // 3. Alt + D: Delete active/viewed/highlighted record
+      if (e.altKey && (e.key === 'd' || e.key === 'D')) {
+        e.preventDefault();
+        if (viewingCustomer) {
+          handleDelete(viewingCustomer._id);
+        } else if (highlightedRowIndex >= 0 && highlightedRowIndex < parties.length) {
+          handleDelete(parties[highlightedRowIndex]._id);
+        }
+        return;
+      }
+
+      // 4. Escape: Close drawers / modals / forms
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (selectedCityName) {
+          setSelectedCityName(null);
+        } else if (showForm) {
+          resetForm();
+        } else if (viewingCustomer) {
+          setViewingCustomer(null);
+        }
+        return;
+      }
+
+      // 5. Arrow Keys & Enter on Rows (only active when not typing)
+      if (!isInput) {
+        if (parties.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setHighlightedRowIndex(prev => {
+            const nextIdx = prev + 1;
+            return nextIdx < parties.length ? nextIdx : 0;
+          });
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setHighlightedRowIndex(prev => {
+            const nextIdx = prev - 1;
+            return nextIdx >= 0 ? nextIdx : parties.length - 1;
+          });
+        } else if (e.key === 'Enter') {
+          if (highlightedRowIndex >= 0 && highlightedRowIndex < parties.length) {
+            e.preventDefault();
+            setViewingCustomer(parties[highlightedRowIndex]);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [parties, highlightedRowIndex, viewingCustomer, showForm, selectedCityName, customAlert]);
+
+  // Form Field Navigation: Enter key acts as Tab
+  const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    if (e.key === 'Enter') {
+      const target = e.target as HTMLElement;
+      
+      // If typing in a textarea or pressing Enter on a submit/reset button, do normal action
+      if (target.tagName === 'TEXTAREA' || target.tagName === 'BUTTON' || target.closest('button')) {
+        return;
+      }
+      
+      e.preventDefault();
+      const form = e.currentTarget;
+      const focusable = Array.from(
+        form.querySelectorAll('input, select, textarea, button:not([tabindex="-1"])')
+      ) as HTMLElement[];
+      
+      const index = focusable.indexOf(target);
+      if (index > -1 && index < focusable.length - 1) {
+        focusable[index + 1].focus();
+      }
+    }
+  };
+
   // Load visible columns & filters & limit from localStorage on path change
   useEffect(() => {
     setPage(1);
@@ -498,6 +617,8 @@ const PartyManagement: React.FC = () => {
     setCitySearchText('');
     setRegionCitySearchText('');
     setSelectedCityName(null);
+    setHighlightedRowIndex(-1);
+    setCustomAlert(null);
     setShowForm(false);
     setEditingItem(null);
     setFormData(getEmptyFormData());
@@ -743,7 +864,7 @@ const PartyManagement: React.FC = () => {
     } catch (err: any) {
       console.error('Error saving inline reference:', err);
       const msg = err.response?.data?.msg || 'Error saving. Please try again.';
-      alert(msg);
+      showAlert(msg, 'error');
     } finally {
       setIsSavingInline(false);
     }
@@ -924,7 +1045,7 @@ const PartyManagement: React.FC = () => {
       fetchDropdownOptions();
     } catch (err: any) {
       const msg = err.response?.data?.msg || 'Error saving. Please try again.';
-      alert(msg);
+      showAlert(msg, 'error');
     }
   };
 
@@ -1016,13 +1137,13 @@ const PartyManagement: React.FC = () => {
           await Promise.all(selectedIds.map(id => deletePartyApi(id)));
         }
         setSelectedIds([]);
-        alert(`Successfully deleted selected entries.`);
+        showAlert(`Successfully deleted selected entries.`, 'success');
         fetchMainData();
         fetchStatsCounts();
         fetchDropdownOptions();
       } catch (err) {
         console.error('Error during bulk delete:', err);
-        alert('An error occurred during bulk delete. Some items might not have been deleted.');
+        showAlert('An error occurred during bulk delete. Some items might not have been deleted.', 'error');
         fetchMainData();
         fetchStatsCounts();
         fetchDropdownOptions();
@@ -1036,7 +1157,7 @@ const PartyManagement: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) {
-      alert('Image must be less than 2MB');
+      showAlert('Image must be less than 2MB', 'warning');
       return;
     }
     const reader = new FileReader();
@@ -1123,7 +1244,7 @@ const PartyManagement: React.FC = () => {
       setShowDuplicates(true);
     } catch (err) {
       console.error('Error finding duplicates:', err);
-      alert('Error scanning for duplicates. Please try again.');
+      showAlert('Error scanning for duplicates. Please try again.', 'error');
     } finally {
       setLoading(false);
     }
@@ -1249,13 +1370,13 @@ const PartyManagement: React.FC = () => {
             });
           }
           if (routesToImport.length === 0) {
-            alert('No valid routes found to import.');
+            showAlert('No valid routes found to import.', 'warning');
             return;
           }
           for (const routeData of routesToImport) {
             await createRoute(routeData);
           }
-          alert(`Successfully imported ${routesToImport.length} routes.`);
+          showAlert(`Successfully imported ${routesToImport.length} routes.`, 'success');
         } else {
           const partiesToImport = normalizedData.map(item => {
             // Match any variant of name fields
@@ -1304,12 +1425,12 @@ const PartyManagement: React.FC = () => {
           }).filter(Boolean);
 
           if (partiesToImport.length === 0) {
-            alert(`No valid ${typeLabelPlural.toLowerCase()} found to import.`);
+            showAlert(`No valid ${typeLabelPlural.toLowerCase()} found to import.`, 'warning');
             return;
           }
 
           await importPartiesApi(partiesToImport);
-          alert(`Successfully imported ${partiesToImport.length} ${typeLabelPlural.toLowerCase()}`);
+          showAlert(`Successfully imported ${partiesToImport.length} ${typeLabelPlural.toLowerCase()}`, 'success');
         }
 
         fetchMainData();
@@ -1318,7 +1439,7 @@ const PartyManagement: React.FC = () => {
       } catch (error: any) {
         console.error('Import error details:', error);
         const errMsg = error.response?.data?.msg || error.message || 'Unknown error';
-        alert(`Error importing file: ${errMsg}`);
+        showAlert(`Error importing file: ${errMsg}`, 'error');
       }
     };
     reader.readAsBinaryString(file);
@@ -1877,13 +1998,17 @@ const PartyManagement: React.FC = () => {
                     return (
                       <React.Fragment key={item._id}>
                         <tr
-                          className={`transition-colors cursor-pointer ${
+                          className={`transition-all cursor-pointer border-l-2 ${
                             isSelectedRow 
-                              ? 'bg-blue-50/50 hover:bg-blue-50 text-blue-900 font-semibold' 
-                              : 'hover:bg-gray-50 text-gray-700'
+                              ? 'bg-blue-50/50 hover:bg-blue-50 text-blue-900 font-semibold border-l-blue-600 shadow-xs' 
+                              : idx === highlightedRowIndex
+                                ? 'bg-gray-100 hover:bg-gray-200 text-gray-900 font-semibold border-l-gray-400 shadow-xs'
+                                : 'hover:bg-gray-50 border-l-transparent text-gray-700'
                           }`}
+                          onMouseEnter={() => setHighlightedRowIndex(idx)}
                           onClick={() => {
                             setViewingCustomer(item);
+                            setHighlightedRowIndex(idx);
                           }}
                         >
                           <td className="px-4 py-3.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
@@ -2156,7 +2281,7 @@ const PartyManagement: React.FC = () => {
 
           {/* Form Fields container */}
           <div className="flex-1 overflow-y-auto p-5">
-            <form id="partyForm" onSubmit={handleSubmit} className="space-y-6">
+            <form id="partyForm" onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="space-y-6">
               
               {/* 1. CUSTOMER FORM VIEW */}
               {currentType === 'customer' && (
@@ -2975,7 +3100,7 @@ const PartyManagement: React.FC = () => {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleInlineSave} className="p-6 space-y-4">
+            <form onSubmit={handleInlineSave} onKeyDown={handleFormKeyDown} className="p-6 space-y-4">
               {inlineModalType === 'agent' && (
                 <>
                   <div>
@@ -3264,21 +3389,21 @@ const PartyManagement: React.FC = () => {
                 {currentType === 'customer' && (
                   <>
                     <button
-                      onClick={() => alert('Customer History / Visit feature is coming soon!')}
+                      onClick={() => showAlert('Customer History / Visit feature is coming soon!', 'info')}
                       className="flex items-center justify-center space-x-2 p-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 font-semibold text-xs rounded-lg border border-gray-200 transition-colors"
                     >
                       <History className="w-4 h-4 text-gray-450" />
                       <span>History / Visit</span>
                     </button>
                     <button
-                      onClick={() => alert('Ledger report will be generated shortly!')}
+                      onClick={() => showAlert('Ledger report will be generated shortly!', 'info')}
                       className="flex items-center justify-center space-x-2 p-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 font-semibold text-xs rounded-lg border border-gray-200 transition-colors"
                     >
                       <BookOpen className="w-4 h-4 text-gray-450" />
                       <span>Ledger</span>
                     </button>
                     <button
-                      onClick={() => alert('Record Payment feature is coming soon!')}
+                      onClick={() => showAlert('Record Payment feature is coming soon!', 'info')}
                       className="flex items-center justify-center space-x-2 p-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 font-semibold text-xs rounded-lg border border-gray-200 transition-colors"
                     >
                       <CreditCard className="w-4 h-4 text-gray-450" />
@@ -4075,6 +4200,34 @@ const PartyManagement: React.FC = () => {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Alert Modal Popup (Tally-like enter button close) */}
+      {customAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-500 bg-opacity-75 overflow-y-auto animate-in fade-in duration-100">
+          <div className="relative bg-white rounded-xl max-w-md w-full shadow-2xl p-6 border border-gray-150 animate-in fade-in zoom-in-95 duration-150 text-center space-y-4">
+            {customAlert.type === 'error' && <XCircle className="w-12 h-12 text-red-500 mx-auto" />}
+            {customAlert.type === 'success' && <CheckCircle className="w-12 h-12 text-green-500 mx-auto" />}
+            {customAlert.type === 'warning' && <AlertTriangle className="w-12 h-12 text-yellow-500 mx-auto" />}
+            {customAlert.type === 'info' && <Building className="w-12 h-12 text-blue-500 mx-auto" />}
+
+            <div>
+              <h3 className="text-base font-bold text-gray-955 uppercase tracking-wider">
+                {customAlert.type === 'error' ? 'Error' : customAlert.type === 'success' ? 'Success' : customAlert.type === 'warning' ? 'Warning' : 'Notification'}
+              </h3>
+              <p className="text-sm text-gray-600 mt-2 font-medium leading-relaxed whitespace-pre-wrap">{customAlert.message}</p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setCustomAlert(null)}
+              className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-semibold text-sm shadow-xs focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer"
+              autoFocus
+            >
+              OK (Enter)
+            </button>
           </div>
         </div>
       )}
