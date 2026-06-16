@@ -318,11 +318,21 @@ const PartyManagement: React.FC = () => {
   // Custom Alert and Highlighting States
   const [customAlert, setCustomAlert] = useState<{ message: string; type: 'info' | 'success' | 'warning' | 'error' } | null>(null);
   const [customConfirm, setCustomConfirm] = useState<{ message: string; onConfirm: () => void } | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
   const [highlightedRowIndex, setHighlightedRowIndex] = useState<number>(-1);
 
   const showAlert = (message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
     setCustomAlert({ message, type });
   };
+
+  // Auto-dismiss toast notification after 3 seconds
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => {
+      setToast(null);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   // Close custom alert dialog on Enter or Escape keypress
   useEffect(() => {
@@ -1112,8 +1122,10 @@ const PartyManagement: React.FC = () => {
           fetchMainData();
           fetchStatsCounts();
           fetchDropdownOptions();
+          setToast({ message: `${typeLabel} deleted successfully.`, type: 'success' });
         } catch (err) {
           console.error('Error deleting item:', err);
+          setToast({ message: `Failed to delete ${typeLabel.toLowerCase()}.`, type: 'error' });
         }
       }
     });
@@ -1172,13 +1184,13 @@ const PartyManagement: React.FC = () => {
             await Promise.all(selectedIds.map(id => deletePartyApi(id)));
           }
           setSelectedIds([]);
-          showAlert(`Successfully deleted selected entries.`, 'success');
+          setToast({ message: `Successfully deleted selected entries.`, type: 'success' });
           fetchMainData();
           fetchStatsCounts();
           fetchDropdownOptions();
         } catch (err) {
           console.error('Error during bulk delete:', err);
-          showAlert('An error occurred during bulk delete. Some items might not have been deleted.', 'error');
+          setToast({ message: 'An error occurred during bulk delete.', type: 'error' });
           fetchMainData();
           fetchStatsCounts();
           fetchDropdownOptions();
@@ -1300,8 +1312,10 @@ const PartyManagement: React.FC = () => {
           await fetchStatsCounts();
           // Refresh duplicate scan
           await handleFindDuplicates();
+          setToast({ message: `Duplicate record deleted successfully.`, type: 'success' });
         } catch (err) {
           console.error('Delete failed:', err);
+          setToast({ message: `Failed to delete duplicate record.`, type: 'error' });
         }
       }
     });
@@ -1574,13 +1588,26 @@ const PartyManagement: React.FC = () => {
 
   return (
     <div className="flex h-full relative">
+      {/* Subtle Toast Notification */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 flex items-center space-x-2 bg-gray-900 text-white px-4 py-2.5 rounded-lg shadow-xl border border-gray-800 animate-in fade-in slide-in-from-top-4 duration-200">
+          {toast.type === 'success' && <CheckCircle className="w-4.5 h-4.5 text-green-400" />}
+          {toast.type === 'error' && <XCircle className="w-4.5 h-4.5 text-red-400" />}
+          {toast.type === 'info' && <Building className="w-4.5 h-4.5 text-blue-400" />}
+          <span className="text-xs font-semibold">{toast.message}</span>
+          <button onClick={() => setToast(null)} className="text-gray-400 hover:text-white transition-colors pl-2">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Main Content Pane */}
-      <div className={`flex-1 p-6 overflow-y-auto transition-all duration-300 ${showForm || viewingCustomer ? 'mr-[520px]' : ''}`}>
+      <div className={`flex-1 p-4 overflow-y-auto transition-all duration-300 ${showForm || viewingCustomer ? 'mr-[520px]' : ''}`}>
         
         {/* Top Header Card */}
-        <div className="mb-6">
+        <div className="mb-4">
           {/* Top Bar with Navigation Back link and user profile pill */}
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-3">
             <div 
               className="flex items-center space-x-1.5 text-gray-500 hover:text-gray-900 cursor-pointer transition-colors" 
               onClick={() => navigate(-1)}
@@ -1644,27 +1671,27 @@ const PartyManagement: React.FC = () => {
         </div>
 
         {/* Stats Section */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 border-l-4 border-l-blue-500">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 border-l-4 border-l-blue-500">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total {typeLabelPlural}</p>
-            <p className="text-3xl font-bold text-gray-900 mt-1">{stats.total}</p>
+            <p className="text-2xl font-bold text-gray-900 mt-0.5">{stats.total}</p>
           </div>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 border-l-4 border-l-green-500">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 border-l-4 border-l-green-500">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Active</p>
-            <p className="text-3xl font-bold text-green-600 mt-1">{stats.active}</p>
+            <p className="text-2xl font-bold text-green-600 mt-0.5">{stats.active}</p>
           </div>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 border-l-4 border-l-red-500">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 border-l-4 border-l-red-500">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Inactive</p>
-            <p className="text-3xl font-bold text-red-600 mt-1">{stats.inactive}</p>
+            <p className="text-2xl font-bold text-red-600 mt-0.5">{stats.inactive}</p>
           </div>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 border-l-4 border-l-yellow-500">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 border-l-4 border-l-yellow-500">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">On Hold</p>
-            <p className="text-3xl font-bold text-yellow-600 mt-1">{stats.onHold || 0}</p>
+            <p className="text-2xl font-bold text-yellow-600 mt-0.5">{stats.onHold || 0}</p>
           </div>
         </div>
 
         {/* Table Toolbar */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 mb-4">
           <div className="flex items-center justify-between">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -1981,7 +2008,7 @@ const PartyManagement: React.FC = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead>
                 <tr className="bg-gray-50">
-                  <th className="px-4 py-3 text-left w-10">
+                  <th className="px-3 py-2 text-left w-10">
                     <input
                       type="checkbox"
                       checked={isAllOnPageSelected}
@@ -1992,13 +2019,13 @@ const PartyManagement: React.FC = () => {
                       className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 border-gray-300 cursor-pointer"
                     />
                   </th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider w-10">#</th>
+                  <th className="px-3.5 py-2 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider w-10">#</th>
                   {Object.entries(visibleColumns).map(([col, visible]) =>
                     visible && allColumns[col] && (
                       <th 
                         key={col} 
                         onClick={() => handleSort(col)}
-                        className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100/50 transition-colors select-none"
+                        className="px-3.5 py-2 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100/50 transition-colors select-none"
                       >
                         <div className="flex items-center space-x-1">
                           <span>{allColumns[col]}</span>
@@ -2013,7 +2040,7 @@ const PartyManagement: React.FC = () => {
                       </th>
                     )
                   )}
-                  <th className="px-5 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider w-24">Actions</th>
+                  <th className="px-3.5 py-2 text-right text-[11px] font-bold text-gray-400 uppercase tracking-wider w-24">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -2052,7 +2079,7 @@ const PartyManagement: React.FC = () => {
                             setHighlightedRowIndex(idx);
                           }}
                         >
-                          <td className="px-4 py-3.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                          <td className="px-3 py-1.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                             <input
                               type="checkbox"
                               checked={selectedIds.includes(item._id)}
@@ -2060,16 +2087,16 @@ const PartyManagement: React.FC = () => {
                               className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 border-gray-300 cursor-pointer"
                             />
                           </td>
-                          <td className="px-5 py-3.5 whitespace-nowrap text-sm text-gray-400">{rowNum}</td>
+                          <td className="px-3.5 py-1.5 whitespace-nowrap text-xs text-gray-400">{rowNum}</td>
                           {Object.entries(visibleColumns).map(([col, visible]) => {
                             if (!visible || !allColumns[col]) return null;
                             return (
-                              <td key={col} className="px-5 py-3.5 whitespace-nowrap text-sm font-medium text-gray-700">
+                              <td key={col} className="px-3.5 py-1.5 whitespace-nowrap text-xs font-medium text-gray-700">
                                 {col === 'firmName' ? (
                                   <div className="flex flex-col">
                                     <span className="font-semibold text-gray-955">{item.firmName || '-'}</span>
                                     {(currentType === 'customer' || currentType === 'vendor') && item.ownerName && (
-                                      <span className="text-xs text-gray-455 font-normal mt-0.5">{item.ownerName}</span>
+                                      <span className="text-[11px] text-gray-455 font-normal mt-0.5">{item.ownerName}</span>
                                     )}
                                   </div>
                                 ) : col === 'contactName' ? (
@@ -2078,7 +2105,7 @@ const PartyManagement: React.FC = () => {
                                   <div className="flex flex-col">
                                     <span className="font-semibold text-gray-955">{item.name || '-'}</span>
                                     {currentType === 'route' && item.code && (
-                                      <span className="text-xs text-gray-455 font-normal mt-0.5">{item.code}</span>
+                                      <span className="text-[11px] text-gray-455 font-normal mt-0.5">{item.code}</span>
                                     )}
                                   </div>
                                 ) : col === 'phone' ? (
@@ -2104,7 +2131,7 @@ const PartyManagement: React.FC = () => {
                                   ) : <span className="text-gray-400">-</span>
                                 ) : col === 'assignedAgent' ? (
                                   item.assignedAgent ? (
-                                    <span className="inline-flex px-2.5 py-1 text-xs font-medium rounded-md bg-purple-50 text-purple-775">
+                                    <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded bg-purple-50 text-purple-700 border border-purple-100">
                                       {item.assignedAgent}
                                     </span>
                                   ) : <span className="text-gray-400">Not Assigned</span>
@@ -2120,7 +2147,7 @@ const PartyManagement: React.FC = () => {
                                   </span>
                                 ) : col === 'customerGrade' ? (
                                   item.customerGrade ? (
-                                    <span className={`inline-flex px-2.5 py-0.5 text-xs font-bold rounded uppercase ${
+                                    <span className={`inline-flex px-2 py-0.5 text-xs font-bold rounded uppercase ${
                                       item.customerGrade.includes('Grade A') ? 'bg-purple-100 text-purple-700' :
                                       item.customerGrade.includes('Grade B') ? 'bg-indigo-100 text-indigo-700' :
                                       'bg-amber-100 text-amber-700'
@@ -2129,7 +2156,7 @@ const PartyManagement: React.FC = () => {
                                     </span>
                                   ) : <span className="text-gray-400">-</span>
                                 ) : col === 'status' ? (
-                                  <span className={`inline-flex px-2.5 py-0.5 text-[10px] font-bold rounded uppercase border ${
+                                  <span className={`inline-flex px-2 py-0.5 text-[10px] font-bold rounded uppercase border ${
                                     item.status === 'active' ? 'bg-green-50 border-green-200 text-green-700' :
                                     item.status === 'inactive' ? 'bg-gray-50 border-gray-200 text-gray-500' :
                                     'bg-yellow-50 border-yellow-250 text-yellow-755'
@@ -2142,26 +2169,26 @@ const PartyManagement: React.FC = () => {
                               </td>
                             );
                           })}
-                          <td className="px-5 py-3.5 whitespace-nowrap text-right text-sm" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex items-center justify-end space-x-2 text-xs">
+                          <td className="px-3.5 py-1.5 whitespace-nowrap text-right text-xs" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-end space-x-1.5 text-[11px]">
                               <button
                                 onClick={() => setViewingCustomer(item)}
-                                className="px-2.5 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors font-semibold shadow-xs"
+                                className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors font-semibold shadow-xs"
                               >
                                 Profile
                               </button>
                               <button
                                 onClick={() => handleEdit(item)}
-                                className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded bg-gray-50 hover:bg-blue-50 text-gray-700 hover:text-blue-700 border border-gray-200 hover:border-blue-200 transition-colors font-semibold shadow-xs"
+                                className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-gray-50 hover:bg-blue-50 text-gray-700 hover:text-blue-700 border border-gray-200 hover:border-blue-200 transition-colors font-semibold shadow-xs"
                               >
-                                <Edit className="w-3.5 h-3.5" />
+                                <Edit className="w-3 h-3" />
                                 <span>Edit</span>
                               </button>
                               <button
                                 onClick={() => handleDelete(item._id)}
-                                className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 transition-colors font-semibold shadow-xs"
+                                className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-red-600 hover:bg-red-700 text-white transition-colors font-semibold shadow-xs"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <Trash2 className="w-3 h-3 text-white" />
                                 <span>Delete</span>
                               </button>
                             </div>
@@ -3423,11 +3450,11 @@ const PartyManagement: React.FC = () => {
                 </button>
                 <button
                   onClick={() => handleDelete(viewingCustomer._id)}
-                  className="flex items-center justify-center space-x-2 p-2.5 bg-red-50 hover:bg-red-100 text-red-600 font-semibold text-xs rounded-lg border border-red-200 transition-colors"
+                  className="flex items-center justify-center space-x-2 p-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold text-xs rounded-lg transition-colors shadow-sm focus:ring-2 focus:ring-red-500 focus:outline-none"
                 >
-                  <Trash2 className="w-4 h-4 text-red-600" />
+                  <Trash2 className="w-4 h-4 text-white" />
                   <span>Delete</span>
-                  <kbd className="ml-1 px-1.5 py-0.5 text-[9px] font-mono font-bold text-red-500 bg-red-100 rounded border border-red-200 select-none pointer-events-none">Alt+D</kbd>
+                  <kbd className="ml-1 px-1.5 py-0.5 text-[9px] font-mono font-bold text-red-100 bg-red-800 rounded border border-red-700 select-none pointer-events-none">Alt+D</kbd>
                 </button>
                 
                 {currentType === 'customer' && (
@@ -4278,7 +4305,7 @@ const PartyManagement: React.FC = () => {
                   customConfirm.onConfirm();
                   setCustomConfirm(null);
                 }}
-                className="flex-1 py-2.5 bg-red-650 hover:bg-red-700 text-white rounded-lg transition-colors font-semibold text-sm shadow-xs focus:ring-2 focus:ring-red-500 focus:outline-none cursor-pointer flex items-center justify-center gap-1.5"
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-semibold text-sm shadow-xs focus:ring-2 focus:ring-red-500 focus:outline-none cursor-pointer flex items-center justify-center gap-1.5"
                 autoFocus
               >
                 Delete
