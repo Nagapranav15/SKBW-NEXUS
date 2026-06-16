@@ -1,0 +1,55 @@
+[
+  {
+    "id": "1",
+    "quoteNumber": "QT-2024-0001",
+    "customerId": "1",
+    "customerName": "ABC Educational Supplies",
+    "date": "2024-01-10",
+    "validUntil": "2024-02-10",
+    "items": [
+      {
+        "itemId": "1",
+        "itemName": "A4 Single Line Notebook - 200 Pages",
+        "quantity": 100,
+        "price": 250.00,
+        "total": 25000.00
+      },
+      {
+        "itemId": "2",
+        "itemName": "A5 Ruled Notebook - 100 Pages",
+        "quantity": 50,
+        "price": 150.00,
+        "total": 7500.00
+      }
+    ],
+    "subtotal": 32500.00,
+    "tax": 5850.00,
+    "total": 38350.00,
+    "status": "accepted",
+    "notes": "Bulk order for new academic year",
+    "createdAt": "2024-01-10T00:00:00.000Z"
+  },
+  {
+    "id": "2",
+    "quoteNumber": "QT-2024-0002",
+    "customerId": "2",
+    "customerName": "XYZ School Supplies",
+    "date": "2024-01-12",
+    "validUntil": "2024-02-12",
+    "items": [
+      {
+        "itemId": "2",
+        "itemName": "A5 Ruled Notebook - 100 Pages",
+        "quantity": 200,
+        "price": 150.00,
+        "total": 30000.00
+      }
+    ],
+    "subtotal": 30000.00,
+    "tax": 5400.00,
+    "total": 35400.00,
+    "status": "accepted",
+    "notes": "Regular monthly order",
+    "createdAt": "2024-01-12T00:00:00.000Z"
+  }
+]

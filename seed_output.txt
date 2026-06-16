@@ -1,0 +1,12 @@
+﻿node.exe : npm error Missing script: "seed"
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Users\nagap\AppData\Roaming\ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm error Missing script: "seed":String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+npm error
+npm error To see a list of scripts, run:
+npm error   npm run
+npm error A complete log of this run can be found in: 
+C:\Users\nagap\AppData\Local\npm-cache\_logs\2026-04-06T07_24_22_326Z-debug-0.log

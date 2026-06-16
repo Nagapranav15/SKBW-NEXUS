@@ -1,0 +1,35 @@
+[
+  {
+    "id": "1",
+    "username": "admin",
+    "password": "admin123",
+    "role": "Admin",
+    "email": "admin@company.com",
+    "fullName": "System Administrator",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "lastLogin": "2024-01-15T10:30:00.000Z",
+    "status": "active"
+  },
+  {
+    "id": "2",
+    "username": "manager",
+    "password": "manager123",
+    "role": "Manager",
+    "email": "manager@company.com",
+    "fullName": "Production Manager",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "lastLogin": "2024-01-15T09:15:00.000Z",
+    "status": "active"
+  },
+  {
+    "id": "3",
+    "username": "sales",
+    "password": "sales123",
+    "role": "Sales",
+    "email": "sales@company.com",
+    "fullName": "Sales Executive",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "lastLogin": "2024-01-15T08:45:00.000Z",
+    "status": "active"
+  }
+]

@@ -1,0 +1,22 @@
+[
+  {
+    "id": "1",
+    "name": "Notebook Manufacturing Co.",
+    "logo": "",
+    "address": "123 Industrial Area, Phase 2, Manufacturing Hub, City - 560001",
+    "phone": "+91 9876543210",
+    "email": "info@notebookmanufacturing.com",
+    "gst": "29ABCDE1234F1Z5",
+    "createdAt": "2024-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "2",
+    "name": "Premium Stationery Ltd.",
+    "logo": "",
+    "address": "456 Business Park, Sector 5, Commercial Zone, City - 560002",
+    "phone": "+91 9876543211",
+    "email": "contact@premiumstationery.com",
+    "gst": "29FGHIJ5678K2L6",
+    "createdAt": "2024-01-01T00:00:00.000Z"
+  }
+]

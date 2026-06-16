@@ -1,0 +1,30 @@
+[
+  {
+    "id": "1",
+    "dcNumber": "DC-2024-0001",
+    "orderId": "3",
+    "orderNumber": "SO-2024-0003",
+    "customerId": "3",
+    "customerName": "Modern College Store",
+    "date": "2024-01-15",
+    "transporterId": "1",
+    "transporterName": "Express Logistics",
+    "vehicleNumber": "MH12AB1234",
+    "items": [
+      {
+        "itemId": "1",
+        "itemName": "A4 Single Line Notebook - 200 Pages",
+        "orderedQty": 75,
+        "deliveredQty": 75,
+        "price": 250.00,
+        "total": 18750.00
+      }
+    ],
+    "subtotal": 18750.00,
+    "tax": 3375.00,
+    "total": 22125.00,
+    "status": "ready",
+    "notes": "Handle with care - premium notebooks",
+    "createdAt": "2024-01-15T00:00:00.000Z"
+  }
+]

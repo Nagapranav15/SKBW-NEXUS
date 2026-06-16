@@ -1,0 +1,25 @@
+[
+  {
+    "id": "1",
+    "dcId": "1",
+    "dcNumber": "DC-2024-0001",
+    "customerId": "3",
+    "customerName": "Modern College Store",
+    "transporterId": "1",
+    "transporterName": "Express Logistics",
+    "vehicleNumber": "MH12AB1234",
+    "items": [
+      {
+        "itemId": "1",
+        "itemName": "A4 Single Line Notebook - 200 Pages",
+        "quantity": 75,
+        "scannedQty": 0,
+        "status": "pending"
+      }
+    ],
+    "status": "ready",
+    "assignedTo": "",
+    "notes": "",
+    "createdAt": "2024-01-15T00:00:00.000Z"
+  }
+]

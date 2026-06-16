@@ -1,0 +1,78 @@
+[
+  {
+    "id": "1",
+    "orderNumber": "SO-2024-0001",
+    "customerId": "1",
+    "customerName": "ABC Educational Supplies",
+    "date": "2024-01-11",
+    "deliveryDate": "2024-01-25",
+    "items": [
+      {
+        "itemId": "1",
+        "itemName": "A4 Single Line Notebook - 200 Pages",
+        "quantity": 100,
+        "price": 250.00,
+        "total": 25000.00
+      },
+      {
+        "itemId": "2",
+        "itemName": "A5 Ruled Notebook - 100 Pages",
+        "quantity": 50,
+        "price": 150.00,
+        "total": 7500.00
+      }
+    ],
+    "subtotal": 32500.00,
+    "tax": 5850.00,
+    "total": 38350.00,
+    "status": "confirmed",
+    "notes": "Converted from quote QT-2024-0001",
+    "createdAt": "2024-01-11T00:00:00.000Z"
+  },
+  {
+    "id": "2",
+    "orderNumber": "SO-2024-0002",
+    "customerId": "2",
+    "customerName": "XYZ School Supplies",
+    "date": "2024-01-13",
+    "deliveryDate": "2024-01-27",
+    "items": [
+      {
+        "itemId": "2",
+        "itemName": "A5 Ruled Notebook - 100 Pages",
+        "quantity": 200,
+        "price": 150.00,
+        "total": 30000.00
+      }
+    ],
+    "subtotal": 30000.00,
+    "tax": 5400.00,
+    "total": 35400.00,
+    "status": "pending",
+    "notes": "Converted from quote QT-2024-0002",
+    "createdAt": "2024-01-13T00:00:00.000Z"
+  },
+  {
+    "id": "3",
+    "orderNumber": "SO-2024-0003",
+    "customerId": "3",
+    "customerName": "Modern College Store",
+    "date": "2024-01-14",
+    "deliveryDate": "2024-01-28",
+    "items": [
+      {
+        "itemId": "1",
+        "itemName": "A4 Single Line Notebook - 200 Pages",
+        "quantity": 75,
+        "price": 250.00,
+        "total": 18750.00
+      }
+    ],
+    "subtotal": 18750.00,
+    "tax": 3375.00,
+    "total": 22125.00,
+    "status": "ready",
+    "notes": "Rush order for immediate delivery",
+    "createdAt": "2024-01-14T00:00:00.000Z"
+  }
+]
