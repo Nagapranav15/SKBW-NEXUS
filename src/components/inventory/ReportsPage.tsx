@@ -94,14 +94,14 @@ const ReportsPage: React.FC = () => {
                 <tr><td colSpan={8} className="px-6 py-12 text-center text-gray-400">No audit logs found</td></tr>
               ) : auditLogs.map((log: any) => (
                 <tr key={log._id} className="hover:bg-gray-50">
-                  <td className="px-6 py-3 text-sm text-gray-500">{new Date(log.createdAt).toLocaleString()}</td>
+                  <td className="px-6 py-3 text-[13.5px] text-gray-500">{new Date(log.createdAt).toLocaleString()}</td>
                   <td className="px-6 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${actionColors[log.action_type] || 'bg-gray-100 text-gray-700'}`}>{log.action_type}</span></td>
-                  <td className="px-6 py-3 text-sm font-medium text-gray-900">{log.item?.name || '-'}</td>
-                  <td className="px-6 py-3 text-sm text-gray-500">{log.quantity_before}</td>
-                  <td className="px-6 py-3 text-sm text-gray-500">{log.quantity_after}</td>
-                  <td className="px-6 py-3"><span className={`text-sm font-medium ${log.change_amount > 0 ? 'text-green-600' : 'text-red-600'}`}>{log.change_amount > 0 ? '+' : ''}{log.change_amount}</span></td>
-                  <td className="px-6 py-3 text-sm text-gray-500">{log.performed_by?.fullName || 'System'}</td>
-                  <td className="px-6 py-3 text-sm text-gray-400 max-w-[200px] truncate">{log.reason || '-'}</td>
+                  <td className="px-6 py-3 text-[13.5px] font-medium text-gray-900">{log.item?.name || '-'}</td>
+                  <td className="px-6 py-3 text-[13.5px] text-gray-500">{log.quantity_before}</td>
+                  <td className="px-6 py-3 text-[13.5px] text-gray-500">{log.quantity_after}</td>
+                  <td className="px-6 py-3"><span className={`text-[13.5px] font-medium ${log.change_amount > 0 ? 'text-green-600' : 'text-red-600'}`}>{log.change_amount > 0 ? '+' : ''}{log.change_amount}</span></td>
+                  <td className="px-6 py-3 text-[13.5px] text-gray-500">{log.performed_by?.fullName || 'System'}</td>
+                  <td className="px-6 py-3 text-[13.5px] text-gray-400 max-w-[200px] truncate">{log.reason || '-'}</td>
                 </tr>
               ))}
             </tbody>

@@ -111,12 +111,12 @@ const SkuStockPage: React.FC = () => {
                 const isOut = s.totalQuantity === 0;
                 return (
                   <tr key={s.item?._id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-3 text-sm font-medium text-blue-600">{s.item?.itemId}</td>
-                    <td className="px-6 py-3 text-sm font-medium text-gray-900">{s.item?.name}</td>
+                    <td className="px-6 py-3 text-[13.5px] font-medium text-blue-600">{s.item?.itemId}</td>
+                    <td className="px-6 py-3 text-[13.5px] font-medium text-gray-900">{s.item?.name}</td>
                     <td className="px-6 py-3"><span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-700">{s.item?.category || '-'}</span></td>
-                    <td className="px-6 py-3 text-sm text-gray-500">{s.item?.primaryUnit || '-'}</td>
-                    <td className="px-6 py-3 text-sm font-semibold text-gray-900">{s.totalQuantity?.toLocaleString()}</td>
-                    <td className="px-6 py-3 text-sm text-gray-500">{s.locations?.length || 0} zone(s)</td>
+                    <td className="px-6 py-3 text-[13.5px] text-gray-500">{s.item?.primaryUnit || '-'}</td>
+                    <td className="px-6 py-3 text-[13.5px] font-semibold text-gray-900">{s.totalQuantity?.toLocaleString()}</td>
+                    <td className="px-6 py-3 text-[13.5px] text-gray-500">{s.locations?.length || 0} zone(s)</td>
                     <td className="px-6 py-3">
                       {isOut ? <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">Out of Stock</span> :
                        isLow ? <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium flex items-center gap-1 w-fit"><AlertTriangle className="w-3 h-3" />Low</span> :

@@ -13,7 +13,9 @@ import {
   Database,
   ArrowDownToLine,
   BarChart3,
-  Warehouse
+  Warehouse,
+  LayoutGrid,
+  Layers
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DataManager from './DataManager';
@@ -77,10 +79,10 @@ const Layout: React.FC = () => {
 
   const inventoryItems = [
     { label: 'Dashboard', path: '/inventory/dashboard', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
-    { label: 'Zones', path: '/inventory/zones', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
     { label: 'SKU Master', path: '/inventory/skus', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
-    { label: 'Movements', path: '/inventory/movements', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
     { label: 'BOM & Assembly', path: '/inventory/bom', permission: ['MANAGE_INVENTORY', 'MANAGE_ITEMS'] },
+    { label: 'Zones', path: '/inventory/zones', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
+    { label: 'Movements', path: '/inventory/movements', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
     { label: 'Analytics', path: '/inventory/analytics', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
     { label: 'Reports', path: '/inventory/reports', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
   ];
@@ -95,6 +97,32 @@ const Layout: React.FC = () => {
       case 'sales': return 'bg-green-100 text-green-700';
       default: return 'bg-gray-100 text-gray-700';
     }
+  };
+
+  const getPrimaryClass = (path: string) => {
+    const active = isActive(path);
+    return `w-full flex items-center space-x-3 px-3 py-2 transition-all duration-150 ${
+      active
+        ? 'border-l-4 border-blue-600 bg-gradient-to-r from-blue-100 to-blue-50/30 text-blue-700 font-semibold rounded-r-lg rounded-l-none shadow-xs'
+        : 'border-l-4 border-transparent text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-lg'
+    }`;
+  };
+
+  const getDropdownPrimaryClass = (activeCondition: boolean) => {
+    return `w-full flex items-center justify-between px-3 py-2 transition-all duration-150 ${
+      activeCondition
+        ? 'border-l-4 border-blue-600 bg-gradient-to-r from-blue-100 to-blue-50/30 text-blue-700 font-semibold rounded-r-lg rounded-l-none shadow-xs'
+        : 'border-l-4 border-transparent text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-lg'
+    }`;
+  };
+
+  const getSubItemClass = (path: string) => {
+    const active = isActive(path);
+    return `w-full text-left px-3 py-1.5 transition-all duration-150 text-[13px] ${
+      active
+        ? 'border-l-4 border-blue-500 bg-gradient-to-r from-blue-50/80 to-blue-50/10 text-blue-600 font-semibold rounded-r-lg rounded-l-none'
+        : 'border-l-4 border-transparent text-gray-650 hover:bg-gray-50 hover:text-gray-900 rounded-lg'
+    }`;
   };
 
   return (
@@ -137,11 +165,7 @@ const Layout: React.FC = () => {
             <button
               key={item.path}
               onClick={() => navigate(item.path)}
-              className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
-                isActive(item.path)
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
+              className={getPrimaryClass(item.path)}
             >
               <item.icon className="w-5 h-5" />
               {sidebarOpen && <span>{item.label}</span>}
@@ -153,15 +177,11 @@ const Layout: React.FC = () => {
             <div className="relative">
               <button
                 onClick={() => setMasterDropdownOpen(!masterDropdownOpen)}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${
-                  isPartyActive() || isInventoryActive()
-                    ? 'bg-blue-100 text-blue-700 font-semibold'
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
+                className={getDropdownPrimaryClass(isPartyActive() || isInventoryActive())}
               >
                 <div className="flex items-center space-x-3">
-                  <Warehouse className="w-5 h-5 text-blue-600" />
-                  {sidebarOpen && <span className="font-semibold text-gray-900">Masters</span>}
+                  <LayoutGrid className="w-5 h-5 text-blue-600" />
+                  {sidebarOpen && <span className="text-base font-bold text-gray-955">Masters</span>}
                 </div>
                 {sidebarOpen && (
                   <ChevronDown className={`w-4 h-4 transition-transform ${masterDropdownOpen ? 'rotate-180' : ''}`} />
@@ -170,20 +190,20 @@ const Layout: React.FC = () => {
 
               {masterDropdownOpen && sidebarOpen && (
                 <div className="mt-2 ml-4 pl-2 border-l border-gray-100 space-y-3">
-                  {/* Party Management Section */}
+                  {/* Party Section */}
                   {hasPartyAccess && (
                     <div>
                       <button
                         onClick={() => setPartyDropdownOpen(!partyDropdownOpen)}
-                        className={`w-full flex items-center justify-between px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                        className={`w-full flex items-center justify-between px-2 py-1 rounded-lg text-sm font-semibold transition-colors ${
                           isPartyActive()
                             ? 'text-blue-700 bg-blue-50/40'
-                            : 'text-gray-500 hover:bg-gray-50'
+                            : 'text-gray-650 hover:bg-gray-50'
                         }`}
                       >
                         <div className="flex items-center space-x-1.5">
-                          <Users className="w-3.5 h-3.5" />
-                          <span>Party Management</span>
+                          <Users className="w-3.5 h-3.5 text-gray-500" />
+                          <span>Party</span>
                         </div>
                         <ChevronDown className={`w-3.5 h-3.5 transition-transform ${partyDropdownOpen ? 'rotate-180' : ''}`} />
                       </button>
@@ -194,11 +214,7 @@ const Layout: React.FC = () => {
                             <button
                               key={item.path}
                               onClick={() => navigate(item.path)}
-                              className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                                isActive(item.path)
-                                  ? 'bg-blue-50 text-blue-600 font-medium'
-                                  : 'text-gray-600 hover:bg-gray-50'
-                              }`}
+                              className={getSubItemClass(item.path)}
                             >
                               {item.label}
                             </button>
@@ -208,20 +224,20 @@ const Layout: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Inventory Management Section */}
+                  {/* Inventory Section */}
                   {hasInventoryAccess && (
                     <div>
                       <button
                         onClick={() => setInventoryDropdownOpen(!inventoryDropdownOpen)}
-                        className={`w-full flex items-center justify-between px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                        className={`w-full flex items-center justify-between px-2 py-1 rounded-lg text-sm font-semibold transition-colors ${
                           isInventoryActive()
                             ? 'text-blue-700 bg-blue-50/40'
-                            : 'text-gray-500 hover:bg-gray-50'
+                            : 'text-gray-650 hover:bg-gray-50'
                         }`}
                       >
                         <div className="flex items-center space-x-1.5">
-                          <Package className="w-3.5 h-3.5" />
-                          <span>Inventory Management</span>
+                          <Package className="w-3.5 h-3.5 text-gray-500" />
+                          <span>Inventory</span>
                         </div>
                         <ChevronDown className={`w-3.5 h-3.5 transition-transform ${inventoryDropdownOpen ? 'rotate-180' : ''}`} />
                       </button>
@@ -232,11 +248,7 @@ const Layout: React.FC = () => {
                             <button
                               key={item.path}
                               onClick={() => navigate(item.path)}
-                              className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                                isActive(item.path)
-                                  ? 'bg-blue-50 text-blue-600 font-medium'
-                                  : 'text-gray-600 hover:bg-gray-50'
-                              }`}
+                              className={getSubItemClass(item.path)}
                             >
                               {item.label}
                             </button>
@@ -255,11 +267,7 @@ const Layout: React.FC = () => {
             <div className="relative">
               <button
                 onClick={() => setSalesDropdownOpen(!salesDropdownOpen)}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${
-                  isSalesActive()
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
+                className={getDropdownPrimaryClass(isSalesActive())}
               >
                 <div className="flex items-center space-x-3">
                   <ShoppingCart className="w-5 h-5" />
@@ -276,11 +284,7 @@ const Layout: React.FC = () => {
                     <button
                       key={item.path}
                       onClick={() => navigate(item.path)}
-                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                        isActive(item.path)
-                          ? 'bg-blue-50 text-blue-600'
-                          : 'text-gray-600 hover:bg-gray-50'
-                      }`}
+                      className={getSubItemClass(item.path)}
                     >
                       {item.label}
                     </button>
@@ -305,11 +309,7 @@ const Layout: React.FC = () => {
           {hasPermission(['MANAGE_REPORTS', 'VIEW_REPORTS', 'VIEW_TRANSACTIONS']) && (
             <button
               onClick={() => navigate('/transactions')}
-              className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
-                isActive('/transactions')
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
+              className={getPrimaryClass('/transactions')}
             >
               <ArrowDownToLine className="w-5 h-5" />
               {sidebarOpen && <span>Transactions</span>}
@@ -320,11 +320,7 @@ const Layout: React.FC = () => {
           {hasPermission(['MANAGE_REPORTS', 'VIEW_REPORTS']) && (
             <button
               onClick={() => navigate('/analyzer')}
-              className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
-                isActive('/analyzer')
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
+              className={getPrimaryClass('/analyzer')}
             >
               <BarChart3 className="w-5 h-5" />
               {sidebarOpen && <span>Analyzer</span>}

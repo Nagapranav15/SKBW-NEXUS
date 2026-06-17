@@ -1,6 +1,7 @@
 const Party = require('../models/partyModel');
 const Route = require('../models/routeModel');
 const ActivityLog = require('../models/activityLogModel');
+const Sequence = require('../models/sequenceModel');
 
 const stateMap = {
   "andhra pradesh": "AP",
@@ -77,24 +78,43 @@ const generateCustomerCode = async (partyData) => {
   const cityCode = getCityCode(partyData.city);
   const prefix = `${stateCode}-${routeCode}-${cityCode}-`;
   
-  const customers = await Party.find({
-    type: 'customer',
-    code: { $regex: '^' + prefix }
-  }, { code: 1 });
-  
-  let maxNum = 0;
-  customers.forEach(c => {
-    if (c.code) {
-      const parts = c.code.split('-');
-      const lastPart = parts[parts.length - 1];
-      const num = parseInt(lastPart, 10);
-      if (!isNaN(num) && num > maxNum) {
-        maxNum = num;
+  // Find or initialize Sequence document for the prefix
+  let seqDoc = await Sequence.findOne({ prefix });
+  if (!seqDoc) {
+    // Find the max number currently in the database for existing records
+    const customers = await Party.find({
+      type: 'customer',
+      code: { $regex: '^' + prefix }
+    }, { code: 1 });
+    
+    let maxNum = 0;
+    customers.forEach(c => {
+      if (c.code) {
+        const parts = c.code.split('-');
+        const lastPart = parts[parts.length - 1];
+        const num = parseInt(lastPart, 10);
+        if (!isNaN(num) && num > maxNum) {
+          maxNum = num;
+        }
       }
-    }
-  });
+    });
+    
+    // Create sequence starting at maxNum
+    seqDoc = await Sequence.findOneAndUpdate(
+      { prefix },
+      { $setOnInsert: { sequence: maxNum } },
+      { new: true, upsert: true }
+    );
+  }
   
-  const runningNum = String(maxNum + 1).padStart(4, '0');
+  // Increment and get next sequence number
+  seqDoc = await Sequence.findOneAndUpdate(
+    { prefix },
+    { $inc: { sequence: 1 } },
+    { new: true }
+  );
+  
+  const runningNum = String(seqDoc.sequence).padStart(4, '0');
   return prefix + runningNum;
 };
 
@@ -150,15 +170,73 @@ exports.getParties = async (req, res) => {
     const limit = parseInt(req.query.limit) || 50;
     const skip = (page - 1) * limit;
 
-    // Secure sorting with whitelist validation
+    // Secure sorting & filtering with whitelist validation
     const allowedSortFields = ['firmName', 'contactName', 'ownerName', 'phone', 'city', 'district', 'state', 'pincode', 'route', 'agentAssigned', 'customerGrade', 'creditLimit', 'outstanding', 'status', 'createdAt'];
-    let sortBy = req.query.sortBy || 'createdAt';
-    if (!allowedSortFields.includes(sortBy)) {
-      sortBy = 'createdAt';
+
+    // Parse dynamic Multi-Filter rules
+    if (req.query.filterRules) {
+      try {
+        const rules = JSON.parse(req.query.filterRules);
+        if (Array.isArray(rules) && rules.length > 0) {
+          const ruleQueries = [];
+          rules.forEach(rule => {
+            const { field, condition, value } = rule;
+            if (value === undefined || value === null || value === '') return;
+            
+            let queryVal;
+            if (condition === 'equal to') {
+              queryVal = new RegExp('^' + value.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i');
+            } else if (condition === 'contains') {
+              queryVal = new RegExp(value.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i');
+            } else if (condition === 'greater than') {
+              const numVal = Number(value);
+              queryVal = !isNaN(numVal) ? { $gt: numVal } : { $gt: value };
+            } else if (condition === 'less than') {
+              const numVal = Number(value);
+              queryVal = !isNaN(numVal) ? { $lt: numVal } : { $lt: value };
+            } else if (condition === 'starts with') {
+              queryVal = new RegExp('^' + value.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i');
+            } else if (condition === 'ends with') {
+              queryVal = new RegExp(value.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i');
+            }
+            
+            if (queryVal !== undefined && allowedSortFields.includes(field)) {
+              ruleQueries.push({ [field]: queryVal });
+            }
+          });
+          
+          if (ruleQueries.length > 0) {
+            filter.$and = filter.$and ? [...filter.$and, ...ruleQueries] : ruleQueries;
+          }
+        }
+      } catch (err) {
+        console.error('Error parsing filterRules:', err);
+      }
     }
-    const sortOrder = req.query.sortOrder === 'asc' ? 1 : -1;
+
+    // Secure sorting with whitelist validation (multi-column supported)
     const sortObj = {};
-    sortObj[sortBy] = sortOrder;
+    if (req.query.sortBy && req.query.sortBy.includes(',')) {
+      const fields = req.query.sortBy.split(',');
+      const orders = (req.query.sortOrder || '').split(',');
+      fields.forEach((f, idx) => {
+        const field = f.trim();
+        if (allowedSortFields.includes(field)) {
+          const order = orders[idx] === 'desc' ? -1 : 1;
+          sortObj[field] = order;
+        }
+      });
+    } else if (req.query.sortBy) {
+      let sortBy = req.query.sortBy;
+      if (!allowedSortFields.includes(sortBy)) {
+        sortBy = 'createdAt';
+      }
+      const sortOrder = req.query.sortOrder === 'desc' ? -1 : 1;
+      sortObj[sortBy] = sortOrder;
+    } else {
+      // Default to no sorting or date sorting
+      sortObj['createdAt'] = -1;
+    }
 
     const [rawParties, total] = await Promise.all([
       Party.find(filter).sort(sortObj).skip(skip).limit(limit),
@@ -250,6 +328,24 @@ exports.updateParty = async (req, res) => {
     delete data.__v;
     delete data.createdAt;
     delete data.updatedAt;
+    
+    // Check if city, route, or state changed for a customer to regenerate code
+    const existingParty = await Party.findById(req.params.id);
+    if (existingParty && existingParty.type === 'customer') {
+      const routeChanged = (data.route !== undefined && data.route !== existingParty.route);
+      const cityChanged = (data.city !== undefined && data.city !== existingParty.city);
+      const stateChanged = (data.state !== undefined && data.state !== existingParty.state);
+      
+      if (routeChanged || cityChanged || stateChanged) {
+        const mergedData = {
+          state: data.state !== undefined ? data.state : existingParty.state,
+          route: data.route !== undefined ? data.route : existingParty.route,
+          city: data.city !== undefined ? data.city : existingParty.city
+        };
+        data.code = await generateCustomerCode(mergedData);
+      }
+    }
+    
     const party = await Party.findByIdAndUpdate(req.params.id, data, { new: true });
     if (!party) return res.status(404).json({ msg: 'Party not found' });
 
@@ -304,39 +400,7 @@ exports.importParties = async (req, res) => {
         data.companies = [data.company];
       }
       if (data.type === 'customer' && !data.code) {
-        const state = (data.state || "Andhra Pradesh").trim();
-        const stateCode = stateMap[state.toLowerCase()] || state.substring(0, 2).toUpperCase();
-        const routeCode = getRouteCode(data.route);
-        const cityCode = getCityCode(data.city);
-        const prefix = `${stateCode}-${routeCode}-${cityCode}-`;
-
-        // Find matches in DB
-        const dbMatches = await Party.find({ type: 'customer', code: { $regex: '^' + prefix } }, { code: 1 });
-        let maxNum = 0;
-        dbMatches.forEach(c => {
-          if (c.code) {
-            const parts = c.code.split('-');
-            const lastPart = parts[parts.length - 1];
-            const num = parseInt(lastPart, 10);
-            if (!isNaN(num) && num > maxNum) {
-              maxNum = num;
-            }
-          }
-        });
-
-        // Find matches in processedParties so far
-        processedParties.forEach(prev => {
-          if (prev.type === 'customer' && prev.code && prev.code.startsWith(prefix)) {
-            const parts = prev.code.split('-');
-            const lastPart = parts[parts.length - 1];
-            const num = parseInt(lastPart, 10);
-            if (!isNaN(num) && num > maxNum) {
-              maxNum = num;
-            }
-          }
-        });
-
-        data.code = prefix + String(maxNum + 1).padStart(4, '0');
+        data.code = await generateCustomerCode(data);
       }
       processedParties.push(data);
     }

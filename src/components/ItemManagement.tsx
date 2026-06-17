@@ -410,8 +410,8 @@ const ItemManagement: React.FC = () => {
                   <tr key={item.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
-                        <div className="text-sm font-medium text-gray-900">{item.name}</div>
-                        <div className="text-sm text-gray-500">ID: {item.itemId}</div>
+                        <div className="text-[13.5px] font-medium text-gray-900">{item.name}</div>
+                        <div className="text-[13.5px] text-gray-500">ID: {item.itemId}</div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -420,28 +420,28 @@ const ItemManagement: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{item.primaryUnit}</div>
+                      <div className="text-[13.5px] text-gray-900">{item.primaryUnit}</div>
                       {item.altUnit && (
-                        <div className="text-sm text-gray-500">
+                        <div className="text-[13.5px] text-gray-500">
                           1 {item.primaryUnit} = {item.conversionFactor} {item.altUnit}
                         </div>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">₹{item.price.toFixed(2)}</div>
-                      <div className="text-sm text-gray-500">Cost: ₹{item.cost.toFixed(2)}</div>
+                      <div className="text-[13.5px] text-gray-900">₹{item.price.toFixed(2)}</div>
+                      <div className="text-[13.5px] text-gray-500">Cost: ₹{item.cost.toFixed(2)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{item.stock} {item.primaryUnit}</div>
+                      <div className="text-[13.5px] text-gray-900">{item.stock} {item.primaryUnit}</div>
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${stockStatus.color}`}>
                         {stockStatus.text}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {item.bomTotalCost !== undefined ? (
-                        <div className="text-sm text-gray-900">₹{item.bomTotalCost.toFixed(2)}</div>
+                        <div className="text-[13.5px] text-gray-900">₹{item.bomTotalCost.toFixed(2)}</div>
                       ) : (
-                        <div className="text-sm text-gray-500">N/A</div>
+                        <div className="text-[13.5px] text-gray-500">N/A</div>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -452,7 +452,7 @@ const ItemManagement: React.FC = () => {
                         {item.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <td className="px-6 py-4 whitespace-nowrap text-[13.5px] font-medium">
                       <div className="flex space-x-2">
                         {canManage && (
                           <button

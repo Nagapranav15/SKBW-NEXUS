@@ -17,6 +17,114 @@ import {
 import { getRoutes, createRoute, updateRoute, deleteRoute } from '../api/routeApi';
 import { getActivityLogs } from '../api/activityLogApi';
 
+const WhatsAppIcon: React.FC = () => (
+  <svg 
+    className="w-4.5 h-4.5 text-green-500 hover:text-green-600 transition-colors inline-block align-middle ml-1.5 cursor-pointer shrink-0" 
+    viewBox="0 0 24 24" 
+    fill="currentColor"
+    title="Chat on WhatsApp"
+  >
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.458 5.705 1.459h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+  </svg>
+);
+
+const getWhatsAppLink = (phoneNum: string) => {
+  const digits = phoneNum.replace(/\D/g, '');
+  const normalized = digits.length === 10 ? '91' + digits : digits;
+  return `https://wa.me/${normalized}`;
+};
+
+const getRouteDisplay = (routeName: string, allRoutes: { name: string; code: string }[]) => {
+  if (!routeName) return '-';
+  const found = allRoutes.find(r => r.name.toLowerCase() === routeName.toLowerCase());
+  return found && found.code ? found.code : routeName;
+};
+
+interface SortRule {
+  field: string;
+  order: 'asc' | 'desc';
+}
+
+interface FilterRule {
+  join: 'and' | 'or';
+  field: string;
+  condition: 'equal to' | 'contains' | 'greater than' | 'less than' | 'starts with' | 'ends with';
+  value: string;
+}
+
+const getColumnsSchema = (type: string): Record<string, string> => {
+  switch (type) {
+    case 'customer':
+      return {
+        firmName: 'Firm Name',
+        phone: 'Mobile Number',
+        city: 'City',
+        district: 'District',
+        agentAssigned: 'Assigned Agent',
+        route: 'Region',
+        customerGrade: 'Grade',
+        creditLimit: 'Credit Limit',
+        outstanding: 'Outstanding',
+        status: 'Status'
+      };
+    case 'vendor':
+      return {
+        firmName: 'Firm Name',
+        phone: 'Mobile',
+        city: 'City',
+        district: 'District',
+        status: 'Status'
+      };
+    case 'agent':
+      return {
+        contactName: 'Agent Name',
+        phone: 'Mobile',
+        assignedRoutes: 'Assigned Regions',
+        status: 'Status'
+      };
+    case 'route':
+      return {
+        name: 'Region Code',
+        assignedAgent: 'Assigned Agent',
+        citiesCount: 'Cities Count',
+        customersCount: 'Customers Count',
+        status: 'Status'
+      };
+    case 'market':
+      return {
+        firmName: 'City Name',
+        district: 'District',
+        state: 'State',
+        route: 'Region',
+        customerCount: 'Customer Count',
+        status: 'Status'
+      };
+    case 'transporter':
+      return {
+        firmName: 'Transporter Name',
+        contactName: 'Contact Person',
+        phone: 'Mobile',
+        city: 'City',
+        status: 'Status'
+      };
+    default:
+      return {};
+  }
+};
+
+const getDefaultVisibleColumns = (type: string): Record<string, boolean> => {
+  const allCols = getColumnsSchema(type);
+  const defaultCols: Record<string, boolean> = {};
+  Object.keys(allCols).forEach(key => {
+    if (type === 'customer') {
+      defaultCols[key] = ['firmName', 'phone', 'city', 'agentAssigned', 'customerGrade', 'status'].includes(key);
+    } else {
+      defaultCols[key] = true;
+    }
+  });
+  return defaultCols;
+};
+
 interface Party {
   _id: string;
   type: 'customer' | 'vendor' | 'agent' | 'market' | 'transporter' | 'staff' | 'employee';
@@ -311,6 +419,11 @@ const PartyManagement: React.FC = () => {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
+  // Filter input searches
+  const [filterCitySearch, setFilterCitySearch] = useState('');
+  const [filterRouteSearch, setFilterRouteSearch] = useState('');
+  const [filterAgentSearch, setFilterAgentSearch] = useState('');
+
   // Cities search under regions
   const [citySearchText, setCitySearchText] = useState('');
   const [regionCitySearchText, setRegionCitySearchText] = useState('');
@@ -381,18 +494,50 @@ const PartyManagement: React.FC = () => {
   const [cityCustomersLoading, setCityCustomersLoading] = useState(false);
   const [cityCustomersSearchText, setCityCustomersSearchText] = useState('');
 
-  // Persisted Filters state
-  const [filters, setFilters] = useState<any>({
-    status: [],
-    city: [],
-    route: [],
-    agentAssigned: [],
-    customerGrade: []
+  // Lazy initialize visibleColumns from localStorage
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
+    const type = getTypeFromPath();
+    const saved = localStorage.getItem(`skbw_erp_visible_columns_${type}`);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // ignore
+      }
+    }
+    return getDefaultVisibleColumns(type);
   });
 
-  // Sorting state
-  const [sortField, setSortField] = useState<string>('firmName');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  // Lazy initialize sortRules from localStorage (default to empty rule set to avoid default sort on refresh)
+  const [sortRules, setSortRules] = useState<SortRule[]>(() => {
+    const type = getTypeFromPath();
+    const saved = localStorage.getItem(`skbw_erp_sort_rules_${type}`);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // ignore
+      }
+    }
+    return [];
+  });
+
+  // Lazy initialize filterRules from localStorage
+  const [filterRules, setFilterRules] = useState<FilterRule[]>(() => {
+    const type = getTypeFromPath();
+    const saved = localStorage.getItem(`skbw_erp_filter_rules_${type}`);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // ignore
+      }
+    }
+    return [];
+  });
+
+  // Sorting state helpers (no longer active states, just derived or empty helpers)
+  const allColumns = getColumnsSchema(currentType);
 
   // Activity Log State
   const [showActivityLog, setShowActivityLog] = useState(false);
@@ -411,79 +556,6 @@ const PartyManagement: React.FC = () => {
     'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
     'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal'
   ];
-
-  // Table Columns Setup
-  const getColumnsSchema = () => {
-    switch (currentType) {
-      case 'customer':
-        return {
-          firmName: 'Firm Name',
-          phone: 'Mobile Number',
-          city: 'City',
-          district: 'District',
-          agentAssigned: 'Assigned Agent',
-          route: 'Route',
-          customerGrade: 'Grade',
-          creditLimit: 'Credit Limit',
-          outstanding: 'Outstanding',
-          status: 'Status'
-        };
-      case 'vendor':
-        return {
-          firmName: 'Firm Name',
-          phone: 'Mobile',
-          city: 'City',
-          district: 'District',
-          status: 'Status'
-        };
-      case 'agent':
-        return {
-          contactName: 'Agent Name',
-          phone: 'Mobile',
-          assignedRoutes: 'Assigned Routes',
-          status: 'Status'
-        };
-      case 'route':
-        return {
-          name: 'Region / Line Name',
-          assignedAgent: 'Assigned Agent',
-          citiesCount: 'Cities Count',
-          customersCount: 'Customers Count',
-          status: 'Status'
-        };
-      case 'market':
-        return {
-          firmName: 'City Name',
-          district: 'District',
-          state: 'State',
-          route: 'Region / Line',
-          customerCount: 'Customer Count',
-          status: 'Status'
-        };
-      case 'transporter':
-        return {
-          firmName: 'Transporter Name',
-          contactName: 'Contact Person',
-          phone: 'Mobile',
-          city: 'City',
-          status: 'Status'
-        };
-    }
-  };
-
-  const allColumns = getColumnsSchema();
-  const getDefaultVisibleColumns = () => {
-    const defaultCols: Record<string, boolean> = {};
-    Object.keys(allColumns).forEach(key => {
-      if (currentType === 'customer') {
-        defaultCols[key] = ['firmName', 'phone', 'city', 'agentAssigned', 'customerGrade', 'status'].includes(key);
-      } else {
-        defaultCols[key] = true;
-      }
-    });
-    return defaultCols;
-  };
-  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(getDefaultVisibleColumns());
 
   // Empty forms schemas
   const getEmptyFormData = () => {
@@ -664,27 +736,35 @@ const PartyManagement: React.FC = () => {
     setShowSortSelector(false);
     setShowColumnSelector(false);
     setShowFilterPanel(false);
+    setFilterCitySearch('');
+    setFilterRouteSearch('');
+    setFilterAgentSearch('');
 
-    // Reset sort field based on type
-    if (currentType === 'route') {
-      setSortField('name');
-      setSortOrder('asc');
+    // Load sorting rules from localStorage
+    const savedSort = localStorage.getItem(`skbw_erp_sort_rules_${currentType}`);
+    if (savedSort) {
+      try {
+        setSortRules(JSON.parse(savedSort));
+      } catch (e) {
+        setSortRules([]);
+      }
     } else {
-      setSortField('firmName');
-      setSortOrder('asc');
+      setSortRules([]);
     }
 
+    // Load columns
     const savedCols = localStorage.getItem(`skbw_erp_visible_columns_${currentType}`);
     if (savedCols) {
       try {
         setVisibleColumns(JSON.parse(savedCols));
       } catch (e) {
-        setVisibleColumns(getDefaultVisibleColumns());
+        setVisibleColumns(getDefaultVisibleColumns(currentType));
       }
     } else {
-      setVisibleColumns(getDefaultVisibleColumns());
+      setVisibleColumns(getDefaultVisibleColumns(currentType));
     }
 
+    // Load limit
     const savedLimit = localStorage.getItem(`skbw_erp_limit_${currentType}`);
     if (savedLimit) {
       setLimit(parseInt(savedLimit, 10));
@@ -692,29 +772,50 @@ const PartyManagement: React.FC = () => {
       setLimit(25);
     }
 
-    const savedFilters = localStorage.getItem(`skbw_erp_filters_${currentType}`);
+    // Load filter rules
+    const savedFilters = localStorage.getItem(`skbw_erp_filter_rules_${currentType}`);
     if (savedFilters) {
       try {
-        setFilters(JSON.parse(savedFilters));
+        setFilterRules(JSON.parse(savedFilters));
       } catch (e) {
-        setFilters({
-          status: [],
-          city: [],
-          route: [],
-          agentAssigned: [],
-          customerGrade: []
-        });
+        setFilterRules([]);
       }
     } else {
-      setFilters({
-        status: [],
-        city: [],
-        route: [],
-        agentAssigned: [],
-        customerGrade: []
-      });
+      setFilterRules([]);
     }
   }, [currentType]);
+
+  // Autofocus first input field when form opens
+  useEffect(() => {
+    if (showForm) {
+      const timer = setTimeout(() => {
+        const form = document.getElementById('partyForm');
+        if (form) {
+          const firstInput = form.querySelector('input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])') as HTMLElement | null;
+          if (firstInput) {
+            firstInput.focus();
+            if (firstInput instanceof HTMLInputElement && (firstInput.type === 'text' || firstInput.type === 'tel' || firstInput.type === 'email')) {
+              firstInput.select();
+            }
+          }
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [showForm]);
+
+  // Auto-scroll highlighted row into view during arrow-key navigation
+  useEffect(() => {
+    if (highlightedRowIndex >= 0) {
+      const element = document.getElementById(`row-${highlightedRowIndex}`);
+      if (element) {
+        element.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest'
+        });
+      }
+    }
+  }, [highlightedRowIndex]);
 
   // Persist limit
   const handleLimitChange = (newLimit: number) => {
@@ -726,28 +827,33 @@ const PartyManagement: React.FC = () => {
   // Persist filters
   useEffect(() => {
     if (currentType) {
-      localStorage.setItem(`skbw_erp_filters_${currentType}`, JSON.stringify(filters));
+      localStorage.setItem(`skbw_erp_filter_rules_${currentType}`, JSON.stringify(filterRules));
     }
-  }, [filters, currentType]);
+  }, [filterRules, currentType]);
 
   // Reset selected IDs on page / search / filters change
   useEffect(() => {
     setSelectedIds([]);
-  }, [page, debouncedSearch, filters]);
+  }, [page, debouncedSearch, filterRules]);
 
   const handleSort = (columnKey: string) => {
-    // Map columnKey to database field name
     let field = columnKey;
     if (columnKey === 'firmName') {
       field = currentType === 'route' ? 'name' : 'firmName';
     }
     
-    if (sortField === field) {
-      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    const existingIdx = sortRules.findIndex(r => r.field === field);
+    let updatedRules: SortRule[] = [];
+    if (existingIdx === 0) {
+      const order = sortRules[0].order === 'asc' ? 'desc' : 'asc';
+      updatedRules = [{ field, order }, ...sortRules.slice(1)];
     } else {
-      setSortField(field);
-      setSortOrder('asc');
+      const existingRule = sortRules[existingIdx];
+      const order = existingRule ? existingRule.order : 'asc';
+      updatedRules = [{ field, order }, ...sortRules.filter((_, idx) => idx !== existingIdx)];
     }
+    setSortRules(updatedRules);
+    localStorage.setItem(`skbw_erp_sort_rules_${currentType}`, JSON.stringify(updatedRules));
     setPage(1);
   };
 
@@ -816,16 +922,64 @@ const PartyManagement: React.FC = () => {
     }
   };
 
-  const openInlineModal = (type: 'agent' | 'route' | 'market' | 'transporter') => {
+  const handleAddCustomerToCity = () => {
+    if (!viewingCustomer) return;
+    setEditingItem(null);
+    setFormData({
+      ...getEmptyFormData(),
+      type: 'customer',
+      city: viewingCustomer.firmName,
+      district: viewingCustomer.district || '',
+      state: viewingCustomer.state || 'Andhra Pradesh',
+      route: viewingCustomer.route || ''
+    });
+    setShowForm(true);
+  };
+
+  const handleAddCustomerFromModal = () => {
+    if (!selectedCityName) return;
+    const cityObj = parties.find((p: any) => p.firmName === selectedCityName);
+    setEditingItem(null);
+    setFormData({
+      ...getEmptyFormData(),
+      type: 'customer',
+      city: selectedCityName,
+      district: cityObj?.district || '',
+      state: cityObj?.state || 'Andhra Pradesh',
+      route: cityObj?.route || ''
+    });
+    setShowForm(true);
+  };
+
+  const handleCardClick = (statusValue: string | null) => {
+    if (statusValue === null) {
+      const updated = filterRules.filter(r => r.field !== 'status');
+      setFilterRules(updated);
+      localStorage.setItem(`skbw_erp_filter_rules_${currentType}`, JSON.stringify(updated));
+    } else {
+      const existingIdx = filterRules.findIndex(r => r.field === 'status' && r.value === statusValue);
+      let updated: FilterRule[] = [];
+      if (existingIdx > -1) {
+        updated = filterRules.filter((_, idx) => idx !== existingIdx);
+      } else {
+        updated = [...filterRules, { join: 'and', field: 'status', condition: 'equal to', value: statusValue }];
+      }
+      setFilterRules(updated);
+      localStorage.setItem(`skbw_erp_filter_rules_${currentType}`, JSON.stringify(updated));
+    }
+    setPage(1);
+  };
+
+  const openInlineModal = (type: 'agent' | 'route' | 'market' | 'transporter', initialData?: any) => {
     setInlineAgentData({ name: '', phone: '' });
     setInlineRouteData({ name: '', code: '', assignedAgent: '', description: '' });
     setInlineMarketData({
       name: '',
       city: '',
       district: '',
-      route: '',
+      route: initialData?.route || '',
       state: 'Andhra Pradesh',
-      agentAssigned: '',
+      agentAssigned: initialData?.agentAssigned || '',
       status: 'active'
     });
     setInlineTransporterData({ name: '', contactName: '', phone: '', email: '', city: '' });
@@ -895,8 +1049,20 @@ const PartyManagement: React.FC = () => {
         setFormData((prev: any) => ({ ...prev, preferredTransport: res.data.firmName }));
       }
       
-      // Refresh dropdowns
+      // Refresh dropdowns, main data list, and stats count
       await fetchDropdownOptions();
+      await fetchMainData();
+      await fetchStatsCounts();
+
+      // If viewing a Region details drawer, refresh viewingCustomer in real-time
+      if (currentType === 'route' && viewingCustomer) {
+        const routesRes = await getRoutes(selectedCompany._id);
+        const updatedRoutes = routesRes.data || [];
+        const updatedRoute = updatedRoutes.find((r: any) => r._id === viewingCustomer._id);
+        if (updatedRoute) {
+          setViewingCustomer(updatedRoute);
+        }
+      }
       setInlineModalType(null);
     } catch (err: any) {
       console.error('Error saving inline reference:', err);
@@ -915,42 +1081,73 @@ const PartyManagement: React.FC = () => {
       if (currentType === 'route') {
         const res = await getRoutes(selectedCompany._id);
         let data = res.data || [];
-        // Apply search & status filter client side for Routes (routes api returns all)
+        
         if (debouncedSearch) {
           const searchRegex = new RegExp(debouncedSearch, 'i');
           data = data.filter((r: any) => searchRegex.test(r.name) || searchRegex.test(r.assignedAgent || ''));
         }
-        if (filters.status && filters.status.length > 0) {
-          data = data.filter((r: any) => filters.status.includes(r.status));
+
+        // Apply Multi-Filter rules client-side for Routes
+        if (filterRules && filterRules.length > 0) {
+          filterRules.forEach((rule: any) => {
+            const val = rule.value?.trim().toLowerCase();
+            if (val === undefined || val === null || val === '') return;
+            data = data.filter((r: any) => {
+              const fieldVal = (r[rule.field] || '').toString().toLowerCase();
+              if (rule.condition === 'equal to') {
+                return fieldVal === val;
+              } else if (rule.condition === 'contains') {
+                return fieldVal.includes(val);
+              } else if (rule.condition === 'greater than') {
+                return Number(r[rule.field]) > Number(val);
+              } else if (rule.condition === 'less than') {
+                return Number(r[rule.field]) < Number(val);
+              } else if (rule.condition === 'starts with') {
+                return fieldVal.startsWith(val);
+              } else if (rule.condition === 'ends with') {
+                return fieldVal.endsWith(val);
+              }
+              return true;
+            });
+          });
         }
 
         // Apply client side sorting for Routes
-        const factor = sortOrder === 'asc' ? 1 : -1;
-        data.sort((a: any, b: any) => {
-          const valA = a[sortField] || '';
-          const valB = b[sortField] || '';
-          return valA.toString().localeCompare(valB.toString()) * factor;
-        });
+        if (sortRules && sortRules.length > 0) {
+          data.sort((a: any, b: any) => {
+            for (const rule of sortRules) {
+              const factor = rule.order === 'asc' ? 1 : -1;
+              const valA = a[rule.field] ?? '';
+              const valB = b[rule.field] ?? '';
+              const cmp = valA.toString().localeCompare(valB.toString()) * factor;
+              if (cmp !== 0) return cmp;
+            }
+            return 0;
+          });
+        }
 
         setTotal(data.length);
         const startIndex = (page - 1) * limit;
         const endIndex = startIndex + limit;
         setParties(data.slice(startIndex, endIndex));
       } else {
+        const sortBy = sortRules.map(r => r.field).join(',');
+        const sortOrder = sortRules.map(r => r.order).join(',');
+
         const params: any = { 
           type: currentType, 
           page, 
-          limit,
-          sortBy: sortField,
-          sortOrder: sortOrder
+          limit
         };
+        if (sortBy) {
+          params.sortBy = sortBy;
+          params.sortOrder = sortOrder;
+        }
         if (debouncedSearch) params.search = debouncedSearch;
         
-        if (filters.status && filters.status.length > 0) params.status = filters.status.join(',');
-        if (filters.city && filters.city.length > 0) params.city = filters.city.join(',');
-        if (filters.route && filters.route.length > 0) params.route = filters.route.join(',');
-        if (filters.agentAssigned && filters.agentAssigned.length > 0) params.agentAssigned = filters.agentAssigned.join(',');
-        if (filters.customerGrade && filters.customerGrade.length > 0) params.customerGrade = filters.customerGrade.join(',');
+        if (filterRules && filterRules.length > 0) {
+          params.filterRules = JSON.stringify(filterRules);
+        }
 
         params.company = selectedCompany._id;
 
@@ -963,7 +1160,7 @@ const PartyManagement: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentType, page, limit, debouncedSearch, filters, selectedCompany, sortField, sortOrder]);
+  }, [currentType, page, limit, debouncedSearch, filterRules, selectedCompany, sortRules]);
 
   // Fetch Stats counts
   const fetchStatsCounts = useCallback(async () => {
@@ -1077,9 +1274,22 @@ const PartyManagement: React.FC = () => {
       }
 
       resetForm();
-      fetchMainData();
-      fetchStatsCounts();
-      fetchDropdownOptions();
+      await fetchMainData();
+      await fetchStatsCounts();
+      await fetchDropdownOptions();
+
+      // Refresh dynamic drawer views if currently viewing a city in drawer
+      if (currentType === 'market' && viewingCustomer) {
+        const updatedMarketRes = await getParties({ type: 'market', limit: 1000, company: selectedCompany?._id });
+        const updatedMarkets = updatedMarketRes.data.parties || [];
+        const updatedCity = updatedMarkets.find((m: any) => m._id === viewingCustomer._id);
+        if (updatedCity) {
+          setViewingCustomer(updatedCity);
+        }
+      }
+      if (selectedCityName) {
+        openCityCustomersPopup(selectedCityName);
+      }
     } catch (err: any) {
       const msg = err.response?.data?.msg || 'Error saving. Please try again.';
       showAlert(msg, 'error');
@@ -1570,12 +1780,17 @@ const PartyManagement: React.FC = () => {
 
   const getAgentRoutesBadges = (agentName: string) => {
     const routes = allRoutes.filter(r => r.assignedAgent === agentName);
-    if (routes.length === 0) return <span className="text-gray-400">None</span>;
+    if (routes.length === 0) return <span className="text-gray-400 text-xs italic">None</span>;
     return (
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap gap-1.5">
         {routes.map(r => (
-          <span key={r._id} className="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-            {r.name}
+          <span
+            key={r._id}
+            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-xs hover:bg-indigo-100 transition-colors cursor-default"
+            title={r.name}
+          >
+            <Tag className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+            <span>{r.code || r.name}</span>
           </span>
         ))}
       </div>
@@ -1637,7 +1852,7 @@ const PartyManagement: React.FC = () => {
               {selectedIds.length > 0 && (
                 <button
                   onClick={handleBulkDelete}
-                  className="flex items-center space-x-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-semibold shadow-md animate-pulse"
+                  className="flex items-center space-x-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-all font-semibold shadow-md active:scale-95 duration-100"
                 >
                   <Trash2 className="w-4 h-4" />
                   <span>Delete Selected ({selectedIds.length})</span>
@@ -1672,22 +1887,53 @@ const PartyManagement: React.FC = () => {
 
         {/* Stats Section */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 border-l-4 border-l-blue-500">
+          <button
+            onClick={() => handleCardClick(null)}
+            className={`w-full text-left bg-white rounded-xl shadow-xs border p-3 border-l-4 border-l-blue-500 transition-all duration-200 hover:scale-[1.015] active:scale-98 focus:outline-hidden ${
+              !filterRules.some((r: any) => r.field === 'status')
+                ? 'ring-2 ring-blue-500 bg-blue-50/20 border-blue-200 shadow-sm'
+                : 'border-gray-100 hover:border-blue-200 hover:shadow-xs'
+            }`}
+          >
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total {typeLabelPlural}</p>
             <p className="text-2xl font-bold text-gray-900 mt-0.5">{stats.total}</p>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 border-l-4 border-l-green-500">
+          </button>
+
+          <button
+            onClick={() => handleCardClick('active')}
+            className={`w-full text-left bg-white rounded-xl shadow-xs border p-3 border-l-4 border-l-green-500 transition-all duration-200 hover:scale-[1.015] active:scale-98 focus:outline-hidden ${
+              filterRules.some((r: any) => r.field === 'status' && r.value === 'active')
+                ? 'ring-2 ring-green-500 bg-green-50/20 border-green-200 shadow-sm'
+                : 'border-gray-100 hover:border-green-200 hover:shadow-xs'
+            }`}
+          >
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Active</p>
             <p className="text-2xl font-bold text-green-600 mt-0.5">{stats.active}</p>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 border-l-4 border-l-red-500">
+          </button>
+
+          <button
+            onClick={() => handleCardClick('inactive')}
+            className={`w-full text-left bg-white rounded-xl shadow-xs border p-3 border-l-4 border-l-red-500 transition-all duration-200 hover:scale-[1.015] active:scale-98 focus:outline-hidden ${
+              filterRules.some((r: any) => r.field === 'status' && r.value === 'inactive')
+                ? 'ring-2 ring-red-500 bg-red-50/20 border-red-200 shadow-sm'
+                : 'border-gray-100 hover:border-red-200 hover:shadow-xs'
+            }`}
+          >
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Inactive</p>
             <p className="text-2xl font-bold text-red-600 mt-0.5">{stats.inactive}</p>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 border-l-4 border-l-yellow-500">
+          </button>
+
+          <button
+            onClick={() => handleCardClick('on-hold')}
+            className={`w-full text-left bg-white rounded-xl shadow-xs border p-3 border-l-4 border-l-yellow-500 transition-all duration-200 hover:scale-[1.015] active:scale-98 focus:outline-hidden ${
+              filterRules.some((r: any) => r.field === 'status' && r.value === 'on-hold')
+                ? 'ring-2 ring-yellow-500 bg-yellow-50/20 border-yellow-200 shadow-sm'
+                : 'border-gray-100 hover:border-yellow-200 hover:shadow-xs'
+            }`}
+          >
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">On Hold</p>
             <p className="text-2xl font-bold text-yellow-600 mt-0.5">{stats.onHold || 0}</p>
-          </div>
+          </button>
         </div>
 
         {/* Table Toolbar */}
@@ -1705,105 +1951,198 @@ const PartyManagement: React.FC = () => {
             </div>
             
             <div className="flex items-center space-x-2 ml-4">
+              {/* Filters Button */}
               <button
                 onClick={() => setShowFilterPanel(!showFilterPanel)}
-                className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  showFilterPanel || Object.values(filters).some((arr: any) => arr.length > 0) ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
+                className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-semibold border transition-all duration-150 ${
+                  showFilterPanel || filterRules.length > 0
+                    ? 'bg-blue-50 text-blue-600 border-blue-200 shadow-xs'
+                    : 'bg-white border-gray-200 text-gray-755 hover:bg-gray-50'
                 }`}
               >
-                <Filter className="w-4 h-4" />
+                <Filter className="w-4 h-4 text-blue-600" />
                 <span>Filters</span>
-                {Object.values(filters).some((arr: any) => arr.length > 0) && (
-                  <span className="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold bg-blue-600 text-white rounded-full">
-                    {Object.values(filters).filter((arr: any) => arr.length > 0).length}
+                {filterRules.length > 0 && (
+                  <span className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold">
+                    {filterRules.length}
                   </span>
                 )}
               </button>
+
+              {/* Sort By Dropdown */}
               <div className="relative">
                 <button
                   onClick={() => setShowSortSelector(!showSortSelector)}
-                  className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    showSortSelector ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
+                  className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-semibold border transition-all duration-150 ${
+                    showSortSelector || sortRules.length > 0
+                      ? 'bg-blue-50 text-blue-600 border-blue-200 shadow-xs'
+                      : 'bg-white border-gray-200 text-gray-755 hover:bg-gray-50'
                   }`}
                 >
-                  <ArrowUpDown className="w-4 h-4 text-gray-450" />
-                  <span>Sort By</span>
-                  <span className="ml-1 px-1.5 py-0.5 text-xs font-semibold bg-blue-600 text-white rounded-full">
-                    {(() => {
-                      const displayField = sortField === 'name' && currentType === 'route' ? 'firmName' : sortField;
-                      const matchedEntry = Object.entries(allColumns).find(([k]) => k === displayField);
-                      return matchedEntry ? matchedEntry[1] : (sortField === 'createdAt' ? 'Date Created' : 'Default');
-                    })()}
-                  </span>
+                  <ArrowUpDown className="w-4 h-4 text-blue-600" />
+                  <span>Sort</span>
+                  {sortRules.length > 0 && (
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold">
+                      {sortRules.length}
+                    </span>
+                  )}
                 </button>
-                
                 {showSortSelector && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-2 space-y-1">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2 py-1">Sort Field</p>
-                    {Object.entries(allColumns).map(([key, label]) => {
-                      const dbField = key === 'firmName' && currentType === 'route' ? 'name' : key;
-                      const isCurrent = sortField === dbField;
-                      return (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setShowSortSelector(false)} />
+                    <div className="absolute right-0 mt-2 w-[340px] rounded-2xl shadow-xl bg-white border border-gray-150 p-4 z-20 space-y-3 animate-in fade-in slide-in-from-top-2 duration-100">
+                      <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Sort Rules</span>
                         <button
-                          key={key}
                           onClick={() => {
-                            setSortField(dbField);
+                            setSortRules([]);
+                            localStorage.setItem(`skbw_erp_sort_rules_${currentType}`, JSON.stringify([]));
                             setPage(1);
                           }}
-                          className={`w-full text-left px-2 py-1.5 text-xs rounded-md transition-colors flex items-center justify-between ${
-                            isCurrent ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-750 hover:bg-gray-50'
-                          }`}
+                          className="text-xs text-red-500 hover:text-red-755 font-semibold cursor-pointer"
                         >
-                          <span>{label}</span>
-                          {isCurrent && <span className="text-[10px] uppercase font-bold text-blue-600">{sortOrder}</span>}
-                        </button>
-                      );
-                    })}
-                    <button
-                      onClick={() => {
-                        setSortField('createdAt');
-                        setPage(1);
-                      }}
-                      className={`w-full text-left px-2 py-1.5 text-xs rounded-md transition-colors flex items-center justify-between ${
-                        sortField === 'createdAt' ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-750 hover:bg-gray-50'
-                      }`}
-                    >
-                      <span>Date Created</span>
-                      {sortField === 'createdAt' && <span className="text-[10px] uppercase font-bold text-blue-600">{sortOrder}</span>}
-                    </button>
-                    <div className="border-t border-gray-100 my-1 pt-1">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2 py-1">Sort Order</p>
-                      <div className="flex space-x-1 p-1">
-                        <button
-                          onClick={() => { setSortOrder('asc'); setPage(1); }}
-                          className={`flex-1 py-1 text-center text-xs rounded-md border font-medium transition-colors ${
-                            sortOrder === 'asc' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                          }`}
-                        >
-                          Ascending
-                        </button>
-                        <button
-                          onClick={() => { setSortOrder('desc'); setPage(1); }}
-                          className={`flex-1 py-1 text-center text-xs rounded-md border font-medium transition-colors ${
-                            sortOrder === 'desc' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                          }`}
-                        >
-                          Descending
+                          Clear all
                         </button>
                       </div>
+
+                      <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+                        {sortRules.map((rule, idx) => (
+                          <div key={idx} className="flex items-center space-x-2">
+                            {/* Sort Field Selection Dropdown */}
+                            <div className="relative flex-1">
+                              <select
+                                value={rule.field}
+                                onChange={(e) => {
+                                  const updated = [...sortRules];
+                                  updated[idx] = { ...updated[idx], field: e.target.value };
+                                  setSortRules(updated);
+                                  localStorage.setItem(`skbw_erp_sort_rules_${currentType}`, JSON.stringify(updated));
+                                  setPage(1);
+                                }}
+                                className="w-full pl-3 pr-8 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 bg-gray-50 focus:bg-white focus:ring-1 focus:ring-blue-500 appearance-none cursor-pointer"
+                              >
+                                {Object.entries(allColumns).map(([key, label]) => {
+                                  const dbField = key === 'firmName' && currentType === 'route' ? 'name' : key;
+                                  return (
+                                    <option key={key} value={dbField}>
+                                      {label}
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                            </div>
+
+                            {/* Sort Order Direction Toggle Button */}
+                            <button
+                              onClick={() => {
+                                const updated = [...sortRules];
+                                updated[idx] = { ...updated[idx], order: rule.order === 'asc' ? 'desc' : 'asc' };
+                                setSortRules(updated);
+                                localStorage.setItem(`skbw_erp_sort_rules_${currentType}`, JSON.stringify(updated));
+                                setPage(1);
+                              }}
+                              className="p-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-650 transition-colors flex items-center justify-center w-8 h-8 shrink-0 cursor-pointer"
+                              title="Toggle Sort Order"
+                            >
+                              {rule.order === 'asc' ? (
+                                <ChevronUp className="w-4 h-4 text-gray-500" />
+                              ) : (
+                                <ChevronDown className="w-4 h-4 text-gray-500" />
+                              )}
+                            </button>
+
+                            {/* Remove Sort Rule Button */}
+                            <button
+                              onClick={() => {
+                                const updated = sortRules.filter((_, i) => i !== idx);
+                                setSortRules(updated);
+                                localStorage.setItem(`skbw_erp_sort_rules_${currentType}`, JSON.stringify(updated));
+                                setPage(1);
+                              }}
+                              className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors flex items-center justify-center w-8 h-8 shrink-0 cursor-pointer"
+                              title="Remove Sort Rule"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          const nextField = Object.keys(allColumns).find(k => !sortRules.some(r => r.field === k)) || 'createdAt';
+                          const updated = [...sortRules, { field: nextField, order: 'asc' as const }];
+                          setSortRules(updated);
+                          localStorage.setItem(`skbw_erp_sort_rules_${currentType}`, JSON.stringify(updated));
+                          setPage(1);
+                        }}
+                        className="w-full py-2 border border-dashed border-gray-300 rounded-lg text-xs text-gray-550 hover:text-gray-755 hover:border-gray-400 hover:bg-gray-50 transition-all font-semibold text-center flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <span>+ Add sort rule</span>
+                      </button>
                     </div>
-                  </div>
+                  </>
                 )}
               </div>
-              <button
-                onClick={() => setShowColumnSelector(!showColumnSelector)}
-                className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  showColumnSelector ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <Columns className="w-4 h-4" />
-                <span>Columns</span>
-              </button>
+
+              {/* Columns Selector Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowColumnSelector(!showColumnSelector)}
+                  className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-semibold border transition-all duration-150 ${
+                    showColumnSelector
+                      ? 'bg-blue-50 text-blue-600 border-blue-200 shadow-xs'
+                      : 'bg-white border-gray-200 text-gray-755 hover:bg-gray-50'
+                  }`}
+                >
+                  <Columns className="w-4 h-4 text-blue-600" />
+                  <span>Columns</span>
+                </button>
+                {showColumnSelector && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setShowColumnSelector(false)} />
+                    <div className="absolute right-0 mt-2 w-56 rounded-xl shadow-xl bg-white border border-gray-150 p-3.5 z-20 space-y-2 animate-in fade-in slide-in-from-top-2 duration-100">
+                      <div className="flex justify-between items-center pb-2 border-b border-gray-100 mb-1.5">
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Visible Columns</span>
+                        <button
+                          onClick={() => {
+                            const reset = getDefaultVisibleColumns(currentType);
+                            setVisibleColumns(reset);
+                            localStorage.setItem(`skbw_erp_visible_columns_${currentType}`, JSON.stringify(reset));
+                          }}
+                          className="text-[10px] text-blue-600 hover:underline font-semibold cursor-pointer"
+                        >
+                          Reset
+                        </button>
+                      </div>
+                      <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                        {Object.entries(allColumns).map(([key, label]) => {
+                          const isVisible = !!visibleColumns[key];
+                          return (
+                            <label key={key} className="flex items-center space-x-2 text-xs text-gray-655 cursor-pointer hover:text-gray-905 select-none py-0.5">
+                              <input
+                                type="checkbox"
+                                checked={isVisible}
+                                onChange={() => {
+                                  const updated = {
+                                    ...visibleColumns,
+                                    [key]: !isVisible
+                                  };
+                                  setVisibleColumns(updated);
+                                  localStorage.setItem(`skbw_erp_visible_columns_${currentType}`, JSON.stringify(updated));
+                                }}
+                                className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 border-gray-300 cursor-pointer"
+                              />
+                              <span className={isVisible ? 'font-semibold text-blue-700' : ''}>{label}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
               <button
                 onClick={handleExport}
                 className="flex items-center space-x-1.5 px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm font-medium transition-colors"
@@ -1834,169 +2173,138 @@ const PartyManagement: React.FC = () => {
             </div>
           </div>
 
-          {/* Collapsible Multi-Filter Bar */}
+          {/* Collapsible Multi-Filter Panel */}
           {showFilterPanel && (
-            <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 md:grid-cols-5 gap-4">
-              {/* Status */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Status</label>
-                <div className="space-y-1 max-h-24 overflow-y-auto border border-gray-150 rounded-lg p-2 bg-gray-50/50">
-                  {['active', 'inactive', 'on-hold'].map(s => {
-                    const isChecked = filters.status?.includes(s);
-                    return (
-                      <label key={s} className="flex items-center space-x-2 text-xs text-gray-600 cursor-pointer hover:text-gray-900">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => {
-                            setFilters((prev: any) => ({
-                              ...prev,
-                              status: isChecked ? prev.status.filter((x: any) => x !== s) : [...(prev.status || []), s]
-                            }));
-                            setPage(1);
-                          }}
-                          className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 border-gray-300"
-                        />
-                        <span className="capitalize">{s === 'on-hold' ? 'On Hold' : s}</span>
-                      </label>
-                    );
-                  })}
-                </div>
+            <div className="mt-3 pt-3 border-t border-gray-100 space-y-3 animate-in slide-in-from-top-2 duration-150">
+              <div className="flex justify-between items-center pb-1">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Filter className="w-3.5 h-3.5 text-blue-600" />
+                  Multi-Filter Builder
+                </span>
+                <button
+                  onClick={() => {
+                    setFilterRules([]);
+                    localStorage.setItem(`skbw_erp_filter_rules_${currentType}`, JSON.stringify([]));
+                    setPage(1);
+                  }}
+                  className="text-xs text-red-500 hover:text-red-755 font-semibold cursor-pointer bg-transparent border-0"
+                >
+                  Clear all
+                </button>
               </div>
 
-              {/* City Selection */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">City / Town</label>
-                <div className="space-y-1 max-h-24 overflow-y-auto border border-gray-150 rounded-lg p-2 bg-gray-50/50">
-                  {allCities.map(c => {
-                    const isChecked = filters.city?.includes(c);
-                    return (
-                      <label key={c} className="flex items-center space-x-2 text-xs text-gray-600 cursor-pointer hover:text-gray-900">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => {
-                            setFilters((prev: any) => ({
-                              ...prev,
-                              city: isChecked ? prev.city.filter((x: any) => x !== c) : [...(prev.city || []), c]
-                            }));
-                            setPage(1);
-                          }}
-                          className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 border-gray-300"
-                        />
-                        <span>{c}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Region / Route Selection */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Region / Route</label>
-                <div className="space-y-1 max-h-24 overflow-y-auto border border-gray-150 rounded-lg p-2 bg-gray-50/50">
-                  {allRoutes.map(r => {
-                    const isChecked = filters.route?.includes(r.name);
-                    return (
-                      <label key={r._id} className="flex items-center space-x-2 text-xs text-gray-600 cursor-pointer hover:text-gray-900">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => {
-                            setFilters((prev: any) => ({
-                              ...prev,
-                              route: isChecked ? prev.route.filter((x: any) => x !== r.name) : [...(prev.route || []), r.name]
-                            }));
-                            setPage(1);
-                          }}
-                          className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 border-gray-300"
-                        />
-                        <span>{r.name}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Agent Selection */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Assigned Agent</label>
-                <div className="space-y-1 max-h-24 overflow-y-auto border border-gray-150 rounded-lg p-2 bg-gray-50/50">
-                  {allAgents.map(a => {
-                    const isChecked = filters.agentAssigned?.includes(a.firmName);
-                    return (
-                      <label key={a._id} className="flex items-center space-x-2 text-xs text-gray-600 cursor-pointer hover:text-gray-900">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => {
-                            setFilters((prev: any) => ({
-                              ...prev,
-                              agentAssigned: isChecked ? prev.agentAssigned.filter((x: any) => x !== a.firmName) : [...(prev.agentAssigned || []), a.firmName]
-                            }));
-                            setPage(1);
-                          }}
-                          className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 border-gray-300"
-                        />
-                        <span>{a.firmName}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Customer Grade selection */}
-              {currentType === 'customer' && (
-                <div>
-                  <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Grade</label>
-                  <div className="space-y-1 max-h-24 overflow-y-auto border border-gray-150 rounded-lg p-2 bg-gray-50/50">
-                    {['Grade A (Premium)', 'Grade B (Regular)', 'Grade C (Risk)'].map(g => {
-                      const isChecked = filters.customerGrade?.includes(g);
-                      return (
-                        <label key={g} className="flex items-center space-x-2 text-xs text-gray-600 cursor-pointer hover:text-gray-900">
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => {
-                              setFilters((prev: any) => ({
-                                ...prev,
-                                customerGrade: isChecked ? prev.customerGrade.filter((x: any) => x !== g) : [...(prev.customerGrade || []), g]
-                              }));
+              <div className="overflow-x-auto border border-gray-200 rounded-lg shadow-xs bg-white">
+                <table className="min-w-full divide-y divide-gray-200 text-xs">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-500 w-16"></th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-500">Field</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-500">Condition</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-500">Look For</th>
+                      <th className="px-3 py-2 text-center font-semibold text-gray-500 w-12">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-100">
+                    {filterRules.map((rule, idx) => (
+                      <tr key={idx} className="hover:bg-gray-50/50">
+                        <td className="px-3 py-2 font-semibold text-gray-450 uppercase">
+                          {idx === 0 ? '' : 'and'}
+                        </td>
+                        <td className="px-3 py-2">
+                          <select
+                            value={rule.field}
+                            onChange={(e) => {
+                              const updated = [...filterRules];
+                              updated[idx] = { ...updated[idx], field: e.target.value };
+                              setFilterRules(updated);
+                              localStorage.setItem(`skbw_erp_filter_rules_${currentType}`, JSON.stringify(updated));
                               setPage(1);
                             }}
-                            className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 border-gray-300"
+                            className="px-2 py-1 border border-gray-200 rounded bg-gray-50 text-xs w-full focus:bg-white focus:outline-none cursor-pointer"
+                          >
+                            {Object.entries(allColumns).map(([key, label]) => {
+                              const dbField = key === 'firmName' && currentType === 'route' ? 'name' : key;
+                              return (
+                                <option key={key} value={dbField}>
+                                  {label}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </td>
+                        <td className="px-3 py-2">
+                          <select
+                            value={rule.condition}
+                            onChange={(e) => {
+                              const updated = [...filterRules];
+                              updated[idx] = { ...updated[idx], condition: e.target.value as any };
+                              setFilterRules(updated);
+                              localStorage.setItem(`skbw_erp_filter_rules_${currentType}`, JSON.stringify(updated));
+                              setPage(1);
+                            }}
+                            className="px-2 py-1 border border-gray-200 rounded bg-gray-50 text-xs w-full focus:bg-white focus:outline-none cursor-pointer"
+                          >
+                            <option value="equal to">equal to</option>
+                            <option value="contains">contains</option>
+                            <option value="greater than">greater than</option>
+                            <option value="less than">less than</option>
+                            <option value="starts with">starts with</option>
+                            <option value="ends with">ends with</option>
+                          </select>
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="text"
+                            placeholder="Type search value..."
+                            value={rule.value}
+                            onChange={(e) => {
+                              const updated = [...filterRules];
+                              updated[idx] = { ...updated[idx], value: e.target.value };
+                              setFilterRules(updated);
+                              localStorage.setItem(`skbw_erp_filter_rules_${currentType}`, JSON.stringify(updated));
+                            }}
+                            onBlur={() => setPage(1)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                setPage(1);
+                              }
+                            }}
+                            className="px-2 py-1 border border-gray-200 rounded text-xs w-full focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white placeholder-gray-400"
                           />
-                          <span>{g.replace(/ \(.+\)/g, '')}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Columns Visibility Selector */}
-          {showColumnSelector && (
-            <div className="mt-3 pt-3 border-t border-gray-100">
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(allColumns).map(([key, label]) => (
-                  <button
-                    key={key}
-                    onClick={() => {
-                      const updated = { ...visibleColumns, [key]: !visibleColumns[key] };
-                      setVisibleColumns(updated);
-                      localStorage.setItem(`skbw_erp_visible_columns_${currentType}`, JSON.stringify(updated));
-                    }}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors border ${
-                      visibleColumns[key]
-                        ? 'bg-blue-50 text-blue-700 border-blue-200'
-                        : 'bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <button
+                            onClick={() => {
+                              const updated = filterRules.filter((_, i) => i !== idx);
+                              setFilterRules(updated);
+                              localStorage.setItem(`skbw_erp_filter_rules_${currentType}`, JSON.stringify(updated));
+                              setPage(1);
+                            }}
+                            className="text-red-500 hover:text-red-700 transition-colors p-1 cursor-pointer bg-transparent border-0"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    <tr>
+                      <td colSpan={5} className="px-3 py-2 bg-gray-50/50">
+                        <button
+                          onClick={() => {
+                            const nextField = Object.keys(allColumns)[0] || 'firmName';
+                            const updated = [...filterRules, { join: 'and' as const, field: nextField, condition: 'equal to' as const, value: '' }];
+                            setFilterRules(updated);
+                            localStorage.setItem(`skbw_erp_filter_rules_${currentType}`, JSON.stringify(updated));
+                          }}
+                          className="text-blue-650 hover:text-blue-800 font-semibold text-xs flex items-center gap-1.5 cursor-pointer bg-transparent border-0"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Add filter rule
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
@@ -2019,19 +2327,19 @@ const PartyManagement: React.FC = () => {
                       className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 border-gray-300 cursor-pointer"
                     />
                   </th>
-                  <th className="px-3.5 py-2 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider w-10">#</th>
+                  <th className="px-3.5 py-2 text-left text-xs font-bold text-gray-400 uppercase tracking-wider w-10">#</th>
                   {Object.entries(visibleColumns).map(([col, visible]) =>
                     visible && allColumns[col] && (
                       <th 
                         key={col} 
                         onClick={() => handleSort(col)}
-                        className="px-3.5 py-2 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100/50 transition-colors select-none"
+                        className="px-3.5 py-2 text-left text-xs font-bold text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100/50 transition-colors select-none"
                       >
                         <div className="flex items-center space-x-1">
                           <span>{allColumns[col]}</span>
                           <span className="text-gray-400">
-                            {sortField === (col === 'firmName' && currentType === 'route' ? 'name' : col) ? (
-                              sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5 inline ml-0.5 text-blue-600" /> : <ChevronDown className="w-3.5 h-3.5 inline ml-0.5 text-blue-600" />
+                            {sortRules[0]?.field === (col === 'firmName' && currentType === 'route' ? 'name' : col) ? (
+                              sortRules[0].order === 'asc' ? <ChevronUp className="w-3.5 h-3.5 inline ml-0.5 text-blue-600" /> : <ChevronDown className="w-3.5 h-3.5 inline ml-0.5 text-blue-600" />
                             ) : (
                               <ArrowUpDown className="w-3 h-3 inline ml-0.5 text-gray-300 opacity-40 hover:opacity-100 transition-opacity" />
                             )}
@@ -2040,7 +2348,7 @@ const PartyManagement: React.FC = () => {
                       </th>
                     )
                   )}
-                  <th className="px-3.5 py-2 text-right text-[11px] font-bold text-gray-400 uppercase tracking-wider w-24">Actions</th>
+                  <th className="px-3.5 py-2 text-right text-xs font-bold text-gray-400 uppercase tracking-wider w-24">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -2066,11 +2374,12 @@ const PartyManagement: React.FC = () => {
                     return (
                       <React.Fragment key={item._id}>
                         <tr
+                          id={`row-${idx}`}
                           className={`transition-all cursor-pointer border-l-2 ${
                             isSelectedRow 
-                              ? 'bg-blue-50/50 hover:bg-blue-50 text-blue-900 font-semibold border-l-blue-600 shadow-xs' 
+                              ? 'bg-blue-50/80 hover:bg-blue-50 text-blue-900 font-semibold border-l-blue-600 shadow-xs' 
                               : idx === highlightedRowIndex
-                                ? 'bg-gray-100 hover:bg-gray-200 text-gray-900 font-semibold border-l-gray-400 shadow-xs'
+                                ? 'bg-blue-50/30 hover:bg-blue-50/50 text-blue-900 font-semibold border-l-blue-500 shadow-xs ring-1 ring-blue-100/50 ring-inset'
                                 : 'hover:bg-gray-50 border-l-transparent text-gray-700'
                           }`}
                           onMouseEnter={() => setHighlightedRowIndex(idx)}
@@ -2087,46 +2396,63 @@ const PartyManagement: React.FC = () => {
                               className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 border-gray-300 cursor-pointer"
                             />
                           </td>
-                          <td className="px-3.5 py-1.5 whitespace-nowrap text-xs text-gray-400">{rowNum}</td>
+                          <td className="px-3.5 py-2 whitespace-nowrap text-[13px] text-gray-400">{rowNum}</td>
                           {Object.entries(visibleColumns).map(([col, visible]) => {
                             if (!visible || !allColumns[col]) return null;
                             return (
-                              <td key={col} className="px-3.5 py-1.5 whitespace-nowrap text-xs font-medium text-gray-700">
+                              <td key={col} className="px-3.5 py-2 whitespace-nowrap text-[13.5px] font-medium text-gray-700">
                                 {col === 'firmName' ? (
                                   <div className="flex flex-col">
                                     <span className="font-semibold text-gray-955">{item.firmName || '-'}</span>
                                     {(currentType === 'customer' || currentType === 'vendor') && item.ownerName && (
-                                      <span className="text-[11px] text-gray-455 font-normal mt-0.5">{item.ownerName}</span>
+                                      <span className="text-xs text-gray-455 font-normal mt-0.5">{item.ownerName}</span>
                                     )}
                                   </div>
                                 ) : col === 'contactName' ? (
                                   <span className="font-semibold text-gray-955">{item.contactName || item.ownerName || '-'}</span>
                                 ) : col === 'name' ? (
                                   <div className="flex flex-col">
-                                    <span className="font-semibold text-gray-955">{item.name || '-'}</span>
-                                    {currentType === 'route' && item.code && (
-                                      <span className="text-[11px] text-gray-455 font-normal mt-0.5">{item.code}</span>
+                                    {currentType === 'route' ? (
+                                      <>
+                                        <span className="font-semibold text-gray-955">{item.code || '-'}</span>
+                                        {item.name && (
+                                          <span className="text-xs text-gray-455 font-normal mt-0.5">{item.name}</span>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <span className="font-semibold text-gray-955">{item.name || '-'}</span>
                                     )}
                                   </div>
                                 ) : col === 'phone' ? (
-                                  <div className="flex items-center">
+                                  <div className="flex items-center space-x-1">
                                     {item.phone ? (
-                                      <a
-                                        href={`tel:${item.phone.replace(/\D/g, '')}`}
-                                        className="text-blue-600 hover:text-blue-800 hover:underline font-semibold"
-                                        onClick={e => e.stopPropagation()}
-                                        title={`Call ${item.phone}`}
-                                      >
-                                        {item.phone}
-                                      </a>
+                                      <>
+                                        <a
+                                          href={`tel:${item.phone.replace(/\D/g, '')}`}
+                                          className="text-blue-600 hover:text-blue-800 hover:underline font-semibold"
+                                          onClick={e => e.stopPropagation()}
+                                          title={`Call ${item.phone}`}
+                                        >
+                                          {item.phone}
+                                        </a>
+                                        <a
+                                          href={getWhatsAppLink(item.phone)}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          onClick={e => e.stopPropagation()}
+                                          className="inline-flex items-center"
+                                        >
+                                          <WhatsAppIcon />
+                                        </a>
+                                      </>
                                     ) : (
                                       <span className="text-gray-400">-</span>
                                     )}
                                   </div>
                                 ) : col === 'route' ? (
                                   item.route ? (
-                                    <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
-                                      {item.route}
+                                    <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100" title={item.route}>
+                                      {getRouteDisplay(item.route, allRoutes)}
                                     </span>
                                   ) : <span className="text-gray-400">-</span>
                                 ) : col === 'assignedAgent' ? (
@@ -2245,12 +2571,12 @@ const PartyManagement: React.FC = () => {
                                         <div
                                           key={city._id}
                                           onClick={() => openCityCustomersPopup(city.firmName)}
-                                          className="p-3.5 border border-gray-100 rounded-lg bg-gray-50/30 flex items-center justify-between hover:border-blue-300 hover:bg-blue-50/10 hover:shadow-xs transition-all cursor-pointer group"
+                                          className="p-3.5 border border-gray-100 rounded-lg bg-gray-50/30 flex items-center justify-between hover:border-blue-300 hover:bg-blue-50/10 hover:shadow-xs transition-all cursor-pointer group min-w-0"
                                           title={`Click to view customers in ${city.firmName}`}
                                         >
-                                          <div>
-                                            <span className="font-semibold text-gray-950 text-sm block group-hover:text-blue-600 transition-colors">{city.firmName}</span>
-                                            <span className="text-xs text-gray-400 font-medium">{city.district || '-'}, {city.state || '-'}</span>
+                                          <div className="min-w-0 flex-1 mr-2">
+                                            <span className="font-semibold text-gray-950 text-sm block group-hover:text-blue-600 transition-colors truncate">{city.firmName}</span>
+                                            <span className="text-xs text-gray-400 mt-1 font-medium leading-normal block truncate">{city.district || '-'}, {city.state || '-'}</span>
                                           </div>
                                           <div className="text-right flex flex-col items-end">
                                             <span className="inline-flex px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-50 text-blue-700 border border-blue-100 mb-1 group-hover:bg-blue-100 group-hover:text-blue-800 transition-colors">
@@ -2336,11 +2662,11 @@ const PartyManagement: React.FC = () => {
 
       {/* Side Slider Form Panel */}
       {showForm && (
-        <div className="fixed top-0 right-0 h-full w-[520px] bg-white shadow-2xl border-l border-gray-200 z-40 flex flex-col">
+        <div className="fixed top-0 right-0 h-full w-full sm:w-[520px] bg-white shadow-2xl border-l border-gray-200 z-[60] flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between p-5 border-b border-gray-200 bg-gray-50">
             <h2 className="text-lg font-bold text-gray-900">
-              {editingItem ? 'Edit' : 'Add'} {typeLabel} Master
+              {editingItem ? 'Edit' : 'Add'} {currentType === 'route' && !formData.type ? 'Region' : (formData.type ? (formData.type.charAt(0).toUpperCase() + formData.type.slice(1)) : typeLabel)} Master
             </h2>
             <button onClick={resetForm} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-lg transition-colors">
               <X className="w-5 h-5" />
@@ -2352,7 +2678,7 @@ const PartyManagement: React.FC = () => {
             <form id="partyForm" onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="space-y-6">
               
               {/* 1. CUSTOMER FORM VIEW */}
-              {currentType === 'customer' && (
+              {formData.type === 'customer' && (
                 <>
                   {/* Basic Info */}
                   <div className="space-y-4">
@@ -2394,15 +2720,27 @@ const PartyManagement: React.FC = () => {
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">WhatsApp Number</label>
-                      <input
-                        type="tel"
-                        placeholder="Leave blank to match Mobile"
-                        value={formData.whatsapp || ''}
-                        onChange={e => setFormData({ ...formData, whatsapp: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                      />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">WhatsApp Number</label>
+                        <input
+                          type="tel"
+                          placeholder="Leave blank to match Mobile"
+                          value={formData.whatsapp || ''}
+                          onChange={e => setFormData({ ...formData, whatsapp: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Alternate Mobile</label>
+                        <input
+                          type="tel"
+                          placeholder="Alternate number"
+                          value={formData.altPhone || ''}
+                          onChange={e => setFormData({ ...formData, altPhone: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                        />
+                      </div>
                     </div>
 
                     <div>
@@ -2704,7 +3042,7 @@ const PartyManagement: React.FC = () => {
               )}
 
               {/* 2. VENDOR FORM VIEW */}
-              {currentType === 'vendor' && (
+              {formData.type === 'vendor' && (
                 <>
                   <div>
                     <h3 className="text-sm font-semibold text-gray-900 mb-3 border-b pb-1">Basic Information</h3>
@@ -2720,6 +3058,10 @@ const PartyManagement: React.FC = () => {
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1">Mobile Number*</label>
                         <input type="tel" placeholder="e.g. 98765 43210" value={formData.phone || ''} onChange={e => setFormData({ ...formData, phone: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" required />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Alternate Mobile</label>
+                        <input type="tel" placeholder="Alternate mobile" value={formData.altPhone || ''} onChange={e => setFormData({ ...formData, altPhone: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                       </div>
                       <div className="col-span-2">
                         <label className="block text-xs font-medium text-gray-500 mb-1">Email Address</label>
@@ -2795,7 +3137,7 @@ const PartyManagement: React.FC = () => {
               )}
 
               {/* 3. AGENT FORM VIEW */}
-              {currentType === 'agent' && (
+              {formData.type === 'agent' && (
                 <>
                   <div>
                     <h3 className="text-sm font-semibold text-gray-900 mb-3 border-b pb-1">Agent Details</h3>
@@ -2807,6 +3149,10 @@ const PartyManagement: React.FC = () => {
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1">Mobile*</label>
                         <input type="tel" placeholder="e.g. 98765 43210" value={formData.phone || ''} onChange={e => setFormData({ ...formData, phone: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" required />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Alternate Mobile</label>
+                        <input type="tel" placeholder="Alternate mobile" value={formData.altPhone || ''} onChange={e => setFormData({ ...formData, altPhone: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                       </div>
                     </div>
                   </div>
@@ -2850,19 +3196,19 @@ const PartyManagement: React.FC = () => {
                 </>
               )}
 
-              {/* 4. ROUTE FORM VIEW */}
-              {currentType === 'route' && (
+              {/* 4. REGION FORM VIEW */}
+              {formData.type === 'route' && (
                 <>
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3 border-b pb-1">Route Details</h3>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3 border-b pb-1">Region Details</h3>
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1">Route Name*</label>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">Region Name*</label>
                           <input type="text" placeholder="e.g. Andhra Line" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" required />
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1">Route Code*</label>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">Region Code*</label>
                           <input type="text" placeholder="e.g. A" value={formData.code || ''} onChange={e => setFormData({ ...formData, code: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" required />
                         </div>
                       </div>
@@ -2877,22 +3223,22 @@ const PartyManagement: React.FC = () => {
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1">Description</label>
-                        <textarea placeholder="Route notes or details" value={formData.description || ''} onChange={e => setFormData({ ...formData, description: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent h-20" />
+                        <textarea placeholder="Region notes or details" value={formData.description || ''} onChange={e => setFormData({ ...formData, description: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent h-20" />
                       </div>
                     </div>
                   </div>
                 </>
               )}
 
-              {/* 5. MARKET FORM VIEW */}
-              {currentType === 'market' && (
+              {/* 5. CITY FORM VIEW */}
+              {formData.type === 'market' && (
                 <>
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3 border-b pb-1">Market Details</h3>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3 border-b pb-1">City Details</h3>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="col-span-2">
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Market Name*</label>
-                        <input type="text" placeholder="e.g. Anna Nagar Market" value={formData.firmName || ''} onChange={e => setFormData({ ...formData, firmName: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" required />
+                        <label className="block text-xs font-medium text-gray-500 mb-1">City Name*</label>
+                        <input type="text" placeholder="e.g. Nellore" value={formData.firmName || ''} onChange={e => setFormData({ ...formData, firmName: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" required />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1">City</label>
@@ -2903,12 +3249,12 @@ const PartyManagement: React.FC = () => {
                         <input type="text" placeholder="e.g. Chennai" value={formData.district || ''} onChange={e => setFormData({ ...formData, district: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                       </div>
                       <div className="col-span-2">
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Assigned Route</label>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Assigned Region</label>
                         <SearchableDropdown
                           value={formData.route || ''}
                           onChange={val => setFormData({ ...formData, route: val })}
                           options={allRoutes.map(r => ({ label: r.name, value: r.name }))}
-                          placeholder="Select Route"
+                          placeholder="Select Region"
                         />
                       </div>
                     </div>
@@ -2917,7 +3263,7 @@ const PartyManagement: React.FC = () => {
               )}
 
               {/* 6. TRANSPORTER FORM VIEW */}
-              {currentType === 'transporter' && (
+              {formData.type === 'transporter' && (
                 <>
                   <div>
                     <h3 className="text-sm font-semibold text-gray-900 mb-3 border-b pb-1">Transporter Details</h3>
@@ -2948,7 +3294,7 @@ const PartyManagement: React.FC = () => {
               )}
 
               {/* Status Select Buttons */}
-              {currentType !== 'market' && (
+              {formData.type !== 'market' && (
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900 mb-3 border-b pb-1">Status</h3>
                   <div className="flex space-x-3">
@@ -3000,7 +3346,7 @@ const PartyManagement: React.FC = () => {
       {/* Activity Log slide-out modal */}
       {showActivityLog && (
         <div className="fixed inset-0 z-50 overflow-hidden" aria-labelledby="slide-over-title" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 overflow-hidden bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setShowActivityLog(false)}></div>
+          <div className="absolute inset-0 overflow-hidden bg-gray-900/40 backdrop-blur-sm transition-opacity" onClick={() => setShowActivityLog(false)}></div>
           <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
             <div className="pointer-events-auto w-screen max-w-md">
               <div className="flex h-full flex-col overflow-y-scroll bg-white shadow-2xl">
@@ -3071,11 +3417,11 @@ const PartyManagement: React.FC = () => {
 
       {/* Find Duplicates Modal */}
       {showDuplicates && (
-        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-gray-500 bg-opacity-75">
-          <div className="relative bg-white rounded-xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[85vh]">
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm">
+          <div className="relative bg-white rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
             
             {/* Header */}
-            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-xl flex justify-between items-center">
+            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-2xl flex justify-between items-center">
               <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-yellow-500" />
                 Find Duplicates for {typeLabelPlural}
@@ -3156,10 +3502,10 @@ const PartyManagement: React.FC = () => {
 
       {/* Dynamic Inline Creation Modal */}
       {inlineModalType && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-500 bg-opacity-75 overflow-y-auto">
-          <div className="relative bg-white rounded-xl max-w-md w-full shadow-2xl flex flex-col border border-gray-150 animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm overflow-y-auto">
+          <div className="relative bg-white rounded-2xl max-w-md w-full shadow-2xl flex flex-col border border-gray-150 animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
             {/* Header */}
-            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-xl flex justify-between items-center">
+            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-2xl flex justify-between items-center">
               <h2 className="text-lg font-bold text-gray-900 capitalize">
                 Add New {inlineModalType === 'market' ? 'City' : inlineModalType === 'route' ? 'Region' : inlineModalType}
               </h2>
@@ -3403,13 +3749,13 @@ const PartyManagement: React.FC = () => {
 
       {/* Customer Details Right-Side Drawer */}
       {viewingCustomer && !showForm && (
-        <div className="fixed top-0 right-0 h-full w-[520px] bg-white shadow-2xl border-l border-gray-200 z-40 flex flex-col transition-all duration-300 animate-in slide-in-from-right">
+        <div className="fixed top-0 right-0 h-full w-full sm:w-[520px] bg-white shadow-2xl border-l border-gray-200 z-40 flex flex-col transition-all duration-300 animate-in slide-in-from-right">
           {/* Header */}
           <div className="flex items-center justify-between p-5 border-b border-gray-200 bg-gray-50">
             <div className="flex-1 min-w-0 pr-4">
               <div className="flex items-center space-x-2">
                 <h2 className="text-xl font-bold text-gray-900 truncate">
-                  {currentType === 'route' ? viewingCustomer.name : (viewingCustomer.firmName || viewingCustomer.contactName)}
+                  {currentType === 'route' ? (viewingCustomer.code ? `${viewingCustomer.code} (${viewingCustomer.name})` : viewingCustomer.name) : (viewingCustomer.firmName || viewingCustomer.contactName)}
                 </h2>
                 <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full uppercase border ${
                   viewingCustomer.status === 'active' ? 'bg-green-50 border-green-200 text-green-700' :
@@ -3518,15 +3864,25 @@ const PartyManagement: React.FC = () => {
                     </div>
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">Mobile Number</span>
-                      <div className="flex items-center">
+                      <div className="flex items-center space-x-1.5">
                         {viewingCustomer.phone ? (
-                          <a
-                            href={`tel:${viewingCustomer.phone.replace(/\D/g, '')}`}
-                            className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
-                            title={`Call ${viewingCustomer.phone}`}
-                          >
-                            {viewingCustomer.phone}
-                          </a>
+                          <>
+                            <a
+                              href={`tel:${viewingCustomer.phone.replace(/\D/g, '')}`}
+                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                              title={`Call ${viewingCustomer.phone}`}
+                            >
+                              {viewingCustomer.phone}
+                            </a>
+                            <a
+                              href={getWhatsAppLink(viewingCustomer.phone)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center"
+                            >
+                              <WhatsAppIcon />
+                            </a>
+                          </>
                         ) : (
                           <span className="font-semibold text-gray-900">-</span>
                         )}
@@ -3534,11 +3890,43 @@ const PartyManagement: React.FC = () => {
                     </div>
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">Alternate Mobile</span>
-                      <span className="font-semibold text-gray-900">{viewingCustomer.altPhone || '-'}</span>
+                      <div className="flex items-center space-x-1.5">
+                        {viewingCustomer.altPhone ? (
+                          <>
+                            <a
+                              href={`tel:${viewingCustomer.altPhone.replace(/\D/g, '')}`}
+                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                              title={`Call ${viewingCustomer.altPhone}`}
+                            >
+                              {viewingCustomer.altPhone}
+                            </a>
+                            <a
+                              href={getWhatsAppLink(viewingCustomer.altPhone)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center"
+                            >
+                              <WhatsAppIcon />
+                            </a>
+                          </>
+                        ) : (
+                          <span className="font-semibold text-gray-900">-</span>
+                        )}
+                      </div>
                     </div>
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">Email ID</span>
-                      <span className="font-semibold text-gray-900 truncate block" title={viewingCustomer.email}>{viewingCustomer.email || '-'}</span>
+                      {viewingCustomer.email ? (
+                        <a
+                          href={`mailto:${viewingCustomer.email}`}
+                          className="font-semibold text-blue-600 hover:text-blue-800 hover:underline truncate block"
+                          title={`Email ${viewingCustomer.email}`}
+                        >
+                          {viewingCustomer.email}
+                        </a>
+                      ) : (
+                        <span className="font-semibold text-gray-900 block truncate">-</span>
+                      )}
                     </div>
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">GST Number</span>
@@ -3628,9 +4016,9 @@ const PartyManagement: React.FC = () => {
                   </h3>
                   <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm">
                     <div>
-                      <span className="block text-xs text-gray-400 font-medium">Assigned Route</span>
+                      <span className="block text-xs text-gray-400 font-medium">Assigned Region</span>
                       <span className="inline-flex px-2 py-0.5 mt-0.5 text-xs font-semibold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-150">
-                        {viewingCustomer.route || 'No Route'}
+                        {viewingCustomer.route || 'No Region'}
                       </span>
                     </div>
                     <div>
@@ -3718,15 +4106,25 @@ const PartyManagement: React.FC = () => {
                     </div>
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">Mobile Number</span>
-                      <div className="flex items-center">
+                      <div className="flex items-center space-x-1.5">
                         {viewingCustomer.phone ? (
-                          <a
-                            href={`tel:${viewingCustomer.phone.replace(/\D/g, '')}`}
-                            className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
-                            title={`Call ${viewingCustomer.phone}`}
-                          >
-                            {viewingCustomer.phone}
-                          </a>
+                          <>
+                            <a
+                              href={`tel:${viewingCustomer.phone.replace(/\D/g, '')}`}
+                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                              title={`Call ${viewingCustomer.phone}`}
+                            >
+                              {viewingCustomer.phone}
+                            </a>
+                            <a
+                              href={getWhatsAppLink(viewingCustomer.phone)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center"
+                            >
+                              <WhatsAppIcon />
+                            </a>
+                          </>
                         ) : (
                           <span className="font-semibold text-gray-900">-</span>
                         )}
@@ -3734,11 +4132,43 @@ const PartyManagement: React.FC = () => {
                     </div>
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">Alternate Mobile</span>
-                      <span className="font-semibold text-gray-900">{viewingCustomer.altPhone || '-'}</span>
+                      <div className="flex items-center space-x-1.5">
+                        {viewingCustomer.altPhone ? (
+                          <>
+                            <a
+                              href={`tel:${viewingCustomer.altPhone.replace(/\D/g, '')}`}
+                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                              title={`Call ${viewingCustomer.altPhone}`}
+                            >
+                              {viewingCustomer.altPhone}
+                            </a>
+                            <a
+                              href={getWhatsAppLink(viewingCustomer.altPhone)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center"
+                            >
+                              <WhatsAppIcon />
+                            </a>
+                          </>
+                        ) : (
+                          <span className="font-semibold text-gray-900">-</span>
+                        )}
+                      </div>
                     </div>
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">Email ID</span>
-                      <span className="font-semibold text-gray-900 truncate block" title={viewingCustomer.email}>{viewingCustomer.email || '-'}</span>
+                      {viewingCustomer.email ? (
+                        <a
+                          href={`mailto:${viewingCustomer.email}`}
+                          className="font-semibold text-blue-600 hover:text-blue-800 hover:underline truncate block"
+                          title={`Email ${viewingCustomer.email}`}
+                        >
+                          {viewingCustomer.email}
+                        </a>
+                      ) : (
+                        <span className="font-semibold text-gray-900 block truncate">-</span>
+                      )}
                     </div>
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">GST Number</span>
@@ -3840,15 +4270,25 @@ const PartyManagement: React.FC = () => {
                     </div>
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">Mobile Number</span>
-                      <div className="flex items-center">
+                      <div className="flex items-center space-x-1.5">
                         {viewingCustomer.phone ? (
-                          <a
-                            href={`tel:${viewingCustomer.phone.replace(/\D/g, '')}`}
-                            className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
-                            title={`Call ${viewingCustomer.phone}`}
-                          >
-                            {viewingCustomer.phone}
-                          </a>
+                          <>
+                            <a
+                              href={`tel:${viewingCustomer.phone.replace(/\D/g, '')}`}
+                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                              title={`Call ${viewingCustomer.phone}`}
+                            >
+                              {viewingCustomer.phone}
+                            </a>
+                            <a
+                              href={getWhatsAppLink(viewingCustomer.phone)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center"
+                            >
+                              <WhatsAppIcon />
+                            </a>
+                          </>
                         ) : (
                           <span className="font-semibold text-gray-905">-</span>
                         )}
@@ -3856,11 +4296,43 @@ const PartyManagement: React.FC = () => {
                     </div>
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">Alternate Mobile</span>
-                      <span className="font-semibold text-gray-905">{viewingCustomer.altPhone || '-'}</span>
+                      <div className="flex items-center space-x-1.5">
+                        {viewingCustomer.altPhone ? (
+                          <>
+                            <a
+                              href={`tel:${viewingCustomer.altPhone.replace(/\D/g, '')}`}
+                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                              title={`Call ${viewingCustomer.altPhone}`}
+                            >
+                              {viewingCustomer.altPhone}
+                            </a>
+                            <a
+                              href={getWhatsAppLink(viewingCustomer.altPhone)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center"
+                            >
+                              <WhatsAppIcon />
+                            </a>
+                          </>
+                        ) : (
+                          <span className="font-semibold text-gray-905">-</span>
+                        )}
+                      </div>
                     </div>
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">Email ID</span>
-                      <span className="font-semibold text-gray-905 truncate block" title={viewingCustomer.email}>{viewingCustomer.email || '-'}</span>
+                      {viewingCustomer.email ? (
+                        <a
+                          href={`mailto:${viewingCustomer.email}`}
+                          className="font-semibold text-blue-600 hover:text-blue-800 hover:underline truncate block"
+                          title={`Email ${viewingCustomer.email}`}
+                        >
+                          {viewingCustomer.email}
+                        </a>
+                      ) : (
+                        <span className="font-semibold text-gray-905 block truncate">-</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -3868,7 +4340,7 @@ const PartyManagement: React.FC = () => {
                 {/* Assigned Routes Section */}
                 <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
                   <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
-                    <MapPin className="w-4 h-4 text-gray-500" /> Assigned Regions / Routes
+                    <MapPin className="w-4 h-4 text-gray-500" /> Assigned Regions
                   </h3>
                   <div className="pt-1">
                     {getAgentRoutesBadges(viewingCustomer.firmName || viewingCustomer.contactName)}
@@ -3921,9 +4393,17 @@ const PartyManagement: React.FC = () => {
                     <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
                       <Building className="w-4 h-4 text-gray-500" /> Cities in Region
                     </h3>
-                    <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2.5 py-0.5 rounded-full">
-                      {allMarkets.filter(m => m.route === viewingCustomer.name).length} Total
-                    </span>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => openInlineModal('market', { route: viewingCustomer.name })}
+                        className="text-[11px] font-bold text-blue-600 hover:text-blue-805 transition-colors flex items-center gap-0.5 border border-blue-250 bg-blue-50/50 hover:bg-blue-50 px-2 py-0.5 rounded-md"
+                      >
+                        <Plus className="w-3 h-3" /> Add City
+                      </button>
+                      <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2.5 py-0.5 rounded-full">
+                        {allMarkets.filter(m => m.route === viewingCustomer.name).length} Total
+                      </span>
+                    </div>
                   </div>
 
                   {/* Search Input for cities in this region */}
@@ -3949,7 +4429,9 @@ const PartyManagement: React.FC = () => {
 
                   <div className="max-h-[340px] overflow-y-auto pr-1">
                     {(() => {
-                      const citiesUnderRoute = allMarkets.filter(m => m.route === viewingCustomer.name);
+                      const citiesUnderRoute = [...allMarkets]
+                        .filter(m => m.route === viewingCustomer.name)
+                        .sort((a, b) => (a.firmName || '').localeCompare(b.firmName || ''));
                       const filteredCities = citiesUnderRoute.filter(c =>
                         (c.firmName || '').toLowerCase().includes(regionCitySearchText.toLowerCase())
                       );
@@ -3968,18 +4450,18 @@ const PartyManagement: React.FC = () => {
                             <div
                               key={city._id}
                               onClick={() => openCityCustomersPopup(city.firmName)}
-                              className="p-3 border border-gray-200 hover:border-blue-400 rounded-xl bg-white flex flex-col justify-between hover:shadow-xs hover:bg-blue-50/5 transition-all cursor-pointer group"
+                              className="p-3 border border-gray-200 hover:border-blue-400 rounded-xl bg-white flex flex-col justify-between hover:shadow-xs hover:bg-blue-50/5 transition-all cursor-pointer group min-w-0"
                               title={`Click to view customers in ${city.firmName}`}
                             >
-                              <div className="mb-2">
+                              <div className="mb-2 min-w-0">
                                 <span className="font-bold text-gray-955 text-sm block group-hover:text-blue-600 transition-colors truncate">
                                   {city.firmName}
                                 </span>
-                                <span className="text-[11px] text-gray-450 font-medium block truncate mt-0.5">
+                                <span className="text-[11px] text-gray-450 font-medium block truncate mt-1 leading-normal">
                                   {city.district || '-'}, {city.state || '-'}
                                 </span>
                               </div>
-                              <div className="flex items-center justify-between mt-1 pt-1.5 border-t border-gray-50 shrink-0">
+                              <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100 shrink-0">
                                 <span className={`inline-flex px-1.5 py-0.5 text-[9px] font-bold uppercase rounded ${
                                   city.status === 'active'
                                     ? 'bg-green-50 text-green-755 border border-green-150'
@@ -4023,7 +4505,7 @@ const PartyManagement: React.FC = () => {
                       <span className="font-semibold text-gray-905">{viewingCustomer.state || '-'}</span>
                     </div>
                     <div>
-                      <span className="block text-xs text-gray-400 font-medium">Assigned Route</span>
+                      <span className="block text-xs text-gray-400 font-medium">Assigned Region</span>
                       <span className="inline-flex px-2 py-0.5 mt-0.5 text-xs font-semibold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-150">
                         {viewingCustomer.route || 'No Region'}
                       </span>
@@ -4050,8 +4532,15 @@ const PartyManagement: React.FC = () => {
                       <span className="font-bold text-gray-909 text-lg">{viewingCustomer.customerCount || 0}</span>
                     </div>
                     <button
+                      onClick={handleAddCustomerToCity}
+                      className="flex items-center justify-center space-x-2 w-full p-2.5 bg-green-50 hover:bg-green-100 text-green-755 rounded-lg border border-green-200 text-xs font-semibold transition-colors"
+                    >
+                      <Plus className="w-4 h-4 text-green-600" />
+                      <span>Add Customer to City</span>
+                    </button>
+                    <button
                       onClick={() => openCityCustomersPopup(viewingCustomer.firmName)}
-                      className="flex items-center justify-center space-x-2 w-full p-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg border border-blue-200 text-xs font-semibold transition-colors"
+                      className="flex items-center justify-center space-x-2 w-full p-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg border border-blue-205 text-xs font-semibold transition-colors"
                     >
                       <Users className="w-4 h-4 text-blue-600" />
                       <span>View Customers in {viewingCustomer.firmName}</span>
@@ -4080,15 +4569,25 @@ const PartyManagement: React.FC = () => {
                     </div>
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">Mobile Number</span>
-                      <div className="flex items-center">
+                      <div className="flex items-center space-x-1.5">
                         {viewingCustomer.phone ? (
-                          <a
-                            href={`tel:${viewingCustomer.phone.replace(/\D/g, '')}`}
-                            className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
-                            title={`Call ${viewingCustomer.phone}`}
-                          >
-                            {viewingCustomer.phone}
-                          </a>
+                          <>
+                            <a
+                              href={`tel:${viewingCustomer.phone.replace(/\D/g, '')}`}
+                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                              title={`Call ${viewingCustomer.phone}`}
+                            >
+                              {viewingCustomer.phone}
+                            </a>
+                            <a
+                              href={getWhatsAppLink(viewingCustomer.phone)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center"
+                            >
+                              <WhatsAppIcon />
+                            </a>
+                          </>
                         ) : (
                           <span className="font-semibold text-gray-905">-</span>
                         )}
@@ -4096,7 +4595,17 @@ const PartyManagement: React.FC = () => {
                     </div>
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">Email Address</span>
-                      <span className="font-semibold text-gray-905 truncate block" title={viewingCustomer.email}>{viewingCustomer.email || '-'}</span>
+                      {viewingCustomer.email ? (
+                        <a
+                          href={`mailto:${viewingCustomer.email}`}
+                          className="font-semibold text-blue-600 hover:text-blue-800 hover:underline truncate block"
+                          title={`Email ${viewingCustomer.email}`}
+                        >
+                          {viewingCustomer.email}
+                        </a>
+                      ) : (
+                        <span className="font-semibold text-gray-905 block truncate">-</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -4126,10 +4635,10 @@ const PartyManagement: React.FC = () => {
 
       {/* City Customers Popup Modal */}
       {selectedCityName && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-500 bg-opacity-75 overflow-y-auto">
-          <div className="relative bg-white rounded-xl max-w-4xl w-full shadow-2xl flex flex-col max-h-[85vh] border border-gray-150 animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-100">
+          <div className="relative bg-white rounded-2xl max-w-4xl w-full shadow-2xl flex flex-col max-h-[85vh] border border-gray-150 animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
             {/* Header */}
-            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-xl flex justify-between items-center">
+            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-2xl flex justify-between items-center">
               <div>
                 <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                   <Users className="w-5 h-5 text-blue-600" />
@@ -4137,12 +4646,21 @@ const PartyManagement: React.FC = () => {
                 </h2>
                 <p className="text-xs text-gray-500 mt-0.5">Showing customers registered under this city</p>
               </div>
-              <button
-                onClick={() => setSelectedCityName(null)}
-                className="text-gray-400 hover:text-gray-650 transition-colors p-1 hover:bg-gray-100 rounded-lg"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={handleAddCustomerFromModal}
+                  className="flex items-center space-x-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Customer</span>
+                </button>
+                <button
+                  onClick={() => setSelectedCityName(null)}
+                  className="text-gray-400 hover:text-gray-650 transition-colors p-1.5 hover:bg-gray-100 rounded-lg"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Search Bar */}
@@ -4196,7 +4714,7 @@ const PartyManagement: React.FC = () => {
                           <tr className="bg-gray-50">
                             <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Firm Name</th>
                             <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Mobile Number</th>
-                            <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Route / Region</th>
+                            <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Region</th>
                             <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Agent Assigned</th>
                             <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
                           </tr>
@@ -4205,14 +4723,14 @@ const PartyManagement: React.FC = () => {
                           {filtered.map((cust) => (
                             <tr key={cust._id} className="hover:bg-gray-50/50 transition-colors">
                               <td className="px-4 py-3">
-                                <div className="flex flex-col">
-                                  <span className="font-semibold text-gray-900 text-sm">{cust.firmName || '-'}</span>
-                                  {cust.ownerName && (
-                                    <span className="text-xs text-gray-450 font-normal">{cust.ownerName}</span>
+                                <div className="flex flex-col gap-0.5">
+                                  <span className="font-semibold text-gray-900 text-[13.5px] leading-tight">{cust.firmName || '-'}</span>
+                                  {cust.ownerName && cust.ownerName !== cust.firmName && (
+                                    <span className="text-xs text-gray-450 font-normal leading-normal">{cust.ownerName}</span>
                                   )}
                                 </div>
                               </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                              <td className="px-4 py-3 whitespace-nowrap text-[13.5px] text-gray-700">
                                 {cust.phone ? (
                                   <a
                                     href={`tel:${cust.phone.replace(/\D/g, '')}`}
@@ -4225,7 +4743,7 @@ const PartyManagement: React.FC = () => {
                                   <span className="text-gray-400">-</span>
                                 )}
                               </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-700">
+                              <td className="px-4 py-3 whitespace-nowrap text-[13.5px] text-gray-700">
                                 {cust.route ? (
                                   <span className="inline-flex px-2 py-0.5 font-semibold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
                                     {cust.route}
@@ -4234,7 +4752,7 @@ const PartyManagement: React.FC = () => {
                                   <span className="text-gray-455">-</span>
                                 )}
                               </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-700">
+                              <td className="px-4 py-3 whitespace-nowrap text-[13.5px] text-gray-700">
                                 {cust.agentAssigned ? (
                                   <span className="inline-flex px-2 py-0.5 font-semibold rounded-full bg-purple-50 text-purple-700 border border-purple-100">
                                     {cust.agentAssigned}
@@ -4277,8 +4795,8 @@ const PartyManagement: React.FC = () => {
 
       {/* Custom Confirm Modal Popup (Keyboard/Mouse controlled) */}
       {customConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-500 bg-opacity-75 overflow-y-auto animate-in fade-in duration-100">
-          <div className="relative bg-white rounded-xl max-w-md w-full shadow-2xl p-6 border border-gray-150 animate-in fade-in zoom-in-95 duration-150 text-center space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-100">
+          <div className="relative bg-white rounded-2xl max-w-md w-full shadow-2xl p-6 border border-gray-150 animate-in fade-in zoom-in-95 duration-150 text-center space-y-4">
             <AlertTriangle className="w-12 h-12 text-red-500 mx-auto animate-bounce" />
 
             <div>
@@ -4318,8 +4836,8 @@ const PartyManagement: React.FC = () => {
 
       {/* Custom Alert Modal Popup (Tally-like enter button close) */}
       {customAlert && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-500 bg-opacity-75 overflow-y-auto animate-in fade-in duration-100">
-          <div className="relative bg-white rounded-xl max-w-md w-full shadow-2xl p-6 border border-gray-150 animate-in fade-in zoom-in-95 duration-150 text-center space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-100">
+          <div className="relative bg-white rounded-2xl max-w-md w-full shadow-2xl p-6 border border-gray-150 animate-in fade-in zoom-in-95 duration-150 text-center space-y-4">
             {customAlert.type === 'error' && <XCircle className="w-12 h-12 text-red-500 mx-auto" />}
             {customAlert.type === 'success' && <CheckCircle className="w-12 h-12 text-green-500 mx-auto" />}
             {customAlert.type === 'warning' && <AlertTriangle className="w-12 h-12 text-yellow-500 mx-auto" />}

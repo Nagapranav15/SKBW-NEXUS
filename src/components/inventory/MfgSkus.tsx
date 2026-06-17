@@ -57,13 +57,13 @@ const MfgSkus: React.FC = () => {
              filtered.length === 0 ? <tr><td colSpan={8} className="px-6 py-12 text-center text-gray-400">No SKUs found</td></tr> :
              filtered.map(s => (
               <tr key={s._id} className="hover:bg-gray-50">
-                <td className="px-6 py-3 text-sm font-medium text-blue-600">{s.sku_code}</td>
-                <td className="px-6 py-3 text-sm font-medium">{s.name}</td>
+                <td className="px-6 py-3 text-[13.5px] font-medium text-blue-600">{s.sku_code}</td>
+                <td className="px-6 py-3 text-[13.5px] font-medium">{s.name}</td>
                 <td className="px-6 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${catColors[s.category]}`}>{s.category}</span></td>
-                <td className="px-6 py-3 text-sm text-gray-500">{s.unit_type}</td>
-                <td className="px-6 py-3 text-sm text-gray-500">{s.pages || '-'}</td>
-                <td className="px-6 py-3 text-sm text-gray-500">{s.default_books_per_gbl || '-'}</td>
-                {isAdmin && <td className="px-6 py-3 text-sm text-gray-500">₹{s.cost_per_unit || 0}</td>}
+                <td className="px-6 py-3 text-[13.5px] text-gray-500">{s.unit_type}</td>
+                <td className="px-6 py-3 text-[13.5px] text-gray-500">{s.pages || '-'}</td>
+                <td className="px-6 py-3 text-[13.5px] text-gray-500">{s.default_books_per_gbl || '-'}</td>
+                {isAdmin && <td className="px-6 py-3 text-[13.5px] text-gray-500">₹{s.cost_per_unit || 0}</td>}
                 <td className="px-6 py-3 flex gap-1">
                   {canManage && <><button onClick={() => openEdit(s)} className="p-1 hover:bg-blue-50 rounded"><Edit className="w-4 h-4 text-blue-600" /></button><button onClick={() => handleDelete(s._id)} className="p-1 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4 text-red-500" /></button></>}
                 </td>

@@ -139,22 +139,22 @@ const MovementsPage: React.FC = () => {
                     </span>
                   </td>
                   <td className="px-6 py-3">
-                    <div className="text-sm font-medium text-gray-900">{m.item?.name || 'Unknown'}</div>
+                    <div className="text-[13.5px] font-medium text-gray-900">{m.item?.name || 'Unknown'}</div>
                     <div className="text-xs text-gray-500">{m.item?.itemId}</div>
                   </td>
-                  <td className="px-6 py-3"><span className={`text-sm font-semibold ${m.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>{m.quantity > 0 ? '+' : ''}{m.quantity}</span></td>
-                  <td className="px-6 py-3 text-sm text-gray-500">
+                  <td className="px-6 py-3"><span className={`text-[13.5px] font-semibold ${m.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>{m.quantity > 0 ? '+' : ''}{m.quantity}</span></td>
+                  <td className="px-6 py-3 text-[13.5px] text-gray-500">
                     {m.quantity_before != null ? `${m.quantity_before} → ${m.quantity_after}` : '-'}
                   </td>
                   <td className="px-6 py-3"><span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">{m.source_type}</span></td>
-                  <td className="px-6 py-3 text-sm text-gray-500">
+                  <td className="px-6 py-3 text-[13.5px] text-gray-500">
                     {m.warehouse?.name || '-'}{m.sectionId ? ` / ${m.sectionId}` : ''}
                     {m.movement_type === 'TRANSFER' && m.from_warehouse && (
                       <div className="text-xs text-blue-500 mt-0.5">{m.from_warehouse?.name} → {m.to_warehouse?.name || m.warehouse?.name}</div>
                     )}
                   </td>
-                  <td className="px-6 py-3 text-sm text-gray-500">{new Date(m.date || m.createdAt).toLocaleDateString()}</td>
-                  <td className="px-6 py-3 text-sm text-gray-400 max-w-[200px] truncate">{m.notes || '-'}</td>
+                  <td className="px-6 py-3 text-[13.5px] text-gray-500">{new Date(m.date || m.createdAt).toLocaleDateString()}</td>
+                  <td className="px-6 py-3 text-[13.5px] text-gray-400 max-w-[200px] truncate">{m.notes || '-'}</td>
                 </tr>
               ))}
             </tbody>

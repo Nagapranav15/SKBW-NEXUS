@@ -102,10 +102,10 @@ const DeliveryChallan: React.FC = () => {
           <tbody className="bg-white divide-y divide-gray-200">
             {filtered.map((dc) => (
               <tr key={dc._id} className="hover:bg-gray-50">
-                <td className="px-6 py-4"><div className="text-sm font-medium text-gray-900">{dc.dcNumber}</div><div className="text-sm text-gray-500">Order: {dc.orderNumber}</div><div className="text-sm text-gray-500">{new Date(dc.date).toLocaleDateString()}</div></td>
-                <td className="px-6 py-4 text-sm text-gray-900">{dc.customerName}</td>
-                <td className="px-6 py-4"><div className="text-sm text-gray-900">{dc.transporterName || 'N/A'}</div><div className="text-sm text-gray-500">{dc.vehicleNumber || 'N/A'}</div></td>
-                <td className="px-6 py-4 text-sm font-medium text-gray-900">₹{dc.total?.toFixed(2)}</td>
+                <td className="px-6 py-4"><div className="text-[13.5px] font-medium text-gray-900">{dc.dcNumber}</div><div className="text-[13.5px] text-gray-500">Order: {dc.orderNumber}</div><div className="text-[13.5px] text-gray-500">{new Date(dc.date).toLocaleDateString()}</div></td>
+                <td className="px-6 py-4 text-[13.5px] text-gray-900">{dc.customerName}</td>
+                <td className="px-6 py-4"><div className="text-[13.5px] text-gray-900">{dc.transporterName || 'N/A'}</div><div className="text-[13.5px] text-gray-500">{dc.vehicleNumber || 'N/A'}</div></td>
+                <td className="px-6 py-4 text-[13.5px] font-medium text-gray-900">₹{dc.total?.toFixed(2)}</td>
                 <td className="px-6 py-4"><span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(dc.status)}`}>{dc.status}</span></td>
                 <td className="px-6 py-4">
                   {canManage && <div className="flex space-x-2">

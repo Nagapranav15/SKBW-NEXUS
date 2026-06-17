@@ -279,14 +279,14 @@ const SalesQuotes: React.FC = () => {
               {filteredQuotes.map((quote) => (
                 <tr key={quote._id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{quote.quoteNumber}</div>
-                    <div className="text-sm text-gray-500">Date: {new Date(quote.date).toLocaleDateString()}</div>
-                    <div className="text-sm text-gray-500">Valid: {new Date(quote.validUntil).toLocaleDateString()}</div>
+                    <div className="text-[13.5px] font-medium text-gray-900">{quote.quoteNumber}</div>
+                    <div className="text-[13.5px] text-gray-500">Date: {new Date(quote.date).toLocaleDateString()}</div>
+                    <div className="text-[13.5px] text-gray-500">Valid: {new Date(quote.validUntil).toLocaleDateString()}</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{quote.customerName}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-[13.5px] font-medium text-gray-900">{quote.customerName}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">₹{quote.total?.toFixed(2)}</div>
-                    <div className="text-sm text-gray-500">{quote.items?.length} items</div>
+                    <div className="text-[13.5px] font-medium text-gray-900">₹{quote.total?.toFixed(2)}</div>
+                    <div className="text-[13.5px] text-gray-500">{quote.items?.length} items</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {canManage ? (
@@ -305,7 +305,7 @@ const SalesQuotes: React.FC = () => {
                       </span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <td className="px-6 py-4 whitespace-nowrap text-[13.5px] font-medium">
                     <div className="flex space-x-2">
                       {canCreate && (
                         <button onClick={() => handleEdit(quote)} className="text-blue-600 hover:text-blue-900">

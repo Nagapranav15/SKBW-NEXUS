@@ -210,14 +210,14 @@ const SalesOrders: React.FC = () => {
               {filteredOrders.map((order) => (
                 <tr key={order._id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{order.orderNumber}</div>
-                    <div className="text-sm text-gray-500">Date: {new Date(order.date).toLocaleDateString()}</div>
-                    <div className="text-sm text-gray-500">Delivery: {order.deliveryDate ? new Date(order.deliveryDate).toLocaleDateString() : 'N/A'}</div>
+                    <div className="text-[13.5px] font-medium text-gray-900">{order.orderNumber}</div>
+                    <div className="text-[13.5px] text-gray-500">Date: {new Date(order.date).toLocaleDateString()}</div>
+                    <div className="text-[13.5px] text-gray-500">Delivery: {order.deliveryDate ? new Date(order.deliveryDate).toLocaleDateString() : 'N/A'}</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.customerName}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-[13.5px] font-medium text-gray-900">{order.customerName}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">₹{order.total?.toFixed(2)}</div>
-                    <div className="text-sm text-gray-500">{order.items?.length} items</div>
+                    <div className="text-[13.5px] font-medium text-gray-900">₹{order.total?.toFixed(2)}</div>
+                    <div className="text-[13.5px] text-gray-500">{order.items?.length} items</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="space-y-1">
@@ -235,7 +235,7 @@ const SalesOrders: React.FC = () => {
                       </select>
                     ) : <span className={`text-xs font-semibold rounded-full px-2 py-1 ${getStatusColor(order.status)}`}>{order.status.replace('_', ' ')}</span>}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <td className="px-6 py-4 whitespace-nowrap text-[13.5px] font-medium">
                     <div className="flex space-x-2">
                       {canManage && <button onClick={() => handleEdit(order)} className="text-blue-600 hover:text-blue-900"><Edit className="w-4 h-4" /></button>}
                       {canManage && <button onClick={() => handleDelete(order._id)} className="text-red-600 hover:text-red-900"><Trash2 className="w-4 h-4" /></button>}

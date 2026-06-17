@@ -169,11 +169,11 @@ const ZoneDetail: React.FC<Props> = ({ zone: initialZone, factory: initialFactor
                   const catColor = s.sku?.category === 'Raw' ? 'bg-amber-100 text-amber-700' : s.sku?.category === 'Finished' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700';
                   return (
                     <tr key={i} className="hover:bg-gray-50">
-                      <td className="py-3 pr-4"><p className="font-medium text-sm">{s.sku?.name}</p><p className="text-xs text-gray-400">{s.sku?.sku_code}</p></td>
+                      <td className="py-3 pr-4"><p className="font-medium text-[13.5px]">{s.sku?.name}</p><p className="text-xs text-gray-400">{s.sku?.sku_code}</p></td>
                       <td className="py-3 pr-4"><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${catColor}`}>{s.sku?.category}</span></td>
-                      <td className="py-3 pr-4 text-sm font-semibold">{s.quantity.toLocaleString()}</td>
-                      <td className="py-3 text-sm text-gray-500">{s.sku?.unit_type}</td>
-                      {isAdmin && <td className="py-3 text-sm text-gray-500">₹{(s.quantity * (s.sku?.cost_per_unit || 0)).toLocaleString()}</td>}
+                      <td className="py-3 pr-4 text-[13.5px] font-semibold">{s.quantity.toLocaleString()}</td>
+                      <td className="py-3 text-[13.5px] text-gray-500">{s.sku?.unit_type}</td>
+                      {isAdmin && <td className="py-3 text-[13.5px] text-gray-500">₹{(s.quantity * (s.sku?.cost_per_unit || 0)).toLocaleString()}</td>}
                     </tr>
                   );
                 })}

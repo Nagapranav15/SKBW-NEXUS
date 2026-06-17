@@ -68,17 +68,17 @@ const MfgMovements: React.FC = () => {
           <tbody className="divide-y divide-gray-100">
             {loading ? <tr><td colSpan={8} className="px-6 py-12 text-center text-gray-400">Loading...</td></tr> :
              movements.length === 0 ? <tr><td colSpan={8} className="px-6 py-12 text-center text-gray-400">No movements</td></tr> :
-             movements.map(m => (
-              <tr key={m._id} className="hover:bg-gray-50">
-                <td className="px-6 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${typeColors[m.type]}`}>{m.type}</span></td>
-                <td className="px-6 py-3 text-sm">{m.sku?.name || '-'}<div className="text-xs text-gray-400">{m.sku?.sku_code}</div></td>
-                <td className="px-6 py-3 text-sm font-semibold">{m.quantity} {m.unit}</td>
-                <td className="px-6 py-3 text-sm text-gray-500">{m.from_zone?.zone_code || '-'}</td>
-                <td className="px-6 py-3 text-sm text-gray-500">{m.to_zone?.zone_code || '-'}</td>
-                {isAdmin && <td className="px-6 py-3 text-sm">₹{m.cost_per_unit || 0}</td>}
-                <td className="px-6 py-3 text-xs text-gray-500">{new Date(m.createdAt).toLocaleDateString()}</td>
-                <td className="px-6 py-3 text-sm text-gray-400 max-w-[150px] truncate">{m.remarks || '-'}</td>
-              </tr>))}
+              movements.map(m => (
+               <tr key={m._id} className="hover:bg-gray-50">
+                 <td className="px-6 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${typeColors[m.type]}`}>{m.type}</span></td>
+                 <td className="px-6 py-3 text-[13.5px]">{m.sku?.name || '-'}<div className="text-xs text-gray-400">{m.sku?.sku_code}</div></td>
+                 <td className="px-6 py-3 text-[13.5px] font-semibold">{m.quantity} {m.unit}</td>
+                 <td className="px-6 py-3 text-[13.5px] text-gray-500">{m.from_zone?.zone_code || '-'}</td>
+                 <td className="px-6 py-3 text-[13.5px] text-gray-500">{m.to_zone?.zone_code || '-'}</td>
+                 {isAdmin && <td className="px-6 py-3 text-[13.5px]">₹{m.cost_per_unit || 0}</td>}
+                 <td className="px-6 py-3 text-xs text-gray-500">{new Date(m.createdAt).toLocaleDateString()}</td>
+                 <td className="px-6 py-3 text-[13.5px] text-gray-400 max-w-[150px] truncate">{m.remarks || '-'}</td>
+               </tr>))}
           </tbody></table>
         {total > limit && <div className="px-6 py-3 border-t flex justify-between text-sm"><span className="text-gray-500">{page*limit+1}–{Math.min((page+1)*limit,total)} of {total}</span><div className="flex gap-2"><button disabled={page===0} onClick={()=>setPage(p=>p-1)} className="px-3 py-1 border rounded disabled:opacity-50">Prev</button><button disabled={(page+1)*limit>=total} onClick={()=>setPage(p=>p+1)} className="px-3 py-1 border rounded disabled:opacity-50">Next</button></div></div>}
       </div>
