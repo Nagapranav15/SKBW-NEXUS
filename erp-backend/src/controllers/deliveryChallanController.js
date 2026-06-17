@@ -35,7 +35,7 @@ exports.createDeliveryChallan = async (req, res) => {
 
 exports.updateDeliveryChallan = async (req, res) => {
   try {
-    const challan = await DeliveryChallan.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const challan = await DeliveryChallan.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
     if (!challan) return res.status(404).json({ msg: "Delivery Challan not found" });
     res.json(challan);
   } catch (err) {

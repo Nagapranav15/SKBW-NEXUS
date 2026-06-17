@@ -96,7 +96,7 @@ exports.createTransaction = async (req, res) => {
 // PUT /api/transactions/:id
 exports.updateTransaction = async (req, res) => {
   try {
-    const txn = await Transaction.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const txn = await Transaction.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
     if (!txn) return res.status(404).json({ msg: "Transaction not found" });
     res.json(txn);
   } catch (err) {

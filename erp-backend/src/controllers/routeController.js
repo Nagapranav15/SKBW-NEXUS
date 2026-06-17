@@ -80,8 +80,46 @@ exports.updateRoute = async (req, res) => {
     delete data.__v;
     delete data.createdAt;
     delete data.updatedAt;
-    const route = await Route.findByIdAndUpdate(req.params.id, data, { new: true });
-    if (!route) return res.status(404).json({ msg: 'Route not found' });
+
+    const existingRoute = await Route.findById(req.params.id);
+    if (!existingRoute) return res.status(404).json({ msg: 'Route not found' });
+
+    const route = await Route.findByIdAndUpdate(req.params.id, data, { returnDocument: 'after' });
+
+    // Sync cities (markets) and customers if route name or agent changed
+    const nameChanged = data.name !== undefined && data.name !== existingRoute.name;
+    const agentChanged = data.assignedAgent !== undefined && data.assignedAgent !== existingRoute.assignedAgent;
+
+    if (nameChanged || agentChanged) {
+      const partyFilter = { route: existingRoute.name };
+      const partyUpdate = {};
+
+      if (nameChanged) {
+        partyUpdate.route = data.name;
+      }
+      if (agentChanged) {
+        partyUpdate.agentAssigned = data.assignedAgent || '';
+      }
+
+      await Party.updateMany(
+        { ...partyFilter, type: { $in: ['market', 'customer'] } },
+        { $set: partyUpdate }
+      );
+
+      // Regenerate customer codes if route name changed
+      if (nameChanged) {
+        const { generateCustomerCode } = require('./partyController');
+        const customersToUpdate = await Party.find({ type: 'customer', route: data.name });
+        for (const customer of customersToUpdate) {
+          const newCode = await generateCustomerCode({
+            state: customer.state,
+            route: data.name,
+            city: customer.city
+          });
+          await Party.findByIdAndUpdate(customer._id, { code: newCode });
+        }
+      }
+    }
 
     // Log activity
     await ActivityLog.create({
@@ -101,8 +139,16 @@ exports.updateRoute = async (req, res) => {
 
 exports.deleteRoute = async (req, res) => {
   try {
-    const route = await Route.findByIdAndDelete(req.params.id);
+    const route = await Route.findById(req.params.id);
     if (!route) return res.status(404).json({ msg: 'Route not found' });
+
+    await Route.findByIdAndDelete(req.params.id);
+
+    // Reset region and agent fields for all linked cities and customers
+    await Party.updateMany(
+      { route: route.name, type: { $in: ['market', 'customer'] } },
+      { $set: { route: '', agentAssigned: '' } }
+    );
 
     // Log activity
     await ActivityLog.create({

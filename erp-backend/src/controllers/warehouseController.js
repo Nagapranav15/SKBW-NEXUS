@@ -33,7 +33,7 @@ exports.createWarehouse = async (req, res) => {
 
 exports.updateWarehouse = async (req, res) => {
   try {
-    const wh = await Warehouse.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const wh = await Warehouse.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
     if (!wh) return res.status(404).json({ msg: "Warehouse not found" });
     res.json(wh);
   } catch (err) {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, Package, Barcode, RefreshCw } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Package, Barcode, RefreshCw, Eye, X, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getItems, createItem, updateItem, deleteItem as deleteItemApi } from '../api/itemApi';
 
@@ -53,6 +53,9 @@ const ItemManagement: React.FC = () => {
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [, setShowBOMModal] = useState(false);
 
+  // Stats Filter State (for filtering main table list)
+  const [statsFilter, setStatsFilter] = useState<'all' | 'finished' | 'semi' | 'raw' | 'low_stock'>('all');
+
   const [formData, setFormData] = useState({
     itemId: '',
     name: '',
@@ -96,14 +99,25 @@ const ItemManagement: React.FC = () => {
     }
   };
 
+  const handleStatsCardClick = (category: 'finished' | 'semi' | 'raw' | 'low_stock') => {
+    setStatsFilter(prev => prev === category ? 'all' : category);
+  };
+
   useEffect(() => {
     let filtered = items;
 
     if (searchTerm) {
+      const lowerSearch = searchTerm.toLowerCase();
       filtered = filtered.filter(item =>
-        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.itemId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.category.toLowerCase().includes(searchTerm.toLowerCase())
+        (item.name || '').toLowerCase().includes(lowerSearch) ||
+        (item.itemId || '').toLowerCase().includes(lowerSearch) ||
+        (item.category || '').toLowerCase().includes(lowerSearch) ||
+        (item.primaryUnit || '').toLowerCase().includes(lowerSearch) ||
+        (item.altUnit || '').toLowerCase().includes(lowerSearch) ||
+        String(item.price || '').toLowerCase().includes(lowerSearch) ||
+        String(item.cost || '').toLowerCase().includes(lowerSearch) ||
+        String(item.stock || '').toLowerCase().includes(lowerSearch) ||
+        (item.status || '').toLowerCase().includes(lowerSearch)
       );
     }
 
@@ -111,8 +125,15 @@ const ItemManagement: React.FC = () => {
       filtered = filtered.filter(item => item.category === filterCategory);
     }
 
+    // Apply card filter (statsFilter)
+    if (statsFilter === 'low_stock') {
+      filtered = filtered.filter(item => item.stock <= item.minStock);
+    } else if (statsFilter !== 'all') {
+      filtered = filtered.filter(item => item.category === statsFilter);
+    }
+
     setFilteredItems(filtered);
-  }, [items, searchTerm, filterCategory]);
+  }, [items, searchTerm, filterCategory, statsFilter]);
 
 
 
@@ -318,57 +339,85 @@ const ItemManagement: React.FC = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow-sm p-4">
+        <button
+          onClick={() => handleStatsCardClick('finished')}
+          className={`w-full text-left rounded-lg shadow-sm p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] group border ${
+            statsFilter === 'finished' 
+              ? 'bg-green-50/40 border-green-400 ring-2 ring-green-100 shadow-md' 
+              : 'bg-white border-transparent hover:shadow-md hover:-translate-y-0.5 hover:border-gray-200'
+          }`}
+        >
           <div className="flex items-center">
             <Package className="w-8 h-8 text-green-600 mr-3" />
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Finished Goods</h3>
+              <h3 className={`text-lg font-semibold transition-colors ${statsFilter === 'finished' ? 'text-green-700' : 'text-gray-900 group-hover:text-green-600'}`}>Finished Goods</h3>
               <p className="text-2xl font-bold text-green-600">
                 {items.filter(item => item.category === 'finished').length}
               </p>
             </div>
           </div>
-        </div>
+        </button>
 
-        <div className="bg-white rounded-lg shadow-sm p-4">
+        <button
+          onClick={() => handleStatsCardClick('semi')}
+          className={`w-full text-left rounded-lg shadow-sm p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] group border ${
+            statsFilter === 'semi' 
+              ? 'bg-blue-50/40 border-blue-400 ring-2 ring-blue-100 shadow-md' 
+              : 'bg-white border-transparent hover:shadow-md hover:-translate-y-0.5 hover:border-gray-200'
+          }`}
+        >
           <div className="flex items-center">
             <Barcode className="w-8 h-8 text-blue-600 mr-3" />
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Semi-Finished</h3>
+              <h3 className={`text-lg font-semibold transition-colors ${statsFilter === 'semi' ? 'text-blue-750' : 'text-gray-900 group-hover:text-blue-600'}`}>Semi-Finished</h3>
               <p className="text-2xl font-bold text-blue-600">
                 {items.filter(item => item.category === 'semi').length}
               </p>
             </div>
           </div>
-        </div>
+        </button>
 
-        <div className="bg-white rounded-lg shadow-sm p-4">
+        <button
+          onClick={() => handleStatsCardClick('raw')}
+          className={`w-full text-left rounded-lg shadow-sm p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] group border ${
+            statsFilter === 'raw' 
+              ? 'bg-orange-50/40 border-orange-400 ring-2 ring-orange-100 shadow-md' 
+              : 'bg-white border-transparent hover:shadow-md hover:-translate-y-0.5 hover:border-gray-200'
+          }`}
+        >
           <div className="flex items-center">
             <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center mr-3">
               <span className="text-orange-600 font-bold">R</span>
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Raw Materials</h3>
+              <h3 className={`text-lg font-semibold transition-colors ${statsFilter === 'raw' ? 'text-orange-700' : 'text-gray-900 group-hover:text-orange-600'}`}>Raw Materials</h3>
               <p className="text-2xl font-bold text-orange-600">
                 {items.filter(item => item.category === 'raw').length}
               </p>
             </div>
           </div>
-        </div>
+        </button>
 
-        <div className="bg-white rounded-lg shadow-sm p-4">
+        <button
+          onClick={() => handleStatsCardClick('low_stock')}
+          className={`w-full text-left rounded-lg shadow-sm p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] group border ${
+            statsFilter === 'low_stock' 
+              ? 'bg-red-50/40 border-red-400 ring-2 ring-red-100 shadow-md' 
+              : 'bg-white border-transparent hover:shadow-md hover:-translate-y-0.5 hover:border-gray-200'
+          }`}
+        >
           <div className="flex items-center">
             <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center mr-3">
               <span className="text-red-600 font-bold">!</span>
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Low Stock</h3>
+              <h3 className={`text-lg font-semibold transition-colors ${statsFilter === 'low_stock' ? 'text-red-700' : 'text-gray-900 group-hover:text-red-650'}`}>Low Stock</h3>
               <p className="text-2xl font-bold text-red-600">
                 {items.filter(item => item.stock <= item.minStock).length}
               </p>
             </div>
           </div>
-        </div>
+        </button>
       </div>
 
       {/* Items Table */}

@@ -62,7 +62,14 @@ const SkuStockPage: React.FC = () => {
   let filtered = summary;
   if (search) {
     const s = search.toLowerCase();
-    filtered = filtered.filter((i: any) => i.item?.name?.toLowerCase().includes(s) || i.item?.itemId?.toLowerCase().includes(s));
+    filtered = filtered.filter((i: any) => 
+      (i.item?.name || '').toLowerCase().includes(s) || 
+      (i.item?.itemId || '').toLowerCase().includes(s) ||
+      (i.item?.category || '').toLowerCase().includes(s) ||
+      (i.item?.primaryUnit || '').toLowerCase().includes(s) ||
+      (i.item?.altUnit || '').toLowerCase().includes(s) ||
+      String(i.totalQuantity || '').toLowerCase().includes(s)
+    );
   }
   if (filterCat) filtered = filtered.filter((i: any) => i.item?.category === filterCat);
 

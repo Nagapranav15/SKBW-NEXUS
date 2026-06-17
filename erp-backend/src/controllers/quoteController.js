@@ -41,7 +41,7 @@ exports.createQuote = async (req, res) => {
 
 exports.updateQuote = async (req, res) => {
   try {
-    const quote = await Quote.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const quote = await Quote.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
     if (!quote) return res.status(404).json({ msg: "Quote not found" });
     res.json(quote);
   } catch (err) {
@@ -65,7 +65,7 @@ exports.updateQuoteStatus = async (req, res) => {
     const quote = await Quote.findByIdAndUpdate(
       req.params.id,
       { status },
-      { new: true }
+      { returnDocument: 'after' }
     );
     if (!quote) return res.status(404).json({ msg: "Quote not found" });
     res.json(quote);

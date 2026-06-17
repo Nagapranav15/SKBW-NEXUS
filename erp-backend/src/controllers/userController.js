@@ -102,7 +102,7 @@ exports.updateUser = async (req, res) => {
       if (role) update.role = role._id;
     }
 
-    const user = await User.findByIdAndUpdate(req.params.id, update, { new: true })
+    const user = await User.findByIdAndUpdate(req.params.id, update, { returnDocument: 'after' })
       .populate({ path: "role", populate: { path: "permissions" } })
       .select("-password");
 

@@ -103,7 +103,7 @@ const generateCustomerCode = async (partyData) => {
     seqDoc = await Sequence.findOneAndUpdate(
       { prefix },
       { $setOnInsert: { sequence: maxNum } },
-      { new: true, upsert: true }
+      { returnDocument: 'after', upsert: true }
     );
   }
   
@@ -111,7 +111,7 @@ const generateCustomerCode = async (partyData) => {
   seqDoc = await Sequence.findOneAndUpdate(
     { prefix },
     { $inc: { sequence: 1 } },
-    { new: true }
+    { returnDocument: 'after' }
   );
   
   const runningNum = String(seqDoc.sequence).padStart(4, '0');
@@ -160,7 +160,16 @@ exports.getParties = async (req, res) => {
         { phone: searchRegex },
         { city: searchRegex },
         { email: searchRegex },
-        { route: searchRegex }
+        { route: searchRegex },
+        { code: searchRegex },
+        { gstin: searchRegex },
+        { gstNumber: searchRegex },
+        { aadharNumber: searchRegex },
+        { district: searchRegex },
+        { state: searchRegex },
+        { pincode: searchRegex },
+        { agentAssigned: searchRegex },
+        { customerGrade: searchRegex }
       ];
       filter.$or = searchFilter;
     }
@@ -345,8 +354,48 @@ exports.updateParty = async (req, res) => {
         data.code = await generateCustomerCode(mergedData);
       }
     }
+
+    // Synchronize linked customers if this is a market (city) and its details changed
+    if (existingParty && existingParty.type === 'market') {
+      const nameChanged = data.firmName !== undefined && data.firmName !== existingParty.firmName;
+      const routeChanged = data.route !== undefined && data.route !== existingParty.route;
+      const agentChanged = data.agentAssigned !== undefined && data.agentAssigned !== existingParty.agentAssigned;
+
+      if (nameChanged || routeChanged || agentChanged) {
+        const customerFilter = { type: 'customer', city: existingParty.firmName };
+        const customerUpdate = {};
+
+        if (nameChanged) {
+          customerUpdate.city = data.firmName;
+        }
+        if (routeChanged) {
+          customerUpdate.route = data.route;
+        }
+        if (agentChanged) {
+          customerUpdate.agentAssigned = data.agentAssigned || '';
+        }
+
+        // Update all customers under this city
+        await Party.updateMany(customerFilter, { $set: customerUpdate });
+
+        // Regenerate customer codes if city or region changed
+        if (nameChanged || routeChanged) {
+          const newCityName = nameChanged ? data.firmName : existingParty.firmName;
+          const newRouteName = routeChanged ? data.route : existingParty.route;
+          const customersToUpdate = await Party.find({ type: 'customer', city: newCityName });
+          for (const customer of customersToUpdate) {
+            const newCode = await generateCustomerCode({
+              state: customer.state,
+              route: newRouteName,
+              city: newCityName
+            });
+            await Party.findByIdAndUpdate(customer._id, { code: newCode });
+          }
+        }
+      }
+    }
     
-    const party = await Party.findByIdAndUpdate(req.params.id, data, { new: true });
+    const party = await Party.findByIdAndUpdate(req.params.id, data, { returnDocument: 'after' });
     if (!party) return res.status(404).json({ msg: 'Party not found' });
 
     // Log activity
@@ -367,8 +416,18 @@ exports.updateParty = async (req, res) => {
 
 exports.deleteParty = async (req, res) => {
   try {
-    const party = await Party.findByIdAndDelete(req.params.id);
+    const party = await Party.findById(req.params.id);
     if (!party) return res.status(404).json({ msg: 'Party not found' });
+
+    await Party.findByIdAndDelete(req.params.id);
+
+    // If it was a market (city), reset city, route, and agent for all linked customers
+    if (party.type === 'market') {
+      await Party.updateMany(
+        { type: 'customer', city: party.firmName },
+        { $set: { city: '', route: '', agentAssigned: '' } }
+      );
+    }
 
     // Log activity
     await ActivityLog.create({
@@ -459,3 +518,5 @@ exports.unlinkPartyFromCompany = async (req, res) => {
     res.status(500).json({ msg: err.message });
   }
 };
+
+exports.generateCustomerCode = generateCustomerCode;

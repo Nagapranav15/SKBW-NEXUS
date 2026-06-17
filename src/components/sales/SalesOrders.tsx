@@ -60,7 +60,21 @@ const SalesOrders: React.FC = () => {
 
   useEffect(() => {
     let filtered = orders;
-    if (searchTerm) filtered = filtered.filter(o => o.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) || o.customerName.toLowerCase().includes(searchTerm.toLowerCase()));
+    if (searchTerm) {
+      const lowerSearch = searchTerm.toLowerCase();
+      filtered = filtered.filter(o =>
+        (o.orderNumber || '').toLowerCase().includes(lowerSearch) ||
+        (o.customerName || '').toLowerCase().includes(lowerSearch) ||
+        (o.status || '').toLowerCase().includes(lowerSearch) ||
+        (o.payment_mode || '').toLowerCase().includes(lowerSearch) ||
+        (o.payment_status || '').toLowerCase().includes(lowerSearch) ||
+        String(o.total || '').toLowerCase().includes(lowerSearch) ||
+        (o.items || []).some((item: any) =>
+          (item.itemName || '').toLowerCase().includes(lowerSearch) ||
+          (item.itemId || '').toLowerCase().includes(lowerSearch)
+        )
+      );
+    }
     if (filterStatus !== 'all') filtered = filtered.filter(o => o.status === filterStatus);
     setFilteredOrders(filtered);
   }, [orders, searchTerm, filterStatus]);

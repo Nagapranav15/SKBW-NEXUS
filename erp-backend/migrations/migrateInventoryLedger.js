@@ -35,7 +35,7 @@ const migrate = async () => {
       await MinimumStockLevel.findOneAndUpdate(
         { item: item._id, company: item.company },
         { minimum_quantity: item.minStock, reorder_quantity: item.minStock * 2, is_active: true },
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: 'after' }
       );
       created++;
     } catch (err) {

@@ -102,7 +102,7 @@ const deductStock = async (items, sourceType, sourceId, companyId, userId, sessi
     const updated = await Item.findByIdAndUpdate(
       orderItem.itemId,
       { $inc: { stock: -orderItem.quantity } },
-      { new: true, ...opts }
+      { returnDocument: 'after', ...opts }
     );
     if (!updated) throw new Error(`Item not found: ${orderItem.itemId}`);
     if (updated.stock < 0) {
@@ -151,7 +151,7 @@ const addStock = async (items, sourceType, sourceId, companyId, userId, session)
     await Item.findByIdAndUpdate(
       orderItem.itemId,
       { $inc: { stock: orderItem.quantity } },
-      { new: true, ...opts }
+      { returnDocument: 'after', ...opts }
     );
 
     const movement = await StockMovement.create([{
@@ -193,7 +193,7 @@ const addStockToLocation = async (itemId, warehouseId, sectionId, quantity, comp
   );
 
   // Update Item.stock
-  await Item.findByIdAndUpdate(itemId, { $inc: { stock: qty } }, { new: true, ...opts });
+  await Item.findByIdAndUpdate(itemId, { $inc: { stock: qty } }, { returnDocument: 'after', ...opts });
 
   // Create movement
   const movement = await StockMovement.create([{
@@ -280,7 +280,7 @@ const adjustStock = async (itemId, quantity, reason, companyId, userId, session)
   }
 
   const stockBefore = item.stock;
-  await Item.findByIdAndUpdate(itemId, { $inc: { stock: quantity } }, { new: true, ...opts });
+  await Item.findByIdAndUpdate(itemId, { $inc: { stock: quantity } }, { returnDocument: 'after', ...opts });
 
   const movement = await StockMovement.create([{
     item: itemId, quantity,
@@ -332,7 +332,7 @@ const reverseMovements = async (sourceType, sourceId, companyId, userId, session
     await Item.findByIdAndUpdate(
       mov.item,
       { $inc: { stock: -mov.quantity } },
-      { new: true, ...opts }
+      { returnDocument: 'after', ...opts }
     );
 
     const reversal = await StockMovement.create([{

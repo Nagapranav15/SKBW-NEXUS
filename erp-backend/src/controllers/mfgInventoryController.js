@@ -18,7 +18,7 @@ exports.createFactory = async (req, res) => {
   catch (e) { res.status(e.code === 11000 ? 409 : 500).json({ msg: e.code === 11000 ? "Factory code already exists" : e.message }); }
 };
 exports.updateFactory = async (req, res) => {
-  const f = await Factory.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  const f = await Factory.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
   f ? res.json(f) : res.status(404).json({ msg: "Not found" });
 };
 exports.deleteFactory = async (req, res) => {
@@ -39,7 +39,7 @@ exports.createFloor = async (req, res) => {
   catch (e) { res.status(e.code === 11000 ? 409 : 500).json({ msg: e.code === 11000 ? "Floor already exists" : e.message }); }
 };
 exports.updateFloor = async (req, res) => {
-  const f = await Floor.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  const f = await Floor.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
   f ? res.json(f) : res.status(404).json({ msg: "Not found" });
 };
 exports.deleteFloor = async (req, res) => {
@@ -61,7 +61,7 @@ exports.createZone = async (req, res) => {
   catch (e) { res.status(e.code === 11000 ? 409 : 500).json({ msg: e.code === 11000 ? "Zone code already exists" : e.message }); }
 };
 exports.updateZone = async (req, res) => {
-  const z = await Zone.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  const z = await Zone.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
   z ? res.json(z) : res.status(404).json({ msg: "Not found" });
 };
 exports.deleteZone = async (req, res) => {
@@ -83,7 +83,7 @@ exports.createSku = async (req, res) => {
   catch (e) { res.status(e.code === 11000 ? 409 : 500).json({ msg: e.code === 11000 ? "SKU code already exists" : e.message }); }
 };
 exports.updateSku = async (req, res) => {
-  const s = await Sku.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  const s = await Sku.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
   s ? res.json(s) : res.status(404).json({ msg: "Not found" });
 };
 exports.deleteSku = async (req, res) => {
@@ -339,7 +339,7 @@ exports.createBom = async (req, res) => {
   catch (e) { res.status(500).json({ msg: e.message }); }
 };
 exports.updateBom = async (req, res) => {
-  const b = await Bom.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  const b = await Bom.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
   b ? res.json(b) : res.status(404).json({ msg: "Not found" });
 };
 exports.deleteBom = async (req, res) => {

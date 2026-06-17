@@ -53,11 +53,10 @@ const partySchema = new mongoose.Schema({
   gstNumber: { type: String, default: "" },
   aadharNumber: { type: String, default: "" },
   openingBalance: {
-    type: Number,
-    default: 0
+    type: Number
   },
   route: { type: String, default: '' },
-  creditLimit: { type: Number, default: 0 },
+  creditLimit: { type: Number },
   creditDays: { type: Number, default: 0 },
   outstanding: { type: Number, default: 0 },
   preferredTransport: { type: String, default: '' },

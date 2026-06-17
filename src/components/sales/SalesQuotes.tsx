@@ -61,9 +61,16 @@ const SalesQuotes: React.FC = () => {
   useEffect(() => {
     let filtered = quotes;
     if (searchTerm) {
+      const lowerSearch = searchTerm.toLowerCase();
       filtered = filtered.filter(q =>
-        q.quoteNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        q.customerName.toLowerCase().includes(searchTerm.toLowerCase())
+        (q.quoteNumber || '').toLowerCase().includes(lowerSearch) ||
+        (q.customerName || '').toLowerCase().includes(lowerSearch) ||
+        (q.status || '').toLowerCase().includes(lowerSearch) ||
+        String(q.total || '').toLowerCase().includes(lowerSearch) ||
+        (q.items || []).some((item: any) =>
+          (item.itemName || '').toLowerCase().includes(lowerSearch) ||
+          (item.itemId || '').toLowerCase().includes(lowerSearch)
+        )
       );
     }
     if (filterStatus !== 'all') {

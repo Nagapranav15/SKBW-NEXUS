@@ -68,7 +68,22 @@ const DeliveryChallan: React.FC = () => {
     return m[s] || 'bg-gray-100 text-gray-800';
   };
 
-  const filtered = challans.filter(c => c.dcNumber?.toLowerCase().includes(searchTerm.toLowerCase()) || c.customerName?.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filtered = challans.filter(c => {
+    const lowerSearch = searchTerm.toLowerCase();
+    return (
+      (c.dcNumber || '').toLowerCase().includes(lowerSearch) ||
+      (c.customerName || '').toLowerCase().includes(lowerSearch) ||
+      (c.orderNumber || '').toLowerCase().includes(lowerSearch) ||
+      (c.transporterName || '').toLowerCase().includes(lowerSearch) ||
+      (c.vehicleNumber || '').toLowerCase().includes(lowerSearch) ||
+      (c.status || '').toLowerCase().includes(lowerSearch) ||
+      String(c.total || '').toLowerCase().includes(lowerSearch) ||
+      (c.items || []).some((item: any) =>
+        (item.itemName || '').toLowerCase().includes(lowerSearch) ||
+        (item.itemId || '').toLowerCase().includes(lowerSearch)
+      )
+    );
+  });
 
   if (loading) return <div className="p-6 flex justify-center"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>;
 

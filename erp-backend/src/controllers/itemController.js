@@ -36,7 +36,7 @@ exports.createItem = async (req, res) => {
 
 exports.updateItem = async (req, res) => {
   try {
-    const item = await Item.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const item = await Item.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
     if (!item) return res.status(404).json({ msg: "Item not found" });
     res.json(item);
   } catch (err) {

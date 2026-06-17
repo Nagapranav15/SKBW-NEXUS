@@ -236,7 +236,7 @@ exports.updateSalesOrder = async (req, res) => {
       );
     }
 
-    const order = await SalesOrder.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const order = await SalesOrder.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
 
     // Update linked transaction if exists
     if (order.total > 0) {
@@ -307,7 +307,7 @@ exports.updateSalesOrderStatus = async (req, res) => {
     const order = await SalesOrder.findByIdAndUpdate(
       req.params.id,
       { status },
-      { new: true }
+      { returnDocument: 'after' }
     );
     if (!order) return res.status(404).json({ msg: "Sales order not found" });
     res.json(order);

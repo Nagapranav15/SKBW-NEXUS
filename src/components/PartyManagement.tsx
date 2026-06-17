@@ -6,7 +6,7 @@ import {
   ChevronsLeft, ChevronsRight, ExternalLink, Phone, Mail, Clock,
   AlertTriangle, RefreshCw, CheckCircle, XCircle, Pause,
   History, BookOpen, CreditCard, FileText, ShoppingCart, User, Tag,
-  ArrowUpDown, ChevronUp, ChevronDown
+  ArrowUpDown, ChevronUp, ChevronDown, Eye
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext';
@@ -367,6 +367,9 @@ const PartyManagement: React.FC = () => {
   // Stats State
   const [stats, setStats] = useState({ total: 0, active: 0, inactive: 0, onHold: 0 });
 
+  // Status Filter State (for filtering main table list)
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'on-hold'>('all');
+
   // Main Lists
   const [parties, setParties] = useState<any[]>([]); // Dynamic: holds Routes if type is route, else Parties
   const [loading, setLoading] = useState(true);
@@ -394,6 +397,7 @@ const PartyManagement: React.FC = () => {
     district: '',
     route: '',
     state: 'Andhra Pradesh',
+    pincode: '',
     agentAssigned: '',
     status: 'active'
   });
@@ -401,6 +405,7 @@ const PartyManagement: React.FC = () => {
 
   // Modals & Forms
   const [showForm, setShowForm] = useState(false);
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<any | null>(null);
   const [viewingCustomer, setViewingCustomer] = useState<any | null>(null);
   const [docView, setDocView] = useState<'gst' | 'aadhar'>('gst');
@@ -417,7 +422,6 @@ const PartyManagement: React.FC = () => {
   // Search & Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
 
   // Filter input searches
   const [filterCitySearch, setFilterCitySearch] = useState('');
@@ -588,14 +592,14 @@ const PartyManagement: React.FC = () => {
       agentAssigned: '',
       assignedMarket: '',
       route: '',
-      creditLimit: currentType === 'customer' ? 100000 : 0,
+      creditLimit: '',
       creditDays: currentType === 'customer' ? 30 : 0,
       outstanding: 0,
       preferredTransport: '',
       gpsLocation: '',
       customerPhoto: '',
       shopPhoto: '',
-      openingBalance: 0,
+      openingBalance: '',
       status: 'active' as Party['status'],
       customerGrade: currentType === 'customer' ? 'Grade B (Regular)' : '',
       gstNumber: '',
@@ -783,6 +787,7 @@ const PartyManagement: React.FC = () => {
     } else {
       setFilterRules([]);
     }
+    setStatusFilter('all');
   }, [currentType]);
 
   // Autofocus first input field when form opens
@@ -979,6 +984,7 @@ const PartyManagement: React.FC = () => {
       district: '',
       route: initialData?.route || '',
       state: 'Andhra Pradesh',
+      pincode: '',
       agentAssigned: initialData?.agentAssigned || '',
       status: 'active'
     });
@@ -1020,6 +1026,7 @@ const PartyManagement: React.FC = () => {
           city: inlineMarketData.name,
           district: inlineMarketData.district,
           state: inlineMarketData.state || 'Andhra Pradesh',
+          pincode: inlineMarketData.pincode || '',
           route: inlineMarketData.route,
           agentAssigned: inlineMarketData.agentAssigned || '',
           status: inlineMarketData.status || 'active',
@@ -1032,6 +1039,7 @@ const PartyManagement: React.FC = () => {
           assignedMarket: res.data.firmName,
           district: res.data.district || prev.district || '',
           state: res.data.state || prev.state || 'Andhra Pradesh',
+          pincode: res.data.pincode || prev.pincode || '',
           route: res.data.route || prev.route || '',
           agentAssigned: res.data.agentAssigned || prev.agentAssigned || ''
         }));
@@ -1082,6 +1090,11 @@ const PartyManagement: React.FC = () => {
         const res = await getRoutes(selectedCompany._id);
         let data = res.data || [];
         
+        // Filter by statusFilter
+        if (statusFilter !== 'all') {
+          data = data.filter((r: any) => r.status === statusFilter);
+        }
+
         if (debouncedSearch) {
           const searchRegex = new RegExp(debouncedSearch, 'i');
           data = data.filter((r: any) => searchRegex.test(r.name) || searchRegex.test(r.assignedAgent || ''));
@@ -1139,6 +1152,12 @@ const PartyManagement: React.FC = () => {
           page, 
           limit
         };
+        
+        // Pass statusFilter to backend API
+        if (statusFilter !== 'all') {
+          params.status = statusFilter;
+        }
+
         if (sortBy) {
           params.sortBy = sortBy;
           params.sortOrder = sortOrder;
@@ -1160,7 +1179,7 @@ const PartyManagement: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentType, page, limit, debouncedSearch, filterRules, selectedCompany, sortRules]);
+  }, [currentType, page, limit, debouncedSearch, filterRules, selectedCompany, sortRules, statusFilter]);
 
   // Fetch Stats counts
   const fetchStatsCounts = useCallback(async () => {
@@ -1183,6 +1202,11 @@ const PartyManagement: React.FC = () => {
       console.error('Error fetching stats:', err);
     }
   }, [currentType, selectedCompany]);
+
+  const handleStatsCardClick = (category: 'all' | 'active' | 'inactive' | 'on-hold') => {
+    setStatusFilter(prev => prev === category ? 'all' : category);
+    setPage(1);
+  };
 
   // Load everything
   useEffect(() => {
@@ -1220,6 +1244,16 @@ const PartyManagement: React.FC = () => {
     e.preventDefault();
     try {
       const submitData = { ...formData, company: selectedCompany?._id };
+
+      // Safe Casts for creditLimit, creditDays, openingBalance
+      if (submitData.creditLimit === '') submitData.creditLimit = 0;
+      else if (submitData.creditLimit !== undefined) submitData.creditLimit = parseFloat(submitData.creditLimit) || 0;
+
+      if (submitData.creditDays === '') submitData.creditDays = 0;
+      else if (submitData.creditDays !== undefined) submitData.creditDays = parseInt(submitData.creditDays, 10) || 0;
+
+      if (submitData.openingBalance === '') submitData.openingBalance = 0;
+      else if (submitData.openingBalance !== undefined) submitData.openingBalance = parseFloat(submitData.openingBalance) || 0;
 
       // Strip immutable properties if editing to prevent database validation errors
       if (editingItem) {
@@ -1278,6 +1312,11 @@ const PartyManagement: React.FC = () => {
       await fetchStatsCounts();
       await fetchDropdownOptions();
 
+      // Refresh viewingCustomer if the currently viewed item was edited
+      if (editingItem && viewingCustomer && viewingCustomer._id === editingItem._id && savedItem?.data) {
+        setViewingCustomer(savedItem.data);
+      }
+
       // Refresh dynamic drawer views if currently viewing a city in drawer
       if (currentType === 'market' && viewingCustomer) {
         const updatedMarketRes = await getParties({ type: 'market', limit: 1000, company: selectedCompany?._id });
@@ -1299,7 +1338,20 @@ const PartyManagement: React.FC = () => {
   // Trigger Edit
   const handleEdit = (item: any) => {
     setEditingItem(item);
-    setFormData({ ...item });
+    
+    let agentAssigned = item.agentAssigned;
+    if (currentType === 'customer' && item.route) {
+      const routeDoc = allRoutes.find(r => r.name === item.route);
+      if (routeDoc?.assignedAgent) {
+        agentAssigned = routeDoc.assignedAgent;
+      }
+    }
+
+    setFormData({ 
+      ...item,
+      agentAssigned,
+      type: item.type || (currentType === 'route' ? 'route' : currentType)
+    });
     setIsAddingNewCity(false);
     setNewCityName('');
 
@@ -1538,7 +1590,7 @@ const PartyManagement: React.FC = () => {
 
     if (currentType === 'route') {
       exportData = parties.map(p => ({
-        'Route Name': p.name,
+        'Region Name': p.name,
         'Assigned Agent': p.assignedAgent || '-',
         'Status': p.status
       }));
@@ -1583,8 +1635,11 @@ const PartyManagement: React.FC = () => {
         'District': p.district,
         'State': p.state,
         'Pincode': p.pincode,
-        'Route': p.route || '-',
-        'Agent Assigned': p.agentAssigned || '-',
+        'Region': p.route || '-',
+        'Agent Assigned': (() => {
+          const routeDoc = allRoutes.find(r => r.name === p.route);
+          return routeDoc?.assignedAgent || p.agentAssigned || '-';
+        })(),
         'Market': p.assignedMarket || '-',
         'Credit Limit': p.creditLimit || 0,
         'Credit Days': p.creditDays || 0,
@@ -1623,7 +1678,7 @@ const PartyManagement: React.FC = () => {
         if (currentType === 'route') {
           const routesToImport = [];
           for (const item of normalizedData) {
-            const rName = String(item['routename'] || item['route'] || item['name'] || '').trim();
+            const rName = String(item['regionname'] || item['region'] || item['routename'] || item['route'] || item['name'] || '').trim();
             if (!rName) continue;
             routesToImport.push({
               name: rName,
@@ -1673,7 +1728,7 @@ const PartyManagement: React.FC = () => {
               district: String(item['district'] || '').trim(),
               state: String(item['state'] || 'Tamil Nadu').trim(),
               pincode: String(item['pincode'] || '').trim(),
-              route: String(item['assignedroute'] || item['route'] || '').trim(),
+              route: String(item['assignedregion'] || item['region'] || item['assignedroute'] || item['route'] || '').trim(),
               agentAssigned: String(item['assignedagent'] || item['agentassigned'] || item['agent'] || '').trim(),
               assignedMarket: String(item['assignedmarket'] || item['market'] || '').trim(),
               creditLimit: parseFloat(item['creditlimit'] || item['limit'] || 0),
@@ -1714,10 +1769,10 @@ const PartyManagement: React.FC = () => {
     let sampleRows: string[][] = [];
 
     if (currentType === 'route') {
-      headers = ['Route Name', 'Assigned Agent', 'Status'];
+      headers = ['Region Name', 'Assigned Agent', 'Status'];
       sampleRows = [
-        ['Route 1', 'Venkatesh Rao', 'active'],
-        ['Route 2', 'Ramesh Kumar', 'active']
+        ['Region 1', 'Venkatesh Rao', 'active'],
+        ['Region 2', 'Ramesh Kumar', 'active']
       ];
     } else if (currentType === 'agent') {
       headers = ['Agent Name', 'Mobile', 'Status'];
@@ -1728,8 +1783,8 @@ const PartyManagement: React.FC = () => {
     } else if (currentType === 'market') {
       headers = ['City Name', 'District', 'State', 'Region / Line', 'Status'];
       sampleRows = [
-        ['Secunderabad', 'Hyderabad', 'Telangana', 'Route 1', 'active'],
-        ['Tirupati', 'Tirupati', 'Andhra Pradesh', 'Route 1', 'active']
+        ['Secunderabad', 'Hyderabad', 'Telangana', 'Region 1', 'active'],
+        ['Tirupati', 'Tirupati', 'Andhra Pradesh', 'Region 1', 'active']
       ];
     } else if (currentType === 'transporter') {
       headers = ['Transporter Name', 'Contact Person', 'Mobile', 'Email', 'City', 'Status'];
@@ -1740,7 +1795,7 @@ const PartyManagement: React.FC = () => {
       headers = [
         'Firm Name', 'Owner Name', 'Contact Person', 'Mobile Number', 'WhatsApp Number',
         'Email Address', 'Door No', 'Street Name', 'Address Line', 'Area', 'Landmark',
-        'Town/City', 'District', 'State', 'Pincode', 'Assigned Route', 'Assigned Agent',
+        'Town/City', 'District', 'State', 'Pincode', 'Assigned Region', 'Assigned Agent',
         'Assigned Market', 'Credit Limit', 'Credit Days', 'Opening Balance', 'Preferred Transporter',
         'GST Number', 'Aadhar Number', 'Status'
       ];
@@ -1886,53 +1941,61 @@ const PartyManagement: React.FC = () => {
         </div>
 
         {/* Stats Section */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 animate-none">
           <button
-            onClick={() => handleCardClick(null)}
-            className={`w-full text-left bg-white rounded-xl shadow-xs border p-3 border-l-4 border-l-blue-500 transition-all duration-200 hover:scale-[1.015] active:scale-98 focus:outline-hidden ${
-              !filterRules.some((r: any) => r.field === 'status')
-                ? 'ring-2 ring-blue-500 bg-blue-50/20 border-blue-200 shadow-sm'
-                : 'border-gray-100 hover:border-blue-200 hover:shadow-xs'
+            onClick={() => handleStatsCardClick('all')}
+            className={`w-full text-left rounded-xl shadow-xs border p-3 border-l-4 border-l-blue-500 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] group ${
+              statusFilter === 'all' 
+                ? 'bg-blue-50/40 border-blue-400 ring-2 ring-blue-100 shadow-sm' 
+                : 'bg-white border-gray-100 hover:shadow-md hover:-translate-y-0.5'
             }`}
           >
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total {typeLabelPlural}</p>
-            <p className="text-2xl font-bold text-gray-900 mt-0.5">{stats.total}</p>
+            <div>
+              <p className={`text-xs font-semibold uppercase tracking-wider transition-colors ${statusFilter === 'all' ? 'text-blue-600' : 'text-gray-400 group-hover:text-blue-500'}`}>Total {typeLabelPlural}</p>
+              <p className="text-2xl font-bold text-gray-900 mt-0.5">{stats.total}</p>
+            </div>
           </button>
 
           <button
-            onClick={() => handleCardClick('active')}
-            className={`w-full text-left bg-white rounded-xl shadow-xs border p-3 border-l-4 border-l-green-500 transition-all duration-200 hover:scale-[1.015] active:scale-98 focus:outline-hidden ${
-              filterRules.some((r: any) => r.field === 'status' && r.value === 'active')
-                ? 'ring-2 ring-green-500 bg-green-50/20 border-green-200 shadow-sm'
-                : 'border-gray-100 hover:border-green-200 hover:shadow-xs'
+            onClick={() => handleStatsCardClick('active')}
+            className={`w-full text-left rounded-xl shadow-xs border p-3 border-l-4 border-l-green-500 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] group ${
+              statusFilter === 'active' 
+                ? 'bg-green-50/40 border-green-400 ring-2 ring-green-100 shadow-sm' 
+                : 'bg-white border-gray-100 hover:shadow-md hover:-translate-y-0.5'
             }`}
           >
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Active</p>
-            <p className="text-2xl font-bold text-green-600 mt-0.5">{stats.active}</p>
+            <div>
+              <p className={`text-xs font-semibold uppercase tracking-wider transition-colors ${statusFilter === 'active' ? 'text-green-600' : 'text-gray-400 group-hover:text-green-500'}`}>Active</p>
+              <p className="text-2xl font-bold text-green-600 mt-0.5">{stats.active}</p>
+            </div>
           </button>
 
           <button
-            onClick={() => handleCardClick('inactive')}
-            className={`w-full text-left bg-white rounded-xl shadow-xs border p-3 border-l-4 border-l-red-500 transition-all duration-200 hover:scale-[1.015] active:scale-98 focus:outline-hidden ${
-              filterRules.some((r: any) => r.field === 'status' && r.value === 'inactive')
-                ? 'ring-2 ring-red-500 bg-red-50/20 border-red-200 shadow-sm'
-                : 'border-gray-100 hover:border-red-200 hover:shadow-xs'
+            onClick={() => handleStatsCardClick('inactive')}
+            className={`w-full text-left rounded-xl shadow-xs border p-3 border-l-4 border-l-red-500 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] group ${
+              statusFilter === 'inactive' 
+                ? 'bg-red-50/40 border-red-400 ring-2 ring-red-100 shadow-sm' 
+                : 'bg-white border-gray-100 hover:shadow-md hover:-translate-y-0.5'
             }`}
           >
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Inactive</p>
-            <p className="text-2xl font-bold text-red-600 mt-0.5">{stats.inactive}</p>
+            <div>
+              <p className={`text-xs font-semibold uppercase tracking-wider transition-colors ${statusFilter === 'inactive' ? 'text-red-600' : 'text-gray-400 group-hover:text-red-500'}`}>Inactive</p>
+              <p className="text-2xl font-bold text-red-600 mt-0.5">{stats.inactive}</p>
+            </div>
           </button>
 
           <button
-            onClick={() => handleCardClick('on-hold')}
-            className={`w-full text-left bg-white rounded-xl shadow-xs border p-3 border-l-4 border-l-yellow-500 transition-all duration-200 hover:scale-[1.015] active:scale-98 focus:outline-hidden ${
-              filterRules.some((r: any) => r.field === 'status' && r.value === 'on-hold')
-                ? 'ring-2 ring-yellow-500 bg-yellow-50/20 border-yellow-200 shadow-sm'
-                : 'border-gray-100 hover:border-yellow-200 hover:shadow-xs'
+            onClick={() => handleStatsCardClick('on-hold')}
+            className={`w-full text-left rounded-xl shadow-xs border p-3 border-l-4 border-l-yellow-500 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] group ${
+              statusFilter === 'on-hold' 
+                ? 'bg-yellow-50/40 border-yellow-400 ring-2 ring-yellow-100 shadow-sm' 
+                : 'bg-white border-gray-100 hover:shadow-md hover:-translate-y-0.5'
             }`}
           >
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">On Hold</p>
-            <p className="text-2xl font-bold text-yellow-600 mt-0.5">{stats.onHold || 0}</p>
+            <div>
+              <p className={`text-xs font-semibold uppercase tracking-wider transition-colors ${statusFilter === 'on-hold' ? 'text-yellow-600' : 'text-gray-400 group-hover:text-yellow-500'}`}>On Hold</p>
+              <p className="text-2xl font-bold text-yellow-600 mt-0.5">{stats.onHold || 0}</p>
+            </div>
           </button>
         </div>
 
@@ -2845,11 +2908,18 @@ const PartyManagement: React.FC = () => {
                         value={formData.city || ''}
                         onChange={val => {
                           const selectedMarket = allMarkets.find(m => m.firmName === val);
+                          const routeName = selectedMarket?.route || '';
+                          const routeDoc = allRoutes.find(r => r.name === routeName);
+                          const agentName = routeDoc?.assignedAgent || selectedMarket?.agentAssigned || '';
+                          
                           setFormData({ 
                             ...formData, 
                             city: val,
                             district: selectedMarket?.district || formData.district || '',
-                            state: selectedMarket?.state || formData.state || 'Andhra Pradesh'
+                            state: selectedMarket?.state || formData.state || 'Andhra Pradesh',
+                            pincode: selectedMarket?.pincode || formData.pincode || '',
+                            route: routeName || formData.route || '',
+                            agentAssigned: agentName || formData.agentAssigned || ''
                           });
                         }}
                         options={allMarkets.map(m => ({ label: m.firmName, value: m.firmName }))}
@@ -2860,6 +2930,39 @@ const PartyManagement: React.FC = () => {
                         }}
                         required
                       />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3 animate-none">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">District</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Tirupati"
+                          value={formData.district || ''}
+                          onChange={e => setFormData({ ...formData, district: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">State</label>
+                        <input
+                          type="text"
+                          placeholder="Andhra Pradesh"
+                          value={formData.state || ''}
+                          onChange={e => setFormData({ ...formData, state: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Pin Code</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 517501"
+                          value={formData.pincode || ''}
+                          onChange={e => setFormData({ ...formData, pincode: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white transition-colors"
+                        />
+                      </div>
                     </div>
 
                     <div>
@@ -2882,7 +2985,14 @@ const PartyManagement: React.FC = () => {
                       <label className="block text-xs font-medium text-gray-700 mb-1">Region / Line <span className="text-red-500">*</span></label>
                       <SearchableDropdown
                         value={formData.route || ''}
-                        onChange={val => setFormData({ ...formData, route: val })}
+                        onChange={val => {
+                          const routeDoc = allRoutes.find(r => r.name === val);
+                          setFormData({
+                            ...formData,
+                            route: val,
+                            agentAssigned: routeDoc?.assignedAgent || formData.agentAssigned || ''
+                          });
+                        }}
                         options={allRoutes.map(r => ({ label: r.name, value: r.name }))}
                         placeholder="Select Region"
                         addNewOption={{
@@ -2926,14 +3036,14 @@ const PartyManagement: React.FC = () => {
                   <div className="space-y-4 pt-2">
                     <h3 className="text-xs font-semibold text-blue-600 uppercase tracking-wider border-b pb-1">Credit & Grade Settings</h3>
                     
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-3 animate-none">
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">Credit Days Limit</label>
                         <input
                           type="number"
                           placeholder="e.g. 30"
                           value={formData.creditDays}
-                          onChange={e => setFormData({ ...formData, creditDays: parseInt(e.target.value) || 0 })}
+                          onChange={e => setFormData({ ...formData, creditDays: e.target.value === '' ? '' : parseInt(e.target.value, 10) })}
                           className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
                         />
                       </div>
@@ -2943,7 +3053,7 @@ const PartyManagement: React.FC = () => {
                           type="number"
                           placeholder="e.g. 100000"
                           value={formData.creditLimit}
-                          onChange={e => setFormData({ ...formData, creditLimit: parseFloat(e.target.value) || 0 })}
+                          onChange={e => setFormData({ ...formData, creditLimit: e.target.value === '' ? '' : parseFloat(e.target.value) })}
                           className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
                         />
                       </div>
@@ -2955,7 +3065,7 @@ const PartyManagement: React.FC = () => {
                         type="number"
                         placeholder="e.g. 0"
                         value={formData.openingBalance}
-                        onChange={e => setFormData({ ...formData, openingBalance: parseFloat(e.target.value) || 0 })}
+                        onChange={e => setFormData({ ...formData, openingBalance: e.target.value === '' ? '' : parseFloat(e.target.value) })}
                         className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
                       />
                     </div>
@@ -3007,7 +3117,7 @@ const PartyManagement: React.FC = () => {
                         <div className="border border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:bg-gray-50 relative min-h-[110px] flex flex-col items-center justify-center">
                           {formData.customerPhoto ? (
                             <>
-                              <img src={formData.customerPhoto} alt="Customer" className="max-h-24 max-w-full rounded object-cover" />
+                              <img src={formData.customerPhoto} alt="Customer" className="max-h-24 max-w-full rounded object-cover cursor-zoom-in hover:opacity-90 transition-opacity" onClick={() => setZoomedImage(formData.customerPhoto)} />
                               <button type="button" onClick={() => setFormData({ ...formData, customerPhoto: '' })} className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"><X className="w-3.5 h-3.5" /></button>
                             </>
                           ) : (
@@ -3024,7 +3134,7 @@ const PartyManagement: React.FC = () => {
                         <div className="border border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:bg-gray-50 relative min-h-[110px] flex flex-col items-center justify-center">
                           {formData.shopPhoto ? (
                             <>
-                              <img src={formData.shopPhoto} alt="Shop" className="max-h-24 max-w-full rounded object-cover" />
+                              <img src={formData.shopPhoto} alt="Shop" className="max-h-24 max-w-full rounded object-cover cursor-zoom-in hover:opacity-90 transition-opacity" onClick={() => setZoomedImage(formData.shopPhoto)} />
                               <button type="button" onClick={() => setFormData({ ...formData, shopPhoto: '' })} className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"><X className="w-3.5 h-3.5" /></button>
                             </>
                           ) : (
@@ -3238,21 +3348,32 @@ const PartyManagement: React.FC = () => {
                     <div className="grid grid-cols-2 gap-3">
                       <div className="col-span-2">
                         <label className="block text-xs font-medium text-gray-500 mb-1">City Name*</label>
-                        <input type="text" placeholder="e.g. Nellore" value={formData.firmName || ''} onChange={e => setFormData({ ...formData, firmName: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" required />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">City</label>
-                        <input type="text" placeholder="e.g. Chennai" value={formData.city || ''} onChange={e => setFormData({ ...formData, city: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                        <input type="text" placeholder="e.g. Nellore" value={formData.firmName || ''} onChange={e => setFormData({ ...formData, firmName: e.target.value, city: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" required />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1">District</label>
-                        <input type="text" placeholder="e.g. Chennai" value={formData.district || ''} onChange={e => setFormData({ ...formData, district: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                        <input type="text" placeholder="e.g. Nellore" value={formData.district || ''} onChange={e => setFormData({ ...formData, district: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">State</label>
+                        <input type="text" placeholder="Andhra Pradesh" value={formData.state || ''} onChange={e => setFormData({ ...formData, state: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Pin Code</label>
+                        <input type="text" placeholder="e.g. 524001" value={formData.pincode || ''} onChange={e => setFormData({ ...formData, pincode: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                       </div>
                       <div className="col-span-2">
                         <label className="block text-xs font-medium text-gray-500 mb-1">Assigned Region</label>
                         <SearchableDropdown
                           value={formData.route || ''}
-                          onChange={val => setFormData({ ...formData, route: val })}
+                          onChange={val => {
+                            const routeDoc = allRoutes.find(r => r.name === val);
+                            setFormData({
+                              ...formData,
+                              route: val,
+                              agentAssigned: routeDoc?.assignedAgent || formData.agentAssigned || ''
+                            });
+                          }}
                           options={allRoutes.map(r => ({ label: r.name, value: r.name }))}
                           placeholder="Select Region"
                         />
@@ -3547,7 +3668,7 @@ const PartyManagement: React.FC = () => {
                 <>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Route Name*</label>
+                      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Region Name*</label>
                       <input
                         type="text"
                         placeholder="e.g. Andhra Line"
@@ -3558,7 +3679,7 @@ const PartyManagement: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Route Code*</label>
+                      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Region Code*</label>
                       <input
                         type="text"
                         placeholder="e.g. A"
@@ -3581,7 +3702,7 @@ const PartyManagement: React.FC = () => {
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Description</label>
                     <textarea
-                      placeholder="Route notes or details"
+                      placeholder="Region notes or details"
                       value={inlineRouteData.description}
                       onChange={e => setInlineRouteData({ ...inlineRouteData, description: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 focus:bg-white transition-colors h-20"
@@ -3625,11 +3746,42 @@ const PartyManagement: React.FC = () => {
                       />
                     </div>
                   </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Pin Code</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 524001"
+                        value={inlineMarketData.pincode}
+                        onChange={e => setInlineMarketData({ ...inlineMarketData, pincode: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Status</label>
+                      <select
+                        value={inlineMarketData.status}
+                        onChange={e => setInlineMarketData({ ...inlineMarketData, status: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white transition-colors"
+                      >
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                        <option value="on-hold">On Hold</option>
+                      </select>
+                    </div>
+                  </div>
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">Region / Line <span className="text-red-500">*</span></label>
                     <SearchableDropdown
                       value={inlineMarketData.route}
-                      onChange={val => setInlineMarketData({ ...inlineMarketData, route: val })}
+                      onChange={val => {
+                        const routeDoc = allRoutes.find(r => r.name === val);
+                        setInlineMarketData({ 
+                          ...inlineMarketData, 
+                          route: val,
+                          agentAssigned: routeDoc?.assignedAgent || inlineMarketData.agentAssigned || '' 
+                        });
+                      }}
                       options={allRoutes.map(r => ({ label: r.name, value: r.name }))}
                       placeholder="Select Region"
                       required
@@ -3643,17 +3795,6 @@ const PartyManagement: React.FC = () => {
                       options={allAgents.map(a => ({ label: a.firmName, value: a.firmName }))}
                       placeholder="Select Agent"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">Status</label>
-                    <select
-                      value={inlineMarketData.status}
-                      onChange={e => setInlineMarketData({ ...inlineMarketData, status: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white transition-colors"
-                    >
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
                   </div>
                 </>
               )}
@@ -3752,6 +3893,26 @@ const PartyManagement: React.FC = () => {
         <div className="fixed top-0 right-0 h-full w-full sm:w-[520px] bg-white shadow-2xl border-l border-gray-200 z-40 flex flex-col transition-all duration-300 animate-in slide-in-from-right">
           {/* Header */}
           <div className="flex items-center justify-between p-5 border-b border-gray-200 bg-gray-50">
+            {currentType === 'customer' && (viewingCustomer.customerPhoto || viewingCustomer.shopPhoto) && (
+              <div className="flex items-center shrink-0 -space-x-2 mr-3 select-none">
+                {viewingCustomer.customerPhoto && (
+                  <img 
+                    src={viewingCustomer.customerPhoto} 
+                    alt="Customer Avatar" 
+                    className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-md cursor-zoom-in hover:scale-105 transition-transform" 
+                    onClick={() => setZoomedImage(viewingCustomer.customerPhoto)}
+                  />
+                )}
+                {viewingCustomer.shopPhoto && (
+                  <img 
+                    src={viewingCustomer.shopPhoto} 
+                    alt="Shop Avatar" 
+                    className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-md cursor-zoom-in hover:scale-105 transition-transform" 
+                    onClick={() => setZoomedImage(viewingCustomer.shopPhoto)}
+                  />
+                )}
+              </div>
+            )}
             <div className="flex-1 min-w-0 pr-4">
               <div className="flex items-center space-x-2">
                 <h2 className="text-xl font-bold text-gray-900 truncate">
@@ -4023,7 +4184,12 @@ const PartyManagement: React.FC = () => {
                     </div>
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">Assigned Agent</span>
-                      <span className="font-semibold text-gray-905">{viewingCustomer.agentAssigned || 'No Agent'}</span>
+                      <span className="font-semibold text-gray-905">
+                        {(() => {
+                          const routeDoc = allRoutes.find(r => r.name === viewingCustomer.route);
+                          return routeDoc?.assignedAgent || viewingCustomer.agentAssigned || 'No Agent';
+                        })()}
+                      </span>
                     </div>
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">Credit Days Limit</span>
@@ -4073,7 +4239,7 @@ const PartyManagement: React.FC = () => {
                         <div className="space-y-1">
                           <span className="block text-xs text-gray-400 font-medium">Customer Photo</span>
                           <div className="border border-gray-200 rounded-lg p-1.5 bg-white">
-                            <img src={viewingCustomer.customerPhoto} alt="Customer" className="max-h-32 mx-auto rounded object-cover" />
+                            <img src={viewingCustomer.customerPhoto} alt="Customer" className="max-h-32 mx-auto rounded object-cover cursor-zoom-in hover:opacity-90 transition-opacity" onClick={() => setZoomedImage(viewingCustomer.customerPhoto)} />
                           </div>
                         </div>
                       )}
@@ -4081,7 +4247,7 @@ const PartyManagement: React.FC = () => {
                         <div className="space-y-1">
                           <span className="block text-xs text-gray-400 font-medium">Shop Photo</span>
                           <div className="border border-gray-200 rounded-lg p-1.5 bg-white">
-                            <img src={viewingCustomer.shopPhoto} alt="Shop" className="max-h-32 mx-auto rounded object-cover" />
+                            <img src={viewingCustomer.shopPhoto} alt="Shop" className="max-h-32 mx-auto rounded object-cover cursor-zoom-in hover:opacity-90 transition-opacity" onClick={() => setZoomedImage(viewingCustomer.shopPhoto)} />
                           </div>
                         </div>
                       )}
@@ -4753,13 +4919,17 @@ const PartyManagement: React.FC = () => {
                                 )}
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap text-[13.5px] text-gray-700">
-                                {cust.agentAssigned ? (
-                                  <span className="inline-flex px-2 py-0.5 font-semibold rounded-full bg-purple-50 text-purple-700 border border-purple-100">
-                                    {cust.agentAssigned}
-                                  </span>
-                                ) : (
-                                  <span className="text-gray-455">None</span>
-                                )}
+                                {(() => {
+                                  const routeDoc = allRoutes.find(r => r.name === cust.route);
+                                  const agent = routeDoc?.assignedAgent || cust.agentAssigned;
+                                  return agent ? (
+                                    <span className="inline-flex px-2 py-0.5 font-semibold rounded-full bg-purple-50 text-purple-700 border border-purple-100">
+                                      {agent}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-455">None</span>
+                                  );
+                                })()}
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap">
                                 <span className={`inline-flex px-2 py-0.5 text-[10px] font-bold rounded uppercase border ${
@@ -4859,6 +5029,28 @@ const PartyManagement: React.FC = () => {
               OK
               <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold text-blue-100 bg-blue-800 rounded border border-blue-700 shadow-xs select-none pointer-events-none">Enter</kbd>
             </button>
+          </div>
+        </div>
+      )}
+      {/* Image Zoom Lightbox */}
+      {zoomedImage && (
+        <div 
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-xs transition-opacity duration-300"
+          onClick={() => setZoomedImage(null)}
+        >
+          <button 
+            className="absolute top-4 right-4 p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-colors focus:outline-none"
+            onClick={() => setZoomedImage(null)}
+          >
+            <X className="w-8 h-8" />
+          </button>
+          <div className="max-w-[90vw] max-h-[90vh] p-2 relative animate-in zoom-in duration-200">
+            <img 
+              src={zoomedImage} 
+              alt="Zoomed preview" 
+              className="max-w-full max-h-[85vh] rounded-lg shadow-2xl object-contain border border-white/10" 
+              onClick={(e) => e.stopPropagation()} 
+            />
           </div>
         </div>
       )}

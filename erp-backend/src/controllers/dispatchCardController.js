@@ -35,7 +35,7 @@ exports.createDispatchCard = async (req, res) => {
 
 exports.updateDispatchCard = async (req, res) => {
   try {
-    const card = await DispatchCard.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const card = await DispatchCard.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
     if (!card) return res.status(404).json({ msg: "Dispatch Card not found" });
     res.json(card);
   } catch (err) {

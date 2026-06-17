@@ -30,7 +30,7 @@ exports.createCompany = async (req, res) => {
 
 exports.updateCompany = async (req, res) => {
   try {
-    const company = await Company.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const company = await Company.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
     if (!company) return res.status(404).json({ msg: "Company not found" });
     res.json(company);
   } catch (err) {

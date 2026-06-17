@@ -303,7 +303,7 @@ exports.setMinimumStockLevel = async (req, res) => {
     const level = await MinimumStockLevel.findOneAndUpdate(
       { item, company },
       { minimum_quantity: Number(minimum_quantity) || 0, reorder_quantity: Number(reorder_quantity) || 0, is_active: true },
-      { new: true, upsert: true }
+      { returnDocument: 'after', upsert: true }
     );
 
     res.json(level);

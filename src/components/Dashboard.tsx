@@ -59,7 +59,7 @@ const Dashboard: React.FC = () => {
     { title: 'Customers', value: dashData?.stats?.customersCount || 0, icon: Users, color: 'text-blue-600 bg-blue-50', path: '/party/customers' },
     { title: 'Vendors', value: dashData?.stats?.vendorsCount || 0, icon: Building2, color: 'text-green-600 bg-green-50', path: '/party/vendors' },
     { title: 'Agents', value: dashData?.stats?.agentsCount || 0, icon: UserCheck, color: 'text-indigo-600 bg-indigo-50', path: '/party/agents' },
-    { title: 'Routes', value: dashData?.stats?.routesCount || 0, icon: Compass, color: 'text-orange-600 bg-orange-50', path: '/party/routes' },
+    { title: 'Regions', value: dashData?.stats?.routesCount || 0, icon: Compass, color: 'text-orange-600 bg-orange-50', path: '/party/routes' },
     { title: 'Markets', value: dashData?.stats?.marketsCount || 0, icon: MapPin, color: 'text-teal-600 bg-teal-50', path: '/party/markets' },
     { title: 'Transporters', value: dashData?.stats?.transportersCount || 0, icon: Truck, color: 'text-red-600 bg-red-50', path: '/party/transporters' },
     { title: 'Items', value: dashData?.stats?.totalItems || 0, icon: Package, color: 'text-purple-600 bg-purple-50', path: '/items' },
