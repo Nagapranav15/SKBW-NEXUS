@@ -40,6 +40,61 @@ const getRouteDisplay = (routeName: string, allRoutes: { name: string; code: str
   return found && found.code ? found.code : routeName;
 };
 
+const tagColors = [
+  { bg: 'bg-red-50/70', text: 'text-red-700', border: 'border-red-200' },
+  { bg: 'bg-orange-50/70', text: 'text-orange-700', border: 'border-orange-200' },
+  { bg: 'bg-amber-50/70', text: 'text-amber-700', border: 'border-amber-200' },
+  { bg: 'bg-emerald-50/70', text: 'text-emerald-700', border: 'border-emerald-200' },
+  { bg: 'bg-teal-50/70', text: 'text-teal-700', border: 'border-teal-200' },
+  { bg: 'bg-cyan-50/70', text: 'text-cyan-700', border: 'border-cyan-200' },
+  { bg: 'bg-sky-50/70', text: 'text-sky-700', border: 'border-sky-200' },
+  { bg: 'bg-blue-50/70', text: 'text-blue-700', border: 'border-blue-200' },
+  { bg: 'bg-indigo-50/70', text: 'text-indigo-700', border: 'border-indigo-200' },
+  { bg: 'bg-violet-50/70', text: 'text-violet-700', border: 'border-violet-200' },
+  { bg: 'bg-fuchsia-50/70', text: 'text-fuchsia-700', border: 'border-fuchsia-200' },
+  { bg: 'bg-pink-50/70', text: 'text-pink-700', border: 'border-pink-200' },
+  { bg: 'bg-rose-50/70', text: 'text-rose-700', border: 'border-rose-200' }
+];
+
+const getTagColor = (tag: string) => {
+  let hash = 0;
+  const t = String(tag || '').trim().toLowerCase();
+  for (let i = 0; i < t.length; i++) {
+    hash = t.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % tagColors.length;
+  return tagColors[index];
+};
+
+const getOutstandingInfo = (type: 'customer' | 'vendor' | string, balance: number) => {
+  const isCustomer = type === 'customer';
+  const val = balance || 0;
+  
+  if (val > 0) {
+    return {
+      colorClass: 'bg-green-50 border-green-200 text-green-700',
+      textClass: 'text-green-700 font-semibold',
+      label: isCustomer ? 'Customer has to pay us' : 'Vendor owes us',
+      formatted: `₹${val.toLocaleString('en-IN')}`
+    };
+  } else if (val < 0) {
+    const absVal = Math.abs(val);
+    return {
+      colorClass: 'bg-red-50 border-red-200 text-red-700',
+      textClass: 'text-red-700 font-semibold',
+      label: isCustomer ? 'We have to pay customer' : 'We have to pay vendor',
+      formatted: `₹${absVal.toLocaleString('en-IN')}`
+    };
+  } else {
+    return {
+      colorClass: 'bg-gray-50 border-gray-200 text-gray-500',
+      textClass: 'text-gray-500 font-medium',
+      label: 'No outstanding',
+      formatted: '₹0'
+    };
+  }
+};
+
 interface SortRule {
   field: string;
   order: 'asc' | 'desc';
@@ -64,7 +119,8 @@ const getColumnsSchema = (type: string): Record<string, string> => {
         route: 'Region',
         customerGrade: 'Grade',
         creditLimit: 'Credit Limit',
-        outstanding: 'Outstanding',
+        outstandingBalance: 'Outstanding Balance',
+        tags: 'Tags',
         status: 'Status'
       };
     case 'vendor':
@@ -73,6 +129,8 @@ const getColumnsSchema = (type: string): Record<string, string> => {
         phone: 'Mobile',
         city: 'City',
         district: 'District',
+        outstandingBalance: 'Outstanding Balance',
+        tags: 'Tags',
         status: 'Status'
       };
     case 'agent':
@@ -148,7 +206,7 @@ interface Party {
   route?: string;
   creditLimit?: number;
   creditDays?: number;
-  outstanding?: number;
+  outstandingBalance?: number;
   preferredTransport?: string;
   gpsLocation?: string;
   customerPhoto?: string;
@@ -158,6 +216,7 @@ interface Party {
   createdAt: string;
   updatedAt: string;
   customerCount?: number;
+  tags?: string[];
 }
 
 interface RouteItem {
@@ -565,6 +624,7 @@ const PartyManagement: React.FC = () => {
   const getEmptyFormData = () => {
     if (currentType === 'route') {
       return {
+        type: 'route',
         name: '',
         code: '',
         status: 'active',
@@ -594,7 +654,7 @@ const PartyManagement: React.FC = () => {
       route: '',
       creditLimit: '',
       creditDays: currentType === 'customer' ? 30 : 0,
-      outstanding: 0,
+      outstandingBalance: 0,
       preferredTransport: '',
       gpsLocation: '',
       customerPhoto: '',
@@ -604,7 +664,8 @@ const PartyManagement: React.FC = () => {
       customerGrade: currentType === 'customer' ? 'Grade B (Regular)' : '',
       gstNumber: '',
       aadharNumber: '',
-      remarks: ''
+      remarks: '',
+      tags: []
     };
   };
 
@@ -1350,7 +1411,9 @@ const PartyManagement: React.FC = () => {
     setFormData({ 
       ...item,
       agentAssigned,
-      type: item.type || (currentType === 'route' ? 'route' : currentType)
+      type: item.type || (currentType === 'route' ? 'route' : currentType),
+      tags: item.tags || [],
+      outstandingBalance: item.outstandingBalance !== undefined ? item.outstandingBalance : (item.outstanding || 0)
     });
     setIsAddingNewCity(false);
     setNewCityName('');
@@ -1644,6 +1707,8 @@ const PartyManagement: React.FC = () => {
         'Credit Limit': p.creditLimit || 0,
         'Credit Days': p.creditDays || 0,
         'Opening Balance': p.openingBalance || 0,
+        'Outstanding Balance': p.outstandingBalance !== undefined ? p.outstandingBalance : (p.outstanding || 0),
+        'Tags': Array.isArray(p.tags) ? p.tags.join(', ') : '',
         'Preferred Transport': p.preferredTransport || '-',
         'Status': p.status
       }));
@@ -1734,6 +1799,8 @@ const PartyManagement: React.FC = () => {
               creditLimit: parseFloat(item['creditlimit'] || item['limit'] || 0),
               creditDays: parseInt(item['creditdays'] || item['days'] || 0),
               openingBalance: parseFloat(item['openingbalance'] || item['balance'] || 0),
+              outstandingBalance: item['outstandingbalance'] !== undefined ? parseFloat(item['outstandingbalance'] || 0) : (item['outstanding'] !== undefined ? parseFloat(item['outstanding'] || 0) : 0),
+              tags: (item['tags'] || item['tag']) ? String(item['tags'] || item['tag']).split(',').map((t: string) => t.trim()).filter(Boolean) : [],
               preferredTransport: String(item['preferredtransporter'] || item['preferredtransport'] || item['transport'] || '').trim(),
               gstNumber: String(item['gstnumber'] || item['gst'] || item['gstin'] || '').trim(),
               aadharNumber: String(item['aadharnumber'] || item['aadhar'] || item['aadharno'] || '').trim(),
@@ -1796,7 +1863,7 @@ const PartyManagement: React.FC = () => {
         'Firm Name', 'Owner Name', 'Contact Person', 'Mobile Number', 'WhatsApp Number',
         'Email Address', 'Door No', 'Street Name', 'Address Line', 'Area', 'Landmark',
         'Town/City', 'District', 'State', 'Pincode', 'Assigned Region', 'Assigned Agent',
-        'Assigned Market', 'Credit Limit', 'Credit Days', 'Opening Balance', 'Preferred Transporter',
+        'Assigned Market', 'Credit Limit', 'Credit Days', 'Opening Balance', 'Outstanding Balance', 'Tags', 'Preferred Transporter',
         'GST Number', 'Aadhar Number', 'Status'
       ];
       sampleRows = [
@@ -1810,7 +1877,7 @@ const PartyManagement: React.FC = () => {
           currentType === 'customer' ? '500003' : '517501',
           'Route 1', 'Venkatesh Rao',
           currentType === 'customer' ? 'Secunderabad' : 'Tirupati',
-          '500000', '30', '0', 'GARUDA', '36AAAAA1111A1Z1', '123456789012', 'active'
+          '500000', '30', '0', '0', 'reliable, wholesale', 'GARUDA', '36AAAAA1111A1Z1', '123456789012', 'active'
         ]
       ];
     }
@@ -2530,10 +2597,35 @@ const PartyManagement: React.FC = () => {
                                   <span className="font-medium text-gray-900">{item[col] !== undefined ? item[col] : 0}</span>
                                 ) : col === 'creditLimit' ? (
                                   <span className="font-medium text-gray-955">₹{(item.creditLimit || 0).toLocaleString('en-IN')}</span>
-                                ) : col === 'outstanding' ? (
-                                  <span className={`font-semibold ${(item.outstanding || 0) > 0 ? 'text-red-650' : 'text-green-655'}`}>
-                                    ₹{(item.outstanding || 0).toLocaleString('en-IN')}
-                                  </span>
+                                ) : col === 'outstandingBalance' ? (() => {
+                                  const balance = item.outstandingBalance !== undefined ? item.outstandingBalance : (item.outstanding || 0);
+                                  const info = getOutstandingInfo(currentType, balance);
+                                  return (
+                                    <div className="flex flex-col">
+                                      <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded border ${info.colorClass} w-fit`}>
+                                        {info.formatted}
+                                      </span>
+                                      <span className="text-[10px] text-gray-450 mt-0.5 font-medium leading-none">
+                                        {info.label}
+                                      </span>
+                                    </div>
+                                  );
+                                })() : col === 'tags' ? (
+                                  Array.isArray(item.tags) && item.tags.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1">
+                                      {item.tags.map((tag: string, idx: number) => {
+                                        const colors = getTagColor(tag);
+                                        return (
+                                          <span
+                                            key={idx}
+                                            className={`inline-flex px-1.5 py-0.5 text-[10px] font-bold rounded border shadow-3xs ${colors.bg} ${colors.text} ${colors.border}`}
+                                          >
+                                            {tag}
+                                          </span>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : <span className="text-gray-400">-</span>
                                 ) : col === 'customerGrade' ? (
                                   item.customerGrade ? (
                                     <span className={`inline-flex px-2 py-0.5 text-xs font-bold rounded uppercase ${
@@ -3241,6 +3333,91 @@ const PartyManagement: React.FC = () => {
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">Google Maps Link</label>
                       <input type="text" placeholder="Paste Google Maps URL" value={formData.gpsLocation || ''} onChange={e => setFormData({ ...formData, gpsLocation: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 pt-2">
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3 border-b pb-1">Business Settings</h3>
+                    
+                    <div className="grid grid-cols-2 gap-3 animate-none">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Outstanding Balance (₹)</label>
+                        <input
+                          type="number"
+                          placeholder="e.g. 0"
+                          value={formData.outstandingBalance === undefined || formData.outstandingBalance === null ? '' : formData.outstandingBalance}
+                          onChange={e => setFormData({ ...formData, outstandingBalance: e.target.value === '' ? '' : parseFloat(e.target.value) })}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Operating Status</label>
+                        <select
+                          value={formData.status || 'active'}
+                          onChange={e => setFormData({ ...formData, status: e.target.value as Party['status'] })}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 font-medium"
+                        >
+                          <option value="active">Active</option>
+                          <option value="inactive">Inactive</option>
+                          <option value="on-hold">On Hold</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Tags</label>
+                      <div className="flex flex-wrap gap-1.5 p-2 border border-gray-200 rounded-lg bg-white min-h-[42px] focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all">
+                        {(formData.tags || []).map((tag: string, idx: number) => {
+                          const colors = getTagColor(tag);
+                          return (
+                            <span
+                              key={idx}
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border transition-all shadow-3xs ${colors.bg} ${colors.text} ${colors.border}`}
+                            >
+                              <span>{tag}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = (formData.tags || []).filter((_: any, i: number) => i !== idx);
+                                  setFormData({ ...formData, tags: updated });
+                                }}
+                                className={`hover:opacity-80 rounded-full focus:outline-hidden ${colors.text}`}
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </span>
+                          );
+                        })}
+                        <input
+                          type="text"
+                          placeholder={(formData.tags || []).length === 0 ? "Press Enter or Comma to add tags..." : "Add tag..."}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ',') {
+                              e.preventDefault();
+                              const val = e.currentTarget.value.trim().replace(/,$/, '');
+                              if (val && !(formData.tags || []).includes(val)) {
+                                setFormData({ ...formData, tags: [...(formData.tags || []), val] });
+                              }
+                              e.currentTarget.value = '';
+                            } else if (e.key === 'Backspace' && !e.currentTarget.value) {
+                              const updated = [...(formData.tags || [])];
+                              updated.pop();
+                              setFormData({ ...formData, tags: updated });
+                            }
+                          }}
+                          className="flex-1 min-w-[120px] bg-transparent text-sm border-none focus:outline-hidden p-0 h-6 focus:ring-0 text-gray-900"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Remarks / Notes</label>
+                      <textarea
+                        placeholder="General remarks/instructions..."
+                        value={formData.remarks || ''}
+                        onChange={e => setFormData({ ...formData, remarks: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white h-20 text-gray-900"
+                      />
                     </div>
                   </div>
                 </>
@@ -4199,6 +4376,23 @@ const PartyManagement: React.FC = () => {
                       <span className="block text-xs text-gray-400 font-medium">Credit Limit</span>
                       <span className="font-semibold text-gray-905">₹{(viewingCustomer.creditLimit || 0).toLocaleString('en-IN')}</span>
                     </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Outstanding Balance</span>
+                      {(() => {
+                        const balance = viewingCustomer.outstandingBalance !== undefined ? viewingCustomer.outstandingBalance : (viewingCustomer.outstanding || 0);
+                        const info = getOutstandingInfo('customer', balance);
+                        return (
+                          <div className="flex flex-col mt-0.5">
+                            <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded border ${info.colorClass} w-fit`}>
+                              {info.formatted}
+                            </span>
+                            <span className="text-[10px] text-gray-450 mt-0.5 font-medium leading-none">
+                              {info.label}
+                            </span>
+                          </div>
+                        );
+                      })()}
+                    </div>
                     <div className="col-span-2">
                       <span className="block text-xs text-gray-400 font-medium">Preferred Transport</span>
                       <span className="font-semibold text-gray-905">{viewingCustomer.preferredTransport || 'Direct Delivery'}</span>
@@ -4215,6 +4409,26 @@ const PartyManagement: React.FC = () => {
                         </span>
                       ) : (
                         <span className="text-gray-400">-</span>
+                      )}
+                    </div>
+                    <div className="col-span-2">
+                      <span className="block text-xs text-gray-400 font-medium">Tags</span>
+                      {Array.isArray(viewingCustomer.tags) && viewingCustomer.tags.length > 0 ? (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {viewingCustomer.tags.map((tag: string, idx: number) => {
+                            const colors = getTagColor(tag);
+                            return (
+                              <span
+                                key={idx}
+                                className={`inline-flex px-2 py-0.5 text-xs font-bold rounded border shadow-3xs ${colors.bg} ${colors.text} ${colors.border}`}
+                              >
+                                {tag}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 mt-1 block text-sm">-</span>
                       )}
                     </div>
                     {viewingCustomer.remarks && (
@@ -4399,14 +4613,41 @@ const PartyManagement: React.FC = () => {
                   </h3>
                   <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm">
                     <div>
-                      <span className="block text-xs text-gray-400 font-medium">Opening Balance</span>
-                      <span className="font-semibold text-gray-905">₹{(viewingCustomer.openingBalance || 0).toLocaleString('en-IN')}</span>
-                    </div>
-                    <div>
                       <span className="block text-xs text-gray-400 font-medium">Outstanding Balance</span>
-                      <span className={`font-semibold ${(viewingCustomer.outstanding || 0) > 0 ? 'text-red-650' : 'text-green-655'}`}>
-                        ₹{(viewingCustomer.outstanding || 0).toLocaleString('en-IN')}
-                      </span>
+                      {(() => {
+                        const balance = viewingCustomer.outstandingBalance !== undefined ? viewingCustomer.outstandingBalance : (viewingCustomer.outstanding || 0);
+                        const info = getOutstandingInfo('vendor', balance);
+                        return (
+                          <div className="flex flex-col mt-0.5">
+                            <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded border ${info.colorClass} w-fit`}>
+                              {info.formatted}
+                            </span>
+                            <span className="text-[10px] text-gray-450 mt-0.5 font-medium leading-none">
+                              {info.label}
+                            </span>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                    <div className="col-span-2">
+                      <span className="block text-xs text-gray-400 font-medium">Tags</span>
+                      {Array.isArray(viewingCustomer.tags) && viewingCustomer.tags.length > 0 ? (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {viewingCustomer.tags.map((tag: string, idx: number) => {
+                            const colors = getTagColor(tag);
+                            return (
+                              <span
+                                key={idx}
+                                className={`inline-flex px-2 py-0.5 text-xs font-bold rounded border shadow-3xs ${colors.bg} ${colors.text} ${colors.border}`}
+                              >
+                                {tag}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 mt-1 block text-sm">-</span>
+                      )}
                     </div>
                     {viewingCustomer.remarks && (
                       <div className="col-span-2">

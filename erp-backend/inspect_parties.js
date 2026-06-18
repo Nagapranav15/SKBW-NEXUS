@@ -6,15 +6,16 @@ async function inspect() {
   await mongoose.connect(process.env.MONGO_URI);
   console.log("Connected to DB.");
 
-  const customers = await Party.find({ type: 'customer' }).limit(5);
-  console.log("CUSTOMERS:", JSON.stringify(customers.map(c => ({
-    _id: c._id,
-    firmName: c.firmName,
-    city: c.city,
-    route: c.route,
-    gstNumber: c.gstNumber,
-    aadharNumber: c.aadharNumber,
-    status: c.status
+  const parties = await Party.find({});
+  console.log("All Parties in Database:", JSON.stringify(parties.map(p => ({
+    _id: p._id,
+    type: p.type,
+    firmName: p.firmName,
+    ownerName: p.ownerName,
+    contactName: p.contactName,
+    city: p.city,
+    route: p.route,
+    status: p.status
   })), null, 2));
 
   process.exit(0);

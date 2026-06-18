@@ -23,11 +23,13 @@ exports.getRoutes = async (req, res) => {
     const routesWithCounts = await Promise.all(routes.map(async (route) => {
       const citiesCount = await Party.countDocuments({
         type: 'market',
-        route: route.name
+        route: route.name,
+        company: route.company
       });
       const customersCount = await Party.countDocuments({
         type: 'customer',
-        route: route.name
+        route: route.name,
+        company: route.company
       });
 
       return {
@@ -102,14 +104,14 @@ exports.updateRoute = async (req, res) => {
       }
 
       await Party.updateMany(
-        { ...partyFilter, type: { $in: ['market', 'customer'] } },
+        { ...partyFilter, type: { $in: ['market', 'customer'] }, company: existingRoute.company },
         { $set: partyUpdate }
       );
 
       // Regenerate customer codes if route name changed
       if (nameChanged) {
         const { generateCustomerCode } = require('./partyController');
-        const customersToUpdate = await Party.find({ type: 'customer', route: data.name });
+        const customersToUpdate = await Party.find({ type: 'customer', route: data.name, company: existingRoute.company });
         for (const customer of customersToUpdate) {
           const newCode = await generateCustomerCode({
             state: customer.state,
@@ -146,7 +148,7 @@ exports.deleteRoute = async (req, res) => {
 
     // Reset region and agent fields for all linked cities and customers
     await Party.updateMany(
-      { route: route.name, type: { $in: ['market', 'customer'] } },
+      { route: route.name, type: { $in: ['market', 'customer'] }, company: route.company },
       { $set: { route: '', agentAssigned: '' } }
     );
 

@@ -122,11 +122,15 @@ exports.getParties = async (req, res) => {
   try {
     const filter = {};
     if (req.query.type) filter.type = req.query.type;
+
+    let companyFilter = null;
     if (req.query.company) {
-      filter.$or = [
-        { company: req.query.company },
-        { companies: req.query.company }
-      ];
+      companyFilter = {
+        $or: [
+          { company: req.query.company },
+          { companies: req.query.company }
+        ]
+      };
     }
 
     if (req.query.status) {
@@ -151,27 +155,37 @@ exports.getParties = async (req, res) => {
     }
 
     // Text search across multiple fields
+    let searchFilter = null;
     if (req.query.search) {
       const searchRegex = new RegExp(req.query.search, 'i');
-      const searchFilter = [
-        { firmName: searchRegex },
-        { contactName: searchRegex },
-        { ownerName: searchRegex },
-        { phone: searchRegex },
-        { city: searchRegex },
-        { email: searchRegex },
-        { route: searchRegex },
-        { code: searchRegex },
-        { gstin: searchRegex },
-        { gstNumber: searchRegex },
-        { aadharNumber: searchRegex },
-        { district: searchRegex },
-        { state: searchRegex },
-        { pincode: searchRegex },
-        { agentAssigned: searchRegex },
-        { customerGrade: searchRegex }
-      ];
-      filter.$or = searchFilter;
+      searchFilter = {
+        $or: [
+          { firmName: searchRegex },
+          { contactName: searchRegex },
+          { ownerName: searchRegex },
+          { phone: searchRegex },
+          { city: searchRegex },
+          { email: searchRegex },
+          { route: searchRegex },
+          { code: searchRegex },
+          { gstin: searchRegex },
+          { gstNumber: searchRegex },
+          { aadharNumber: searchRegex },
+          { district: searchRegex },
+          { state: searchRegex },
+          { pincode: searchRegex },
+          { agentAssigned: searchRegex },
+          { customerGrade: searchRegex },
+          { tags: searchRegex }
+        ]
+      };
+    }
+
+    const conditions = [];
+    if (companyFilter) conditions.push(companyFilter);
+    if (searchFilter) conditions.push(searchFilter);
+    if (conditions.length > 0) {
+      filter.$and = conditions;
     }
 
     // Pagination
@@ -180,7 +194,7 @@ exports.getParties = async (req, res) => {
     const skip = (page - 1) * limit;
 
     // Secure sorting & filtering with whitelist validation
-    const allowedSortFields = ['firmName', 'contactName', 'ownerName', 'phone', 'city', 'district', 'state', 'pincode', 'route', 'agentAssigned', 'customerGrade', 'creditLimit', 'outstanding', 'status', 'createdAt'];
+    const allowedSortFields = ['firmName', 'contactName', 'ownerName', 'phone', 'city', 'district', 'state', 'pincode', 'route', 'agentAssigned', 'customerGrade', 'creditLimit', 'outstandingBalance', 'status', 'createdAt'];
 
     // Parse dynamic Multi-Filter rules
     if (req.query.filterRules) {
@@ -263,7 +277,8 @@ exports.getParties = async (req, res) => {
       if (party.type === 'market') {
         partyObj.customerCount = await Party.countDocuments({
           type: 'customer',
-          city: party.firmName
+          city: party.firmName,
+          company: party.company
         });
       }
       return partyObj;
@@ -279,6 +294,12 @@ exports.getPartyStats = async (req, res) => {
   try {
     const filter = {};
     if (req.query.type) filter.type = req.query.type;
+    if (req.query.company) {
+      filter.$or = [
+        { company: req.query.company },
+        { companies: req.query.company }
+      ];
+    }
 
     const [total, active, inactive, onHold] = await Promise.all([
       Party.countDocuments(filter),

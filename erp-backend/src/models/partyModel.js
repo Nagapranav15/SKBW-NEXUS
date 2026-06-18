@@ -59,6 +59,7 @@ const partySchema = new mongoose.Schema({
   creditLimit: { type: Number },
   creditDays: { type: Number, default: 0 },
   outstanding: { type: Number, default: 0 },
+  outstandingBalance: { type: Number, default: 0 },
   preferredTransport: { type: String, default: '' },
   gpsLocation: { type: String, default: '' },
   customerPhoto: { type: String, default: '' },
@@ -76,6 +77,10 @@ const partySchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "Company",
     required: false
+  },
+  tags: {
+    type: [String],
+    default: []
   }
 }, { timestamps: true });
 
