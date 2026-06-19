@@ -473,138 +473,232 @@ exports.importParties = async (req, res) => {
       return res.status(400).json({ msg: 'No parties data provided' });
     }
 
-    // In-memory cache for Routes and Markets we verify/create in this execution
-    // Keys will be "companyId:name" in lowercase
-    const routesCache = new Map();
-    const marketsCache = new Map();
-    const createdRouteCodes = new Set();
+    const companyIds = [...new Set(parties.map(p => p.company).filter(Boolean))];
+    if (companyIds.length === 0) {
+      return res.status(400).json({ msg: 'No valid company IDs in import data' });
+    }
 
-    const processedParties = [];
+    // 1. Pre-fetch existing Routes and Markets for all companies in the dataset
+    const [routes, markets] = await Promise.all([
+      Route.find({ company: { $in: companyIds } }),
+      Party.find({ type: 'market', company: { $in: companyIds } })
+    ]);
+
+    const routesMap = new Map();
+    const routeCodesSet = new Set();
+    routes.forEach(r => {
+      routesMap.set(`${r.company}:${r.name.toLowerCase()}`, r);
+      routeCodesSet.add(`${r.company}:${r.code.toUpperCase()}`);
+    });
+
+    const marketsMap = new Map();
+    markets.forEach(m => {
+      marketsMap.set(`${m.company}:${m.firmName.toLowerCase()}`, m);
+    });
+
+    // 2. Identify missing Routes and Markets, planning their creation
+    const newRoutesToCreateMap = new Map();
+    const newMarketsToCreateMap = new Map();
+
     for (const p of parties) {
-      const data = { ...p };
-      const companyId = data.company;
-
-      if (data.company && (!data.companies || data.companies.length === 0)) {
-        data.companies = [data.company];
-      }
-
-      // Auto-create Route and Market for customer import
-      if (data.type === 'customer' && companyId) {
-        const routeName = (data.route || '').trim();
-        const cityName = (data.city || '').trim();
+      if (p.type === 'customer' && p.company) {
+        const companyId = p.company;
+        const routeName = (p.route || '').trim();
+        const cityName = (p.city || '').trim();
 
         if (routeName) {
           const routeKey = `${companyId}:${routeName.toLowerCase()}`;
-          let routeDoc = routesCache.get(routeKey);
-
-          if (!routeDoc) {
-            // Check if Route already exists in database
-            routeDoc = await Route.findOne({
-              name: { $regex: new RegExp(`^${routeName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') },
-              company: companyId
-            });
-
-            if (!routeDoc) {
-              // Generate a unique route code
-              const baseCode = getRouteCode(routeName);
-              let routeCode = baseCode;
-              let suffix = 1;
-              while (
-                (await Route.findOne({ code: routeCode, company: companyId })) ||
-                createdRouteCodes.has(`${companyId}:${routeCode}`)
-              ) {
-                routeCode = `${baseCode}${suffix}`;
-                suffix++;
-              }
-
-              // Create Route
-              routeDoc = await Route.create({
-                name: routeName,
-                code: routeCode,
-                company: companyId,
-                status: 'active'
-              });
-
-              createdRouteCodes.add(`${companyId}:${routeCode}`);
-
-              // Log Route creation activity
-              await ActivityLog.create({
-                action: 'CREATE',
-                entityType: 'route',
-                entityName: routeDoc.name,
-                details: `Auto-created route ${routeDoc.name} during customer import`,
-                performedBy: req.user ? req.user.fullName : "System",
-                company: companyId
-              }).catch(err => console.error("Auto route activity log failed:", err));
+          if (!routesMap.has(routeKey) && !newRoutesToCreateMap.has(routeKey)) {
+            const baseCode = getRouteCode(routeName);
+            let routeCode = baseCode;
+            let suffix = 1;
+            while (routeCodesSet.has(`${companyId}:${routeCode.toUpperCase()}`)) {
+              routeCode = `${baseCode}${suffix}`;
+              suffix++;
             }
+            routeCodesSet.add(`${companyId}:${routeCode.toUpperCase()}`);
 
-            routesCache.set(routeKey, routeDoc);
+            newRoutesToCreateMap.set(routeKey, {
+              name: routeName,
+              code: routeCode,
+              company: companyId,
+              status: 'active'
+            });
           }
-
-          // Use the exact database route name (preserves case)
-          data.route = routeDoc.name;
         }
 
         if (cityName) {
           const marketKey = `${companyId}:${cityName.toLowerCase()}`;
-          let marketDoc = marketsCache.get(marketKey);
-
-          if (!marketDoc) {
-            // Check if Market already exists in database
-            marketDoc = await Party.findOne({
+          if (!marketsMap.has(marketKey) && !newMarketsToCreateMap.has(marketKey)) {
+            newMarketsToCreateMap.set(marketKey, {
               type: 'market',
-              firmName: { $regex: new RegExp(`^${cityName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') },
-              company: companyId
+              firmName: cityName,
+              district: p.district || '',
+              state: p.state || 'Tamil Nadu',
+              pincode: p.pincode || '',
+              route: routeName,
+              company: companyId,
+              companies: [companyId],
+              status: 'active'
             });
-
-            if (!marketDoc) {
-              // Create Market
-              marketDoc = await Party.create({
-                type: 'market',
-                firmName: cityName,
-                district: data.district || '',
-                state: data.state || 'Tamil Nadu',
-                pincode: data.pincode || '',
-                route: data.route || '', // Link to the normalized route name
-                company: companyId,
-                companies: [companyId],
-                status: 'active'
-              });
-
-              // Log Market creation activity
-              await ActivityLog.create({
-                action: 'CREATE',
-                entityType: 'market',
-                entityName: marketDoc.firmName,
-                details: `Auto-created market ${marketDoc.firmName} during customer import`,
-                performedBy: req.user ? req.user.fullName : "System",
-                company: companyId
-              }).catch(err => console.error("Auto market activity log failed:", err));
-            }
-
-            marketsCache.set(marketKey, marketDoc);
           }
-
-          // Use the exact database city name (preserves case)
-          data.city = marketDoc.firmName;
-          
-          // Autofill missing district, state, pincode, route on customer if they are empty
-          if (!data.district && marketDoc.district) data.district = marketDoc.district;
-          if (!data.state && marketDoc.state) data.state = marketDoc.state;
-          if (!data.pincode && marketDoc.pincode) data.pincode = marketDoc.pincode;
-          if (!data.route && marketDoc.route) data.route = marketDoc.route;
         }
       }
+    }
 
-      if (data.type === 'customer' && !data.code) {
-        data.code = await generateCustomerCode(data);
+    // Bulk insert new routes and markets
+    if (newRoutesToCreateMap.size > 0) {
+      const inserted = await Route.insertMany([...newRoutesToCreateMap.values()]);
+      inserted.forEach(r => {
+        routesMap.set(`${r.company}:${r.name.toLowerCase()}`, r);
+      });
+    }
+
+    if (newMarketsToCreateMap.size > 0) {
+      const inserted = await Party.insertMany([...newMarketsToCreateMap.values()]);
+      inserted.forEach(m => {
+        marketsMap.set(`${m.company}:${m.firmName.toLowerCase()}`, m);
+      });
+    }
+
+    // Activity logging for auto-created routes/markets in bulk
+    const activityLogs = [];
+    newRoutesToCreateMap.forEach(r => {
+      activityLogs.push({
+        action: 'CREATE',
+        entityType: 'route',
+        entityName: r.name,
+        details: `Auto-created route ${r.name} during customer import`,
+        performedBy: req.user ? req.user.fullName : "System",
+        company: r.company
+      });
+    });
+    newMarketsToCreateMap.forEach(m => {
+      activityLogs.push({
+        action: 'CREATE',
+        entityType: 'market',
+        entityName: m.firmName,
+        details: `Auto-created market ${m.firmName} during customer import`,
+        performedBy: req.user ? req.user.fullName : "System",
+        company: m.company
+      });
+    });
+    if (activityLogs.length > 0) {
+      const ActivityLog = require('../models/activityLogModel');
+      await ActivityLog.insertMany(activityLogs).catch(err => console.error("Activity logs failed:", err));
+    }
+
+    // 3. Resolve Customer prefixes and fetch existing sequence counters
+    const partiesWithPrefixes = parties.map(p => {
+      const data = { ...p };
+      if (data.type === 'customer' && !data.code && data.company) {
+        const state = (data.state || "Andhra Pradesh").trim();
+        const stateCode = stateMap[state.toLowerCase()] || state.substring(0, 2).toUpperCase();
+        
+        let routeCode = "GEN";
+        if (data.route) {
+          const routeKey = `${data.company}:${data.route.toLowerCase()}`;
+          const routeDoc = routesMap.get(routeKey);
+          if (routeDoc && routeDoc.code) {
+            routeCode = routeDoc.code.trim().toUpperCase();
+          } else {
+            routeCode = getRouteCode(data.route);
+          }
+        }
+        const cityCode = getCityCode(data.city);
+        const prefix = `${stateCode}-${routeCode}-${cityCode}-`;
+        return { data, prefix };
+      }
+      return { data, prefix: null };
+    });
+
+    const uniquePrefixes = [...new Set(partiesWithPrefixes.map(x => x.prefix).filter(Boolean))];
+    const Sequence = require('../models/sequenceModel');
+    const existingSeqs = await Sequence.find({ prefix: { $in: uniquePrefixes } });
+    const seqsMap = new Map();
+    existingSeqs.forEach(s => seqsMap.set(s.prefix, s.sequence));
+
+    // Find max counter for prefixes that don't have sequence documents in MongoDB yet
+    for (const prefix of uniquePrefixes) {
+      if (!seqsMap.has(prefix)) {
+        const customers = await Party.find({
+          type: 'customer',
+          code: { $regex: '^' + prefix }
+        }, { code: 1 });
+
+        let maxNum = 0;
+        customers.forEach(c => {
+          if (c.code) {
+            const parts = c.code.split('-');
+            const lastPart = parts[parts.length - 1];
+            const num = parseInt(lastPart, 10);
+            if (!isNaN(num) && num > maxNum) {
+              maxNum = num;
+            }
+          }
+        });
+        seqsMap.set(prefix, maxNum);
+      }
+    }
+
+    // 4. Generate customer codes and build processedParties list
+    const processedParties = [];
+    for (const item of partiesWithPrefixes) {
+      const data = item.data;
+      if (data.company && (!data.companies || data.companies.length === 0)) {
+        data.companies = [data.company];
+      }
+
+      if (data.type === 'customer' && data.company) {
+        const companyId = data.company;
+
+        // Apply normalized case names from caches
+        if (data.route) {
+          const routeKey = `${companyId}:${data.route.toLowerCase()}`;
+          const routeDoc = routesMap.get(routeKey);
+          if (routeDoc) data.route = routeDoc.name;
+        }
+
+        if (data.city) {
+          const marketKey = `${companyId}:${data.city.toLowerCase()}`;
+          const marketDoc = marketsMap.get(marketKey);
+          if (marketDoc) {
+            data.city = marketDoc.firmName;
+            if (!data.district && marketDoc.district) data.district = marketDoc.district;
+            if (!data.state && marketDoc.state) data.state = marketDoc.state;
+            if (!data.pincode && marketDoc.pincode) data.pincode = marketDoc.pincode;
+            if (!data.route && marketDoc.route) data.route = marketDoc.route;
+          }
+        }
+
+        if (!data.code && item.prefix) {
+          const currentCounter = seqsMap.get(item.prefix) || 0;
+          const nextCounter = currentCounter + 1;
+          seqsMap.set(item.prefix, nextCounter);
+
+          const runningNum = String(nextCounter).padStart(4, '0');
+          data.code = item.prefix + runningNum;
+        }
       }
       processedParties.push(data);
     }
 
+    // 5. Bulk write sequence updates back to database
+    if (uniquePrefixes.length > 0) {
+      const bulkOps = uniquePrefixes.map(prefix => ({
+        updateOne: {
+          filter: { prefix },
+          update: { $set: { sequence: seqsMap.get(prefix) } },
+          upsert: true
+        }
+      }));
+      await Sequence.bulkWrite(bulkOps);
+    }
+
+    // 6. Insert all processed parties in one bulk query
     const created = await Party.insertMany(processedParties, { ordered: false });
 
-    // Log activity
+    // Activity log for final bulk import success
     if (created.length > 0) {
       await ActivityLog.create({
         action: 'IMPORT',
