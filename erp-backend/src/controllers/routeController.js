@@ -21,14 +21,17 @@ exports.getRoutes = async (req, res) => {
     const routes = await Route.find(filter).sort(sortObj);
 
     const routesWithCounts = await Promise.all(routes.map(async (route) => {
+      const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const routeRegex = new RegExp('^' + escapeRegex(route.name) + '$', 'i');
+      
       const citiesCount = await Party.countDocuments({
         type: 'market',
-        route: route.name,
+        route: routeRegex,
         company: route.company
       });
       const customersCount = await Party.countDocuments({
         type: 'customer',
-        route: route.name,
+        route: routeRegex,
         company: route.company
       });
 

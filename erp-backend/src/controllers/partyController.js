@@ -275,9 +275,10 @@ exports.getParties = async (req, res) => {
       }
       const partyObj = party.toObject();
       if (party.type === 'market') {
+        const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
         partyObj.customerCount = await Party.countDocuments({
           type: 'customer',
-          city: party.firmName,
+          city: new RegExp('^' + escapeRegex(party.firmName) + '$', 'i'),
           company: party.company
         });
       }
@@ -572,13 +573,19 @@ exports.importParties = async (req, res) => {
         if (cityName) {
           const marketKey = `${companyId}:${cityName.toLowerCase()}`;
           if (!marketsMap.has(marketKey) && !newMarketsToCreateMap.has(marketKey)) {
+            let resolvedRouteName = '';
+            if (routeName) {
+              const routeKey = `${companyId}:${routeName.toLowerCase()}`;
+              const matchedRouteDoc = routesMap.get(routeKey) || newRoutesToCreateMap.get(routeKey);
+              resolvedRouteName = matchedRouteDoc ? matchedRouteDoc.name : routeName;
+            }
             newMarketsToCreateMap.set(marketKey, {
               type: 'market',
               firmName: cityName,
               district: p.district || '',
               state: p.state || 'Tamil Nadu',
               pincode: p.pincode || '',
-              route: routeName,
+              route: resolvedRouteName,
               company: companyId,
               companies: [companyId],
               status: 'active'
