@@ -20,7 +20,7 @@ import { getActivityLogs } from '../api/activityLogApi';
 
 const WhatsAppIcon: React.FC = () => (
   <svg 
-    className="w-4.5 h-4.5 text-green-500 hover:text-green-600 transition-colors inline-block align-middle ml-1.5 cursor-pointer shrink-0" 
+    className="w-5 h-5 text-emerald-500 hover:text-emerald-600 transition-all duration-300 transform hover:scale-125 hover:rotate-[12deg] active:scale-95 inline-block align-middle ml-1.5 cursor-pointer shrink-0 filter hover:drop-shadow-[0_0_5px_rgba(16,185,129,0.65)]" 
     viewBox="0 0 24 24" 
     fill="currentColor"
     title="Chat on WhatsApp"
@@ -118,7 +118,6 @@ const getColumnsSchema = (type: string): Record<string, string> => {
         district: 'District',
         agentAssigned: 'Assigned Agent',
         route: 'Region',
-        customerGrade: 'Grade',
         creditLimit: 'Credit Limit',
         outstandingBalance: 'Outstanding Balance',
         tags: 'Tags',
@@ -130,7 +129,6 @@ const getColumnsSchema = (type: string): Record<string, string> => {
         phone: 'Mobile',
         city: 'City',
         district: 'District',
-        vendorType: 'Vendor Type',
         outstandingBalance: 'Outstanding Balance',
         tags: 'Tags',
         status: 'Status'
@@ -177,7 +175,7 @@ const getDefaultVisibleColumns = (type: string): Record<string, boolean> => {
   const defaultCols: Record<string, boolean> = {};
   Object.keys(allCols).forEach(key => {
     if (type === 'customer') {
-      defaultCols[key] = ['firmName', 'phone', 'city', 'agentAssigned', 'customerGrade', 'status'].includes(key);
+      defaultCols[key] = ['firmName', 'phone', 'city', 'agentAssigned', 'status'].includes(key);
     } else {
       defaultCols[key] = true;
     }
@@ -195,8 +193,6 @@ interface Party {
   altPhone?: string;
   email?: string;
   whatsapp?: string;
-  customerGrade?: string;
-  vendorType?: string;
   doorNo?: string;
   streetName?: string;
   address1?: string;
@@ -667,8 +663,6 @@ const PartyManagement: React.FC = () => {
       shopPhoto: '',
       openingBalance: '',
       status: 'active' as Party['status'],
-      customerGrade: currentType === 'customer' ? 'Grade B (Regular)' : '',
-      vendorType: currentType === 'vendor' ? 'Retailer' : '',
       gstNumber: '',
       aadharNumber: '',
       remarks: '',
@@ -770,8 +764,8 @@ const PartyManagement: React.FC = () => {
     if (e.key === 'Enter') {
       const target = e.target as HTMLElement;
       
-      // If typing in a textarea or pressing Enter on a submit/reset button, do normal action
-      if (target.tagName === 'TEXTAREA' || target.tagName === 'BUTTON' || target.closest('button')) {
+      // If typing in a textarea, a tags input, or pressing Enter on a button, do normal action
+      if (target.tagName === 'TEXTAREA' || target.tagName === 'BUTTON' || target.closest('button') || target.classList.contains('tags-input-field')) {
         return;
       }
       
@@ -1312,7 +1306,18 @@ const PartyManagement: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const submitData = { ...formData, company: selectedCompany?._id };
+      // Intercept any uncommitted tag text in the tags input field to resolve the focus/blur save race condition
+      let tags = formData.tags || [];
+      const tagsInput = document.querySelector('.tags-input-field') as HTMLInputElement | null;
+      if (tagsInput && tagsInput.value.trim()) {
+        const newVal = tagsInput.value.trim().replace(/,$/, '');
+        if (newVal && !tags.includes(newVal)) {
+          tags = [...tags, newVal];
+        }
+        tagsInput.value = ''; // clear it
+      }
+
+      const submitData = { ...formData, tags, company: selectedCompany?._id };
 
       // Safe Casts for creditLimit, creditDays, openingBalance
       if (submitData.creditLimit === '') submitData.creditLimit = 0;
@@ -1321,8 +1326,24 @@ const PartyManagement: React.FC = () => {
       if (submitData.creditDays === '') submitData.creditDays = 0;
       else if (submitData.creditDays !== undefined) submitData.creditDays = parseInt(submitData.creditDays, 10) || 0;
 
-      if (submitData.openingBalance === '') submitData.openingBalance = 0;
-      else if (submitData.openingBalance !== undefined) submitData.openingBalance = parseFloat(submitData.openingBalance) || 0;
+      if (submitData.openingBalance === '') {
+        submitData.openingBalance = 0;
+      } else if (submitData.openingBalance !== undefined) {
+        submitData.openingBalance = parseFloat(submitData.openingBalance) || 0;
+      }
+
+      if (submitData.outstandingBalance === '' || submitData.outstandingBalance === undefined || submitData.outstandingBalance === null) {
+        submitData.outstandingBalance = submitData.openingBalance || 0;
+      } else {
+        submitData.outstandingBalance = parseFloat(submitData.outstandingBalance) || 0;
+      }
+
+      // Remove vendorType and customerGrade completely from submissions
+      delete submitData.vendorType;
+      delete submitData.customerGrade;
+      if (currentType === 'vendor') {
+        delete submitData.openingBalance;
+      }
 
       // Strip immutable properties if editing to prevent database validation errors
       if (editingItem) {
@@ -1421,9 +1442,7 @@ const PartyManagement: React.FC = () => {
       agentAssigned,
       type: item.type || (currentType === 'route' ? 'route' : currentType),
       tags: item.tags || [],
-      outstandingBalance: item.outstandingBalance !== undefined ? item.outstandingBalance : (item.outstanding || 0),
-      customerGrade: currentType === 'customer' ? (item.customerGrade || 'Grade B (Regular)') : '',
-      vendorType: currentType === 'vendor' ? (item.vendorType || 'Retailer') : ''
+      outstandingBalance: item.outstandingBalance !== undefined ? item.outstandingBalance : (item.outstanding || 0)
     });
     setIsAddingNewCity(false);
     setNewCityName('');
@@ -1699,29 +1718,34 @@ const PartyManagement: React.FC = () => {
       }));
     } else {
       // Customer or Vendor
-      exportData = parties.map(p => ({
-        'Firm Name': p.firmName,
-        'Owner Name': p.ownerName,
-        'Phone': p.phone,
-        'Email': p.email,
-        'City': p.city,
-        'District': p.district,
-        'State': p.state,
-        'Pincode': p.pincode,
-        'Region': p.route || '-',
-        'Agent Assigned': (() => {
-          const routeDoc = allRoutes.find(r => r.name === p.route);
-          return routeDoc?.assignedAgent || p.agentAssigned || '-';
-        })(),
-        'Market': p.assignedMarket || '-',
-        'Credit Limit': p.creditLimit || 0,
-        'Credit Days': p.creditDays || 0,
-        'Opening Balance': p.openingBalance || 0,
-        'Outstanding Balance': p.outstandingBalance !== undefined ? p.outstandingBalance : (p.outstanding || 0),
-        'Tags': Array.isArray(p.tags) ? p.tags.join(', ') : '',
-        'Preferred Transport': p.preferredTransport || '-',
-        'Status': p.status
-      }));
+      exportData = parties.map(p => {
+        const row: any = {
+          'Firm Name': p.firmName,
+          'Owner Name': p.ownerName,
+          'Phone': p.phone,
+          'Email': p.email,
+          'City': p.city,
+          'District': p.district,
+          'State': p.state,
+          'Pincode': p.pincode,
+          'Region': p.route || '-',
+          'Agent Assigned': (() => {
+            const routeDoc = allRoutes.find(r => r.name === p.route);
+            return routeDoc?.assignedAgent || p.agentAssigned || '-';
+          })(),
+          'Market': p.assignedMarket || '-',
+          'Credit Limit': p.creditLimit || 0,
+          'Credit Days': p.creditDays || 0,
+        };
+        if (currentType === 'customer') {
+          row['Opening Balance'] = p.openingBalance || 0;
+        }
+        row['Outstanding Balance'] = p.outstandingBalance !== undefined ? p.outstandingBalance : (p.outstanding || 0);
+        row['Tags'] = Array.isArray(p.tags) ? p.tags.join(', ') : '';
+        row['Preferred Transport'] = p.preferredTransport || '-';
+        row['Status'] = p.status;
+        return row;
+      });
     }
 
     const ws = XLSX.utils.json_to_sheet(exportData);
@@ -1801,8 +1825,6 @@ const PartyManagement: React.FC = () => {
               altPhone: String(item['alternatemobile'] || item['alternatephone'] || item['altphone'] || '').trim(),
               email: String(item['emailid'] || item['email'] || item['emailaddress'] || '').trim(),
               whatsapp: String(item['whatsappnumber'] || item['whatsapp'] || '').trim(),
-              customerGrade: String(item['grade'] || item['customergrade'] || '').trim() || (currentType === 'customer' ? 'Grade B (Regular)' : ''),
-              vendorType: String(item['vendortype'] || item['vendorcategory'] || item['type'] || '').trim() || (currentType === 'vendor' ? 'Retailer' : ''),
               doorNo: String(item['doorno'] || '').trim(),
               streetName: String(item['streetname'] || '').trim(),
               address1: String(item['addressline'] || item['address1'] || item['address'] || '').trim(),
@@ -1818,7 +1840,7 @@ const PartyManagement: React.FC = () => {
               assignedMarket: String(item['assignedmarket'] || item['market'] || '').trim(),
               creditLimit: parseFloat(item['creditlimit'] || item['limit'] || 0),
               creditDays: parseInt(item['creditdays'] || item['days'] || 0),
-              openingBalance: parseFloat(item['openingbalance'] || item['balance'] || 0),
+              openingBalance: currentType === 'customer' ? parseFloat(item['openingbalance'] || item['balance'] || 0) : 0,
               outstandingBalance: item['outstandingbalance'] !== undefined ? parseFloat(item['outstandingbalance'] || 0) : (item['outstanding'] !== undefined ? parseFloat(item['outstanding'] || 0) : 0),
               tags: (item['tags'] || item['tag']) ? String(item['tags'] || item['tag']).split(',').map((t: string) => t.trim()).filter(Boolean) : [],
               preferredTransport: String(item['preferredtransporter'] || item['preferredtransport'] || item['transport'] || '').trim(),
@@ -1884,7 +1906,7 @@ const PartyManagement: React.FC = () => {
         'Email ID', 'GST Number', 'Aadhar Number', 'Door No', 'Street Name', 'Address Line',
         'Area', 'Landmark', 'Town/City', 'District', 'State', 'Pincode', 'Google Map',
         'Region / Line', 'Assigned Agent', 'Preferred Transporter', 'Credit Limit', 'Credit Days',
-        'Opening Balance', currentType === 'customer' ? 'Grade' : 'Vendor Type', 'Status', 'Outstanding Balance', 'Tags'
+        ...(currentType === 'customer' ? ['Opening Balance'] : []), 'Status', 'Outstanding Balance', 'Tags'
       ];
       sampleRows = [
         [
@@ -1911,8 +1933,7 @@ const PartyManagement: React.FC = () => {
           'GARUDA',
           '500000',
           '30',
-          '0',
-          currentType === 'customer' ? 'Grade B (Regular)' : 'Retailer',
+          ...(currentType === 'customer' ? ['0'] : []),
           'active',
           '0',
           'vip, regular'
@@ -1966,9 +1987,9 @@ const PartyManagement: React.FC = () => {
       {/* Subtle Toast Notification */}
       {toast && (
         <div className="fixed top-4 right-4 z-50 flex items-center space-x-2 bg-gray-900 text-white px-4 py-2.5 rounded-lg shadow-xl border border-gray-800 animate-in fade-in slide-in-from-top-4 duration-200">
-          {toast.type === 'success' && <CheckCircle className="w-4.5 h-4.5 text-green-400" />}
-          {toast.type === 'error' && <XCircle className="w-4.5 h-4.5 text-red-400" />}
-          {toast.type === 'info' && <Building className="w-4.5 h-4.5 text-blue-400" />}
+          {toast.type === 'success' && <CheckCircle className="w-5 h-5 text-green-400" />}
+          {toast.type === 'error' && <XCircle className="w-5 h-5 text-red-400" />}
+          {toast.type === 'info' && <Building className="w-5 h-5 text-blue-400" />}
           <span className="text-xs font-semibold">{toast.message}</span>
           <button onClick={() => setToast(null)} className="text-gray-400 hover:text-white transition-colors pl-2">
             <X className="w-3.5 h-3.5" />
@@ -2618,18 +2639,23 @@ const PartyManagement: React.FC = () => {
                                     )}
                                   </div>
                                 ) : col === 'route' ? (
-                                  item.route ? (
-                                    <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100" title={item.route}>
-                                      {getRouteDisplay(item.route, allRoutes)}
-                                    </span>
-                                  ) : <span className="text-gray-400">-</span>
-                                ) : col === 'assignedAgent' ? (
-                                  item.assignedAgent ? (
+                                   item.route ? (
+                                     <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100" title={item.route}>
+                                       {getRouteDisplay(item.route, allRoutes)}
+                                     </span>
+                                   ) : (
+                                     <span className="text-gray-400">-</span>
+                                   )
+                                ) : (col === 'assignedAgent' || col === 'agentAssigned') ? (() => {
+                                  const agentVal = col === 'assignedAgent' ? item.assignedAgent : item.agentAssigned;
+                                  return agentVal ? (
                                     <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded bg-purple-50 text-purple-700 border border-purple-100">
-                                      {item.assignedAgent}
+                                      {agentVal}
                                     </span>
-                                  ) : <span className="text-gray-400">Not Assigned</span>
-                                ) : col === 'assignedRoutes' ? (
+                                  ) : (
+                                    <span className="text-gray-400 text-xs italic">Not Assigned</span>
+                                  );
+                                })() : col === 'assignedRoutes' ? (
                                   getAgentRoutesBadges(item.firmName || item.contactName)
                                 ) : col === 'citiesCount' || col === 'customersCount' || col === 'customerCount' ? (
                                   <span className="font-medium text-gray-900">{item[col] !== undefined ? item[col] : 0}</span>
@@ -2663,29 +2689,6 @@ const PartyManagement: React.FC = () => {
                                         );
                                       })}
                                     </div>
-                                  ) : <span className="text-gray-400">-</span>
-                                ) : col === 'customerGrade' ? (
-                                  item.customerGrade ? (
-                                    <span className={`inline-flex px-2 py-0.5 text-xs font-bold rounded uppercase ${
-                                      item.customerGrade.includes('Grade A') ? 'bg-purple-100 text-purple-700' :
-                                      item.customerGrade.includes('Grade B') ? 'bg-indigo-100 text-indigo-700' :
-                                      'bg-amber-100 text-amber-700'
-                                    }`}>
-                                      {item.customerGrade.replace(/ \(.+\)/, '').toUpperCase()}
-                                    </span>
-                                  ) : <span className="text-gray-400">-</span>
-                                ) : col === 'vendorType' ? (
-                                  item.vendorType ? (
-                                    <span className={`inline-flex px-2 py-0.5 text-xs font-bold rounded uppercase ${
-                                      (item.vendorType === 'Retailer' || item.vendorType === 'Raw Material') ? 'bg-orange-100 text-orange-700 border border-orange-200' :
-                                      (item.vendorType === 'Wholesaler' || item.vendorType === 'Packaging') ? 'bg-blue-100 text-blue-700 border border-blue-200' :
-                                      (item.vendorType === 'Service provider' || item.vendorType === 'Machinery/Spares') ? 'bg-teal-100 text-teal-700 border border-teal-200' :
-                                      (item.vendorType === 'Value-Added Reseller (VAR)' || item.vendorType === 'Services') ? 'bg-purple-100 text-purple-700 border border-purple-200' :
-                                      item.vendorType === 'Distributor' ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' :
-                                      'bg-gray-100 text-gray-750 border border-gray-200'
-                                    }`}>
-                                      {item.vendorType}
-                                    </span>
                                   ) : <span className="text-gray-400">-</span>
                                 ) : col === 'status' ? (
                                   <span className={`inline-flex px-2 py-0.5 text-[10px] font-bold rounded uppercase border ${
@@ -3202,41 +3205,92 @@ const PartyManagement: React.FC = () => {
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Opening Outstanding Balance (₹)</label>
-                      <input
-                        type="number"
-                        placeholder="e.g. 0"
-                        value={formData.openingBalance}
-                        onChange={e => setFormData({ ...formData, openingBalance: e.target.value === '' ? '' : parseFloat(e.target.value) })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                      />
-                    </div>
-
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Customer Grade</label>
-                        <select
-                          value={formData.customerGrade || 'Grade B (Regular)'}
-                          onChange={e => setFormData({ ...formData, customerGrade: e.target.value })}
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Opening Balance (₹)</label>
+                        <input
+                          type="number"
+                          placeholder="e.g. 0"
+                          value={formData.openingBalance === undefined || formData.openingBalance === null ? '' : formData.openingBalance}
+                          onChange={e => setFormData({ ...formData, openingBalance: e.target.value === '' ? '' : parseFloat(e.target.value) })}
                           className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                        >
-                          <option value="Grade A (Premium)">Grade A (Premium)</option>
-                          <option value="Grade B (Regular)">Grade B (Regular)</option>
-                          <option value="Grade C (Risk)">Grade C (Risk)</option>
-                        </select>
+                        />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Operating Status</label>
-                        <select
-                          value={formData.status || 'active'}
-                          onChange={e => setFormData({ ...formData, status: e.target.value as Party['status'] })}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                        >
-                          <option value="active">Active</option>
-                          <option value="inactive">Inactive</option>
-                          <option value="on-hold">On Hold</option>
-                        </select>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Outstanding Balance (₹)</label>
+                        <input
+                          type="number"
+                          placeholder="e.g. 0"
+                          value={formData.outstandingBalance === undefined || formData.outstandingBalance === null ? '' : formData.outstandingBalance}
+                          onChange={e => setFormData({ ...formData, outstandingBalance: e.target.value === '' ? '' : parseFloat(e.target.value) })}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                        />
+                      </div>
+                    </div>
+
+                     <div>
+                       <label className="block text-xs font-medium text-gray-700 mb-1">Operating Status</label>
+                       <select
+                         value={formData.status || 'active'}
+                         onChange={e => setFormData({ ...formData, status: e.target.value as Party['status'] })}
+                         className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                       >
+                         <option value="active">Active</option>
+                         <option value="inactive">Inactive</option>
+                         <option value="on-hold">On Hold</option>
+                       </select>
+                     </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Tags</label>
+                      <div className="flex flex-wrap gap-1.5 p-2 border border-gray-200 rounded-lg bg-white min-h-[42px] focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all">
+                        {(formData.tags || []).map((tag: string, idx: number) => {
+                          const colors = getTagColor(tag);
+                          return (
+                            <span
+                              key={idx}
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border transition-all shadow-3xs ${colors.bg} ${colors.text} ${colors.border}`}
+                            >
+                              <span>{tag}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = (formData.tags || []).filter((_: any, i: number) => i !== idx);
+                                  setFormData({ ...formData, tags: updated });
+                                }}
+                                className={`hover:opacity-80 rounded-full focus:outline-hidden ${colors.text}`}
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </span>
+                          );
+                        })}
+                        <input
+                          type="text"
+                          placeholder={(formData.tags || []).length === 0 ? "Press Enter or Comma to add tags..." : "Add tag..."}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ',') {
+                              e.preventDefault();
+                              const val = e.currentTarget.value.trim().replace(/,$/, '');
+                              if (val && !(formData.tags || []).includes(val)) {
+                                setFormData({ ...formData, tags: [...(formData.tags || []), val] });
+                              }
+                              e.currentTarget.value = '';
+                            } else if (e.key === 'Backspace' && !e.currentTarget.value) {
+                              const updated = [...(formData.tags || [])];
+                              updated.pop();
+                              setFormData({ ...formData, tags: updated });
+                            }
+                          }}
+                          onBlur={(e) => {
+                            const val = e.currentTarget.value.trim().replace(/,$/, '');
+                            if (val && !(formData.tags || []).includes(val)) {
+                              setFormData({ ...formData, tags: [...(formData.tags || []), val] });
+                            }
+                            e.currentTarget.value = '';
+                          }}
+                          className="tags-input-field flex-1 min-w-[120px] bg-transparent text-sm border-none focus:outline-hidden p-0 h-6 focus:ring-0 text-gray-900"
+                        />
                       </div>
                     </div>
 
@@ -3395,22 +3449,7 @@ const PartyManagement: React.FC = () => {
                     <h3 className="text-sm font-semibold text-gray-900 mb-3 border-b pb-1">Business Settings</h3>
                     
                     <div className="grid grid-cols-2 gap-3 animate-none">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Vendor Type</label>
-                        <select
-                          value={formData.vendorType || 'Retailer'}
-                          onChange={e => setFormData({ ...formData, vendorType: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 font-medium"
-                        >
-                          <option value="Retailer">Retailer</option>
-                          <option value="Wholesaler">Wholesaler</option>
-                          <option value="Service provider">Service provider</option>
-                          <option value="Value-Added Reseller (VAR)">Value-Added Reseller (VAR)</option>
-                          <option value="Distributor">Distributor</option>
-                          <option value="Other">Other</option>
-                        </select>
-                      </div>
-                      <div>
+                      <div className="col-span-2">
                         <label className="block text-xs font-medium text-gray-700 mb-1">Operating Status</label>
                         <select
                           value={formData.status || 'active'}
@@ -3476,7 +3515,14 @@ const PartyManagement: React.FC = () => {
                               setFormData({ ...formData, tags: updated });
                             }
                           }}
-                          className="flex-1 min-w-[120px] bg-transparent text-sm border-none focus:outline-hidden p-0 h-6 focus:ring-0 text-gray-900"
+                          onBlur={(e) => {
+                            const val = e.currentTarget.value.trim().replace(/,$/, '');
+                            if (val && !(formData.tags || []).includes(val)) {
+                              setFormData({ ...formData, tags: [...(formData.tags || []), val] });
+                            }
+                            e.currentTarget.value = '';
+                          }}
+                          className="tags-input-field flex-1 min-w-[120px] bg-transparent text-sm border-none focus:outline-hidden p-0 h-6 focus:ring-0 text-gray-900"
                         />
                       </div>
                     </div>
@@ -3828,9 +3874,27 @@ const PartyManagement: React.FC = () => {
                               <p className="font-semibold text-gray-950">
                                 {currentType === 'route' ? item.name : (item.firmName || item.contactName)}
                               </p>
-                              <p className="text-xs text-gray-400 mt-0.5">
-                                {currentType === 'route' ? `Agent: ${item.assignedAgent || 'None'}` : `Mobile: ${item.phone || '-'} | City: ${item.city || '-'}`}
-                              </p>
+                              <div className="text-xs text-gray-450 mt-0.5 flex items-center space-x-1.5 flex-wrap">
+                                {currentType === 'route' ? (
+                                  <span>Agent: {item.assignedAgent || 'None'}</span>
+                                ) : (
+                                  <>
+                                    <span>Mobile: {item.phone || '-'}</span>
+                                    {item.phone && (
+                                      <a
+                                        href={getWhatsAppLink(item.phone)}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex items-center animate-none"
+                                      >
+                                        <WhatsAppIcon />
+                                      </a>
+                                    )}
+                                    <span className="mx-1 text-gray-300">|</span>
+                                    <span>City: {item.city || '-'}</span>
+                                  </>
+                                )}
+                              </div>
                             </div>
                             <div className="flex space-x-2">
                               <button
@@ -4474,6 +4538,10 @@ const PartyManagement: React.FC = () => {
                       <span className="font-semibold text-gray-905">₹{(viewingCustomer.creditLimit || 0).toLocaleString('en-IN')}</span>
                     </div>
                     <div>
+                      <span className="block text-xs text-gray-400 font-medium">Opening Balance</span>
+                      <span className="font-semibold text-gray-905">₹{(viewingCustomer.openingBalance || 0).toLocaleString('en-IN')}</span>
+                    </div>
+                    <div>
                       <span className="block text-xs text-gray-400 font-medium">Outstanding Balance</span>
                       {(() => {
                         const balance = viewingCustomer.outstandingBalance !== undefined ? viewingCustomer.outstandingBalance : (viewingCustomer.outstanding || 0);
@@ -4493,20 +4561,6 @@ const PartyManagement: React.FC = () => {
                     <div className="col-span-2">
                       <span className="block text-xs text-gray-400 font-medium">Preferred Transport</span>
                       <span className="font-semibold text-gray-905">{viewingCustomer.preferredTransport || 'Direct Delivery'}</span>
-                    </div>
-                    <div className="col-span-2">
-                      <span className="block text-xs text-gray-400 font-medium">Customer Grade</span>
-                      {viewingCustomer.customerGrade ? (
-                        <span className={`inline-flex px-2.5 py-0.5 text-xs font-bold rounded uppercase mt-0.5 ${
-                          viewingCustomer.customerGrade.includes('Grade A') ? 'bg-purple-100 text-purple-755' :
-                          viewingCustomer.customerGrade.includes('Grade B') ? 'bg-indigo-100 text-indigo-755' :
-                          'bg-amber-100 text-amber-755'
-                        }`}>
-                          {viewingCustomer.customerGrade}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
                     </div>
                     <div className="col-span-2">
                       <span className="block text-xs text-gray-400 font-medium">Tags</span>
@@ -4681,23 +4735,6 @@ const PartyManagement: React.FC = () => {
                       <span className="block text-xs text-gray-400 font-medium">Aadhar Number</span>
                       <span className="font-semibold text-gray-900">{viewingCustomer.aadharNumber || '-'}</span>
                     </div>
-                    <div>
-                      <span className="block text-xs text-gray-400 font-medium">Vendor Type</span>
-                      {viewingCustomer.vendorType ? (
-                        <span className={`inline-flex px-2 py-0.5 text-xs font-bold rounded uppercase ${
-                          (viewingCustomer.vendorType === 'Retailer' || viewingCustomer.vendorType === 'Raw Material') ? 'bg-orange-100 text-orange-700 border border-orange-200' :
-                          (viewingCustomer.vendorType === 'Wholesaler' || viewingCustomer.vendorType === 'Packaging') ? 'bg-blue-100 text-blue-700 border border-blue-200' :
-                          (viewingCustomer.vendorType === 'Service provider' || viewingCustomer.vendorType === 'Machinery/Spares') ? 'bg-teal-100 text-teal-700 border border-teal-200' :
-                          (viewingCustomer.vendorType === 'Value-Added Reseller (VAR)' || viewingCustomer.vendorType === 'Services') ? 'bg-purple-100 text-purple-700 border border-purple-200' :
-                          viewingCustomer.vendorType === 'Distributor' ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' :
-                          'bg-gray-100 text-gray-750 border border-gray-200'
-                        }`}>
-                          {viewingCustomer.vendorType}
-                        </span>
-                      ) : (
-                        <span className="font-semibold text-gray-900">-</span>
-                      )}
-                    </div>
                   </div>
                 </div>
 
@@ -4752,7 +4789,7 @@ const PartyManagement: React.FC = () => {
                     <Building className="w-4 h-4 text-gray-500" /> Business Details
                   </h3>
                   <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm">
-                    <div>
+                    <div className="col-span-2">
                       <span className="block text-xs text-gray-400 font-medium">Outstanding Balance</span>
                       {(() => {
                         const balance = viewingCustomer.outstandingBalance !== undefined ? viewingCustomer.outstandingBalance : (viewingCustomer.outstanding || 0);

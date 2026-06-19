@@ -15,7 +15,12 @@ import {
   BarChart3,
   Warehouse,
   LayoutGrid,
-  Layers
+  Layers,
+  Store,
+  Briefcase,
+  Compass,
+  MapPin,
+  Truck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DataManager from './DataManager';
@@ -55,12 +60,12 @@ const Layout: React.FC = () => {
   ];
 
   const partyItems = [
-    { label: 'Customers', path: '/party/customers', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
-    { label: 'Vendors', path: '/party/vendors', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
-    { label: 'Agents', path: '/party/agents', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
-    { label: 'Regions', path: '/party/routes', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
-    { label: 'Cities', path: '/party/markets', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
-    { label: 'Transporters', path: '/party/transporters', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
+    { icon: Users, label: 'Customers', path: '/party/customers', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
+    { icon: Store, label: 'Vendors', path: '/party/vendors', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
+    { icon: Briefcase, label: 'Agents', path: '/party/agents', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
+    { icon: Compass, label: 'Regions', path: '/party/routes', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
+    { icon: MapPin, label: 'Cities', path: '/party/markets', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
+    { icon: Truck, label: 'Transporters', path: '/party/transporters', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
   ];
 
   const salesItems = [
@@ -233,9 +238,10 @@ const Layout: React.FC = () => {
                             <button
                               key={item.path}
                               onClick={() => handleNavigate(item.path)}
-                              className={getSubItemClass(item.path)}
+                              className={`${getSubItemClass(item.path)} flex items-center gap-2`}
                             >
-                              {item.label}
+                              <item.icon className="w-4 h-4 shrink-0" />
+                              <span>{item.label}</span>
                             </button>
                           ))}
                         </div>

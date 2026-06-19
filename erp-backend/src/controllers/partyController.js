@@ -292,9 +292,6 @@ const normalizeAllPartyFields = (data) => {
   if (data.landmark) data.landmark = toTitleCase(data.landmark);
   if (data.streetName) data.streetName = toTitleCase(data.streetName);
 
-  // Normalize vendor type
-  if (data.vendorType) data.vendorType = toTitleCase(data.vendorType);
-
   // Normalize agent/transporter names
   if (data.agentAssigned) data.agentAssigned = toTitleCase(data.agentAssigned);
   if (data.preferredTransport) data.preferredTransport = toTitleCase(data.preferredTransport);
@@ -323,6 +320,29 @@ const normalizeAllPartyFields = (data) => {
   // For market type, firmName IS the city name — canonicalize it
   if (data.type === 'market' && data.firmName) {
     data.firmName = getNormalizedCityName(data.firmName);
+  }
+
+  // If outstandingBalance is provided, ensure outstanding is in sync
+  if (data.outstandingBalance !== undefined && data.outstandingBalance !== null && data.outstandingBalance !== '') {
+    data.outstanding = parseFloat(data.outstandingBalance) || 0;
+    data.outstandingBalance = parseFloat(data.outstandingBalance) || 0;
+  } else if (data.outstanding !== undefined && data.outstanding !== null && data.outstanding !== '') {
+    data.outstandingBalance = parseFloat(data.outstanding) || 0;
+    data.outstanding = parseFloat(data.outstanding) || 0;
+  }
+
+  // If openingBalance is provided, initialize outstanding fields if they are missing or not provided
+  if (data.openingBalance !== undefined && data.openingBalance !== null && data.openingBalance !== '') {
+    const opBal = parseFloat(data.openingBalance) || 0;
+    if (data.outstandingBalance === undefined || data.outstandingBalance === null || data.outstandingBalance === '') {
+      data.outstandingBalance = opBal;
+      data.outstanding = opBal;
+    }
+  } else {
+    // If outstandingBalance is provided but openingBalance is missing, set openingBalance to outstandingBalance
+    if (data.outstandingBalance !== undefined && data.outstandingBalance !== null && data.outstandingBalance !== '') {
+      data.openingBalance = parseFloat(data.outstandingBalance) || 0;
+    }
   }
 
   return data;
@@ -620,10 +640,6 @@ exports.getParties = async (req, res) => {
       const vals = req.query.agentAssigned.split(',').map(v => v.trim());
       filter.agentAssigned = { $in: vals.map(v => new RegExp('^' + v.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i')) };
     }
-    if (req.query.customerGrade) {
-      const vals = req.query.customerGrade.split(',').map(v => v.trim());
-      filter.customerGrade = { $in: vals.map(v => new RegExp('^' + v.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i')) };
-    }
 
     // Text search across multiple fields
     let searchFilter = null;
@@ -646,7 +662,6 @@ exports.getParties = async (req, res) => {
           { state: searchRegex },
           { pincode: searchRegex },
           { agentAssigned: searchRegex },
-          { customerGrade: searchRegex },
           { tags: searchRegex }
         ]
       };
@@ -665,7 +680,7 @@ exports.getParties = async (req, res) => {
     const skip = (page - 1) * limit;
 
     // Secure sorting & filtering with whitelist validation
-    const allowedSortFields = ['firmName', 'contactName', 'ownerName', 'phone', 'city', 'district', 'state', 'pincode', 'route', 'agentAssigned', 'customerGrade', 'vendorType', 'creditLimit', 'outstandingBalance', 'status', 'createdAt'];
+    const allowedSortFields = ['firmName', 'contactName', 'ownerName', 'phone', 'city', 'district', 'state', 'pincode', 'route', 'agentAssigned', 'creditLimit', 'outstandingBalance', 'status', 'createdAt'];
 
     // Parse dynamic Multi-Filter rules
     if (req.query.filterRules) {
@@ -834,6 +849,18 @@ exports.updateParty = async (req, res) => {
     
     const existingParty = await Party.findById(req.params.id);
     if (existingParty) {
+      // If openingBalance changed, adjust outstanding fields by the difference
+      if (data.openingBalance !== undefined && data.openingBalance !== null && data.openingBalance !== '') {
+        const oldOpBal = existingParty.openingBalance || 0;
+        const newOpBal = parseFloat(data.openingBalance) || 0;
+        const diff = newOpBal - oldOpBal;
+        if (diff !== 0) {
+          const currentOutstandingBal = data.outstandingBalance !== undefined && data.outstandingBalance !== '' ? parseFloat(data.outstandingBalance) : (existingParty.outstandingBalance !== undefined ? existingParty.outstandingBalance : (existingParty.outstanding || 0));
+          const currentOutstanding = data.outstanding !== undefined && data.outstanding !== '' ? parseFloat(data.outstanding) : (existingParty.outstanding !== undefined ? existingParty.outstanding : (existingParty.outstandingBalance || 0));
+          data.outstandingBalance = currentOutstandingBal + diff;
+          data.outstanding = currentOutstanding + diff;
+        }
+      }
       await ensureRouteAndMarket(data, data.company || existingParty.company, req.user ? req.user.fullName : 'System');
       if (existingParty.type === 'customer') {
         const routeChanged = (data.route !== undefined && data.route !== existingParty.route);
