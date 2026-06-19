@@ -48,6 +48,7 @@ const partySchema = new mongoose.Schema({
   department: { type: String, default: "" },
   whatsapp: { type: String, default: "" },
   customerGrade: { type: String, default: "" },
+  vendorType: { type: String, default: "" },
   remarks: { type: String, default: "" },
   code: { type: String, default: "" },
   gstNumber: { type: String, default: "" },

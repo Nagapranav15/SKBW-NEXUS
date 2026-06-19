@@ -129,6 +129,7 @@ const getColumnsSchema = (type: string): Record<string, string> => {
         phone: 'Mobile',
         city: 'City',
         district: 'District',
+        vendorType: 'Vendor Type',
         outstandingBalance: 'Outstanding Balance',
         tags: 'Tags',
         status: 'Status'
@@ -194,6 +195,7 @@ interface Party {
   email?: string;
   whatsapp?: string;
   customerGrade?: string;
+  vendorType?: string;
   doorNo?: string;
   streetName?: string;
   address1?: string;
@@ -664,6 +666,7 @@ const PartyManagement: React.FC = () => {
       openingBalance: '',
       status: 'active' as Party['status'],
       customerGrade: currentType === 'customer' ? 'Grade B (Regular)' : '',
+      vendorType: currentType === 'vendor' ? 'Raw Material' : '',
       gstNumber: '',
       aadharNumber: '',
       remarks: '',
@@ -1794,6 +1797,7 @@ const PartyManagement: React.FC = () => {
               email: String(item['emailid'] || item['email'] || item['emailaddress'] || '').trim(),
               whatsapp: String(item['whatsappnumber'] || item['whatsapp'] || '').trim(),
               customerGrade: String(item['grade'] || item['customergrade'] || '').trim(),
+              vendorType: String(item['vendortype'] || item['vendorcategory'] || item['type'] || '').trim(),
               doorNo: String(item['doorno'] || '').trim(),
               streetName: String(item['streetname'] || '').trim(),
               address1: String(item['addressline'] || item['address1'] || item['address'] || '').trim(),
@@ -1875,7 +1879,7 @@ const PartyManagement: React.FC = () => {
         'Email ID', 'GST Number', 'Aadhar Number', 'Door No', 'Street Name', 'Address Line',
         'Area', 'Landmark', 'Town/City', 'District', 'State', 'Pincode', 'Google Map',
         'Region / Line', 'Assigned Agent', 'Preferred Transporter', 'Credit Limit', 'Credit Days',
-        'Opening Balance', 'Grade', 'Status', 'Outstanding Balance', 'Tags'
+        'Opening Balance', currentType === 'customer' ? 'Grade' : 'Vendor Type', 'Status', 'Outstanding Balance', 'Tags'
       ];
       sampleRows = [
         [
@@ -1903,7 +1907,7 @@ const PartyManagement: React.FC = () => {
           '500000',
           '30',
           '0',
-          currentType === 'customer' ? 'Grade B (Regular)' : '',
+          currentType === 'customer' ? 'Grade B (Regular)' : 'Raw Material',
           'active',
           '0',
           'vip, regular'
@@ -2665,6 +2669,18 @@ const PartyManagement: React.FC = () => {
                                       {item.customerGrade.replace(/ \(.+\)/, '').toUpperCase()}
                                     </span>
                                   ) : <span className="text-gray-400">-</span>
+                                ) : col === 'vendorType' ? (
+                                  item.vendorType ? (
+                                    <span className={`inline-flex px-2 py-0.5 text-xs font-bold rounded uppercase ${
+                                      item.vendorType === 'Raw Material' ? 'bg-orange-100 text-orange-700 border border-orange-200' :
+                                      item.vendorType === 'Packaging' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
+                                      item.vendorType === 'Machinery/Spares' ? 'bg-teal-100 text-teal-700 border border-teal-200' :
+                                      item.vendorType === 'Services' ? 'bg-purple-100 text-purple-700 border border-purple-200' :
+                                      'bg-gray-105 text-gray-700 border border-gray-200'
+                                    }`}>
+                                      {item.vendorType}
+                                    </span>
+                                  ) : <span className="text-gray-400">-</span>
                                 ) : col === 'status' ? (
                                   <span className={`inline-flex px-2 py-0.5 text-[10px] font-bold rounded uppercase border ${
                                     item.status === 'active' ? 'bg-green-50 border-green-200 text-green-700' :
@@ -3192,18 +3208,37 @@ const PartyManagement: React.FC = () => {
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Customer Grade</label>
-                        <select
-                          value={formData.customerGrade || 'Grade B (Regular)'}
-                          onChange={e => setFormData({ ...formData, customerGrade: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                        >
-                          <option value="Grade A (Premium)">Grade A (Premium)</option>
-                          <option value="Grade B (Regular)">Grade B (Regular)</option>
-                          <option value="Grade C (Risk)">Grade C (Risk)</option>
-                        </select>
-                      </div>
+                      {currentType === 'customer' ? (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Customer Grade</label>
+                          <select
+                            value={formData.customerGrade || 'Grade B (Regular)'}
+                            onChange={e => setFormData({ ...formData, customerGrade: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                          >
+                            <option value="Grade A (Premium)">Grade A (Premium)</option>
+                            <option value="Grade B (Regular)">Grade B (Regular)</option>
+                            <option value="Grade C (Risk)">Grade C (Risk)</option>
+                          </select>
+                        </div>
+                      ) : currentType === 'vendor' ? (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Vendor Type</label>
+                          <select
+                            value={formData.vendorType || 'Raw Material'}
+                            onChange={e => setFormData({ ...formData, vendorType: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                          >
+                            <option value="Raw Material">Raw Material</option>
+                            <option value="Packaging">Packaging</option>
+                            <option value="Machinery/Spares">Machinery/Spares</option>
+                            <option value="Services">Services</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
+                      ) : (
+                        <div />
+                      )}
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">Operating Status</label>
                         <select
@@ -4612,6 +4647,22 @@ const PartyManagement: React.FC = () => {
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">Aadhar Number</span>
                       <span className="font-semibold text-gray-900">{viewingCustomer.aadharNumber || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">Vendor Type</span>
+                      {viewingCustomer.vendorType ? (
+                        <span className={`inline-flex px-2 py-0.5 text-xs font-bold rounded uppercase ${
+                          viewingCustomer.vendorType === 'Raw Material' ? 'bg-orange-100 text-orange-700 border border-orange-200' :
+                          viewingCustomer.vendorType === 'Packaging' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
+                          viewingCustomer.vendorType === 'Machinery/Spares' ? 'bg-teal-100 text-teal-700 border border-teal-200' :
+                          viewingCustomer.vendorType === 'Services' ? 'bg-purple-100 text-purple-700 border border-purple-200' :
+                          'bg-gray-100 text-gray-700 border border-gray-250'
+                        }`}>
+                          {viewingCustomer.vendorType}
+                        </span>
+                      ) : (
+                        <span className="font-semibold text-gray-900">-</span>
+                      )}
                     </div>
                   </div>
                 </div>
