@@ -192,6 +192,8 @@ interface Party {
   phone: string;
   altPhone?: string;
   email?: string;
+  whatsapp?: string;
+  customerGrade?: string;
   doorNo?: string;
   streetName?: string;
   address1?: string;
@@ -1788,12 +1790,21 @@ const PartyManagement: React.FC = () => {
               contactName: String(item['contactperson'] || item['contactname'] || item['contact'] || name).trim(),
               ownerName: String(item['ownername'] || item['owner'] || name).trim(),
               phone: phoneVal,
-              email: String(item['email'] || item['emailaddress'] || '').trim(),
+              altPhone: String(item['alternatemobile'] || item['alternatephone'] || item['altphone'] || '').trim(),
+              email: String(item['emailid'] || item['email'] || item['emailaddress'] || '').trim(),
+              whatsapp: String(item['whatsappnumber'] || item['whatsapp'] || '').trim(),
+              customerGrade: String(item['grade'] || item['customergrade'] || '').trim(),
+              doorNo: String(item['doorno'] || '').trim(),
+              streetName: String(item['streetname'] || '').trim(),
+              address1: String(item['addressline'] || item['address1'] || item['address'] || '').trim(),
+              area: String(item['area'] || '').trim(),
+              landmark: String(item['landmark'] || '').trim(),
               city: String(item['towncity'] || item['city'] || item['town'] || '').trim(),
               district: String(item['district'] || '').trim(),
               state: String(item['state'] || 'Tamil Nadu').trim(),
               pincode: String(item['pincode'] || '').trim(),
-              route: String(item['assignedregion'] || item['region'] || item['assignedroute'] || item['route'] || '').trim(),
+              gpsLocation: String(item['googlemap'] || item['gpslocation'] || item['location'] || '').trim(),
+              route: String(item['regionline'] || item['assignedregion'] || item['region'] || item['assignedroute'] || item['route'] || '').trim(),
               agentAssigned: String(item['assignedagent'] || item['agentassigned'] || item['agent'] || '').trim(),
               assignedMarket: String(item['assignedmarket'] || item['market'] || '').trim(),
               creditLimit: parseFloat(item['creditlimit'] || item['limit'] || 0),
@@ -1860,24 +1871,42 @@ const PartyManagement: React.FC = () => {
       ];
     } else {
       headers = [
-        'Firm Name', 'Owner Name', 'Contact Person', 'Mobile Number', 'WhatsApp Number',
-        'Email Address', 'Door No', 'Street Name', 'Address Line', 'Area', 'Landmark',
-        'Town/City', 'District', 'State', 'Pincode', 'Assigned Region', 'Assigned Agent',
-        'Assigned Market', 'Credit Limit', 'Credit Days', 'Opening Balance', 'Outstanding Balance', 'Tags', 'Preferred Transporter',
-        'GST Number', 'Aadhar Number', 'Status'
+        'Firm Name', 'Owner Name', 'Mobile Number', 'WhatsApp Number', 'Alternate Mobile',
+        'Email ID', 'GST Number', 'Aadhar Number', 'Door No', 'Street Name', 'Address Line',
+        'Area', 'Landmark', 'Town/City', 'District', 'State', 'Pincode', 'Google Map',
+        'Region / Line', 'Assigned Agent', 'Preferred Transporter', 'Credit Limit', 'Credit Days',
+        'Opening Balance', 'Grade', 'Status', 'Outstanding Balance', 'Tags'
       ];
       sampleRows = [
         [
           currentType === 'customer' ? 'Charminar Notebook Publishers' : 'Paper Mills Supplier Ltd',
-          'Mohammad Ali', 'Mohammad Ali', '9988776611', '9988776611',
-          'ali@charminar.com', '12-3-45', 'Main Market Road', 'Near Bus Stand', 'Auto Nagar', 'Opp. Water Tank',
+          'Mohammad Ali',
+          '9988776611',
+          '9988776611',
+          '9848022334',
+          'ali@charminar.com',
+          '36AAAAA1111A1Z1',
+          '123456789012',
+          '12-3-45',
+          'Main Market Road',
+          'Near Bus Stand',
+          'Auto Nagar',
+          'Opp. Water Tank',
           currentType === 'customer' ? 'Secunderabad' : 'Tirupati',
           currentType === 'customer' ? 'Hyderabad' : 'Tirupati',
           currentType === 'customer' ? 'Telangana' : 'Andhra Pradesh',
           currentType === 'customer' ? '500003' : '517501',
-          'Route 1', 'Venkatesh Rao',
-          currentType === 'customer' ? 'Secunderabad' : 'Tirupati',
-          '500000', '30', '0', '0', 'reliable, wholesale', 'GARUDA', '36AAAAA1111A1Z1', '123456789012', 'active'
+          'https://maps.google.com/?q=17.3850,78.4867',
+          'Andhra LIne',
+          'Venkatesh Rao',
+          'GARUDA',
+          '500000',
+          '30',
+          '0',
+          currentType === 'customer' ? 'Grade B (Regular)' : '',
+          'active',
+          '0',
+          'vip, regular'
         ]
       ];
     }
@@ -4223,6 +4252,32 @@ const PartyManagement: React.FC = () => {
                           </>
                         ) : (
                           <span className="font-semibold text-gray-900">-</span>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400 font-medium">WhatsApp Number</span>
+                      <div className="flex items-center space-x-1.5">
+                        {viewingCustomer.whatsapp ? (
+                          <>
+                            <a
+                              href={`tel:${viewingCustomer.whatsapp.replace(/\D/g, '')}`}
+                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                              title={`Call ${viewingCustomer.whatsapp}`}
+                            >
+                              {viewingCustomer.whatsapp}
+                            </a>
+                            <a
+                              href={getWhatsAppLink(viewingCustomer.whatsapp)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center"
+                            >
+                              <WhatsAppIcon />
+                            </a>
+                          </>
+                        ) : (
+                          <span className="font-semibold text-gray-500 text-sm italic">Same as Mobile</span>
                         )}
                       </div>
                     </div>

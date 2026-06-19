@@ -473,12 +473,129 @@ exports.importParties = async (req, res) => {
       return res.status(400).json({ msg: 'No parties data provided' });
     }
 
+    // In-memory cache for Routes and Markets we verify/create in this execution
+    // Keys will be "companyId:name" in lowercase
+    const routesCache = new Map();
+    const marketsCache = new Map();
+    const createdRouteCodes = new Set();
+
     const processedParties = [];
     for (const p of parties) {
       const data = { ...p };
+      const companyId = data.company;
+
       if (data.company && (!data.companies || data.companies.length === 0)) {
         data.companies = [data.company];
       }
+
+      // Auto-create Route and Market for customer import
+      if (data.type === 'customer' && companyId) {
+        const routeName = (data.route || '').trim();
+        const cityName = (data.city || '').trim();
+
+        if (routeName) {
+          const routeKey = `${companyId}:${routeName.toLowerCase()}`;
+          let routeDoc = routesCache.get(routeKey);
+
+          if (!routeDoc) {
+            // Check if Route already exists in database
+            routeDoc = await Route.findOne({
+              name: { $regex: new RegExp(`^${routeName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') },
+              company: companyId
+            });
+
+            if (!routeDoc) {
+              // Generate a unique route code
+              const baseCode = getRouteCode(routeName);
+              let routeCode = baseCode;
+              let suffix = 1;
+              while (
+                (await Route.findOne({ code: routeCode, company: companyId })) ||
+                createdRouteCodes.has(`${companyId}:${routeCode}`)
+              ) {
+                routeCode = `${baseCode}${suffix}`;
+                suffix++;
+              }
+
+              // Create Route
+              routeDoc = await Route.create({
+                name: routeName,
+                code: routeCode,
+                company: companyId,
+                status: 'active'
+              });
+
+              createdRouteCodes.add(`${companyId}:${routeCode}`);
+
+              // Log Route creation activity
+              await ActivityLog.create({
+                action: 'CREATE',
+                entityType: 'route',
+                entityName: routeDoc.name,
+                details: `Auto-created route ${routeDoc.name} during customer import`,
+                performedBy: req.user ? req.user.fullName : "System",
+                company: companyId
+              }).catch(err => console.error("Auto route activity log failed:", err));
+            }
+
+            routesCache.set(routeKey, routeDoc);
+          }
+
+          // Use the exact database route name (preserves case)
+          data.route = routeDoc.name;
+        }
+
+        if (cityName) {
+          const marketKey = `${companyId}:${cityName.toLowerCase()}`;
+          let marketDoc = marketsCache.get(marketKey);
+
+          if (!marketDoc) {
+            // Check if Market already exists in database
+            marketDoc = await Party.findOne({
+              type: 'market',
+              firmName: { $regex: new RegExp(`^${cityName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') },
+              company: companyId
+            });
+
+            if (!marketDoc) {
+              // Create Market
+              marketDoc = await Party.create({
+                type: 'market',
+                firmName: cityName,
+                district: data.district || '',
+                state: data.state || 'Tamil Nadu',
+                pincode: data.pincode || '',
+                route: data.route || '', // Link to the normalized route name
+                company: companyId,
+                companies: [companyId],
+                status: 'active'
+              });
+
+              // Log Market creation activity
+              await ActivityLog.create({
+                action: 'CREATE',
+                entityType: 'market',
+                entityName: marketDoc.firmName,
+                details: `Auto-created market ${marketDoc.firmName} during customer import`,
+                performedBy: req.user ? req.user.fullName : "System",
+                company: companyId
+              }).catch(err => console.error("Auto market activity log failed:", err));
+            }
+
+            marketsCache.set(marketKey, marketDoc);
+          }
+
+          // Use the exact database city name (preserves case)
+          data.city = marketDoc.firmName;
+          
+          // Autofill missing district, state, pincode, route on customer if they are empty
+          if (!data.district && marketDoc.district) data.district = marketDoc.district;
+          if (!data.state && marketDoc.state) data.state = marketDoc.state;
+          if (!data.pincode && marketDoc.pincode) data.pincode = marketDoc.pincode;
+          if (!data.route && marketDoc.route) data.route = marketDoc.route;
+        }
+      }
+
       if (data.type === 'customer' && !data.code) {
         data.code = await generateCustomerCode(data);
       }
