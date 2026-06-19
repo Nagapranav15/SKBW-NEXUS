@@ -194,7 +194,7 @@ exports.getParties = async (req, res) => {
     const skip = (page - 1) * limit;
 
     // Secure sorting & filtering with whitelist validation
-    const allowedSortFields = ['firmName', 'contactName', 'ownerName', 'phone', 'city', 'district', 'state', 'pincode', 'route', 'agentAssigned', 'customerGrade', 'creditLimit', 'outstandingBalance', 'status', 'createdAt'];
+    const allowedSortFields = ['firmName', 'contactName', 'ownerName', 'phone', 'city', 'district', 'state', 'pincode', 'route', 'agentAssigned', 'customerGrade', 'vendorType', 'creditLimit', 'outstandingBalance', 'status', 'createdAt'];
 
     // Parse dynamic Multi-Filter rules
     if (req.query.filterRules) {

@@ -21,7 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import DataManager from './DataManager';
 
 const Layout: React.FC = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
   const [salesDropdownOpen, setSalesDropdownOpen] = useState(false);
   const [masterDropdownOpen, setMasterDropdownOpen] = useState(() => {
     return window.location.pathname.startsWith('/party') || window.location.pathname.startsWith('/inventory');
@@ -36,6 +36,13 @@ const Layout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, hasPermission, hasRole, selectedCompany } = useAuth();
+
+  const handleNavigate = (path: string) => {
+    navigate(path);
+    if (window.innerWidth < 768) {
+      setSidebarOpen(false);
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -126,9 +133,21 @@ const Layout: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-gray-100 overflow-hidden">
+      {/* Sidebar Overlay for Mobile */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-gray-900/40 backdrop-blur-xs z-40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <div className={`${sidebarOpen ? 'w-64' : 'w-16'} bg-white shadow-lg transition-all duration-300 flex flex-col`}>
+      <div className={`
+        fixed inset-y-0 left-0 z-50 md:relative md:z-0
+        ${sidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-0 md:translate-x-0 md:w-16'}
+        bg-white shadow-lg transition-all duration-300 flex flex-col h-full
+      `}>
         {/* Header */}
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
@@ -164,7 +183,7 @@ const Layout: React.FC = () => {
           {visibleMenuItems.map((item) => (
             <button
               key={item.path}
-              onClick={() => navigate(item.path)}
+              onClick={() => handleNavigate(item.path)}
               className={getPrimaryClass(item.path)}
             >
               <item.icon className="w-5 h-5" />
@@ -213,7 +232,7 @@ const Layout: React.FC = () => {
                           {visiblePartyItems.map((item) => (
                             <button
                               key={item.path}
-                              onClick={() => navigate(item.path)}
+                              onClick={() => handleNavigate(item.path)}
                               className={getSubItemClass(item.path)}
                             >
                               {item.label}
@@ -247,7 +266,7 @@ const Layout: React.FC = () => {
                           {visibleInventoryItems.map((item) => (
                             <button
                               key={item.path}
-                              onClick={() => navigate(item.path)}
+                              onClick={() => handleNavigate(item.path)}
                               className={getSubItemClass(item.path)}
                             >
                               {item.label}
@@ -283,7 +302,7 @@ const Layout: React.FC = () => {
                   {visibleSalesItems.map((item) => (
                     <button
                       key={item.path}
-                      onClick={() => navigate(item.path)}
+                      onClick={() => handleNavigate(item.path)}
                       className={getSubItemClass(item.path)}
                     >
                       {item.label}
@@ -308,7 +327,7 @@ const Layout: React.FC = () => {
           {/* Transactions — visible to admin, manager (view) */}
           {hasPermission(['MANAGE_REPORTS', 'VIEW_REPORTS', 'VIEW_TRANSACTIONS']) && (
             <button
-              onClick={() => navigate('/transactions')}
+              onClick={() => handleNavigate('/transactions')}
               className={getPrimaryClass('/transactions')}
             >
               <ArrowDownToLine className="w-5 h-5" />
@@ -319,7 +338,7 @@ const Layout: React.FC = () => {
           {/* Analyzer — visible to admin, manager */}
           {hasPermission(['MANAGE_REPORTS', 'VIEW_REPORTS']) && (
             <button
-              onClick={() => navigate('/analyzer')}
+              onClick={() => handleNavigate('/analyzer')}
               className={getPrimaryClass('/analyzer')}
             >
               <BarChart3 className="w-5 h-5" />
@@ -329,7 +348,7 @@ const Layout: React.FC = () => {
 
           {/* Change Company */}
           <button
-            onClick={() => navigate('/company-selection')}
+            onClick={() => handleNavigate('/company-selection')}
             className="w-full flex items-center space-x-3 px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <Building2 className="w-5 h-5" />
@@ -350,7 +369,21 @@ const Layout: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden relative">
+        {/* Mobile Navbar trigger */}
+        <div className="md:hidden flex items-center bg-white border-b border-gray-200 px-4 py-2.5 shrink-0 justify-between">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-1 rounded-lg hover:bg-gray-150 text-gray-700 transition-colors"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+          <span className="font-bold text-gray-900 text-sm truncate max-w-[200px]">{selectedCompany?.name || 'SKBW ERP'}</span>
+          <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs uppercase shrink-0">
+            {user?.fullName?.charAt(0) || 'A'}
+          </div>
+        </div>
+
         <main className="flex-1 overflow-y-auto">
           <Outlet />
         </main>

@@ -565,14 +565,15 @@ const PartyManagement: React.FC = () => {
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
     const type = getTypeFromPath();
     const saved = localStorage.getItem(`skbw_erp_visible_columns_${type}`);
+    const defaults = getDefaultVisibleColumns(type);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        return { ...defaults, ...JSON.parse(saved) };
       } catch (e) {
         // ignore
       }
     }
-    return getDefaultVisibleColumns(type);
+    return defaults;
   });
 
   // Lazy initialize sortRules from localStorage (default to empty rule set to avoid default sort on refresh)
@@ -666,7 +667,7 @@ const PartyManagement: React.FC = () => {
       openingBalance: '',
       status: 'active' as Party['status'],
       customerGrade: currentType === 'customer' ? 'Grade B (Regular)' : '',
-      vendorType: currentType === 'vendor' ? 'Raw Material' : '',
+      vendorType: currentType === 'vendor' ? 'Retailer' : '',
       gstNumber: '',
       aadharNumber: '',
       remarks: '',
@@ -824,14 +825,15 @@ const PartyManagement: React.FC = () => {
 
     // Load columns
     const savedCols = localStorage.getItem(`skbw_erp_visible_columns_${currentType}`);
+    const defaults = getDefaultVisibleColumns(currentType);
     if (savedCols) {
       try {
-        setVisibleColumns(JSON.parse(savedCols));
+        setVisibleColumns({ ...defaults, ...JSON.parse(savedCols) });
       } catch (e) {
-        setVisibleColumns(getDefaultVisibleColumns(currentType));
+        setVisibleColumns(defaults);
       }
     } else {
-      setVisibleColumns(getDefaultVisibleColumns(currentType));
+      setVisibleColumns(defaults);
     }
 
     // Load limit
@@ -1418,7 +1420,9 @@ const PartyManagement: React.FC = () => {
       agentAssigned,
       type: item.type || (currentType === 'route' ? 'route' : currentType),
       tags: item.tags || [],
-      outstandingBalance: item.outstandingBalance !== undefined ? item.outstandingBalance : (item.outstanding || 0)
+      outstandingBalance: item.outstandingBalance !== undefined ? item.outstandingBalance : (item.outstanding || 0),
+      customerGrade: currentType === 'customer' ? (item.customerGrade || 'Grade B (Regular)') : '',
+      vendorType: currentType === 'vendor' ? (item.vendorType || 'Retailer') : ''
     });
     setIsAddingNewCity(false);
     setNewCityName('');
@@ -1796,8 +1800,8 @@ const PartyManagement: React.FC = () => {
               altPhone: String(item['alternatemobile'] || item['alternatephone'] || item['altphone'] || '').trim(),
               email: String(item['emailid'] || item['email'] || item['emailaddress'] || '').trim(),
               whatsapp: String(item['whatsappnumber'] || item['whatsapp'] || '').trim(),
-              customerGrade: String(item['grade'] || item['customergrade'] || '').trim(),
-              vendorType: String(item['vendortype'] || item['vendorcategory'] || item['type'] || '').trim(),
+              customerGrade: String(item['grade'] || item['customergrade'] || '').trim() || (currentType === 'customer' ? 'Grade B (Regular)' : ''),
+              vendorType: String(item['vendortype'] || item['vendorcategory'] || item['type'] || '').trim() || (currentType === 'vendor' ? 'Retailer' : ''),
               doorNo: String(item['doorno'] || '').trim(),
               streetName: String(item['streetname'] || '').trim(),
               address1: String(item['addressline'] || item['address1'] || item['address'] || '').trim(),
@@ -1907,7 +1911,7 @@ const PartyManagement: React.FC = () => {
           '500000',
           '30',
           '0',
-          currentType === 'customer' ? 'Grade B (Regular)' : 'Raw Material',
+          currentType === 'customer' ? 'Grade B (Regular)' : 'Retailer',
           'active',
           '0',
           'vip, regular'
@@ -1972,7 +1976,7 @@ const PartyManagement: React.FC = () => {
       )}
 
       {/* Main Content Pane */}
-      <div className={`flex-1 p-4 overflow-y-auto transition-all duration-300 ${showForm || viewingCustomer ? 'mr-[520px]' : ''}`}>
+      <div className={`flex-1 p-4 overflow-y-auto transition-all duration-300 ${showForm || viewingCustomer ? 'lg:mr-[520px]' : ''}`}>
         
         {/* Top Header Card */}
         <div className="mb-4">
@@ -1995,7 +1999,7 @@ const PartyManagement: React.FC = () => {
           </div>
 
           {/* Title & Actions Bar */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold text-gray-905 tracking-tight">
                 {pageHeader.title}
@@ -2003,7 +2007,7 @@ const PartyManagement: React.FC = () => {
               <p className="text-sm text-gray-500 mt-1">{pageHeader.sub}</p>
             </div>
             
-            <div className="flex items-center space-x-3">
+            <div className="flex flex-wrap items-center gap-2 md:gap-3">
               {selectedIds.length > 0 && (
                 <button
                   onClick={handleBulkDelete}
@@ -2011,7 +2015,7 @@ const PartyManagement: React.FC = () => {
                 >
                   <Trash2 className="w-4 h-4" />
                   <span>Delete Selected ({selectedIds.length})</span>
-                  <kbd className="ml-1.5 px-1.5 py-0.5 text-[10px] font-mono font-bold text-red-100 bg-red-800 rounded border border-red-700 shadow-xs select-none pointer-events-none">Alt+D</kbd>
+                  <kbd className="hidden md:inline-block ml-1.5 px-1.5 py-0.5 text-[10px] font-mono font-bold text-red-100 bg-red-800 rounded border border-red-700 shadow-xs select-none pointer-events-none">Alt+D</kbd>
                 </button>
               )}
               <button
@@ -2034,7 +2038,7 @@ const PartyManagement: React.FC = () => {
               >
                 <Plus className="w-4 h-4" />
                 <span>Add {currentType === 'market' ? 'City' : typeLabel}</span>
-                <kbd className="ml-1.5 px-1.5 py-0.5 text-[10px] font-mono font-bold text-blue-100 bg-blue-800 rounded border border-blue-700 shadow-xs select-none pointer-events-none">Alt+C</kbd>
+                <kbd className="hidden md:inline-block ml-1.5 px-1.5 py-0.5 text-[10px] font-mono font-bold text-blue-100 bg-blue-800 rounded border border-blue-700 shadow-xs select-none pointer-events-none">Alt+C</kbd>
               </button>
             </div>
           </div>
@@ -2101,8 +2105,8 @@ const PartyManagement: React.FC = () => {
 
         {/* Table Toolbar */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 mb-4">
-          <div className="flex items-center justify-between">
-            <div className="relative flex-1 max-w-md">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-full lg:max-w-md w-full">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
@@ -2113,7 +2117,7 @@ const PartyManagement: React.FC = () => {
               />
             </div>
             
-            <div className="flex items-center space-x-2 ml-4">
+            <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto lg:ml-4">
               {/* Filters Button */}
               <button
                 onClick={() => setShowFilterPanel(!showFilterPanel)}
@@ -2586,20 +2590,20 @@ const PartyManagement: React.FC = () => {
                                       <span className="font-semibold text-gray-955">{item.name || '-'}</span>
                                     )}
                                   </div>
-                                ) : col === 'phone' ? (
+                                ) : (col === 'phone' || col === 'altPhone' || col === 'whatsapp') ? (
                                   <div className="flex items-center space-x-1">
-                                    {item.phone ? (
+                                    {(item as any)[col] ? (
                                       <>
                                         <a
-                                          href={`tel:${item.phone.replace(/\D/g, '')}`}
+                                          href={`tel:${String((item as any)[col]).replace(/\D/g, '')}`}
                                           className="text-blue-600 hover:text-blue-800 hover:underline font-semibold"
                                           onClick={e => e.stopPropagation()}
-                                          title={`Call ${item.phone}`}
+                                          title={`Call ${(item as any)[col]}`}
                                         >
-                                          {item.phone}
+                                          {(item as any)[col]}
                                         </a>
                                         <a
-                                          href={getWhatsAppLink(item.phone)}
+                                          href={getWhatsAppLink(String((item as any)[col]))}
                                           target="_blank"
                                           rel="noreferrer"
                                           onClick={e => e.stopPropagation()}
@@ -2672,11 +2676,12 @@ const PartyManagement: React.FC = () => {
                                 ) : col === 'vendorType' ? (
                                   item.vendorType ? (
                                     <span className={`inline-flex px-2 py-0.5 text-xs font-bold rounded uppercase ${
-                                      item.vendorType === 'Raw Material' ? 'bg-orange-100 text-orange-700 border border-orange-200' :
-                                      item.vendorType === 'Packaging' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
-                                      item.vendorType === 'Machinery/Spares' ? 'bg-teal-100 text-teal-700 border border-teal-200' :
-                                      item.vendorType === 'Services' ? 'bg-purple-100 text-purple-700 border border-purple-200' :
-                                      'bg-gray-105 text-gray-700 border border-gray-200'
+                                      (item.vendorType === 'Retailer' || item.vendorType === 'Raw Material') ? 'bg-orange-100 text-orange-700 border border-orange-200' :
+                                      (item.vendorType === 'Wholesaler' || item.vendorType === 'Packaging') ? 'bg-blue-100 text-blue-700 border border-blue-200' :
+                                      (item.vendorType === 'Service provider' || item.vendorType === 'Machinery/Spares') ? 'bg-teal-100 text-teal-700 border border-teal-200' :
+                                      (item.vendorType === 'Value-Added Reseller (VAR)' || item.vendorType === 'Services') ? 'bg-purple-100 text-purple-700 border border-purple-200' :
+                                      item.vendorType === 'Distributor' ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' :
+                                      'bg-gray-100 text-gray-750 border border-gray-200'
                                     }`}>
                                       {item.vendorType}
                                     </span>
@@ -2809,11 +2814,11 @@ const PartyManagement: React.FC = () => {
 
           {/* Dynamic Pagination Footer */}
           {currentType !== 'route' && (
-            <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 bg-gray-50/50">
-              <div className="text-sm text-gray-500">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3 border-t border-gray-100 bg-gray-50/50">
+              <div className="text-sm text-gray-500 text-center sm:text-left">
                 Showing {startItem} to {endItem} of {total} {typeLabelPlural.toLowerCase()}
               </div>
-              <div className="flex items-center space-x-1">
+              <div className="flex flex-wrap items-center justify-center gap-1">
                 <button onClick={() => setPage(1)} disabled={page === 1} className="p-1.5 rounded-lg hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
                   <ChevronsLeft className="w-4 h-4" />
                 </button>
@@ -3208,37 +3213,18 @@ const PartyManagement: React.FC = () => {
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
-                      {currentType === 'customer' ? (
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Customer Grade</label>
-                          <select
-                            value={formData.customerGrade || 'Grade B (Regular)'}
-                            onChange={e => setFormData({ ...formData, customerGrade: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                          >
-                            <option value="Grade A (Premium)">Grade A (Premium)</option>
-                            <option value="Grade B (Regular)">Grade B (Regular)</option>
-                            <option value="Grade C (Risk)">Grade C (Risk)</option>
-                          </select>
-                        </div>
-                      ) : currentType === 'vendor' ? (
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Vendor Type</label>
-                          <select
-                            value={formData.vendorType || 'Raw Material'}
-                            onChange={e => setFormData({ ...formData, vendorType: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                          >
-                            <option value="Raw Material">Raw Material</option>
-                            <option value="Packaging">Packaging</option>
-                            <option value="Machinery/Spares">Machinery/Spares</option>
-                            <option value="Services">Services</option>
-                            <option value="Other">Other</option>
-                          </select>
-                        </div>
-                      ) : (
-                        <div />
-                      )}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Customer Grade</label>
+                        <select
+                          value={formData.customerGrade || 'Grade B (Regular)'}
+                          onChange={e => setFormData({ ...formData, customerGrade: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                        >
+                          <option value="Grade A (Premium)">Grade A (Premium)</option>
+                          <option value="Grade B (Regular)">Grade B (Regular)</option>
+                          <option value="Grade C (Risk)">Grade C (Risk)</option>
+                        </select>
+                      </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">Operating Status</label>
                         <select
@@ -3326,6 +3312,10 @@ const PartyManagement: React.FC = () => {
                         <input type="tel" placeholder="e.g. 98765 43210" value={formData.phone || ''} onChange={e => setFormData({ ...formData, phone: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" required />
                       </div>
                       <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">WhatsApp Number</label>
+                        <input type="tel" placeholder="Leave blank to match Mobile" value={formData.whatsapp || ''} onChange={e => setFormData({ ...formData, whatsapp: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                      </div>
+                      <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1">Alternate Mobile</label>
                         <input type="tel" placeholder="Alternate mobile" value={formData.altPhone || ''} onChange={e => setFormData({ ...formData, altPhone: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                       </div>
@@ -3405,14 +3395,19 @@ const PartyManagement: React.FC = () => {
                     
                     <div className="grid grid-cols-2 gap-3 animate-none">
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Outstanding Balance (₹)</label>
-                        <input
-                          type="number"
-                          placeholder="e.g. 0"
-                          value={formData.outstandingBalance === undefined || formData.outstandingBalance === null ? '' : formData.outstandingBalance}
-                          onChange={e => setFormData({ ...formData, outstandingBalance: e.target.value === '' ? '' : parseFloat(e.target.value) })}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
-                        />
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Vendor Type</label>
+                        <select
+                          value={formData.vendorType || 'Retailer'}
+                          onChange={e => setFormData({ ...formData, vendorType: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 font-medium"
+                        >
+                          <option value="Retailer">Retailer</option>
+                          <option value="Wholesaler">Wholesaler</option>
+                          <option value="Service provider">Service provider</option>
+                          <option value="Value-Added Reseller (VAR)">Value-Added Reseller (VAR)</option>
+                          <option value="Distributor">Distributor</option>
+                          <option value="Other">Other</option>
+                        </select>
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">Operating Status</label>
@@ -3426,6 +3421,17 @@ const PartyManagement: React.FC = () => {
                           <option value="on-hold">On Hold</option>
                         </select>
                       </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Outstanding Balance (₹)</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 0"
+                        value={formData.outstandingBalance === undefined || formData.outstandingBalance === null ? '' : formData.outstandingBalance}
+                        onChange={e => setFormData({ ...formData, outstandingBalance: e.target.value === '' ? '' : parseFloat(e.target.value) })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                      />
                     </div>
 
                     <div>
@@ -4194,7 +4200,7 @@ const PartyManagement: React.FC = () => {
                 >
                   <Edit className="w-4 h-4" />
                   <span>Edit Profile</span>
-                  <kbd className="ml-1 px-1.5 py-0.5 text-[9px] font-mono font-bold text-blue-500 bg-blue-100 rounded border border-blue-200 select-none pointer-events-none">Alt+E</kbd>
+                  <kbd className="hidden md:inline-block ml-1 px-1.5 py-0.5 text-[9px] font-mono font-bold text-blue-500 bg-blue-100 rounded border border-blue-200 select-none pointer-events-none">Alt+E</kbd>
                 </button>
                 <button
                   onClick={() => handleDelete(viewingCustomer._id)}
@@ -4202,7 +4208,7 @@ const PartyManagement: React.FC = () => {
                 >
                   <Trash2 className="w-4 h-4 text-white" />
                   <span>Delete</span>
-                  <kbd className="ml-1 px-1.5 py-0.5 text-[9px] font-mono font-bold text-red-100 bg-red-800 rounded border border-red-700 select-none pointer-events-none">Alt+D</kbd>
+                  <kbd className="hidden md:inline-block ml-1 px-1.5 py-0.5 text-[9px] font-mono font-bold text-red-100 bg-red-800 rounded border border-red-700 select-none pointer-events-none">Alt+D</kbd>
                 </button>
                 
                 {currentType === 'customer' && (
@@ -4627,6 +4633,32 @@ const PartyManagement: React.FC = () => {
                       </div>
                     </div>
                     <div>
+                      <span className="block text-xs text-gray-400 font-medium">WhatsApp Number</span>
+                      <div className="flex items-center space-x-1.5">
+                        {viewingCustomer.whatsapp ? (
+                          <>
+                            <a
+                              href={`tel:${viewingCustomer.whatsapp.replace(/\D/g, '')}`}
+                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                              title={`Call ${viewingCustomer.whatsapp}`}
+                            >
+                              {viewingCustomer.whatsapp}
+                            </a>
+                            <a
+                              href={getWhatsAppLink(viewingCustomer.whatsapp)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center"
+                            >
+                              <WhatsAppIcon />
+                            </a>
+                          </>
+                        ) : (
+                          <span className="font-semibold text-gray-500 text-sm italic">Same as Mobile</span>
+                        )}
+                      </div>
+                    </div>
+                    <div>
                       <span className="block text-xs text-gray-400 font-medium">Email ID</span>
                       {viewingCustomer.email ? (
                         <a
@@ -4652,11 +4684,12 @@ const PartyManagement: React.FC = () => {
                       <span className="block text-xs text-gray-400 font-medium">Vendor Type</span>
                       {viewingCustomer.vendorType ? (
                         <span className={`inline-flex px-2 py-0.5 text-xs font-bold rounded uppercase ${
-                          viewingCustomer.vendorType === 'Raw Material' ? 'bg-orange-100 text-orange-700 border border-orange-200' :
-                          viewingCustomer.vendorType === 'Packaging' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
-                          viewingCustomer.vendorType === 'Machinery/Spares' ? 'bg-teal-100 text-teal-700 border border-teal-200' :
-                          viewingCustomer.vendorType === 'Services' ? 'bg-purple-100 text-purple-700 border border-purple-200' :
-                          'bg-gray-100 text-gray-700 border border-gray-250'
+                          (viewingCustomer.vendorType === 'Retailer' || viewingCustomer.vendorType === 'Raw Material') ? 'bg-orange-100 text-orange-700 border border-orange-200' :
+                          (viewingCustomer.vendorType === 'Wholesaler' || viewingCustomer.vendorType === 'Packaging') ? 'bg-blue-100 text-blue-700 border border-blue-200' :
+                          (viewingCustomer.vendorType === 'Service provider' || viewingCustomer.vendorType === 'Machinery/Spares') ? 'bg-teal-100 text-teal-700 border border-teal-200' :
+                          (viewingCustomer.vendorType === 'Value-Added Reseller (VAR)' || viewingCustomer.vendorType === 'Services') ? 'bg-purple-100 text-purple-700 border border-purple-200' :
+                          viewingCustomer.vendorType === 'Distributor' ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' :
+                          'bg-gray-100 text-gray-750 border border-gray-200'
                         }`}>
                           {viewingCustomer.vendorType}
                         </span>
@@ -5245,13 +5278,23 @@ const PartyManagement: React.FC = () => {
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap text-[13.5px] text-gray-700">
                                 {cust.phone ? (
-                                  <a
-                                    href={`tel:${cust.phone.replace(/\D/g, '')}`}
-                                    className="text-blue-600 hover:text-blue-800 hover:underline font-semibold"
-                                    title={`Call ${cust.phone}`}
-                                  >
-                                    {cust.phone}
-                                  </a>
+                                  <div className="flex items-center space-x-1.5">
+                                    <a
+                                      href={`tel:${cust.phone.replace(/\D/g, '')}`}
+                                      className="text-blue-600 hover:text-blue-800 hover:underline font-semibold"
+                                      title={`Call ${cust.phone}`}
+                                    >
+                                      {cust.phone}
+                                    </a>
+                                    <a
+                                      href={getWhatsAppLink(cust.phone)}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex items-center"
+                                    >
+                                      <WhatsAppIcon />
+                                    </a>
+                                  </div>
                                 ) : (
                                   <span className="text-gray-400">-</span>
                                 )}
