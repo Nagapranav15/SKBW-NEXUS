@@ -16,3 +16,5 @@ export const createParty = (data: any) => api.post('/parties', data);
 export const updateParty = (id: string, data: any) => api.put(`/parties/${id}`, data);
 export const deleteParty = (id: string) => api.delete(`/parties/${id}`);
 export const importParties = (parties: any[]) => api.post('/parties/import', { parties });
+export const bulkDeleteParties = (ids: string[]) => api.post('/parties/bulk-delete', { ids });
+

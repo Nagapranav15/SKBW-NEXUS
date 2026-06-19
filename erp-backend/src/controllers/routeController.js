@@ -167,3 +167,42 @@ exports.deleteRoute = async (req, res) => {
     res.status(500).json({ msg: err.message });
   }
 };
+
+exports.bulkDeleteRoutes = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ msg: 'No ids provided' });
+    }
+
+    const routesToDelete = await Route.find({ _id: { $in: ids } });
+    if (routesToDelete.length === 0) {
+      return res.status(404).json({ msg: 'No matching routes found to delete' });
+    }
+
+    const routeNames = routesToDelete.map(r => r.name);
+    const companies = routesToDelete.map(r => r.company);
+
+    const result = await Route.deleteMany({ _id: { $in: ids } });
+
+    await Party.updateMany(
+      { route: { $in: routeNames }, type: { $in: ['market', 'customer'] }, company: { $in: companies } },
+      { $set: { route: '', agentAssigned: '' } }
+    );
+
+    // Bulk create activity logs
+    const logs = routesToDelete.map(r => ({
+      action: 'DELETE',
+      entityType: 'route',
+      entityName: r.name,
+      details: `Deleted route during bulk delete: ${r.name}`,
+      performedBy: req.user ? req.user.fullName : "System",
+      company: r.company
+    }));
+    await ActivityLog.insertMany(logs).catch(err => console.error("Bulk delete routes activity logs failed:", err));
+
+    res.json({ msg: `Successfully deleted ${result.deletedCount} routes`, count: result.deletedCount });
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+};

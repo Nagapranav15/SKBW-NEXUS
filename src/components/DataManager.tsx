@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Download, Upload, Database, FileText, AlertCircle, CheckCircle, X } from 'lucide-react';
+import { Download, Upload, Database, FileText, AlertCircle, CheckCircle, X, Trash2 } from 'lucide-react';
 import { exportDataAsJSON, exportDataAsExcel, importDataFromJSON, getDataSummary, saveExportTimestamp } from '../utils/dataExport';
 import { useAuth } from '../context/AuthContext';
 
@@ -37,6 +37,44 @@ const DataManager: React.FC<DataManagerProps> = ({ isOpen, onClose }) => {
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { selectedCompany } = useAuth();
+
+  const [formatting, setFormatting] = useState(false);
+  const [formatError, setFormatError] = useState('');
+  const [formatSuccess, setFormatSuccess] = useState(false);
+
+  const handleFormatDatabase = async () => {
+    const doubleConfirm = window.confirm(
+      "WARNING: Are you sure you want to format (wipe) all business data in the database?\n\nThis will permanently delete all:\n- Customers & Vendors\n- Regions & Cities\n- Items & Inventory\n- Sales Orders & Quotes\n- Delivery Challans & Dispatch Cards\n- Transactions & Activity Logs\n\nUsers and companies will not be deleted. This action CANNOT be undone!"
+    );
+    if (!doubleConfirm) return;
+
+    const finalConfirm = window.prompt("Type 'FORMAT' to confirm database wipe:");
+    if (finalConfirm !== 'FORMAT') {
+      alert("Database wipe cancelled. You must type 'FORMAT' exactly.");
+      return;
+    }
+
+    setFormatting(true);
+    setFormatError('');
+    setFormatSuccess(false);
+
+    try {
+      const response = await api.post('/data-manager/format', { companyId: selectedCompany?._id });
+      setFormatSuccess(true);
+      alert(response.data.msg || "Database formatted successfully!");
+      await fetchSummary();
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+    } catch (error: any) {
+      console.error('Error formatting database:', error);
+      const errMsg = error.response?.data?.msg || 'Failed to format database. Please try again.';
+      setFormatError(errMsg);
+      alert(errMsg);
+    } finally {
+      setFormatting(false);
+    }
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -228,7 +266,6 @@ const DataManager: React.FC<DataManagerProps> = ({ isOpen, onClose }) => {
               <span className="text-red-700">{importError}</span>
             </div>
           )}
-
           <button
             onClick={handleImportClick}
             disabled={importing}
@@ -245,6 +282,26 @@ const DataManager: React.FC<DataManagerProps> = ({ isOpen, onClose }) => {
             onChange={handleFileImport}
             className="hidden"
           />
+        </div>
+
+        {/* Format Section */}
+        <div className="mb-6 border-t border-red-100 pt-6">
+          <h3 className="text-lg font-semibold text-red-600 mb-2 flex items-center">
+            <Trash2 className="w-5 h-5 mr-2" />
+            Format All Data
+          </h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Format (wipe) all business transactions, parties, products, and inventory. This will clear the website data so you can import or seed fresh data. User login accounts will not be affected.
+          </p>
+
+          <button
+            onClick={handleFormatDatabase}
+            disabled={formatting}
+            className="flex items-center justify-center space-x-2 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50 w-full font-semibold shadow-sm hover:shadow"
+          >
+            <Trash2 className="w-5 h-5 animate-pulse" />
+            <span>{formatting ? 'Wiping Database...' : 'Format Database (Wipe All Data)'}</span>
+          </button>
         </div>
 
         {/* Instructions */}

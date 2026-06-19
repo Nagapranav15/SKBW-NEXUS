@@ -466,6 +466,48 @@ exports.deleteParty = async (req, res) => {
   }
 };
 
+exports.bulkDeleteParties = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ msg: 'No ids provided' });
+    }
+
+    const partiesToDelete = await Party.find({ _id: { $in: ids } });
+    if (partiesToDelete.length === 0) {
+      return res.status(404).json({ msg: 'No matching records found to delete' });
+    }
+
+    const marketNames = partiesToDelete
+      .filter(p => p.type === 'market')
+      .map(p => p.firmName);
+
+    const result = await Party.deleteMany({ _id: { $in: ids } });
+
+    if (marketNames.length > 0) {
+      await Party.updateMany(
+        { type: 'customer', city: { $in: marketNames } },
+        { $set: { city: '', route: '', agentAssigned: '' } }
+      );
+    }
+
+    // Bulk create activity logs
+    const logs = partiesToDelete.map(p => ({
+      action: 'DELETE',
+      entityType: p.type,
+      entityName: p.firmName || p.contactName || p.ownerName || 'Unknown',
+      details: `Deleted ${p.type} during bulk delete: ${p.firmName || p.contactName || p.ownerName}`,
+      performedBy: req.user ? req.user.fullName : "System",
+      company: p.company
+    }));
+    await ActivityLog.insertMany(logs).catch(err => console.error("Bulk delete activity logs failed:", err));
+
+    res.json({ msg: `Successfully deleted ${result.deletedCount} records`, count: result.deletedCount });
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+};
+
 exports.importParties = async (req, res) => {
   try {
     const { parties } = req.body;

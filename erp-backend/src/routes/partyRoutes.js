@@ -7,6 +7,7 @@ const partyController = require('../controllers/partyController');
 router.get('/stats', auth, rbac(['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES']), partyController.getPartyStats);
 router.get('/', auth, rbac(['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES']), partyController.getParties);
 router.get('/:id', auth, rbac(['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES']), partyController.getPartyById);
+router.post('/bulk-delete', auth, rbac('MANAGE_PARTIES'), partyController.bulkDeleteParties);
 router.post('/import', auth, rbac(['MANAGE_PARTIES', 'CREATE_PARTIES']), partyController.importParties);
 router.post('/', auth, rbac(['MANAGE_PARTIES', 'CREATE_PARTIES']), partyController.createParty);
 router.put('/:id', auth, rbac('MANAGE_PARTIES'), partyController.updateParty);

@@ -12,9 +12,10 @@ import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext';
 import {
   getParties, getPartyStats, createParty, updateParty,
-  deleteParty as deletePartyApi, importParties as importPartiesApi
+  deleteParty as deletePartyApi, importParties as importPartiesApi,
+  bulkDeleteParties
 } from '../api/partyApi';
-import { getRoutes, createRoute, updateRoute, deleteRoute } from '../api/routeApi';
+import { getRoutes, createRoute, updateRoute, deleteRoute, bulkDeleteRoutes } from '../api/routeApi';
 import { getActivityLogs } from '../api/activityLogApi';
 
 const WhatsAppIcon: React.FC = () => (
@@ -1513,9 +1514,9 @@ const PartyManagement: React.FC = () => {
         try {
           setLoading(true);
           if (currentType === 'route') {
-            await Promise.all(selectedIds.map(id => deleteRoute(id)));
+            await bulkDeleteRoutes(selectedIds);
           } else {
-            await Promise.all(selectedIds.map(id => deletePartyApi(id)));
+            await bulkDeleteParties(selectedIds);
           }
           setSelectedIds([]);
           setToast({ message: `Successfully deleted selected entries.`, type: 'success' });

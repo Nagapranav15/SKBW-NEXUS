@@ -18,6 +18,7 @@ const warehouseRoutes = require("./routes/warehouseRoutes");
 const inventoryRoutes = require("./routes/inventoryRoutes");
 const mfgInventoryRoutes = require("./routes/mfgInventoryRoutes");
 const activityLogRoutes = require("./routes/activityLogRoutes");
+const dataManagerRoutes = require("./routes/dataManagerRoutes");
 
 const app = express();
 
@@ -41,6 +42,7 @@ app.use("/api/warehouses", warehouseRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/mfg", mfgInventoryRoutes);
 app.use("/api/activity-logs", activityLogRoutes);
+app.use("/api/data-manager", dataManagerRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => {

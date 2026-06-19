@@ -12,3 +12,5 @@ export const getRoutes = (company?: string, params?: { status?: string; sortBy?:
 export const createRoute = (data: any) => api.post('/routes', data);
 export const updateRoute = (id: string, data: any) => api.put(`/routes/${id}`, data);
 export const deleteRoute = (id: string) => api.delete(`/routes/${id}`);
+export const bulkDeleteRoutes = (ids: string[]) => api.post('/routes/bulk-delete', { ids });
+

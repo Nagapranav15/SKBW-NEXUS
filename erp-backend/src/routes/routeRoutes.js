@@ -6,6 +6,7 @@ const routeController = require('../controllers/routeController');
 
 router.get('/', auth, rbac(['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES']), routeController.getRoutes);
 router.get('/:id', auth, rbac(['MANAGE_PARTIES', 'VIEW_PARTIES']), routeController.getRouteById);
+router.post('/bulk-delete', auth, rbac(['MANAGE_PARTIES']), routeController.bulkDeleteRoutes);
 router.post('/', auth, rbac(['MANAGE_PARTIES']), routeController.createRoute);
 router.put('/:id', auth, rbac(['MANAGE_PARTIES']), routeController.updateRoute);
 router.delete('/:id', auth, rbac(['MANAGE_PARTIES']), routeController.deleteRoute);
