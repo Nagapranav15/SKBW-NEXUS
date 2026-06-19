@@ -18,6 +18,101 @@ const stateMap = {
   "puducherry": "PY"
 };
 
+// Canonical state names — normalizes variations to proper casing
+const canonicalStates = {
+  "andhra pradesh": "Andhra Pradesh",
+  "ap": "Andhra Pradesh",
+  "telangana": "Telangana",
+  "tg": "Telangana",
+  "tamil nadu": "Tamil Nadu",
+  "tn": "Tamil Nadu",
+  "tamilnadu": "Tamil Nadu",
+  "karnataka": "Karnataka",
+  "ka": "Karnataka",
+  "kerala": "Kerala",
+  "kl": "Kerala",
+  "maharashtra": "Maharashtra",
+  "mh": "Maharashtra",
+  "goa": "Goa",
+  "ga": "Goa",
+  "gujarat": "Gujarat",
+  "gj": "Gujarat",
+  "rajasthan": "Rajasthan",
+  "rj": "Rajasthan",
+  "delhi": "Delhi",
+  "dl": "Delhi",
+  "new delhi": "Delhi",
+  "pondicherry": "Puducherry",
+  "puducherry": "Puducherry",
+  "py": "Puducherry",
+  "odisha": "Odisha",
+  "orissa": "Odisha",
+  "west bengal": "West Bengal",
+  "wb": "West Bengal",
+  "uttar pradesh": "Uttar Pradesh",
+  "up": "Uttar Pradesh",
+  "madhya pradesh": "Madhya Pradesh",
+  "mp": "Madhya Pradesh",
+  "bihar": "Bihar",
+  "jharkhand": "Jharkhand",
+  "chhattisgarh": "Chhattisgarh",
+  "uttarakhand": "Uttarakhand",
+  "himachal pradesh": "Himachal Pradesh",
+  "punjab": "Punjab",
+  "haryana": "Haryana",
+  "jammu and kashmir": "Jammu and Kashmir",
+  "assam": "Assam",
+  "meghalaya": "Meghalaya",
+  "tripura": "Tripura",
+  "manipur": "Manipur",
+  "mizoram": "Mizoram",
+  "nagaland": "Nagaland",
+  "arunachal pradesh": "Arunachal Pradesh",
+  "sikkim": "Sikkim"
+};
+
+// Canonical district names — normalizes variations to proper casing
+const canonicalDistricts = {
+  "hyderabad": "Hyderabad",
+  "tirupati": "Tirupati",
+  "tirupathi": "Tirupati",
+  "nalgonda": "Nalgonda",
+  "suryapet": "Suryapet",
+  "khammam": "Khammam",
+  "bhadradri": "Bhadradri",
+  "bhadradri kothagudem": "Bhadradri",
+  "jangaon": "Jangaon",
+  "warangal": "Warangal",
+  "krishna": "Krishna",
+  "west godavari": "West Godavari",
+  "east godavari": "East Godavari",
+  "guntur": "Guntur",
+  "vizianagaram": "Vizianagaram",
+  "srikakulam": "Srikakulam",
+  "visakhapatnam": "Visakhapatnam",
+  "anakapalli": "Anakapalli",
+  "ganjam": "Ganjam",
+  "gajapati": "Gajapati",
+  "kansar": "Kansar",
+  "nellore": "Nellore",
+  "chittoor": "Chittoor",
+  "kurnool": "Kurnool",
+  "anantapur": "Anantapur",
+  "prakasam": "Prakasam",
+  "kadapa": "Kadapa",
+  "rangareddy": "Rangareddy",
+  "ranga reddy": "Rangareddy",
+  "medchal": "Medchal",
+  "medchal malkajgiri": "Medchal",
+  "sangareddy": "Sangareddy",
+  "nizamabad": "Nizamabad",
+  "karimnagar": "Karimnagar",
+  "adilabad": "Adilabad",
+  "mahabubnagar": "Mahabubnagar",
+  "nanded": "Nanded",
+  "medak": "Medak"
+};
+
 const getRouteCode = (routeName) => {
   if (!routeName) return "GEN";
   const cleaned = routeName.trim().toUpperCase();
@@ -58,6 +153,382 @@ const getCityCode = (cityName) => {
   if (alphaOnly.length >= 3) return alphaOnly.substring(0, 3);
   const rawAlpha = cleaned.replace(/[^A-Z0-9]/g, "");
   return (rawAlpha.substring(0, 3) || "GEN").padEnd(3, "X");
+};
+
+const canonicalCities = {
+  "secunderabad": "Secunderabad",
+  "tirupati": "Tirupati",
+  "tirupathi": "Tirupati",
+  "aswaraopeta": "Aswaraopeta",
+  "aswaraopet": "Aswaraopeta",
+  "berhampur": "Berhampur",
+  "berampur": "Berhampur",
+  "bhadrachalam": "Bhadrachalam",
+  "bobbili": "Bobbili",
+  "chintalapudi": "Chintalapudi",
+  "eluru": "Eluru",
+  "haliya": "Haliya",
+  "huzurnagar": "Huzurnagar",
+  "jaggayyapet": "Jaggayyapet",
+  "jaggayyapeta": "Jaggayyapet",
+  "jangaon": "Jangaon",
+  "kakinada": "Kakinada",
+  "kalluru": "Kalluru",
+  "kanchikacherla": "Kanchikacherla",
+  "kasibugga": "Kasibugga",
+  "khammam": "Khammam",
+  "kodad": "Kodad",
+  "kondamallepalli": "Kondamallepalli",
+  "kondamalipalli": "Kondamallepalli",
+  "kothagudem": "Kothagudem",
+  "kothapeta": "Kothapeta",
+  "machilipatnam": "Machilipatnam",
+  "manuguru": "Manuguru",
+  "mattampally": "Mattampally",
+  "matampalli": "Mattampally",
+  "miryalaguda": "Miryalaguda",
+  "nakrekal": "Nakrekal",
+  "nakerekal": "Nakrekal",
+  "nalgonda": "Nalgonda",
+  "nereducherla": "Nereducherla",
+  "nereducharla": "Nereducherla",
+  "paralakhemundi": "Paralakhemundi",
+  "parvathipuram": "Parvathipuram",
+  "pathapatnam": "Pathapatnam",
+  "peddapuram": "Peddapuram",
+  "pithapuram": "Pithapuram",
+  "ramavaram": "Ramavaram",
+  "ravulapalem": "Ravulapalem",
+  "ravulapalam": "Ravulapalem",
+  "sathupally": "Sathupally",
+  "sathupalli": "Sathupally",
+  "sompeta": "Sompeta",
+  "srikakulam": "Srikakulam",
+  "suryapet": "Suryapet",
+  "tadepalli": "Tadepalli",
+  "tadeapalli": "Tadepalli",
+  "tadepalligudem": "Tadepalligudem",
+  "tadepalli gudem": "Tadepalligudem",
+  "tanuku": "Tanuku",
+  "tiruvuru": "Tiruvuru",
+  "tuni": "Tuni",
+  "valigonda": "Valigonda",
+  "vissannapeta": "Vissannapeta",
+  "visannapeta": "Vissannapeta",
+  "visakhapatnam": "Visakhapatnam (Vizag)",
+  "vizag": "Visakhapatnam (Vizag)",
+  "visakhapatnam (vizag)": "Visakhapatnam (Vizag)",
+  "vizianagaram": "Vizianagaram",
+  "yellamanchili": "Yellamanchili",
+  "yellandu": "Yellandu",
+  "pentapadu": "Pentapadu",
+  "west godavari dist": "Pentapadu",
+  "kansar": "Kansar"
+};
+
+const canonicalRoutes = {
+  "andhra line": "Andhra Line",
+  "hyderabad line": "Hyderabad Line",
+  "nelore line": "Nelore Line",
+  "telangana line": "Telangana Line",
+  "rayalaseema line": "Rayalaseema Line",
+  "odisha line": "Odisha Line",
+  "paid": "Paid",
+  "palnadu": "Palnadu"
+};
+
+const toTitleCase = (str) => {
+  if (!str) return "";
+  return str.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+};
+
+const getNormalizedRouteName = (routeName) => {
+  if (!routeName) return "";
+  const cleaned = routeName.trim();
+  const lower = cleaned.toLowerCase();
+  if (canonicalRoutes[lower]) return canonicalRoutes[lower];
+  return toTitleCase(cleaned);
+};
+
+const getNormalizedCityName = (cityName) => {
+  if (!cityName) return "";
+  const cleaned = cityName.trim();
+  const lower = cleaned.toLowerCase();
+  if (canonicalCities[lower]) return canonicalCities[lower];
+  return toTitleCase(cleaned);
+};
+
+const getNormalizedStateName = (stateName) => {
+  if (!stateName) return "";
+  const cleaned = stateName.trim();
+  const lower = cleaned.toLowerCase();
+  if (canonicalStates[lower]) return canonicalStates[lower];
+  return toTitleCase(cleaned);
+};
+
+const getNormalizedDistrictName = (districtName) => {
+  if (!districtName) return "";
+  const cleaned = districtName.trim();
+  const lower = cleaned.toLowerCase();
+  if (canonicalDistricts[lower]) return canonicalDistricts[lower];
+  return toTitleCase(cleaned);
+};
+
+// Universal normalization — applies to ALL party types
+const normalizeAllPartyFields = (data) => {
+  // Normalize city, state, district for every party type
+  if (data.city) data.city = getNormalizedCityName(data.city);
+  if (data.state) data.state = getNormalizedStateName(data.state);
+  if (data.district) data.district = getNormalizedDistrictName(data.district);
+  if (data.route) data.route = getNormalizedRouteName(data.route);
+
+  // Title-case name fields
+  if (data.firmName) data.firmName = toTitleCase(data.firmName);
+  if (data.ownerName) data.ownerName = toTitleCase(data.ownerName);
+  if (data.contactName) data.contactName = toTitleCase(data.contactName);
+
+  // Title-case address fields
+  if (data.area) data.area = toTitleCase(data.area);
+  if (data.landmark) data.landmark = toTitleCase(data.landmark);
+  if (data.streetName) data.streetName = toTitleCase(data.streetName);
+
+  // Normalize vendor type
+  if (data.vendorType) data.vendorType = toTitleCase(data.vendorType);
+
+  // Normalize agent/transporter names
+  if (data.agentAssigned) data.agentAssigned = toTitleCase(data.agentAssigned);
+  if (data.preferredTransport) data.preferredTransport = toTitleCase(data.preferredTransport);
+  if (data.assignedMarket) data.assignedMarket = getNormalizedCityName(data.assignedMarket);
+
+  // Normalize group, designation, department
+  if (data.group) data.group = toTitleCase(data.group);
+  if (data.designation) data.designation = toTitleCase(data.designation);
+  if (data.department) data.department = toTitleCase(data.department);
+
+  // Trim and lowercase email
+  if (data.email) data.email = data.email.trim().toLowerCase();
+
+  // Normalize status
+  if (data.status) data.status = data.status.trim().toLowerCase();
+
+  // Trim phone fields
+  if (data.phone) data.phone = String(data.phone).trim();
+  if (data.altPhone) data.altPhone = String(data.altPhone).trim();
+  if (data.whatsapp) data.whatsapp = String(data.whatsapp).trim();
+
+  // Trim GST / Aadhar
+  if (data.gstNumber) data.gstNumber = String(data.gstNumber).trim().toUpperCase();
+  if (data.aadharNumber) data.aadharNumber = String(data.aadharNumber).trim();
+
+  // For market type, firmName IS the city name — canonicalize it
+  if (data.type === 'market' && data.firmName) {
+    data.firmName = getNormalizedCityName(data.firmName);
+  }
+
+  return data;
+};
+
+const ensureRouteAndMarket = async (partyData, companyId, userFullName) => {
+  // 1. Always run universal normalization on partyData
+  normalizeAllPartyFields(partyData);
+
+  if (partyData.type === 'customer') {
+    const routeName = partyData.route;
+    const cityName = partyData.city;
+    const agentName = partyData.agentAssigned;
+    const transporterName = partyData.preferredTransport;
+
+    // 2. Ensure Route exists
+    let routeDoc = null;
+    if (routeName) {
+      routeDoc = await Route.findOne({
+        company: companyId,
+        name: new RegExp('^' + routeName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i')
+      });
+
+      if (!routeDoc) {
+        // Create new Route
+        const baseCode = getRouteCode(routeName);
+        let routeCode = baseCode;
+        let suffix = 1;
+        // Resolve code collision
+        while (await Route.findOne({ company: companyId, code: routeCode.toUpperCase() })) {
+          routeCode = `${baseCode}${suffix}`;
+          suffix++;
+        }
+        routeDoc = await Route.create({
+          name: routeName,
+          code: routeCode.toUpperCase(),
+          company: companyId,
+          status: 'active'
+        });
+        console.log(`Auto-created route "${routeName}" (Code: ${routeDoc.code})`);
+        
+        // Log Route creation
+        await ActivityLog.create({
+          action: 'CREATE',
+          entityType: 'route',
+          entityName: routeName,
+          details: `Auto-created route ${routeName} during customer setup`,
+          performedBy: userFullName || 'System',
+          company: companyId
+        }).catch(err => console.error("Activity log failed:", err));
+      } else {
+        // Standardize casing to matched Route name
+        partyData.route = routeDoc.name;
+      }
+    }
+
+    // 3. Ensure Market (City) exists
+    if (cityName) {
+      let marketDoc = await Party.findOne({
+        type: 'market',
+        company: companyId,
+        firmName: new RegExp('^' + cityName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i')
+      });
+
+      if (!marketDoc) {
+        // Create new Market
+        marketDoc = await Party.create({
+          type: 'market',
+          firmName: cityName,
+          district: partyData.district || 'GEN',
+          state: partyData.state || 'Andhra Pradesh',
+          pincode: partyData.pincode || '',
+          route: routeName || '',
+          agentAssigned: agentName || (routeDoc ? (routeDoc.assignedAgent || '') : ''),
+          company: companyId,
+          companies: [companyId],
+          status: 'active'
+        });
+        console.log(`Auto-created market "${cityName}" linked to route "${routeName || ''}"`);
+
+        // Log Market creation
+        await ActivityLog.create({
+          action: 'CREATE',
+          entityType: 'market',
+          entityName: cityName,
+          details: `Auto-created market ${cityName} during customer setup`,
+          performedBy: userFullName || 'System',
+          company: companyId
+        }).catch(err => console.error("Activity log failed:", err));
+      } else {
+        // Standardize casing to matched Market name
+        partyData.city = marketDoc.firmName;
+        // Auto-fill route and agent assigned from Market if customer record is missing or mismatching
+        if (marketDoc.route && !partyData.route) {
+          partyData.route = marketDoc.route;
+        }
+        if (marketDoc.agentAssigned && !partyData.agentAssigned) {
+          partyData.agentAssigned = marketDoc.agentAssigned;
+        }
+        // Fill address fields
+        if (marketDoc.district && !partyData.district) partyData.district = marketDoc.district;
+        if (marketDoc.state && !partyData.state) partyData.state = marketDoc.state;
+        if (marketDoc.pincode && !partyData.pincode) partyData.pincode = marketDoc.pincode;
+      }
+    }
+
+    // 4. Ensure Agent exists
+    if (agentName) {
+      const agentDoc = await Party.findOne({
+        type: 'agent',
+        company: companyId,
+        firmName: new RegExp('^' + agentName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i')
+      });
+
+      if (!agentDoc) {
+        await Party.create({
+          type: 'agent',
+          firmName: agentName,
+          company: companyId,
+          companies: [companyId],
+          status: 'active'
+        });
+        console.log(`Auto-created agent "${agentName}" during customer setup`);
+        
+        await ActivityLog.create({
+          action: 'CREATE',
+          entityType: 'agent',
+          entityName: agentName,
+          details: `Auto-created agent ${agentName} during customer setup`,
+          performedBy: userFullName || 'System',
+          company: companyId
+        }).catch(err => console.error("Activity log failed:", err));
+      } else {
+        partyData.agentAssigned = agentDoc.firmName;
+      }
+    }
+
+    // 5. Ensure Transporter exists
+    if (transporterName) {
+      const transporterDoc = await Party.findOne({
+        type: 'transporter',
+        company: companyId,
+        firmName: new RegExp('^' + transporterName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i')
+      });
+
+      if (!transporterDoc) {
+        await Party.create({
+          type: 'transporter',
+          firmName: transporterName,
+          company: companyId,
+          companies: [companyId],
+          status: 'active'
+        });
+        console.log(`Auto-created transporter "${transporterName}" during customer setup`);
+        
+        await ActivityLog.create({
+          action: 'CREATE',
+          entityType: 'transporter',
+          entityName: transporterName,
+          details: `Auto-created transporter ${transporterName} during customer setup`,
+          performedBy: userFullName || 'System',
+          company: companyId
+        }).catch(err => console.error("Activity log failed:", err));
+      } else {
+        partyData.preferredTransport = transporterDoc.firmName;
+      }
+    }
+  }
+
+  if (partyData.type === 'market') {
+    const routeName = partyData.route;
+    if (routeName) {
+      let routeDoc = await Route.findOne({
+        company: companyId,
+        name: new RegExp('^' + routeName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i')
+      });
+
+      if (!routeDoc) {
+        const baseCode = getRouteCode(routeName);
+        let routeCode = baseCode;
+        let suffix = 1;
+        while (await Route.findOne({ company: companyId, code: routeCode.toUpperCase() })) {
+          routeCode = `${baseCode}${suffix}`;
+          suffix++;
+        }
+        routeDoc = await Route.create({
+          name: routeName,
+          code: routeCode.toUpperCase(),
+          company: companyId,
+          status: 'active'
+        });
+        console.log(`Auto-created route "${routeName}" (Code: ${routeDoc.code}) from market setup`);
+
+        await ActivityLog.create({
+          action: 'CREATE',
+          entityType: 'route',
+          entityName: routeName,
+          details: `Auto-created route ${routeName} during market setup`,
+          performedBy: userFullName || 'System',
+          company: companyId
+        }).catch(err => console.error("Activity log failed:", err));
+      } else {
+        partyData.route = routeDoc.name;
+      }
+    }
+  }
 };
 
 const generateCustomerCode = async (partyData) => {
@@ -331,6 +802,7 @@ exports.createParty = async (req, res) => {
     if (data.company && (!data.companies || data.companies.length === 0)) {
       data.companies = [data.company];
     }
+    await ensureRouteAndMarket(data, data.company, req.user ? req.user.fullName : 'System');
     if (data.type === 'customer' && !data.code) {
       data.code = await generateCustomerCode(data);
     }
@@ -360,20 +832,22 @@ exports.updateParty = async (req, res) => {
     delete data.createdAt;
     delete data.updatedAt;
     
-    // Check if city, route, or state changed for a customer to regenerate code
     const existingParty = await Party.findById(req.params.id);
-    if (existingParty && existingParty.type === 'customer') {
-      const routeChanged = (data.route !== undefined && data.route !== existingParty.route);
-      const cityChanged = (data.city !== undefined && data.city !== existingParty.city);
-      const stateChanged = (data.state !== undefined && data.state !== existingParty.state);
-      
-      if (routeChanged || cityChanged || stateChanged) {
-        const mergedData = {
-          state: data.state !== undefined ? data.state : existingParty.state,
-          route: data.route !== undefined ? data.route : existingParty.route,
-          city: data.city !== undefined ? data.city : existingParty.city
-        };
-        data.code = await generateCustomerCode(mergedData);
+    if (existingParty) {
+      await ensureRouteAndMarket(data, data.company || existingParty.company, req.user ? req.user.fullName : 'System');
+      if (existingParty.type === 'customer') {
+        const routeChanged = (data.route !== undefined && data.route !== existingParty.route);
+        const cityChanged = (data.city !== undefined && data.city !== existingParty.city);
+        const stateChanged = (data.state !== undefined && data.state !== existingParty.state);
+        
+        if (routeChanged || cityChanged || stateChanged) {
+          const mergedData = {
+            state: data.state !== undefined ? data.state : existingParty.state,
+            route: data.route !== undefined ? data.route : existingParty.route,
+            city: data.city !== undefined ? data.city : existingParty.city
+          };
+          data.code = await generateCustomerCode(mergedData);
+        }
       }
     }
 
@@ -521,10 +995,10 @@ exports.importParties = async (req, res) => {
       return res.status(400).json({ msg: 'No valid company IDs in import data' });
     }
 
-    // 1. Pre-fetch existing Routes and Markets for all companies in the dataset
-    const [routes, markets] = await Promise.all([
+    // 1. Pre-fetch existing Routes, Markets, Agents, Transporters for all companies
+    const [routes, existingParties] = await Promise.all([
       Route.find({ company: { $in: companyIds } }),
-      Party.find({ type: 'market', company: { $in: companyIds } })
+      Party.find({ type: { $in: ['market', 'agent', 'transporter'] }, company: { $in: companyIds } })
     ]);
 
     const routesMap = new Map();
@@ -535,20 +1009,39 @@ exports.importParties = async (req, res) => {
     });
 
     const marketsMap = new Map();
-    markets.forEach(m => {
-      marketsMap.set(`${m.company}:${m.firmName.toLowerCase()}`, m);
+    const agentsMap = new Map();
+    const transportersMap = new Map();
+
+    existingParties.forEach(p => {
+      if (p.type === 'market') {
+        marketsMap.set(`${p.company}:${p.firmName.toLowerCase()}`, p);
+      } else if (p.type === 'agent') {
+        agentsMap.set(`${p.company}:${p.firmName.toLowerCase()}`, p);
+      } else if (p.type === 'transporter') {
+        transportersMap.set(`${p.company}:${p.firmName.toLowerCase()}`, p);
+      }
     });
 
-    // 2. Identify missing Routes and Markets, planning their creation
+    // 2. Identify missing Routes, Markets, Agents, Transporters, planning their creation
     const newRoutesToCreateMap = new Map();
     const newMarketsToCreateMap = new Map();
+    const newAgentsToCreateMap = new Map();
+    const newTransportersToCreateMap = new Map();
 
     for (const p of parties) {
-      if (p.type === 'customer' && p.company) {
-        const companyId = p.company;
-        const routeName = (p.route || '').trim();
-        const cityName = (p.city || '').trim();
+      if (!p.company) continue;
+      const companyId = p.company;
 
+      // Always normalize fields for EVERY imported party
+      normalizeAllPartyFields(p);
+
+      if (p.type === 'customer') {
+        const routeName = p.route;
+        const cityName = p.city;
+        const agentName = p.agentAssigned;
+        const transporterName = p.preferredTransport;
+
+        // Auto-create Route if missing
         if (routeName) {
           const routeKey = `${companyId}:${routeName.toLowerCase()}`;
           if (!routesMap.has(routeKey) && !newRoutesToCreateMap.has(routeKey)) {
@@ -570,6 +1063,7 @@ exports.importParties = async (req, res) => {
           }
         }
 
+        // Auto-create Market if missing
         if (cityName) {
           const marketKey = `${companyId}:${cityName.toLowerCase()}`;
           if (!marketsMap.has(marketKey) && !newMarketsToCreateMap.has(marketKey)) {
@@ -582,10 +1076,39 @@ exports.importParties = async (req, res) => {
             newMarketsToCreateMap.set(marketKey, {
               type: 'market',
               firmName: cityName,
-              district: p.district || '',
-              state: p.state || 'Tamil Nadu',
+              district: p.district || 'GEN',
+              state: p.state || 'Andhra Pradesh',
               pincode: p.pincode || '',
               route: resolvedRouteName,
+              agentAssigned: agentName || '',
+              company: companyId,
+              companies: [companyId],
+              status: 'active'
+            });
+          }
+        }
+
+        // Auto-create Agent if missing
+        if (agentName) {
+          const agentKey = `${companyId}:${agentName.toLowerCase()}`;
+          if (!agentsMap.has(agentKey) && !newAgentsToCreateMap.has(agentKey)) {
+            newAgentsToCreateMap.set(agentKey, {
+              type: 'agent',
+              firmName: agentName,
+              company: companyId,
+              companies: [companyId],
+              status: 'active'
+            });
+          }
+        }
+
+        // Auto-create Transporter if missing
+        if (transporterName) {
+          const transporterKey = `${companyId}:${transporterName.toLowerCase()}`;
+          if (!transportersMap.has(transporterKey) && !newTransportersToCreateMap.has(transporterKey)) {
+            newTransportersToCreateMap.set(transporterKey, {
+              type: 'transporter',
+              firmName: transporterName,
               company: companyId,
               companies: [companyId],
               status: 'active'
@@ -593,9 +1116,35 @@ exports.importParties = async (req, res) => {
           }
         }
       }
+
+      if (p.type === 'market') {
+        const routeName = p.route;
+
+        // Auto-create Route if missing
+        if (routeName) {
+          const routeKey = `${companyId}:${routeName.toLowerCase()}`;
+          if (!routesMap.has(routeKey) && !newRoutesToCreateMap.has(routeKey)) {
+            const baseCode = getRouteCode(routeName);
+            let routeCode = baseCode;
+            let suffix = 1;
+            while (routeCodesSet.has(`${companyId}:${routeCode.toUpperCase()}`)) {
+              routeCode = `${baseCode}${suffix}`;
+              suffix++;
+            }
+            routeCodesSet.add(`${companyId}:${routeCode.toUpperCase()}`);
+
+            newRoutesToCreateMap.set(routeKey, {
+              name: routeName,
+              code: routeCode,
+              company: companyId,
+              status: 'active'
+            });
+          }
+        }
+      }
     }
 
-    // Bulk insert new routes and markets
+    // Bulk insert new routes, markets, agents, transporters
     if (newRoutesToCreateMap.size > 0) {
       const inserted = await Route.insertMany([...newRoutesToCreateMap.values()]);
       inserted.forEach(r => {
@@ -610,14 +1159,28 @@ exports.importParties = async (req, res) => {
       });
     }
 
-    // Activity logging for auto-created routes/markets in bulk
+    if (newAgentsToCreateMap.size > 0) {
+      const inserted = await Party.insertMany([...newAgentsToCreateMap.values()]);
+      inserted.forEach(a => {
+        agentsMap.set(`${a.company}:${a.firmName.toLowerCase()}`, a);
+      });
+    }
+
+    if (newTransportersToCreateMap.size > 0) {
+      const inserted = await Party.insertMany([...newTransportersToCreateMap.values()]);
+      inserted.forEach(t => {
+        transportersMap.set(`${t.company}:${t.firmName.toLowerCase()}`, t);
+      });
+    }
+
+    // Activity logging for auto-created entities in bulk
     const activityLogs = [];
     newRoutesToCreateMap.forEach(r => {
       activityLogs.push({
         action: 'CREATE',
         entityType: 'route',
         entityName: r.name,
-        details: `Auto-created route ${r.name} during customer import`,
+        details: `Auto-created route ${r.name} during import`,
         performedBy: req.user ? req.user.fullName : "System",
         company: r.company
       });
@@ -627,9 +1190,29 @@ exports.importParties = async (req, res) => {
         action: 'CREATE',
         entityType: 'market',
         entityName: m.firmName,
-        details: `Auto-created market ${m.firmName} during customer import`,
+        details: `Auto-created market ${m.firmName} during import`,
         performedBy: req.user ? req.user.fullName : "System",
         company: m.company
+      });
+    });
+    newAgentsToCreateMap.forEach(a => {
+      activityLogs.push({
+        action: 'CREATE',
+        entityType: 'agent',
+        entityName: a.firmName,
+        details: `Auto-created agent ${a.firmName} during import`,
+        performedBy: req.user ? req.user.fullName : "System",
+        company: a.company
+      });
+    });
+    newTransportersToCreateMap.forEach(t => {
+      activityLogs.push({
+        action: 'CREATE',
+        entityType: 'transporter',
+        entityName: t.firmName,
+        details: `Auto-created transporter ${t.firmName} during import`,
+        performedBy: req.user ? req.user.fullName : "System",
+        company: t.company
       });
     });
     if (activityLogs.length > 0) {
@@ -698,7 +1281,7 @@ exports.importParties = async (req, res) => {
         data.companies = [data.company];
       }
 
-      if (data.type === 'customer' && data.company) {
+      if (data.company) {
         const companyId = data.company;
 
         // Apply normalized case names from caches
@@ -720,13 +1303,29 @@ exports.importParties = async (req, res) => {
           }
         }
 
-        if (!data.code && item.prefix) {
-          const currentCounter = seqsMap.get(item.prefix) || 0;
-          const nextCounter = currentCounter + 1;
-          seqsMap.set(item.prefix, nextCounter);
+        if (data.type === 'customer') {
+          // Apply normalized agent name from cache
+          if (data.agentAssigned) {
+            const agentKey = `${companyId}:${data.agentAssigned.toLowerCase()}`;
+            const agentDoc = agentsMap.get(agentKey);
+            if (agentDoc) data.agentAssigned = agentDoc.firmName;
+          }
 
-          const runningNum = String(nextCounter).padStart(4, '0');
-          data.code = item.prefix + runningNum;
+          // Apply normalized transporter name from cache
+          if (data.preferredTransport) {
+            const transporterKey = `${companyId}:${data.preferredTransport.toLowerCase()}`;
+            const transporterDoc = transportersMap.get(transporterKey);
+            if (transporterDoc) data.preferredTransport = transporterDoc.firmName;
+          }
+
+          if (!data.code && item.prefix) {
+            const currentCounter = seqsMap.get(item.prefix) || 0;
+            const nextCounter = currentCounter + 1;
+            seqsMap.set(item.prefix, nextCounter);
+
+            const runningNum = String(nextCounter).padStart(4, '0');
+            data.code = item.prefix + runningNum;
+          }
         }
       }
       processedParties.push(data);
