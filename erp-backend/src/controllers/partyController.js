@@ -611,7 +611,7 @@ const generateCustomerCode = async (partyData) => {
 
 exports.getParties = async (req, res) => {
   try {
-    const filter = {};
+    const filter = { isDeleted: { $ne: true } };
     if (req.query.type) filter.type = req.query.type;
 
     let companyFilter = null;
@@ -762,11 +762,73 @@ exports.getParties = async (req, res) => {
       const partyObj = party.toObject();
       if (party.type === 'market') {
         const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-        partyObj.customerCount = await Party.countDocuments({
-          type: 'customer',
-          city: new RegExp('^' + escapeRegex(party.firmName) + '$', 'i'),
-          company: party.company
+        const cityRegex = new RegExp('^' + escapeRegex(party.firmName) + '$', 'i');
+        const [customerCount, outstandingResult] = await Promise.all([
+          Party.countDocuments({
+            type: 'customer',
+            city: cityRegex,
+            company: party.company,
+            isDeleted: { $ne: true }
+          }),
+          Party.aggregate([
+            {
+              $match: {
+                type: 'customer',
+                city: cityRegex,
+                company: party.company,
+                isDeleted: { $ne: true }
+              }
+            },
+            {
+              $group: {
+                _id: null,
+                totalOutstanding: { $sum: '$outstanding' }
+              }
+            }
+          ])
+        ]);
+        partyObj.customerCount = customerCount;
+        partyObj.outstanding = outstandingResult.length > 0 ? outstandingResult[0].totalOutstanding : 0;
+        partyObj.outstandingBalance = partyObj.outstanding;
+      } else if (party.type === 'agent') {
+        const agentName = party.firmName;
+        const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const agentRegex = new RegExp('^' + escapeRegex(agentName) + '$', 'i');
+
+        // 1. Get routes assigned to this agent
+        const agentRoutes = await Route.find({
+          company: party.company,
+          assignedAgent: agentRegex
         });
+        const routeNames = agentRoutes.map(r => r.name);
+        const routeRegexes = routeNames.map(name => new RegExp('^' + escapeRegex(name) + '$', 'i'));
+
+        // 2. Count assigned regions (routes)
+        partyObj.assignedRegionsCount = agentRoutes.length;
+
+        // 3. Count assigned cities (markets)
+        const cityFilter = {
+          type: 'market',
+          company: party.company,
+          isDeleted: { $ne: true },
+          $or: [
+            { agentAssigned: agentRegex },
+            { route: { $in: routeRegexes } }
+          ]
+        };
+        partyObj.assignedCitiesCount = await Party.countDocuments(cityFilter);
+
+        // 4. Count assigned customers
+        const customerFilter = {
+          type: 'customer',
+          company: party.company,
+          isDeleted: { $ne: true },
+          $or: [
+            { agentAssigned: agentRegex },
+            { route: { $in: routeRegexes } }
+          ]
+        };
+        partyObj.assignedCustomersCount = await Party.countDocuments(customerFilter);
       }
       return partyObj;
     }));
@@ -779,7 +841,7 @@ exports.getParties = async (req, res) => {
 
 exports.getPartyStats = async (req, res) => {
   try {
-    const filter = {};
+    const filter = { isDeleted: { $ne: true } };
     if (req.query.type) filter.type = req.query.type;
     if (req.query.company) {
       filter.$or = [
@@ -942,7 +1004,8 @@ exports.deleteParty = async (req, res) => {
     const party = await Party.findById(req.params.id);
     if (!party) return res.status(404).json({ msg: 'Party not found' });
 
-    await Party.findByIdAndDelete(req.params.id);
+    party.isDeleted = true;
+    await party.save();
 
     // If it was a market (city), reset city, route, and agent for all linked customers
     if (party.type === 'market') {
@@ -957,12 +1020,12 @@ exports.deleteParty = async (req, res) => {
       action: 'DELETE',
       entityType: party.type,
       entityName: party.firmName || party.contactName || party.ownerName || 'Unknown',
-      details: `Deleted ${party.type}: ${party.firmName || party.contactName || party.ownerName}`,
+      details: `Moved ${party.type} to recycle bin: ${party.firmName || party.contactName || party.ownerName}`,
       performedBy: req.user ? req.user.fullName : "System",
       company: party.company
     }).catch(err => console.error("Activity log failed:", err));
 
-    res.json({ msg: 'Party deleted' });
+    res.json({ msg: 'Party moved to recycle bin' });
   } catch (err) {
     res.status(500).json({ msg: err.message });
   }
@@ -984,7 +1047,7 @@ exports.bulkDeleteParties = async (req, res) => {
       .filter(p => p.type === 'market')
       .map(p => p.firmName);
 
-    const result = await Party.deleteMany({ _id: { $in: ids } });
+    await Party.updateMany({ _id: { $in: ids } }, { $set: { isDeleted: true } });
 
     if (marketNames.length > 0) {
       await Party.updateMany(
@@ -998,13 +1061,86 @@ exports.bulkDeleteParties = async (req, res) => {
       action: 'DELETE',
       entityType: p.type,
       entityName: p.firmName || p.contactName || p.ownerName || 'Unknown',
-      details: `Deleted ${p.type} during bulk delete: ${p.firmName || p.contactName || p.ownerName}`,
+      details: `Moved ${p.type} to recycle bin during bulk delete: ${p.firmName || p.contactName || p.ownerName}`,
       performedBy: req.user ? req.user.fullName : "System",
       company: p.company
     }));
     await ActivityLog.insertMany(logs).catch(err => console.error("Bulk delete activity logs failed:", err));
 
-    res.json({ msg: `Successfully deleted ${result.deletedCount} records`, count: result.deletedCount });
+    res.json({ msg: `Successfully moved ${partiesToDelete.length} records to recycle bin`, count: partiesToDelete.length });
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+};
+
+exports.getDeletedParties = async (req, res) => {
+  try {
+    const filter = { isDeleted: true };
+    if (req.query.type) filter.type = req.query.type;
+    if (req.query.company) {
+      filter.$or = [
+        { company: req.query.company },
+        { companies: req.query.company }
+      ];
+    }
+
+    const parties = await Party.find(filter).sort({ updatedAt: -1 });
+    res.json(parties);
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+};
+
+exports.restoreParty = async (req, res) => {
+  try {
+    const party = await Party.findById(req.params.id);
+    if (!party) return res.status(404).json({ msg: 'Record not found' });
+
+    party.isDeleted = false;
+    await party.save();
+
+    // Log activity
+    await ActivityLog.create({
+      action: 'UPDATE',
+      entityType: party.type,
+      entityName: party.firmName || party.contactName || party.ownerName || 'Unknown',
+      details: `Restored ${party.type}: ${party.firmName || party.contactName || party.ownerName}`,
+      performedBy: req.user ? req.user.fullName : "System",
+      company: party.company
+    }).catch(err => console.error("Activity log failed:", err));
+
+    res.json({ msg: 'Record restored successfully', party });
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+};
+
+exports.permanentlyDeleteParty = async (req, res) => {
+  try {
+    const party = await Party.findById(req.params.id);
+    if (!party) return res.status(404).json({ msg: 'Record not found' });
+
+    await Party.findByIdAndDelete(req.params.id);
+
+    // If it was a market (city), reset city, route, and agent for all linked customers
+    if (party.type === 'market') {
+      await Party.updateMany(
+        { type: 'customer', city: party.firmName },
+        { $set: { city: '', route: '', agentAssigned: '' } }
+      );
+    }
+
+    // Log activity
+    await ActivityLog.create({
+      action: 'DELETE',
+      entityType: party.type,
+      entityName: party.firmName || party.contactName || party.ownerName || 'Unknown',
+      details: `Permanently deleted ${party.type}: ${party.firmName || party.contactName || party.ownerName}`,
+      performedBy: req.user ? req.user.fullName : "System",
+      company: party.company
+    }).catch(err => console.error("Activity log failed:", err));
+
+    res.json({ msg: 'Record permanently deleted' });
   } catch (err) {
     res.status(500).json({ msg: err.message });
   }
@@ -1421,6 +1557,95 @@ exports.unlinkPartyFromCompany = async (req, res) => {
     }
     await party.save();
     res.json(party);
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+};
+
+exports.mergeParties = async (req, res) => {
+  try {
+    const { primaryId, duplicateId } = req.body;
+    if (!primaryId || !duplicateId) {
+      return res.status(400).json({ msg: 'Primary ID and Duplicate ID are required.' });
+    }
+
+    if (primaryId === duplicateId) {
+      return res.status(400).json({ msg: 'Cannot merge a record into itself.' });
+    }
+
+    const [primary, duplicate] = await Promise.all([
+      Party.findById(primaryId),
+      Party.findById(duplicateId)
+    ]);
+
+    if (!primary || !duplicate) {
+      return res.status(404).json({ msg: 'One or both of the records was not found.' });
+    }
+
+    if (primary.type !== duplicate.type) {
+      return res.status(400).json({ msg: 'Cannot merge records of different types.' });
+    }
+
+    // Merge fields from duplicate into primary if primary has them empty
+    const fieldsToMerge = [
+      'ownerName', 'contactName', 'phone', 'altPhone', 'email', 
+      'doorNo', 'streetName', 'address1', 'area', 'landmark', 'city', 'district', 'state', 'pincode',
+      'agentAssigned', 'assignedMarket', 'group', 'designation', 'department', 'whatsapp', 'vendorType',
+      'remarks', 'gstNumber', 'aadharNumber', 'preferredTransport', 'gpsLocation', 'customerPhoto', 'shopPhoto'
+    ];
+
+    fieldsToMerge.forEach(field => {
+      if (!primary[field] && duplicate[field]) {
+        primary[field] = duplicate[field];
+      }
+    });
+
+    // Merge tags (union)
+    if (duplicate.tags && duplicate.tags.length > 0) {
+      const mergedTags = new Set([...(primary.tags || []), ...duplicate.tags]);
+      primary.tags = Array.from(mergedTags);
+    }
+
+    // Sum outstanding / balance
+    const primaryBalance = primary.outstandingBalance || primary.outstanding || 0;
+    const duplicateBalance = duplicate.outstandingBalance || duplicate.outstanding || 0;
+    primary.outstanding = primaryBalance + duplicateBalance;
+    primary.outstandingBalance = primaryBalance + duplicateBalance;
+
+    // Save primary record
+    await primary.save();
+
+    // Now update references in other models
+    const primaryName = primary.firmName || primary.contactName || primary.ownerName || '';
+    
+    const Transaction = require('../models/transactionModel');
+    const SalesOrder = require('../models/salesOrderModel');
+    const Quote = require('../models/quoteModel');
+    const DispatchCard = require('../models/dispatchCardModel');
+    const DeliveryChallan = require('../models/deliveryChallanModel');
+
+    await Promise.all([
+      Transaction.updateMany({ partyId: duplicateId }, { $set: { partyId: primaryId, partyName: primaryName } }),
+      SalesOrder.updateMany({ customerId: duplicateId }, { $set: { customerId: primaryId, customerName: primaryName } }),
+      Quote.updateMany({ customerId: duplicateId }, { $set: { customerId: primaryId, customerName: primaryName } }),
+      DispatchCard.updateMany({ customerId: duplicateId }, { $set: { customerId: primaryId, customerName: primaryName } }),
+      DeliveryChallan.updateMany({ customerId: duplicateId }, { $set: { customerId: primaryId, customerName: primaryName } })
+    ]);
+
+    // Delete the duplicate record
+    await Party.findByIdAndDelete(duplicateId);
+
+    // Log Activity
+    await ActivityLog.create({
+      action: 'UPDATE',
+      entityType: primary.type,
+      entityName: primaryName,
+      details: `Merged duplicate record "${duplicate.firmName || duplicate.contactName}" into "${primaryName}"`,
+      performedBy: req.user ? req.user.fullName : "System",
+      company: primary.company
+    }).catch(err => console.error("Activity log failed:", err));
+
+    res.json({ msg: 'Merge successful', primary });
   } catch (err) {
     res.status(500).json({ msg: err.message });
   }

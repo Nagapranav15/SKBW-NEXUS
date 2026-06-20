@@ -29,7 +29,7 @@ import MfgReports from './components/inventory/MfgReports';
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <div className="min-h-screen bg-gray-50">
           <ToastContainer />
           <Routes>

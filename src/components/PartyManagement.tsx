@@ -13,9 +13,13 @@ import { useAuth } from '../context/AuthContext';
 import {
   getParties, getPartyStats, createParty, updateParty,
   deleteParty as deletePartyApi, importParties as importPartiesApi,
-  bulkDeleteParties
+  bulkDeleteParties, mergeParties,
+  getDeletedParties, restoreParty, permanentlyDeleteParty
 } from '../api/partyApi';
-import { getRoutes, createRoute, updateRoute, deleteRoute, bulkDeleteRoutes } from '../api/routeApi';
+import {
+  getRoutes, createRoute, updateRoute, deleteRoute, bulkDeleteRoutes,
+  getDeletedRoutes, restoreRoute, permanentlyDeleteRoute
+} from '../api/routeApi';
 import { getActivityLogs } from '../api/activityLogApi';
 
 const WhatsAppIcon: React.FC = () => (
@@ -68,7 +72,7 @@ const getTagColor = (tag: string) => {
 };
 
 const getOutstandingInfo = (type: 'customer' | 'vendor' | string, balance: number) => {
-  const isCustomer = type === 'customer';
+  const isCustomer = type === 'customer' || type === 'route' || type === 'market' || type === 'agent';
   const val = balance || 0;
   
   if (val > 0) {
@@ -127,6 +131,7 @@ const getColumnsSchema = (type: string): Record<string, string> => {
       return {
         firmName: 'Firm Name',
         phone: 'Mobile',
+        vendorType: 'Vendor Type',
         city: 'City',
         district: 'District',
         outstandingBalance: 'Outstanding Balance',
@@ -146,6 +151,7 @@ const getColumnsSchema = (type: string): Record<string, string> => {
         assignedAgent: 'Assigned Agent',
         citiesCount: 'Cities Count',
         customersCount: 'Customers Count',
+        outstandingBalance: 'Outstanding Balance',
         status: 'Status'
       };
     case 'market':
@@ -155,6 +161,7 @@ const getColumnsSchema = (type: string): Record<string, string> => {
         state: 'State',
         route: 'Region',
         customerCount: 'Customer Count',
+        outstandingBalance: 'Outstanding Balance',
         status: 'Status'
       };
     case 'transporter':
@@ -193,6 +200,7 @@ interface Party {
   altPhone?: string;
   email?: string;
   whatsapp?: string;
+  vendorType?: string;
   doorNo?: string;
   streetName?: string;
   address1?: string;
@@ -208,6 +216,7 @@ interface Party {
   creditLimit?: number;
   creditDays?: number;
   outstandingBalance?: number;
+  outstanding?: number;
   preferredTransport?: string;
   gpsLocation?: string;
   customerPhoto?: string;
@@ -217,6 +226,9 @@ interface Party {
   createdAt: string;
   updatedAt: string;
   customerCount?: number;
+  assignedRegionsCount?: number;
+  assignedCitiesCount?: number;
+  assignedCustomersCount?: number;
   tags?: string[];
 }
 
@@ -230,6 +242,8 @@ interface RouteItem {
   updatedAt: string;
   citiesCount?: number;
   customersCount?: number;
+  outstandingBalance?: number;
+  outstanding?: number;
 }
 
 interface ActivityLog {
@@ -612,6 +626,14 @@ const PartyManagement: React.FC = () => {
   // Duplicate Detector State
   const [showDuplicates, setShowDuplicates] = useState(false);
   const [duplicateGroups, setDuplicateGroups] = useState<any[]>([]);
+  const [compareGroup, setCompareGroup] = useState<any | null>(null);
+  const [mergeGroup, setMergeGroup] = useState<any | null>(null);
+  const [primaryRecordId, setPrimaryRecordId] = useState<string>('');
+  
+  // Recycle Bin State
+  const [showRecycleBin, setShowRecycleBin] = useState(false);
+  const [deletedItems, setDeletedItems] = useState<any[]>([]);
+  const [recycleBinLoading, setRecycleBinLoading] = useState(false);
 
   // States list for select dropdowns
   const statesList = [
@@ -1338,8 +1360,10 @@ const PartyManagement: React.FC = () => {
         submitData.outstandingBalance = parseFloat(submitData.outstandingBalance) || 0;
       }
 
-      // Remove vendorType and customerGrade completely from submissions
-      delete submitData.vendorType;
+      // Remove vendorType (unless vendor) and customerGrade completely from submissions
+      if (currentType !== 'vendor') {
+        delete submitData.vendorType;
+      }
       delete submitData.customerGrade;
       if (currentType === 'vendor') {
         delete submitData.openingBalance;
@@ -1403,8 +1427,17 @@ const PartyManagement: React.FC = () => {
       await fetchDropdownOptions();
 
       // Refresh viewingCustomer if the currently viewed item was edited
-      if (editingItem && viewingCustomer && viewingCustomer._id === editingItem._id && savedItem?.data) {
-        setViewingCustomer(savedItem.data);
+      if (editingItem && viewingCustomer && viewingCustomer._id === editingItem._id) {
+        if (currentType === 'route') {
+          const routesRes = await getRoutes(selectedCompany?._id);
+          const updatedRoutes = routesRes.data || [];
+          const updatedRoute = updatedRoutes.find((r: any) => r._id === editingItem._id);
+          if (updatedRoute) {
+            setViewingCustomer(updatedRoute);
+          }
+        } else if (savedItem?.data) {
+          setViewingCustomer(savedItem.data);
+        }
       }
 
       // Refresh dynamic drawer views if currently viewing a city in drawer
@@ -1418,6 +1451,9 @@ const PartyManagement: React.FC = () => {
       }
       if (selectedCityName) {
         openCityCustomersPopup(selectedCityName);
+      }
+      if (showDuplicates) {
+        await handleFindDuplicates();
       }
     } catch (err: any) {
       const msg = err.response?.data?.msg || 'Error saving. Please try again.';
@@ -1461,8 +1497,21 @@ const PartyManagement: React.FC = () => {
 
   // Trigger Delete
   const handleDelete = async (id: string) => {
+    if (currentType === 'route') {
+      const routeItem = parties.find(p => p._id === id) || allRoutes.find(r => r._id === id);
+      if (routeItem && ((routeItem.citiesCount || 0) > 0 || (routeItem.customersCount || 0) > 0)) {
+        showAlert("Cannot delete region. Move customers first.", "error");
+        return;
+      }
+    }
+
+    const isCustomer = currentType === 'customer';
+    const confirmMessage = isCustomer 
+      ? "Are you sure? This customer record will be moved to deleted records."
+      : `Delete this ${typeLabel}?`;
+
     setCustomConfirm({
-      message: `Delete this ${typeLabel}?`,
+      message: confirmMessage,
       onConfirm: async () => {
         try {
           if (currentType === 'route') {
@@ -1527,6 +1576,18 @@ const PartyManagement: React.FC = () => {
 
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
+
+    if (currentType === 'route') {
+      const hasRestrictedRoute = selectedIds.some(id => {
+        const routeItem = parties.find(p => p._id === id) || allRoutes.find(r => r._id === id);
+        return routeItem && ((routeItem.citiesCount || 0) > 0 || (routeItem.customersCount || 0) > 0);
+      });
+      if (hasRestrictedRoute) {
+        showAlert("Cannot delete region. Move customers first.", "error");
+        return;
+      }
+    }
+
     setCustomConfirm({
       message: `Are you sure you want to bulk delete the ${selectedIds.length} selected ${typeLabelPlural.toLowerCase()}?`,
       onConfirm: async () => {
@@ -1652,9 +1713,64 @@ const PartyManagement: React.FC = () => {
     }
   };
 
+  const handleKeepBoth = (idx: number) => {
+    setDuplicateGroups(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleViewBoth = (group: any) => {
+    setCompareGroup(group);
+  };
+
+  const handleMergeInit = (group: any) => {
+    setMergeGroup(group);
+    if (group.items && group.items.length > 0) {
+      setPrimaryRecordId(group.items[0]._id);
+    } else {
+      setPrimaryRecordId('');
+    }
+  };
+
+  const handleConfirmMerge = async () => {
+    if (!mergeGroup || !primaryRecordId) return;
+    const primaryItem = mergeGroup.items.find((item: any) => item._id === primaryRecordId);
+    const duplicateItems = mergeGroup.items.filter((item: any) => item._id !== primaryRecordId);
+    
+    if (!primaryItem || duplicateItems.length === 0) return;
+    
+    try {
+      setLoading(true);
+      // Merge duplicate records sequentially
+      for (const dupItem of duplicateItems) {
+        await mergeParties(primaryRecordId, dupItem._id);
+      }
+      
+      // Refresh list data
+      await fetchMainData();
+      await fetchStatsCounts();
+      await fetchDropdownOptions();
+      
+      // Remove this group from duplicates scan list
+      setDuplicateGroups(prev => prev.filter(g => g !== mergeGroup));
+      
+      setMergeGroup(null);
+      setPrimaryRecordId('');
+      setToast({ message: 'Records merged successfully.', type: 'success' });
+    } catch (err: any) {
+      console.error('Merge failed:', err);
+      showAlert(err.response?.data?.msg || 'Failed to merge duplicate records. Please try again.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const deleteDuplicateItem = async (id: string) => {
+    const isCustomer = currentType === 'customer';
+    const confirmMessage = isCustomer 
+      ? "Are you sure? This customer record will be moved to deleted records."
+      : "Are you sure you want to delete this duplicate record?";
+
     setCustomConfirm({
-      message: 'Delete this duplicate record?',
+      message: confirmMessage,
       onConfirm: async () => {
         try {
           if (currentType === 'route') {
@@ -1673,6 +1789,78 @@ const PartyManagement: React.FC = () => {
         }
       }
     });
+  };
+
+  // Recycle Bin Methods
+  const fetchDeletedItems = useCallback(async () => {
+    if (!selectedCompany) return;
+    try {
+      setRecycleBinLoading(true);
+      if (currentType === 'route') {
+        const res = await getDeletedRoutes(selectedCompany._id);
+        setDeletedItems(res.data || []);
+      } else {
+        const res = await getDeletedParties(selectedCompany._id, currentType);
+        setDeletedItems(res.data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching deleted items:', err);
+      showAlert('Failed to fetch deleted items. Please try again.', 'error');
+    } finally {
+      setRecycleBinLoading(false);
+    }
+  }, [selectedCompany, currentType]);
+
+  const handleRestoreItem = async (id: string, name: string) => {
+    try {
+      setRecycleBinLoading(true);
+      if (currentType === 'route') {
+        await restoreRoute(id);
+      } else {
+        await restoreParty(id);
+      }
+      setToast({ message: `Successfully restored: ${name}`, type: 'success' });
+      await fetchMainData();
+      await fetchStatsCounts();
+      await fetchDropdownOptions();
+      await fetchDeletedItems();
+    } catch (err: any) {
+      console.error('Restore failed:', err);
+      showAlert(err.response?.data?.msg || 'Failed to restore item. Please try again.', 'error');
+    } finally {
+      setRecycleBinLoading(false);
+    }
+  };
+
+  const handlePermanentDeleteItem = async (id: string, name: string) => {
+    setCustomConfirm({
+      message: `Are you sure you want to PERMANENTLY delete "${name}"? This action CANNOT be undone and will delete the record completely from the database.`,
+      onConfirm: async () => {
+        try {
+          setRecycleBinLoading(true);
+          if (currentType === 'route') {
+            await permanentlyDeleteRoute(id);
+          } else {
+            await permanentlyDeleteParty(id);
+          }
+          setToast({ message: `Successfully permanently deleted: ${name}`, type: 'success' });
+          await fetchDeletedItems();
+          await fetchMainData();
+          await fetchStatsCounts();
+          await fetchDropdownOptions();
+        } catch (err: any) {
+          console.error('Permanent delete failed:', err);
+          showAlert(err.response?.data?.msg || 'Failed to permanently delete item.', 'error');
+        } finally {
+          setRecycleBinLoading(false);
+        }
+      }
+    });
+  };
+
+  const openRecycleBin = () => {
+    setShowRecycleBin(true);
+    fetchDeletedItems();
   };
 
   // Import / Export Logic
@@ -2053,6 +2241,13 @@ const PartyManagement: React.FC = () => {
               >
                 <AlertTriangle className="w-4 h-4 text-gray-450" />
                 <span>Find Duplicates</span>
+              </button>
+              <button
+                onClick={openRecycleBin}
+                className="flex items-center space-x-2 px-4 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium shadow-xs"
+              >
+                <Trash2 className="w-4 h-4 text-gray-450" />
+                <span>Recycle Bin</span>
               </button>
               <button
                 onClick={() => { setEditingItem(null); setFormData(getEmptyFormData()); setAgentCheckedRoutes([]); setShowForm(true); }}
@@ -2613,12 +2808,12 @@ const PartyManagement: React.FC = () => {
                                     )}
                                   </div>
                                 ) : (col === 'phone' || col === 'altPhone' || col === 'whatsapp') ? (
-                                  <div className="flex items-center space-x-1">
+                                  <div className="flex items-center space-x-1.5 w-[145px]">
                                     {(item as any)[col] ? (
                                       <>
                                         <a
                                           href={`tel:${String((item as any)[col]).replace(/\D/g, '')}`}
-                                          className="text-blue-600 hover:text-blue-800 hover:underline font-semibold"
+                                          className="text-blue-600 hover:text-blue-800 hover:underline font-semibold w-[110px] inline-block truncate"
                                           onClick={e => e.stopPropagation()}
                                           title={`Call ${(item as any)[col]}`}
                                         >
@@ -2676,20 +2871,33 @@ const PartyManagement: React.FC = () => {
                                   );
                                 })() : col === 'tags' ? (
                                   Array.isArray(item.tags) && item.tags.length > 0 ? (
-                                    <div className="flex flex-wrap gap-1">
-                                      {item.tags.map((tag: string, idx: number) => {
+                                    <div className="flex items-center gap-1.5 flex-nowrap max-w-[170px] overflow-hidden" title={item.tags.join(', ')}>
+                                      {item.tags.slice(0, 2).map((tag: string, idx: number) => {
                                         const colors = getTagColor(tag);
                                         return (
                                           <span
                                             key={idx}
-                                            className={`inline-flex px-1.5 py-0.5 text-[10px] font-bold rounded border shadow-3xs ${colors.bg} ${colors.text} ${colors.border}`}
+                                            className={`inline-flex px-2 py-0.5 text-[10px] font-bold rounded-md border shadow-3xs truncate max-w-[70px] transition-all hover:scale-105 ${colors.bg} ${colors.text} ${colors.border}`}
                                           >
                                             {tag}
                                           </span>
                                         );
                                       })}
+                                      {item.tags.length > 2 && (
+                                        <span className="inline-flex px-1.5 py-0.5 text-[10px] font-bold rounded-md border bg-gray-50 text-gray-650 border-gray-200 shadow-3xs cursor-help shrink-0">
+                                          +{item.tags.length - 2}
+                                        </span>
+                                      )}
                                     </div>
                                   ) : <span className="text-gray-400">-</span>
+                                ) : col === 'vendorType' ? (
+                                  item.vendorType ? (
+                                    <span className="inline-flex px-2.5 py-0.5 text-xs font-semibold rounded bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase tracking-wide">
+                                      {item.vendorType}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-400">-</span>
+                                  )
                                 ) : col === 'status' ? (
                                   <span className={`inline-flex px-2 py-0.5 text-[10px] font-bold rounded uppercase border ${
                                     item.status === 'active' ? 'bg-green-50 border-green-200 text-green-700' :
@@ -3363,6 +3571,24 @@ const PartyManagement: React.FC = () => {
                         <input type="text" placeholder="e.g. Ramesh Kumar" value={formData.ownerName || ''} onChange={e => setFormData({ ...formData, ownerName: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" required />
                       </div>
                       <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Vendor Type*</label>
+                        <select
+                          value={formData.vendorType || ''}
+                          onChange={e => setFormData({ ...formData, vendorType: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-905 font-medium"
+                          required
+                        >
+                          <option value="" disabled>Select Vendor Type</option>
+                          <option value="Paper Supplier">Paper Supplier</option>
+                          <option value="Board Supplier">Board Supplier</option>
+                          <option value="Printing Vendor">Printing Vendor</option>
+                          <option value="Consumables Supplier">Consumables Supplier</option>
+                          <option value="Transport Vendor">Transport Vendor</option>
+                          <option value="Service Vendor">Service Vendor</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+                      <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1">Mobile Number*</label>
                         <input type="tel" placeholder="e.g. 98765 43210" value={formData.phone || ''} onChange={e => setFormData({ ...formData, phone: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" required />
                       </div>
@@ -3860,18 +4086,45 @@ const PartyManagement: React.FC = () => {
                   
                   {duplicateGroups.map((group, gIdx) => (
                     <div key={gIdx} className="border border-red-150 bg-red-50/10 rounded-lg p-4">
-                      <div className="flex justify-between items-center mb-3">
-                        <span className="text-xs font-semibold bg-red-100 text-red-800 px-2 py-0.5 rounded">
-                          Duplicate by {group.field}: {group.value}
-                        </span>
-                        <span className="text-xs text-gray-400">{group.items.length} records</span>
+                      <div className="flex justify-between items-start md:items-center flex-col md:flex-row gap-2 mb-3 border-b pb-2 border-red-100/50">
+                        <div>
+                          <span className="text-xs font-semibold bg-red-100 text-red-800 px-2 py-0.5 rounded">
+                            Duplicate by {group.field}: {group.value}
+                          </span>
+                          <span className="text-xs text-gray-400 ml-2">{group.items.length} records</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleViewBoth(group)}
+                            className="px-2 py-1 text-xs font-semibold text-gray-700 bg-white border border-gray-250 rounded hover:bg-gray-55 flex items-center gap-1 transition-all"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            View Both
+                          </button>
+                          {currentType !== 'route' && (
+                            <button
+                              onClick={() => handleMergeInit(group)}
+                              className="px-2 py-1 text-xs font-semibold text-white bg-blue-600 border border-blue-650 rounded hover:bg-blue-700 flex items-center gap-1 transition-all"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5" />
+                              Merge
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleKeepBoth(gIdx)}
+                            className="px-2 py-1 text-xs font-semibold text-gray-600 bg-gray-100 border border-gray-200 rounded hover:bg-gray-200 flex items-center gap-1 transition-all"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            Keep Both
+                          </button>
+                        </div>
                       </div>
                       
                       <div className="space-y-2">
                         {group.items.map((item) => (
                           <div key={item._id} className="flex justify-between items-center bg-white p-3 border rounded-lg text-sm">
                             <div>
-                              <p className="font-semibold text-gray-950">
+                              <p className="font-semibold text-gray-955">
                                 {currentType === 'route' ? item.name : (item.firmName || item.contactName)}
                               </p>
                               <div className="text-xs text-gray-450 mt-0.5 flex items-center space-x-1.5 flex-wrap">
@@ -3879,17 +4132,19 @@ const PartyManagement: React.FC = () => {
                                   <span>Agent: {item.assignedAgent || 'None'}</span>
                                 ) : (
                                   <>
-                                    <span>Mobile: {item.phone || '-'}</span>
-                                    {item.phone && (
-                                      <a
-                                        href={getWhatsAppLink(item.phone)}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="inline-flex items-center animate-none"
-                                      >
-                                        <WhatsAppIcon />
-                                      </a>
-                                    )}
+                                    <span className="flex items-center space-x-1.5 w-[200px] shrink-0">
+                                      <span className="w-[160px] inline-block truncate">Mobile: {item.phone || '-'}</span>
+                                      {item.phone && (
+                                        <a
+                                          href={getWhatsAppLink(item.phone)}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="inline-flex items-center animate-none"
+                                        >
+                                          <WhatsAppIcon />
+                                        </a>
+                                      )}
+                                    </span>
                                     <span className="mx-1 text-gray-300">|</span>
                                     <span>City: {item.city || '-'}</span>
                                   </>
@@ -3898,15 +4153,17 @@ const PartyManagement: React.FC = () => {
                             </div>
                             <div className="flex space-x-2">
                               <button
-                                onClick={() => { setShowDuplicates(false); handleEdit(item); }}
-                                className="px-2.5 py-1 text-xs border hover:bg-gray-50 rounded text-gray-600 font-medium"
+                                onClick={() => handleEdit(item)}
+                                className="px-2.5 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-650 border border-blue-200 rounded font-semibold transition-all flex items-center gap-1"
                               >
+                                <Edit className="w-3.5 h-3.5" />
                                 Edit
                               </button>
                               <button
                                 onClick={() => deleteDuplicateItem(item._id)}
-                                className="px-2.5 py-1 text-xs bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded font-medium"
+                                className="px-2.5 py-1 text-xs bg-red-50 hover:bg-red-100 text-red-650 border border-red-200 rounded font-semibold transition-all flex items-center gap-1"
                               >
+                                <Trash2 className="w-3.5 h-3.5" />
                                 Delete
                               </button>
                             </div>
@@ -3924,6 +4181,302 @@ const PartyManagement: React.FC = () => {
               <button
                 onClick={() => setShowDuplicates(false)}
                 className="px-5 py-2 border rounded-lg hover:bg-gray-100 font-medium text-sm"
+              >
+                Close Window
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Compare Duplicates Modal (View Both) */}
+      {compareGroup && (
+        <div className="fixed inset-0 z-[60] overflow-y-auto flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative bg-white rounded-2xl max-w-4xl w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
+            
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-gray-905 flex items-center gap-2">
+                <Users className="w-5 h-5 text-blue-500" />
+                Compare Duplicates
+              </h3>
+              <button onClick={() => setCompareGroup(null)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content Table */}
+            <div className="p-6 overflow-auto flex-1">
+              <div className="min-w-full inline-block align-middle">
+                <table className="min-w-full divide-y divide-gray-250 border border-gray-200 rounded-lg overflow-hidden">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider border-r border-gray-200 w-[180px]">Field</th>
+                      {compareGroup.items.map((item: any, idx: number) => (
+                        <th key={item._id} className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[200px] border-r last:border-r-0">
+                          Record #{idx + 1}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {[
+                      { label: 'Firm/Company Name', key: 'firmName' },
+                      { label: 'Owner Name', key: 'ownerName' },
+                      { label: 'Contact Name', key: 'contactName' },
+                      { label: 'Mobile Number', key: 'phone' },
+                      { label: 'WhatsApp', key: 'whatsapp' },
+                      { label: 'Email', key: 'email' },
+                      { label: 'Vendor Type', key: 'vendorType', showIf: currentType === 'vendor' },
+                      { label: 'GST Number', key: 'gstNumber' },
+                      { label: 'Aadhar Number', key: 'aadharNumber' },
+                      { label: 'City', key: 'city' },
+                      { label: 'District', key: 'district' },
+                      { label: 'State', key: 'state' },
+                      { label: 'Pincode', key: 'pincode' },
+                      { label: 'Outstanding Balance', key: 'outstandingBalance', isCurrency: true },
+                      { label: 'Assigned Agent', key: 'agentAssigned' },
+                      { label: 'Route', key: 'route' },
+                      { label: 'Status', key: 'status' }
+                    ].filter(row => row.showIf !== false).map((row, rIdx) => (
+                      <tr key={rIdx} className={rIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                        <td className="px-4 py-2.5 text-xs font-semibold text-gray-500 border-r border-gray-200 bg-gray-50/30">{row.label}</td>
+                        {compareGroup.items.map((item: any) => {
+                          const val = item[row.key];
+                          return (
+                            <td key={item._id} className="px-4 py-2.5 text-sm text-gray-800 border-r border-gray-200 last:border-r-0 break-words font-medium">
+                              {row.isCurrency ? (
+                                <span className={val < 0 ? 'text-red-655 font-semibold' : val > 0 ? 'text-green-600 font-semibold' : 'text-gray-500'}>
+                                  ₹{(val || 0).toLocaleString('en-IN')}
+                                </span>
+                              ) : row.key === 'status' ? (
+                                <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${
+                                  val === 'active' ? 'bg-green-50 text-green-705 border border-green-200' :
+                                  val === 'inactive' ? 'bg-red-50 text-red-700 border border-red-200' :
+                                  'bg-amber-50 text-amber-700 border border-amber-200'
+                                }`}>
+                                  {val || 'active'}
+                                </span>
+                              ) : (
+                                val || <span className="text-gray-400 italic text-xs">Empty</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
+              {currentType !== 'route' && (
+                <button
+                  onClick={() => {
+                    setCompareGroup(null);
+                    handleMergeInit(compareGroup);
+                  }}
+                  className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shadow-sm transition-colors"
+                >
+                  Merge These Records
+                </button>
+              )}
+              <button
+                onClick={() => setCompareGroup(null)}
+                className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-150 font-medium text-gray-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+              {/* Merge Selection Modal */}
+      {mergeGroup && (
+        <div className="fixed inset-0 z-[60] overflow-y-auto flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative bg-white rounded-2xl max-w-lg w-full shadow-2xl flex flex-col border border-gray-100 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+            
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-gray-905 flex items-center gap-2">
+                <RefreshCw className="w-5 h-5 text-blue-500" />
+                Merge Records
+              </h3>
+              <button onClick={() => { setMergeGroup(null); setPrimaryRecordId(''); }} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4">
+              <div className="bg-blue-50 border border-blue-150 rounded-xl p-4 text-sm text-blue-800 space-y-2">
+                <p className="font-semibold flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4 text-blue-600" />
+                  How Merge Works:
+                </p>
+                <ul className="list-disc pl-4 space-y-1 text-xs text-blue-700">
+                  <li>Select one record to keep as the <strong>Primary</strong> record.</li>
+                  <li>Non-empty fields from duplicate records will be merged into the primary record if the primary is missing them.</li>
+                  <li>All outstanding balances will be <strong>summed up</strong>.</li>
+                  <li>All transactions, sales orders, quotes, dispatch cards, and delivery challans will point to the primary record.</li>
+                  <li>Duplicate records will be <strong>permanently deleted</strong>.</li>
+                </ul>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-550 uppercase tracking-wider mb-2">Select Primary Record:</label>
+                <div className="space-y-3">
+                  {mergeGroup.items.map((item: any) => (
+                    <label
+                      key={item._id}
+                      className={`flex items-start gap-3 p-3.5 border rounded-xl cursor-pointer transition-all hover:bg-gray-50/50 ${
+                        primaryRecordId === item._id
+                          ? 'border-blue-500 bg-blue-50/20 ring-2 ring-blue-550/20'
+                          : 'border-gray-200 bg-white'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="primaryRecord"
+                        value={item._id}
+                        checked={primaryRecordId === item._id}
+                        onChange={() => setPrimaryRecordId(item._id)}
+                        className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                      />
+                      <div className="text-sm">
+                        <p className="font-semibold text-gray-905">{item.firmName || item.contactName}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          ID: <span className="font-mono text-gray-400">{item._id.substring(item._id.length - 8)}</span> | 
+                          Mobile: {item.phone || 'None'} | 
+                          City: {item.city || 'None'}
+                        </p>
+                        <p className="text-xs font-semibold text-blue-600 mt-1">
+                          Outstanding: ₹{(item.outstandingBalance || item.outstanding || 0).toLocaleString('en-IN')}
+                        </p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
+              <button
+                onClick={() => { setMergeGroup(null); setPrimaryRecordId(''); }}
+                className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 font-medium text-gray-705 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmMerge}
+                disabled={!primaryRecordId || loading}
+                className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-medium shadow-sm transition-colors flex items-center gap-1.5"
+              >
+                {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : null}
+                Confirm & Merge
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Recycle Bin Modal */}
+      {showRecycleBin && (
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm">
+          <div className="relative bg-white rounded-2xl max-w-3xl w-full shadow-2xl flex flex-col max-h-[85vh] overflow-hidden border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
+            
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-2xl flex justify-between items-center">
+              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <Trash2 className="w-5 h-5 text-red-500" />
+                Recycle Bin ({typeLabelPlural})
+              </h2>
+              <button onClick={() => setShowRecycleBin(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* List Body */}
+            <div className="p-6 overflow-y-auto flex-1">
+              {recycleBinLoading ? (
+                <div className="flex justify-center items-center h-48">
+                  <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
+                </div>
+              ) : deletedItems.length === 0 ? (
+                <div className="text-center py-12">
+                  <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-3" />
+                  <p className="font-semibold text-gray-800 text-base">Recycle Bin is empty!</p>
+                  <p className="text-sm text-gray-400 mt-1">There are no deleted {typeLabelPlural.toLowerCase()} in the system.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">#</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
+                        {currentType !== 'route' && (
+                          <>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Mobile</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">City</th>
+                          </>
+                        )}
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Deleted At</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {deletedItems.map((item, idx) => {
+                        const displayName = currentType === 'route' ? item.name : (item.firmName || item.contactName || 'Unnamed');
+                        return (
+                          <tr key={item._id} className="hover:bg-gray-50/50 transition-colors">
+                            <td className="px-4 py-3 text-gray-400 font-medium">{idx + 1}</td>
+                            <td className="px-4 py-3 text-gray-900 font-semibold truncate max-w-[200px]" title={displayName}>
+                              {displayName}
+                            </td>
+                            {currentType !== 'route' && (
+                              <>
+                                <td className="px-4 py-3 text-gray-700">{item.phone || '-'}</td>
+                                <td className="px-4 py-3 text-gray-700">{item.city || '-'}</td>
+                              </>
+                            )}
+                            <td className="px-4 py-3 text-gray-500">
+                              {new Date(item.updatedAt).toLocaleString('en-IN')}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-right space-x-2">
+                              <button
+                                onClick={() => handleRestoreItem(item._id, displayName)}
+                                className="px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded hover:bg-emerald-100 transition-colors"
+                              >
+                                Restore
+                              </button>
+                              <button
+                                onClick={() => handlePermanentDeleteItem(item._id, displayName)}
+                                className="px-3 py-1.5 text-xs font-bold text-red-700 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition-colors"
+                              >
+                                Delete Permanent
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-150 bg-gray-50 rounded-b-xl text-right">
+              <button
+                onClick={() => setShowRecycleBin(false)}
+                className="px-5 py-2 border border-gray-300 bg-white rounded-lg hover:bg-gray-100 font-semibold text-sm transition-colors text-gray-700"
               >
                 Close Window
               </button>
@@ -4337,12 +4890,12 @@ const PartyManagement: React.FC = () => {
                     </div>
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">Mobile Number</span>
-                      <div className="flex items-center space-x-1.5">
+                      <div className="flex items-center space-x-1.5 w-[145px]">
                         {viewingCustomer.phone ? (
                           <>
                             <a
                               href={`tel:${viewingCustomer.phone.replace(/\D/g, '')}`}
-                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline w-[110px] inline-block truncate"
                               title={`Call ${viewingCustomer.phone}`}
                             >
                               {viewingCustomer.phone}
@@ -4363,12 +4916,12 @@ const PartyManagement: React.FC = () => {
                     </div>
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">WhatsApp Number</span>
-                      <div className="flex items-center space-x-1.5">
+                      <div className="flex items-center space-x-1.5 w-[145px]">
                         {viewingCustomer.whatsapp ? (
                           <>
                             <a
                               href={`tel:${viewingCustomer.whatsapp.replace(/\D/g, '')}`}
-                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline w-[110px] inline-block truncate"
                               title={`Call ${viewingCustomer.whatsapp}`}
                             >
                               {viewingCustomer.whatsapp}
@@ -4389,12 +4942,12 @@ const PartyManagement: React.FC = () => {
                     </div>
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">Alternate Mobile</span>
-                      <div className="flex items-center space-x-1.5">
+                      <div className="flex items-center space-x-1.5 w-[145px]">
                         {viewingCustomer.altPhone ? (
                           <>
                             <a
                               href={`tel:${viewingCustomer.altPhone.replace(/\D/g, '')}`}
-                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline w-[110px] inline-block truncate"
                               title={`Call ${viewingCustomer.altPhone}`}
                             >
                               {viewingCustomer.altPhone}
@@ -4636,13 +5189,23 @@ const PartyManagement: React.FC = () => {
                       <span className="font-semibold text-gray-900">{viewingCustomer.contactName || viewingCustomer.ownerName || '-'}</span>
                     </div>
                     <div>
+                      <span className="block text-xs text-gray-400 font-medium">Vendor Type</span>
+                      {viewingCustomer.vendorType ? (
+                        <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase tracking-wide mt-0.5">
+                          {viewingCustomer.vendorType}
+                        </span>
+                      ) : (
+                        <span className="font-semibold text-gray-900 mt-0.5 block">-</span>
+                      )}
+                    </div>
+                    <div>
                       <span className="block text-xs text-gray-400 font-medium">Mobile Number</span>
-                      <div className="flex items-center space-x-1.5">
+                      <div className="flex items-center space-x-1.5 w-[145px]">
                         {viewingCustomer.phone ? (
                           <>
                             <a
                               href={`tel:${viewingCustomer.phone.replace(/\D/g, '')}`}
-                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline w-[110px] inline-block truncate"
                               title={`Call ${viewingCustomer.phone}`}
                             >
                               {viewingCustomer.phone}
@@ -4663,12 +5226,12 @@ const PartyManagement: React.FC = () => {
                     </div>
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">Alternate Mobile</span>
-                      <div className="flex items-center space-x-1.5">
+                      <div className="flex items-center space-x-1.5 w-[145px]">
                         {viewingCustomer.altPhone ? (
                           <>
                             <a
                               href={`tel:${viewingCustomer.altPhone.replace(/\D/g, '')}`}
-                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline w-[110px] inline-block truncate"
                               title={`Call ${viewingCustomer.altPhone}`}
                             >
                               {viewingCustomer.altPhone}
@@ -4689,12 +5252,12 @@ const PartyManagement: React.FC = () => {
                     </div>
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">WhatsApp Number</span>
-                      <div className="flex items-center space-x-1.5">
+                      <div className="flex items-center space-x-1.5 w-[145px]">
                         {viewingCustomer.whatsapp ? (
                           <>
                             <a
                               href={`tel:${viewingCustomer.whatsapp.replace(/\D/g, '')}`}
-                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline w-[110px] inline-block truncate"
                               title={`Call ${viewingCustomer.whatsapp}`}
                             >
                               {viewingCustomer.whatsapp}
@@ -4839,9 +5402,24 @@ const PartyManagement: React.FC = () => {
               </>
             )}
 
-            {/* 3. AGENT CARD VIEW */}
             {currentType === 'agent' && (
               <>
+                {/* Dynamic Stats Grid */}
+                <div className="grid grid-cols-3 gap-3 shrink-0 mb-3">
+                  <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-3 text-center shadow-3xs">
+                    <span className="block text-[10px] text-blue-650 font-bold uppercase tracking-wider">Assigned Regions</span>
+                    <span className="block text-xl font-extrabold text-blue-900 mt-0.5">{viewingCustomer.assignedRegionsCount || 0}</span>
+                  </div>
+                  <div className="bg-indigo-50/40 border border-indigo-100 rounded-xl p-3 text-center shadow-3xs">
+                    <span className="block text-[10px] text-indigo-650 font-bold uppercase tracking-wider">Assigned Cities</span>
+                    <span className="block text-xl font-extrabold text-indigo-900 mt-0.5">{viewingCustomer.assignedCitiesCount || 0}</span>
+                  </div>
+                  <div className="bg-purple-50/40 border border-purple-100 rounded-xl p-3 text-center shadow-3xs">
+                    <span className="block text-[10px] text-purple-650 font-bold uppercase tracking-wider">Assigned Custs</span>
+                    <span className="block text-xl font-extrabold text-purple-900 mt-0.5">{viewingCustomer.assignedCustomersCount || 0}</span>
+                  </div>
+                </div>
+
                 {/* Basic Info Section */}
                 <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
                   <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
@@ -4854,12 +5432,12 @@ const PartyManagement: React.FC = () => {
                     </div>
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">Mobile Number</span>
-                      <div className="flex items-center space-x-1.5">
+                      <div className="flex items-center space-x-1.5 w-[145px]">
                         {viewingCustomer.phone ? (
                           <>
                             <a
                               href={`tel:${viewingCustomer.phone.replace(/\D/g, '')}`}
-                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline w-[110px] inline-block truncate"
                               title={`Call ${viewingCustomer.phone}`}
                             >
                               {viewingCustomer.phone}
@@ -4880,12 +5458,12 @@ const PartyManagement: React.FC = () => {
                     </div>
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">Alternate Mobile</span>
-                      <div className="flex items-center space-x-1.5">
+                      <div className="flex items-center space-x-1.5 w-[145px]">
                         {viewingCustomer.altPhone ? (
                           <>
                             <a
                               href={`tel:${viewingCustomer.altPhone.replace(/\D/g, '')}`}
-                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline w-[110px] inline-block truncate"
                               title={`Call ${viewingCustomer.altPhone}`}
                             >
                               {viewingCustomer.altPhone}
@@ -4950,8 +5528,28 @@ const PartyManagement: React.FC = () => {
                       <span className="block text-xs text-gray-400 font-medium">Region Code</span>
                       <span className="font-semibold text-gray-905">{viewingCustomer.code || '-'}</span>
                     </div>
+                    <div>
+                      <span className="block text-xs text-gray-450 font-semibold text-blue-650">Total Cities</span>
+                      <span className="font-bold text-blue-900 block mt-0.5 text-base">{viewingCustomer.citiesCount || 0}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-450 font-semibold text-indigo-650">Total Customers</span>
+                      <span className="font-bold text-indigo-900 block mt-0.5 text-base">{viewingCustomer.customersCount || 0}</span>
+                    </div>
                     <div className="col-span-2">
-                      <span className="block text-xs text-gray-400 font-medium">Assigned Agent</span>
+                      <span className="block text-xs text-gray-450 font-semibold mb-1">Total Outstanding</span>
+                      {(() => {
+                        const bal = viewingCustomer.outstandingBalance !== undefined ? viewingCustomer.outstandingBalance : (viewingCustomer.outstanding || 0);
+                        const info = getOutstandingInfo('route', bal);
+                        return (
+                          <span className={`inline-flex px-2.5 py-0.5 text-xs font-bold rounded-md border ${info.colorClass}`}>
+                            {info.formatted}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                    <div className="col-span-2">
+                      <span className="block text-xs text-gray-405 font-medium">Assigned Agent</span>
                       {viewingCustomer.assignedAgent ? (
                         <span className="inline-flex px-2.5 py-1 text-xs font-medium rounded-md bg-purple-50 text-purple-755 border border-purple-100 mt-1">
                           {viewingCustomer.assignedAgent}
@@ -5041,9 +5639,18 @@ const PartyManagement: React.FC = () => {
                                 <span className="font-bold text-gray-955 text-sm block group-hover:text-blue-600 transition-colors truncate">
                                   {city.firmName}
                                 </span>
-                                <span className="text-[11px] text-gray-450 font-medium block truncate mt-1 leading-normal">
-                                  {city.district || '-'}, {city.state || '-'}
-                                </span>
+                                <div className="flex flex-col mt-1.5 gap-0.5 text-[11px] text-gray-500 font-medium">
+                                  <span>{city.customerCount || 0} {city.customerCount === 1 ? 'Customer' : 'Customers'}</span>
+                                  {(() => {
+                                    const bal = city.outstanding || city.outstandingBalance || 0;
+                                    const info = getOutstandingInfo('customer', bal);
+                                    return (
+                                      <span className={`${info.textClass} font-bold`}>
+                                        {info.formatted} Outstanding
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
                               </div>
                               <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100 shrink-0">
                                 <span className={`inline-flex px-1.5 py-0.5 text-[9px] font-bold uppercase rounded ${
@@ -5052,9 +5659,6 @@ const PartyManagement: React.FC = () => {
                                     : 'bg-gray-100 text-gray-500'
                                 }`}>
                                   {city.status || 'active'}
-                                </span>
-                                <span className="inline-flex px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-50 text-blue-700 border border-blue-100 group-hover:bg-blue-100 transition-colors">
-                                  {city.customerCount || 0} Custs
                                 </span>
                               </div>
                             </div>
@@ -5153,12 +5757,12 @@ const PartyManagement: React.FC = () => {
                     </div>
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">Mobile Number</span>
-                      <div className="flex items-center space-x-1.5">
+                      <div className="flex items-center space-x-1.5 w-[145px]">
                         {viewingCustomer.phone ? (
                           <>
                             <a
                               href={`tel:${viewingCustomer.phone.replace(/\D/g, '')}`}
-                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline w-[110px] inline-block truncate"
                               title={`Call ${viewingCustomer.phone}`}
                             >
                               {viewingCustomer.phone}
@@ -5300,6 +5904,7 @@ const PartyManagement: React.FC = () => {
                             <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Mobile Number</th>
                             <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Region</th>
                             <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Agent Assigned</th>
+                            <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Outstanding</th>
                             <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
                           </tr>
                         </thead>
@@ -5310,16 +5915,16 @@ const PartyManagement: React.FC = () => {
                                 <div className="flex flex-col gap-0.5">
                                   <span className="font-semibold text-gray-900 text-[13.5px] leading-tight">{cust.firmName || '-'}</span>
                                   {cust.ownerName && cust.ownerName !== cust.firmName && (
-                                    <span className="text-xs text-gray-450 font-normal leading-normal">{cust.ownerName}</span>
+                                    <span className="text-xs text-gray-455 font-normal leading-normal">{cust.ownerName}</span>
                                   )}
                                 </div>
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap text-[13.5px] text-gray-700">
                                 {cust.phone ? (
-                                  <div className="flex items-center space-x-1.5">
+                                  <div className="flex items-center space-x-1.5 w-[145px]">
                                     <a
                                       href={`tel:${cust.phone.replace(/\D/g, '')}`}
-                                      className="text-blue-600 hover:text-blue-800 hover:underline font-semibold"
+                                      className="text-blue-600 hover:text-blue-800 hover:underline font-semibold w-[110px] inline-block truncate"
                                       title={`Call ${cust.phone}`}
                                     >
                                       {cust.phone}
@@ -5356,6 +5961,17 @@ const PartyManagement: React.FC = () => {
                                     </span>
                                   ) : (
                                     <span className="text-gray-455">None</span>
+                                  );
+                                })()}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-[13.5px]">
+                                {(() => {
+                                  const balance = cust.outstandingBalance !== undefined ? cust.outstandingBalance : (cust.outstanding || 0);
+                                  const info = getOutstandingInfo('customer', balance);
+                                  return (
+                                    <span className={`inline-flex px-2.5 py-0.5 text-xs font-semibold rounded-md border ${info.colorClass}`} title={info.label}>
+                                      {info.formatted}
+                                    </span>
                                   );
                                 })()}
                               </td>
