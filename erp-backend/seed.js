@@ -15,6 +15,7 @@ const DeliveryChallan = require("./src/models/deliveryChallanModel");
 const DispatchCard = require("./src/models/dispatchCardModel");
 const StockMovement = require("./src/models/stockMovementModel");
 const Transaction = require("./src/models/transactionModel");
+const Route = require("./src/models/routeModel");
 const { hashPassword } = require("./src/utils/hash");
 
 const loadJSON = (filename) => {
@@ -45,7 +46,8 @@ const seed = async () => {
       DeliveryChallan.deleteMany(),
       DispatchCard.deleteMany(),
       StockMovement.deleteMany(),
-      Transaction.deleteMany()
+      Transaction.deleteMany(),
+      Route.deleteMany()
     ]);
 
     // ============ PERMISSIONS ============
@@ -211,6 +213,138 @@ const seed = async () => {
       });
       partyMap[p.id] = party._id;
     }
+
+    // ============ AGENTS, ROUTES, TRANSPORTERS, CITIES (MARKETS) & CUSTOMERS ============
+    console.log("Seeding routes, agents, transporters, and additional customers...");
+    
+    // Seed agents
+    const agent1 = await Party.create({
+      type: "agent",
+      firmName: "Sales Agent 1",
+      contactName: "Sales Agent 1",
+      phone: "9876543221",
+      status: "active",
+      company: defaultCompanyId
+    });
+
+    const agent2 = await Party.create({
+      type: "agent",
+      firmName: "Sales Agent 2",
+      contactName: "Sales Agent 2",
+      phone: "9876543222",
+      status: "active",
+      company: defaultCompanyId
+    });
+
+    // Seed routes
+    const route1 = await Route.create({
+      name: "North Region",
+      code: "NR",
+      company: defaultCompanyId,
+      assignedAgent: "Sales Agent 1",
+      status: "active"
+    });
+
+    const route2 = await Route.create({
+      name: "South Region",
+      code: "SR",
+      company: defaultCompanyId,
+      assignedAgent: "Sales Agent 2",
+      status: "active"
+    });
+
+    // Seed transporters
+    const transporter1 = await Party.create({
+      type: "transporter",
+      firmName: "Fast Cargo",
+      contactName: "John Doe",
+      phone: "9876543231",
+      status: "active",
+      company: defaultCompanyId,
+      contactPersons: [
+        { name: "John Doe", phone: "9876543231" },
+        { name: "Jane Smith", phone: "9876543232" }
+      ]
+    });
+
+    const transporter2 = await Party.create({
+      type: "transporter",
+      firmName: "Speedy Logistics",
+      contactName: "Bob Johnson",
+      phone: "9876543233",
+      status: "active",
+      company: defaultCompanyId,
+      contactPersons: [
+        { name: "Bob Johnson", phone: "9876543233" }
+      ]
+    });
+
+    // Seed markets
+    const market1 = await Party.create({
+      type: "market",
+      firmName: "Berhampur",
+      district: "Ganjam",
+      state: "Odisha",
+      route: "North Region",
+      agentAssigned: "Sales Agent 1",
+      status: "active",
+      company: defaultCompanyId
+    });
+
+    const market2 = await Party.create({
+      type: "market",
+      firmName: "Bangalore",
+      district: "Bangalore Urban",
+      state: "Karnataka",
+      route: "South Region",
+      agentAssigned: "Sales Agent 2",
+      status: "active",
+      company: defaultCompanyId
+    });
+
+    // Update Bangalore customers' route and preferredTransport
+    await Party.updateMany(
+      { type: "customer", city: "Bangalore" },
+      { $set: { route: "South Region", preferredTransport: "Speedy Logistics" } }
+    );
+
+    // Seed 2 customers in Berhampur to match the city card requirement:
+    // 2 Customers, ₹35,000 Outstanding
+    const cust1 = await Party.create({
+      type: "customer",
+      firmName: "Berhampur Book Depot",
+      contactName: "Harish Patnaik",
+      phone: "9988776655",
+      city: "Berhampur",
+      district: "Ganjam",
+      state: "Odisha",
+      route: "North Region",
+      agentAssigned: "Sales Agent 1",
+      preferredTransport: "Fast Cargo",
+      openingBalance: 20000,
+      outstanding: 20000,
+      outstandingBalance: 20000,
+      status: "active",
+      company: defaultCompanyId
+    });
+
+    const cust2 = await Party.create({
+      type: "customer",
+      firmName: "Ganjam Stationery House",
+      contactName: "Debasis Mohanty",
+      phone: "8877665544",
+      city: "Berhampur",
+      district: "Ganjam",
+      state: "Odisha",
+      route: "North Region",
+      agentAssigned: "Sales Agent 1",
+      preferredTransport: "Fast Cargo",
+      openingBalance: 15000,
+      outstanding: 15000,
+      outstandingBalance: 15000,
+      status: "active",
+      company: defaultCompanyId
+    });
 
     // ============ ITEMS ============
     console.log("Seeding items...");

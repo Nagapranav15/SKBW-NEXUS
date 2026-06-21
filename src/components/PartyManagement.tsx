@@ -75,28 +75,59 @@ const getOutstandingInfo = (type: 'customer' | 'vendor' | string, balance: numbe
   const isCustomer = type === 'customer' || type === 'route' || type === 'market' || type === 'agent';
   const val = balance || 0;
   
-  if (val > 0) {
-    return {
-      colorClass: 'bg-green-50 border-green-200 text-green-700',
-      textClass: 'text-green-700 font-semibold',
-      label: isCustomer ? 'Customer has to pay us' : 'Vendor owes us',
-      formatted: `₹${val.toLocaleString('en-IN')}`
-    };
-  } else if (val < 0) {
-    const absVal = Math.abs(val);
-    return {
-      colorClass: 'bg-red-50 border-red-200 text-red-700',
-      textClass: 'text-red-700 font-semibold',
-      label: isCustomer ? 'We have to pay customer' : 'We have to pay vendor',
-      formatted: `₹${absVal.toLocaleString('en-IN')}`
-    };
+  if (isCustomer) {
+    if (val > 0) {
+      // Customer has to pay us (outstanding) -> RED
+      return {
+        colorClass: 'bg-red-50 border-red-200 text-red-700',
+        textClass: 'text-red-700 font-semibold',
+        label: 'Outstanding (To Collect)',
+        formatted: `₹${val.toLocaleString('en-IN')}`
+      };
+    } else if (val < 0) {
+      // Advance payment -> GREEN
+      const absVal = Math.abs(val);
+      return {
+        colorClass: 'bg-green-50 border-green-200 text-green-700',
+        textClass: 'text-green-700 font-semibold',
+        label: 'Advance (Credit)',
+        formatted: `₹${absVal.toLocaleString('en-IN')}`
+      };
+    } else {
+      return {
+        colorClass: 'bg-gray-50 border-gray-200 text-gray-500',
+        textClass: 'text-gray-500 font-medium',
+        label: 'No outstanding',
+        formatted: '₹0'
+      };
+    }
   } else {
-    return {
-      colorClass: 'bg-gray-50 border-gray-200 text-gray-500',
-      textClass: 'text-gray-500 font-medium',
-      label: 'No outstanding',
-      formatted: '₹0'
-    };
+    // Vendor
+    if (val < 0) {
+      // We owe vendor -> RED
+      const absVal = Math.abs(val);
+      return {
+        colorClass: 'bg-red-50 border-red-200 text-red-700',
+        textClass: 'text-red-700 font-semibold',
+        label: 'We have to pay',
+        formatted: `₹${absVal.toLocaleString('en-IN')}`
+      };
+    } else if (val > 0) {
+      // Vendor owes us -> GREEN
+      return {
+        colorClass: 'bg-green-50 border-green-200 text-green-700',
+        textClass: 'text-green-700 font-semibold',
+        label: 'Vendor owes us',
+        formatted: `₹${val.toLocaleString('en-IN')}`
+      };
+    } else {
+      return {
+        colorClass: 'bg-gray-50 border-gray-200 text-gray-500',
+        textClass: 'text-gray-500 font-medium',
+        label: 'No outstanding',
+        formatted: '₹0'
+      };
+    }
   }
 };
 
@@ -156,20 +187,19 @@ const getColumnsSchema = (type: string): Record<string, string> => {
       };
     case 'market':
       return {
-        firmName: 'City Name',
+        firmName: 'City',
         district: 'District',
         state: 'State',
-        route: 'Region',
-        customerCount: 'Customer Count',
-        outstandingBalance: 'Outstanding Balance',
-        status: 'Status'
+        route: 'Region Code',
+        agentAssigned: 'Agent',
+        customerCount: 'Customers',
+        outstandingBalance: 'Outstanding'
       };
     case 'transporter':
       return {
-        firmName: 'Transporter Name',
-        contactName: 'Contact Person',
+        firmName: 'Transporter',
         phone: 'Mobile',
-        city: 'City',
+        customerCount: 'Customers Using',
         status: 'Status'
       };
     default:
@@ -475,7 +505,7 @@ const PartyManagement: React.FC = () => {
     agentAssigned: '',
     status: 'active'
   });
-  const [inlineTransporterData, setInlineTransporterData] = useState({ name: '', contactName: '', phone: '', email: '', city: '' });
+  const [inlineTransporterData, setInlineTransporterData] = useState({ name: '', contactName: '', phone: '', email: '', city: '', contactPersons: [] as { name: string; phone: string }[] });
 
   // Modals & Forms
   const [showForm, setShowForm] = useState(false);
@@ -1129,13 +1159,15 @@ const PartyManagement: React.FC = () => {
           agentAssigned: res.data.agentAssigned || prev.agentAssigned || ''
         }));
       } else if (inlineModalType === 'transporter') {
+        const primaryContact = inlineTransporterData.contactPersons?.[0];
         const payload = {
           type: 'transporter',
           firmName: inlineTransporterData.name,
-          contactName: inlineTransporterData.contactName || inlineTransporterData.name,
-          phone: inlineTransporterData.phone,
+          contactName: primaryContact?.name || inlineTransporterData.contactName || inlineTransporterData.name,
+          phone: primaryContact?.phone || inlineTransporterData.phone,
           email: inlineTransporterData.email,
           city: inlineTransporterData.city,
+          contactPersons: inlineTransporterData.contactPersons || [],
           company: selectedCompany._id
         };
         const res = await createParty(payload);
@@ -1387,7 +1419,12 @@ const PartyManagement: React.FC = () => {
         submitData.contactName = formData.firmName;
       }
       if (currentType === 'transporter') {
-        if (!submitData.contactName) submitData.contactName = formData.firmName;
+        if (formData.contactPersons && formData.contactPersons.length > 0) {
+          submitData.contactName = formData.contactPersons[0].name || formData.firmName;
+          submitData.phone = formData.contactPersons[0].phone || '';
+        } else {
+          if (!submitData.contactName) submitData.contactName = formData.firmName;
+        }
       }
 
       let savedItem: any;
@@ -1501,6 +1538,14 @@ const PartyManagement: React.FC = () => {
       const routeItem = parties.find(p => p._id === id) || allRoutes.find(r => r._id === id);
       if (routeItem && ((routeItem.citiesCount || 0) > 0 || (routeItem.customersCount || 0) > 0)) {
         showAlert("Cannot delete region. Move customers first.", "error");
+        return;
+      }
+    }
+
+    if (currentType === 'market') {
+      const cityItem = parties.find(p => p._id === id);
+      if (cityItem && (cityItem.customerCount || 0) > 0) {
+        showAlert("Cannot delete city. Move customers first.", "error");
         return;
       }
     }
@@ -1871,67 +1916,112 @@ const PartyManagement: React.FC = () => {
     if (currentType === 'route') {
       exportData = parties.map(p => ({
         'Region Name': p.name,
+        'Region Code': p.code,
         'Assigned Agent': p.assignedAgent || '-',
+        'Cities Count': p.citiesCount || 0,
+        'Customers Count': p.customersCount || 0,
+        'Outstanding Balance': p.outstandingBalance !== undefined ? p.outstandingBalance : (p.outstanding || 0),
         'Status': p.status
       }));
     } else if (currentType === 'agent') {
       exportData = parties.map(p => {
         const routesStr = allRoutes
-          .filter(r => r.assignedAgent === p.firmName)
+          .filter(r => r.assignedAgent === (p.firmName || p.contactName))
           .map(r => r.name)
           .join(', ');
         return {
-          'Agent Name': p.firmName,
-          'Mobile': p.phone,
-          'Assigned Routes': routesStr || '-',
-          'Status': p.status
+          'Agent Name': p.firmName || p.contactName,
+          'Mobile': p.phone || '-',
+          'Alt Phone': p.altPhone || '-',
+          'Email': p.email || '-',
+          'Assigned Regions': routesStr || '-',
+          'Status': p.status || 'active'
         };
       });
     } else if (currentType === 'market') {
       exportData = parties.map(p => ({
-        'Market Name': p.firmName,
-        'City': p.city,
-        'District': p.district,
-        'Route': p.route || '-',
-        'Status': p.status
+        'City': p.firmName,
+        'District': p.district || '-',
+        'State': p.state || '-',
+        'Pincode': p.pincode || '-',
+        'Region Code': p.route || '-',
+        'Agent': p.agentAssigned || '-',
+        'Customers': p.customerCount || 0,
+        'Outstanding': p.outstandingBalance !== undefined ? p.outstandingBalance : (p.outstanding || 0),
+        'Status': p.status || 'active'
       }));
     } else if (currentType === 'transporter') {
-      exportData = parties.map(p => ({
-        'Transporter Name': p.firmName,
-        'Contact Person': p.contactName,
-        'Mobile': p.phone,
-        'Email': p.email || '-',
-        'City': p.city,
-        'Status': p.status
-      }));
+      exportData = parties.map(p => {
+        const contactPersonsStr = Array.isArray(p.contactPersons)
+          ? p.contactPersons.map((cp: any) => `${cp.name || 'Unnamed'}: ${cp.phone || 'No Phone'}`).join(' | ')
+          : p.contactName ? `${p.contactName}: ${p.phone || 'No Phone'}` : '-';
+        return {
+          'Transporter Name': p.firmName || '-',
+          'Mobile': p.phone || '-',
+          'Email': p.email || '-',
+          'Door No': p.doorNo || '-',
+          'Street Name': p.streetName || '-',
+          'Address Line 1': p.address1 || '-',
+          'Area': p.area || '-',
+          'Landmark': p.landmark || '-',
+          'City': p.city || '-',
+          'District': p.district || '-',
+          'State': p.state || '-',
+          'Pincode': p.pincode || '-',
+          'Customers Using': p.customerCount || 0,
+          'Contact Persons': contactPersonsStr,
+          'Remarks': p.remarks || '-',
+          'GST Number': p.gstNumber || '-',
+          'Status': p.status || 'active'
+        };
+      });
     } else {
       // Customer or Vendor
       exportData = parties.map(p => {
+        const contactPersonsStr = Array.isArray(p.contactPersons)
+          ? p.contactPersons.map((cp: any) => `${cp.name || 'Unnamed'}: ${cp.phone || 'No Phone'}`).join(' | ')
+          : '-';
         const row: any = {
-          'Firm Name': p.firmName,
-          'Owner Name': p.ownerName,
-          'Phone': p.phone,
-          'Email': p.email,
-          'City': p.city,
-          'District': p.district,
-          'State': p.state,
-          'Pincode': p.pincode,
+          'Firm Name': p.firmName || '-',
+          'Owner Name': p.ownerName || '-',
+          'Contact Name': p.contactName || '-',
+          'Phone': p.phone || '-',
+          'Alt Phone': p.altPhone || '-',
+          'Email': p.email || '-',
+          'Door No': p.doorNo || '-',
+          'Street Name': p.streetName || '-',
+          'Address Line 1': p.address1 || '-',
+          'Area': p.area || '-',
+          'Landmark': p.landmark || '-',
+          'City': p.city || '-',
+          'District': p.district || '-',
+          'State': p.state || '-',
+          'Pincode': p.pincode || '-',
           'Region': p.route || '-',
-          'Agent Assigned': (() => {
+          'Agent Assigned': p.agentAssigned || (() => {
             const routeDoc = allRoutes.find(r => r.name === p.route);
-            return routeDoc?.assignedAgent || p.agentAssigned || '-';
+            return routeDoc?.assignedAgent || '-';
           })(),
-          'Market': p.assignedMarket || '-',
+          'Assigned Market': p.assignedMarket || '-',
+          'Group': p.group || '-',
+          'Designation': p.designation || '-',
+          'Department': p.department || '-',
+          'WhatsApp': p.whatsapp || '-',
+          'Vendor Type': p.vendorType || '-',
+          'Remarks': p.remarks || '-',
+          'Code': p.code || '-',
+          'GST Number': p.gstNumber || '-',
+          'Aadhar Number': p.aadharNumber || '-',
+          'Opening Balance': p.openingBalance || 0,
           'Credit Limit': p.creditLimit || 0,
           'Credit Days': p.creditDays || 0,
+          'Outstanding Balance': p.outstandingBalance !== undefined ? p.outstandingBalance : (p.outstanding || 0),
+          'Preferred Transport': p.preferredTransport || '-',
+          'GPS Location': p.gpsLocation || '-',
+          'Tags': Array.isArray(p.tags) ? p.tags.join(', ') : '',
+          'Contact Persons': contactPersonsStr,
+          'Status': p.status || 'active'
         };
-        if (currentType === 'customer') {
-          row['Opening Balance'] = p.openingBalance || 0;
-        }
-        row['Outstanding Balance'] = p.outstandingBalance !== undefined ? p.outstandingBalance : (p.outstanding || 0);
-        row['Tags'] = Array.isArray(p.tags) ? p.tags.join(', ') : '';
-        row['Preferred Transport'] = p.preferredTransport || '-';
-        row['Status'] = p.status;
         return row;
       });
     }
@@ -3898,6 +3988,15 @@ const PartyManagement: React.FC = () => {
                           placeholder="Select Region"
                         />
                       </div>
+                      <div className="col-span-2">
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Assigned Agent</label>
+                        <SearchableDropdown
+                          value={formData.agentAssigned || ''}
+                          onChange={val => setFormData({ ...formData, agentAssigned: val })}
+                          options={allAgents.map(a => ({ label: a.firmName || a.contactName, value: a.firmName || a.contactName }))}
+                          placeholder="Select Agent"
+                        />
+                      </div>
                     </div>
                   </div>
                 </>
@@ -3913,14 +4012,6 @@ const PartyManagement: React.FC = () => {
                         <label className="block text-xs font-medium text-gray-500 mb-1">Transporter Name*</label>
                         <input type="text" placeholder="e.g. VRL Logistics" value={formData.firmName || ''} onChange={e => setFormData({ ...formData, firmName: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" required />
                       </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Contact Person</label>
-                        <input type="text" placeholder="e.g. Suresh Kumar" value={formData.contactName || ''} onChange={e => setFormData({ ...formData, contactName: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Mobile Number*</label>
-                        <input type="tel" placeholder="e.g. 98765 43210" value={formData.phone || ''} onChange={e => setFormData({ ...formData, phone: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" required />
-                      </div>
                       <div className="col-span-2">
                         <label className="block text-xs font-medium text-gray-500 mb-1">Email Address</label>
                         <input type="email" placeholder="e.g. example@mail.com" value={formData.email || ''} onChange={e => setFormData({ ...formData, email: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
@@ -3929,6 +4020,69 @@ const PartyManagement: React.FC = () => {
                         <label className="block text-xs font-medium text-gray-500 mb-1">City</label>
                         <input type="text" placeholder="e.g. Bangalore" value={formData.city || ''} onChange={e => setFormData({ ...formData, city: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                       </div>
+
+                      {/* Multiple Contact Persons */}
+                      <div className="col-span-2 mt-2">
+                        <div className="flex justify-between items-center mb-2 border-b pb-1">
+                          <label className="block text-xs font-semibold text-gray-705 uppercase tracking-wider">Contact Persons</label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const currentContacts = formData.contactPersons || [];
+                              setFormData({
+                                ...formData,
+                                contactPersons: [...currentContacts, { name: '', phone: '' }]
+                              });
+                            }}
+                            className="text-xs text-blue-650 hover:text-blue-755 font-semibold flex items-center space-x-1"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Add Contact</span>
+                          </button>
+                        </div>
+                        <div className="space-y-2">
+                          {((formData.contactPersons || []) as any[]).map((cp, idx) => (
+                            <div key={idx} className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                placeholder="Name"
+                                value={cp.name || ''}
+                                onChange={e => {
+                                  const newContacts = [...(formData.contactPersons || [])];
+                                  newContacts[idx] = { ...newContacts[idx], name: e.target.value };
+                                  setFormData({ ...formData, contactPersons: newContacts });
+                                }}
+                                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                              />
+                              <input
+                                type="tel"
+                                placeholder="Phone"
+                                value={cp.phone || ''}
+                                onChange={e => {
+                                  const newContacts = [...(formData.contactPersons || [])];
+                                  newContacts[idx] = { ...newContacts[idx], phone: e.target.value };
+                                  setFormData({ ...formData, contactPersons: newContacts });
+                                }}
+                                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newContacts = (formData.contactPersons || []).filter((_: any, i: number) => i !== idx);
+                                  setFormData({ ...formData, contactPersons: newContacts });
+                                }}
+                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-200"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                          {(!formData.contactPersons || formData.contactPersons.length === 0) && (
+                            <p className="text-xs text-gray-400 italic">No contact persons added yet. Click Add Contact to add.</p>
+                          )}
+                        </div>
+                      </div>
+
                     </div>
                   </div>
                 </>
@@ -4673,51 +4827,90 @@ const PartyManagement: React.FC = () => {
                       placeholder="e.g. VRL Logistics"
                       value={inlineTransporterData.name}
                       onChange={e => setInlineTransporterData({ ...inlineTransporterData, name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 focus:bg-white transition-colors"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 focus:bg-white transition-colors text-gray-900"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Contact Person</label>
+                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Email Address</label>
+                    <input
+                      type="email"
+                      placeholder="e.g. info@vrl.com"
+                      value={inlineTransporterData.email}
+                      onChange={e => setInlineTransporterData({ ...inlineTransporterData, email: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 focus:bg-white transition-colors text-gray-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">City</label>
                     <input
                       type="text"
-                      placeholder="e.g. Suresh Kumar"
-                      value={inlineTransporterData.contactName}
-                      onChange={e => setInlineTransporterData({ ...inlineTransporterData, contactName: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 focus:bg-white transition-colors"
+                      placeholder="e.g. Bangalore"
+                      value={inlineTransporterData.city}
+                      onChange={e => setInlineTransporterData({ ...inlineTransporterData, city: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 focus:bg-white transition-colors text-gray-900"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Mobile Number*</label>
-                    <input
-                      type="tel"
-                      placeholder="e.g. 98765 43210"
-                      value={inlineTransporterData.phone}
-                      onChange={e => setInlineTransporterData({ ...inlineTransporterData, phone: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 focus:bg-white transition-colors"
-                      required
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="col-span-2">
-                      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Email Address</label>
-                      <input
-                        type="email"
-                        placeholder="e.g. info@vrl.com"
-                        value={inlineTransporterData.email}
-                        onChange={e => setInlineTransporterData({ ...inlineTransporterData, email: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 focus:bg-white transition-colors"
-                      />
+
+                  {/* Multiple Contact Persons Inline */}
+                  <div className="col-span-2 mt-2">
+                    <div className="flex justify-between items-center mb-2 border-b pb-1">
+                      <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">Contact Persons</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const currentContacts = inlineTransporterData.contactPersons || [];
+                          setInlineTransporterData({
+                            ...inlineTransporterData,
+                            contactPersons: [...currentContacts, { name: '', phone: '' }]
+                          });
+                        }}
+                        className="text-xs text-blue-600 hover:text-blue-700 font-semibold flex items-center space-x-1"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add Contact</span>
+                      </button>
                     </div>
-                    <div className="col-span-2">
-                      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">City</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Bangalore"
-                        value={inlineTransporterData.city}
-                        onChange={e => setInlineTransporterData({ ...inlineTransporterData, city: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 focus:bg-white transition-colors"
-                      />
+                    <div className="space-y-2">
+                      {((inlineTransporterData.contactPersons || []) as any[]).map((cp, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            placeholder="Name"
+                            value={cp.name || ''}
+                            onChange={e => {
+                              const newContacts = [...(inlineTransporterData.contactPersons || [])];
+                              newContacts[idx] = { ...newContacts[idx], name: e.target.value };
+                              setInlineTransporterData({ ...inlineTransporterData, contactPersons: newContacts });
+                            }}
+                            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                          />
+                          <input
+                            type="tel"
+                            placeholder="Phone"
+                            value={cp.phone || ''}
+                            onChange={e => {
+                              const newContacts = [...(inlineTransporterData.contactPersons || [])];
+                              newContacts[idx] = { ...newContacts[idx], phone: e.target.value };
+                              setInlineTransporterData({ ...inlineTransporterData, contactPersons: newContacts });
+                            }}
+                            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newContacts = (inlineTransporterData.contactPersons || []).filter((_: any, i: number) => i !== idx);
+                              setInlineTransporterData({ ...inlineTransporterData, contactPersons: newContacts });
+                            }}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-200"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                      {(!inlineTransporterData.contactPersons || inlineTransporterData.contactPersons.length === 0) && (
+                        <p className="text-xs text-gray-400 italic">No contact persons added yet. Click Add Contact to add.</p>
+                      )}
                     </div>
                   </div>
                 </>
@@ -5709,16 +5902,40 @@ const PartyManagement: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Customer Information Section */}
-                <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
+                {/* Customer Information & Statistics Section */}
+                <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-4">
                   <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
-                    <Users className="w-4 h-4 text-gray-500" /> Mapped Customers
+                    <Users className="w-4 h-4 text-gray-500" /> City Statistics & Customers
                   </h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-gray-650 font-medium">Total Customers in City:</span>
+                  
+                  <div className="grid grid-cols-2 gap-3 bg-white p-3.5 rounded-xl border border-gray-150 text-sm">
+                    <div>
+                      <span className="block text-xs text-gray-450 font-medium">Total Customers</span>
                       <span className="font-bold text-gray-909 text-lg">{viewingCustomer.customerCount || 0}</span>
                     </div>
+                    <div>
+                      <span className="block text-xs text-gray-450 font-medium">Outstanding</span>
+                      {(() => {
+                        const bal = viewingCustomer.outstandingBalance !== undefined ? viewingCustomer.outstandingBalance : (viewingCustomer.outstanding || 0);
+                        const info = getOutstandingInfo('market', bal);
+                        return (
+                          <span className={`inline-block font-bold text-base mt-0.5 ${info.textClass}`}>
+                            {info.formatted}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-450 font-medium">Active Customers</span>
+                      <span className="font-semibold text-green-700 text-sm">{viewingCustomer.activeCustomersCount || 0}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-450 font-medium">Inactive Customers</span>
+                      <span className="font-semibold text-red-650 text-sm">{viewingCustomer.inactiveCustomersCount || 0}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
                     <button
                       onClick={handleAddCustomerToCity}
                       className="flex items-center justify-center space-x-2 w-full p-2.5 bg-green-50 hover:bg-green-100 text-green-755 rounded-lg border border-green-200 text-xs font-semibold transition-colors"
@@ -5752,36 +5969,6 @@ const PartyManagement: React.FC = () => {
                       <span className="font-semibold text-gray-905">{viewingCustomer.firmName || '-'}</span>
                     </div>
                     <div>
-                      <span className="block text-xs text-gray-400 font-medium">Contact Person</span>
-                      <span className="font-semibold text-gray-905">{viewingCustomer.contactName || '-'}</span>
-                    </div>
-                    <div>
-                      <span className="block text-xs text-gray-400 font-medium">Mobile Number</span>
-                      <div className="flex items-center space-x-1.5 w-[145px]">
-                        {viewingCustomer.phone ? (
-                          <>
-                            <a
-                              href={`tel:${viewingCustomer.phone.replace(/\D/g, '')}`}
-                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline w-[110px] inline-block truncate"
-                              title={`Call ${viewingCustomer.phone}`}
-                            >
-                              {viewingCustomer.phone}
-                            </a>
-                            <a
-                              href={getWhatsAppLink(viewingCustomer.phone)}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center"
-                            >
-                              <WhatsAppIcon />
-                            </a>
-                          </>
-                        ) : (
-                          <span className="font-semibold text-gray-905">-</span>
-                        )}
-                      </div>
-                    </div>
-                    <div>
                       <span className="block text-xs text-gray-400 font-medium">Email Address</span>
                       {viewingCustomer.email ? (
                         <a
@@ -5795,18 +5982,63 @@ const PartyManagement: React.FC = () => {
                         <span className="font-semibold text-gray-905 block truncate">-</span>
                       )}
                     </div>
+                    <div className="col-span-2">
+                      <span className="block text-xs text-gray-400 font-medium">City / Town</span>
+                      <span className="font-semibold text-gray-905">{viewingCustomer.city || '-'}</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Location Information Section */}
+                {/* Usage Statistics Section */}
                 <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
                   <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
-                    <MapPin className="w-4 h-4 text-gray-500" /> Location Information
+                    <Users className="w-4 h-4 text-gray-500" /> Usage Statistics
                   </h3>
-                  <div className="text-sm">
-                    <span className="block text-xs text-gray-400 font-medium">City / Town</span>
-                    <span className="font-semibold text-gray-905">{viewingCustomer.city || '-'}</span>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-650 font-medium">Total Customers:</span>
+                    <span className="font-bold text-gray-909 text-lg">{viewingCustomer.customerCount || 0}</span>
                   </div>
+                </div>
+
+                {/* Contact Persons Section */}
+                <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
+                    <Users className="w-4 h-4 text-gray-500" /> Contact Persons
+                  </h3>
+                  {viewingCustomer.contactPersons && viewingCustomer.contactPersons.length > 0 ? (
+                    <div className="space-y-3">
+                      {viewingCustomer.contactPersons.map((cp: any, idx: number) => (
+                        <div key={idx} className="flex justify-between items-center text-sm border-b border-gray-100 pb-2 last:border-0 last:pb-0">
+                          <div>
+                            <p className="font-semibold text-gray-855">{cp.name || 'No Name'}</p>
+                            <p className="text-xs text-gray-450 mt-0.5">{cp.phone || 'No Phone'}</p>
+                          </div>
+                          {cp.phone && (
+                            <div className="flex items-center space-x-2">
+                              <a
+                                href={`tel:${cp.phone.replace(/\D/g, '')}`}
+                                className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                title={`Call ${cp.name}`}
+                              >
+                                <Phone className="w-4 h-4" />
+                              </a>
+                              <a
+                                href={getWhatsAppLink(cp.phone)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors"
+                                title="WhatsApp"
+                              >
+                                <WhatsAppIcon />
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-400 italic text-center py-2">No contact persons added yet.</p>
+                  )}
                 </div>
               </>
             )}

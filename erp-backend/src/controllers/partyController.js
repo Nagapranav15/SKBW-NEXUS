@@ -609,6 +609,110 @@ const generateCustomerCode = async (partyData) => {
   return prefix + runningNum;
 };
 
+const enrichPartyObj = async (party) => {
+  if (!party) return null;
+  const partyObj = party.toObject ? party.toObject() : party;
+  
+  if (partyObj.type === 'market') {
+    const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const cityRegex = new RegExp('^' + escapeRegex(partyObj.firmName) + '$', 'i');
+    const [customerCount, activeCustomersCount, inactiveCustomersCount, outstandingResult] = await Promise.all([
+      Party.countDocuments({
+        type: 'customer',
+        city: cityRegex,
+        company: partyObj.company,
+        isDeleted: { $ne: true }
+      }),
+      Party.countDocuments({
+        type: 'customer',
+        city: cityRegex,
+        company: partyObj.company,
+        isDeleted: { $ne: true },
+        status: 'active'
+      }),
+      Party.countDocuments({
+        type: 'customer',
+        city: cityRegex,
+        company: partyObj.company,
+        isDeleted: { $ne: true },
+        status: { $ne: 'active' }
+      }),
+      Party.aggregate([
+        {
+          $match: {
+            type: 'customer',
+            city: cityRegex,
+            company: partyObj.company,
+            isDeleted: { $ne: true }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalOutstanding: { $sum: '$outstanding' }
+          }
+        }
+      ])
+    ]);
+    partyObj.customerCount = customerCount;
+    partyObj.activeCustomersCount = activeCustomersCount;
+    partyObj.inactiveCustomersCount = inactiveCustomersCount;
+    partyObj.outstanding = outstandingResult.length > 0 ? outstandingResult[0].totalOutstanding : 0;
+    partyObj.outstandingBalance = partyObj.outstanding;
+  } else if (partyObj.type === 'agent') {
+    const agentName = partyObj.firmName;
+    const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const agentRegex = new RegExp('^' + escapeRegex(agentName) + '$', 'i');
+
+    const agentRoutes = await Route.find({
+      company: partyObj.company,
+      assignedAgent: agentRegex
+    });
+    const routeNames = agentRoutes.map(r => r.name);
+    const routeRegexes = routeNames.map(name => new RegExp('^' + escapeRegex(name) + '$', 'i'));
+
+    partyObj.assignedRegionsCount = agentRoutes.length;
+
+    const cityFilter = {
+      type: 'market',
+      company: partyObj.company,
+      isDeleted: { $ne: true }
+    };
+    if (routeRegexes.length > 0) {
+      cityFilter.route = { $in: routeRegexes };
+    } else {
+      cityFilter.route = '__NONE__';
+    }
+    const assignedCitiesCount = await Party.countDocuments(cityFilter);
+    partyObj.assignedCitiesCount = assignedCitiesCount;
+
+    const customerFilter = {
+      type: 'customer',
+      company: partyObj.company,
+      isDeleted: { $ne: true }
+    };
+    if (routeRegexes.length > 0) {
+      customerFilter.route = { $in: routeRegexes };
+    } else {
+      customerFilter.route = '__NONE__';
+    }
+    const assignedCustomersCount = await Party.countDocuments(customerFilter);
+    partyObj.assignedCustomersCount = assignedCustomersCount;
+  } else if (partyObj.type === 'transporter') {
+    const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const transporterRegex = new RegExp('^' + escapeRegex(partyObj.firmName) + '$', 'i');
+    const customerCount = await Party.countDocuments({
+      type: 'customer',
+      preferredTransport: transporterRegex,
+      company: partyObj.company,
+      isDeleted: { $ne: true }
+    });
+    partyObj.customerCount = customerCount;
+  }
+  
+  return partyObj;
+};
+
 exports.getParties = async (req, res) => {
   try {
     const filter = { isDeleted: { $ne: true } };
@@ -759,78 +863,7 @@ exports.getParties = async (req, res) => {
         party.code = generatedCode;
         await Party.findByIdAndUpdate(party._id, { code: generatedCode });
       }
-      const partyObj = party.toObject();
-      if (party.type === 'market') {
-        const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-        const cityRegex = new RegExp('^' + escapeRegex(party.firmName) + '$', 'i');
-        const [customerCount, outstandingResult] = await Promise.all([
-          Party.countDocuments({
-            type: 'customer',
-            city: cityRegex,
-            company: party.company,
-            isDeleted: { $ne: true }
-          }),
-          Party.aggregate([
-            {
-              $match: {
-                type: 'customer',
-                city: cityRegex,
-                company: party.company,
-                isDeleted: { $ne: true }
-              }
-            },
-            {
-              $group: {
-                _id: null,
-                totalOutstanding: { $sum: '$outstanding' }
-              }
-            }
-          ])
-        ]);
-        partyObj.customerCount = customerCount;
-        partyObj.outstanding = outstandingResult.length > 0 ? outstandingResult[0].totalOutstanding : 0;
-        partyObj.outstandingBalance = partyObj.outstanding;
-      } else if (party.type === 'agent') {
-        const agentName = party.firmName;
-        const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-        const agentRegex = new RegExp('^' + escapeRegex(agentName) + '$', 'i');
-
-        // 1. Get routes assigned to this agent
-        const agentRoutes = await Route.find({
-          company: party.company,
-          assignedAgent: agentRegex
-        });
-        const routeNames = agentRoutes.map(r => r.name);
-        const routeRegexes = routeNames.map(name => new RegExp('^' + escapeRegex(name) + '$', 'i'));
-
-        // 2. Count assigned regions (routes)
-        partyObj.assignedRegionsCount = agentRoutes.length;
-
-        // 3. Count assigned cities (markets)
-        const cityFilter = {
-          type: 'market',
-          company: party.company,
-          isDeleted: { $ne: true },
-          $or: [
-            { agentAssigned: agentRegex },
-            { route: { $in: routeRegexes } }
-          ]
-        };
-        partyObj.assignedCitiesCount = await Party.countDocuments(cityFilter);
-
-        // 4. Count assigned customers
-        const customerFilter = {
-          type: 'customer',
-          company: party.company,
-          isDeleted: { $ne: true },
-          $or: [
-            { agentAssigned: agentRegex },
-            { route: { $in: routeRegexes } }
-          ]
-        };
-        partyObj.assignedCustomersCount = await Party.countDocuments(customerFilter);
-      }
-      return partyObj;
+      return enrichPartyObj(party);
     }));
 
     res.json({ parties, total, page, limit });
@@ -867,7 +900,8 @@ exports.getPartyById = async (req, res) => {
   try {
     const party = await Party.findById(req.params.id);
     if (!party) return res.status(404).json({ msg: 'Party not found' });
-    res.json(party);
+    const enriched = await enrichPartyObj(party);
+    res.json(enriched);
   } catch (err) {
     res.status(500).json({ msg: err.message });
   }
@@ -895,7 +929,8 @@ exports.createParty = async (req, res) => {
       company: party.company
     }).catch(err => console.error("Activity log failed:", err));
 
-    res.status(201).json(party);
+    const enriched = await enrichPartyObj(party);
+    res.status(201).json(enriched);
   } catch (err) {
     res.status(500).json({ msg: err.message });
   }
@@ -993,7 +1028,8 @@ exports.updateParty = async (req, res) => {
       company: party.company
     }).catch(err => console.error("Activity log failed:", err));
 
-    res.json(party);
+    const enriched = await enrichPartyObj(party);
+    res.json(enriched);
   } catch (err) {
     res.status(500).json({ msg: err.message });
   }
@@ -1003,6 +1039,20 @@ exports.deleteParty = async (req, res) => {
   try {
     const party = await Party.findById(req.params.id);
     if (!party) return res.status(404).json({ msg: 'Party not found' });
+
+    if (party.type === 'market') {
+      const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const cityRegex = new RegExp('^' + escapeRegex(party.firmName) + '$', 'i');
+      const customerCount = await Party.countDocuments({
+        type: 'customer',
+        city: cityRegex,
+        company: party.company,
+        isDeleted: { $ne: true }
+      });
+      if (customerCount > 0) {
+        return res.status(400).json({ msg: 'Cannot delete city. Move customers first.' });
+      }
+    }
 
     party.isDeleted = true;
     await party.save();
@@ -1041,6 +1091,23 @@ exports.bulkDeleteParties = async (req, res) => {
     const partiesToDelete = await Party.find({ _id: { $in: ids } });
     if (partiesToDelete.length === 0) {
       return res.status(404).json({ msg: 'No matching records found to delete' });
+    }
+
+    // Check delete protection for markets
+    for (const p of partiesToDelete) {
+      if (p.type === 'market') {
+        const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const cityRegex = new RegExp('^' + escapeRegex(p.firmName) + '$', 'i');
+        const customerCount = await Party.countDocuments({
+          type: 'customer',
+          city: cityRegex,
+          company: p.company,
+          isDeleted: { $ne: true }
+        });
+        if (customerCount > 0) {
+          return res.status(400).json({ msg: `Cannot delete city "${p.firmName}". Move customers first.` });
+        }
+      }
     }
 
     const marketNames = partiesToDelete

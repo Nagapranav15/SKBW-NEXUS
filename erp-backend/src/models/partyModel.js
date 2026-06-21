@@ -82,6 +82,10 @@ const partySchema = new mongoose.Schema({
     type: [String],
     default: []
   },
+  contactPersons: [{
+    name: { type: String, default: "" },
+    phone: { type: String, default: "" }
+  }],
   isDeleted: {
     type: Boolean,
     default: false

@@ -74,7 +74,50 @@ exports.getRouteById = async (req, res) => {
   try {
     const route = await Route.findById(req.params.id);
     if (!route) return res.status(404).json({ msg: 'Route not found' });
-    res.json(route);
+
+    const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const routeRegex = new RegExp('^' + escapeRegex(route.name) + '$', 'i');
+    
+    const [citiesCount, customersCount, outstandingResult] = await Promise.all([
+      Party.countDocuments({
+        type: 'market',
+        route: routeRegex,
+        company: route.company,
+        isDeleted: { $ne: true }
+      }),
+      Party.countDocuments({
+        type: 'customer',
+        route: routeRegex,
+        company: route.company,
+        isDeleted: { $ne: true }
+      }),
+      Party.aggregate([
+        {
+          $match: {
+            type: 'customer',
+            route: routeRegex,
+            company: route.company,
+            isDeleted: { $ne: true }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalOutstanding: { $sum: '$outstanding' }
+          }
+        }
+      ])
+    ]);
+    
+    const outstanding = outstandingResult.length > 0 ? outstandingResult[0].totalOutstanding : 0;
+
+    res.json({
+      ...route.toObject(),
+      citiesCount,
+      customersCount,
+      outstandingBalance: outstanding,
+      outstanding: outstanding
+    });
   } catch (err) {
     res.status(500).json({ msg: err.message });
   }
