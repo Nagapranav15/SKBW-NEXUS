@@ -718,7 +718,8 @@ const PartyManagement: React.FC = () => {
       gstNumber: '',
       aadharNumber: '',
       remarks: '',
-      tags: []
+      tags: [],
+      contactPersons: []
     };
   };
 
@@ -1103,7 +1104,7 @@ const PartyManagement: React.FC = () => {
       agentAssigned: initialData?.agentAssigned || '',
       status: 'active'
     });
-    setInlineTransporterData({ name: '', contactName: '', phone: '', email: '', city: '' });
+    setInlineTransporterData({ name: '', contactName: '', phone: '', email: '', city: '', contactPersons: [] });
     setInlineModalType(type);
   };
 
@@ -1515,6 +1516,7 @@ const PartyManagement: React.FC = () => {
       agentAssigned,
       type: item.type || (currentType === 'route' ? 'route' : currentType),
       tags: item.tags || [],
+      contactPersons: item.contactPersons || [],
       outstandingBalance: item.outstandingBalance !== undefined ? item.outstandingBalance : (item.outstanding || 0)
     });
     setIsAddingNewCity(false);

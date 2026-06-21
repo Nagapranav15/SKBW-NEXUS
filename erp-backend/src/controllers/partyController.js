@@ -660,7 +660,7 @@ const enrichPartyObj = async (party) => {
     partyObj.outstanding = outstandingResult.length > 0 ? outstandingResult[0].totalOutstanding : 0;
     partyObj.outstandingBalance = partyObj.outstanding;
   } else if (partyObj.type === 'agent') {
-    const agentName = partyObj.firmName;
+    const agentName = partyObj.firmName || partyObj.contactName;
     const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
     const agentRegex = new RegExp('^' + escapeRegex(agentName) + '$', 'i');
 
@@ -673,29 +673,46 @@ const enrichPartyObj = async (party) => {
 
     partyObj.assignedRegionsCount = agentRoutes.length;
 
+    const cityConditions = [];
+    if (routeRegexes.length > 0) {
+      cityConditions.push({ route: { $in: routeRegexes } });
+    }
+    cityConditions.push({ agentAssigned: agentRegex });
+
     const cityFilter = {
       type: 'market',
       company: partyObj.company,
-      isDeleted: { $ne: true }
+      isDeleted: { $ne: true },
+      $or: cityConditions
     };
-    if (routeRegexes.length > 0) {
-      cityFilter.route = { $in: routeRegexes };
-    } else {
-      cityFilter.route = '__NONE__';
-    }
     const assignedCitiesCount = await Party.countDocuments(cityFilter);
     partyObj.assignedCitiesCount = assignedCitiesCount;
+
+    // Find all markets assigned to the agent to cover customer city assignments
+    const assignedMarkets = await Party.find({
+      type: 'market',
+      company: partyObj.company,
+      isDeleted: { $ne: true },
+      $or: cityConditions
+    });
+    const assignedMarketNames = assignedMarkets.map(m => m.firmName);
+    const marketRegexes = assignedMarketNames.map(name => new RegExp('^' + escapeRegex(name) + '$', 'i'));
+
+    const customerConditions = [];
+    if (routeRegexes.length > 0) {
+      customerConditions.push({ route: { $in: routeRegexes } });
+    }
+    if (marketRegexes.length > 0) {
+      customerConditions.push({ city: { $in: marketRegexes } });
+    }
+    customerConditions.push({ agentAssigned: agentRegex });
 
     const customerFilter = {
       type: 'customer',
       company: partyObj.company,
-      isDeleted: { $ne: true }
+      isDeleted: { $ne: true },
+      $or: customerConditions
     };
-    if (routeRegexes.length > 0) {
-      customerFilter.route = { $in: routeRegexes };
-    } else {
-      customerFilter.route = '__NONE__';
-    }
     const assignedCustomersCount = await Party.countDocuments(customerFilter);
     partyObj.assignedCustomersCount = assignedCustomersCount;
   } else if (partyObj.type === 'transporter') {

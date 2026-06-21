@@ -9,8 +9,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
-    "dev": "node server.js",
-    "seed": "node seed.js"
+    "dev": "node --watch server.js",
+    "seed": "node seed.js",
+    "search": "node test_api.js"
   },
   "keywords": [],
   "author": "",
