@@ -11,7 +11,7 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "seed": "node seed.js",
-    "search": "node test_api.js"
+    "search": "node test_agent_api.js"
   },
   "keywords": [],
   "author": "",

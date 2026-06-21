@@ -664,20 +664,45 @@ const enrichPartyObj = async (party) => {
     const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
     const agentRegex = new RegExp('^' + escapeRegex(agentName) + '$', 'i');
 
-    const agentRoutes = await Route.find({
+    // 1. Find routes directly assigned to this agent in Route collection
+    const directRoutes = await Route.find({ company: partyObj.company, assignedAgent: agentRegex, isDeleted: { $ne: true } });
+    const directRouteNames = directRoutes.map(r => r.name);
+
+    // 2. Find customers directly assigned to this agent
+    const assignedCustomers = await Party.find({
+      type: 'customer',
       company: partyObj.company,
-      assignedAgent: agentRegex
+      agentAssigned: agentRegex,
+      isDeleted: { $ne: true }
     });
-    const routeNames = agentRoutes.map(r => r.name);
-    const routeRegexes = routeNames.map(name => new RegExp('^' + escapeRegex(name) + '$', 'i'));
+    const customerRouteNames = assignedCustomers.map(c => c.route).filter(Boolean);
+    const customerCities = assignedCustomers.map(c => c.city).filter(Boolean);
+    const customerCityRegexes = customerCities.map(city => new RegExp('^' + escapeRegex(city) + '$', 'i'));
 
-    partyObj.assignedRegionsCount = agentRoutes.length;
+    // 3. Find routes of markets (cities) directly assigned to this agent
+    const assignedMarkets = await Party.find({
+      type: 'market',
+      company: partyObj.company,
+      agentAssigned: agentRegex,
+      isDeleted: { $ne: true }
+    });
+    const marketRouteNames = assignedMarkets.map(m => m.route).filter(Boolean);
 
+    // Union of all route names
+    const allRouteNames = Array.from(new Set([...directRouteNames, ...marketRouteNames, ...customerRouteNames]));
+    const routeRegexes = allRouteNames.map(name => new RegExp('^' + escapeRegex(name) + '$', 'i'));
+
+    partyObj.assignedRegionsCount = allRouteNames.length;
+
+    // Filter cities/markets that are visible/assigned
     const cityConditions = [];
     if (routeRegexes.length > 0) {
       cityConditions.push({ route: { $in: routeRegexes } });
     }
     cityConditions.push({ agentAssigned: agentRegex });
+    if (customerCityRegexes.length > 0) {
+      cityConditions.push({ firmName: { $in: customerCityRegexes } });
+    }
 
     const cityFilter = {
       type: 'market',
@@ -689,15 +714,16 @@ const enrichPartyObj = async (party) => {
     partyObj.assignedCitiesCount = assignedCitiesCount;
 
     // Find all markets assigned to the agent to cover customer city assignments
-    const assignedMarkets = await Party.find({
+    const resolvedMarkets = await Party.find({
       type: 'market',
       company: partyObj.company,
       isDeleted: { $ne: true },
       $or: cityConditions
     });
-    const assignedMarketNames = assignedMarkets.map(m => m.firmName);
-    const marketRegexes = assignedMarketNames.map(name => new RegExp('^' + escapeRegex(name) + '$', 'i'));
+    const resolvedMarketNames = resolvedMarkets.map(m => m.firmName);
+    const marketRegexes = resolvedMarketNames.map(name => new RegExp('^' + escapeRegex(name) + '$', 'i'));
 
+    // Filter customers that are visible/assigned
     const customerConditions = [];
     if (routeRegexes.length > 0) {
       customerConditions.push({ route: { $in: routeRegexes } });
@@ -736,13 +762,72 @@ exports.getParties = async (req, res) => {
     if (req.query.type) filter.type = req.query.type;
 
     let companyFilter = null;
-    if (req.query.company) {
+    const companyId = req.query.company;
+    if (companyId) {
       companyFilter = {
         $or: [
-          { company: req.query.company },
-          { companies: req.query.company }
+          { company: companyId },
+          { companies: companyId }
         ]
       };
+    }
+
+    // Role-based filtering for logged-in sales agent/user
+    if (req.user && req.user.roleName === 'sales' && companyId) {
+      const agentName = req.user.fullName;
+      const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const agentRegex = new RegExp('^' + escapeRegex(agentName) + '$', 'i');
+
+      if (req.query.type === 'market') {
+        const agentRoutes = await Route.find({ company: companyId, assignedAgent: agentRegex, isDeleted: { $ne: true } });
+        const routeNames = agentRoutes.map(r => r.name);
+        const routeRegexes = routeNames.map(name => new RegExp('^' + escapeRegex(name) + '$', 'i'));
+
+        const assignedCustomers = await Party.find({ type: 'customer', company: companyId, agentAssigned: agentRegex, isDeleted: { $ne: true } });
+        const customerCities = assignedCustomers.map(c => c.city).filter(Boolean);
+        const customerCityRegexes = customerCities.map(city => new RegExp('^' + escapeRegex(city) + '$', 'i'));
+
+        const cityConditions = [];
+        if (routeRegexes.length > 0) {
+          cityConditions.push({ route: { $in: routeRegexes } });
+        }
+        cityConditions.push({ agentAssigned: agentRegex });
+        if (customerCityRegexes.length > 0) {
+          cityConditions.push({ firmName: { $in: customerCityRegexes } });
+        }
+
+        filter.$or = cityConditions;
+      } else if (req.query.type === 'customer') {
+        const agentRoutes = await Route.find({ company: companyId, assignedAgent: agentRegex, isDeleted: { $ne: true } });
+        const routeNames = agentRoutes.map(r => r.name);
+        const routeRegexes = routeNames.map(name => new RegExp('^' + escapeRegex(name) + '$', 'i'));
+
+        const cityConditions = [];
+        if (routeRegexes.length > 0) {
+          cityConditions.push({ route: { $in: routeRegexes } });
+        }
+        cityConditions.push({ agentAssigned: agentRegex });
+
+        const assignedMarkets = await Party.find({
+          type: 'market',
+          company: companyId,
+          isDeleted: { $ne: true },
+          $or: cityConditions
+        });
+        const assignedMarketNames = assignedMarkets.map(m => m.firmName);
+        const marketRegexes = assignedMarketNames.map(name => new RegExp('^' + escapeRegex(name) + '$', 'i'));
+
+        const customerConditions = [];
+        if (routeRegexes.length > 0) {
+          customerConditions.push({ route: { $in: routeRegexes } });
+        }
+        if (marketRegexes.length > 0) {
+          customerConditions.push({ city: { $in: marketRegexes } });
+        }
+        customerConditions.push({ agentAssigned: agentRegex });
+
+        filter.$or = customerConditions;
+      }
     }
 
     if (req.query.status) {
