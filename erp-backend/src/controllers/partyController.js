@@ -959,7 +959,9 @@ exports.getParties = async (req, res) => {
     ]);
 
     let parties;
-    if (req.query.type === 'market') {
+    if (req.query.light === 'true') {
+      parties = rawParties.map(p => p.toObject ? p.toObject() : p);
+    } else if (req.query.type === 'market') {
       const cityNames = rawParties.map(p => p.firmName).filter(Boolean);
       const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
       const cityRegexes = cityNames.map(name => new RegExp('^' + escapeRegex(name) + '$', 'i'));

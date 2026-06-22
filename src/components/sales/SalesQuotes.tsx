@@ -83,7 +83,7 @@ const SalesQuotes: React.FC = () => {
     try {
       const [quotesRes, partiesRes, itemsRes] = await Promise.all([
         getQuotes(selectedCompany?._id),
-        getParties({ company: selectedCompany?._id, type: 'customer', limit: 1000 }),
+        getParties({ company: selectedCompany?._id, type: 'customer', limit: 1000, light: true }),
         getItems(selectedCompany?._id)
       ]);
       setQuotes(quotesRes.data);

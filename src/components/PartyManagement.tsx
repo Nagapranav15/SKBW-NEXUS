@@ -983,24 +983,25 @@ const PartyManagement: React.FC = () => {
     if (!selectedCompany) return;
     try {
       // Fetch references in parallel to optimize load time
-      const [agentsRes, routesRes, marketsRes, transportersRes, partiesForCitiesRes] = await Promise.all([
-        getParties({ type: 'agent', limit: 1000, company: selectedCompany._id }),
+      const [agentsRes, routesRes, marketsRes, transportersRes] = await Promise.all([
+        getParties({ type: 'agent', limit: 1000, company: selectedCompany._id, light: true }),
         getRoutes(selectedCompany._id, { status: 'active' }),
-        getParties({ type: 'market', limit: 1000, company: selectedCompany._id }),
-        getParties({ type: 'transporter', limit: 1000, company: selectedCompany._id }),
-        getParties({ limit: 1000, company: selectedCompany._id })
+        getParties({ type: 'market', limit: 1000, company: selectedCompany._id, light: true }),
+        getParties({ type: 'transporter', limit: 1000, company: selectedCompany._id, light: true })
       ]);
 
       setAllAgents(agentsRes.data.parties || []);
       setAllRoutes(routesRes.data || []);
-      setAllMarkets(marketsRes.data.parties || []);
+      
+      const marketsList = marketsRes.data.parties || [];
+      setAllMarkets(marketsList);
       setAllTransporters(transportersRes.data.parties || []);
 
-      const partiesList = partiesForCitiesRes.data.parties || [];
+      // Extract unique city names from markets list since markets represent cities/markets
       const cities = new Set<string>();
-      partiesList.forEach((p: any) => {
-        if (p.city && p.city.trim()) {
-          cities.add(p.city.trim());
+      marketsList.forEach((m: any) => {
+        if (m.firmName && m.firmName.trim()) {
+          cities.add(m.firmName.trim());
         }
       });
       setAllCities(Array.from(cities).sort());

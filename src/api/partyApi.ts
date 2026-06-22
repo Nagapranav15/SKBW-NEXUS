@@ -1,6 +1,6 @@
 import api from './axios';
 
-export const getParties = (params?: { type?: string; status?: string; search?: string; page?: number; limit?: number; company?: string }) => {
+export const getParties = (params?: { type?: string; status?: string; search?: string; page?: number; limit?: number; company?: string; light?: boolean }) => {
   return api.get('/parties', { params });
 };
 

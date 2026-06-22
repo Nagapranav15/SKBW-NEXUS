@@ -83,7 +83,7 @@ const SalesOrders: React.FC = () => {
     try {
       const [ordersRes, partiesRes, itemsRes] = await Promise.all([
         getSalesOrders(selectedCompany?._id),
-        getParties({ company: selectedCompany?._id, type: 'customer', limit: 1000 }),
+        getParties({ company: selectedCompany?._id, type: 'customer', limit: 1000, light: true }),
         getItems(selectedCompany?._id)
       ]);
       setOrders(ordersRes.data);
