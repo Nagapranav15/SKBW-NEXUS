@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider } from './context/AuthProvider';
 import { ToastContainer } from './components/ui/Toast';
 import Login from './components/Login';
 import CompanySelection from './components/CompanySelection';
