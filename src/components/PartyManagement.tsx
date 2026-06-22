@@ -1323,12 +1323,16 @@ const PartyManagement: React.FC = () => {
     setPage(1);
   };
 
-  // Load everything
+  // Load dropdown options once on mount or when selected company changes
+  useEffect(() => {
+    fetchDropdownOptions();
+  }, [fetchDropdownOptions]);
+
+  // Load main list and stats when filters/type/pagination changes
   useEffect(() => {
     fetchMainData();
     fetchStatsCounts();
-    fetchDropdownOptions();
-  }, [fetchMainData, fetchStatsCounts, fetchDropdownOptions]);
+  }, [fetchMainData, fetchStatsCounts]);
 
   // Load Activity Logs
   const fetchLogs = async () => {
