@@ -13,18 +13,13 @@ const ReportsPage: React.FC = () => {
   const [filterAction, setFilterAction] = useState('');
   const limit = 30;
 
-  useEffect(() => {
-    if (selectedCompany?._id) {
-      loadLogs();
-    }
-  }, [selectedCompany, page, filterAction]);
+  useEffect(() => { if (selectedCompany) loadLogs(); }, [selectedCompany, page, filterAction]);
 
   const loadLogs = async () => {
-    if (!selectedCompany?._id) return;
     setLoading(true);
     try {
       const res = await ledgerApi.getAuditLogs({
-        companyId: selectedCompany._id, limit, skip: page * limit,
+        companyId: selectedCompany?._id, limit, skip: page * limit,
         ...(filterAction ? { action_type: filterAction } : {})
       });
       setAuditLogs(res.data.logs || []);

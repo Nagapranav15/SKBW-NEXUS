@@ -16,26 +16,12 @@ const MfgSkus: React.FC = () => {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ sku_code: '', name: '', category: 'Raw', brand: '', pages: '', default_books_per_gbl: '', unit_type: 'kg', cost_per_unit: '' });
 
-  useEffect(() => {
-    if (selectedCompany?._id) {
-      load();
-    }
-  }, [selectedCompany]);
-
-  const load = async () => {
-    if (!selectedCompany?._id) return;
-    setLoading(true);
-    try {
-      const r = await mfgApi.getSkus(selectedCompany._id);
-      setSkus(r.data);
-    } catch (e) { console.error(e); }
-    finally { setLoading(false); }
-  };
+  useEffect(() => { if (selectedCompany) load(); }, [selectedCompany]);
+  const load = async () => { setLoading(true); try { const r = await mfgApi.getSkus(selectedCompany?._id); setSkus(r.data); } catch (e) { console.error(e); } finally { setLoading(false); } };
 
   const handleSave = async () => {
-    if (!selectedCompany?._id) return;
     try {
-      const data = { ...form, pages: form.pages ? Number(form.pages) : null, default_books_per_gbl: form.default_books_per_gbl ? Number(form.default_books_per_gbl) : null, cost_per_unit: Number(form.cost_per_unit) || 0, company: selectedCompany._id };
+      const data = { ...form, pages: form.pages ? Number(form.pages) : null, default_books_per_gbl: form.default_books_per_gbl ? Number(form.default_books_per_gbl) : null, cost_per_unit: Number(form.cost_per_unit) || 0, company: selectedCompany?._id };
       if (editId) await mfgApi.updateSku(editId, data); else await mfgApi.createSku(data);
       setShowModal(false); setEditId(null); load(); showToast(editId ? 'Updated' : 'Created', 'success');
     } catch (e: any) { showToast(e.response?.data?.msg || 'Error', 'error'); }

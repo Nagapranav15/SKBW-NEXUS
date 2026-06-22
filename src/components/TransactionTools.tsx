@@ -45,17 +45,12 @@ const TransactionTools: React.FC = () => {
   const [importMsg, setImportMsg] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (selectedCompany?._id) {
-      fetchTransactions();
-    }
-  }, [selectedCompany, pagination.page, search, filters]);
+  useEffect(() => { fetchTransactions(); }, [selectedCompany, pagination.page, search, filters]);
 
   const fetchTransactions = async () => {
-    if (!selectedCompany?._id) return;
     setLoading(true);
     try {
-      const params: any = { companyId: selectedCompany._id, page: pagination.page, limit: pagination.limit, search };
+      const params: any = { companyId: selectedCompany?._id, page: pagination.page, limit: pagination.limit, search };
       if (filters.type) params.type = filters.type;
       if (filters.category) params.category = filters.category;
       if (filters.paymentMethod) params.paymentMethod = filters.paymentMethod;
@@ -69,9 +64,8 @@ const TransactionTools: React.FC = () => {
   };
 
   const handleSave = async () => {
-    if (!selectedCompany?._id) return;
     try {
-      const data = { ...form, amount: Number(form.amount), company: selectedCompany._id };
+      const data = { ...form, amount: Number(form.amount), company: selectedCompany?._id };
       if (editingTxn) { await txnApi.updateTransaction(editingTxn._id, data); }
       else { await txnApi.createTransaction(data); }
       setShowModal(false); setEditingTxn(null); resetForm(); fetchTransactions();
@@ -92,10 +86,9 @@ const TransactionTools: React.FC = () => {
   const resetForm = () => setForm({ date: new Date().toISOString().split('T')[0], type: 'credit', category: '', subcategory: '', amount: '', paymentMethod: 'cash', customPaymentMethod: '', referenceId: '', ledgerAccount: '', description: '', partyName: '' });
 
   const handleExportDaily = async () => {
-    if (!selectedCompany?._id) return;
     setExporting(true);
     try {
-      const res = await txnApi.exportDailyTransactions(exportDate, exportFormat, selectedCompany._id);
+      const res = await txnApi.exportDailyTransactions(exportDate, exportFormat, selectedCompany?._id);
       if (exportFormat === 'json') {
         const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
         txnApi.downloadBlob(blob, `transactions_${exportDate}.json`);
@@ -107,10 +100,9 @@ const TransactionTools: React.FC = () => {
   };
 
   const handleExportLedger = async () => {
-    if (!selectedCompany?._id) return;
     setExporting(true);
     try {
-      const res = await txnApi.exportLedger(selectedCompany._id);
+      const res = await txnApi.exportLedger(selectedCompany?._id);
       txnApi.downloadBlob(res.data, `ledger_${new Date().toISOString().split('T')[0]}.xlsx`);
     } catch (err) { alert('Ledger export failed'); }
     finally { setExporting(false); }
@@ -137,18 +129,16 @@ const TransactionTools: React.FC = () => {
   };
 
   const handlePreview = async () => {
-    if (!selectedCompany?._id) return;
     try {
-      const res = await txnApi.previewImport(importData, selectedCompany._id);
+      const res = await txnApi.previewImport(importData, selectedCompany?._id);
       setImportPreview(res.data);
     } catch { alert('Preview failed'); }
   };
 
   const handleImport = async () => {
-    if (!selectedCompany?._id) return;
     setImporting(true);
     try {
-      const res = await txnApi.importTransactions(importData, selectedCompany._id, importMode);
+      const res = await txnApi.importTransactions(importData, selectedCompany?._id, importMode);
       setImportMsg(`Imported: ${res.data.imported}, Skipped: ${res.data.skipped}, Overwritten: ${res.data.overwritten}`);
       setImportData([]); setImportPreview(null); fetchTransactions();
     } catch { alert('Import failed'); }

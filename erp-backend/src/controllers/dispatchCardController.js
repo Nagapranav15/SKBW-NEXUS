@@ -3,10 +3,8 @@ const DispatchCard = require("../models/dispatchCardModel");
 exports.getDispatchCards = async (req, res) => {
   try {
     const { companyId } = req.query;
-    if (!companyId) {
-      return res.status(400).json({ msg: "Company ID is required" });
-    }
-    const filter = { company: companyId };
+    const filter = {};
+    if (companyId) filter.company = companyId;
     if (req.query.status) filter.status = req.query.status;
 
     const cards = await DispatchCard.find(filter).sort({ createdAt: -1 });

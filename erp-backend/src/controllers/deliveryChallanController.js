@@ -3,10 +3,8 @@ const DeliveryChallan = require("../models/deliveryChallanModel");
 exports.getDeliveryChallans = async (req, res) => {
   try {
     const { companyId } = req.query;
-    if (!companyId) {
-      return res.status(400).json({ msg: "Company ID is required" });
-    }
-    const filter = { company: companyId };
+    const filter = {};
+    if (companyId) filter.company = companyId;
     if (req.query.status) filter.status = req.query.status;
 
     const challans = await DeliveryChallan.find(filter).sort({ createdAt: -1 });

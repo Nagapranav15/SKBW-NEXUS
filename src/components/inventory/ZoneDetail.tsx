@@ -31,20 +31,15 @@ const ZoneDetail: React.FC<Props> = ({ zone: initialZone, factory: initialFactor
   const [form, setForm] = useState({ type: 'IN', sku: '', quantity: '', unit: 'kg', cost_per_unit: '', remarks: '' });
   const [editForm, setEditForm] = useState({ zone_code: '', name: '', description: '', factory_id: '', floor_id: '' });
 
-  useEffect(() => {
-    if (selectedCompany?._id) {
-      load();
-    }
-  }, [zone._id, selectedCompany]);
+  useEffect(() => { load(); }, [zone._id]);
 
   const load = async () => {
-    if (!selectedCompany?._id) return;
     setLoading(true);
     try {
       const [s, m, sk] = await Promise.all([
-        mfgApi.getZoneStock(zone._id, selectedCompany._id),
-        mfgApi.getZoneMovements(zone._id, selectedCompany._id, 20),
-        mfgApi.getSkus(selectedCompany._id)
+        mfgApi.getZoneStock(zone._id, selectedCompany?._id),
+        mfgApi.getZoneMovements(zone._id, selectedCompany?._id, 20),
+        mfgApi.getSkus(selectedCompany?._id)
       ]);
       setStock(s.data || []);
       setMovements(m.data || []);
@@ -54,7 +49,6 @@ const ZoneDetail: React.FC<Props> = ({ zone: initialZone, factory: initialFactor
   };
 
   const handleAddStock = async () => {
-    if (!selectedCompany?._id) return;
     try {
       const data: any = {
         type: form.type,
@@ -62,7 +56,7 @@ const ZoneDetail: React.FC<Props> = ({ zone: initialZone, factory: initialFactor
         quantity: Number(form.quantity),
         unit: form.unit,
         remarks: form.remarks || '',
-        company: selectedCompany._id
+        company: selectedCompany?._id
       };
       if (form.type === 'IN') data.to_zone = zone._id;
       if (form.type === 'OUT') data.from_zone = zone._id;

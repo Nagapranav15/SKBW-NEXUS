@@ -46,10 +46,8 @@ const autoCreateTransaction = async ({ sourceType, sourceId, amount, date, party
 exports.getSalesOrders = async (req, res) => {
   try {
     const { companyId } = req.query;
-    if (!companyId) {
-      return res.status(400).json({ msg: "Company ID is required" });
-    }
-    const filter = { company: companyId };
+    const filter = {};
+    if (companyId) filter.company = companyId;
     if (req.query.status) filter.status = req.query.status;
 
     // Sales role: only see own orders
@@ -321,13 +319,10 @@ exports.updateSalesOrderStatus = async (req, res) => {
 exports.getPendingOrders = async (req, res) => {
   try {
     const { companyId } = req.query;
-    if (!companyId) {
-      return res.status(400).json({ msg: "Company ID is required" });
-    }
     const filter = {
-      company: companyId,
       status: { $in: ["pending", "confirmed", "in_production"] }
     };
+    if (companyId) filter.company = companyId;
 
     if (req.user.roleName === "sales") {
       filter.createdBy = req.user.id;

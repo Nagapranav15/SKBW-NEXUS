@@ -27,16 +27,12 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (selectedCompany?._id) {
-      fetchDashboard();
-    }
+    fetchDashboard();
   }, [selectedCompany]);
 
   const fetchDashboard = async () => {
-    if (!selectedCompany?._id) return;
     try {
-      setLoading(true);
-      const res = await getDashboardStats(selectedCompany._id);
+      const res = await getDashboardStats(selectedCompany?._id);
       setDashData(res.data);
     } catch (err) {
       console.error('Error fetching dashboard:', err);

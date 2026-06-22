@@ -15,10 +15,8 @@ const generateTransactionId = (date) => {
 exports.getTransactions = async (req, res) => {
   try {
     const { companyId, page = 1, limit = 50, type, category, paymentMethod, search, startDate, endDate, dataYear, source, source_type } = req.query;
-    if (!companyId) {
-      return res.status(400).json({ msg: "Company ID is required" });
-    }
-    const filter = { company: companyId };
+    const filter = {};
+    if (companyId) filter.company = companyId;
     if (type) filter.type = type;
     if (category) filter.category = category;
     if (paymentMethod) filter.paymentMethod = paymentMethod;
@@ -121,16 +119,14 @@ exports.deleteTransaction = async (req, res) => {
 exports.exportDailyTransactions = async (req, res) => {
   try {
     const { date, format = "xlsx", companyId } = req.query;
-    if (!companyId) {
-      return res.status(400).json({ msg: "Company ID is required" });
-    }
     const targetDate = date ? new Date(date) : new Date();
     const startOfDay = new Date(targetDate);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(targetDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const filter = { date: { $gte: startOfDay, $lte: endOfDay }, company: companyId };
+    const filter = { date: { $gte: startOfDay, $lte: endOfDay } };
+    if (companyId) filter.company = companyId;
 
     const transactions = await Transaction.find(filter).sort({ date: 1 });
     const dateStr = targetDate.toISOString().split("T")[0];
@@ -195,10 +191,8 @@ exports.exportDailyTransactions = async (req, res) => {
 exports.exportLedger = async (req, res) => {
   try {
     const { companyId } = req.query;
-    if (!companyId) {
-      return res.status(400).json({ msg: "Company ID is required" });
-    }
-    const filter = { company: companyId };
+    const filter = {};
+    if (companyId) filter.company = companyId;
 
     const [transactions, parties, items] = await Promise.all([
       Transaction.find(filter).sort({ date: -1 }),
@@ -401,10 +395,8 @@ exports.importTransactions = async (req, res) => {
 exports.getAnalytics = async (req, res) => {
   try {
     const { companyId, startDate, endDate, compareYear } = req.query;
-    if (!companyId) {
-      return res.status(400).json({ msg: "Company ID is required" });
-    }
-    const filter = { company: companyId };
+    const filter = {};
+    if (companyId) filter.company = companyId;
     if (startDate || endDate) {
       filter.date = {};
       if (startDate) filter.date.$gte = new Date(startDate);

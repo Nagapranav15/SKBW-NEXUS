@@ -9,17 +9,11 @@ const DigitalDispatch: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (selectedCompany?._id) {
-      fetchCards();
-    }
-  }, [selectedCompany]);
+  useEffect(() => { fetchCards(); }, [selectedCompany]);
 
   const fetchCards = async () => {
-    if (!selectedCompany?._id) return;
     try {
-      setLoading(true);
-      const res = await getDispatchCards(selectedCompany._id);
+      const res = await getDispatchCards(selectedCompany?._id);
       setCards(res.data);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }

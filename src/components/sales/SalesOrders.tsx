@@ -56,11 +56,7 @@ const SalesOrders: React.FC = () => {
     payment_mode: 'cash', payment_reference_id: '', payment_status: 'pending', payment_notes: ''
   });
 
-  useEffect(() => {
-    if (selectedCompany?._id) {
-      fetchData();
-    }
-  }, [selectedCompany]);
+  useEffect(() => { fetchData(); }, [selectedCompany]);
 
   useEffect(() => {
     let filtered = orders;
@@ -84,13 +80,11 @@ const SalesOrders: React.FC = () => {
   }, [orders, searchTerm, filterStatus]);
 
   const fetchData = async () => {
-    if (!selectedCompany?._id) return;
     try {
-      setLoading(true);
       const [ordersRes, partiesRes, itemsRes] = await Promise.all([
-        getSalesOrders(selectedCompany._id),
-        getParties({ company: selectedCompany._id, type: 'customer', limit: 1000 }),
-        getItems(selectedCompany._id)
+        getSalesOrders(selectedCompany?._id),
+        getParties({ company: selectedCompany?._id, type: 'customer', limit: 1000 }),
+        getItems(selectedCompany?._id)
       ]);
       setOrders(ordersRes.data);
       setCustomers(partiesRes.data.parties || []);

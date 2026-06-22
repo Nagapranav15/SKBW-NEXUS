@@ -9,10 +9,8 @@ const ledgerService = require("../services/inventoryLedgerService");
 exports.getDashboardStats = async (req, res) => {
   try {
     const { companyId } = req.query;
-    if (!companyId) {
-      return res.status(400).json({ msg: "Company ID is required" });
-    }
-    const filter = { company: companyId };
+    const filter = {};
+    if (companyId) filter.company = companyId;
 
     const [
       customersCount,
@@ -104,10 +102,8 @@ exports.getDashboardStats = async (req, res) => {
 exports.getSalesReport = async (req, res) => {
   try {
     const { companyId, startDate, endDate } = req.query;
-    if (!companyId) {
-      return res.status(400).json({ msg: "Company ID is required" });
-    }
-    const filter = { company: companyId };
+    const filter = {};
+    if (companyId) filter.company = companyId;
 
     if (startDate || endDate) {
       filter.createdAt = {};

@@ -25,18 +25,12 @@ const MovementsPage: React.FC = () => {
 
   const limit = 20;
 
-  useEffect(() => {
-    if (selectedCompany?._id) {
-      loadMovements();
-      loadFormData();
-    }
-  }, [selectedCompany, page, filterType]);
+  useEffect(() => { if (selectedCompany) { loadMovements(); loadFormData(); } }, [selectedCompany, page, filterType]);
 
   const loadMovements = async () => {
-    if (!selectedCompany?._id) return;
     setLoading(true);
     try {
-      const res = await invApi.getAllStockMovements(selectedCompany._id, {
+      const res = await invApi.getAllStockMovements(selectedCompany?._id, {
         limit, skip: page * limit,
         ...(filterType ? { movement_type: filterType } : {})
       });
@@ -47,11 +41,10 @@ const MovementsPage: React.FC = () => {
   };
 
   const loadFormData = async () => {
-    if (!selectedCompany?._id) return;
     try {
       const [itemRes, whRes] = await Promise.all([
-        getItems(selectedCompany._id),
-        invApi.getWarehouses(selectedCompany._id)
+        getItems(selectedCompany?._id),
+        invApi.getWarehouses(selectedCompany?._id)
       ]);
       setItems(itemRes.data.filter((i: any) => i.status === 'active'));
       setWarehouses(whRes.data);
@@ -59,11 +52,11 @@ const MovementsPage: React.FC = () => {
   };
 
   const handleRecord = async () => {
-    if (!selectedCompany?._id || !form.item || !form.quantity) return;
+    if (!form.item || !form.quantity) return;
     try {
       const qty = Number(form.quantity);
       if (form.movement_type === 'IN') {
-        await invApi.addStock({ item: form.item, warehouse: form.warehouse, sectionId: form.sectionId || 'DEFAULT', quantity: qty, company: selectedCompany._id });
+        await invApi.addStock({ item: form.item, warehouse: form.warehouse, sectionId: form.sectionId || 'DEFAULT', quantity: qty, company: selectedCompany?._id });
       } else {
         // For other types use adjust endpoint
         await invApi.updateStock(form.item, { quantity: form.movement_type === 'OUT' ? -qty : qty });

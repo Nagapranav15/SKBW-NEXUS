@@ -16,19 +16,14 @@ const SkuStockPage: React.FC = () => {
   const [detailMovements, setDetailMovements] = useState<any[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
 
-  useEffect(() => {
-    if (selectedCompany?._id) {
-      loadData();
-    }
-  }, [selectedCompany]);
+  useEffect(() => { if (selectedCompany) loadData(); }, [selectedCompany]);
 
   const loadData = async () => {
-    if (!selectedCompany?._id) return;
     setLoading(true);
     try {
       const [sumRes, lsRes] = await Promise.all([
-        invApi.getInventorySummary(selectedCompany._id),
-        ledgerApi.getLowStockItems(selectedCompany._id)
+        invApi.getInventorySummary(selectedCompany?._id),
+        ledgerApi.getLowStockItems(selectedCompany?._id)
       ]);
       setSummary(sumRes.data);
       setLowStock(lsRes.data || []);
@@ -37,20 +32,18 @@ const SkuStockPage: React.FC = () => {
   };
 
   const viewDetails = async (item: any) => {
-    if (!selectedCompany?._id) return;
     setDetailItem(item);
     setDetailLoading(true);
     try {
-      const res = await invApi.getStockMovements(item.item?._id, selectedCompany._id);
+      const res = await invApi.getStockMovements(item.item?._id, selectedCompany?._id);
       setDetailMovements(res.data.movements || []);
     } catch (err) { console.error(err); }
     finally { setDetailLoading(false); }
   };
 
   const handleExport = async () => {
-    if (!selectedCompany?._id) return;
     try {
-      const res = await ledgerApi.exportInventory(selectedCompany._id);
+      const res = await ledgerApi.exportInventory(selectedCompany?._id);
       const rows = res.data;
       if (!rows?.length) { showToast('No data to export', 'warning'); return; }
       const headers = Object.keys(rows[0]);
