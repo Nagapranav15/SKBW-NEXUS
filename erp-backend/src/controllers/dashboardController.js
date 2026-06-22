@@ -21,10 +21,13 @@ exports.getDashboardStats = async (req, res) => {
       transportersCount,
       totalItems,
       pendingOrders,
-      totalOrders,
+      totalOrdersAggregation,
       recentOrders,
       quotes,
-      challans
+      challans,
+      inQueue,
+      inProduction,
+      completedToday
     ] = await Promise.all([
       Party.countDocuments({ ...filter, type: "customer" }),
       Party.countDocuments({ ...filter, type: "vendor" }),
@@ -34,26 +37,41 @@ exports.getDashboardStats = async (req, res) => {
       Party.countDocuments({ ...filter, type: "transporter" }),
       Item.countDocuments({ ...filter, status: "active" }),
       SalesOrder.countDocuments({ ...filter, status: { $in: ["pending", "confirmed", "in_production"] } }),
-      SalesOrder.find(filter),
+      SalesOrder.aggregate([
+        { $match: filter },
+        {
+          $group: {
+            _id: null,
+            totalRevenue: { $sum: '$total' },
+            confirmedRevenue: {
+              $sum: {
+                $cond: [
+                  { $in: ['$status', ["confirmed", "ready", "dispatched", "delivered"]] },
+                  '$total',
+                  0
+                ]
+              }
+            }
+          }
+        }
+      ]),
       SalesOrder.find(filter).sort({ createdAt: -1 }).limit(5),
       Quote.countDocuments(filter),
-      DeliveryChallan.countDocuments(filter)
+      DeliveryChallan.countDocuments(filter),
+      SalesOrder.countDocuments({ ...filter, status: "pending" }),
+      SalesOrder.countDocuments({ ...filter, status: "in_production" }),
+      SalesOrder.countDocuments({
+        ...filter,
+        status: "delivered",
+        updatedAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) }
+      })
     ]);
 
     // Calculate revenue
-    const totalRevenue = totalOrders.reduce((sum, o) => sum + (o.total || 0), 0);
-    const confirmedRevenue = totalOrders
-      .filter(o => ["confirmed", "ready", "dispatched", "delivered"].includes(o.status))
-      .reduce((sum, o) => sum + (o.total || 0), 0);
+    const revenueStats = totalOrdersAggregation[0] || { totalRevenue: 0, confirmedRevenue: 0 };
+    const totalRevenue = revenueStats.totalRevenue;
+    const confirmedRevenue = revenueStats.confirmedRevenue;
 
-    // Production stats
-    const inQueue = await SalesOrder.countDocuments({ ...filter, status: "pending" });
-    const inProduction = await SalesOrder.countDocuments({ ...filter, status: "in_production" });
-    const completedToday = await SalesOrder.countDocuments({
-      ...filter,
-      status: "delivered",
-      updatedAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) }
-    });
 
     // Inventory stats
     let inventorySummary = {};

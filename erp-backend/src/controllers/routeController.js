@@ -81,64 +81,70 @@ exports.getRoutes = async (req, res) => {
 
     const routes = await Route.find(filter).sort(sortObj);
 
-    const routesWithCounts = await Promise.all(routes.map(async (route) => {
-      const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-      const routeRegex = new RegExp('^' + escapeRegex(route.name) + '$', 'i');
-      
-      let marketFilter = {
-        type: 'market',
-        route: routeRegex,
-        company: route.company,
-        isDeleted: { $ne: true }
-      };
-      let customerFilter = {
-        type: 'customer',
-        route: routeRegex,
-        company: route.company,
-        isDeleted: { $ne: true }
-      };
+    const rNames = routes.map(r => r.name).filter(Boolean);
+    const marketMatch = {
+      type: 'market',
+      isDeleted: { $ne: true },
+      route: { $in: rNames }
+    };
+    const customerMatch = {
+      type: 'customer',
+      isDeleted: { $ne: true },
+      route: { $in: rNames }
+    };
+    if (companyId) {
+      marketMatch.company = companyId;
+      customerMatch.company = companyId;
+    }
 
-      if (req.user && req.user.roleName === 'sales' && companyId) {
-        const isRouteAssigned = routeNames.some(name => new RegExp('^' + escapeRegex(name) + '$', 'i').test(route.name));
-        if (!isRouteAssigned) {
-          const marketSub = [{ agentAssigned: agentRegex }];
-          if (customerCityRegexes.length > 0) {
-            marketSub.push({ firmName: { $in: customerCityRegexes } });
-          }
-          marketFilter.$or = marketSub;
-
-          const customerSub = [{ agentAssigned: agentRegex }];
-          if (marketRegexes.length > 0) {
-            customerSub.push({ city: { $in: marketRegexes } });
-          }
-          customerFilter.$or = customerSub;
-        }
-      }
-
-      const citiesCount = await Party.countDocuments(marketFilter);
-      const customersCount = await Party.countDocuments(customerFilter);
-
-      const outstandingResult = await Party.aggregate([
-        {
-          $match: customerFilter
-        },
+    const [marketStats, customerStats] = await Promise.all([
+      Party.aggregate([
+        { $match: marketMatch },
         {
           $group: {
-            _id: null,
-            totalOutstanding: { $sum: '$outstanding' }
+            _id: { $toLower: '$route' },
+            citiesCount: { $sum: 1 }
           }
         }
-      ]);
-      const outstanding = outstandingResult.length > 0 ? outstandingResult[0].totalOutstanding : 0;
+      ]),
+      Party.aggregate([
+        { $match: customerMatch },
+        {
+          $group: {
+            _id: { $toLower: '$route' },
+            customersCount: { $sum: 1 },
+            outstanding: { $sum: '$outstanding' }
+          }
+        }
+      ])
+    ]);
 
+    const marketMap = {};
+    marketStats.forEach(s => {
+      marketMap[s._id] = s.citiesCount;
+    });
+
+    const customerMap = {};
+    customerStats.forEach(s => {
+      customerMap[s._id] = {
+        customersCount: s.customersCount,
+        outstanding: s.outstanding
+      };
+    });
+
+    const routesWithCounts = routes.map(route => {
+      const routeLower = (route.name || '').toLowerCase();
+      const citiesCount = marketMap[routeLower] || 0;
+      const cStat = customerMap[routeLower] || { customersCount: 0, outstanding: 0 };
+      
       return {
         ...route.toObject(),
         citiesCount,
-        customersCount,
-        outstandingBalance: outstanding,
-        outstanding: outstanding
+        customersCount: cStat.customersCount,
+        outstandingBalance: cStat.outstanding,
+        outstanding: cStat.outstanding
       };
-    }));
+    });
 
     res.json(routesWithCounts);
   } catch (err) {

@@ -958,15 +958,159 @@ exports.getParties = async (req, res) => {
       Party.countDocuments(filter)
     ]);
 
-    const parties = await Promise.all(rawParties.map(async (party) => {
-      // Self-healing Customer Code if missing
-      if (party.type === 'customer' && !party.code) {
-        const generatedCode = await generateCustomerCode(party);
-        party.code = generatedCode;
-        await Party.findByIdAndUpdate(party._id, { code: generatedCode });
+    let parties;
+    if (req.query.type === 'market') {
+      const cityNames = rawParties.map(p => p.firmName).filter(Boolean);
+      const matchQuery = {
+        type: 'customer',
+        isDeleted: { $ne: true },
+        city: { $in: cityNames }
+      };
+      if (companyId) {
+        matchQuery.company = companyId;
       }
-      return enrichPartyObj(party);
-    }));
+      const stats = await Party.aggregate([
+        { $match: matchQuery },
+        {
+          $group: {
+            _id: { $toLower: '$city' },
+            customerCount: { $sum: 1 },
+            activeCustomersCount: {
+              $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] }
+            },
+            inactiveCustomersCount: {
+              $sum: { $cond: [{ $ne: ['$status', 'active'] }, 1, 0] }
+            },
+            outstanding: { $sum: '$outstanding' }
+          }
+        }
+      ]);
+      const statsMap = {};
+      stats.forEach(s => {
+        statsMap[s._id] = s;
+      });
+      parties = rawParties.map(p => {
+        const partyObj = p.toObject ? p.toObject() : p;
+        const cityLower = (partyObj.firmName || '').toLowerCase();
+        const cityStats = statsMap[cityLower] || { customerCount: 0, activeCustomersCount: 0, inactiveCustomersCount: 0, outstanding: 0 };
+        partyObj.customerCount = cityStats.customerCount;
+        partyObj.activeCustomersCount = cityStats.activeCustomersCount;
+        partyObj.inactiveCustomersCount = cityStats.inactiveCustomersCount;
+        partyObj.outstanding = cityStats.outstanding;
+        partyObj.outstandingBalance = cityStats.outstanding;
+        return partyObj;
+      });
+    } else if (req.query.type === 'transporter') {
+      const transporterNames = rawParties.map(p => p.firmName).filter(Boolean);
+      const matchQuery = {
+        type: 'customer',
+        isDeleted: { $ne: true },
+        preferredTransport: { $in: transporterNames }
+      };
+      if (companyId) {
+        matchQuery.company = companyId;
+      }
+      const stats = await Party.aggregate([
+        { $match: matchQuery },
+        {
+          $group: {
+            _id: { $toLower: '$preferredTransport' },
+            customerCount: { $sum: 1 }
+          }
+        }
+      ]);
+      const statsMap = {};
+      stats.forEach(s => {
+        statsMap[s._id] = s.customerCount;
+      });
+      parties = rawParties.map(p => {
+        const partyObj = p.toObject ? p.toObject() : p;
+        const nameLower = (partyObj.firmName || '').toLowerCase();
+        partyObj.customerCount = statsMap[nameLower] || 0;
+        return partyObj;
+      });
+    } else if (req.query.type === 'agent') {
+      const routeQuery = { isDeleted: { $ne: true } };
+      const marketQuery = { type: 'market', isDeleted: { $ne: true } };
+      const customerQuery = { type: 'customer', isDeleted: { $ne: true } };
+      if (companyId) {
+        routeQuery.company = companyId;
+        marketQuery.company = companyId;
+        customerQuery.company = companyId;
+      }
+
+      const [allRoutes, allMarkets, allCustomers] = await Promise.all([
+        Route.find(routeQuery),
+        Party.find(marketQuery),
+        Party.find(customerQuery)
+      ]);
+
+      parties = rawParties.map(p => {
+        const partyObj = p.toObject ? p.toObject() : p;
+        const agentName = partyObj.firmName || partyObj.contactName;
+        if (!agentName) return partyObj;
+
+        const agentLower = agentName.toLowerCase();
+
+        // 1. Find routes directly assigned to this agent
+        const directRouteNames = allRoutes
+          .filter(r => r.assignedAgent && r.assignedAgent.toLowerCase() === agentLower)
+          .map(r => r.name);
+
+        // 2. Find customers directly assigned to this agent
+        const assignedCustomers = allCustomers.filter(c => c.agentAssigned && c.agentAssigned.toLowerCase() === agentLower);
+        const customerRouteNames = assignedCustomers.map(c => c.route).filter(Boolean);
+        const customerCities = assignedCustomers.map(c => c.city).filter(Boolean).map(c => c.toLowerCase());
+
+        // 3. Find routes of markets (cities) directly assigned to this agent
+        const assignedMarkets = allMarkets.filter(m => m.agentAssigned && m.agentAssigned.toLowerCase() === agentLower);
+        const marketRouteNames = assignedMarkets.map(m => m.route).filter(Boolean);
+
+        // Union of all route names
+        const allRouteNames = Array.from(new Set([
+          ...directRouteNames,
+          ...marketRouteNames,
+          ...customerRouteNames
+        ]));
+        const routeNamesSet = new Set(allRouteNames.map(r => r.toLowerCase()));
+
+        partyObj.assignedRegionsCount = allRouteNames.length;
+
+        // Filter cities/markets that are visible/assigned
+        const assignedCities = allMarkets.filter(m => {
+          const isRouteMatch = m.route && routeNamesSet.has(m.route.toLowerCase());
+          const isAgentMatch = m.agentAssigned && m.agentAssigned.toLowerCase() === agentLower;
+          const isCustomerCityMatch = m.firmName && customerCities.includes(m.firmName.toLowerCase());
+          return isRouteMatch || isAgentMatch || isCustomerCityMatch;
+        });
+        partyObj.assignedCitiesCount = assignedCities.length;
+
+        const assignedCityNames = new Set(assignedCities.map(m => (m.firmName || '').toLowerCase()));
+
+        // Filter customers that are visible/assigned
+        const assignedCustomersCount = allCustomers.filter(c => {
+          const isRouteMatch = c.route && routeNamesSet.has(c.route.toLowerCase());
+          const isCityMatch = c.city && assignedCityNames.has(c.city.toLowerCase());
+          const isAgentMatch = c.agentAssigned && c.agentAssigned.toLowerCase() === agentLower;
+          return isRouteMatch || isCityMatch || isAgentMatch;
+        }).length;
+
+        partyObj.assignedCustomersCount = assignedCustomersCount;
+
+        return partyObj;
+      });
+    } else {
+      // Fallback for customer, vendor, or others
+      parties = await Promise.all(rawParties.map(async (party) => {
+        const partyObj = party.toObject ? party.toObject() : party;
+        if (partyObj.type === 'customer' && !partyObj.code) {
+          const generatedCode = await generateCustomerCode(party);
+          partyObj.code = generatedCode;
+          await Party.findByIdAndUpdate(party._id, { code: generatedCode });
+        }
+        return enrichPartyObj(party);
+      }));
+    }
 
     res.json({ parties, total, page, limit });
   } catch (err) {
