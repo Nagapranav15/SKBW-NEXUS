@@ -83,16 +83,16 @@ exports.getRoutes = async (req, res) => {
 
     const rNames = routes.map(r => r.name).filter(Boolean);
     const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-    const routeRegexes = rNames.map(name => new RegExp('^' + escapeRegex(name) + '$', 'i'));
+    const routeMatchRegexes = rNames.map(name => new RegExp('^' + escapeRegex(name) + '$', 'i'));
     const marketMatch = {
       type: 'market',
       isDeleted: { $ne: true },
-      route: { $in: routeRegexes }
+      route: { $in: routeMatchRegexes }
     };
     const customerMatch = {
       type: 'customer',
       isDeleted: { $ne: true },
-      route: { $in: routeRegexes }
+      route: { $in: routeMatchRegexes }
     };
     if (companyId) {
       try {
