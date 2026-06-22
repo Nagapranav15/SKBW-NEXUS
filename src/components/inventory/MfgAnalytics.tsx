@@ -9,8 +9,21 @@ const MfgAnalytics: React.FC = () => {
   const [days, setDays] = useState(30);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { if (selectedCompany) load(); }, [selectedCompany, days]);
-  const load = async () => { setLoading(true); try { const r = await mfgApi.getAnalytics(selectedCompany?._id, days); setData(r.data); } catch(e){console.error(e);} finally{setLoading(false);} };
+  useEffect(() => {
+    if (selectedCompany?._id) {
+      load();
+    }
+  }, [selectedCompany, days]);
+
+  const load = async () => {
+    if (!selectedCompany?._id) return;
+    setLoading(true);
+    try {
+      const r = await mfgApi.getAnalytics(selectedCompany._id, days);
+      setData(r.data);
+    } catch(e){console.error(e);}
+    finally{setLoading(false);}
+  };
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>;
 

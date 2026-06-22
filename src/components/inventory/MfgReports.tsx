@@ -12,11 +12,20 @@ const MfgReports: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'valuation' | 'ledger'>('valuation');
 
-  useEffect(() => { if (selectedCompany) load(); }, [selectedCompany]);
+  useEffect(() => {
+    if (selectedCompany?._id) {
+      load();
+    }
+  }, [selectedCompany]);
+
   const load = async () => {
+    if (!selectedCompany?._id) return;
     setLoading(true);
     try {
-      const [s, m] = await Promise.all([mfgApi.getStock(selectedCompany?._id), mfgApi.getMovements({ companyId: selectedCompany?._id, limit: 100 })]);
+      const [s, m] = await Promise.all([
+        mfgApi.getStock(selectedCompany._id),
+        mfgApi.getMovements({ companyId: selectedCompany._id, limit: 100 })
+      ]);
       setStock(s.data || []); setMovements(m.data.movements || []);
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };

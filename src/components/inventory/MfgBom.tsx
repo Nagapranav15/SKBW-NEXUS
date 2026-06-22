@@ -17,20 +17,39 @@ const MfgBom: React.FC = () => {
   const [form, setForm] = useState({ name: '', output_sku: '', output_quantity: '1', components: [{ sku: '', quantity: '', unit: 'kg' }], notes: '' });
   const [execForm, setExecForm] = useState({ zone_id: '', multiplier: '1' });
 
-  useEffect(() => { if (selectedCompany) load(); }, [selectedCompany]);
-  const load = async () => { setLoading(true); try { const [b, s, z] = await Promise.all([mfgApi.getBoms(selectedCompany?._id), mfgApi.getSkus(selectedCompany?._id), mfgApi.getZones(selectedCompany?._id)]); setBoms(b.data); setSkus(s.data); setZones(z.data); } catch(e){console.error(e);} finally{setLoading(false);} };
+  useEffect(() => {
+    if (selectedCompany?._id) {
+      load();
+    }
+  }, [selectedCompany]);
+
+  const load = async () => {
+    if (!selectedCompany?._id) return;
+    setLoading(true);
+    try {
+      const [b, s, z] = await Promise.all([
+        mfgApi.getBoms(selectedCompany._id),
+        mfgApi.getSkus(selectedCompany._id),
+        mfgApi.getZones(selectedCompany._id)
+      ]);
+      setBoms(b.data); setSkus(s.data); setZones(z.data);
+    } catch(e){console.error(e);}
+    finally{setLoading(false);}
+  };
 
   const handleSave = async () => {
+    if (!selectedCompany?._id) return;
     try {
-      const data = { ...form, output_quantity: Number(form.output_quantity), components: form.components.filter(c => c.sku && c.quantity).map(c => ({ ...c, quantity: Number(c.quantity) })), company: selectedCompany?._id };
+      const data = { ...form, output_quantity: Number(form.output_quantity), components: form.components.filter(c => c.sku && c.quantity).map(c => ({ ...c, quantity: Number(c.quantity) })), company: selectedCompany._id };
       if (editId) await mfgApi.updateBom(editId, data); else await mfgApi.createBom(data);
       setShowModal(false); setEditId(null); load(); showToast(editId ? 'Updated' : 'Created', 'success');
     } catch (e: any) { showToast(e.response?.data?.msg || 'Error', 'error'); }
   };
 
   const handleExecute = async () => {
+    if (!selectedCompany?._id) return;
     try {
-      await mfgApi.executeBom({ bomId: showExecModal._id, zone_id: execForm.zone_id, multiplier: Number(execForm.multiplier), company: selectedCompany?._id });
+      await mfgApi.executeBom({ bomId: showExecModal._id, zone_id: execForm.zone_id, multiplier: Number(execForm.multiplier), company: selectedCompany._id });
       setShowExecModal(null); showToast('BOM executed — components consumed, output produced', 'success');
     } catch (e: any) { showToast(e.response?.data?.msg || 'Execution failed', 'error'); }
   };

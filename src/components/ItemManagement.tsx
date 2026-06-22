@@ -82,13 +82,16 @@ const ItemManagement: React.FC = () => {
   const altUnits = ['PCS', 'GBL', 'GRAM', 'CM', 'ML', 'UNIT'];
 
   useEffect(() => {
-    fetchItems();
+    if (selectedCompany?._id) {
+      fetchItems();
+    }
   }, [selectedCompany]);
 
   const fetchItems = async () => {
+    if (!selectedCompany?._id) return;
     try {
       setLoading(true);
-      const res = await getItems(selectedCompany?._id);
+      const res = await getItems(selectedCompany._id);
       const itemsData = res.data.map((i: any) => ({ ...i, id: i._id }));
       setItems(itemsData);
       setFilteredItems(itemsData);

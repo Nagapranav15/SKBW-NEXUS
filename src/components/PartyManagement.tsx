@@ -1021,6 +1021,7 @@ const PartyManagement: React.FC = () => {
 
   // Fetch customers in a city and open popup modal
   const openCityCustomersPopup = async (cityName: string) => {
+    if (!selectedCompany?._id) return;
     setSelectedCityName(cityName);
     setCityCustomersSearchText('');
     try {
@@ -1028,7 +1029,7 @@ const PartyManagement: React.FC = () => {
       const res = await getParties({
         type: 'customer',
         city: cityName,
-        company: selectedCompany?._id,
+        company: selectedCompany._id,
         limit: 1000
       } as any);
       setCityCustomers(res.data.parties || []);

@@ -10,11 +10,17 @@ const PendingOrders: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const canManage = hasPermission('MANAGE_ORDERS');
 
-  useEffect(() => { fetchOrders(); }, [selectedCompany]);
+  useEffect(() => {
+    if (selectedCompany?._id) {
+      fetchOrders();
+    }
+  }, [selectedCompany]);
 
   const fetchOrders = async () => {
+    if (!selectedCompany?._id) return;
     try {
-      const res = await getPendingOrders(selectedCompany?._id);
+      setLoading(true);
+      const res = await getPendingOrders(selectedCompany._id);
       setOrders(res.data);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }

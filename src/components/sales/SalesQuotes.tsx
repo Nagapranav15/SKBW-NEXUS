@@ -55,7 +55,9 @@ const SalesQuotes: React.FC = () => {
   });
 
   useEffect(() => {
-    fetchData();
+    if (selectedCompany?._id) {
+      fetchData();
+    }
   }, [selectedCompany]);
 
   useEffect(() => {
@@ -80,11 +82,13 @@ const SalesQuotes: React.FC = () => {
   }, [quotes, searchTerm, filterStatus]);
 
   const fetchData = async () => {
+    if (!selectedCompany?._id) return;
     try {
+      setLoading(true);
       const [quotesRes, partiesRes, itemsRes] = await Promise.all([
-        getQuotes(selectedCompany?._id),
-        getParties({ company: selectedCompany?._id, type: 'customer', limit: 1000 }),
-        getItems(selectedCompany?._id)
+        getQuotes(selectedCompany._id),
+        getParties({ company: selectedCompany._id, type: 'customer', limit: 1000 }),
+        getItems(selectedCompany._id)
       ]);
       setQuotes(quotesRes.data);
       setCustomers(partiesRes.data.parties || []);

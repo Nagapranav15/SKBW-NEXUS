@@ -10,11 +10,17 @@ const SalesReports: React.FC = () => {
   const [endDate, setEndDate] = useState('');
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { fetchReport(); }, [selectedCompany]);
+  useEffect(() => {
+    if (selectedCompany?._id) {
+      fetchReport();
+    }
+  }, [selectedCompany]);
 
   const fetchReport = async () => {
+    if (!selectedCompany?._id) return;
     try {
-      const res = await getSalesReport(selectedCompany?._id, startDate || undefined, endDate || undefined);
+      setLoading(true);
+      const res = await getSalesReport(selectedCompany._id, startDate || undefined, endDate || undefined);
       setReportData(res.data);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }

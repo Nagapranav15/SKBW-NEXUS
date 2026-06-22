@@ -21,16 +21,21 @@ const MfgZones: React.FC = () => {
   const [editId, setEditId] = useState<string | null>(null);
   const [selectedZone, setSelectedZone] = useState<any>(null);
 
-  useEffect(() => { if (selectedCompany) loadAll(); }, [selectedCompany]);
+  useEffect(() => {
+    if (selectedCompany?._id) {
+      loadAll();
+    }
+  }, [selectedCompany]);
 
   const loadAll = async () => {
+    if (!selectedCompany?._id) return;
     setLoading(true);
     try {
       const [f, fl, z, zs] = await Promise.all([
-        mfgApi.getFactories(selectedCompany?._id),
-        mfgApi.getFloors(selectedCompany?._id),
-        mfgApi.getZones(selectedCompany?._id),
-        mfgApi.getZonesWithStock(selectedCompany?._id)
+        mfgApi.getFactories(selectedCompany._id),
+        mfgApi.getFloors(selectedCompany._id),
+        mfgApi.getZones(selectedCompany._id),
+        mfgApi.getZonesWithStock(selectedCompany._id)
       ]);
       setFactories(f.data); setFloors(fl.data); setZones(z.data); setZoneStockMap(zs.data || {});
     } catch (e) { console.error(e); }
@@ -38,16 +43,17 @@ const MfgZones: React.FC = () => {
   };
 
   const handleSave = async () => {
+    if (!selectedCompany?._id) return;
     try {
       if (showModal === 'factory') {
         if (editId) await mfgApi.updateFactory(editId, form);
-        else await mfgApi.createFactory({ ...form, company: selectedCompany?._id });
+        else await mfgApi.createFactory({ ...form, company: selectedCompany._id });
       } else if (showModal === 'floor') {
         if (editId) await mfgApi.updateFloor(editId, form);
-        else await mfgApi.createFloor({ ...form, company: selectedCompany?._id });
+        else await mfgApi.createFloor({ ...form, company: selectedCompany._id });
       } else if (showModal === 'zone') {
         if (editId) await mfgApi.updateZone(editId, form);
-        else await mfgApi.createZone({ ...form, company: selectedCompany?._id });
+        else await mfgApi.createZone({ ...form, company: selectedCompany._id });
       }
       setShowModal(null); setForm({}); setEditId(null); loadAll();
       showToast(`${showModal} ${editId ? 'updated' : 'created'}`, 'success');

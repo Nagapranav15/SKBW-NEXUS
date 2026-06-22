@@ -19,26 +19,34 @@ const MfgMovements: React.FC = () => {
   const [form, setForm] = useState({ type: 'IN', from_zone: '', to_zone: '', sku: '', quantity: '', unit: 'kg', gsm_used: '', books_per_gbl: '', cost_per_unit: '', remarks: '' });
   const limit = 25;
 
-  useEffect(() => { if (selectedCompany) { load(); loadFormData(); } }, [selectedCompany, page, filterType]);
+  useEffect(() => {
+    if (selectedCompany?._id) {
+      load();
+      loadFormData();
+    }
+  }, [selectedCompany, page, filterType]);
 
   const load = async () => {
+    if (!selectedCompany?._id) return;
     setLoading(true);
     try {
-      const r = await mfgApi.getMovements({ companyId: selectedCompany?._id, limit, skip: page * limit, ...(filterType ? { type: filterType } : {}) });
+      const r = await mfgApi.getMovements({ companyId: selectedCompany._id, limit, skip: page * limit, ...(filterType ? { type: filterType } : {}) });
       setMovements(r.data.movements || []); setTotal(r.data.total || 0);
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
   const loadFormData = async () => {
+    if (!selectedCompany?._id) return;
     try {
-      const [s, z] = await Promise.all([mfgApi.getSkus(selectedCompany?._id), mfgApi.getZones(selectedCompany?._id)]);
+      const [s, z] = await Promise.all([mfgApi.getSkus(selectedCompany._id), mfgApi.getZones(selectedCompany._id)]);
       setSkus(s.data); setZones(z.data);
     } catch (e) { console.error(e); }
   };
 
   const handleRecord = async () => {
+    if (!selectedCompany?._id) return;
     try {
-      const data: any = { ...form, quantity: Number(form.quantity), company: selectedCompany?._id };
+      const data: any = { ...form, quantity: Number(form.quantity), company: selectedCompany._id };
       if (form.gsm_used) data.gsm_used = Number(form.gsm_used);
       if (form.books_per_gbl) data.books_per_gbl = Number(form.books_per_gbl);
       if (form.cost_per_unit) data.cost_per_unit = Number(form.cost_per_unit);

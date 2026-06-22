@@ -761,16 +761,16 @@ exports.getParties = async (req, res) => {
     const filter = { isDeleted: { $ne: true } };
     if (req.query.type) filter.type = req.query.type;
 
-    let companyFilter = null;
     const companyId = req.query.company;
-    if (companyId) {
-      companyFilter = {
-        $or: [
-          { company: companyId },
-          { companies: companyId }
-        ]
-      };
+    if (!companyId) {
+      return res.status(400).json({ msg: "Company ID is required" });
     }
+    const companyFilter = {
+      $or: [
+        { company: companyId },
+        { companies: companyId }
+      ]
+    };
 
     // Role-based filtering for logged-in sales agent/user
     if (req.user && req.user.roleName === 'sales' && companyId) {
@@ -978,12 +978,14 @@ exports.getPartyStats = async (req, res) => {
   try {
     const filter = { isDeleted: { $ne: true } };
     if (req.query.type) filter.type = req.query.type;
-    if (req.query.company) {
-      filter.$or = [
-        { company: req.query.company },
-        { companies: req.query.company }
-      ];
+    const companyId = req.query.company;
+    if (!companyId) {
+      return res.status(400).json({ msg: "Company ID is required" });
     }
+    filter.$or = [
+      { company: companyId },
+      { companies: companyId }
+    ];
 
     const [total, active, inactive, onHold] = await Promise.all([
       Party.countDocuments(filter),

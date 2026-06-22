@@ -30,15 +30,20 @@ const InventoryManagement: React.FC = () => {
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'map' | 'ledger'>('map');
 
-  useEffect(() => { loadData(); }, [selectedCompany]);
+  useEffect(() => {
+    if (selectedCompany?._id) {
+      loadData();
+    }
+  }, [selectedCompany]);
 
   const loadData = async () => {
+    if (!selectedCompany?._id) return;
     setLoading(true);
     try {
       const [whRes, sumRes, itemRes] = await Promise.all([
-        invApi.getWarehouses(selectedCompany?._id),
-        invApi.getInventorySummary(selectedCompany?._id),
-        getItems(selectedCompany?._id)
+        invApi.getWarehouses(selectedCompany._id),
+        invApi.getInventorySummary(selectedCompany._id),
+        getItems(selectedCompany._id)
       ]);
       setWarehouses(whRes.data);
       setSummary(sumRes.data);
@@ -46,7 +51,7 @@ const InventoryManagement: React.FC = () => {
       if (whRes.data.length > 0 && !selectedWH) setSelectedWH(whRes.data[0]);
       // Fetch low stock
       try {
-        const lsRes = await ledgerApi.getLowStockItems(selectedCompany?._id);
+        const lsRes = await ledgerApi.getLowStockItems(selectedCompany._id);
         setLowStockItems(lsRes.data || []);
       } catch (_) {}
     } catch (err) { console.error(err); }
@@ -111,8 +116,9 @@ const InventoryManagement: React.FC = () => {
   };
 
   const handleExportCSV = async () => {
+    if (!selectedCompany?._id) return;
     try {
-      const res = await ledgerApi.exportInventory(selectedCompany?._id);
+      const res = await ledgerApi.exportInventory(selectedCompany._id);
       const rows = res.data;
       if (!rows || rows.length === 0) { showToast('No data to export', 'warning'); return; }
       const headers = Object.keys(rows[0]);
@@ -126,8 +132,9 @@ const InventoryManagement: React.FC = () => {
   };
 
   const handleViewAuditLogs = async () => {
+    if (!selectedCompany?._id) return;
     try {
-      const res = await ledgerApi.getAuditLogs({ companyId: selectedCompany?._id, limit: 50 });
+      const res = await ledgerApi.getAuditLogs({ companyId: selectedCompany._id, limit: 50 });
       setAuditLogs(res.data.logs || []);
       setShowAuditModal(true);
     } catch (err) { showToast('Failed to load audit logs', 'error'); }

@@ -20,13 +20,19 @@ const DeliveryChallan: React.FC = () => {
     transporterName: '', vehicleNumber: '', items: [] as any[], notes: ''
   });
 
-  useEffect(() => { fetchData(); }, [selectedCompany]);
+  useEffect(() => {
+    if (selectedCompany?._id) {
+      fetchData();
+    }
+  }, [selectedCompany]);
 
   const fetchData = async () => {
+    if (!selectedCompany?._id) return;
     try {
+      setLoading(true);
       const [challansRes, ordersRes] = await Promise.all([
-        getDeliveryChallans(selectedCompany?._id),
-        getSalesOrders(selectedCompany?._id, 'ready')
+        getDeliveryChallans(selectedCompany._id),
+        getSalesOrders(selectedCompany._id, 'ready')
       ]);
       setChallans(challansRes.data);
       setOrders(ordersRes.data);

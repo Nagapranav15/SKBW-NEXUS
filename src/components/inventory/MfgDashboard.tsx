@@ -9,14 +9,19 @@ const MfgDashboard: React.FC = () => {
   const [stock, setStock] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { if (selectedCompany) load(); }, [selectedCompany]);
+  useEffect(() => {
+    if (selectedCompany?._id) {
+      load();
+    }
+  }, [selectedCompany]);
 
   const load = async () => {
+    if (!selectedCompany?._id) return;
     setLoading(true);
     try {
       const [s, st] = await Promise.all([
-        mfgApi.getDashboardStats(selectedCompany?._id),
-        mfgApi.getStock(selectedCompany?._id)
+        mfgApi.getDashboardStats(selectedCompany._id),
+        mfgApi.getStock(selectedCompany._id)
       ]);
       setStats(s.data);
       setStock(st.data || []);
