@@ -22,20 +22,26 @@ const dataManagerRoutes = require("./routes/dataManagerRoutes");
 
 const app = express();
 
-// Allow Vercel frontend + local dev. Add ALLOWED_ORIGINS (comma-separated) in Render env vars if needed.
+// Allowed origins: custom domain + Vercel previews + local dev
 const allowedOrigins = [
+  // Production custom domain
+  'https://skbw.in',
+  'https://www.skbw.in',
+  // Local development
   'http://localhost:5173',
   'http://127.0.0.1:5173',
   'http://localhost:3000',
+  // Extra origins from Render env var (comma-separated), e.g. staging domains
   ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()) : []),
 ];
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, Postman)
+    // Allow requests with no origin (Postman, curl, mobile apps)
     if (!origin) return callback(null, true);
-    // Allow any *.vercel.app subdomain
+    // Allow any *.vercel.app preview deployment
     if (/^https:\/\/.*\.vercel\.app$/.test(origin)) return callback(null, true);
+    // Allow explicit allowlist
     if (allowedOrigins.includes(origin)) return callback(null, true);
     callback(new Error(`CORS: origin ${origin} not allowed`));
   },
