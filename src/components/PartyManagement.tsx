@@ -479,6 +479,10 @@ const PartyManagement: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
+  // Ref variables to track fetch sequence IDs to prevent asynchronous race conditions
+  const fetchIdRef = React.useRef<number>(0);
+  const statsFetchIdRef = React.useRef<number>(0);
+
   // Dropdown Options (Dynamic Cross-References)
   const [allAgents, setAllAgents] = useState<Party[]>([]);
   const [allRoutes, setAllRoutes] = useState<RouteItem[]>([]);
@@ -1199,10 +1203,12 @@ const PartyManagement: React.FC = () => {
   // Fetch Main Data List
   const fetchMainData = useCallback(async () => {
     if (!selectedCompany) return;
+    const currentFetchId = ++fetchIdRef.current;
     try {
       setLoading(true);
       if (currentType === 'route') {
         const res = await getRoutes(selectedCompany._id);
+        if (currentFetchId !== fetchIdRef.current) return;
         let data = res.data || [];
         
         // Filter by statusFilter
@@ -1286,22 +1292,27 @@ const PartyManagement: React.FC = () => {
         params.company = selectedCompany._id;
 
         const res = await getParties(params);
+        if (currentFetchId !== fetchIdRef.current) return;
         setParties(res.data.parties || []);
         setTotal(res.data.total || 0);
       }
     } catch (err) {
       console.error('Error loading data list:', err);
     } finally {
-      setLoading(false);
+      if (currentFetchId === fetchIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [currentType, page, limit, debouncedSearch, filterRules, selectedCompany, sortRules, statusFilter]);
 
   // Fetch Stats counts
   const fetchStatsCounts = useCallback(async () => {
     if (!selectedCompany) return;
+    const currentFetchId = ++statsFetchIdRef.current;
     try {
       if (currentType === 'route') {
         const res = await getRoutes(selectedCompany._id);
+        if (currentFetchId !== statsFetchIdRef.current) return;
         const data = res.data || [];
         setStats({
           total: data.length,
@@ -1311,6 +1322,7 @@ const PartyManagement: React.FC = () => {
         });
       } else {
         const res = await getPartyStats(currentType, selectedCompany._id);
+        if (currentFetchId !== statsFetchIdRef.current) return;
         setStats(res.data);
       }
     } catch (err) {
