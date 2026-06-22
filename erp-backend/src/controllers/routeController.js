@@ -17,56 +17,34 @@ exports.getRoutes = async (req, res) => {
 
     if (req.user && req.user.roleName === 'sales' && companyId) {
       const agentName = req.user.fullName || '';
-      const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-      agentRegex = new RegExp('^' + escapeRegex(agentName) + '$', 'i');
 
       // 1. Find routes directly assigned to this agent in Route collection
-      const agentRoutes = await Route.find({ company: companyId, assignedAgent: agentRegex, isDeleted: { $ne: true } });
+      const agentRoutes = await Route.find({ company: companyId, assignedAgent: agentName, isDeleted: { $ne: true } }).select('name').lean();
       const directRouteNames = agentRoutes.map(r => r.name);
 
       // 2. Find routes of markets (cities) directly assigned to this agent
       const assignedMarkets = await Party.find({
         type: 'market',
         company: companyId,
-        agentAssigned: agentRegex,
+        agentAssigned: agentName,
         isDeleted: { $ne: true }
-      });
+      }).select('route').lean();
       const marketRouteNames = assignedMarkets.map(m => m.route).filter(Boolean);
 
       // 3. Find routes of customers directly assigned to this agent
       const assignedCustomers = await Party.find({
         type: 'customer',
         company: companyId,
-        agentAssigned: agentRegex,
+        agentAssigned: agentName,
         isDeleted: { $ne: true }
-      });
+      }).select('route').lean();
       const customerRouteNames = assignedCustomers.map(c => c.route).filter(Boolean);
 
       // Union of all route names
       const allRouteNames = Array.from(new Set([...directRouteNames, ...marketRouteNames, ...customerRouteNames]));
       routeNames = allRouteNames;
-      routeRegexes = allRouteNames.map(name => new RegExp('^' + escapeRegex(name) + '$', 'i'));
 
-      filter.name = { $in: routeRegexes };
-
-      // Pre-calculate cities and markets for filtering counts later
-      const customerCities = assignedCustomers.map(c => c.city).filter(Boolean);
-      customerCityRegexes = customerCities.map(city => new RegExp('^' + escapeRegex(city) + '$', 'i'));
-
-      const cityConditions = [];
-      if (routeRegexes.length > 0) {
-        cityConditions.push({ route: { $in: routeRegexes } });
-      }
-      cityConditions.push({ agentAssigned: agentRegex });
-
-      const resolvedMarkets = await Party.find({
-        type: 'market',
-        company: companyId,
-        isDeleted: { $ne: true },
-        $or: cityConditions
-      });
-      const resolvedMarketNames = resolvedMarkets.map(m => m.firmName);
-      marketRegexes = resolvedMarketNames.map(name => new RegExp('^' + escapeRegex(name) + '$', 'i'));
+      filter.name = { $in: routeNames };
     }
 
     // Secure sorting with whitelist validation
@@ -79,7 +57,7 @@ exports.getRoutes = async (req, res) => {
     const sortObj = {};
     sortObj[sortBy] = sortOrder;
 
-    const routes = await Route.find(filter).sort(sortObj);
+    const routes = await Route.find(filter).sort(sortObj).lean();
 
     const rNames = routes.map(r => r.name).filter(Boolean);
     const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
@@ -145,7 +123,7 @@ exports.getRoutes = async (req, res) => {
       const cStat = customerMap[routeLower] || { customersCount: 0, outstanding: 0 };
       
       return {
-        ...route.toObject(),
+        ...route,
         citiesCount,
         customersCount: cStat.customersCount,
         outstandingBalance: cStat.outstanding,
@@ -161,7 +139,7 @@ exports.getRoutes = async (req, res) => {
 
 exports.getRouteById = async (req, res) => {
   try {
-    const route = await Route.findById(req.params.id);
+    const route = await Route.findById(req.params.id).lean();
     if (!route) return res.status(404).json({ msg: 'Route not found' });
 
     const companyId = route.company;
@@ -175,7 +153,7 @@ exports.getRouteById = async (req, res) => {
       const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
       agentRegex = new RegExp('^' + escapeRegex(agentName) + '$', 'i');
 
-      const agentRoutes = await Route.find({ company: companyId, assignedAgent: agentRegex, isDeleted: { $ne: true } });
+      const agentRoutes = await Route.find({ company: companyId, assignedAgent: agentRegex, isDeleted: { $ne: true } }).select('name').lean();
       const directRouteNames = agentRoutes.map(r => r.name);
 
       const assignedMarkets = await Party.find({
@@ -183,7 +161,7 @@ exports.getRouteById = async (req, res) => {
         company: companyId,
         agentAssigned: agentRegex,
         isDeleted: { $ne: true }
-      });
+      }).select('route').lean();
       const marketRouteNames = assignedMarkets.map(m => m.route).filter(Boolean);
 
       const assignedCustomers = await Party.find({
@@ -191,7 +169,7 @@ exports.getRouteById = async (req, res) => {
         company: companyId,
         agentAssigned: agentRegex,
         isDeleted: { $ne: true }
-      });
+      }).select('route city').lean();
       const customerRouteNames = assignedCustomers.map(c => c.route).filter(Boolean);
 
       const allRouteNames = Array.from(new Set([...directRouteNames, ...marketRouteNames, ...customerRouteNames]));
@@ -218,7 +196,7 @@ exports.getRouteById = async (req, res) => {
         company: companyId,
         isDeleted: { $ne: true },
         $or: cityConditions
-      });
+      }).select('firmName').lean();
       const resolvedMarketNames = resolvedMarkets.map(m => m.firmName);
       marketRegexes = resolvedMarketNames.map(name => new RegExp('^' + escapeRegex(name) + '$', 'i'));
     }
@@ -275,7 +253,7 @@ exports.getRouteById = async (req, res) => {
     const outstanding = outstandingResult.length > 0 ? outstandingResult[0].totalOutstanding : 0;
 
     res.json({
-      ...route.toObject(),
+      ...route,
       citiesCount,
       customersCount,
       outstandingBalance: outstanding,

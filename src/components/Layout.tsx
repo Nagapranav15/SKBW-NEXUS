@@ -234,16 +234,33 @@ const Layout: React.FC = () => {
                       
                       {partyDropdownOpen && (
                         <div className="mt-1 ml-2 pl-2 border-l border-gray-150 space-y-0.5">
-                          {visiblePartyItems.map((item) => (
-                            <button
-                              key={item.path}
-                              onClick={() => handleNavigate(item.path)}
-                              className={`${getSubItemClass(item.path)} flex items-center gap-2`}
-                            >
-                              <item.icon className="w-4 h-4 shrink-0" />
-                              <span>{item.label}</span>
-                            </button>
-                          ))}
+                          {visiblePartyItems.map((item) => {
+                            let shortcut = '';
+                            if (item.path === '/party/customers') shortcut = 'Alt+1';
+                            else if (item.path === '/party/vendors') shortcut = 'Alt+2';
+                            else if (item.path === '/party/agents') shortcut = 'Alt+3';
+                            else if (item.path === '/party/routes') shortcut = 'Alt+4';
+                            else if (item.path === '/party/markets') shortcut = 'Alt+5';
+                            else if (item.path === '/party/transporters') shortcut = 'Alt+6';
+
+                            return (
+                              <button
+                                key={item.path}
+                                onClick={() => handleNavigate(item.path)}
+                                className={`${getSubItemClass(item.path)} flex items-center justify-between gap-2 pr-2`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <item.icon className="w-4 h-4 shrink-0" />
+                                  <span>{item.label}</span>
+                                </div>
+                                {shortcut && sidebarOpen && (
+                                  <kbd className="hidden sm:inline-block font-mono text-[9px] text-gray-400 bg-gray-100/80 border border-gray-200 px-1 rounded select-none pointer-events-none opacity-80">
+                                    {shortcut}
+                                  </kbd>
+                                )}
+                              </button>
+                            );
+                          })}
                         </div>
                       )}
                     </div>

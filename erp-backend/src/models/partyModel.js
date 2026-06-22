@@ -109,6 +109,7 @@ partySchema.index({ type: 1, route: 1, company: 1, isDeleted: 1 });
 partySchema.index({ type: 1, agentAssigned: 1, company: 1, isDeleted: 1 });
 partySchema.index({ type: 1, preferredTransport: 1, company: 1, isDeleted: 1 });
 partySchema.index({ status: 1 });
-partySchema.index({ createdAt: -1 });
+// Compound index for sorted queries: covers type+company filter with createdAt sort
+partySchema.index({ type: 1, company: 1, createdAt: -1, isDeleted: 1 });
 
 module.exports = mongoose.model("Party", partySchema);

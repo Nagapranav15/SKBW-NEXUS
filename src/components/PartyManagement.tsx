@@ -11,7 +11,7 @@ import {
 import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext';
 import {
-  getParties, getPartyStats, createParty, updateParty,
+  getParties, getPartyStats, createParty, updateParty, getPartyById,
   deleteParty as deletePartyApi, importParties as importPartiesApi,
   bulkDeleteParties, mergeParties,
   getDeletedParties, restoreParty, permanentlyDeleteParty
@@ -32,6 +32,16 @@ const WhatsAppIcon: React.FC = () => (
     <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.458 5.705 1.459h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
   </svg>
 );
+
+const getContactPersonForCard = (party: any) => {
+  if (!party) return '-';
+  const cName = (party.contactName || '').trim();
+  const oName = (party.ownerName || '').trim();
+  
+  if (cName && cName !== '-') return cName;
+  if (oName && oName !== '-') return oName;
+  return '-';
+};
 
 const getWhatsAppLink = (phoneNum: string) => {
   const digits = phoneNum.replace(/\D/g, '');
@@ -543,8 +553,66 @@ const PartyManagement: React.FC = () => {
   // Custom Alert and Highlighting States
   const [customAlert, setCustomAlert] = useState<{ message: string; type: 'info' | 'success' | 'warning' | 'error' } | null>(null);
   const [customConfirm, setCustomConfirm] = useState<{ message: string; onConfirm: () => void } | null>(null);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error'; prominent?: boolean } | null>(null);
   const [highlightedRowIndex, setHighlightedRowIndex] = useState<number>(-1);
+  const [highlightedDuplicateIdx, setHighlightedDuplicateIdx] = useState<number>(-1);
+  const [highlightedRecycleIdx, setHighlightedRecycleIdx] = useState<number>(-1);
+
+  // Request desktop notification permission on mount
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  // Notification Helpers (Tally-style confirm audio and desktop popups)
+  const playSuccessSound = () => {
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return;
+      const ctx = new AudioContextClass();
+      const now = ctx.currentTime;
+      
+      // Dual-tone chime: nice, clean, harmonious success sound
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(523.25, now); // C5
+      gain1.gain.setValueAtTime(0.08, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(659.25, now + 0.08); // E5
+      gain2.gain.setValueAtTime(0.08, now + 0.08);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.43);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      
+      osc1.start(now);
+      osc1.stop(now + 0.4);
+      osc2.start(now + 0.08);
+      osc2.stop(now + 0.48);
+    } catch (e) {
+      console.error('Audio playback failed', e);
+    }
+  };
+
+  const showDesktopNotification = (title: string, body: string) => {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') {
+      new Notification(title, { body });
+    } else if (Notification.permission !== 'denied') {
+      Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+          new Notification(title, { body });
+        }
+      });
+    }
+  };
 
   const showAlert = (message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
     setCustomAlert({ message, type });
@@ -737,6 +805,31 @@ const PartyManagement: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
+  const loadPartyDetails = async (item: any) => {
+    if (!item) {
+      setViewingCustomer(null);
+      return;
+    }
+    if (currentType === 'route') {
+      setViewingCustomer(item);
+      return;
+    }
+    try {
+      setLoading(true);
+      const res = await getPartyById(item._id);
+      if (res.data) {
+        setViewingCustomer(res.data);
+      } else {
+        setViewingCustomer(item);
+      }
+    } catch (err) {
+      console.error('Error fetching party details:', err);
+      setViewingCustomer(item);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Global Keyboard Navigation (Tally-like controls)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -744,27 +837,147 @@ const PartyManagement: React.FC = () => {
       if (customAlert || customConfirm) return;
 
       const isInput = document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA';
+      const totalPages = Math.ceil(total / limit);
 
-      // 2. Alt + C: Open Create Form
-      if (e.altKey && (e.key === 'c' || e.key === 'C')) {
-        e.preventDefault();
-        setShowForm(true);
-        setEditingItem(null);
-        setFormData(getEmptyFormData());
-        return;
-      }
-
-      // 2.5 Alt + E: Edit currently viewed customer
-      if (e.altKey && (e.key === 'e' || e.key === 'E')) {
-        e.preventDefault();
-        if (viewingCustomer) {
-          handleEdit(viewingCustomer);
+      // Keyboard lock for comparison view (View Both)
+      if (compareGroup) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          setCompareGroup(null);
+          return;
+        }
+        if (e.key === 'Enter' || e.key === 'm' || e.key === 'M') {
+          if (currentType !== 'route') {
+            e.preventDefault();
+            setCompareGroup(null);
+            handleMergeInit(compareGroup);
+          }
+          return;
         }
         return;
       }
 
-      // 3. Alt + D: Delete active/viewed/highlighted record
-      if (e.altKey && (e.key === 'd' || e.key === 'D')) {
+      // Keyboard lock for Find Duplicates modal
+      if (showDuplicates) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          setShowDuplicates(false);
+          setHighlightedDuplicateIdx(-1);
+          return;
+        }
+        if (duplicateGroups.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setHighlightedDuplicateIdx(prev => (prev < duplicateGroups.length - 1 ? prev + 1 : 0));
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setHighlightedDuplicateIdx(prev => (prev > 0 ? prev - 1 : duplicateGroups.length - 1));
+          return;
+        }
+
+        if (highlightedDuplicateIdx >= 0 && highlightedDuplicateIdx < duplicateGroups.length) {
+          const group = duplicateGroups[highlightedDuplicateIdx];
+          if (e.key === 'v' || e.key === 'V') {
+            e.preventDefault();
+            handleViewBoth(group);
+            return;
+          }
+          if (e.key === 'm' || e.key === 'M') {
+            if (currentType !== 'route') {
+              e.preventDefault();
+              handleMergeInit(group);
+            }
+            return;
+          }
+          if (e.key === 'k' || e.key === 'K') {
+            e.preventDefault();
+            handleKeepBoth(highlightedDuplicateIdx);
+            setHighlightedDuplicateIdx(prev => {
+              const nextLen = duplicateGroups.length - 1;
+              if (nextLen <= 0) return -1;
+              return prev >= nextLen ? nextLen - 1 : prev;
+            });
+            return;
+          }
+        }
+        return;
+      }
+
+      // Keyboard lock for Recycle Bin modal
+      if (showRecycleBin) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          setShowRecycleBin(false);
+          setHighlightedRecycleIdx(-1);
+          return;
+        }
+        if (deletedItems.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setHighlightedRecycleIdx(prev => (prev < deletedItems.length - 1 ? prev + 1 : 0));
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setHighlightedRecycleIdx(prev => (prev > 0 ? prev - 1 : deletedItems.length - 1));
+          return;
+        }
+
+        if (highlightedRecycleIdx >= 0 && highlightedRecycleIdx < deletedItems.length) {
+          const item = deletedItems[highlightedRecycleIdx];
+          const displayName = currentType === 'route' ? item.name : (item.firmName || item.contactName || 'Unnamed');
+          if (e.key === 'Enter' || e.key === 'r' || e.key === 'R') {
+            e.preventDefault();
+            handleRestoreItem(item._id, displayName);
+            return;
+          }
+          if (e.key === 'Delete') {
+            e.preventDefault();
+            handlePermanentDeleteItem(item._id, displayName);
+            return;
+          }
+        }
+        return;
+      }
+
+      // 2. Tab/View switching via Alt+1 to Alt+6 (Tally menu shortcut style)
+      if (e.altKey && !isInput) {
+        if (e.key === '1') { e.preventDefault(); navigate('/party/customers'); return; }
+        if (e.key === '2') { e.preventDefault(); navigate('/party/vendors'); return; }
+        if (e.key === '3') { e.preventDefault(); navigate('/party/agents'); return; }
+        if (e.key === '4') { e.preventDefault(); navigate('/party/routes'); return; }
+        if (e.key === '5') { e.preventDefault(); navigate('/party/markets'); return; }
+        if (e.key === '6') { e.preventDefault(); navigate('/party/transporters'); return; }
+      }
+
+      // 3. Alt + C / F8: Open Create Form (like Tally Alt+C)
+      if ((e.altKey && (e.key === 'c' || e.key === 'C')) || e.key === 'F8') {
+        e.preventDefault();
+        if (!showForm && !viewingCustomer && !mergeGroup) {
+          setShowForm(true);
+          setEditingItem(null);
+          setFormData(getEmptyFormData());
+        }
+        return;
+      }
+
+      // 3.5 Alt + E / F2: Edit currently viewed/highlighted customer (like Tally F2)
+      if ((e.altKey && (e.key === 'e' || e.key === 'E')) || e.key === 'F2') {
+        e.preventDefault();
+        if (viewingCustomer) {
+          handleEdit(viewingCustomer);
+        } else if (highlightedRowIndex >= 0 && highlightedRowIndex < parties.length) {
+          handleEdit(parties[highlightedRowIndex]);
+        }
+        return;
+      }
+
+      // 4. Alt + D / Delete key: Delete active/viewed/highlighted record
+      if ((e.altKey && (e.key === 'd' || e.key === 'D')) || (!isInput && e.key === 'Delete')) {
         e.preventDefault();
         if (viewingCustomer) {
           handleDelete(viewingCustomer._id);
@@ -774,21 +987,86 @@ const PartyManagement: React.FC = () => {
         return;
       }
 
-      // 4. Escape: Close drawers / modals / forms
+      // Alt + F: Find Duplicates
+      if (e.altKey && (e.key === 'f' || e.key === 'F') && !showForm && !viewingCustomer) {
+        e.preventDefault();
+        handleFindDuplicates();
+        return;
+      }
+
+      // Alt + R: Recycle Bin
+      if (e.altKey && (e.key === 'r' || e.key === 'R') && !showForm && !viewingCustomer) {
+        e.preventDefault();
+        openRecycleBin();
+        return;
+      }
+
+      // Alt + L: Activity Log
+      if (e.altKey && (e.key === 'l' || e.key === 'L') && !showForm && !viewingCustomer) {
+        e.preventDefault();
+        setShowActivityLog(true);
+        return;
+      }
+
+      // Ctrl/Cmd + F: Focus Search Box (like Tally search)
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F') && !showForm) {
+        e.preventDefault();
+        const searchInput = document.getElementById('party-search-input') as HTMLInputElement | null;
+        if (searchInput) { searchInput.focus(); searchInput.select(); }
+        return;
+      }
+
+      // 5. Escape: Close drawers / modals / forms
       if (e.key === 'Escape') {
         e.preventDefault();
-        if (selectedCityName) {
+        if (inlineModalType) {
+          setInlineModalType(null);
+        } else if (mergeGroup) {
+          setMergeGroup(null); setPrimaryRecordId('');
+        } else if (selectedCityName) {
           setSelectedCityName(null);
         } else if (showForm) {
           resetForm();
         } else if (viewingCustomer) {
           setViewingCustomer(null);
+        } else if (showDuplicates) {
+          setShowDuplicates(false);
+          setHighlightedDuplicateIdx(-1);
+        } else if (showActivityLog) {
+          setShowActivityLog(false);
+        } else if (showRecycleBin) {
+          setShowRecycleBin(false);
+          setHighlightedRecycleIdx(-1);
         }
         return;
       }
 
-      // 5. Arrow Keys & Enter on Rows (only active when not typing)
-      if (!isInput) {
+      // Page navigation (PageDown / PageUp) — like Tally page scrolling
+      if (!isInput && !showForm && !viewingCustomer) {
+        if (e.key === 'PageDown') {
+          e.preventDefault();
+          setPage(p => Math.min(totalPages, p + 1));
+          return;
+        }
+        if (e.key === 'PageUp') {
+          e.preventDefault();
+          setPage(p => Math.max(1, p - 1));
+          return;
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Home') {
+          e.preventDefault();
+          setPage(1);
+          return;
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === 'End') {
+          e.preventDefault();
+          setPage(totalPages);
+          return;
+        }
+      }
+
+      // 6. Arrow Keys & Enter & Spacebar on Rows (only active when not typing)
+      if (!isInput && !showForm && !viewingCustomer) {
         if (parties.length === 0) return;
 
         if (e.key === 'ArrowDown') {
@@ -806,7 +1084,12 @@ const PartyManagement: React.FC = () => {
         } else if (e.key === 'Enter') {
           if (highlightedRowIndex >= 0 && highlightedRowIndex < parties.length) {
             e.preventDefault();
-            setViewingCustomer(parties[highlightedRowIndex]);
+            loadPartyDetails(parties[highlightedRowIndex]);
+          }
+        } else if (e.key === ' ' || e.code === 'Space') {
+          if (highlightedRowIndex >= 0 && highlightedRowIndex < parties.length) {
+            e.preventDefault();
+            handleSelectRow(parties[highlightedRowIndex]._id);
           }
         }
       }
@@ -814,10 +1097,18 @@ const PartyManagement: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [parties, highlightedRowIndex, viewingCustomer, showForm, selectedCityName, customAlert, customConfirm]);
+  }, [parties, highlightedRowIndex, viewingCustomer, showForm, selectedCityName, customAlert, customConfirm, mergeGroup, showDuplicates, showActivityLog, showRecycleBin, total, limit, page, duplicateGroups, highlightedDuplicateIdx, compareGroup, deletedItems, highlightedRecycleIdx, currentType, navigate, inlineModalType]);
 
-  // Form Field Navigation: Enter key acts as Tab
+  // Form Field Navigation: Enter key acts as Tab, Ctrl/Cmd+A / Ctrl/Cmd+Enter submits
   const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    // Tally Accept shortcut (Ctrl/Cmd+A or Ctrl/Cmd+Enter) to save form immediately
+    const isCmdOrCtrl = e.ctrlKey || e.metaKey;
+    if ((isCmdOrCtrl && (e.key === 'a' || e.key === 'A')) || (isCmdOrCtrl && e.key === 'Enter')) {
+      e.preventDefault();
+      e.currentTarget.requestSubmit();
+      return;
+    }
+
     if (e.key === 'Enter') {
       const target = e.target as HTMLElement;
       
@@ -1440,6 +1731,19 @@ const PartyManagement: React.FC = () => {
           if (!submitData.contactName) submitData.contactName = formData.firmName;
         }
       }
+      if (currentType === 'vendor') {
+        if (formData.contactPersons && formData.contactPersons.length > 0) {
+          submitData.contactName = formData.contactPersons[0].name || formData.ownerName || formData.firmName;
+          if (!submitData.phone && formData.contactPersons[0].phone) {
+            submitData.phone = formData.contactPersons[0].phone;
+          }
+        } else {
+          submitData.contactName = formData.ownerName || formData.firmName;
+        }
+        if (submitData.contactName === '-') {
+          submitData.contactName = formData.ownerName || formData.firmName;
+        }
+      }
 
       let savedItem: any;
 
@@ -1513,30 +1817,47 @@ const PartyManagement: React.FC = () => {
   };
 
   // Trigger Edit
-  const handleEdit = (item: any) => {
-    setEditingItem(item);
+  const handleEdit = async (item: any) => {
+    if (!item) return;
+
+    let fullItem = item;
+    if (currentType !== 'route') {
+      try {
+        setLoading(true);
+        const res = await getPartyById(item._id);
+        if (res.data) {
+          fullItem = res.data;
+        }
+      } catch (err) {
+        console.error('Error fetching party details for editing:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    setEditingItem(fullItem);
     
-    let agentAssigned = item.agentAssigned;
-    if (currentType === 'customer' && item.route) {
-      const routeDoc = allRoutes.find(r => r.name === item.route);
+    let agentAssigned = fullItem.agentAssigned;
+    if (currentType === 'customer' && fullItem.route) {
+      const routeDoc = allRoutes.find(r => r.name === fullItem.route);
       if (routeDoc?.assignedAgent) {
         agentAssigned = routeDoc.assignedAgent;
       }
     }
 
     setFormData({ 
-      ...item,
+      ...fullItem,
       agentAssigned,
-      type: item.type || (currentType === 'route' ? 'route' : currentType),
-      tags: item.tags || [],
-      contactPersons: item.contactPersons || [],
-      outstandingBalance: item.outstandingBalance !== undefined ? item.outstandingBalance : (item.outstanding || 0)
+      type: fullItem.type || (currentType === 'route' ? 'route' : currentType),
+      tags: fullItem.tags || [],
+      contactPersons: fullItem.contactPersons || [],
+      outstandingBalance: fullItem.outstandingBalance !== undefined ? fullItem.outstandingBalance : (fullItem.outstanding || 0)
     });
     setIsAddingNewCity(false);
     setNewCityName('');
 
     if (currentType === 'agent') {
-      const agentName = item.firmName || item.contactName;
+      const agentName = fullItem.firmName || fullItem.contactName;
       // Get all route IDs currently assigned to this agent
       const assignedRouteIds = allRoutes
         .filter(r => r.assignedAgent === agentName)
@@ -1765,6 +2086,9 @@ const PartyManagement: React.FC = () => {
 
       setDuplicateGroups(groups);
       setShowDuplicates(true);
+      if (groups.length > 0) {
+        setHighlightedDuplicateIdx(0);
+      }
     } catch (err) {
       console.error('Error finding duplicates:', err);
       showAlert('Error scanning for duplicates. Please try again.', 'error');
@@ -1814,7 +2138,17 @@ const PartyManagement: React.FC = () => {
       
       setMergeGroup(null);
       setPrimaryRecordId('');
-      setToast({ message: 'Records merged successfully.', type: 'success' });
+      const mergedCount = duplicateItems.length;
+      setToast({
+        message: `✅ Merge complete! ${mergedCount} duplicate${mergedCount > 1 ? 's' : ''} merged into "${primaryItem.firmName || primaryItem.contactName}". All transactions updated.`,
+        type: 'success',
+        prominent: true
+      });
+      playSuccessSound();
+      showDesktopNotification(
+        'Merge Completed Successfully',
+        `${mergedCount} duplicate${mergedCount > 1 ? 's' : ''} merged into "${primaryItem.firmName || primaryItem.contactName}". All transactions updated.`
+      );
     } catch (err: any) {
       console.error('Merge failed:', err);
       showAlert(err.response?.data?.msg || 'Failed to merge duplicate records. Please try again.', 'error');
@@ -1920,6 +2254,7 @@ const PartyManagement: React.FC = () => {
 
   const openRecycleBin = () => {
     setShowRecycleBin(true);
+    setHighlightedRecycleIdx(0);
     fetchDeletedItems();
   };
 
@@ -2330,7 +2665,7 @@ const PartyManagement: React.FC = () => {
                 >
                   <Trash2 className="w-4 h-4" />
                   <span>Delete Selected ({selectedIds.length})</span>
-                  <kbd className="hidden md:inline-block ml-1.5 px-1.5 py-0.5 text-[10px] font-mono font-bold text-red-100 bg-red-800 rounded border border-red-700 shadow-xs select-none pointer-events-none">Alt+D</kbd>
+                  <kbd className="hidden md:inline-block ml-1.5 px-1.5 py-0.5 text-[10px] font-mono font-bold text-red-100 bg-red-800 rounded border border-red-700 shadow-xs select-none pointer-events-none">Alt/Opt+D</kbd>
                 </button>
               )}
               <button
@@ -2339,6 +2674,7 @@ const PartyManagement: React.FC = () => {
               >
                 <Clock className="w-4 h-4 text-gray-450" />
                 <span>Activity Log</span>
+                <kbd className="hidden md:inline-block ml-1 px-1.5 py-0.5 text-[10px] font-mono font-bold text-gray-400 bg-gray-100 rounded border border-gray-200 shadow-xs select-none pointer-events-none">Alt/Opt+L</kbd>
               </button>
               <button
                 onClick={handleFindDuplicates}
@@ -2346,6 +2682,7 @@ const PartyManagement: React.FC = () => {
               >
                 <AlertTriangle className="w-4 h-4 text-gray-450" />
                 <span>Find Duplicates</span>
+                <kbd className="hidden md:inline-block ml-1 px-1.5 py-0.5 text-[10px] font-mono font-bold text-gray-400 bg-gray-100 rounded border border-gray-200 shadow-xs select-none pointer-events-none">Alt/Opt+F</kbd>
               </button>
               <button
                 onClick={openRecycleBin}
@@ -2353,6 +2690,7 @@ const PartyManagement: React.FC = () => {
               >
                 <Trash2 className="w-4 h-4 text-gray-450" />
                 <span>Recycle Bin</span>
+                <kbd className="hidden md:inline-block ml-1 px-1.5 py-0.5 text-[10px] font-mono font-bold text-gray-400 bg-gray-100 rounded border border-gray-200 shadow-xs select-none pointer-events-none">Alt/Opt+R</kbd>
               </button>
               <button
                 onClick={() => { setEditingItem(null); setFormData(getEmptyFormData()); setAgentCheckedRoutes([]); setShowForm(true); }}
@@ -2360,7 +2698,7 @@ const PartyManagement: React.FC = () => {
               >
                 <Plus className="w-4 h-4" />
                 <span>Add {currentType === 'market' ? 'City' : typeLabel}</span>
-                <kbd className="hidden md:inline-block ml-1.5 px-1.5 py-0.5 text-[10px] font-mono font-bold text-blue-100 bg-blue-800 rounded border border-blue-700 shadow-xs select-none pointer-events-none">Alt+C</kbd>
+                <kbd className="hidden md:inline-block ml-1.5 px-1.5 py-0.5 text-[10px] font-mono font-bold text-blue-100 bg-blue-800 rounded border border-blue-700 shadow-xs select-none pointer-events-none">Alt/Opt+C</kbd>
               </button>
             </div>
           </div>
@@ -2873,7 +3211,7 @@ const PartyManagement: React.FC = () => {
                           }`}
                           onMouseEnter={() => setHighlightedRowIndex(idx)}
                           onClick={() => {
-                            setViewingCustomer(item);
+                            loadPartyDetails(item);
                             setHighlightedRowIndex(idx);
                           }}
                         >
@@ -2898,7 +3236,7 @@ const PartyManagement: React.FC = () => {
                                     )}
                                   </div>
                                 ) : col === 'contactName' ? (
-                                  <span className="font-semibold text-gray-955">{item.contactName || item.ownerName || '-'}</span>
+                                  <span className="font-semibold text-gray-955">{getContactPersonForCard(item)}</span>
                                 ) : col === 'name' ? (
                                   <div className="flex flex-col">
                                     {currentType === 'route' ? (
@@ -3020,7 +3358,7 @@ const PartyManagement: React.FC = () => {
                           <td className="px-3.5 py-1.5 whitespace-nowrap text-right text-xs" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-end space-x-1.5 text-[11px]">
                               <button
-                                onClick={() => setViewingCustomer(item)}
+                                onClick={() => loadPartyDetails(item)}
                                 className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors font-semibold shadow-xs"
                               >
                                 Profile
@@ -3867,6 +4205,68 @@ const PartyManagement: React.FC = () => {
                         className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white h-20 text-gray-900"
                       />
                     </div>
+
+                    {/* Multiple Contact Persons */}
+                    <div className="col-span-2 mt-2">
+                      <div className="flex justify-between items-center mb-2 border-b pb-1">
+                        <label className="block text-xs font-semibold text-gray-705 uppercase tracking-wider">Contact Persons</label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const currentContacts = formData.contactPersons || [];
+                            setFormData({
+                              ...formData,
+                              contactPersons: [...currentContacts, { name: '', phone: '' }]
+                            });
+                          }}
+                          className="text-xs text-blue-650 hover:text-blue-755 font-semibold flex items-center space-x-1"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add Contact</span>
+                        </button>
+                      </div>
+                      <div className="space-y-2">
+                        {((formData.contactPersons || []) as any[]).map((cp, idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              placeholder="Name"
+                              value={cp.name || ''}
+                              onChange={e => {
+                                const newContacts = [...(formData.contactPersons || [])];
+                                newContacts[idx] = { ...newContacts[idx], name: e.target.value };
+                                setFormData({ ...formData, contactPersons: newContacts });
+                              }}
+                              className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                            />
+                            <input
+                              type="tel"
+                              placeholder="Phone"
+                              value={cp.phone || ''}
+                              onChange={e => {
+                                const newContacts = [...(formData.contactPersons || [])];
+                                newContacts[idx] = { ...newContacts[idx], phone: e.target.value };
+                                setFormData({ ...formData, contactPersons: newContacts });
+                              }}
+                              className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newContacts = (formData.contactPersons || []).filter((_: any, i: number) => i !== idx);
+                                setFormData({ ...formData, contactPersons: newContacts });
+                              }}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-200"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                        {(!formData.contactPersons || formData.contactPersons.length === 0) && (
+                          <p className="text-xs text-gray-400 italic">No contact persons added yet. Click Add Contact to add.</p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </>
               )}
@@ -4137,9 +4537,10 @@ const PartyManagement: React.FC = () => {
             <button
               type="submit"
               form="partyForm"
-              className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium text-sm shadow-sm"
+              className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium text-sm shadow-sm flex items-center justify-center gap-1.5"
             >
-              {editingItem ? 'Update' : 'Save'} {typeLabel}
+              <span>{editingItem ? 'Update' : 'Save'} {typeLabel}</span>
+              <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold text-blue-200 bg-blue-700/50 rounded border border-blue-500/30 shadow-xs select-none pointer-events-none">Ctrl/Cmd+A</kbd>
             </button>
             <button
               type="button"
@@ -4167,9 +4568,10 @@ const PartyManagement: React.FC = () => {
                     <h2 className="text-lg font-bold text-gray-900" id="slide-over-title">
                       {typeLabel} Activity Log
                     </h2>
-                    <div className="ml-3 flex h-7 items-center">
+                    <div className="ml-3 flex h-7 items-center space-x-2">
+                      <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold text-gray-500 bg-gray-100 rounded border border-gray-200 shadow-xs select-none pointer-events-none">Esc</kbd>
                       <button onClick={() => setShowActivityLog(false)} className="rounded-md text-gray-400 hover:text-gray-500 focus:outline-none">
-                        <X className="h-6 h-6" />
+                        <X className="h-6 w-6" />
                       </button>
                     </div>
                   </div>
@@ -4236,9 +4638,18 @@ const PartyManagement: React.FC = () => {
                 <AlertTriangle className="w-5 h-5 text-yellow-500" />
                 Find Duplicates for {typeLabelPlural}
               </h2>
-              <button onClick={() => setShowDuplicates(false)} className="text-gray-400 hover:text-gray-600">
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-3">
+                <span className="hidden sm:flex items-center gap-1.5 text-[10px] text-gray-400 font-mono select-none">
+                  <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-gray-500">↑↓</kbd> select &nbsp;
+                  <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-gray-500">V</kbd> view &nbsp;
+                  {currentType !== 'route' && <><kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-gray-500">M</kbd> merge &nbsp;</>}
+                  <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-gray-500">K</kbd> keep &nbsp;
+                  <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-gray-500">Esc</kbd> close
+                </span>
+                <button onClick={() => setShowDuplicates(false)} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* List */}
@@ -4254,10 +4665,18 @@ const PartyManagement: React.FC = () => {
                   <p className="text-sm text-gray-500">The following duplicate groups were identified. Check details and clean up if necessary:</p>
                   
                   {duplicateGroups.map((group, gIdx) => (
-                    <div key={gIdx} className="border border-red-150 bg-red-50/10 rounded-lg p-4">
+                    <div 
+                      key={gIdx} 
+                      className={`border rounded-lg p-4 transition-all duration-150 ${
+                        gIdx === highlightedDuplicateIdx
+                          ? 'border-blue-500 bg-blue-50/20 ring-2 ring-blue-500/20 shadow-sm'
+                          : 'border-red-150 bg-red-50/10'
+                      }`}
+                      onMouseEnter={() => setHighlightedDuplicateIdx(gIdx)}
+                    >
                       <div className="flex justify-between items-start md:items-center flex-col md:flex-row gap-2 mb-3 border-b pb-2 border-red-100/50">
                         <div>
-                          <span className="text-xs font-semibold bg-red-100 text-red-800 px-2 py-0.5 rounded">
+                          <span className="text-xs font-semibold bg-red-105 text-red-800 px-2 py-0.5 rounded">
                             Duplicate by {group.field}: {group.value}
                           </span>
                           <span className="text-xs text-gray-400 ml-2">{group.items.length} records</span>
@@ -4265,26 +4684,32 @@ const PartyManagement: React.FC = () => {
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleViewBoth(group)}
+                            title="View Both (V)"
                             className="px-2 py-1 text-xs font-semibold text-gray-700 bg-white border border-gray-250 rounded hover:bg-gray-55 flex items-center gap-1 transition-all"
                           >
                             <Eye className="w-3.5 h-3.5" />
-                            View Both
+                            <span>View Both</span>
+                            <kbd className="hidden sm:inline-block font-mono text-[9px] text-gray-400 bg-gray-100 px-1 border rounded ml-1">V</kbd>
                           </button>
                           {currentType !== 'route' && (
                             <button
                               onClick={() => handleMergeInit(group)}
+                              title="Merge (M)"
                               className="px-2 py-1 text-xs font-semibold text-white bg-blue-600 border border-blue-650 rounded hover:bg-blue-700 flex items-center gap-1 transition-all"
                             >
                               <RefreshCw className="w-3.5 h-3.5" />
-                              Merge
+                              <span>Merge</span>
+                              <kbd className="hidden sm:inline-block font-mono text-[9px] text-blue-200 bg-blue-700 px-1 border border-blue-500 rounded ml-1">M</kbd>
                             </button>
                           )}
                           <button
                             onClick={() => handleKeepBoth(gIdx)}
+                            title="Keep Both (K)"
                             className="px-2 py-1 text-xs font-semibold text-gray-600 bg-gray-100 border border-gray-200 rounded hover:bg-gray-200 flex items-center gap-1 transition-all"
                           >
                             <X className="w-3.5 h-3.5" />
-                            Keep Both
+                            <span>Keep Both</span>
+                            <kbd className="hidden sm:inline-block font-mono text-[9px] text-gray-450 bg-gray-250 px-1 border border-gray-300 rounded ml-1">K</kbd>
                           </button>
                         </div>
                       </div>
@@ -4566,9 +4991,17 @@ const PartyManagement: React.FC = () => {
                 <Trash2 className="w-5 h-5 text-red-500" />
                 Recycle Bin ({typeLabelPlural})
               </h2>
-              <button onClick={() => setShowRecycleBin(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-3">
+                <span className="hidden sm:flex items-center gap-1.5 text-[10px] text-gray-400 font-mono select-none">
+                  <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-gray-500">↑↓</kbd> select &nbsp;
+                  <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-gray-500">Enter / R</kbd> restore &nbsp;
+                  <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-gray-500">Del</kbd> delete permanent &nbsp;
+                  <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-gray-500">Esc</kbd> close
+                </span>
+                <button onClick={() => setShowRecycleBin(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* List Body */}
@@ -4603,8 +5036,17 @@ const PartyManagement: React.FC = () => {
                     <tbody className="bg-white divide-y divide-gray-200">
                       {deletedItems.map((item, idx) => {
                         const displayName = currentType === 'route' ? item.name : (item.firmName || item.contactName || 'Unnamed');
+                        const isHighlighted = idx === highlightedRecycleIdx;
                         return (
-                          <tr key={item._id} className="hover:bg-gray-50/50 transition-colors">
+                          <tr 
+                            key={item._id} 
+                            className={`transition-colors ${
+                              isHighlighted
+                                ? 'bg-blue-50/70 hover:bg-blue-100/50 ring-2 ring-blue-500/20 shadow-sm font-semibold'
+                                : 'hover:bg-gray-50/50'
+                            }`}
+                            onMouseEnter={() => setHighlightedRecycleIdx(idx)}
+                          >
                             <td className="px-4 py-3 text-gray-400 font-medium">{idx + 1}</td>
                             <td className="px-4 py-3 text-gray-900 font-semibold truncate max-w-[200px]" title={displayName}>
                               {displayName}
@@ -4621,15 +5063,21 @@ const PartyManagement: React.FC = () => {
                             <td className="px-4 py-3 whitespace-nowrap text-right space-x-2">
                               <button
                                 onClick={() => handleRestoreItem(item._id, displayName)}
-                                className="px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded hover:bg-emerald-100 transition-colors"
+                                className="px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded hover:bg-emerald-100 transition-colors inline-flex items-center gap-1"
                               >
-                                Restore
+                                <span>Restore</span>
+                                {isHighlighted && (
+                                  <kbd className="hidden sm:inline-block font-mono text-[9px] text-emerald-600 bg-emerald-100 border border-emerald-350 px-1 rounded">R</kbd>
+                                )}
                               </button>
                               <button
                                 onClick={() => handlePermanentDeleteItem(item._id, displayName)}
-                                className="px-3 py-1.5 text-xs font-bold text-red-700 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition-colors"
+                                className="px-3 py-1.5 text-xs font-bold text-red-700 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition-colors inline-flex items-center gap-1"
                               >
-                                Delete Permanent
+                                <span>Delete Permanent</span>
+                                {isHighlighted && (
+                                  <kbd className="hidden sm:inline-block font-mono text-[9px] text-red-650 bg-red-100 border border-red-350 px-1 rounded">Del</kbd>
+                                )}
                               </button>
                             </td>
                           </tr>
@@ -4944,16 +5392,20 @@ const PartyManagement: React.FC = () => {
                       <span>Saving...</span>
                     </>
                   ) : (
-                    <span>Save {inlineModalType === 'market' ? 'City' : inlineModalType === 'route' ? 'Region' : inlineModalType ? inlineModalType.charAt(0).toUpperCase() + inlineModalType.slice(1) : ''}</span>
+                    <>
+                      <span>Save {inlineModalType === 'market' ? 'City' : inlineModalType === 'route' ? 'Region' : inlineModalType ? inlineModalType.charAt(0).toUpperCase() + inlineModalType.slice(1) : ''}</span>
+                      <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold text-blue-200 bg-blue-700/50 rounded border border-blue-500/30 shadow-xs select-none pointer-events-none">Ctrl/Cmd+A</kbd>
+                    </>
                   )}
                 </button>
                 <button
                   type="button"
                   onClick={() => setInlineModalType(null)}
                   disabled={isSavingInline}
-                  className="px-5 py-2.5 border border-gray-300 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors font-medium text-sm disabled:opacity-50"
+                  className="px-5 py-2.5 border border-gray-300 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-1.5"
                 >
-                  Cancel
+                  <span>Cancel</span>
+                  <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold text-gray-500 bg-gray-100 rounded border border-gray-200 shadow-xs select-none pointer-events-none">Esc</kbd>
                 </button>
               </div>
             </form>
@@ -5026,7 +5478,7 @@ const PartyManagement: React.FC = () => {
                 >
                   <Edit className="w-4 h-4" />
                   <span>Edit Profile</span>
-                  <kbd className="hidden md:inline-block ml-1 px-1.5 py-0.5 text-[9px] font-mono font-bold text-blue-500 bg-blue-100 rounded border border-blue-200 select-none pointer-events-none">Alt+E</kbd>
+                  <kbd className="hidden md:inline-block ml-1 px-1.5 py-0.5 text-[9px] font-mono font-bold text-blue-500 bg-blue-100 rounded border border-blue-200 select-none pointer-events-none">Alt/Opt+E</kbd>
                 </button>
                 <button
                   onClick={() => handleDelete(viewingCustomer._id)}
@@ -5034,7 +5486,7 @@ const PartyManagement: React.FC = () => {
                 >
                   <Trash2 className="w-4 h-4 text-white" />
                   <span>Delete</span>
-                  <kbd className="hidden md:inline-block ml-1 px-1.5 py-0.5 text-[9px] font-mono font-bold text-red-100 bg-red-800 rounded border border-red-700 select-none pointer-events-none">Alt+D</kbd>
+                  <kbd className="hidden md:inline-block ml-1 px-1.5 py-0.5 text-[9px] font-mono font-bold text-red-100 bg-red-800 rounded border border-red-700 select-none pointer-events-none">Alt/Opt+D</kbd>
                 </button>
                 
                 {currentType === 'customer' && (
@@ -5094,7 +5546,7 @@ const PartyManagement: React.FC = () => {
                   <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm">
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">Contact Person</span>
-                      <span className="font-semibold text-gray-900">{viewingCustomer.contactName || viewingCustomer.ownerName || '-'}</span>
+                      <span className="font-semibold text-gray-900">{getContactPersonForCard(viewingCustomer)}</span>
                     </div>
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">Mobile Number</span>
@@ -5394,7 +5846,7 @@ const PartyManagement: React.FC = () => {
                   <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm">
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">Contact Person</span>
-                      <span className="font-semibold text-gray-900">{viewingCustomer.contactName || viewingCustomer.ownerName || '-'}</span>
+                      <span className="font-semibold text-gray-900">{getContactPersonForCard(viewingCustomer)}</span>
                     </div>
                     <div>
                       <span className="block text-xs text-gray-400 font-medium">Vendor Type</span>
@@ -5606,6 +6058,47 @@ const PartyManagement: React.FC = () => {
                       </div>
                     )}
                   </div>
+                </div>
+
+                {/* Contact Persons Section */}
+                <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
+                    <Users className="w-4 h-4 text-gray-500" /> Contact Persons
+                  </h3>
+                  {viewingCustomer.contactPersons && viewingCustomer.contactPersons.length > 0 ? (
+                    <div className="space-y-3">
+                      {viewingCustomer.contactPersons.map((cp: any, idx: number) => (
+                        <div key={idx} className="flex justify-between items-center text-sm border-b border-gray-100 pb-2 last:border-0 last:pb-0">
+                          <div>
+                            <p className="font-semibold text-gray-855">{cp.name || 'No Name'}</p>
+                            <p className="text-xs text-gray-455 mt-0.5">{cp.phone || 'No Phone'}</p>
+                          </div>
+                          {cp.phone && (
+                            <div className="flex items-center space-x-2">
+                              <a
+                                href={`tel:${cp.phone.replace(/\D/g, '')}`}
+                                className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                title={`Call ${cp.name}`}
+                              >
+                                <Phone className="w-4 h-4" />
+                              </a>
+                              <a
+                                href={getWhatsAppLink(cp.phone)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors"
+                                title="WhatsApp"
+                              >
+                                <WhatsAppIcon />
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-400 italic text-center py-2">No contact persons added yet.</p>
+                  )}
                 </div>
               </>
             )}
