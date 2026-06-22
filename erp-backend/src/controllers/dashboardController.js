@@ -12,6 +12,16 @@ exports.getDashboardStats = async (req, res) => {
     const filter = {};
     if (companyId) filter.company = companyId;
 
+    const aggFilter = { ...filter };
+    if (companyId) {
+      try {
+        const mongoose = require('mongoose');
+        aggFilter.company = new mongoose.Types.ObjectId(companyId);
+      } catch (err) {
+        console.error("Invalid companyId in getDashboardStats:", companyId);
+      }
+    }
+
     const [
       customersCount,
       vendorsCount,
@@ -38,7 +48,7 @@ exports.getDashboardStats = async (req, res) => {
       Item.countDocuments({ ...filter, status: "active" }),
       SalesOrder.countDocuments({ ...filter, status: { $in: ["pending", "confirmed", "in_production"] } }),
       SalesOrder.aggregate([
-        { $match: filter },
+        { $match: aggFilter },
         {
           $group: {
             _id: null,

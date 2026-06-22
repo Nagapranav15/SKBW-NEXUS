@@ -82,19 +82,26 @@ exports.getRoutes = async (req, res) => {
     const routes = await Route.find(filter).sort(sortObj);
 
     const rNames = routes.map(r => r.name).filter(Boolean);
+    const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const routeRegexes = rNames.map(name => new RegExp('^' + escapeRegex(name) + '$', 'i'));
     const marketMatch = {
       type: 'market',
       isDeleted: { $ne: true },
-      route: { $in: rNames }
+      route: { $in: routeRegexes }
     };
     const customerMatch = {
       type: 'customer',
       isDeleted: { $ne: true },
-      route: { $in: rNames }
+      route: { $in: routeRegexes }
     };
     if (companyId) {
-      marketMatch.company = companyId;
-      customerMatch.company = companyId;
+      try {
+        const companyObjectId = new (require('mongoose').Types.ObjectId)(companyId);
+        marketMatch.company = companyObjectId;
+        customerMatch.company = companyObjectId;
+      } catch (e) {
+        console.error("Invalid company ID in getRoutes:", companyId);
+      }
     }
 
     const [marketStats, customerStats] = await Promise.all([

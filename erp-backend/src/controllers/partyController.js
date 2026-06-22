@@ -961,13 +961,19 @@ exports.getParties = async (req, res) => {
     let parties;
     if (req.query.type === 'market') {
       const cityNames = rawParties.map(p => p.firmName).filter(Boolean);
+      const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const cityRegexes = cityNames.map(name => new RegExp('^' + escapeRegex(name) + '$', 'i'));
       const matchQuery = {
         type: 'customer',
         isDeleted: { $ne: true },
-        city: { $in: cityNames }
+        city: { $in: cityRegexes }
       };
       if (companyId) {
-        matchQuery.company = companyId;
+        try {
+          matchQuery.company = new (require('mongoose').Types.ObjectId)(companyId);
+        } catch (e) {
+          console.error("Invalid company ID:", companyId);
+        }
       }
       const stats = await Party.aggregate([
         { $match: matchQuery },
@@ -1002,13 +1008,19 @@ exports.getParties = async (req, res) => {
       });
     } else if (req.query.type === 'transporter') {
       const transporterNames = rawParties.map(p => p.firmName).filter(Boolean);
+      const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const transporterRegexes = transporterNames.map(name => new RegExp('^' + escapeRegex(name) + '$', 'i'));
       const matchQuery = {
         type: 'customer',
         isDeleted: { $ne: true },
-        preferredTransport: { $in: transporterNames }
+        preferredTransport: { $in: transporterRegexes }
       };
       if (companyId) {
-        matchQuery.company = companyId;
+        try {
+          matchQuery.company = new (require('mongoose').Types.ObjectId)(companyId);
+        } catch (e) {
+          console.error("Invalid company ID:", companyId);
+        }
       }
       const stats = await Party.aggregate([
         { $match: matchQuery },
