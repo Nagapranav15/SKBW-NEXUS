@@ -102,4 +102,13 @@ partySchema.pre("save", function () {
   }
 });
 
+// Database Indexes for performance optimization
+partySchema.index({ type: 1, company: 1, isDeleted: 1 });
+partySchema.index({ type: 1, city: 1, company: 1, isDeleted: 1 });
+partySchema.index({ type: 1, route: 1, company: 1, isDeleted: 1 });
+partySchema.index({ type: 1, agentAssigned: 1, company: 1, isDeleted: 1 });
+partySchema.index({ type: 1, preferredTransport: 1, company: 1, isDeleted: 1 });
+partySchema.index({ status: 1 });
+partySchema.index({ createdAt: -1 });
+
 module.exports = mongoose.model("Party", partySchema);

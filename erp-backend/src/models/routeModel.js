@@ -11,4 +11,9 @@ const routeSchema = new mongoose.Schema({
   isDeleted: { type: Boolean, default: false }
 }, { timestamps: true });
 
+// Database Indexes for performance optimization
+routeSchema.index({ company: 1, isDeleted: 1 });
+routeSchema.index({ company: 1, name: 1, isDeleted: 1 });
+routeSchema.index({ company: 1, assignedAgent: 1, isDeleted: 1 });
+
 module.exports = mongoose.model('Route', routeSchema);

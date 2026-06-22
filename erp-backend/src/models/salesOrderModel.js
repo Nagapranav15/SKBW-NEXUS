@@ -81,4 +81,10 @@ const salesOrderSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+// Database Indexes for performance optimization
+salesOrderSchema.index({ company: 1, createdAt: -1 });
+salesOrderSchema.index({ company: 1, customerId: 1 });
+salesOrderSchema.index({ company: 1, status: 1 });
+salesOrderSchema.index({ orderNumber: 1, company: 1 }, { unique: true });
+
 module.exports = mongoose.model("SalesOrder", salesOrderSchema);

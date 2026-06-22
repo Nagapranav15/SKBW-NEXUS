@@ -982,24 +982,20 @@ const PartyManagement: React.FC = () => {
   const fetchDropdownOptions = useCallback(async () => {
     if (!selectedCompany) return;
     try {
-      // Fetch Agents
-      const agentsRes = await getParties({ type: 'agent', limit: 1000, company: selectedCompany._id });
+      // Fetch references in parallel to optimize load time
+      const [agentsRes, routesRes, marketsRes, transportersRes, partiesForCitiesRes] = await Promise.all([
+        getParties({ type: 'agent', limit: 1000, company: selectedCompany._id }),
+        getRoutes(selectedCompany._id, { status: 'active' }),
+        getParties({ type: 'market', limit: 1000, company: selectedCompany._id }),
+        getParties({ type: 'transporter', limit: 1000, company: selectedCompany._id }),
+        getParties({ limit: 1000, company: selectedCompany._id })
+      ]);
+
       setAllAgents(agentsRes.data.parties || []);
-
-      // Fetch Routes
-      const routesRes = await getRoutes(selectedCompany._id, { status: 'active' });
       setAllRoutes(routesRes.data || []);
-
-      // Fetch Markets
-      const marketsRes = await getParties({ type: 'market', limit: 1000, company: selectedCompany._id });
       setAllMarkets(marketsRes.data.parties || []);
-
-      // Fetch Transporters
-      const transportersRes = await getParties({ type: 'transporter', limit: 1000, company: selectedCompany._id });
       setAllTransporters(transportersRes.data.parties || []);
 
-      // Fetch all parties of company to extract unique cities
-      const partiesForCitiesRes = await getParties({ limit: 1000, company: selectedCompany._id });
       const partiesList = partiesForCitiesRes.data.parties || [];
       const cities = new Set<string>();
       partiesList.forEach((p: any) => {
