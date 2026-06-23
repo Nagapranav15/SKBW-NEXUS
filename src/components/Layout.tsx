@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { 
   Menu, 
@@ -41,6 +41,133 @@ const Layout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, hasPermission, hasRole, selectedCompany } = useAuth();
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore shortcut triggering if user is actively typing in text field
+      const activeEl = document.activeElement;
+      if (
+        activeEl && (
+          activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          (activeEl as HTMLElement).isContentEditable
+        )
+      ) {
+        return;
+      }
+
+      const key = e.key.toLowerCase();
+      const isAltPressed = e.altKey;
+      const isSimplePress = !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey;
+
+      if (isAltPressed || isSimplePress) {
+        switch (key) {
+          case 'escape':
+            setShowDataManager(false);
+            break;
+          case 'd':
+            e.preventDefault();
+            handleNavigate('/dashboard');
+            break;
+          case 'i':
+            e.preventDefault();
+            handleNavigate('/items');
+            break;
+          case 'c':
+            e.preventDefault();
+            handleNavigate('/party/customers');
+            break;
+          case 'v':
+            e.preventDefault();
+            handleNavigate('/party/vendors');
+            break;
+          case 'a':
+            e.preventDefault();
+            handleNavigate('/party/agents');
+            break;
+          case 'r':
+            e.preventDefault();
+            handleNavigate('/party/routes');
+            break;
+          case 'y':
+            e.preventDefault();
+            handleNavigate('/party/markets');
+            break;
+          case 't':
+            e.preventDefault();
+            handleNavigate('/party/transporters');
+            break;
+          case 'h':
+            e.preventDefault();
+            handleNavigate('/inventory/dashboard');
+            break;
+          case 'k':
+            e.preventDefault();
+            handleNavigate('/inventory/skus');
+            break;
+          case 'b':
+            e.preventDefault();
+            handleNavigate('/inventory/bom');
+            break;
+          case 'z':
+            e.preventDefault();
+            handleNavigate('/inventory/zones');
+            break;
+          case 'm':
+            e.preventDefault();
+            handleNavigate('/inventory/movements');
+            break;
+          case 'n':
+            e.preventDefault();
+            handleNavigate('/inventory/analytics');
+            break;
+          case 'p':
+            e.preventDefault();
+            handleNavigate('/inventory/reports');
+            break;
+          case 'g':
+            e.preventDefault();
+            setShowDataManager(true);
+            break;
+          case 'x':
+            e.preventDefault();
+            handleNavigate('/transactions');
+            break;
+          case 'l':
+            e.preventDefault();
+            handleNavigate('/analyzer');
+            break;
+          case 's':
+            e.preventDefault();
+            handleNavigate('/company-selection');
+            break;
+          case '1':
+            if (isAltPressed) { e.preventDefault(); handleNavigate('/party/customers'); }
+            break;
+          case '2':
+            if (isAltPressed) { e.preventDefault(); handleNavigate('/party/vendors'); }
+            break;
+          case '3':
+            if (isAltPressed) { e.preventDefault(); handleNavigate('/party/agents'); }
+            break;
+          case '4':
+            if (isAltPressed) { e.preventDefault(); handleNavigate('/party/routes'); }
+            break;
+          case '5':
+            if (isAltPressed) { e.preventDefault(); handleNavigate('/party/markets'); }
+            break;
+          case '6':
+            if (isAltPressed) { e.preventDefault(); handleNavigate('/party/transporters'); }
+            break;
+          default:
+            break;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [user, selectedCompany]);
 
   const handleNavigate = (path: string) => {
     navigate(path);
@@ -185,16 +312,26 @@ const Layout: React.FC = () => {
 
         {/* Navigation */}
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          {visibleMenuItems.map((item) => (
-            <button
-              key={item.path}
-              onClick={() => handleNavigate(item.path)}
-              className={getPrimaryClass(item.path)}
-            >
-              <item.icon className="w-5 h-5" />
-              {sidebarOpen && <span>{item.label}</span>}
-            </button>
-          ))}
+          {visibleMenuItems.map((item) => {
+            const shortcut = item.path === '/dashboard' ? 'D' : 'I';
+            return (
+              <button
+                key={item.path}
+                onClick={() => handleNavigate(item.path)}
+                className={`${getPrimaryClass(item.path)} flex items-center justify-between`}
+              >
+                <div className="flex items-center space-x-3">
+                  <item.icon className="w-5 h-5" />
+                  {sidebarOpen && <span>{item.label}</span>}
+                </div>
+                {sidebarOpen && (
+                  <kbd className="hidden sm:inline-block font-mono text-[9px] text-gray-400 bg-gray-100 border border-gray-200 px-1.5 rounded select-none">
+                    {shortcut}
+                  </kbd>
+                )}
+              </button>
+            );
+          })}
 
           {/* Master Dropdown */}
           {(hasPartyAccess || hasInventoryAccess) && (
@@ -236,12 +373,12 @@ const Layout: React.FC = () => {
                         <div className="mt-1 ml-2 pl-2 border-l border-gray-150 space-y-0.5">
                           {visiblePartyItems.map((item) => {
                             let shortcut = '';
-                            if (item.path === '/party/customers') shortcut = 'Alt+1';
-                            else if (item.path === '/party/vendors') shortcut = 'Alt+2';
-                            else if (item.path === '/party/agents') shortcut = 'Alt+3';
-                            else if (item.path === '/party/routes') shortcut = 'Alt+4';
-                            else if (item.path === '/party/markets') shortcut = 'Alt+5';
-                            else if (item.path === '/party/transporters') shortcut = 'Alt+6';
+                            if (item.path === '/party/customers') shortcut = 'C / Alt+1';
+                            else if (item.path === '/party/vendors') shortcut = 'V / Alt+2';
+                            else if (item.path === '/party/agents') shortcut = 'A / Alt+3';
+                            else if (item.path === '/party/routes') shortcut = 'R / Alt+4';
+                            else if (item.path === '/party/markets') shortcut = 'Y / Alt+5';
+                            else if (item.path === '/party/transporters') shortcut = 'T / Alt+6';
 
                             return (
                               <button
@@ -286,15 +423,31 @@ const Layout: React.FC = () => {
                       
                       {inventoryDropdownOpen && (
                         <div className="mt-1 ml-2 pl-2 border-l border-gray-150 space-y-0.5">
-                          {visibleInventoryItems.map((item) => (
-                            <button
-                              key={item.path}
-                              onClick={() => handleNavigate(item.path)}
-                              className={getSubItemClass(item.path)}
-                            >
-                              {item.label}
-                            </button>
-                          ))}
+                          {visibleInventoryItems.map((item) => {
+                            let shortcut = '';
+                            if (item.path === '/inventory/dashboard') shortcut = 'H';
+                            else if (item.path === '/inventory/skus') shortcut = 'K';
+                            else if (item.path === '/inventory/bom') shortcut = 'B';
+                            else if (item.path === '/inventory/zones') shortcut = 'Z';
+                            else if (item.path === '/inventory/movements') shortcut = 'M';
+                            else if (item.path === '/inventory/analytics') shortcut = 'N';
+                            else if (item.path === '/inventory/reports') shortcut = 'P';
+
+                            return (
+                              <button
+                                key={item.path}
+                                onClick={() => handleNavigate(item.path)}
+                                className={`${getSubItemClass(item.path)} flex items-center justify-between gap-2 pr-2`}
+                              >
+                                <span>{item.label}</span>
+                                {shortcut && sidebarOpen && (
+                                  <kbd className="hidden sm:inline-block font-mono text-[9px] text-gray-400 bg-gray-100/80 border border-gray-200 px-1 rounded select-none pointer-events-none opacity-80">
+                                    {shortcut}
+                                  </kbd>
+                                )}
+                              </button>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -340,10 +493,17 @@ const Layout: React.FC = () => {
           {hasRole('admin') && (
             <button
               onClick={() => setShowDataManager(true)}
-              className="w-full flex items-center space-x-3 px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              className="w-full flex items-center justify-between px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
             >
-              <Database className="w-5 h-5" />
-              {sidebarOpen && <span>Data Manager</span>}
+              <div className="flex items-center space-x-3">
+                <Database className="w-5 h-5" />
+                {sidebarOpen && <span>Data Manager</span>}
+              </div>
+              {sidebarOpen && (
+                <kbd className="hidden sm:inline-block font-mono text-[9px] text-gray-400 bg-gray-100 border border-gray-200 px-1.5 rounded select-none">
+                  G
+                </kbd>
+              )}
             </button>
           )}
 
@@ -351,10 +511,17 @@ const Layout: React.FC = () => {
           {hasPermission(['MANAGE_REPORTS', 'VIEW_REPORTS', 'VIEW_TRANSACTIONS']) && (
             <button
               onClick={() => handleNavigate('/transactions')}
-              className={getPrimaryClass('/transactions')}
+              className={`${getPrimaryClass('/transactions')} flex items-center justify-between`}
             >
-              <ArrowDownToLine className="w-5 h-5" />
-              {sidebarOpen && <span>Transactions</span>}
+              <div className="flex items-center space-x-3">
+                <ArrowDownToLine className="w-5 h-5" />
+                {sidebarOpen && <span>Transactions</span>}
+              </div>
+              {sidebarOpen && (
+                <kbd className="hidden sm:inline-block font-mono text-[9px] text-gray-400 bg-gray-100 border border-gray-200 px-1.5 rounded select-none">
+                  X
+                </kbd>
+              )}
             </button>
           )}
 
@@ -362,20 +529,34 @@ const Layout: React.FC = () => {
           {hasPermission(['MANAGE_REPORTS', 'VIEW_REPORTS']) && (
             <button
               onClick={() => handleNavigate('/analyzer')}
-              className={getPrimaryClass('/analyzer')}
+              className={`${getPrimaryClass('/analyzer')} flex items-center justify-between`}
             >
-              <BarChart3 className="w-5 h-5" />
-              {sidebarOpen && <span>Analyzer</span>}
+              <div className="flex items-center space-x-3">
+                <BarChart3 className="w-5 h-5" />
+                {sidebarOpen && <span>Analyzer</span>}
+              </div>
+              {sidebarOpen && (
+                <kbd className="hidden sm:inline-block font-mono text-[9px] text-gray-400 bg-gray-100 border border-gray-200 px-1.5 rounded select-none">
+                  L
+                </kbd>
+              )}
             </button>
           )}
 
           {/* Change Company */}
           <button
             onClick={() => handleNavigate('/company-selection')}
-            className="w-full flex items-center space-x-3 px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            className="w-full flex items-center justify-between px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            <Building2 className="w-5 h-5" />
-            {sidebarOpen && <span>Switch Company</span>}
+            <div className="flex items-center space-x-3">
+              <Building2 className="w-5 h-5" />
+              {sidebarOpen && <span>Switch Company</span>}
+            </div>
+            {sidebarOpen && (
+              <kbd className="hidden sm:inline-block font-mono text-[9px] text-gray-400 bg-gray-100 border border-gray-200 px-1.5 rounded select-none">
+                S
+              </kbd>
+            )}
           </button>
         </nav>
 
