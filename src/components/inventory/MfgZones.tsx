@@ -824,6 +824,7 @@ const MfgZones: React.FC = () => {
             </div>
           ) : (
             <ZoneDetail
+              key={selectedZone._id}
               zone={selectedZone}
               factory={factories.find(f => f._id === (selectedZone.factory_id?._id || selectedZone.factory_id))}
               floor={floors.find(f => f._id === (selectedZone.floor_id?._id || selectedZone.floor_id))}
