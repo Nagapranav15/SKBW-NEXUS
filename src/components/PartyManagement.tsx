@@ -665,7 +665,32 @@ const PartyManagement: React.FC = () => {
   // Clear region city search when selected region/customer changes
   useEffect(() => {
     setRegionCitySearchText('');
+    setInlineCityCustomersSearch('');
+    setInlineCityCustomers([]);
   }, [viewingCustomer]);
+
+  // Auto-load customers when a city panel is opened
+  useEffect(() => {
+    if (!viewingCustomer || currentType !== 'market') return;
+    let cancelled = false;
+    const cityName = viewingCustomer.firmName;
+    if (!cityName) return;
+    setInlineCityCustomersLoading(true);
+    setInlineCityCustomers([]);
+    getParties({
+      type: 'customer',
+      city: cityName,
+      company: selectedCompany?._id,
+      limit: 1000
+    } as any)
+      .then((res: any) => {
+        if (!cancelled) setInlineCityCustomers(res.data.parties || []);
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setInlineCityCustomersLoading(false); });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewingCustomer?._id, currentType]);
 
 
   // City customers popup modal state
@@ -673,6 +698,11 @@ const PartyManagement: React.FC = () => {
   const [cityCustomers, setCityCustomers] = useState<any[]>([]);
   const [cityCustomersLoading, setCityCustomersLoading] = useState(false);
   const [cityCustomersSearchText, setCityCustomersSearchText] = useState('');
+
+  // Inline city panel customer list state
+  const [inlineCityCustomers, setInlineCityCustomers] = useState<any[]>([]);
+  const [inlineCityCustomersLoading, setInlineCityCustomersLoading] = useState(false);
+  const [inlineCityCustomersSearch, setInlineCityCustomersSearch] = useState('');
 
   // Lazy initialize visibleColumns from localStorage
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
@@ -5535,6 +5565,102 @@ const PartyManagement: React.FC = () => {
               </div>
             </div>
 
+            {/* ── Unified Stats Grid (all types) ── */}
+            {(() => {
+              const getStats = () => {
+                if (currentType === 'customer') {
+                  const regionName = viewingCustomer.route || null;
+                  const cityName = viewingCustomer.city || viewingCustomer.assignedMarket || null;
+                  const balance = viewingCustomer.outstandingBalance !== undefined
+                    ? viewingCustomer.outstandingBalance
+                    : (viewingCustomer.outstanding || 0);
+                  const outInfo = getOutstandingInfo('customer', balance);
+                  return [
+                    { label: 'Assigned Region', value: regionName || '-', color: 'blue', isText: true },
+                    { label: 'Assigned City', value: cityName || '-', color: 'indigo', isText: true },
+                    { label: 'Outstanding', value: outInfo.formatted, color: balance > 0 ? 'red' : balance < 0 ? 'green' : 'gray', isText: true }
+                  ];
+                }
+                if (currentType === 'vendor') {
+                  const cityName = viewingCustomer.city || null;
+                  const balance = viewingCustomer.outstandingBalance !== undefined
+                    ? viewingCustomer.outstandingBalance
+                    : (viewingCustomer.outstanding || 0);
+                  const outInfo = getOutstandingInfo('vendor', balance);
+                  return [
+                    { label: 'Vendor Type', value: viewingCustomer.vendorType || '-', color: 'emerald', isText: true },
+                    { label: 'Assigned City', value: cityName || '-', color: 'indigo', isText: true },
+                    { label: 'Outstanding', value: outInfo.formatted, color: balance < 0 ? 'red' : balance > 0 ? 'green' : 'gray', isText: true }
+                  ];
+                }
+                if (currentType === 'agent') {
+                  return [
+                    { label: 'Assigned Regions', value: viewingCustomer.assignedRegionsCount || 0, color: 'blue' },
+                    { label: 'Assigned Cities', value: viewingCustomer.assignedCitiesCount || 0, color: 'indigo' },
+                    { label: 'Assigned Custs', value: viewingCustomer.assignedCustomersCount || 0, color: 'purple' }
+                  ];
+                }
+                if (currentType === 'route') {
+                  const balance = viewingCustomer.outstandingBalance !== undefined
+                    ? viewingCustomer.outstandingBalance
+                    : (viewingCustomer.outstanding || 0);
+                  const outInfo = getOutstandingInfo('route', balance);
+                  return [
+                    { label: 'Assigned Cities', value: viewingCustomer.citiesCount || 0, color: 'blue' },
+                    { label: 'Assigned Custs', value: viewingCustomer.customersCount || 0, color: 'indigo' },
+                    { label: 'Outstanding', value: outInfo.formatted, color: balance > 0 ? 'red' : balance < 0 ? 'green' : 'gray', isText: true }
+                  ];
+                }
+                if (currentType === 'market') {
+                  const balance = viewingCustomer.outstandingBalance !== undefined
+                    ? viewingCustomer.outstandingBalance
+                    : (viewingCustomer.outstanding || 0);
+                  const outInfo = getOutstandingInfo('market', balance);
+                  return [
+                    { label: 'Assigned Region', value: viewingCustomer.route || '-', color: 'blue', isText: true },
+                    { label: 'Assigned Custs', value: viewingCustomer.customerCount || 0, color: 'indigo' },
+                    { label: 'Outstanding', value: outInfo.formatted, color: balance > 0 ? 'red' : balance < 0 ? 'green' : 'gray', isText: true }
+                  ];
+                }
+                if (currentType === 'transporter') {
+                  return [
+                    { label: 'Assigned Regions', value: '-', color: 'blue', isText: true },
+                    { label: 'Assigned Cities', value: '-', color: 'indigo', isText: true },
+                    { label: 'Assigned Custs', value: viewingCustomer.customerCount || 0, color: 'purple' }
+                  ];
+                }
+                return [];
+              };
+              const colorMap: Record<string, { bg: string; border: string; label: string; val: string }> = {
+                blue:   { bg: 'bg-blue-50/40',   border: 'border-blue-100',   label: 'text-blue-650',   val: 'text-blue-900' },
+                indigo: { bg: 'bg-indigo-50/40', border: 'border-indigo-100', label: 'text-indigo-650', val: 'text-indigo-900' },
+                purple: { bg: 'bg-purple-50/40', border: 'border-purple-100', label: 'text-purple-650', val: 'text-purple-900' },
+                emerald:{ bg: 'bg-emerald-50/40',border: 'border-emerald-100',label: 'text-emerald-700',val: 'text-emerald-900' },
+                red:    { bg: 'bg-red-50/40',    border: 'border-red-100',    label: 'text-red-650',    val: 'text-red-900' },
+                green:  { bg: 'bg-green-50/40',  border: 'border-green-100',  label: 'text-green-650',  val: 'text-green-900' },
+                gray:   { bg: 'bg-gray-50/40',   border: 'border-gray-200',   label: 'text-gray-500',   val: 'text-gray-700' },
+              };
+              const stats = getStats();
+              if (!stats.length) return null;
+              return (
+                <div className="grid grid-cols-3 gap-3 shrink-0">
+                  {stats.map((s: any, i: number) => {
+                    const c = colorMap[s.color] || colorMap.blue;
+                    return (
+                      <div key={i} className={`${c.bg} border ${c.border} rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]`}>
+                        <span className={`block text-[10px] ${c.label} font-bold uppercase tracking-wider leading-tight`}>{s.label}</span>
+                        {s.isText ? (
+                          <span className={`block text-xs ${c.val} font-extrabold mt-1 truncate px-1`} title={String(s.value)}>{s.value}</span>
+                        ) : (
+                          <span className={`block text-xl ${c.val} font-extrabold mt-0.5`}>{s.value}</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
             {/* 1. CUSTOMER CARD VIEW */}
             {currentType === 'customer' && (
               <>
@@ -6105,22 +6231,6 @@ const PartyManagement: React.FC = () => {
 
             {currentType === 'agent' && (
               <>
-                {/* Dynamic Stats Grid */}
-                <div className="grid grid-cols-3 gap-3 shrink-0 mb-3">
-                  <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-3 text-center shadow-3xs">
-                    <span className="block text-[10px] text-blue-650 font-bold uppercase tracking-wider">Assigned Regions</span>
-                    <span className="block text-xl font-extrabold text-blue-900 mt-0.5">{viewingCustomer.assignedRegionsCount || 0}</span>
-                  </div>
-                  <div className="bg-indigo-50/40 border border-indigo-100 rounded-xl p-3 text-center shadow-3xs">
-                    <span className="block text-[10px] text-indigo-650 font-bold uppercase tracking-wider">Assigned Cities</span>
-                    <span className="block text-xl font-extrabold text-indigo-900 mt-0.5">{viewingCustomer.assignedCitiesCount || 0}</span>
-                  </div>
-                  <div className="bg-purple-50/40 border border-purple-100 rounded-xl p-3 text-center shadow-3xs">
-                    <span className="block text-[10px] text-purple-650 font-bold uppercase tracking-wider">Assigned Custs</span>
-                    <span className="block text-xl font-extrabold text-purple-900 mt-0.5">{viewingCustomer.assignedCustomersCount || 0}</span>
-                  </div>
-                </div>
-
                 {/* Basic Info Section */}
                 <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
                   <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
@@ -6411,54 +6521,124 @@ const PartyManagement: React.FC = () => {
                 </div>
 
                 {/* Customer Information & Statistics Section */}
-                <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-4">
-                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
-                    <Users className="w-4 h-4 text-gray-500" /> City Statistics & Customers
-                  </h3>
-                  
-                  <div className="grid grid-cols-2 gap-3 bg-white p-3.5 rounded-xl border border-gray-150 text-sm">
-                    <div>
-                      <span className="block text-xs text-gray-450 font-medium">Total Customers</span>
-                      <span className="font-bold text-gray-909 text-lg">{viewingCustomer.customerCount || 0}</span>
-                    </div>
-                    <div>
-                      <span className="block text-xs text-gray-450 font-medium">Outstanding</span>
-                      {(() => {
-                        const bal = viewingCustomer.outstandingBalance !== undefined ? viewingCustomer.outstandingBalance : (viewingCustomer.outstanding || 0);
-                        const info = getOutstandingInfo('market', bal);
-                        return (
-                          <span className={`inline-block font-bold text-base mt-0.5 ${info.textClass}`}>
-                            {info.formatted}
-                          </span>
-                        );
-                      })()}
-                    </div>
-                    <div>
-                      <span className="block text-xs text-gray-450 font-medium">Active Customers</span>
-                      <span className="font-semibold text-green-700 text-sm">{viewingCustomer.activeCustomersCount || 0}</span>
-                    </div>
-                    <div>
-                      <span className="block text-xs text-gray-450 font-medium">Inactive Customers</span>
-                      <span className="font-semibold text-red-650 text-sm">{viewingCustomer.inactiveCustomersCount || 0}</span>
+                <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
+                  <div className="flex justify-between items-center border-b pb-1.5">
+                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Users className="w-4 h-4 text-gray-500" /> Customers in City
+                    </h3>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={handleAddCustomerToCity}
+                        className="text-[11px] font-bold text-green-700 hover:text-green-800 transition-colors flex items-center gap-0.5 border border-green-250 bg-green-50/50 hover:bg-green-50 px-2 py-0.5 rounded-md"
+                      >
+                        <Plus className="w-3 h-3" /> Add Customer
+                      </button>
+                      <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2.5 py-0.5 rounded-full">
+                        {inlineCityCustomers.length} Total
+                      </span>
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <button
-                      onClick={handleAddCustomerToCity}
-                      className="flex items-center justify-center space-x-2 w-full p-2.5 bg-green-50 hover:bg-green-100 text-green-755 rounded-lg border border-green-200 text-xs font-semibold transition-colors"
-                    >
-                      <Plus className="w-4 h-4 text-green-600" />
-                      <span>Add Customer to City</span>
-                    </button>
-                    <button
-                      onClick={() => openCityCustomersPopup(viewingCustomer.firmName)}
-                      className="flex items-center justify-center space-x-2 w-full p-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg border border-blue-205 text-xs font-semibold transition-colors"
-                    >
-                      <Users className="w-4 h-4 text-blue-600" />
-                      <span>View Customers in {viewingCustomer.firmName}</span>
-                    </button>
+                  {/* Search Input */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-3.5 h-3.5" />
+                    <input
+                      type="text"
+                      placeholder="Search customers in this city..."
+                      value={inlineCityCustomersSearch}
+                      onChange={(e) => setInlineCityCustomersSearch(e.target.value)}
+                      className="w-full pl-9 pr-8 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white transition-colors"
+                    />
+                    {inlineCityCustomersSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setInlineCityCustomersSearch('')}
+                        className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-650"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
+
+                  {/* Customer Grid */}
+                  <div className="max-h-[360px] overflow-y-auto pr-1">
+                    {inlineCityCustomersLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <RefreshCw className="w-5 h-5 text-blue-400 animate-spin" />
+                        <span className="ml-2 text-xs text-gray-400">Loading customers...</span>
+                      </div>
+                    ) : (() => {
+                      const filtered = inlineCityCustomers.filter(c =>
+                        (c.firmName || c.contactName || '').toLowerCase().includes(inlineCityCustomersSearch.toLowerCase()) ||
+                        (c.phone || '').includes(inlineCityCustomersSearch)
+                      );
+
+                      if (inlineCityCustomers.length === 0) {
+                        return <p className="text-xs text-gray-400 italic text-center py-4">No customers in this city yet.</p>;
+                      }
+                      if (filtered.length === 0) {
+                        return <p className="text-xs text-gray-400 italic text-center py-4">No matching customers found.</p>;
+                      }
+
+                      return (
+                        <div className="grid grid-cols-2 gap-2">
+                          {filtered.map((cust: any) => {
+                            const bal = cust.outstandingBalance !== undefined ? cust.outstandingBalance : (cust.outstanding || 0);
+                            const outInfo = getOutstandingInfo('customer', bal);
+                            return (
+                              <div
+                                key={cust._id}
+                                onClick={() => {
+                                  setViewingCustomer(cust);
+                                }}
+                                className="p-3 border border-gray-200 hover:border-blue-400 rounded-xl bg-white flex flex-col justify-between hover:shadow-xs hover:bg-blue-50/5 transition-all cursor-pointer group min-w-0"
+                                title={`View profile of ${cust.firmName || cust.contactName}`}
+                              >
+                                <div className="mb-2 min-w-0">
+                                  <span className="font-bold text-gray-955 text-sm block group-hover:text-blue-600 transition-colors truncate">
+                                    {cust.firmName || cust.contactName || '-'}
+                                  </span>
+                                  <div className="flex flex-col mt-1.5 gap-0.5 text-[11px] text-gray-500 font-medium">
+                                    {cust.phone && (
+                                      <span className="truncate">{cust.phone}</span>
+                                    )}
+                                    <span className={`${outInfo.textClass} font-bold`}>
+                                      {outInfo.formatted} Outstanding
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100 shrink-0">
+                                  <span className={`inline-flex px-1.5 py-0.5 text-[9px] font-bold uppercase rounded ${
+                                    cust.status === 'active'
+                                      ? 'bg-green-50 text-green-755 border border-green-150'
+                                      : cust.status === 'on-hold'
+                                      ? 'bg-yellow-50 text-yellow-700 border border-yellow-200'
+                                      : 'bg-gray-100 text-gray-500'
+                                  }`}>
+                                    {cust.status || 'active'}
+                                  </span>
+                                  {cust.agentAssigned && (
+                                    <span className="text-[9px] text-gray-400 font-medium truncate ml-1 max-w-[50px]" title={cust.agentAssigned}>
+                                      {cust.agentAssigned}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Full list popup button */}
+                  <button
+                    onClick={() => openCityCustomersPopup(viewingCustomer.firmName)}
+                    className="flex items-center justify-center space-x-2 w-full p-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg border border-blue-200 text-xs font-semibold transition-colors"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Open Full Customer List</span>
+                  </button>
                 </div>
               </>
             )}
