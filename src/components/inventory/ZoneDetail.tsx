@@ -80,7 +80,13 @@ const ZoneDetail: React.FC<Props> = ({
     zone_code: '', name: '', description: '', factory_id: '', floor_id: '', status: 'active'
   });
 
-  useEffect(() => { load(); }, [zone._id]);
+  useEffect(() => {
+    setZone(initialZone);
+    setFactory(initialFactory);
+    setFloor(initialFloor);
+  }, [initialZone, initialFactory, initialFloor]);
+
+  useEffect(() => { load(); }, [zone?._id]);
 
   const load = async () => {
     setLoading(true);
@@ -217,15 +223,20 @@ const ZoneDetail: React.FC<Props> = ({
               </div>
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-lg font-bold text-gray-900 leading-tight">{zone.name || zone.zone_code}</h1>
+                  <h1 className="text-2xl font-bold text-gray-905 leading-tight">{zone.name || zone.zone_code}</h1>
                   <StatusBadge status={zone.status ?? 'active'} />
                 </div>
-                <p className="text-xs text-gray-400 flex items-center gap-1 leading-none mt-0.5">
-                  <span>{factory?.name ?? '—'}</span>
-                  <span>›</span>
-                  <span>{floor?.name ?? '—'}</span>
-                  <span>›</span>
-                  <span className="text-gray-600 font-medium">{zone.zone_code}</span>
+                <p className="text-[13.5px] text-gray-500 flex items-center gap-1.5 flex-wrap leading-none mt-1 font-semibold">
+                  <span className="text-gray-400 font-normal">Factory:</span>
+                  <span className="text-gray-800 font-bold">{factory?.name ?? '—'}</span>
+                  <span className="text-gray-300">/</span>
+                  <span className="text-gray-400 font-normal">Floor:</span>
+                  <span className="text-gray-800 font-bold">{floor?.name ?? '—'}</span>
+                  <span className="text-gray-300">/</span>
+                  <span className="text-gray-400 font-normal">Zone:</span>
+                  <span className="text-blue-600 font-extrabold bg-blue-50 px-1.5 py-0.5 rounded text-[11px]">
+                    {zone.name ? `${zone.name} (${zone.zone_code})` : zone.zone_code}
+                  </span>
                 </p>
               </div>
             </div>
