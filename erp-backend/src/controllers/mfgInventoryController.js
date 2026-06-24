@@ -291,22 +291,57 @@ exports.getZonesWithStock = async (req, res) => {
 
     // Merge into per-zone totals
     const zoneStock = {};
+    const skuIds = new Set();
+
     (result.inbound || []).forEach(r => {
+      if (!r._id.zone || !r._id.sku) return;
       const zid = r._id.zone.toString();
-      if (!zoneStock[zid]) zoneStock[zid] = { skuCount: new Set(), totalQty: 0 };
-      zoneStock[zid].totalQty += r.qty;
-      zoneStock[zid].skuCount.add(r._id.sku.toString());
-    });
-    (result.outbound || []).forEach(r => {
-      const zid = r._id.zone.toString();
-      if (!zoneStock[zid]) zoneStock[zid] = { skuCount: new Set(), totalQty: 0 };
-      zoneStock[zid].totalQty -= r.qty;
+      const skuId = r._id.sku.toString();
+      if (!zoneStock[zid]) zoneStock[zid] = { skus: {} };
+      if (!zoneStock[zid].skus[skuId]) zoneStock[zid].skus[skuId] = 0;
+      zoneStock[zid].skus[skuId] += r.qty;
+      skuIds.add(skuId);
     });
 
-    // Convert sets to counts
+    (result.outbound || []).forEach(r => {
+      if (!r._id.zone || !r._id.sku) return;
+      const zid = r._id.zone.toString();
+      const skuId = r._id.sku.toString();
+      if (!zoneStock[zid]) zoneStock[zid] = { skus: {} };
+      if (!zoneStock[zid].skus[skuId]) zoneStock[zid].skus[skuId] = 0;
+      zoneStock[zid].skus[skuId] -= r.qty;
+      skuIds.add(skuId);
+    });
+
+    // Fetch SKU costs to calculate stock value
+    const skuDocs = await Sku.find({ _id: { $in: Array.from(skuIds) } });
+    const skuCostMap = {};
+    skuDocs.forEach(s => {
+      skuCostMap[s._id.toString()] = s.cost_per_unit || 0;
+    });
+
+    // Convert sets and SKU balances to counts and value
     const summary = {};
     Object.entries(zoneStock).forEach(([zid, data]) => {
-      summary[zid] = { skuCount: data.skuCount.size, totalQty: Math.max(0, data.totalQty) };
+      let zoneSkuCount = 0;
+      let zoneTotalQty = 0;
+      let zoneStockValue = 0;
+
+      Object.entries(data.skus).forEach(([skuId, qty]) => {
+        const finalQty = Math.max(0, qty);
+        if (finalQty > 0) {
+          zoneSkuCount++;
+          zoneTotalQty += finalQty;
+          zoneStockValue += finalQty * (skuCostMap[skuId] || 0);
+        }
+      });
+
+      summary[zid] = {
+        skuCount: zoneSkuCount,
+        locationCount: zoneSkuCount,
+        totalQty: zoneTotalQty,
+        stockValue: zoneStockValue
+      };
     });
 
     res.json(summary);

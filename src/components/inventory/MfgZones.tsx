@@ -69,6 +69,11 @@ const MfgZones: React.FC = () => {
   const [form, setForm] = useState<any>({});
   const [editId, setEditId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showStockDetailModal, setShowStockDetailModal] = useState(false);
+  const [showViewAllModal, setShowViewAllModal] = useState<'factories' | 'floors' | 'zones' | 'locations' | null>(null);
+  const [highlightedViewAllIdx, setHighlightedViewAllIdx] = useState<number>(-1);
+  const [treeHighlight, setTreeHighlight] = useState<{ type: 'factory' | 'floor' | 'zone'; id: string } | null>(null);
+  const [showHelpModal, setShowHelpModal] = useState(false);
 
   // New Utility Panel States
   const [showActivityLog, setShowActivityLog] = useState(false);
@@ -456,31 +461,387 @@ const MfgZones: React.FC = () => {
   // ── Keyboard Shortcuts listener ──────────────────────────────────────────
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Esc to close modals
-      if (e.key === 'Escape') {
-        setShowActivityLog(false);
-        setShowDuplicates(false);
-        setShowRecycleBin(false);
+      // Check if target is input/textarea to avoid key trigger conflicts
+      const isInput = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
+
+      // 1. Modals Open Handlers
+      if (showViewAllModal) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          setShowViewAllModal(null);
+          setHighlightedViewAllIdx(-1);
+          return;
+        }
+
+        const itemsLength = 
+          showViewAllModal === 'factories' ? factories.length :
+          showViewAllModal === 'floors' ? floors.length :
+          showViewAllModal === 'zones' ? zones.length :
+          zones.filter(z => (zoneStockMap[z._id]?.skuCount ?? 0) > 0).length;
+
+        if (itemsLength === 0) return;
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setHighlightedViewAllIdx(prev => (prev < itemsLength - 1 ? prev + 1 : 0));
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setHighlightedViewAllIdx(prev => (prev > 0 ? prev - 1 : itemsLength - 1));
+          return;
+        }
+        if (e.key === 'Home' || e.key === 'PageUp') {
+          e.preventDefault();
+          setHighlightedViewAllIdx(0);
+          return;
+        }
+        if (e.key === 'End' || e.key === 'PageDown') {
+          e.preventDefault();
+          setHighlightedViewAllIdx(itemsLength - 1);
+          return;
+        }
+
+        if (highlightedViewAllIdx >= 0 && highlightedViewAllIdx < itemsLength) {
+          if (showViewAllModal === 'factories') {
+            const item = factories[highlightedViewAllIdx];
+            if (e.key === 'Enter' || e.code === 'KeyE') {
+              e.preventDefault();
+              setShowModal('factory');
+              setForm({ name: item.name, code: item.code, status: item.status ?? 'active' });
+              setEditId(item._id);
+              setShowViewAllModal(null);
+              return;
+            }
+            if (e.key === 'Delete') {
+              e.preventDefault();
+              handleDelete('factory', item._id, item.name);
+              return;
+            }
+          } else if (showViewAllModal === 'floors') {
+            const item = floors[highlightedViewAllIdx];
+            if (e.key === 'Enter' || e.code === 'KeyE') {
+              e.preventDefault();
+              setShowModal('floor');
+              setForm({ name: item.name, factory_id: item.factory_id?._id || item.factory_id, status: item.status ?? 'active' });
+              setEditId(item._id);
+              setShowViewAllModal(null);
+              return;
+            }
+            if (e.key === 'Delete') {
+              e.preventDefault();
+              handleDelete('floor', item._id, item.name);
+              return;
+            }
+          } else if (showViewAllModal === 'zones') {
+            const item = zones[highlightedViewAllIdx];
+            if (e.key === 'Enter' || e.code === 'KeyV') {
+              e.preventDefault();
+              setSelectedZone(item);
+              setShowViewAllModal(null);
+              return;
+            }
+            if (e.code === 'KeyE') {
+              e.preventDefault();
+              setShowModal('zone');
+              setForm({
+                zone_code: item.zone_code,
+                name: item.name,
+                description: item.description || '',
+                floor_id: item.floor_id?._id || item.floor_id,
+                factory_id: item.factory_id?._id || item.factory_id,
+                status: item.status ?? 'active'
+              });
+              setEditId(item._id);
+              setShowViewAllModal(null);
+              return;
+            }
+            if (e.key === 'Delete') {
+              e.preventDefault();
+              handleDelete('zone', item._id, item.name || item.zone_code);
+              return;
+            }
+          } else if (showViewAllModal === 'locations') {
+            const activeLocationsZones = zones.filter(z => (zoneStockMap[z._id]?.skuCount ?? 0) > 0);
+            const item = activeLocationsZones[highlightedViewAllIdx];
+            if (e.key === 'Enter' || e.code === 'KeyV') {
+              e.preventDefault();
+              setSelectedZone(item);
+              setShowViewAllModal(null);
+              return;
+            }
+          }
+        }
+        return;
       }
 
-      // Alt/Opt shortcuts
-      if (e.altKey) {
-        const key = e.key.toLowerCase();
-        if (key === 'l') {
+      if (showDuplicates) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          setShowDuplicates(false);
+          setHighlightedDuplicateIdx(-1);
+          return;
+        }
+        if (duplicateGroups.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setHighlightedDuplicateIdx(prev => (prev < duplicateGroups.length - 1 ? prev + 1 : 0));
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setHighlightedDuplicateIdx(prev => (prev > 0 ? prev - 1 : duplicateGroups.length - 1));
+          return;
+        }
+        if (e.key === 'Home' || e.key === 'PageUp') {
+          e.preventDefault();
+          setHighlightedDuplicateIdx(0);
+          return;
+        }
+        if (e.key === 'End' || e.key === 'PageDown') {
+          e.preventDefault();
+          setHighlightedDuplicateIdx(duplicateGroups.length - 1);
+          return;
+        }
+
+        if (highlightedDuplicateIdx >= 0 && highlightedDuplicateIdx < duplicateGroups.length) {
+          const group = duplicateGroups[highlightedDuplicateIdx];
+          if (e.code === 'KeyK') {
+            e.preventDefault();
+            setDuplicateGroups(prev => prev.filter((_, i) => i !== highlightedDuplicateIdx));
+            setHighlightedDuplicateIdx(prev => {
+              const nextLen = duplicateGroups.length - 1;
+              if (nextLen <= 0) return -1;
+              return prev >= nextLen ? nextLen - 1 : prev;
+            });
+            return;
+          }
+        }
+        return;
+      }
+
+      if (showRecycleBin) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          setShowRecycleBin(false);
+          setHighlightedRecycleIdx(-1);
+          return;
+        }
+        if (deletedItems.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setHighlightedRecycleIdx(prev => (prev < deletedItems.length - 1 ? prev + 1 : 0));
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setHighlightedRecycleIdx(prev => (prev > 0 ? prev - 1 : deletedItems.length - 1));
+          return;
+        }
+        if (e.key === 'Home' || e.key === 'PageUp') {
+          e.preventDefault();
+          setHighlightedRecycleIdx(0);
+          return;
+        }
+        if (e.key === 'End' || e.key === 'PageDown') {
+          e.preventDefault();
+          setHighlightedRecycleIdx(deletedItems.length - 1);
+          return;
+        }
+
+        if (highlightedRecycleIdx >= 0 && highlightedRecycleIdx < deletedItems.length) {
+          const item = deletedItems[highlightedRecycleIdx];
+          if (e.key === 'Enter' || e.code === 'KeyR') {
+            e.preventDefault();
+            handleRestoreItem(item._id, item.name);
+            return;
+          }
+          if (e.key === 'Delete') {
+            e.preventDefault();
+            handlePermanentDeleteItem(item._id, item.name);
+            return;
+          }
+        }
+        return;
+      }
+
+      if (showHelpModal) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          setShowHelpModal(false);
+        }
+        return;
+      }
+
+      // Esc to close activity log or stock value details
+      if (e.key === 'Escape') {
+        setShowActivityLog(false);
+        setShowStockDetailModal(false);
+      }
+
+      // 2. Main Screen Navigation (when no input is focused and no modal is open)
+      if (!isInput && !showModal && !showActivityLog && !showStockDetailModal) {
+        const nodes = getVisibleTreeNodes();
+        
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (nodes.length === 0) return;
+          setTreeHighlight(prev => {
+            if (!prev) return { type: nodes[0].type, id: nodes[0].id };
+            const idx = nodes.findIndex(n => n.id === prev.id);
+            const nextIdx = idx < nodes.length - 1 ? idx + 1 : 0;
+            return { type: nodes[nextIdx].type, id: nodes[nextIdx].id };
+          });
+          return;
+        }
+
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (nodes.length === 0) return;
+          setTreeHighlight(prev => {
+            if (!prev) return { type: nodes[nodes.length - 1].type, id: nodes[nodes.length - 1].id };
+            const idx = nodes.findIndex(n => n.id === prev.id);
+            const prevIdx = idx > 0 ? idx - 1 : nodes.length - 1;
+            return { type: nodes[prevIdx].type, id: nodes[prevIdx].id };
+          });
+          return;
+        }
+
+        if (e.key === 'Home' || e.key === 'PageUp') {
+          e.preventDefault();
+          if (nodes.length === 0) return;
+          setTreeHighlight({ type: nodes[0].type, id: nodes[0].id });
+          return;
+        }
+
+        if (e.key === 'End' || e.key === 'PageDown') {
+          e.preventDefault();
+          if (nodes.length === 0) return;
+          setTreeHighlight({ type: nodes[nodes.length - 1].type, id: nodes[nodes.length - 1].id });
+          return;
+        }
+
+        if (e.key === 'Enter' || e.key === ' ') {
+          if (!treeHighlight) return;
+          const currentNode = nodes.find(n => n.id === treeHighlight.id);
+          if (!currentNode) return;
+          e.preventDefault();
+          if (currentNode.type === 'factory') {
+            const isExpanded = expandedFactories[currentNode.id] !== false;
+            setExpandedFactories(p => ({ ...p, [currentNode.id]: !isExpanded }));
+          } else if (currentNode.type === 'floor') {
+            const isExpanded = expandedFloors[currentNode.id] !== false;
+            setExpandedFloors(p => ({ ...p, [currentNode.id]: !isExpanded }));
+          } else if (currentNode.type === 'zone') {
+            setSelectedZone(currentNode.data);
+          }
+          return;
+        }
+
+        // Tally Master Operations shortcuts (Alt+C contextually)
+        if (e.altKey && e.code === 'KeyC') {
+          e.preventDefault();
+          if (!treeHighlight) {
+            setShowModal('factory');
+            setForm({ name: '', code: '', status: 'active' });
+            setEditId(null);
+          } else {
+            const current = nodes.find(n => n.id === treeHighlight.id);
+            if (current?.type === 'factory') {
+              setShowModal('floor');
+              setForm({ name: '', factory_id: current.id, status: 'active' });
+              setEditId(null);
+            } else if (current?.type === 'floor') {
+              const parentFactId = current.data.factory_id?._id || current.data.factory_id;
+              setShowModal('zone');
+              setForm({ zone_code: '', name: '', description: '', floor_id: current.id, factory_id: parentFactId, status: 'active' });
+              setEditId(null);
+            } else if (current?.type === 'zone') {
+              const parentFloorId = current.data.floor_id?._id || current.data.floor_id;
+              const parentFactoryId = current.data.factory_id?._id || current.data.factory_id;
+              setShowModal('zone');
+              setForm({ zone_code: '', name: '', description: '', floor_id: parentFloorId, factory_id: parentFactoryId, status: 'active' });
+              setEditId(null);
+            }
+          }
+          return;
+        }
+
+        // Alter master (Alt+E or F2)
+        if ((e.altKey && e.code === 'KeyE') || e.key === 'F2') {
+          if (!treeHighlight) return;
+          const current = nodes.find(n => n.id === treeHighlight.id);
+          if (!current) return;
+          e.preventDefault();
+          if (current.type === 'factory') {
+            setShowModal('factory');
+            setForm({ name: current.data.name, code: current.data.code, status: current.data.status ?? 'active' });
+            setEditId(current.id);
+          } else if (current.type === 'floor') {
+            setShowModal('floor');
+            setForm({ name: current.data.name, factory_id: current.data.factory_id?._id || current.data.factory_id, status: current.data.status ?? 'active' });
+            setEditId(current.id);
+          } else if (current.type === 'zone') {
+            setShowModal('zone');
+            setForm({
+              zone_code: current.data.zone_code,
+              name: current.data.name,
+              description: current.data.description || '',
+              floor_id: current.data.floor_id?._id || current.data.floor_id,
+              factory_id: current.data.factory_id?._id || current.data.factory_id,
+              status: current.data.status ?? 'active'
+            });
+            setEditId(current.id);
+          }
+          return;
+        }
+
+        // Delete master (Alt+D)
+        if (e.altKey && e.code === 'KeyD') {
+          if (!treeHighlight) return;
+          const current = nodes.find(n => n.id === treeHighlight.id);
+          if (!current) return;
+          e.preventDefault();
+          handleDelete(current.type, current.id, current.data.name || current.data.zone_code);
+          return;
+        }
+      }
+
+      // Alt/Opt shortcuts (when not inside inputs)
+      if (e.altKey && !isInput) {
+        const key = e.code;
+        if (key === 'KeyL') {
           e.preventDefault();
           setShowActivityLog(true);
-        } else if (key === 'f') {
+        } else if (key === 'KeyF') {
           e.preventDefault();
           handleFindDuplicates();
-        } else if (key === 'r') {
+        } else if (key === 'KeyR') {
           e.preventDefault();
           openRecycleBin();
+        } else if (key === 'KeyH') {
+          e.preventDefault();
+          setShowHelpModal(true);
         }
+      }
+
+      // F1 for help
+      if (e.key === 'F1') {
+        e.preventDefault();
+        setShowHelpModal(true);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [factories, floors, zones]);
+  }, [
+    factories, floors, zones, zoneStockMap,
+    showViewAllModal, highlightedViewAllIdx,
+    showDuplicates, duplicateGroups, highlightedDuplicateIdx,
+    showRecycleBin, deletedItems, highlightedRecycleIdx,
+    treeHighlight, showHelpModal, showModal, showActivityLog, showStockDetailModal
+  ]);
 
   // ── Filtering ─────────────────────────────────────────────────────────────
   const q = search.toLowerCase().trim();
@@ -503,6 +864,28 @@ const MfgZones: React.FC = () => {
         (f.code ?? '').toLowerCase().includes(q);
     })
     : factories;
+
+  const getVisibleTreeNodes = useCallback(() => {
+    const nodes: { type: 'factory' | 'floor' | 'zone'; id: string; data: any }[] = [];
+    displayFactories.forEach(factory => {
+      nodes.push({ type: 'factory', id: factory._id, data: factory });
+      const factExpanded = expandedFactories[factory._id] !== false;
+      if (factExpanded) {
+        const factFloors = getFactoryFloors(factory._id);
+        factFloors.forEach(floor => {
+          nodes.push({ type: 'floor', id: floor._id, data: floor });
+          const flExpanded = expandedFloors[floor._id] !== false;
+          if (flExpanded) {
+            const flZones = getFloorZones(floor._id);
+            flZones.forEach(zone => {
+              nodes.push({ type: 'zone', id: zone._id, data: zone });
+            });
+          }
+        });
+      }
+    });
+    return nodes;
+  }, [displayFactories, expandedFactories, expandedFloors, floors, zones]);
 
   // ── Loading ───────────────────────────────────────────────────────────────
   if (loading) {
@@ -532,6 +915,13 @@ const MfgZones: React.FC = () => {
               className="p-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 transition-colors"
             >
               <RefreshCw className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setShowHelpModal(true)}
+              title="Shortcut Help (Alt+H)"
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 bg-white text-gray-700 transition-colors"
+            >
+              <kbd className="hidden md:inline-block px-1 bg-gray-50 border rounded text-[10px] text-gray-500 font-mono">Alt+H</kbd> Shortcuts
             </button>
             <button
               onClick={() => setShowActivityLog(true)}
@@ -584,6 +974,10 @@ const MfgZones: React.FC = () => {
             icon={<Building2 className="w-3.5 h-3.5 text-blue-600" />}
             iconBg="bg-blue-50"
             viewAll
+            onViewAll={() => {
+              setShowViewAllModal('factories');
+              setHighlightedViewAllIdx(0);
+            }}
           />
           <StatCard
             label="Floors"
@@ -591,6 +985,10 @@ const MfgZones: React.FC = () => {
             icon={<Layers className="w-3.5 h-3.5 text-orange-500" />}
             iconBg="bg-orange-50"
             viewAll
+            onViewAll={() => {
+              setShowViewAllModal('floors');
+              setHighlightedViewAllIdx(0);
+            }}
           />
           <StatCard
             label="Zones"
@@ -598,6 +996,10 @@ const MfgZones: React.FC = () => {
             icon={<MapPin className="w-3.5 h-3.5 text-red-500" />}
             iconBg="bg-red-50"
             viewAll
+            onViewAll={() => {
+              setShowViewAllModal('zones');
+              setHighlightedViewAllIdx(0);
+            }}
           />
           <StatCard
             label="Locations"
@@ -605,6 +1007,10 @@ const MfgZones: React.FC = () => {
             icon={<Package className="w-3.5 h-3.5 text-purple-500" />}
             iconBg="bg-purple-50"
             viewAll
+            onViewAll={() => {
+              setShowViewAllModal('locations');
+              setHighlightedViewAllIdx(0);
+            }}
           />
           <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 flex items-center gap-2.5 min-w-0 hover:shadow-sm transition-shadow">
             <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 bg-amber-50">
@@ -615,7 +1021,12 @@ const MfgZones: React.FC = () => {
               <p className="text-lg font-bold text-amber-600 leading-snug truncate">
                 {fmtCurrency(totalStockValue as number)}
               </p>
-              <span className="text-xs text-blue-600 font-medium leading-none">View details →</span>
+              <button
+                onClick={() => setShowStockDetailModal(true)}
+                className="text-xs text-blue-600 hover:underline font-medium leading-none block text-left"
+              >
+                View details →
+              </button>
             </div>
           </div>
         </div>
@@ -659,8 +1070,9 @@ const MfgZones: React.FC = () => {
               return (
                 <div key={factory._id} className="mb-1">
                   {/* Factory row */}
-                  <div className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 group cursor-pointer select-none"
-                    onClick={() => setExpandedFactories(p => ({ ...p, [factory._id]: !factExpanded }))}>
+                  <div className={`flex items-center justify-between px-3 py-2 hover:bg-gray-50 group cursor-pointer select-none transition-colors ${treeHighlight?.id === factory._id ? 'bg-blue-50 ring-2 ring-blue-500/20' : ''}`}
+                    onClick={() => { setTreeHighlight({ type: 'factory', id: factory._id }); setExpandedFactories(p => ({ ...p, [factory._id]: !factExpanded })); }}
+                    onMouseEnter={() => setTreeHighlight({ type: 'factory', id: factory._id })}>
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-gray-400 flex-shrink-0">
                         {factExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
@@ -701,8 +1113,9 @@ const MfgZones: React.FC = () => {
                       <div key={floor._id}>
                         {/* Floor row */}
                         <div
-                          className="flex items-center justify-between pl-7 pr-3 py-1.5 hover:bg-gray-50 group cursor-pointer select-none"
-                          onClick={() => setExpandedFloors(p => ({ ...p, [floor._id]: !flExpanded }))}
+                          className={`flex items-center justify-between pl-7 pr-3 py-1.5 hover:bg-gray-50 group cursor-pointer select-none transition-colors ${treeHighlight?.id === floor._id ? 'bg-blue-50 ring-2 ring-blue-500/20' : ''}`}
+                          onClick={() => { setTreeHighlight({ type: 'floor', id: floor._id }); setExpandedFloors(p => ({ ...p, [floor._id]: !flExpanded })); }}
+                          onMouseEnter={() => setTreeHighlight({ type: 'floor', id: floor._id })}
                         >
                           <div className="flex items-center gap-2 min-w-0">
                             <span className="text-gray-400 flex-shrink-0">
@@ -737,11 +1150,14 @@ const MfgZones: React.FC = () => {
                           return (
                             <div
                               key={zone._id}
-                              onClick={() => setSelectedZone(zone)}
+                              onClick={() => { setTreeHighlight({ type: 'zone', id: zone._id }); setSelectedZone(zone); }}
+                              onMouseEnter={() => setTreeHighlight({ type: 'zone', id: zone._id })}
                               className={`flex items-center justify-between pl-14 pr-3 py-1.5 cursor-pointer group select-none transition-colors ${
-                                isSelected
-                                  ? 'bg-blue-50 border-l-2 border-blue-500'
-                                  : 'hover:bg-gray-50 border-l-2 border-transparent'
+                                treeHighlight?.id === zone._id
+                                  ? 'bg-blue-100/70 border-l-2 border-blue-600'
+                                  : isSelected
+                                    ? 'bg-blue-50 border-l-2 border-blue-500'
+                                    : 'hover:bg-gray-50 border-l-2 border-transparent'
                               }`}
                             >
                               <div className="flex items-center gap-2 min-w-0">
@@ -1312,6 +1728,523 @@ const MfgZones: React.FC = () => {
             <div className="px-6 py-4 bg-gray-50 border-t flex justify-end">
               <button
                 onClick={() => setShowRecycleBin(false)}
+                className="px-4 py-2 border border-gray-250 rounded-lg text-[15px] font-medium text-gray-700 hover:bg-gray-150 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stock Value Details Modal */}
+      {showStockDetailModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm">
+          <div className="relative bg-white rounded-2xl max-w-4xl w-full shadow-2xl flex flex-col max-h-[85vh] overflow-hidden border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <IndianRupee className="w-5 h-5 text-amber-500" />
+                Stock Value Breakdown by Zone
+              </h2>
+              <button
+                onClick={() => setShowStockDetailModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-6">
+              {/* Summary Stats */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-4">
+                  <span className="text-xs text-amber-700 font-semibold uppercase tracking-wider font-medium">Total Stock Value</span>
+                  <p className="text-3xl font-black text-amber-600 mt-1">{fmtCurrency(totalStockValue as number)}</p>
+                </div>
+                <div className="bg-purple-50/50 border border-purple-100 rounded-xl p-4">
+                  <span className="text-xs text-purple-700 font-semibold uppercase tracking-wider font-medium">Total Active Locations</span>
+                  <p className="text-3xl font-black text-purple-600 mt-1">{fmt(totalLocations as number)}</p>
+                </div>
+                <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4">
+                  <span className="text-xs text-blue-700 font-semibold uppercase tracking-wider font-medium">Total Stock Quantity</span>
+                  <p className="text-3xl font-black text-blue-600 mt-1">
+                    {fmt(Object.values(zoneStockMap).reduce((a: number, v: any) => a + (v?.totalQty ?? 0), 0) as number)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Table */}
+              <div className="border border-gray-200 rounded-xl overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Zone</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Location</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Unique Items</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Qty</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Value</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {zones.map((zone) => {
+                      const zs = zoneStockMap[zone._id] ?? { skuCount: 0, locationCount: 0, totalQty: 0, stockValue: 0 };
+                      const factName = factories.find(f => f._id === (zone.factory_id?._id || zone.factory_id))?.name ?? 'Unknown Factory';
+                      const floorName = floors.find(f => f._id === (zone.floor_id?._id || zone.floor_id))?.name ?? 'Unknown Floor';
+
+                      if (zs.totalQty === 0 && zs.stockValue === 0) return null; // Only show zones with stock
+
+                      return (
+                        <tr key={zone._id} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="px-4 py-3">
+                            <div className="font-semibold text-gray-900">{zone.name || zone.zone_code}</div>
+                            <div className="text-xs text-gray-450 mt-0.5">Code: {zone.zone_code}</div>
+                          </td>
+                          <td className="px-4 py-3 text-gray-650 font-medium">
+                            <span className="text-[13px]">{factName}</span>
+                            <span className="text-gray-300 mx-1.5">•</span>
+                            <span className="text-[13px]">{floorName}</span>
+                          </td>
+                          <td className="px-4 py-3 text-right text-gray-900 font-medium">
+                            {zs.skuCount}
+                          </td>
+                          <td className="px-4 py-3 text-right text-gray-900 font-medium">
+                            {fmt(zs.totalQty)}
+                          </td>
+                          <td className="px-4 py-3 text-right text-amber-600 font-bold">
+                            {fmtCurrency(zs.stockValue)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {Object.values(zoneStockMap).every((v: any) => (v.totalQty ?? 0) === 0) && (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-8 text-center text-gray-450 italic">
+                          No stock inventory found in any zones.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-gray-50 border-t flex justify-end">
+              <button
+                onClick={() => setShowStockDetailModal(false)}
+                className="px-4 py-2 border border-gray-250 rounded-lg text-[15px] font-medium text-gray-700 hover:bg-gray-150 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View All Modal */}
+      {showViewAllModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm">
+          <div className="relative bg-white rounded-2xl max-w-3xl w-full shadow-2xl flex flex-col max-h-[85vh] overflow-hidden border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center rounded-t-2xl">
+              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2 capitalize">
+                {showViewAllModal === 'factories' && <Building2 className="w-5 h-5 text-blue-500" />}
+                {showViewAllModal === 'floors' && <Layers className="w-5 h-5 text-orange-500" />}
+                {showViewAllModal === 'zones' && <MapPin className="w-5 h-5 text-red-500" />}
+                {showViewAllModal === 'locations' && <Package className="w-5 h-5 text-purple-500" />}
+                All {showViewAllModal}
+              </h2>
+              <div className="flex items-center gap-3">
+                <span className="hidden sm:flex items-center gap-1.5 text-[10px] text-gray-400 font-mono select-none">
+                  <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-gray-500">↑↓</kbd> select &nbsp;
+                  {showViewAllModal !== 'locations' ? (
+                    <><kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-gray-500">Enter / E</kbd> edit &nbsp;</>
+                  ) : (
+                    <><kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-gray-500">Enter / V</kbd> view &nbsp;</>
+                  )}
+                  {showViewAllModal !== 'locations' && <><kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-gray-500">Del</kbd> delete &nbsp;</>}
+                  <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-gray-500">Esc</kbd> close
+                </span>
+                <button
+                  onClick={() => { setShowViewAllModal(null); setHighlightedViewAllIdx(-1); }}
+                  className="text-gray-400 hover:text-gray-650 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* List Body */}
+            <div className="p-6 overflow-y-auto flex-1">
+              {showViewAllModal === 'factories' && (
+                <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">#</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Factory Name</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Code</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {factories.map((item, idx) => {
+                        const isHighlighted = idx === highlightedViewAllIdx;
+                        return (
+                          <tr
+                            key={item._id}
+                            className={`transition-colors ${isHighlighted ? 'bg-blue-50/70 hover:bg-blue-100/50' : 'hover:bg-gray-50/50'}`}
+                            onMouseEnter={() => setHighlightedViewAllIdx(idx)}
+                          >
+                            <td className="px-4 py-3 text-gray-400 font-medium">{idx + 1}</td>
+                            <td className="px-4 py-3 text-gray-900 font-semibold truncate max-w-[200px]" title={item.name}>
+                              {item.name}
+                            </td>
+                            <td className="px-4 py-3 text-gray-505 font-mono">{item.code}</td>
+                            <td className="px-4 py-3">
+                              <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${(item.status ?? 'active') === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                {item.status ?? 'ACTIVE'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-right space-x-2">
+                              <button
+                                onClick={() => {
+                                  setShowModal('factory');
+                                  setForm({ name: item.name, code: item.code, status: item.status ?? 'active' });
+                                  setEditId(item._id);
+                                  setShowViewAllModal(null);
+                                }}
+                                className="px-2.5 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-150 rounded font-semibold transition-colors inline-flex items-center gap-1"
+                              >
+                                <Edit className="w-3.5 h-3.5" /> Edit
+                              </button>
+                              <button
+                                onClick={() => handleDelete('factory', item._id, item.name)}
+                                className="px-2.5 py-1 text-xs bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded hover:bg-red-100 transition-colors inline-flex items-center gap-1"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" /> Delete
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {showViewAllModal === 'floors' && (
+                <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">#</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Floor Name</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Factory</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {floors.map((item, idx) => {
+                        const isHighlighted = idx === highlightedViewAllIdx;
+                        const parentFactory = factories.find(f => f._id === (item.factory_id?._id || item.factory_id))?.name ?? 'Unknown Factory';
+                        return (
+                          <tr
+                            key={item._id}
+                            className={`transition-colors ${isHighlighted ? 'bg-blue-50/70 hover:bg-blue-100/50' : 'hover:bg-gray-50/50'}`}
+                            onMouseEnter={() => setHighlightedViewAllIdx(idx)}
+                          >
+                            <td className="px-4 py-3 text-gray-400 font-medium">{idx + 1}</td>
+                            <td className="px-4 py-3 text-gray-900 font-semibold truncate max-w-[200px]" title={item.name}>
+                              {item.name}
+                            </td>
+                            <td className="px-4 py-3 text-gray-505">{parentFactory}</td>
+                            <td className="px-4 py-3">
+                              <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${(item.status ?? 'active') === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                {item.status ?? 'ACTIVE'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-right space-x-2">
+                              <button
+                                onClick={() => {
+                                  setShowModal('floor');
+                                  setForm({ name: item.name, factory_id: item.factory_id?._id || item.factory_id, status: item.status ?? 'active' });
+                                  setEditId(item._id);
+                                  setShowViewAllModal(null);
+                                }}
+                                className="px-2.5 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-150 rounded font-semibold transition-colors inline-flex items-center gap-1"
+                              >
+                                <Edit className="w-3.5 h-3.5" /> Edit
+                              </button>
+                              <button
+                                onClick={() => handleDelete('floor', item._id, item.name)}
+                                className="px-2.5 py-1 text-xs bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded hover:bg-red-100 transition-colors inline-flex items-center gap-1"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" /> Delete
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {showViewAllModal === 'zones' && (
+                <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">#</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Zone Name</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Code</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Factory & Floor</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {zones.map((item, idx) => {
+                        const isHighlighted = idx === highlightedViewAllIdx;
+                        const parentFactory = factories.find(f => f._id === (item.factory_id?._id || item.factory_id))?.name ?? 'Unknown Factory';
+                        const parentFloor = floors.find(f => f._id === (item.floor_id?._id || item.floor_id))?.name ?? 'Unknown Floor';
+                        return (
+                          <tr
+                            key={item._id}
+                            className={`transition-colors ${isHighlighted ? 'bg-blue-50/70 hover:bg-blue-100/50' : 'hover:bg-gray-50/50'}`}
+                            onMouseEnter={() => setHighlightedViewAllIdx(idx)}
+                          >
+                            <td className="px-4 py-3 text-gray-400 font-medium">{idx + 1}</td>
+                            <td className="px-4 py-3 text-gray-900 font-semibold truncate max-w-[150px]" title={item.name || item.zone_code}>
+                              {item.name || item.zone_code}
+                            </td>
+                            <td className="px-4 py-3 text-gray-505 font-mono">{item.zone_code}</td>
+                            <td className="px-4 py-3 text-gray-505 truncate max-w-[200px]" title={`${parentFactory} - ${parentFloor}`}>
+                              {parentFactory} • {parentFloor}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${(item.status ?? 'active') === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                {item.status ?? 'ACTIVE'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-right space-x-2">
+                              <button
+                                onClick={() => {
+                                  setSelectedZone(item);
+                                  setShowViewAllModal(null);
+                                }}
+                                className="px-2.5 py-1 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-150 rounded font-semibold transition-colors inline-flex items-center gap-1"
+                              >
+                                <Eye className="w-3.5 h-3.5" /> View
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setShowModal('zone');
+                                  setForm({
+                                    zone_code: item.zone_code,
+                                    name: item.name,
+                                    description: item.description || '',
+                                    floor_id: item.floor_id?._id || item.floor_id,
+                                    factory_id: item.factory_id?._id || item.factory_id,
+                                    status: item.status ?? 'active'
+                                  });
+                                  setEditId(item._id);
+                                  setShowViewAllModal(null);
+                                }}
+                                className="px-2.5 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-150 rounded font-semibold transition-colors inline-flex items-center gap-1"
+                              >
+                                <Edit className="w-3.5 h-3.5" /> Edit
+                              </button>
+                              <button
+                                onClick={() => handleDelete('zone', item._id, item.name || item.zone_code)}
+                                className="px-2.5 py-1 text-xs bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded hover:bg-red-100 transition-colors inline-flex items-center gap-1"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" /> Delete
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {showViewAllModal === 'locations' && (
+                <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">#</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Zone</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Factory & Floor</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Unique SKUs</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Quantity</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Value</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {zones
+                        .filter(z => (zoneStockMap[z._id]?.skuCount ?? 0) > 0)
+                        .map((item, idx) => {
+                          const isHighlighted = idx === highlightedViewAllIdx;
+                          const zs = zoneStockMap[item._id] ?? { skuCount: 0, locationCount: 0, totalQty: 0, stockValue: 0 };
+                          const parentFactory = factories.find(f => f._id === (item.factory_id?._id || item.factory_id))?.name ?? 'Unknown Factory';
+                          const parentFloor = floors.find(f => f._id === (item.floor_id?._id || item.floor_id))?.name ?? 'Unknown Floor';
+                          return (
+                            <tr
+                              key={item._id}
+                              className={`transition-colors ${isHighlighted ? 'bg-blue-50/70 hover:bg-blue-100/50' : 'hover:bg-gray-50/50'}`}
+                              onMouseEnter={() => setHighlightedViewAllIdx(idx)}
+                            >
+                              <td className="px-4 py-3 text-gray-400 font-medium">{idx + 1}</td>
+                              <td className="px-4 py-3 text-gray-900 font-semibold truncate max-w-[150px]" title={item.name || item.zone_code}>
+                                {item.name || item.zone_code}
+                              </td>
+                              <td className="px-4 py-3 text-gray-505 truncate max-w-[200px]" title={`${parentFactory} - ${parentFloor}`}>
+                                {parentFactory} • {parentFloor}
+                              </td>
+                              <td className="px-4 py-3 text-right text-gray-900 font-medium">{zs.skuCount}</td>
+                              <td className="px-4 py-3 text-right text-gray-900 font-medium">{fmt(zs.totalQty)}</td>
+                              <td className="px-4 py-3 text-right text-amber-600 font-bold">{fmtCurrency(zs.stockValue)}</td>
+                              <td className="px-4 py-3 whitespace-nowrap text-right">
+                                <button
+                                  onClick={() => {
+                                    setSelectedZone(item);
+                                    setShowViewAllModal(null);
+                                  }}
+                                  className="px-3 py-1.5 text-xs bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-150 rounded font-semibold transition-colors inline-flex items-center gap-1"
+                                >
+                                  <Eye className="w-3.5 h-3.5" /> View Stock
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      {zones.filter(z => (zoneStockMap[z._id]?.skuCount ?? 0) > 0).length === 0 && (
+                        <tr>
+                          <td colSpan={7} className="px-4 py-8 text-center text-gray-450 italic">
+                            No active stock locations recorded yet.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+            <div className="px-6 py-4 bg-gray-50 border-t flex justify-end">
+              <button
+                onClick={() => { setShowViewAllModal(null); setHighlightedViewAllIdx(-1); }}
+                className="px-4 py-2 border border-gray-250 rounded-lg text-[15px] font-medium text-gray-700 hover:bg-gray-150 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Shortcuts Help Modal */}
+      {showHelpModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm">
+          <div className="relative bg-white rounded-2xl max-w-xl w-full shadow-2xl flex flex-col max-h-[85vh] overflow-hidden border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center rounded-t-2xl">
+              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <kbd className="px-2 py-1 bg-blue-100 text-blue-800 text-xs border border-blue-200 rounded font-semibold select-none">Alt + H</kbd>
+                Keyboard Shortcut Cheat Sheet (TallyPrime Style)
+              </h2>
+              <button
+                onClick={() => setShowHelpModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+              <p className="text-sm text-gray-500">
+                You can fully navigate and manage the Zone Master dashboard using these Tally-compatible shortcut keys (works with <strong>Option (⌥)</strong> button on Mac):
+              </p>
+              
+              <div className="border border-gray-200 rounded-xl overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Action</th>
+                      <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Shortcut Key</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-150 text-gray-700">
+                    <tr className="hover:bg-gray-50/50">
+                      <td className="px-4 py-2 font-medium">Close current popup / Cancel</td>
+                      <td className="px-4 py-2 text-right"><kbd className="px-1.5 py-0.5 bg-gray-100 border rounded text-xs">Esc</kbd></td>
+                    </tr>
+                    <tr className="hover:bg-gray-50/50">
+                      <td className="px-4 py-2 font-medium">Navigate tree or popup lists</td>
+                      <td className="px-4 py-2 text-right"><kbd className="px-1.5 py-0.5 bg-gray-100 border rounded text-xs">↑ / ↓ Arrow keys</kbd></td>
+                    </tr>
+                    <tr className="hover:bg-gray-50/50">
+                      <td className="px-4 py-2 font-medium">Move to first/top item</td>
+                      <td className="px-4 py-2 text-right"><kbd className="px-1.5 py-0.5 bg-gray-100 border rounded text-xs">Home / PgUp</kbd></td>
+                    </tr>
+                    <tr className="hover:bg-gray-50/50">
+                      <td className="px-4 py-2 font-medium">Move to last/bottom item</td>
+                      <td className="px-4 py-2 text-right"><kbd className="px-1.5 py-0.5 bg-gray-100 border rounded text-xs">End / PgDn</kbd></td>
+                    </tr>
+                    <tr className="hover:bg-gray-50/50">
+                      <td className="px-4 py-2 font-medium">Expand/Collapse tree or drill-down</td>
+                      <td className="px-4 py-2 text-right"><kbd className="px-1.5 py-0.5 bg-gray-100 border rounded text-xs">Enter / Space</kbd></td>
+                    </tr>
+                    <tr className="hover:bg-gray-50/50">
+                      <td className="px-4 py-2 font-medium">Create master contextually (on-the-fly)</td>
+                      <td className="px-4 py-2 text-right">
+                        <kbd className="px-1.5 py-0.5 bg-gray-100 border rounded text-xs">Alt + C</kbd> or <kbd className="px-1.5 py-0.5 bg-gray-100 border rounded text-xs">⌥ + C</kbd>
+                      </td>
+                    </tr>
+                    <tr className="hover:bg-gray-50/50">
+                      <td className="px-4 py-2 font-medium">Edit highlighted item</td>
+                      <td className="px-4 py-2 text-right">
+                        <kbd className="px-1.5 py-0.5 bg-gray-100 border rounded text-xs">Alt + E</kbd> / <kbd className="px-1.5 py-0.5 bg-gray-100 border rounded text-xs">F2</kbd>
+                      </td>
+                    </tr>
+                    <tr className="hover:bg-gray-50/50">
+                      <td className="px-4 py-2 font-medium">Delete highlighted item</td>
+                      <td className="px-4 py-2 text-right">
+                        <kbd className="px-1.5 py-0.5 bg-gray-100 border rounded text-xs">Alt + D</kbd> or <kbd className="px-1.5 py-0.5 bg-gray-100 border rounded text-xs">⌥ + D</kbd>
+                      </td>
+                    </tr>
+                    <tr className="hover:bg-gray-50/50">
+                      <td className="px-4 py-2 font-medium">Open Activity Log</td>
+                      <td className="px-4 py-2 text-right">
+                        <kbd className="px-1.5 py-0.5 bg-gray-100 border rounded text-xs">Alt + L</kbd> or <kbd className="px-1.5 py-0.5 bg-gray-100 border rounded text-xs">⌥ + L</kbd>
+                      </td>
+                    </tr>
+                    <tr className="hover:bg-gray-50/50">
+                      <td className="px-4 py-2 font-medium">Scan for Duplicate Entries</td>
+                      <td className="px-4 py-2 text-right">
+                        <kbd className="px-1.5 py-0.5 bg-gray-100 border rounded text-xs">Alt + F</kbd> or <kbd className="px-1.5 py-0.5 bg-gray-100 border rounded text-xs">⌥ + F</kbd>
+                      </td>
+                    </tr>
+                    <tr className="hover:bg-gray-50/50">
+                      <td className="px-4 py-2 font-medium">Open Recycle Bin</td>
+                      <td className="px-4 py-2 text-right">
+                        <kbd className="px-1.5 py-0.5 bg-gray-100 border rounded text-xs">Alt + R</kbd> or <kbd className="px-1.5 py-0.5 bg-gray-100 border rounded text-xs">⌥ + R</kbd>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-gray-50 border-t flex justify-end">
+              <button
+                onClick={() => setShowHelpModal(false)}
                 className="px-4 py-2 border border-gray-250 rounded-lg text-[15px] font-medium text-gray-700 hover:bg-gray-150 transition-colors"
               >
                 Close
