@@ -6,7 +6,7 @@ import {
   ChevronsLeft, ChevronsRight, ExternalLink, Phone, Mail, Clock,
   AlertTriangle, RefreshCw, CheckCircle, XCircle, Pause,
   History, BookOpen, CreditCard, FileText, ShoppingCart, User, Tag,
-  ArrowUpDown, ChevronUp, ChevronDown, Eye
+  ArrowUpDown, ChevronUp, ChevronDown, Eye, Settings
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext';
@@ -767,6 +767,21 @@ const PartyManagement: React.FC = () => {
   const [showRecycleBin, setShowRecycleBin] = useState(false);
   const [deletedItems, setDeletedItems] = useState<any[]>([]);
   const [recycleBinLoading, setRecycleBinLoading] = useState(false);
+
+  const [showToolsDropdown, setShowToolsDropdown] = useState(false);
+  const toolsDropdownRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (toolsDropdownRef.current && !toolsDropdownRef.current.contains(e.target as Node)) {
+        setShowToolsDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, []);
 
   // States list for select dropdowns
   const statesList = [
@@ -2803,30 +2818,54 @@ const PartyManagement: React.FC = () => {
                   <kbd className="hidden md:inline-block ml-1.5 px-1.5 py-0.5 text-[10px] font-mono font-bold text-red-100 bg-red-800 rounded border border-red-700 shadow-xs select-none pointer-events-none">Alt/Opt+D</kbd>
                 </button>
               )}
-              <button
-                onClick={() => setShowActivityLog(true)}
-                className="flex items-center space-x-2 px-4 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium shadow-xs"
-              >
-                <Clock className="w-4 h-4 text-gray-450" />
-                <span>Activity Log</span>
-                <kbd className="hidden md:inline-block ml-1 px-1.5 py-0.5 text-[10px] font-mono font-bold text-gray-400 bg-gray-100 rounded border border-gray-200 shadow-xs select-none pointer-events-none">Alt/Opt+L</kbd>
-              </button>
-              <button
-                onClick={handleFindDuplicates}
-                className="flex items-center space-x-2 px-4 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium shadow-xs"
-              >
-                <AlertTriangle className="w-4 h-4 text-gray-450" />
-                <span>Find Duplicates</span>
-                <kbd className="hidden md:inline-block ml-1 px-1.5 py-0.5 text-[10px] font-mono font-bold text-gray-400 bg-gray-100 rounded border border-gray-200 shadow-xs select-none pointer-events-none">Alt/Opt+F</kbd>
-              </button>
-              <button
-                onClick={openRecycleBin}
-                className="flex items-center space-x-2 px-4 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium shadow-xs"
-              >
-                <Trash2 className="w-4 h-4 text-gray-450" />
-                <span>Recycle Bin</span>
-                <kbd className="hidden md:inline-block ml-1 px-1.5 py-0.5 text-[10px] font-mono font-bold text-gray-400 bg-gray-100 rounded border border-gray-200 shadow-xs select-none pointer-events-none">Alt/Opt+R</kbd>
-              </button>
+              {/* Tools dropdown */}
+              <div className="relative" ref={toolsDropdownRef}>
+                <button
+                  onClick={() => setShowToolsDropdown(!showToolsDropdown)}
+                  className="flex items-center space-x-2 px-4 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium shadow-xs cursor-pointer"
+                >
+                  <Settings className="w-4 h-4 text-gray-500" />
+                  <span>Tools</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                </button>
+
+                {showToolsDropdown && (
+                  <div className="absolute right-0 mt-1 w-52 bg-white border border-gray-200 rounded-xl shadow-lg z-50 divide-y divide-gray-100 animate-in fade-in duration-100 slide-in-from-top-1">
+                    <div className="py-1">
+                      <button
+                        onClick={() => { setShowActivityLog(true); setShowToolsDropdown(false); }}
+                        className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-gray-400" />
+                          <span>Activity Log</span>
+                        </div>
+                        <kbd className="px-1.5 bg-gray-55 border border-gray-200 rounded text-[9px] text-gray-450 font-mono font-medium">Alt+L</kbd>
+                      </button>
+                      <button
+                        onClick={() => { handleFindDuplicates(); setShowToolsDropdown(false); }}
+                        className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-gray-400" />
+                          <span>Find Duplicates</span>
+                        </div>
+                        <kbd className="px-1.5 bg-gray-55 border border-gray-200 rounded text-[9px] text-gray-450 font-mono font-medium">Alt+F</kbd>
+                      </button>
+                      <button
+                        onClick={() => { openRecycleBin(); setShowToolsDropdown(false); }}
+                        className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Trash2 className="w-4 h-4 text-gray-400" />
+                          <span>Recycle Bin</span>
+                        </div>
+                        <kbd className="px-1.5 bg-gray-55 border border-gray-200 rounded text-[9px] text-gray-450 font-mono font-medium">Alt+R</kbd>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
               <button
                 onClick={() => { setEditingItem(null); setFormData(getEmptyFormData()); setAgentCheckedRoutes([]); setShowForm(true); }}
                 className="flex items-center space-x-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-semibold text-sm shadow-xs"
