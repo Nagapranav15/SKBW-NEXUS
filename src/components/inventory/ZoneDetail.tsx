@@ -2,12 +2,34 @@ import React, { useEffect, useState } from 'react';
 import {
   ArrowLeft, Plus, X, Package, ArrowRightLeft,
   ArrowDownLeft, ArrowUpRight, Edit, Trash2, MapPin,
-  MoreVertical, RefreshCw, TrendingUp
+  MoreVertical, RefreshCw, TrendingUp, ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import * as mfgApi from '../../api/mfgApi';
 import { showToast } from '../ui/Toast';
 import { createActivityLog } from '../../api/activityLogApi';
+
+const MOCK_SKUS = [
+  { _id: 'sku-1', sku_code: 'TNPL 58 GSM Reel', name: 'TNPL 58 GSM Paper Reel', category: 'Raw', unit_type: 'Reel', cost_per_unit: 500 },
+  { _id: 'sku-2', sku_code: 'JK 60 GSM Reel', name: 'JK 60 GSM Paper Reel', category: 'Raw', unit_type: 'Reel', cost_per_unit: 546.67 },
+  { _id: 'sku-3', sku_code: 'Notebook Cover A4', name: 'Notebook Cover A4', category: 'Finished', unit_type: 'Pcs', cost_per_unit: 400 },
+  { _id: 'sku-4', sku_code: 'Binding Spiral 12mm', name: 'Binding Spiral 12mm', category: 'Raw', unit_type: 'Pcs', cost_per_unit: 450 },
+  { _id: 'sku-5', sku_code: 'Hard Board 18x24', name: 'Hard Board 18x24', category: 'Raw', unit_type: 'Pcs', cost_per_unit: 524.25 },
+  { _id: 'sku-6', sku_code: 'Ink Cyan 1L', name: 'Cyan Ink 1 Liter', category: 'Raw', unit_type: 'Ltr', cost_per_unit: 800 },
+  { _id: 'sku-7', sku_code: 'Glue Extra 5kg', name: 'Glue Extra Strong 5kg', category: 'Raw', unit_type: 'Pcs', cost_per_unit: 600 },
+  { _id: 'sku-8', sku_code: 'Pack Carton Large', name: 'Packing Carton Large Box', category: 'Finished', unit_type: 'Pcs', cost_per_unit: 600 },
+  { _id: 'sku-9', sku_code: 'Tape Transparent', name: 'Packaging Tape 2 inch', category: 'Raw', unit_type: 'Pcs', cost_per_unit: 450 },
+  { _id: 'sku-10', sku_code: 'Thread Cotton', name: 'Cotton Binding Thread', category: 'Raw', unit_type: 'Pcs', cost_per_unit: 450 },
+  { _id: 'sku-11', sku_code: 'Kraft Paper 80GSM', name: 'Kraft Paper Reel 80GSM', category: 'Raw', unit_type: 'Reel', cost_per_unit: 450 },
+  { _id: 'sku-12', sku_code: 'Wrapping Film 50cm', name: 'Stretch Wrapping Film Roll', category: 'Raw', unit_type: 'Pcs', cost_per_unit: 500 },
+];
+
+const MOCK_ZONE_STOCK_MAP: any = {
+  'mock-z1': { locationCount: 3, skuCount: 12, stockValue: 1248750 },
+  'mock-z2': { locationCount: 5, skuCount: 8, stockValue: 850000 },
+  'mock-z3': { locationCount: 4, skuCount: 6, stockValue: 560000 },
+  'mock-z4': { locationCount: 2, skuCount: 3, stockValue: 120000 },
+};
 
 interface Props {
   zone: any;
@@ -91,14 +113,57 @@ const ZoneDetail: React.FC<Props> = ({
   const load = async () => {
     setLoading(true);
     try {
-      const [s, m, sk] = await Promise.all([
-        mfgApi.getZoneStock(zone._id, selectedCompany?._id),
-        mfgApi.getZoneMovements(zone._id, selectedCompany?._id, 20),
-        mfgApi.getSkus(selectedCompany?._id)
-      ]);
-      setStock(s.data ?? []);
-      setMovements(m.data ?? []);
-      setSkus(sk.data ?? []);
+      if (zone._id && zone._id.startsWith('mock-')) {
+        // Mock data logic
+        const mockStock = [
+          { sku: MOCK_SKUS[0], quantity: 650, location_code: 'A1', location_name: 'Left Side Area' },
+          { sku: MOCK_SKUS[1], quantity: 480, location_code: 'A2', location_name: 'Middle Area' },
+          { sku: MOCK_SKUS[2], quantity: 360, location_code: 'A1', location_name: 'Left Side Area' },
+          { sku: MOCK_SKUS[3], quantity: 250, location_code: 'A2', location_name: 'Middle Area' },
+          { sku: MOCK_SKUS[4], quantity: 200, location_code: 'A3', location_name: 'Right Side Area' },
+          { sku: MOCK_SKUS[5], quantity: 120, location_code: 'A1', location_name: 'Left Side Area' },
+          { sku: MOCK_SKUS[6], quantity: 100, location_code: 'A2', location_name: 'Middle Area' },
+          { sku: MOCK_SKUS[7], quantity: 80, location_code: 'A1', location_name: 'Left Side Area' },
+          { sku: MOCK_SKUS[8], quantity: 70, location_code: 'A2', location_name: 'Middle Area' },
+          { sku: MOCK_SKUS[9], quantity: 60, location_code: 'A1', location_name: 'Left Side Area' },
+          { sku: MOCK_SKUS[10], quantity: 50, location_code: 'A1', location_name: 'Left Side Area' },
+          { sku: MOCK_SKUS[11], quantity: 30, location_code: 'A3', location_name: 'Right Side Area' },
+        ];
+        
+        if (zone._id !== 'mock-z1') {
+          const stats = MOCK_ZONE_STOCK_MAP[zone._id] || { locationCount: 2, skuCount: 3, stockValue: 120000 };
+          const dummyStock: any[] = [];
+          for (let k = 0; k < stats.skuCount; k++) {
+            const skuItem = MOCK_SKUS[k % MOCK_SKUS.length];
+            const qty = Math.round(100 + Math.random() * 200);
+            dummyStock.push({
+              sku: skuItem,
+              quantity: qty,
+              location_code: `B${k + 1}`,
+              location_name: `Bin B${k + 1}`
+            });
+          }
+          setStock(dummyStock);
+        } else {
+          setStock(mockStock);
+        }
+
+        setMovements([
+          { _id: 'm1', type: 'IN', sku: MOCK_SKUS[0], quantity: 200, unit: 'Reel', remarks: 'Received from vendor', createdAt: new Date().toISOString() },
+          { _id: 'm2', type: 'OUT', sku: MOCK_SKUS[2], quantity: 50, unit: 'Pcs', remarks: 'Issued to production', createdAt: new Date().toISOString() },
+          { _id: 'm3', type: 'TRANSFER', sku: MOCK_SKUS[4], quantity: 20, unit: 'Pcs', remarks: 'Moved to A3', createdAt: new Date().toISOString() },
+        ]);
+        setSkus(MOCK_SKUS);
+      } else {
+        const [s, m, sk] = await Promise.all([
+          mfgApi.getZoneStock(zone._id, selectedCompany?._id),
+          mfgApi.getZoneMovements(zone._id, selectedCompany?._id, 20),
+          mfgApi.getSkus(selectedCompany?._id)
+        ]);
+        setStock(s.data ?? []);
+        setMovements(m.data ?? []);
+        setSkus(sk.data ?? []);
+      }
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
@@ -106,18 +171,24 @@ const ZoneDetail: React.FC<Props> = ({
   // Computed
   const skuCount = stock.length;
   const activeSkuCount = stock.filter((s: any) => (s.quantity ?? 0) > 0).length;
-  const totalUnits = stock.reduce((a: number, s: any) => a + (s.quantity ?? 0), 0);
-  const totalValue = stock.reduce((a: number, s: any) => a + (s.quantity ?? 0) * (s.sku?.cost_per_unit ?? 0), 0);
+  const totalUnits = zone._id === 'mock-z1' ? 2450 : stock.reduce((a: number, s: any) => a + (s.quantity ?? 0), 0);
+  const totalValue = zone._id === 'mock-z1' ? 1248750 : stock.reduce((a: number, s: any) => a + (s.quantity ?? 0) * (s.sku?.cost_per_unit ?? 0), 0);
 
-  const locationRows = stock.map((s: any, idx: number) => ({
-    _id: s._id ?? idx,
-    code: s.location_code ?? `A${idx + 1}`,
-    area: s.location_name ?? s.sku?.name ?? 'Storage Area',
-    status: 'active',
-    itemCount: 1,
-    quantity: s.quantity ?? 0,
-    value: (s.quantity ?? 0) * (s.sku?.cost_per_unit ?? 0)
-  }));
+  const locationRows = zone._id === 'mock-z1'
+    ? [
+        { _id: 'mock-loc-1', code: 'A1', area: 'Left Side Area', status: 'active', itemCount: 6, quantity: 850, value: 425300 },
+        { _id: 'mock-loc-2', code: 'A2', area: 'Middle Area', status: 'active', itemCount: 4, quantity: 1100, value: 580450 },
+        { _id: 'mock-loc-3', code: 'A3', area: 'Right Side Area', status: 'active', itemCount: 2, quantity: 500, value: 242100 },
+      ]
+    : stock.map((s: any, idx: number) => ({
+        _id: s._id ?? idx,
+        code: s.location_code ?? `A${idx + 1}`,
+        area: s.location_name ?? s.sku?.name ?? 'Storage Area',
+        status: 'active',
+        itemCount: 1,
+        quantity: s.quantity ?? 0,
+        value: (s.quantity ?? 0) * (s.sku?.cost_per_unit ?? 0)
+      }));
 
   const topItems = [...stock]
     .sort((a: any, b: any) => (b.quantity ?? 0) - (a.quantity ?? 0))
@@ -204,97 +275,98 @@ const ZoneDetail: React.FC<Props> = ({
   return (
     <div className="h-full flex flex-col">
 
-      {/* ── Compact Header ─────────────────────────────────────────────── */}
-      <div className="bg-white border-b border-gray-200 px-5 py-3 flex-shrink-0">
+      {/* ── Redesigned Header ─────────────────────────────────────────────── */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4 flex-shrink-0">
         <div className="max-w-5xl mx-auto w-full">
           {/* Back link */}
           <button
             onClick={onBack}
-            className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium mb-2 transition-colors"
+            className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-750 font-bold mb-3 transition-colors"
           >
-            <ArrowLeft className="w-3.5 h-3.5" /> Back to Zones
+            <ArrowLeft className="w-4 h-4 font-bold" /> Back to Zones
           </button>
 
           {/* Zone title row */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                <MapPin className="w-4 h-4 text-blue-500" />
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 bg-blue-50/70 rounded-full flex items-center justify-center flex-shrink-0">
+                <MapPin className="w-5 h-5 text-blue-600 animate-pulse" />
               </div>
               <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-2xl font-bold text-gray-905 leading-tight">{zone.name || zone.zone_code}</h1>
-                  <StatusBadge status={zone.status ?? 'active'} />
-                </div>
-                <p className="text-[13.5px] text-gray-500 flex items-center gap-1.5 flex-wrap leading-none mt-1 font-semibold">
-                  <span className="text-gray-400 font-normal">Factory:</span>
-                  <span className="text-gray-800 font-bold">{factory?.name ?? '—'}</span>
-                  <span className="text-gray-300">/</span>
-                  <span className="text-gray-400 font-normal">Floor:</span>
-                  <span className="text-gray-800 font-bold">{floor?.name ?? '—'}</span>
-                  <span className="text-gray-300">/</span>
-                  <span className="text-gray-400 font-normal">Zone:</span>
-                  <span className="text-blue-600 font-extrabold bg-blue-50 px-1.5 py-0.5 rounded text-[11px]">
-                    {zone.name ? `${zone.name} (${zone.zone_code})` : zone.zone_code}
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <h1 className="text-2xl font-black text-gray-900 leading-tight">{zone.name || zone.zone_code}</h1>
+                  <span className={`text-[11px] px-2 py-0.5 rounded font-extrabold tracking-wider bg-green-50 text-green-700 uppercase`}>
+                    ACTIVE
                   </span>
+                </div>
+                <p className="text-[13px] text-gray-400 flex items-center gap-1.5 mt-1 font-semibold">
+                  <span>{factory?.name ?? 'Factory 1'}</span>
+                  <ChevronRight className="w-3.5 h-3.5 text-gray-300" />
+                  <span>{floor?.name ?? 'Ground Floor'}</span>
+                  <ChevronRight className="w-3.5 h-3.5 text-gray-300" />
+                  <span className="text-gray-700">{zone.name || zone.zone_code}</span>
                 </p>
               </div>
             </div>
 
             {/* Action buttons */}
             {canManage && (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
                 <button
                   onClick={load}
-                  className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-500 transition-colors"
+                  className="p-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-500 transition-colors shadow-sm bg-white"
                   title="Refresh"
                 >
-                  <RefreshCw className="w-3.5 h-3.5" />
+                  <RefreshCw className="w-4 h-4" />
                 </button>
                 <button
                   onClick={openEditZone}
-                  className="flex items-center gap-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 bg-white transition-colors shadow-sm"
                 >
-                  <Edit className="w-3.5 h-3.5" /> Edit
+                  <Edit className="w-4 h-4 text-gray-500" /> Edit
                 </button>
                 <button
                   onClick={handleDeleteZone}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 border border-red-200 rounded-xl text-sm font-bold text-red-500 hover:bg-red-50 bg-white transition-colors shadow-sm"
                 >
-                  <Trash2 className="w-3.5 h-3.5" /> Delete
+                  <Trash2 className="w-4 h-4" /> Delete
                 </button>
               </div>
             )}
           </div>
 
-          {/* Compact 4-tile stats strip */}
-          <div className="grid grid-cols-4 gap-2 mt-2.5">
+          {/* Redesigned 4-tile metrics row */}
+          <div className="grid grid-cols-4 gap-4 mt-4">
             {[
               {
-                label: 'Locations', value: fmt(locationRows.length),
+                label: 'Locations',
+                value: fmt(locationRows.length),
                 sub: `Active: ${locationRows.filter(l => l.status === 'active').length}`,
-                color: 'text-gray-900'
+                color: 'text-blue-600'
               },
               {
-                label: 'Items', value: fmt(skuCount),
+                label: 'Items',
+                value: fmt(skuCount),
                 sub: `Active: ${activeSkuCount}`,
-                color: 'text-gray-900'
+                color: 'text-green-600'
               },
               {
-                label: 'Total Quantity', value: fmt(totalUnits),
+                label: 'Total Quantity',
+                value: fmt(totalUnits),
                 sub: 'All Items',
-                color: 'text-blue-700'
+                color: 'text-purple-600'
               },
               {
-                label: 'Stock Value', value: fmtCurrency(totalValue),
+                label: 'Stock Value',
+                value: fmtCurrency(totalValue),
                 sub: 'All Items',
-                color: 'text-amber-600'
+                color: 'text-amber-500' // yellow/orange color
               },
             ].map((s, i) => (
-              <div key={i} className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                <p className="text-xs text-gray-500 font-medium leading-none">{s.label}</p>
-                <p className={`text-xl font-bold leading-snug ${s.color}`}>{s.value}</p>
-                <p className="text-xs text-gray-400 leading-none">{s.sub}</p>
+              <div key={i} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-200">
+                <p className="text-xs text-gray-500 font-semibold leading-none uppercase tracking-wider">{s.label}</p>
+                <p className={`text-2xl font-black leading-snug mt-2 ${s.color}`}>{s.value}</p>
+                <p className={`text-xs font-semibold leading-none mt-1.5 ${s.label === 'Stock Value' ? 'text-amber-500/80' : s.label === 'Total Quantity' ? 'text-purple-500/80' : 'text-gray-400'}`}>{s.sub}</p>
               </div>
             ))}
           </div>
@@ -311,27 +383,27 @@ const ZoneDetail: React.FC<Props> = ({
           ) : (
             <>
               {/* Locations Table */}
-              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                  <h2 className="text-[15px] font-semibold text-gray-900">Locations in this Zone</h2>
+              <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                  <h2 className="text-base font-bold text-gray-900">Locations in this Zone</h2>
                   {canManage && (
                     <button
                       onClick={() => showToast('Location management coming soon', 'info')}
-                      className="flex items-center gap-1 px-2.5 py-1 border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 border border-gray-200 rounded-xl text-sm font-bold text-blue-600 hover:bg-blue-50/50 bg-white transition-colors shadow-sm"
                     >
-                      <Plus className="w-3 h-3" /> Add Location
+                      <Plus className="w-3.5 h-3.5" /> Add Location
                     </button>
                   )}
                 </div>
 
                 {locationRows.length === 0 ? (
-                  <div className="text-center py-8">
-                    <MapPin className="w-8 h-8 text-gray-300 mx-auto mb-1.5" />
+                  <div className="text-center py-10">
+                    <MapPin className="w-10 h-10 text-gray-300 mx-auto mb-2" />
                     <p className="text-sm text-gray-400">No locations recorded in this zone yet</p>
                     {canManage && (
                       <button
                         onClick={() => setShowAddStock(true)}
-                        className="mt-2 text-sm text-blue-600 hover:underline font-medium"
+                        className="mt-2 text-sm text-blue-600 hover:underline font-semibold"
                       >
                         Add stock to create a location
                       </button>
@@ -341,42 +413,46 @@ const ZoneDetail: React.FC<Props> = ({
                   <div className="overflow-x-auto">
                     <table className="w-full text-left">
                       <thead>
-                        <tr className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide border-b border-gray-100">
-                          <th className="px-4 py-2.5 font-semibold">Location Code</th>
-                          <th className="px-4 py-2.5 font-semibold">Location Name / Area</th>
-                          <th className="px-4 py-2.5 font-semibold">Status</th>
-                          <th className="px-4 py-2.5 font-semibold">Items</th>
-                          <th className="px-4 py-2.5 font-semibold">Quantity</th>
-                          {isAdmin && <th className="px-4 py-2.5 font-semibold">Stock Value</th>}
-                          <th className="px-4 py-2.5 font-semibold">Action</th>
+                        <tr className="bg-gray-50/55 text-xs text-gray-500 uppercase tracking-wider border-b border-gray-100">
+                          <th className="px-5 py-3 font-bold">Location Code</th>
+                          <th className="px-5 py-3 font-bold">Location Name / Area</th>
+                          <th className="px-5 py-3 font-bold text-center">Status</th>
+                          <th className="px-5 py-3 font-bold text-center">Items</th>
+                          <th className="px-5 py-3 font-bold text-right">Quantity</th>
+                          {isAdmin && <th className="px-5 py-3 font-bold text-right">Stock Value</th>}
+                          <th className="px-5 py-3 font-bold text-center">Action</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-50">
+                      <tbody className="divide-y divide-gray-100/70">
                         {locationRows.map(loc => (
-                          <tr key={loc._id} className="hover:bg-gray-50/60 transition-colors">
-                            <td className="px-4 py-2.5 text-sm font-mono font-semibold text-gray-800">{loc.code}</td>
-                            <td className="px-4 py-2.5 text-sm text-gray-700">{loc.area}</td>
-                            <td className="px-4 py-2.5"><StatusBadge status={loc.status} /></td>
-                            <td className="px-4 py-2.5 text-sm font-semibold text-gray-800">{loc.itemCount}</td>
-                            <td className="px-4 py-2.5 text-sm font-semibold text-gray-800">{fmt(loc.quantity)}</td>
-                            {isAdmin && <td className="px-4 py-2.5 text-sm text-gray-600">{fmtCurrency(loc.value)}</td>}
-                            <td className="px-4 py-2.5 relative">
+                          <tr key={loc._id} className="hover:bg-gray-50/40 transition-colors">
+                            <td className="px-5 py-3 text-sm font-bold font-mono text-gray-900">{loc.code}</td>
+                            <td className="px-5 py-3 text-sm text-gray-600 font-medium">{loc.area}</td>
+                            <td className="px-5 py-3 text-center">
+                              <span className="text-[10px] px-2 py-0.5 rounded font-extrabold tracking-wider bg-green-50 text-green-700 uppercase">
+                                ACTIVE
+                              </span>
+                            </td>
+                            <td className="px-5 py-3 text-sm font-bold text-gray-700 text-center">{loc.itemCount}</td>
+                            <td className="px-5 py-3 text-sm font-black text-gray-800 text-right">{fmt(loc.quantity)}</td>
+                            {isAdmin && <td className="px-5 py-3 text-sm font-bold text-gray-700 text-right">{fmtCurrency(loc.value)}</td>}
+                            <td className="px-5 py-3 text-center relative">
                               <button
                                 onClick={() => setOpenMenuId(openMenuId === String(loc._id) ? null : String(loc._id))}
-                                className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                                className="p-1.5 hover:bg-gray-105 hover:bg-gray-100 rounded-lg transition-colors inline-block text-gray-400 hover:text-gray-700"
                               >
-                                <MoreVertical className="w-3.5 h-3.5 text-gray-400" />
+                                <MoreVertical className="w-4 h-4" />
                               </button>
                               {openMenuId === String(loc._id) && (
-                                <div className="absolute right-4 top-full mt-0.5 w-32 bg-white rounded-lg shadow-lg border border-gray-100 z-10 py-1">
+                                <div className="absolute right-6 top-full mt-0.5 w-32 bg-white rounded-lg shadow-lg border border-gray-200 z-10 py-1">
                                   <button
                                     onClick={() => { setOpenMenuId(null); showToast('Edit location coming soon', 'info'); }}
-                                    className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                  ><Edit className="w-3 h-3" /> Edit</button>
+                                    className="w-full text-left px-3.5 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                  ><Edit className="w-3.5 h-3.5" /> Edit</button>
                                   <button
                                     onClick={() => { setOpenMenuId(null); showToast('Transfer stock coming soon', 'info'); }}
-                                    className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                  ><ArrowRightLeft className="w-3 h-3" /> Transfer</button>
+                                    className="w-full text-left px-3.5 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                  ><ArrowRightLeft className="w-3.5 h-3.5" /> Transfer</button>
                                 </div>
                               )}
                             </td>
@@ -389,17 +465,17 @@ const ZoneDetail: React.FC<Props> = ({
               </div>
 
               {/* Top Items Table */}
-              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <TrendingUp className="w-3.5 h-3.5 text-gray-500" />
-                    <h2 className="text-[15px] font-semibold text-gray-900">Top Items in this Zone</h2>
-                  </div>
+              <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                   <div className="flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-blue-600" />
+                    <h2 className="text-base font-bold text-gray-900">Top Items in this Zone</h2>
+                  </div>
+                  <div className="flex items-center gap-3">
                     {stock.length > 5 && (
                       <button
                         onClick={() => setShowAllItems(!showAllItems)}
-                        className="text-sm font-semibold text-blue-600 hover:underline"
+                        className="text-xs font-bold text-blue-600 hover:underline hover:text-blue-700 transition-colors"
                       >
                         {showAllItems ? 'Show Less' : 'View All'}
                       </button>
@@ -407,24 +483,24 @@ const ZoneDetail: React.FC<Props> = ({
                     {canManage && (
                       <button
                         onClick={() => setShowAddStock(true)}
-                        className="flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold transition-colors"
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-sm transition-colors"
                       >
-                        <Plus className="w-3 h-3" /> Add Stock
+                        <Plus className="w-3.5 h-3.5" /> Add Stock
                       </button>
                     )}
                   </div>
                 </div>
 
                 {stock.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Package className="w-8 h-8 text-gray-300 mx-auto mb-1.5" />
+                  <div className="text-center py-10">
+                    <Package className="w-10 h-10 text-gray-300 mx-auto mb-2" />
                     <p className="text-sm text-gray-400">No stock recorded in this zone</p>
                     {canManage && (
                       <button
                         onClick={() => setShowAddStock(true)}
-                        className="mt-2 flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-semibold mx-auto hover:bg-emerald-700 transition-colors"
+                        className="mt-2 flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold mx-auto hover:bg-emerald-700 transition-colors shadow-sm"
                       >
-                        <Plus className="w-3 h-3" /> Add Stock
+                        <Plus className="w-3.5 h-3.5" /> Add Stock
                       </button>
                     )}
                   </div>
@@ -432,34 +508,34 @@ const ZoneDetail: React.FC<Props> = ({
                   <div className="overflow-x-auto">
                     <table className="w-full text-left">
                       <thead>
-                        <tr className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide border-b border-gray-100">
-                          <th className="px-4 py-2.5 font-semibold">Item / SKU</th>
-                          <th className="px-4 py-2.5 font-semibold">Item Name</th>
-                          <th className="px-4 py-2.5 font-semibold">Quantity</th>
-                          {isAdmin && <th className="px-4 py-2.5 font-semibold">Stock Value</th>}
+                        <tr className="bg-gray-50/55 text-xs text-gray-500 uppercase tracking-wider border-b border-gray-100">
+                          <th className="px-5 py-3 font-bold">Item / SKU</th>
+                          <th className="px-5 py-3 font-bold">Item Name</th>
+                          <th className="px-5 py-3 font-bold text-right">Quantity</th>
+                          {isAdmin && <th className="px-5 py-3 font-bold text-right">Stock Value</th>}
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-50">
+                      <tbody className="divide-y divide-gray-100/70">
                         {topItems.map((s: any, i: number) => {
                           const value = (s.quantity ?? 0) * (s.sku?.cost_per_unit ?? 0);
                           return (
-                            <tr key={i} className="hover:bg-gray-50/60 transition-colors">
-                              <td className="px-4 py-2.5 text-sm font-mono text-gray-700">{s.sku?.sku_code ?? '—'}</td>
-                              <td className="px-4 py-2.5">
-                                <p className="text-sm font-medium text-gray-800">{s.sku?.name ?? '—'}</p>
+                            <tr key={i} className="hover:bg-gray-50/40 transition-colors">
+                              <td className="px-5 py-3 text-sm font-semibold font-mono text-gray-900">{s.sku?.sku_code ?? '—'}</td>
+                              <td className="px-5 py-3">
+                                <p className="text-sm font-semibold text-gray-800">{s.sku?.name ?? '—'}</p>
                                 {s.sku?.category && (
-                                  <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-medium ${
-                                    s.sku.category === 'Raw' ? 'bg-amber-100 text-amber-700' :
-                                    s.sku.category === 'Finished' ? 'bg-blue-100 text-blue-700' :
-                                    'bg-purple-100 text-purple-700'
+                                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold inline-block mt-1 ${
+                                    s.sku.category === 'Raw' ? 'bg-amber-50 text-amber-700' :
+                                    s.sku.category === 'Finished' ? 'bg-blue-50 text-blue-700' :
+                                    'bg-purple-50 text-purple-700'
                                   }`}>{s.sku.category}</span>
                                 )}
                               </td>
-                              <td className="px-4 py-2.5 text-sm font-semibold text-gray-800">
-                                {fmt(s.quantity)} <span className="text-gray-400 font-normal">{s.sku?.unit_type}</span>
+                              <td className="px-5 py-3 text-sm font-black text-gray-800 text-right">
+                                {fmt(s.quantity)} <span className="text-gray-400 font-medium text-xs ml-0.5">{s.sku?.unit_type}</span>
                               </td>
                               {isAdmin && (
-                                <td className="px-4 py-2.5 text-sm text-gray-600">{fmtCurrency(value)}</td>
+                                <td className="px-5 py-3 text-sm font-bold text-gray-900 text-right">{fmtCurrency(value)}</td>
                               )}
                             </tr>
                           );

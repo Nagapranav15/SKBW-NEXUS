@@ -2,7 +2,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   Plus, Trash2, Edit, X, Search, Factory, Layers, MapPin,
   RefreshCw, ChevronDown, ChevronRight, Package, IndianRupee,
-  Building2, Filter, Clock, AlertTriangle, CheckCircle, Eye
+  Building2, Filter, Clock, AlertTriangle, CheckCircle, Eye,
+  ArrowUp, ArrowDown, GripVertical, Settings
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import * as mfgApi from '../../api/mfgApi';
@@ -58,6 +59,20 @@ const MfgZones: React.FC = () => {
   const [expandedFactories, setExpandedFactories] = useState<Record<string, boolean>>({});
   const [expandedFloors, setExpandedFloors] = useState<Record<string, boolean>>({});
 
+  useEffect(() => {
+    if (selectedCompany) {
+      try {
+        const storedF = localStorage.getItem(`expanded_factories_${selectedCompany._id}`);
+        setExpandedFactories(storedF ? JSON.parse(storedF) : {});
+        
+        const storedFl = localStorage.getItem(`expanded_floors_${selectedCompany._id}`);
+        setExpandedFloors(storedFl ? JSON.parse(storedFl) : {});
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, [selectedCompany]);
+
   // Search / filter
   const [search, setSearch] = useState('');
 
@@ -73,7 +88,26 @@ const MfgZones: React.FC = () => {
   const [showViewAllModal, setShowViewAllModal] = useState<'factories' | 'floors' | 'zones' | 'locations' | null>(null);
   const [highlightedViewAllIdx, setHighlightedViewAllIdx] = useState<number>(-1);
   const [treeHighlight, setTreeHighlight] = useState<{ type: 'factory' | 'floor' | 'zone'; id: string } | null>(null);
+  const [draggedFactoryId, setDraggedFactoryId] = useState<string | null>(null);
+  const [canDragId, setCanDragId] = useState<string | null>(null);
+  const [dragOverFactoryId, setDragOverFactoryId] = useState<string | null>(null);
+  const [dropPosition, setDropPosition] = useState<'before' | 'after' | null>(null);
+  const dragStartedRef = React.useRef(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
+  const [showToolsDropdown, setShowToolsDropdown] = useState(false);
+  const toolsDropdownRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (toolsDropdownRef.current && !toolsDropdownRef.current.contains(e.target as Node)) {
+        setShowToolsDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, []);
 
   // New Utility Panel States
   const [showActivityLog, setShowActivityLog] = useState(false);
@@ -147,9 +181,9 @@ const MfgZones: React.FC = () => {
   const totalStockValue = Object.values(zoneStockMap).reduce((a: number, v: any) => a + (v?.stockValue ?? 0), 0);
 
   // ── Load all ──────────────────────────────────────────────────────────────
-  const loadAll = useCallback(async () => {
+  const loadAll = useCallback(async (silent = false) => {
     if (!selectedCompany) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const [f, fl, z, zs] = await Promise.all([
         mfgApi.getFactories(selectedCompany._id),
@@ -160,22 +194,31 @@ const MfgZones: React.FC = () => {
       const factList: any[] = f.data ?? [];
       const floorList: any[] = fl.data ?? [];
       const zoneList: any[] = z.data ?? [];
+
+      // Sort factories based on manual order from localStorage
+      const storedOrder = localStorage.getItem(`factory_order_${selectedCompany._id}`);
+      if (storedOrder) {
+        const orderMap = JSON.parse(storedOrder) as string[];
+        factList.sort((a, b) => {
+          const idxA = orderMap.indexOf(a._id);
+          const idxB = orderMap.indexOf(b._id);
+          if (idxA === -1 && idxB === -1) return 0;
+          if (idxA === -1) return 1;
+          if (idxB === -1) return -1;
+          return idxA - idxB;
+        });
+      }
+
       setFactories(factList);
       setFloors(floorList);
       setZones(zoneList);
       setZoneStockMap(zs.data ?? {});
 
-      // Auto-expand all factories & floors on first load
-      const fe: Record<string, boolean> = {};
-      const fle: Record<string, boolean> = {};
-      factList.forEach(f => { fe[f._id] = true; });
-      floorList.forEach(fl => { fle[fl._id] = true; });
-      setExpandedFactories(fe);
-      setExpandedFloors(fle);
+
     } catch (e) {
       console.error(e);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [selectedCompany]);
 
@@ -215,7 +258,7 @@ const MfgZones: React.FC = () => {
       }
       setShowModal(null); setForm({}); setEditId(null);
       showToast(`${showModal} ${editId ? 'updated' : 'created'} successfully`, 'success');
-      loadAll();
+      loadAll(true);
     } catch (e: any) {
       showToast(e.response?.data?.msg || 'Error saving', 'error');
     } finally {
@@ -241,10 +284,101 @@ const MfgZones: React.FC = () => {
       }
       await logActivity('DELETE', name, `Deleted ${type}: ${name}`);
       showToast(`${type} deleted and moved to Recycle Bin`, 'success');
-      loadAll();
+      loadAll(true);
     } catch (e: any) {
       showToast(e.response?.data?.msg || 'Cannot delete — may have children', 'error');
     }
+  };
+
+  const moveFactory = (factoryId: string, direction: 'up' | 'down') => {
+    const idx = factories.findIndex(f => f._id === factoryId);
+    if (idx === -1) return;
+    const newIndex = direction === 'up' ? idx - 1 : idx + 1;
+    if (newIndex < 0 || newIndex >= factories.length) return;
+
+    const list = [...factories];
+    const [removed] = list.splice(idx, 1);
+    list.splice(newIndex, 0, removed);
+
+    setFactories(list);
+
+    // Save to localStorage
+    const orderMap = list.map(f => f._id);
+    localStorage.setItem(`factory_order_${selectedCompany?._id}`, JSON.stringify(orderMap));
+    showToast('Factory order updated', 'success');
+  };
+
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    e.dataTransfer.setData('text/plain', id);
+    setDraggedFactoryId(id);
+    dragStartedRef.current = true;
+  };
+
+  const handleDragOver = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    if (!draggedFactoryId || draggedFactoryId === targetId) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const relativeY = e.clientY - rect.top;
+    const position = relativeY < rect.height / 2 ? 'before' : 'after';
+
+    setDragOverFactoryId(targetId);
+    setDropPosition(position);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverFactoryId(null);
+    setDropPosition(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    const sourceId = e.dataTransfer.getData('text/plain') || draggedFactoryId;
+    if (!sourceId || sourceId === targetId) {
+      setDragOverFactoryId(null);
+      setDropPosition(null);
+      return;
+    }
+
+    const sourceIdx = factories.findIndex(f => f._id === sourceId);
+    const targetIdx = factories.findIndex(f => f._id === targetId);
+    if (sourceIdx === -1 || targetIdx === -1) {
+      setDragOverFactoryId(null);
+      setDropPosition(null);
+      return;
+    }
+
+    const list = [...factories];
+    const [removed] = list.splice(sourceIdx, 1);
+
+    let newIdx = factories.findIndex(f => f._id === targetId);
+    if (dropPosition === 'after') {
+      newIdx += 1;
+    }
+    const adjustedIdx = sourceIdx < newIdx ? newIdx - 1 : newIdx;
+
+    list.splice(adjustedIdx, 0, removed);
+    setFactories(list);
+
+    // Save to localStorage
+    const orderMap = list.map(f => f._id);
+    localStorage.setItem(`factory_order_${selectedCompany?._id}`, JSON.stringify(orderMap));
+
+    setDraggedFactoryId(null);
+    setDragOverFactoryId(null);
+    setDropPosition(null);
+    setCanDragId(null);
+    showToast('Factory order updated', 'success');
+  };
+
+  const handleDragEnd = () => {
+    setDraggedFactoryId(null);
+    setDragOverFactoryId(null);
+    setDropPosition(null);
+    setCanDragId(null);
+    setTimeout(() => {
+      dragStartedRef.current = false;
+    }, 100);
   };
 
   // Zone Detail view is now embedded directly in the right panel to match Customer module's split-pane layout.
@@ -404,7 +538,7 @@ const MfgZones: React.FC = () => {
 
       await logActivity('RESTORE', name, `Restored ${item.type}: ${name}`);
       showToast(`${item.type} restored successfully`, 'success');
-      loadAll();
+      loadAll(true);
     } catch (e: any) {
       showToast(e.response?.data?.msg || 'Failed to restore item', 'error');
     } finally {
@@ -729,11 +863,22 @@ const MfgZones: React.FC = () => {
           if (!currentNode) return;
           e.preventDefault();
           if (currentNode.type === 'factory') {
-            const isExpanded = expandedFactories[currentNode.id] !== false;
-            setExpandedFactories(p => ({ ...p, [currentNode.id]: !isExpanded }));
+            const isExpanded = !!expandedFactories[currentNode.id];
+            setExpandedFactories(p => {
+              const updated = { ...p, [currentNode.id]: !isExpanded };
+              localStorage.setItem(`expanded_factories_${selectedCompany?._id}`, JSON.stringify(updated));
+              return updated;
+            });
           } else if (currentNode.type === 'floor') {
-            const isExpanded = expandedFloors[currentNode.id] !== false;
-            setExpandedFloors(p => ({ ...p, [currentNode.id]: !isExpanded }));
+            const isExpanded = !!expandedFloors[currentNode.id];
+            setExpandedFloors(p => {
+              const updated: Record<string, boolean> = {};
+              if (!isExpanded) {
+                updated[currentNode.id] = true;
+              }
+              localStorage.setItem(`expanded_floors_${selectedCompany?._id}`, JSON.stringify(updated));
+              return updated;
+            });
           } else if (currentNode.type === 'zone') {
             setSelectedZone(currentNode.data);
           }
@@ -869,12 +1014,12 @@ const MfgZones: React.FC = () => {
     const nodes: { type: 'factory' | 'floor' | 'zone'; id: string; data: any }[] = [];
     displayFactories.forEach(factory => {
       nodes.push({ type: 'factory', id: factory._id, data: factory });
-      const factExpanded = expandedFactories[factory._id] !== false;
+      const factExpanded = !!expandedFactories[factory._id];
       if (factExpanded) {
         const factFloors = getFactoryFloors(factory._id);
         factFloors.forEach(floor => {
           nodes.push({ type: 'floor', id: floor._id, data: floor });
-          const flExpanded = expandedFloors[floor._id] !== false;
+          const flExpanded = !!expandedFloors[floor._id];
           if (flExpanded) {
             const flZones = getFloorZones(floor._id);
             flZones.forEach(zone => {
@@ -916,31 +1061,54 @@ const MfgZones: React.FC = () => {
             >
               <RefreshCw className="w-3.5 h-3.5" />
             </button>
-            <button
-              onClick={() => setShowHelpModal(true)}
-              title="Shortcut Help (Alt+H)"
-              className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 bg-white text-gray-700 transition-colors"
-            >
-              <kbd className="hidden md:inline-block px-1 bg-gray-50 border rounded text-[10px] text-gray-500 font-mono">Alt+H</kbd> Shortcuts
-            </button>
-            <button
-              onClick={() => setShowActivityLog(true)}
-              className="flex items-center gap-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 bg-white text-gray-700 transition-colors"
-            >
-              <Clock className="w-3.5 h-3.5 text-gray-500" /> Activity Log
-            </button>
-            <button
-              onClick={handleFindDuplicates}
-              className="flex items-center gap-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 bg-white text-gray-700 transition-colors"
-            >
-              <AlertTriangle className="w-3.5 h-3.5 text-gray-500" /> Find Duplicates
-            </button>
-            <button
-              onClick={openRecycleBin}
-              className="flex items-center gap-1 px-3 py-1.5 border border-gray-250 rounded-lg text-sm font-medium hover:bg-gray-50 bg-white text-gray-700 transition-colors"
-            >
-              <Trash2 className="w-3.5 h-3.5 text-gray-500" /> Recycle Bin
-            </button>
+            {/* Tools dropdown */}
+            <div className="relative" ref={toolsDropdownRef}>
+              <button
+                onClick={() => setShowToolsDropdown(!showToolsDropdown)}
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 bg-white text-gray-700 transition-colors shadow-sm"
+              >
+                <Settings className="w-3.5 h-3.5 text-gray-500" />
+                <span>Tools</span>
+                <ChevronDown className="w-3 h-3 text-gray-400" />
+              </button>
+
+              {showToolsDropdown && (
+                <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50 divide-y divide-gray-100 animate-in fade-in duration-100 slide-in-from-top-1">
+                  <div className="py-1">
+                    <button
+                      onClick={() => { setShowHelpModal(true); setShowToolsDropdown(false); }}
+                      className="flex w-full items-center gap-2 px-3.5 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <kbd className="px-1.5 bg-gray-55 border border-gray-200 rounded text-[9px] text-gray-450 font-mono font-medium">Alt+H</kbd>
+                      <span>Shortcuts</span>
+                    </button>
+                  </div>
+                  <div className="py-1">
+                    <button
+                      onClick={() => { setShowActivityLog(true); setShowToolsDropdown(false); }}
+                      className="flex w-full items-center gap-2 px-3.5 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <Clock className="w-3.5 h-3.5 text-gray-400" />
+                      <span>Activity Log</span>
+                    </button>
+                    <button
+                      onClick={() => { handleFindDuplicates(); setShowToolsDropdown(false); }}
+                      className="flex w-full items-center gap-2 px-3.5 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <AlertTriangle className="w-3.5 h-3.5 text-gray-400" />
+                      <span>Find Duplicates</span>
+                    </button>
+                    <button
+                      onClick={() => { openRecycleBin(); setShowToolsDropdown(false); }}
+                      className="flex w-full items-center gap-2 px-3.5 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-gray-400" />
+                      <span>Recycle Bin</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             {canManage && (
               <>
                 <button
@@ -1062,22 +1230,61 @@ const MfgZones: React.FC = () => {
               </div>
             )}
 
-            {displayFactories.map(factory => {
+            {displayFactories.map((factory, idx) => {
               const factFloors = getFactoryFloors(factory._id);
               const factZoneCount = zones.filter(z => (z.factory_id?._id || z.factory_id) === factory._id).length;
-              const factExpanded = expandedFactories[factory._id] !== false; // default open
+              const factExpanded = !!expandedFactories[factory._id];
 
               return (
                 <div key={factory._id} className="mb-1">
                   {/* Factory row */}
-                  <div className={`flex items-center justify-between px-3 py-2 hover:bg-gray-50 group cursor-pointer select-none transition-colors ${treeHighlight?.id === factory._id ? 'bg-blue-50 ring-2 ring-blue-500/20' : ''}`}
-                    onClick={() => { setTreeHighlight({ type: 'factory', id: factory._id }); setExpandedFactories(p => ({ ...p, [factory._id]: !factExpanded })); }}
-                    onMouseEnter={() => setTreeHighlight({ type: 'factory', id: factory._id })}>
+                  <div
+                    draggable={canManage && canDragId === factory._id}
+                    onDragStart={e => handleDragStart(e, factory._id)}
+                    onDragOver={e => handleDragOver(e, factory._id)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={e => handleDrop(e, factory._id)}
+                    onDragEnd={handleDragEnd}
+                    className={`flex items-center justify-between px-3 py-2 hover:bg-gray-55/40 group select-none transition-all duration-100 relative ${
+                      draggedFactoryId === factory._id
+                        ? 'opacity-30 bg-gray-100 border border-dashed border-blue-400'
+                        : ''
+                    } ${
+                      dragOverFactoryId === factory._id
+                        ? 'bg-blue-50/40'
+                        : ''
+                    } ${treeHighlight?.id === factory._id ? 'bg-blue-50 ring-2 ring-blue-500/20' : ''}`}
+                    onClick={() => {
+                      if (dragStartedRef.current) return;
+                      setTreeHighlight({ type: 'factory', id: factory._id });
+                      setExpandedFactories(p => {
+                        const updated = { ...p, [factory._id]: !factExpanded };
+                        localStorage.setItem(`expanded_factories_${selectedCompany?._id}`, JSON.stringify(updated));
+                        return updated;
+                      });
+                    }}
+                    onMouseEnter={() => setTreeHighlight({ type: 'factory', id: factory._id })}
+                  >
+                    {/* Visual drag indicators */}
+                    {dragOverFactoryId === factory._id && dropPosition === 'before' && (
+                      <div className="absolute top-0 left-0 right-0 h-0.5 bg-blue-500 z-50 pointer-events-none" />
+                    )}
+                    {dragOverFactoryId === factory._id && dropPosition === 'after' && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500 z-50 pointer-events-none" />
+                    )}
+
                     <div className="flex items-center gap-2 min-w-0">
+                      {canManage && (
+                        <GripVertical
+                          className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-450 flex-shrink-0 cursor-grab active:cursor-grabbing"
+                          onMouseDown={() => setCanDragId(factory._id)}
+                          onMouseUp={() => setCanDragId(null)}
+                        />
+                      )}
                       <span className="text-gray-400 flex-shrink-0">
                         {factExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                       </span>
-                      <Building2 className="w-4 h-4 text-gray-600 flex-shrink-0" />
+                      <Factory className="w-4 h-4 text-blue-600 flex-shrink-0" />
                       <span className="font-semibold text-[15px] text-gray-800 truncate">{factory.name}</span>
                       <span className={`text-xs px-1.5 py-0.5 rounded font-bold uppercase tracking-wide flex-shrink-0 ${
                         (factory.status ?? 'active') === 'active'
@@ -1094,10 +1301,12 @@ const MfgZones: React.FC = () => {
                           <button
                             onClick={e => { e.stopPropagation(); setShowModal('factory'); setForm({ name: factory.name, code: factory.code, status: factory.status ?? 'active' }); setEditId(factory._id); }}
                             className="p-1 hover:bg-blue-50 rounded"
+                            title="Edit"
                           ><Edit className="w-3 h-3 text-blue-500" /></button>
                           <button
                             onClick={e => { e.stopPropagation(); handleDelete('factory', factory._id, factory.name); }}
                             className="p-1 hover:bg-red-50 rounded"
+                            title="Delete"
                           ><Trash2 className="w-3 h-3 text-red-400" /></button>
                         </div>
                       )}
@@ -1105,98 +1314,120 @@ const MfgZones: React.FC = () => {
                   </div>
 
                   {/* Floors */}
-                  {factExpanded && factFloors.map(floor => {
-                    const flZones = getFloorZones(floor._id);
-                    const flExpanded = expandedFloors[floor._id] !== false; // default open
+                  {factExpanded && (
+                    <div className="relative">
+                      {/* Vertical line indicating floors belong to this factory */}
+                      <div className="absolute left-[18px] top-0 bottom-4 w-px bg-gray-200" />
 
-                    return (
-                      <div key={floor._id}>
-                        {/* Floor row */}
-                        <div
-                          className={`flex items-center justify-between pl-7 pr-3 py-1.5 hover:bg-gray-50 group cursor-pointer select-none transition-colors ${treeHighlight?.id === floor._id ? 'bg-blue-50 ring-2 ring-blue-500/20' : ''}`}
-                          onClick={() => { setTreeHighlight({ type: 'floor', id: floor._id }); setExpandedFloors(p => ({ ...p, [floor._id]: !flExpanded })); }}
-                          onMouseEnter={() => setTreeHighlight({ type: 'floor', id: floor._id })}
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-gray-400 flex-shrink-0">
-                              {flExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                            </span>
-                            <Layers className="w-3.5 h-3.5 text-orange-500 flex-shrink-0" />
-                            <span className="text-[15px] text-gray-700 font-medium truncate">{floor.name}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 flex-shrink-0 ml-1">
-                            <span className="text-xs text-gray-400">{flZones.length} Zones</span>
-                            {canManage && (
-                              <div className="hidden group-hover:flex items-center gap-0.5">
-                                <button
-                                  onClick={e => { e.stopPropagation(); setShowModal('floor'); setForm({ name: floor.name, factory_id: factory._id, status: floor.status ?? 'active' }); setEditId(floor._id); }}
-                                  className="p-1 hover:bg-blue-50 rounded"
-                                ><Edit className="w-3 h-3 text-blue-500" /></button>
-                                <button
-                                  onClick={e => { e.stopPropagation(); handleDelete('floor', floor._id, floor.name); }}
-                                  className="p-1 hover:bg-red-50 rounded"
-                                ><Trash2 className="w-3 h-3 text-red-400" /></button>
+                      {factFloors.map(floor => {
+                        const flZones = getFloorZones(floor._id);
+                        const flExpanded = !!expandedFloors[floor._id];
+
+                        return (
+                          <div key={floor._id} className="relative">
+                            {/* Floor row */}
+                            <div
+                              className={`flex items-center justify-between pl-7 pr-3 py-1.5 hover:bg-gray-55/40 group cursor-pointer select-none transition-colors relative z-10 ${treeHighlight?.id === floor._id ? 'bg-blue-50 ring-2 ring-blue-500/20' : ''}`}
+                              onClick={() => {
+                                setTreeHighlight({ type: 'floor', id: floor._id });
+                                setExpandedFloors(p => {
+                                  const updated: Record<string, boolean> = {};
+                                  if (!flExpanded) {
+                                    updated[floor._id] = true;
+                                  }
+                                  localStorage.setItem(`expanded_floors_${selectedCompany?._id}`, JSON.stringify(updated));
+                                  return updated;
+                                });
+                              }}
+                              onMouseEnter={() => setTreeHighlight({ type: 'floor', id: floor._id })}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-gray-400 flex-shrink-0">
+                                  {flExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                                </span>
+                                <Layers className="w-3.5 h-3.5 text-orange-500 flex-shrink-0" />
+                                <span className="text-[15px] text-gray-700 font-medium truncate">{floor.name}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 flex-shrink-0 ml-1">
+                                <span className="text-xs text-gray-400">{flZones.length} Zones</span>
+                                {canManage && (
+                                  <div className="hidden group-hover:flex items-center gap-0.5">
+                                    <button
+                                      onClick={e => { e.stopPropagation(); setShowModal('floor'); setForm({ name: floor.name, factory_id: factory._id, status: floor.status ?? 'active' }); setEditId(floor._id); }}
+                                      className="p-1 hover:bg-blue-50 rounded"
+                                    ><Edit className="w-3 h-3 text-blue-500" /></button>
+                                    <button
+                                      onClick={e => { e.stopPropagation(); handleDelete('floor', floor._id, floor.name); }}
+                                      className="p-1 hover:bg-red-50 rounded"
+                                    ><Trash2 className="w-3 h-3 text-red-400" /></button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Zones */}
+                            {flExpanded && (
+                              <div className="relative">
+                                {/* Vertical line indicating zones belong to this floor */}
+                                <div className="absolute left-[32px] top-0 bottom-4 w-px bg-gray-200" />
+
+                                {flZones.map(zone => {
+                                  const zs = zoneStockMap[zone._id] ?? {};
+                                  const isSelected = selectedZone?._id === zone._id;
+                                  const locCount = zs.locationCount ?? zs.skuCount ?? 0;
+
+                                  return (
+                                    <div
+                                      key={zone._id}
+                                      onClick={() => { setTreeHighlight({ type: 'zone', id: zone._id }); setSelectedZone(zone); }}
+                                      onMouseEnter={() => setTreeHighlight({ type: 'zone', id: zone._id })}
+                                      className={`flex items-center justify-between ml-14 mr-4 my-1.5 px-3 py-1.5 cursor-pointer rounded-lg border transition-all duration-150 relative z-10 ${
+                                        isSelected
+                                          ? 'bg-blue-50/70 border-blue-500 text-blue-750 shadow-sm'
+                                          : 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50/30'
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <MapPin className={`w-3.5 h-3.5 flex-shrink-0 ${isSelected ? 'text-blue-500' : 'text-gray-400'}`} />
+                                        <span className={`text-[13px] truncate ${isSelected ? 'text-blue-700 font-bold' : 'text-gray-700 font-semibold'}`}>
+                                          {zone.name || zone.zone_code}
+                                        </span>
+                                      </div>
+                                      <span className={`text-[11px] flex-shrink-0 ml-1 ${isSelected ? 'text-blue-600 font-bold' : 'text-gray-400 font-medium'}`}>
+                                        {locCount} Locations
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+
+                                {flZones.length === 0 && (
+                                  <p className="pl-14 pr-3 py-1 text-xs text-gray-400 italic relative z-10">No zones</p>
+                                )}
+
+                                {canManage && (
+                                  <button
+                                    onClick={() => { setShowModal('zone'); setForm({ zone_code: '', name: '', description: '', floor_id: floor._id, factory_id: factory._id, status: 'active' }); setEditId(null); }}
+                                    className="w-full pl-14 pr-3 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-55/40 flex items-center gap-1.5 transition-colors relative z-10"
+                                  >
+                                    <Plus className="w-3 h-3" /> Add Zone
+                                  </button>
+                                )}
                               </div>
                             )}
                           </div>
-                        </div>
+                        );
+                      })}
 
-                        {/* Zones */}
-                        {flExpanded && flZones.map(zone => {
-                          const zs = zoneStockMap[zone._id] ?? {};
-                          const isSelected = selectedZone?._id === zone._id;
-                          const locCount = zs.locationCount ?? zs.skuCount ?? 0;
-
-                          return (
-                            <div
-                              key={zone._id}
-                              onClick={() => { setTreeHighlight({ type: 'zone', id: zone._id }); setSelectedZone(zone); }}
-                              onMouseEnter={() => setTreeHighlight({ type: 'zone', id: zone._id })}
-                              className={`flex items-center justify-between pl-14 pr-3 py-1.5 cursor-pointer group select-none transition-colors ${
-                                treeHighlight?.id === zone._id
-                                  ? 'bg-blue-100/70 border-l-2 border-blue-600'
-                                  : isSelected
-                                    ? 'bg-blue-50 border-l-2 border-blue-500'
-                                    : 'hover:bg-gray-50 border-l-2 border-transparent'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <MapPin className={`w-3.5 h-3.5 flex-shrink-0 ${isSelected ? 'text-blue-500' : 'text-gray-400'}`} />
-                                <span className={`text-[15px] truncate ${isSelected ? 'text-blue-700 font-semibold' : 'text-gray-700'}`}>
-                                  {zone.name || zone.zone_code}
-                                </span>
-                              </div>
-                              <span className="text-xs text-gray-400 flex-shrink-0 ml-1">
-                                {locCount} Locations
-                              </span>
-                            </div>
-                          );
-                        })}
-
-                        {flExpanded && flZones.length === 0 && (
-                          <p className="pl-14 pr-3 py-1 text-sm text-gray-400 italic">No zones</p>
-                        )}
-
-                        {flExpanded && canManage && (
-                          <button
-                            onClick={() => { setShowModal('zone'); setForm({ zone_code: '', name: '', description: '', floor_id: floor._id, factory_id: factory._id, status: 'active' }); setEditId(null); }}
-                            className="w-full pl-14 pr-3 py-1 text-xs text-blue-600 hover:bg-blue-50 flex items-center gap-1.5 transition-colors"
-                          >
-                            <Plus className="w-3 h-3" /> Add Zone
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  {/* Add City button at factory level */}
-                  {factExpanded && canManage && (
-                    <button
-                      onClick={() => { setShowModal('floor'); setForm({ name: '', factory_id: factory._id, status: 'active' }); setEditId(null); }}
-                      className="w-full pl-10 pr-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-1.5 transition-colors"
-                    >
-                      <Plus className="w-3 h-3" /> Add Floor
-                    </button>
+                      {/* Add Floor button */}
+                      {canManage && (
+                        <button
+                          onClick={() => { setShowModal('floor'); setForm({ name: '', factory_id: factory._id, status: 'active' }); setEditId(null); }}
+                          className="w-full pl-10 pr-3 py-1.5 text-sm font-semibold text-blue-600 hover:bg-blue-55/40 flex items-center gap-1.5 transition-colors relative z-10"
+                        >
+                          <Plus className="w-3 h-3" /> Add Floor
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               );

@@ -32,7 +32,7 @@ exports.deleteFactory = async (req, res) => {
 exports.getFloors = async (req, res) => {
   const f = {}; if (req.query.companyId) f.company = req.query.companyId;
   if (req.query.factoryId) f.factory_id = req.query.factoryId;
-  res.json(await Floor.find(f).populate("factory_id", "name code").sort({ name: 1 }));
+  res.json(await Floor.find(f).populate("factory_id", "name code").sort({ createdAt: 1 }));
 };
 exports.createFloor = async (req, res) => {
   try { res.status(201).json(await Floor.create(req.body)); }

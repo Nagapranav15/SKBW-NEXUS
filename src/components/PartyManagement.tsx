@@ -319,94 +319,93 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
   className = ""
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(value);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setSearch(value);
+  }, [value]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
+        if (search !== value) {
+          onChange(search);
+        }
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [search, value, onChange]);
 
   const filteredOptions = options.filter(opt =>
     (opt.label || "").toLowerCase().includes(search.toLowerCase())
   );
 
-  const selectedOption = options.find(opt => opt.value === value);
-
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
-      <button
-        type="button"
-        onClick={() => {
-          setIsOpen(!isOpen);
-          setSearch("");
-        }}
-        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-left flex items-center justify-between cursor-pointer"
-      >
-        <span className={selectedOption ? "text-gray-900 font-semibold" : "text-gray-400"}>
-          {selectedOption ? selectedOption.label : placeholder}
-        </span>
-        <span className="text-gray-400 ml-2">
+      <div className="relative w-full flex items-center">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            onChange(e.target.value);
+            setIsOpen(true);
+          }}
+          onFocus={() => setIsOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              if (filteredOptions.length > 0 && isOpen) {
+                e.preventDefault();
+                e.stopPropagation();
+                onChange(filteredOptions[0].value);
+                setSearch(filteredOptions[0].label);
+                setIsOpen(false);
+              }
+            } else if (e.key === 'Escape') {
+              setIsOpen(false);
+            }
+          }}
+          placeholder={placeholder}
+          required={required}
+          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-left pr-8 text-gray-900 font-semibold placeholder-gray-400"
+        />
+        <button
+          type="button"
+          onClick={() => {
+            setIsOpen(!isOpen);
+            if (!isOpen) {
+              setSearch(value);
+            }
+          }}
+          className="absolute right-2 text-gray-400 cursor-pointer focus:outline-none flex items-center justify-center p-1 hover:text-gray-650"
+        >
           {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-        </span>
-      </button>
-
-      {/* Hidden inputs to trigger required validity */}
-      <input
-        type="text"
-        value={value}
-        onChange={() => {}}
-        required={required}
-        className="absolute inset-0 opacity-0 pointer-events-none w-full h-full"
-        tabIndex={-1}
-      />
+        </button>
+      </div>
 
       {isOpen && (
-        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-250 rounded-lg shadow-xl flex flex-col max-h-60 overflow-hidden animate-in fade-in duration-100">
-          <div className="p-2 border-b border-gray-150 bg-gray-50 flex items-center gap-1.5">
-            <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-            <input
-              type="text"
-              placeholder="Search..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-transparent border-0 p-0 text-xs focus:ring-0 focus:outline-none text-gray-900"
-              autoFocus
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch("")}
-                className="text-gray-400 hover:text-gray-650"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            )}
-          </div>
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-250 rounded-lg shadow-xl flex flex-col max-h-60 overflow-y-auto animate-in fade-in duration-100">
+          {addNewOption && (
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                addNewOption.onClick();
+              }}
+              className="w-full text-left px-3 py-2.5 text-xs font-bold text-blue-600 hover:bg-blue-50 transition-colors border-b border-gray-100 flex items-center gap-1 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>{addNewOption.label}</span>
+            </button>
+          )}
 
-          <div className="overflow-y-auto flex-1 divide-y divide-gray-50">
-            {addNewOption && (
-              <button
-                type="button"
-                onClick={() => {
-                  setIsOpen(false);
-                  addNewOption.onClick();
-                }}
-                className="w-full text-left px-3 py-2.5 text-xs font-bold text-blue-600 hover:bg-blue-50 transition-colors border-b border-gray-100 flex items-center gap-1"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>{addNewOption.label}</span>
-              </button>
-            )}
-
+          <div className="divide-y divide-gray-50">
             {filteredOptions.length === 0 ? (
               <div className="px-3 py-3 text-xs text-gray-450 text-center italic">
-                No matches found
+                No matching options (using "{search}")
               </div>
             ) : (
               filteredOptions.map((opt) => (
@@ -415,9 +414,10 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                   type="button"
                   onClick={() => {
                     onChange(opt.value);
+                    setSearch(opt.label);
                     setIsOpen(false);
                   }}
-                  className={`w-full text-left px-3 py-2.5 text-xs hover:bg-gray-100 transition-colors flex items-center justify-between ${
+                  className={`w-full text-left px-3 py-2.5 text-xs hover:bg-gray-100 transition-colors flex items-center justify-between cursor-pointer ${
                     value === opt.value ? "bg-blue-50 text-blue-700 font-semibold" : "text-gray-700 font-medium"
                   }`}
                 >
@@ -504,6 +504,7 @@ const PartyManagement: React.FC = () => {
   const [isAddingNewCity, setIsAddingNewCity] = useState(false);
   const [newCityName, setNewCityName] = useState('');
   const [inlineModalType, setInlineModalType] = useState<'agent' | 'route' | 'market' | 'transporter' | null>(null);
+  const [parentModalType, setParentModalType] = useState<'market' | 'route' | null>(null);
   const [isSavingInline, setIsSavingInline] = useState(false);
 
   // Subform states for inline creation
@@ -1414,7 +1415,9 @@ const PartyManagement: React.FC = () => {
   };
 
   const openInlineModal = (type: 'agent' | 'route' | 'market' | 'transporter', initialData?: any) => {
+    setParentModalType(null);
     setInlineAgentData({ name: '', phone: '' });
+    setAgentCheckedRoutes([]);
     setInlineRouteData({ name: '', code: '', assignedAgent: '', description: '' });
     setInlineMarketData({
       name: '',
@@ -1430,11 +1433,24 @@ const PartyManagement: React.FC = () => {
     setInlineModalType(type);
   };
 
+  const openNestedInlineModal = (type: 'agent' | 'route', parentType: 'market' | 'route') => {
+    setParentModalType(parentType);
+    if (type === 'agent') {
+      setInlineAgentData({ name: '', phone: '' });
+      setAgentCheckedRoutes([]);
+    } else if (type === 'route') {
+      setInlineRouteData({ name: '', code: '', assignedAgent: '', description: '' });
+    }
+    setInlineModalType(type);
+  };
+
   const handleInlineSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCompany) return;
     try {
       setIsSavingInline(true);
+      let nextModalType: 'agent' | 'route' | 'market' | 'transporter' | null = null;
+      
       if (inlineModalType === 'agent') {
         const payload = {
           type: 'agent',
@@ -1445,7 +1461,30 @@ const PartyManagement: React.FC = () => {
           company: selectedCompany._id
         };
         const res = await createParty(payload);
-        setFormData((prev: any) => ({ ...prev, agentAssigned: res.data.firmName }));
+
+        // Save route assignments for inline agent
+        const agentName = res.data.firmName;
+        for (const routeItem of allRoutes) {
+          const isChecked = agentCheckedRoutes.includes(routeItem._id);
+          const isCurrentlyAssigned = routeItem.assignedAgent === agentName;
+
+          if (isChecked && !isCurrentlyAssigned) {
+            await updateRoute(routeItem._id, { ...routeItem, assignedAgent: agentName });
+          } else if (!isChecked && isCurrentlyAssigned) {
+            await updateRoute(routeItem._id, { ...routeItem, assignedAgent: '' });
+          }
+        }
+
+        if (parentModalType === 'market') {
+          setInlineMarketData((prev: any) => ({ ...prev, agentAssigned: res.data.firmName }));
+          nextModalType = 'market';
+        } else if (parentModalType === 'route') {
+          setInlineRouteData((prev: any) => ({ ...prev, assignedAgent: res.data.firmName }));
+          nextModalType = 'route';
+        } else {
+          setFormData((prev: any) => ({ ...prev, agentAssigned: res.data.firmName }));
+          nextModalType = null;
+        }
       } else if (inlineModalType === 'route') {
         const payload = {
           name: inlineRouteData.name,
@@ -1455,7 +1494,13 @@ const PartyManagement: React.FC = () => {
           company: selectedCompany._id
         };
         const res = await createRoute(payload);
-        setFormData((prev: any) => ({ ...prev, route: res.data.name }));
+        if (parentModalType === 'market') {
+          setInlineMarketData((prev: any) => ({ ...prev, route: res.data.name }));
+          nextModalType = 'market';
+        } else {
+          setFormData((prev: any) => ({ ...prev, route: res.data.name }));
+          nextModalType = null;
+        }
       } else if (inlineModalType === 'market') {
         const payload = {
           type: 'market',
@@ -1481,6 +1526,7 @@ const PartyManagement: React.FC = () => {
           route: res.data.route || prev.route || '',
           agentAssigned: res.data.agentAssigned || prev.agentAssigned || ''
         }));
+        nextModalType = null;
       } else if (inlineModalType === 'transporter') {
         const primaryContact = inlineTransporterData.contactPersons?.[0];
         const payload = {
@@ -1495,13 +1541,14 @@ const PartyManagement: React.FC = () => {
         };
         const res = await createParty(payload);
         setFormData((prev: any) => ({ ...prev, preferredTransport: res.data.firmName }));
+        nextModalType = null;
       }
       
       // Refresh dropdowns, main data list, and stats count
       await fetchDropdownOptions();
       await fetchMainData();
       await fetchStatsCounts();
-
+ 
       // If viewing a Region details drawer, refresh viewingCustomer in real-time
       if (currentType === 'route' && viewingCustomer) {
         const routesRes = await getRoutes(selectedCompany._id);
@@ -1511,7 +1558,9 @@ const PartyManagement: React.FC = () => {
           setViewingCustomer(updatedRoute);
         }
       }
-      setInlineModalType(null);
+      
+      setInlineModalType(nextModalType);
+      setParentModalType(null);
     } catch (err: any) {
       console.error('Error saving inline reference:', err);
       const msg = err.response?.data?.msg || 'Error saving. Please try again.';
@@ -2355,55 +2404,71 @@ const PartyManagement: React.FC = () => {
           'Status': p.status || 'active'
         };
       });
+    } else if (currentType === 'customer') {
+      exportData = parties.map(p => ({
+        'Firm Name': p.firmName || '-',
+        'Owner Name': p.ownerName || '-',
+        'Contact Name': p.contactName || '-',
+        'Phone': p.phone || '-',
+        'Alt Phone': p.altPhone || '-',
+        'WhatsApp': p.whatsapp || '-',
+        'Email': p.email || '-',
+        'GST Number': p.gstNumber || '-',
+        'Aadhar Number': p.aadharNumber || '-',
+        'Door No': p.doorNo || '-',
+        'Street Name': p.streetName || '-',
+        'Address Line': p.address1 || '-',
+        'Area': p.area || '-',
+        'Landmark': p.landmark || '-',
+        'City': p.city || '-',
+        'District': p.district || '-',
+        'State': p.state || '-',
+        'Pincode': p.pincode || '-',
+        'GPS Location': p.gpsLocation || '-',
+        'Region': p.route || '-',
+        'Agent Assigned': p.agentAssigned || (() => {
+          const routeDoc = allRoutes.find(r => r.name === p.route);
+          return routeDoc?.assignedAgent || '-';
+        })(),
+        'Preferred Transport': p.preferredTransport || '-',
+        'Credit Limit': p.creditLimit || 0,
+        'Credit Days': p.creditDays || 0,
+        'Opening Balance': p.openingBalance || 0,
+        'Outstanding Balance': p.outstandingBalance !== undefined ? p.outstandingBalance : (p.outstanding || 0),
+        'Tags': Array.isArray(p.tags) ? p.tags.join(', ') : '',
+        'Remarks': p.remarks || '-',
+        'Status': p.status || 'active'
+      }));
     } else {
-      // Customer or Vendor
-      exportData = parties.map(p => {
-        const contactPersonsStr = Array.isArray(p.contactPersons)
-          ? p.contactPersons.map((cp: any) => `${cp.name || 'Unnamed'}: ${cp.phone || 'No Phone'}`).join(' | ')
-          : '-';
-        const row: any = {
-          'Firm Name': p.firmName || '-',
-          'Owner Name': p.ownerName || '-',
-          'Contact Name': p.contactName || '-',
-          'Phone': p.phone || '-',
-          'Alt Phone': p.altPhone || '-',
-          'Email': p.email || '-',
-          'Door No': p.doorNo || '-',
-          'Street Name': p.streetName || '-',
-          'Address Line 1': p.address1 || '-',
-          'Area': p.area || '-',
-          'Landmark': p.landmark || '-',
-          'City': p.city || '-',
-          'District': p.district || '-',
-          'State': p.state || '-',
-          'Pincode': p.pincode || '-',
-          'Region': p.route || '-',
-          'Agent Assigned': p.agentAssigned || (() => {
-            const routeDoc = allRoutes.find(r => r.name === p.route);
-            return routeDoc?.assignedAgent || '-';
-          })(),
-          'Assigned Market': p.assignedMarket || '-',
-          'Group': p.group || '-',
-          'Designation': p.designation || '-',
-          'Department': p.department || '-',
-          'WhatsApp': p.whatsapp || '-',
-          'Vendor Type': p.vendorType || '-',
-          'Remarks': p.remarks || '-',
-          'Code': p.code || '-',
-          'GST Number': p.gstNumber || '-',
-          'Aadhar Number': p.aadharNumber || '-',
-          'Opening Balance': p.openingBalance || 0,
-          'Credit Limit': p.creditLimit || 0,
-          'Credit Days': p.creditDays || 0,
-          'Outstanding Balance': p.outstandingBalance !== undefined ? p.outstandingBalance : (p.outstanding || 0),
-          'Preferred Transport': p.preferredTransport || '-',
-          'GPS Location': p.gpsLocation || '-',
-          'Tags': Array.isArray(p.tags) ? p.tags.join(', ') : '',
-          'Contact Persons': contactPersonsStr,
-          'Status': p.status || 'active'
-        };
-        return row;
-      });
+      // Vendor
+      exportData = parties.map(p => ({
+        'Firm Name': p.firmName || '-',
+        'Owner Name': p.ownerName || '-',
+        'Contact Name': p.contactName || '-',
+        'Phone': p.phone || '-',
+        'Alt Phone': p.altPhone || '-',
+        'WhatsApp': p.whatsapp || '-',
+        'Email': p.email || '-',
+        'GST Number': p.gstNumber || '-',
+        'Aadhar Number': p.aadharNumber || '-',
+        'Door No': p.doorNo || '-',
+        'Street Name': p.streetName || '-',
+        'Address Line': p.address1 || '-',
+        'Area': p.area || '-',
+        'Landmark': p.landmark || '-',
+        'City': p.city || '-',
+        'District': p.district || '-',
+        'State': p.state || '-',
+        'Pincode': p.pincode || '-',
+        'GPS Location': p.gpsLocation || '-',
+        'Vendor Type': p.vendorType || '-',
+        'Credit Limit': p.creditLimit || 0,
+        'Credit Days': p.creditDays || 0,
+        'Outstanding Balance': p.outstandingBalance !== undefined ? p.outstandingBalance : (p.outstanding || 0),
+        'Tags': Array.isArray(p.tags) ? p.tags.join(', ') : '',
+        'Remarks': p.remarks || '-',
+        'Status': p.status || 'active'
+      }));
     }
 
     const ws = XLSX.utils.json_to_sheet(exportData);
@@ -2504,6 +2569,7 @@ const PartyManagement: React.FC = () => {
               preferredTransport: String(item['preferredtransporter'] || item['preferredtransport'] || item['transport'] || '').trim(),
               gstNumber: String(item['gstnumber'] || item['gst'] || item['gstin'] || '').trim(),
               aadharNumber: String(item['aadharnumber'] || item['aadhar'] || item['aadharno'] || '').trim(),
+              remarks: String(item['remarks'] || '').trim(),
               status: String(item['status'] || 'active').trim().toLowerCase(),
               company: selectedCompany?._id
             };
@@ -2558,21 +2624,21 @@ const PartyManagement: React.FC = () => {
       sampleRows = [
         ['VRL Logistics', 'Suresh Kumar', '9876543210', 'info@vrl.com', 'Bangalore', 'active']
       ];
-    } else {
+    } else if (currentType === 'customer') {
       headers = [
-        'Firm Name', 'Owner Name', 'Mobile Number', 'WhatsApp Number', 'Alternate Mobile',
-        'Email ID', 'GST Number', 'Aadhar Number', 'Door No', 'Street Name', 'Address Line',
-        'Area', 'Landmark', 'Town/City', 'District', 'State', 'Pincode', 'Google Map',
-        'Region / Line', 'Assigned Agent', 'Preferred Transporter', 'Credit Limit', 'Credit Days',
-        ...(currentType === 'customer' ? ['Opening Balance'] : []), 'Status', 'Outstanding Balance', 'Tags'
+        'Firm Name', 'Owner Name', 'Contact Name', 'Phone', 'Alt Phone', 'WhatsApp', 'Email',
+        'GST Number', 'Aadhar Number', 'Door No', 'Street Name', 'Address Line', 'Area', 'Landmark',
+        'City', 'District', 'State', 'Pincode', 'GPS Location', 'Region', 'Agent Assigned',
+        'Preferred Transport', 'Credit Limit', 'Credit Days', 'Opening Balance', 'Outstanding Balance', 'Tags', 'Remarks', 'Status'
       ];
       sampleRows = [
         [
-          currentType === 'customer' ? 'Charminar Notebook Publishers' : 'Paper Mills Supplier Ltd',
+          'Charminar Notebook Publishers',
+          'Mohammad Ali',
           'Mohammad Ali',
           '9988776611',
-          '9988776611',
           '9848022334',
+          '9988776611',
           'ali@charminar.com',
           '36AAAAA1111A1Z1',
           '123456789012',
@@ -2581,20 +2647,59 @@ const PartyManagement: React.FC = () => {
           'Near Bus Stand',
           'Auto Nagar',
           'Opp. Water Tank',
-          currentType === 'customer' ? 'Secunderabad' : 'Tirupati',
-          currentType === 'customer' ? 'Hyderabad' : 'Tirupati',
-          currentType === 'customer' ? 'Telangana' : 'Andhra Pradesh',
-          currentType === 'customer' ? '500003' : '517501',
+          'Secunderabad',
+          'Hyderabad',
+          'Telangana',
+          '500003',
           'https://maps.google.com/?q=17.3850,78.4867',
-          'Andhra LIne',
+          'Andhra Line',
           'Venkatesh Rao',
           'GARUDA',
           '500000',
           '30',
-          ...(currentType === 'customer' ? ['0'] : []),
-          'active',
           '0',
-          'vip, regular'
+          '0',
+          'vip, regular',
+          'Regular client since 2024',
+          'active'
+        ]
+      ];
+    } else {
+      // Vendor
+      headers = [
+        'Firm Name', 'Owner Name', 'Contact Name', 'Phone', 'Alt Phone', 'WhatsApp', 'Email',
+        'GST Number', 'Aadhar Number', 'Door No', 'Street Name', 'Address Line', 'Area', 'Landmark',
+        'City', 'District', 'State', 'Pincode', 'GPS Location', 'Vendor Type', 'Credit Limit', 'Credit Days',
+        'Outstanding Balance', 'Tags', 'Remarks', 'Status'
+      ];
+      sampleRows = [
+        [
+          'Paper Mills Supplier Ltd',
+          'Mohammad Ali',
+          'Mohammad Ali',
+          '9988776611',
+          '9848022334',
+          '9988776611',
+          'ali@charminar.com',
+          '36AAAAA1111A1Z1',
+          '123456789012',
+          '12-3-45',
+          'Main Market Road',
+          'Near Bus Stand',
+          'Auto Nagar',
+          'Opp. Water Tank',
+          'Tirupati',
+          'Tirupati',
+          'Andhra Pradesh',
+          '517501',
+          'https://maps.google.com/?q=17.3850,78.4867',
+          'Paper Mill',
+          '500000',
+          '30',
+          '0',
+          'vip, regular',
+          'Primary raw material supplier',
+          'active'
         ]
       ];
     }
@@ -3730,7 +3835,7 @@ const PartyManagement: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">City <span className="text-red-500">*</span></label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">City</label>
                       <SearchableDropdown
                         value={formData.city || ''}
                         onChange={val => {
@@ -3755,7 +3860,6 @@ const PartyManagement: React.FC = () => {
                           label: "+ Add New City",
                           onClick: () => openInlineModal('market')
                         }}
-                        required
                       />
                     </div>
 
@@ -3809,7 +3913,7 @@ const PartyManagement: React.FC = () => {
                     <h3 className="text-xs font-semibold text-blue-600 uppercase tracking-wider border-b pb-1">Business & Logistics</h3>
                     
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Region / Line <span className="text-red-500">*</span></label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Region / Line</label>
                       <SearchableDropdown
                         value={formData.route || ''}
                         onChange={val => {
@@ -3826,7 +3930,6 @@ const PartyManagement: React.FC = () => {
                           label: "+ Add New Region",
                           onClick: () => openInlineModal('route')
                         }}
-                        required
                       />
                     </div>
 
@@ -5173,6 +5276,41 @@ const PartyManagement: React.FC = () => {
                       required
                     />
                   </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Assigned Regions</label>
+                    <p className="text-[10px] text-gray-400 mb-2">Select the regions this agent is assigned to:</p>
+                    <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2.5 bg-white">
+                      {allRoutes.length === 0 ? (
+                        <p className="text-xs text-gray-400 italic">No regions registered. Create regions first.</p>
+                      ) : (
+                        allRoutes.map(route => {
+                          const isChecked = agentCheckedRoutes.includes(route._id);
+                          return (
+                            <label key={route._id} className="flex items-center space-x-2.5 text-xs p-1 hover:bg-gray-50 rounded cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {
+                                  if (isChecked) {
+                                    setAgentCheckedRoutes(agentCheckedRoutes.filter(id => id !== route._id));
+                                  } else {
+                                    setAgentCheckedRoutes([...agentCheckedRoutes, route._id]);
+                                  }
+                                }}
+                                className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 border-gray-300 cursor-pointer"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <span className="font-semibold text-gray-700 truncate block">{route.name}</span>
+                                {route.assignedAgent && (
+                                  <span className="text-[9px] text-gray-400 block font-medium">(Currently: {route.assignedAgent})</span>
+                                )}
+                              </div>
+                            </label>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
                 </>
               )}
 
@@ -5209,6 +5347,10 @@ const PartyManagement: React.FC = () => {
                       onChange={val => setInlineRouteData({ ...inlineRouteData, assignedAgent: val })}
                       options={allAgents.map(agent => ({ label: agent.firmName, value: agent.firmName }))}
                       placeholder="Select Agent"
+                      addNewOption={{
+                        label: "+ Add New Agent",
+                        onClick: () => openNestedInlineModal('agent', 'route')
+                      }}
                     />
                   </div>
                   <div>
@@ -5283,7 +5425,7 @@ const PartyManagement: React.FC = () => {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">Region / Line <span className="text-red-500">*</span></label>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Region / Line</label>
                     <SearchableDropdown
                       value={inlineMarketData.route}
                       onChange={val => {
@@ -5296,7 +5438,10 @@ const PartyManagement: React.FC = () => {
                       }}
                       options={allRoutes.map(r => ({ label: r.name, value: r.name }))}
                       placeholder="Select Region"
-                      required
+                      addNewOption={{
+                        label: "+ Add New Region",
+                        onClick: () => openNestedInlineModal('route', 'market')
+                      }}
                     />
                   </div>
                   <div>
@@ -5306,6 +5451,10 @@ const PartyManagement: React.FC = () => {
                       onChange={val => setInlineMarketData({ ...inlineMarketData, agentAssigned: val })}
                       options={allAgents.map(a => ({ label: a.firmName, value: a.firmName }))}
                       placeholder="Select Agent"
+                      addNewOption={{
+                        label: "+ Add New Agent",
+                        onClick: () => openNestedInlineModal('agent', 'market')
+                      }}
                     />
                   </div>
                 </>

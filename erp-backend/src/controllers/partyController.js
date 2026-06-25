@@ -548,6 +548,37 @@ const ensureRouteAndMarket = async (partyData, companyId, userFullName) => {
         partyData.route = routeDoc.name;
       }
     }
+
+    const agentName = partyData.agentAssigned;
+    if (agentName) {
+      const agentDoc = await Party.findOne({
+        type: 'agent',
+        company: companyId,
+        firmName: new RegExp('^' + agentName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i')
+      });
+
+      if (!agentDoc) {
+        await Party.create({
+          type: 'agent',
+          firmName: agentName,
+          company: companyId,
+          companies: [companyId],
+          status: 'active'
+        });
+        console.log(`Auto-created agent "${agentName}" during market setup`);
+        
+        await ActivityLog.create({
+          action: 'CREATE',
+          entityType: 'agent',
+          entityName: agentName,
+          details: `Auto-created agent ${agentName} during market setup`,
+          performedBy: userFullName || 'System',
+          company: companyId
+        }).catch(err => console.error("Activity log failed:", err));
+      } else {
+        partyData.agentAssigned = agentDoc.firmName;
+      }
+    }
   }
 };
 

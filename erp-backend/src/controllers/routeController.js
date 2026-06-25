@@ -264,9 +264,40 @@ exports.getRouteById = async (req, res) => {
   }
 };
 
+const ensureAgentExistsForRoute = async (agentName, companyId, performedBy) => {
+  if (!agentName || !companyId) return;
+  const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+  const agentDoc = await Party.findOne({
+    type: 'agent',
+    company: companyId,
+    firmName: new RegExp('^' + escapeRegex(agentName) + '$', 'i')
+  });
+
+  if (!agentDoc) {
+    await Party.create({
+      type: 'agent',
+      firmName: agentName,
+      company: companyId,
+      companies: [companyId],
+      status: 'active'
+    });
+    console.log(`Auto-created agent "${agentName}" during route configuration`);
+
+    await ActivityLog.create({
+      action: 'CREATE',
+      entityType: 'agent',
+      entityName: agentName,
+      details: `Auto-created agent ${agentName} during route configuration`,
+      performedBy: performedBy || 'System',
+      company: companyId
+    }).catch(err => console.error("Activity log failed:", err));
+  }
+};
+
 exports.createRoute = async (req, res) => {
   try {
     const route = await Route.create(req.body);
+    await ensureAgentExistsForRoute(req.body.assignedAgent, req.body.company || (req.user && req.user.company), req.user ? req.user.fullName : 'System');
 
     // Log activity
     await ActivityLog.create({
@@ -296,6 +327,7 @@ exports.updateRoute = async (req, res) => {
     if (!existingRoute) return res.status(404).json({ msg: 'Route not found' });
 
     const route = await Route.findByIdAndUpdate(req.params.id, data, { returnDocument: 'after' });
+    await ensureAgentExistsForRoute(data.assignedAgent, existingRoute.company, req.user ? req.user.fullName : 'System');
 
     // Sync cities (markets) and customers if route name or agent changed
     const nameChanged = data.name !== undefined && data.name !== existingRoute.name;
