@@ -755,6 +755,15 @@ const PartyManagement: React.FC = () => {
   const [showActivityLog, setShowActivityLog] = useState(false);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [activityLogLoading, setActivityLogLoading] = useState(false);
+  const [logSearch, setLogSearch] = useState('');
+  const [logActionFilter, setLogActionFilter] = useState('ALL');
+
+  useEffect(() => {
+    if (!showActivityLog) {
+      setLogSearch('');
+      setLogActionFilter('ALL');
+    }
+  }, [showActivityLog]);
 
   // Duplicate Detector State
   const [showDuplicates, setShowDuplicates] = useState(false);
@@ -1739,7 +1748,7 @@ const PartyManagement: React.FC = () => {
       const res = await getActivityLogs({
         company: selectedCompany._id,
         entityType: currentType,
-        limit: 100
+        limit: 500
       });
       setActivityLogs(res.data.logs || []);
     } catch (err) {
@@ -2755,6 +2764,17 @@ const PartyManagement: React.FC = () => {
       </div>
     );
   };
+
+  const filteredLogs = activityLogs.filter(log => {
+    const matchesSearch = !logSearch || 
+      log.details?.toLowerCase().includes(logSearch.toLowerCase()) ||
+      log.performedBy?.toLowerCase().includes(logSearch.toLowerCase()) ||
+      log.entityName?.toLowerCase().includes(logSearch.toLowerCase());
+      
+    const matchesAction = logActionFilter === 'ALL' || log.action === logActionFilter;
+    
+    return matchesSearch && matchesAction;
+  });
 
   const totalPages = Math.ceil(total / limit);
   const startItem = total === 0 ? 0 : (page - 1) * limit + 1;
@@ -4735,7 +4755,7 @@ const PartyManagement: React.FC = () => {
               <div className="flex h-full flex-col overflow-y-scroll bg-white shadow-2xl">
                 
                 {/* Header */}
-                <div className="bg-gray-50 px-4 py-6 sm:px-6 border-b">
+                <div className="bg-gray-50 px-4 py-6 sm:px-6 border-b flex-shrink-0">
                   <div className="flex items-start justify-between">
                     <h2 className="text-lg font-bold text-gray-900" id="slide-over-title">
                       {typeLabel} Activity Log
@@ -4749,6 +4769,36 @@ const PartyManagement: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Filters */}
+                <div className="bg-gray-50/50 px-4 py-3 sm:px-6 border-b flex gap-2 flex-shrink-0">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search logs..."
+                      value={logSearch}
+                      onChange={e => setLogSearch(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                    />
+                    {logSearch && (
+                      <button onClick={() => setLogSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-450 hover:text-gray-700 text-xs">
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  <select
+                    value={logActionFilter}
+                    onChange={e => setLogActionFilter(e.target.value)}
+                    className="px-2 py-1.5 border border-gray-200 rounded-lg text-xs bg-white text-gray-755 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                  >
+                    <option value="ALL">All Actions</option>
+                    <option value="CREATE">Creates</option>
+                    <option value="UPDATE">Updates</option>
+                    <option value="DELETE">Deletes</option>
+                    <option value="RESTORE">Restores</option>
+                  </select>
+                </div>
+
                 {/* Timeline content */}
                 <div className="relative flex-1 py-6 px-4 sm:px-6">
                   {activityLogLoading ? (
@@ -4757,10 +4807,12 @@ const PartyManagement: React.FC = () => {
                     </div>
                   ) : activityLogs.length === 0 ? (
                     <p className="text-sm text-gray-500 text-center py-8">No recent activity logged for {typeLabelPlural.toLowerCase()}</p>
+                  ) : filteredLogs.length === 0 ? (
+                    <p className="text-sm text-gray-500 text-center py-8">No matching activity logs found.</p>
                   ) : (
                     <div className="flow-root">
                       <ul role="list" className="-mb-8">
-                        {activityLogs.map((log, logIdx) => (
+                        {filteredLogs.map((log, logIdx) => (
                           <li key={log._id}>
                             <div className="relative pb-8">
                               {logIdx !== activityLogs.length - 1 ? (

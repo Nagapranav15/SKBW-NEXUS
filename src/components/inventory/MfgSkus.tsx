@@ -40,6 +40,15 @@ const MfgSkus: React.FC = () => {
   const [showActivityLog, setShowActivityLog] = useState(false);
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [activityLogLoading, setActivityLogLoading] = useState(false);
+  const [logSearch, setLogSearch] = useState('');
+  const [logActionFilter, setLogActionFilter] = useState('ALL');
+
+  useEffect(() => {
+    if (!showActivityLog) {
+      setLogSearch('');
+      setLogActionFilter('ALL');
+    }
+  }, [showActivityLog]);
 
   const [showDuplicates, setShowDuplicates] = useState(false);
   const [duplicateGroups, setDuplicateGroups] = useState<any[]>([]);
@@ -282,7 +291,7 @@ const MfgSkus: React.FC = () => {
       const res = await getActivityLogs({
         company: selectedCompany._id,
         entityType: 'inventory_sku',
-        limit: 100
+        limit: 500
       });
       setActivityLogs(res.data.logs || []);
     } catch (err) {
@@ -349,6 +358,17 @@ const MfgSkus: React.FC = () => {
     Semi: 'bg-purple-100 text-purple-800 border-purple-250', 
     Finished: 'bg-blue-100 text-blue-800 border-blue-250' 
   };
+
+  const filteredLogs = activityLogs.filter(log => {
+    const matchesSearch = !logSearch || 
+      log.details?.toLowerCase().includes(logSearch.toLowerCase()) ||
+      log.performedBy?.toLowerCase().includes(logSearch.toLowerCase()) ||
+      log.entityName?.toLowerCase().includes(logSearch.toLowerCase());
+      
+    const matchesAction = logActionFilter === 'ALL' || log.action === logActionFilter;
+    
+    return matchesSearch && matchesAction;
+  });
 
   return (
     <div className="max-w-6xl mx-auto w-full p-4 space-y-4">
@@ -641,7 +661,7 @@ const MfgSkus: React.FC = () => {
             <div className="pointer-events-auto w-screen max-w-md animate-in slide-in-from-right duration-200">
               <div className="flex h-full flex-col overflow-y-scroll bg-white shadow-2xl">
                 {/* Header */}
-                <div className="bg-gray-50 px-5 py-6 border-b flex justify-between items-center">
+                <div className="bg-gray-50 px-5 py-6 border-b flex justify-between items-center flex-shrink-0">
                   <div>
                     <h2 className="text-lg font-bold text-gray-900">SKU Activity Log</h2>
                     <p className="text-xs text-gray-400">History of SKU catalog modifications</p>
@@ -654,6 +674,36 @@ const MfgSkus: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Filters */}
+                <div className="bg-gray-50/50 px-5 py-3 border-b flex gap-2 flex-shrink-0">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search logs..."
+                      value={logSearch}
+                      onChange={e => setLogSearch(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                    />
+                    {logSearch && (
+                      <button onClick={() => setLogSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-450 hover:text-gray-700 text-xs">
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  <select
+                    value={logActionFilter}
+                    onChange={e => setLogActionFilter(e.target.value)}
+                    className="px-2 py-1.5 border border-gray-200 rounded-lg text-xs bg-white text-gray-755 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                  >
+                    <option value="ALL">All Actions</option>
+                    <option value="CREATE">Creates</option>
+                    <option value="UPDATE">Updates</option>
+                    <option value="DELETE">Deletes</option>
+                    <option value="RESTORE">Restores</option>
+                  </select>
+                </div>
+
                 {/* Content */}
                 <div className="flex-1 py-6 px-5">
                   {activityLogLoading ? (
@@ -662,10 +712,12 @@ const MfgSkus: React.FC = () => {
                     </div>
                   ) : activityLogs.length === 0 ? (
                     <p className="text-[15px] text-gray-500 text-center py-8">No recent SKU logs found</p>
+                  ) : filteredLogs.length === 0 ? (
+                    <p className="text-[15px] text-gray-500 text-center py-8">No matching SKU logs found</p>
                   ) : (
                     <div className="flow-root">
                       <ul role="list" className="-mb-8">
-                        {activityLogs.map((log, logIdx) => (
+                        {filteredLogs.map((log, logIdx) => (
                           <li key={log._id}>
                             <div className="relative pb-8">
                               {logIdx !== activityLogs.length - 1 ? (
