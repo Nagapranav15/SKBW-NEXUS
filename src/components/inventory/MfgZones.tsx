@@ -1048,12 +1048,12 @@ const MfgZones: React.FC = () => {
       {/* ── Compact Header row ──────────────────────────────────────────── */}
       <div className="bg-white border-b border-gray-200 px-5 py-3 flex-shrink-0">
         {/* Title + buttons */}
-        <div className="flex items-center justify-between mb-2.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2.5">
           <div>
             <h1 className="text-xl font-bold text-gray-900 leading-tight">Zone Master</h1>
             <p className="text-sm text-gray-400">Manage factories, floors, zones and locations</p>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
               onClick={loadAll}
               title="Refresh"
@@ -1135,7 +1135,7 @@ const MfgZones: React.FC = () => {
         </div>
 
         {/* ── Compact stat strip ───────────────────────────────────────── */}
-        <div className="grid grid-cols-5 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
           <StatCard
             label="Factories"
             value={factories.length}
@@ -1204,7 +1204,7 @@ const MfgZones: React.FC = () => {
       <div className="flex-1 overflow-hidden flex">
 
         {/* ── Left tree panel ─────────────────────────────────────────── */}
-        <div className="w-80 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col">
+        <div className={`w-full md:w-80 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col ${selectedZone ? 'hidden md:flex' : 'flex'}`}>
           {/* Search bar */}
           <div className="p-3 border-b border-gray-100 flex items-center gap-2">
             <div className="relative flex-1">
@@ -1448,7 +1448,7 @@ const MfgZones: React.FC = () => {
         </div>
 
         {/* ── Right detail / empty state ───────────────────────────────── */}
-        <div className="flex-1 overflow-hidden bg-gray-50 flex flex-col">
+        <div className={`flex-1 overflow-hidden bg-gray-50 flex flex-col ${!selectedZone ? 'hidden md:flex' : 'flex'}`}>
           {!selectedZone ? (
             <div className="flex-1 flex items-center justify-center p-6 bg-white">
               <div className="text-center">

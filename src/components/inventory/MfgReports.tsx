@@ -63,43 +63,47 @@ const MfgReports: React.FC = () => {
       {tab === 'valuation' && (
         <div className="bg-white rounded-xl border overflow-hidden">
           {isAdmin && totalValue !== null && <div className="px-6 py-3 bg-blue-50 border-b text-sm font-medium text-blue-800">Total Inventory Value: ₹{totalValue.toLocaleString()}</div>}
-          <table className="w-full text-left"><thead><tr className="bg-gray-50 text-xs text-gray-500 uppercase"><th className="px-6 py-3">Zone</th><th className="px-6 py-3">SKU</th><th className="px-6 py-3">Category</th><th className="px-6 py-3">Quantity</th><th className="px-6 py-3">Unit</th>{isAdmin && <><th className="px-6 py-3">Cost/Unit</th><th className="px-6 py-3">Value</th></>}</tr></thead>
-            <tbody className="divide-y divide-gray-100">
-              {loading ? <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400">Loading...</td></tr> :
-               stock.length === 0 ? <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400">No stock data</td></tr> :
-               stock.map((s, i) => (
-                <tr key={i} className="hover:bg-gray-50">
-                  <td className="px-6 py-3 text-[13.5px] font-medium text-blue-600">{s.zone?.zone_code || '-'}</td>
-                  <td className="px-6 py-3 text-[13.5px]">{s.sku?.name || '-'}<div className="text-xs text-gray-400">{s.sku?.sku_code}</div></td>
-                  <td className="px-6 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${s.sku?.category === 'Raw' ? 'bg-amber-100 text-amber-800' : s.sku?.category === 'Finished' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-700'}`}>{s.sku?.category}</span></td>
-                  <td className="px-6 py-3 text-[13.5px] font-semibold">{s.quantity.toLocaleString()}</td>
-                  <td className="px-6 py-3 text-[13.5px] text-gray-500">{s.sku?.unit_type}</td>
-                  {isAdmin && <><td className="px-6 py-3 text-[13.5px]">₹{s.sku?.cost_per_unit || 0}</td><td className="px-6 py-3 text-[13.5px] font-medium">₹{(s.quantity * (s.sku?.cost_per_unit || 0)).toLocaleString()}</td></>}
-                </tr>
-              ))}
-            </tbody></table>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left"><thead><tr className="bg-gray-50 text-xs text-gray-500 uppercase"><th className="px-6 py-3">Zone</th><th className="px-6 py-3">SKU</th><th className="px-6 py-3">Category</th><th className="px-6 py-3">Quantity</th><th className="px-6 py-3">Unit</th>{isAdmin && <><th className="px-6 py-3">Cost/Unit</th><th className="px-6 py-3">Value</th></>}</tr></thead>
+              <tbody className="divide-y divide-gray-100">
+                {loading ? <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400">Loading...</td></tr> :
+                 stock.length === 0 ? <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400">No stock data</td></tr> :
+                 stock.map((s, i) => (
+                  <tr key={i} className="hover:bg-gray-50">
+                    <td className="px-6 py-3 text-[13.5px] font-medium text-blue-600">{s.zone?.zone_code || '-'}</td>
+                    <td className="px-6 py-3 text-[13.5px]">{s.sku?.name || '-'}<div className="text-xs text-gray-400">{s.sku?.sku_code}</div></td>
+                    <td className="px-6 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${s.sku?.category === 'Raw' ? 'bg-amber-100 text-amber-800' : s.sku?.category === 'Finished' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-700'}`}>{s.sku?.category}</span></td>
+                    <td className="px-6 py-3 text-[13.5px] font-semibold">{s.quantity.toLocaleString()}</td>
+                    <td className="px-6 py-3 text-[13.5px] text-gray-500">{s.sku?.unit_type}</td>
+                    {isAdmin && <><td className="px-6 py-3 text-[13.5px]">₹{s.sku?.cost_per_unit || 0}</td><td className="px-6 py-3 text-[13.5px] font-medium">₹{(s.quantity * (s.sku?.cost_per_unit || 0)).toLocaleString()}</td></>}
+                  </tr>
+                ))}
+              </tbody></table>
+          </div>
         </div>
       )}
 
       {tab === 'ledger' && (
         <div className="bg-white rounded-xl border overflow-hidden">
-          <table className="w-full text-left"><thead><tr className="bg-gray-50 text-xs text-gray-500 uppercase"><th className="px-6 py-3">Date</th><th className="px-6 py-3">Type</th><th className="px-6 py-3">SKU</th><th className="px-6 py-3">Qty</th><th className="px-6 py-3">From</th><th className="px-6 py-3">To</th><th className="px-6 py-3">By</th><th className="px-6 py-3">Remarks</th></tr></thead>
-            <tbody className="divide-y divide-gray-100">
-              {loading ? <tr><td colSpan={8} className="px-6 py-12 text-center text-gray-400">Loading...</td></tr> :
-               movements.length === 0 ? <tr><td colSpan={8} className="px-6 py-12 text-center text-gray-400">No movements</td></tr> :
-               movements.map(m => (
-                <tr key={m._id} className="hover:bg-gray-50">
-                  <td className="px-6 py-3 text-xs text-gray-500">{new Date(m.createdAt).toLocaleString()}</td>
-                  <td className="px-6 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${m.type === 'IN' ? 'bg-green-100 text-green-800' : m.type === 'OUT' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}`}>{m.type}</span></td>
-                  <td className="px-6 py-3 text-[13.5px]">{m.sku?.name || '-'}</td>
-                  <td className="px-6 py-3 text-[13.5px] font-semibold">{m.quantity} {m.unit}</td>
-                  <td className="px-6 py-3 text-[13.5px] text-gray-500">{m.from_zone?.zone_code || '-'}</td>
-                  <td className="px-6 py-3 text-[13.5px] text-gray-500">{m.to_zone?.zone_code || '-'}</td>
-                  <td className="px-6 py-3 text-[13.5px] text-gray-500">{m.createdBy?.fullName || '-'}</td>
-                  <td className="px-6 py-3 text-[13.5px] text-gray-400 max-w-[200px] truncate">{m.remarks || '-'}</td>
-                </tr>
-              ))}
-            </tbody></table>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left"><thead><tr className="bg-gray-50 text-xs text-gray-500 uppercase"><th className="px-6 py-3">Date</th><th className="px-6 py-3">Type</th><th className="px-6 py-3">SKU</th><th className="px-6 py-3">Qty</th><th className="px-6 py-3">From</th><th className="px-6 py-3">To</th><th className="px-6 py-3">By</th><th className="px-6 py-3">Remarks</th></tr></thead>
+              <tbody className="divide-y divide-gray-100">
+                {loading ? <tr><td colSpan={8} className="px-6 py-12 text-center text-gray-400">Loading...</td></tr> :
+                 movements.length === 0 ? <tr><td colSpan={8} className="px-6 py-12 text-center text-gray-400">No movements</td></tr> :
+                 movements.map(m => (
+                  <tr key={m._id} className="hover:bg-gray-50">
+                    <td className="px-6 py-3 text-xs text-gray-500">{new Date(m.createdAt).toLocaleString()}</td>
+                    <td className="px-6 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${m.type === 'IN' ? 'bg-green-100 text-green-800' : m.type === 'OUT' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}`}>{m.type}</span></td>
+                    <td className="px-6 py-3 text-[13.5px]">{m.sku?.name || '-'}</td>
+                    <td className="px-6 py-3 text-[13.5px] font-semibold">{m.quantity} {m.unit}</td>
+                    <td className="px-6 py-3 text-[13.5px] text-gray-500">{m.from_zone?.zone_code || '-'}</td>
+                    <td className="px-6 py-3 text-[13.5px] text-gray-500">{m.to_zone?.zone_code || '-'}</td>
+                    <td className="px-6 py-3 text-[13.5px] text-gray-500">{m.createdBy?.fullName || '-'}</td>
+                    <td className="px-6 py-3 text-[13.5px] text-gray-400 max-w-[200px] truncate">{m.remarks || '-'}</td>
+                  </tr>
+                ))}
+              </tbody></table>
+          </div>
         </div>
       )}
     </div>

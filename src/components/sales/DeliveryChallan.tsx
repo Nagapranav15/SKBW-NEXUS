@@ -105,33 +105,35 @@ const DeliveryChallan: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50"><tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">DC Details</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transport</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-          </tr></thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {filtered.map((dc) => (
-              <tr key={dc._id} className="hover:bg-gray-50">
-                <td className="px-6 py-4"><div className="text-[13.5px] font-medium text-gray-900">{dc.dcNumber}</div><div className="text-[13.5px] text-gray-500">Order: {dc.orderNumber}</div><div className="text-[13.5px] text-gray-500">{new Date(dc.date).toLocaleDateString()}</div></td>
-                <td className="px-6 py-4 text-[13.5px] text-gray-900">{dc.customerName}</td>
-                <td className="px-6 py-4"><div className="text-[13.5px] text-gray-900">{dc.transporterName || 'N/A'}</div><div className="text-[13.5px] text-gray-500">{dc.vehicleNumber || 'N/A'}</div></td>
-                <td className="px-6 py-4 text-[13.5px] font-medium text-gray-900">₹{dc.total?.toFixed(2)}</td>
-                <td className="px-6 py-4"><span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(dc.status)}`}>{dc.status}</span></td>
-                <td className="px-6 py-4">
-                  {canManage && <div className="flex space-x-2">
-                    <button onClick={() => { setEditingChallan(dc); setFormData({ orderId: dc.orderId, orderNumber: dc.orderNumber, customerName: dc.customerName, date: dc.date, transporterName: dc.transporterName, vehicleNumber: dc.vehicleNumber, items: dc.items, notes: dc.notes }); setShowForm(true); }} className="text-blue-600 hover:text-blue-900"><Edit className="w-4 h-4" /></button>
-                    <button onClick={() => handleDelete(dc._id)} className="text-red-600 hover:text-red-900"><Trash2 className="w-4 h-4" /></button>
-                  </div>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50"><tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">DC Details</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transport</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+            </tr></thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filtered.map((dc) => (
+                <tr key={dc._id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4"><div className="text-[13.5px] font-medium text-gray-900">{dc.dcNumber}</div><div className="text-[13.5px] text-gray-500">Order: {dc.orderNumber}</div><div className="text-[13.5px] text-gray-500">{new Date(dc.date).toLocaleDateString()}</div></td>
+                  <td className="px-6 py-4 text-[13.5px] text-gray-900">{dc.customerName}</td>
+                  <td className="px-6 py-4"><div className="text-[13.5px] text-gray-900">{dc.transporterName || 'N/A'}</div><div className="text-[13.5px] text-gray-500">{dc.vehicleNumber || 'N/A'}</div></td>
+                  <td className="px-6 py-4 text-[13.5px] font-medium text-gray-900">₹{dc.total?.toFixed(2)}</td>
+                  <td className="px-6 py-4"><span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(dc.status)}`}>{dc.status}</span></td>
+                  <td className="px-6 py-4">
+                    {canManage && <div className="flex space-x-2">
+                      <button onClick={() => { setEditingChallan(dc); setFormData({ orderId: dc.orderId, orderNumber: dc.orderNumber, customerName: dc.customerName, date: dc.date, transporterName: dc.transporterName, vehicleNumber: dc.vehicleNumber, items: dc.items, notes: dc.notes }); setShowForm(true); }} className="text-blue-600 hover:text-blue-900"><Edit className="w-4 h-4" /></button>
+                      <button onClick={() => handleDelete(dc._id)} className="text-red-600 hover:text-red-900"><Trash2 className="w-4 h-4" /></button>
+                    </div>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         {filtered.length === 0 && <div className="text-center py-8 text-gray-500">No delivery challans found</div>}
       </div>
 

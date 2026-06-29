@@ -336,7 +336,7 @@ const ZoneDetail: React.FC<Props> = ({
           </div>
 
           {/* Redesigned 4-tile metrics row */}
-          <div className="grid grid-cols-4 gap-4 mt-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
             {[
               {
                 label: 'Locations',
