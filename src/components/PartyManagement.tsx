@@ -2830,7 +2830,7 @@ const PartyManagement: React.FC = () => {
                 </button>
 
                 {showToolsDropdown && (
-                  <div className="absolute right-0 mt-1 w-52 bg-white border border-gray-200 rounded-xl shadow-lg z-50 divide-y divide-gray-100 animate-in fade-in duration-100 slide-in-from-top-1">
+                  <div className="absolute left-0 sm:right-0 sm:left-auto mt-1 w-52 bg-white border border-gray-200 rounded-xl shadow-lg z-50 divide-y divide-gray-100 animate-in fade-in duration-100 slide-in-from-top-1">
                     <div className="py-1">
                       <button
                         onClick={() => { setShowActivityLog(true); setShowToolsDropdown(false); }}
@@ -2991,7 +2991,7 @@ const PartyManagement: React.FC = () => {
                 {showSortSelector && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setShowSortSelector(false)} />
-                    <div className="absolute right-0 mt-2 w-[340px] rounded-2xl shadow-xl bg-white border border-gray-150 p-4 z-20 space-y-3 animate-in fade-in slide-in-from-top-2 duration-100">
+                    <div className="absolute left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:translate-x-0 mt-2 w-[calc(100vw-32px)] sm:w-[340px] rounded-2xl shadow-xl bg-white border border-gray-150 p-4 z-20 space-y-3 animate-in fade-in slide-in-from-top-2 duration-100">
                       <div className="flex justify-between items-center pb-2 border-b border-gray-100">
                         <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Sort Rules</span>
                         <button

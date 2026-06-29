@@ -1073,7 +1073,7 @@ const MfgZones: React.FC = () => {
               </button>
 
               {showToolsDropdown && (
-                <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50 divide-y divide-gray-100 animate-in fade-in duration-100 slide-in-from-top-1">
+                <div className="absolute left-0 sm:right-0 sm:left-auto mt-1 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50 divide-y divide-gray-100 animate-in fade-in duration-100 slide-in-from-top-1">
                   <div className="py-1">
                     <button
                       onClick={() => { setShowHelpModal(true); setShowToolsDropdown(false); }}
