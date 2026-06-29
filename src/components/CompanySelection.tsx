@@ -134,14 +134,14 @@ const CompanySelection: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <div className="text-center flex-1">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Select Company</h1>
-            <p className="text-gray-600">Choose a company to continue or create a new one</p>
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
+          <div className="text-center sm:text-left flex-1">
+            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">Select Company</h1>
+            <p className="text-gray-600 text-sm sm:text-base">Choose a company to continue or create a new one</p>
           </div>
           <button
             onClick={handleLogout}
-            className="flex items-center space-x-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            className="flex items-center space-x-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors w-full sm:w-auto justify-center"
           >
             <LogOut className="w-5 h-5" />
             <span>Logout</span>

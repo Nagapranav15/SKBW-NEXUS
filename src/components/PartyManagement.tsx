@@ -5883,7 +5883,7 @@ const PartyManagement: React.FC = () => {
               const stats = getStats();
               if (!stats.length) return null;
               return (
-                <div className="grid grid-cols-3 gap-3 shrink-0">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 shrink-0">
                   {stats.map((s: any, i: number) => {
                     const c = colorMap[s.color] || colorMap.blue;
                     return (
