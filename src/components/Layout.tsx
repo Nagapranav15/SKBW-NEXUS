@@ -20,7 +20,9 @@ import {
   Briefcase,
   Compass,
   MapPin,
-  Truck
+  Truck,
+  ArrowRightLeft,
+  FileText
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DataManager from './DataManager';
@@ -217,13 +219,13 @@ const Layout: React.FC = () => {
   const isPartyActive = () => location.pathname.startsWith('/party');
 
   const inventoryItems = [
-    { label: 'Dashboard', path: '/inventory/dashboard', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
-    { label: 'SKU Master', path: '/inventory/skus', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
-    { label: 'BOM & Assembly', path: '/inventory/bom', permission: ['MANAGE_INVENTORY', 'MANAGE_ITEMS'] },
-    { label: 'Zones', path: '/inventory/zones', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
-    { label: 'Movements', path: '/inventory/movements', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
-    { label: 'Analytics', path: '/inventory/analytics', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
-    { label: 'Reports', path: '/inventory/reports', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
+    { icon: LayoutGrid, label: 'Dashboard', path: '/inventory/dashboard', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
+    { icon: Package, label: 'SKU Master', path: '/inventory/skus', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
+    { icon: Layers, label: 'BOM & Assembly', path: '/inventory/bom', permission: ['MANAGE_INVENTORY', 'MANAGE_ITEMS'] },
+    { icon: Warehouse, label: 'Zones', path: '/inventory/zones', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
+    { icon: ArrowRightLeft, label: 'Movements', path: '/inventory/movements', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
+    { icon: BarChart3, label: 'Analytics', path: '/inventory/analytics', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
+    { icon: FileText, label: 'Reports', path: '/inventory/reports', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
   ];
   const visibleInventoryItems = inventoryItems.filter(item => hasPermission(item.permission));
   const hasInventoryAccess = visibleInventoryItems.length > 0;
@@ -277,8 +279,8 @@ const Layout: React.FC = () => {
       {/* Sidebar */}
       <div className={`
         fixed inset-y-0 left-0 z-50 md:relative md:z-0
-        ${sidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-0 md:translate-x-0 md:w-16'}
-        bg-white shadow-lg transition-all duration-300 flex flex-col h-full
+        ${sidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64 md:translate-x-0 md:w-16'}
+        bg-white shadow-lg transition-all duration-300 flex flex-col h-full overflow-hidden
       `}>
         {/* Header */}
         <div className="p-4 border-b border-gray-200">
@@ -439,7 +441,10 @@ const Layout: React.FC = () => {
                                 onClick={() => handleNavigate(item.path)}
                                 className={`${getSubItemClass(item.path)} flex items-center justify-between gap-2 pr-2`}
                               >
-                                <span>{item.label}</span>
+                                <div className="flex items-center gap-2">
+                                  {item.icon && <item.icon className="w-3.5 h-3.5 shrink-0 text-gray-500" />}
+                                  <span>{item.label}</span>
+                                </div>
                                 {shortcut && sidebarOpen && (
                                   <kbd className="hidden sm:inline-block font-mono text-[9px] text-gray-400 bg-gray-100/80 border border-gray-200 px-1 rounded select-none pointer-events-none opacity-80">
                                     {shortcut}
