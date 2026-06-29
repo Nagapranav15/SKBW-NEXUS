@@ -1066,7 +1066,7 @@ const MfgZones: React.FC = () => {
     <div className="h-full flex flex-col bg-gray-50">
 
       {/* ── Compact Header row ──────────────────────────────────────────── */}
-      <div className="bg-white border-b border-gray-200 px-5 py-3 flex-shrink-0">
+      <div className={`bg-white border-b border-gray-200 px-5 py-3 flex-shrink-0 ${selectedZone ? 'hidden md:block' : 'block'}`}>
         {/* Title + buttons */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2.5">
           <div>
