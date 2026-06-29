@@ -2787,7 +2787,7 @@ const PartyManagement: React.FC = () => {
               onClick={() => navigate(-1)}
             >
               <ChevronLeft className="w-4 h-4" />
-              <span className="text-sm font-semibold">{typeLabelPlural}</span>
+              <span className="text-sm font-semibold">Back</span>
             </div>
             
             <div className="flex items-center space-x-2 text-gray-700 bg-gray-50 border border-gray-150 px-3.5 py-1.5 rounded-full text-sm font-medium shadow-xs">
