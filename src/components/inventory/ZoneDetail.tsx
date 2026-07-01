@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import {
   ArrowLeft, Plus, X, Package, ArrowRightLeft,
   ArrowDownLeft, ArrowUpRight, Edit, Trash2, MapPin,
-  MoreVertical, RefreshCw, TrendingUp, ChevronRight
+  MoreVertical, RefreshCw, TrendingUp, ChevronRight,
+  Minus, Eye
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import * as mfgApi from '../../api/mfgApi';
@@ -109,6 +110,16 @@ const ZoneDetail: React.FC<Props> = ({
   const [selectedLocRow, setSelectedLocRow] = useState<any>(null);
   const [editLocName, setEditLocName] = useState('');
   const [transferLocForm, setTransferLocForm] = useState({ targetZoneId: '', targetLocation: '' });
+
+  // Sku level actions inside location details card
+  const [showRemoveStockModal, setShowRemoveStockModal] = useState(false);
+  const [selectedSkuForRemove, setSelectedSkuForRemove] = useState<any>(null);
+  const [removeStockQty, setRemoveStockQty] = useState('');
+  const [removeStockRemarks, setRemoveStockRemarks] = useState('');
+  
+  const [showTransferItemModal, setShowTransferItemModal] = useState(false);
+  const [selectedSkuForTransfer, setSelectedSkuForTransfer] = useState<any>(null);
+  const [transferItemForm, setTransferItemForm] = useState({ targetZoneId: '', targetLocation: '', quantity: '' });
 
   useEffect(() => {
     setZone(initialZone);
@@ -331,6 +342,108 @@ const ZoneDetail: React.FC<Props> = ({
     }
   };
 
+  const handleRemoveSkuStock = async () => {
+    if (!selectedLocRow || !selectedSkuForRemove || !removeStockQty) return;
+    const qtyNum = Number(removeStockQty);
+    if (qtyNum <= 0) {
+      showToast('Quantity must be greater than zero', 'error');
+      return;
+    }
+    const maxQty = selectedSkuForRemove.quantity ?? 0;
+    if (qtyNum > maxQty) {
+      showToast(`Cannot remove more than available stock (${maxQty})`, 'error');
+      return;
+    }
+
+    try {
+      if (zone._id.startsWith('mock-')) {
+        const updatedStock = stock.map((s: any) => {
+          if (s.location_name === selectedLocRow.name && s.sku?._id === selectedSkuForRemove.sku?._id) {
+            return { ...s, quantity: Math.max(0, (s.quantity ?? 0) - qtyNum) };
+          }
+          return s;
+        });
+        setStock(updatedStock);
+        setShowRemoveStockModal(false);
+        showToast('Stock removed successfully (mock)', 'success');
+        return;
+      }
+
+      await mfgApi.recordMovement({
+        type: 'OUT',
+        from_zone: zone._id,
+        sku: selectedSkuForRemove.sku?._id,
+        quantity: qtyNum,
+        unit: selectedSkuForRemove.sku?.unit_type || 'kg',
+        remarks: removeStockRemarks.trim() || 'Removed stock from location',
+        location_name: selectedLocRow.name,
+        company: selectedCompany?._id
+      });
+
+      await logActivity('UPDATE', zone.name, `Removed ${qtyNum} ${selectedSkuForRemove.sku?.unit_type || 'kg'} of SKU: ${selectedSkuForRemove.sku?.name} from Location: "${selectedLocRow.name}" in Zone: ${zone.name}`);
+      
+      setShowRemoveStockModal(false);
+      setRemoveStockQty('');
+      setRemoveStockRemarks('');
+      load();
+      showToast('Stock removed successfully', 'success');
+    } catch (e: any) {
+      showToast(e.response?.data?.msg || 'Failed to remove stock', 'error');
+    }
+  };
+
+  const handleTransferSkuStock = async () => {
+    if (!selectedLocRow || !selectedSkuForTransfer || !transferItemForm.targetZoneId || !transferItemForm.targetLocation.trim() || !transferItemForm.quantity) return;
+    const qtyNum = Number(transferItemForm.quantity);
+    if (qtyNum <= 0) {
+      showToast('Quantity must be greater than zero', 'error');
+      return;
+    }
+    const maxQty = selectedSkuForTransfer.quantity ?? 0;
+    if (qtyNum > maxQty) {
+      showToast(`Cannot transfer more than available stock (${maxQty})`, 'error');
+      return;
+    }
+
+    try {
+      if (zone._id.startsWith('mock-')) {
+        const updatedStock = stock.map((s: any) => {
+          if (s.location_name === selectedLocRow.name && s.sku?._id === selectedSkuForTransfer.sku?._id) {
+            return { ...s, quantity: Math.max(0, (s.quantity ?? 0) - qtyNum) };
+          }
+          return s;
+        });
+        setStock(updatedStock);
+        setShowTransferItemModal(false);
+        showToast('Stock item transferred successfully (mock)', 'success');
+        return;
+      }
+
+      await mfgApi.recordMovement({
+        type: 'TRANSFER',
+        from_zone: zone._id,
+        to_zone: transferItemForm.targetZoneId,
+        sku: selectedSkuForTransfer.sku?._id,
+        quantity: qtyNum,
+        unit: selectedSkuForTransfer.sku?.unit_type || 'kg',
+        from_location_name: selectedLocRow.name,
+        location_name: transferItemForm.targetLocation.trim(),
+        company: selectedCompany?._id,
+        remarks: `Transferred item from ${selectedLocRow.name} to ${transferItemForm.targetLocation.trim()}`
+      });
+
+      const destZone = zones.find(z => z._id === transferItemForm.targetZoneId);
+      await logActivity('UPDATE', zone.name, `Transferred ${qtyNum} ${selectedSkuForTransfer.sku?.unit_type || 'kg'} of SKU: ${selectedSkuForTransfer.sku?.name} from Location: "${selectedLocRow.name}" in Zone: ${zone.name} to Location: "${transferItemForm.targetLocation.trim()}" in Zone: ${destZone?.name || 'Unknown'}`);
+
+      setShowTransferItemModal(false);
+      setTransferItemForm({ targetZoneId: '', targetLocation: '', quantity: '' });
+      load();
+      showToast('Stock item transferred successfully', 'success');
+    } catch (e: any) {
+      showToast(e.response?.data?.msg || 'Failed to transfer item', 'error');
+    }
+  };
+
   const openEditZone = () => {
     setEditForm({
       zone_code: zone.zone_code,
@@ -478,7 +591,7 @@ const ZoneDetail: React.FC<Props> = ({
       </div>
 
       {/* ── Body ──────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+      <div className={`flex-1 overflow-y-auto p-4 bg-gray-50 transition-all duration-300 ${selectedLocRow && !showEditLocation && !showTransferLocation && !showRemoveStockModal && !showTransferItemModal ? 'lg:mr-[520px]' : ''}`}>
         <div className="max-w-5xl mx-auto w-full space-y-4">
           {loading ? (
             <div className="flex items-center justify-center py-20">
@@ -537,7 +650,12 @@ const ZoneDetail: React.FC<Props> = ({
                       <tbody className="divide-y divide-gray-100/70">
                         {locationRows.map(loc => (
                           <tr key={loc._id} className="hover:bg-gray-50/40 transition-colors">
-                            <td className="px-5 py-3 text-sm text-gray-800 font-semibold">{loc.name}</td>
+                            <td
+                              className="px-5 py-3 text-sm text-blue-600 hover:text-blue-800 font-bold hover:underline cursor-pointer"
+                              onClick={() => setSelectedLocRow(loc)}
+                            >
+                              {loc.name}
+                            </td>
                             <td className="px-5 py-3 text-center">
                               <span className="text-[10px] px-2 py-0.5 rounded font-extrabold tracking-wider bg-green-50 text-green-700 uppercase">
                                 ACTIVE
@@ -554,7 +672,16 @@ const ZoneDetail: React.FC<Props> = ({
                                 <MoreVertical className="w-4 h-4" />
                               </button>
                               {openMenuId === String(loc._id) && (
-                                <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-xl shadow-xl border border-gray-200 z-30 py-1 divide-y divide-gray-100">
+                                <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-xl shadow-xl border border-gray-200 z-30 py-1 divide-y divide-gray-100 animate-in fade-in slide-in-from-top-1 duration-100">
+                                  <div className="py-0.5">
+                                    <button
+                                      onClick={() => {
+                                        setSelectedLocRow(loc);
+                                        setOpenMenuId(null);
+                                      }}
+                                      className="w-full text-left px-3.5 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 font-semibold"
+                                    ><Eye className="w-3.5 h-3.5 text-gray-500" /> View Items</button>
+                                  </div>
                                   <div className="py-0.5">
                                     <button
                                       onClick={() => {
@@ -908,6 +1035,282 @@ const ZoneDetail: React.FC<Props> = ({
               <button
                 onClick={handleTransferLocation}
                 disabled={!transferLocForm.targetZoneId || !transferLocForm.targetLocation.trim()}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[15px] font-semibold disabled:opacity-50 transition-colors"
+              >
+                Transfer Stock
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Location Details Right-Side Drawer ─────────────────────────────── */}
+      {selectedLocRow && !showEditLocation && !showTransferLocation && !showRemoveStockModal && !showTransferItemModal && (
+        <div className="fixed top-0 right-0 h-full w-full sm:w-[520px] bg-white shadow-2xl border-l border-gray-200 z-40 flex flex-col transition-all duration-300 animate-in slide-in-from-right">
+          {/* Header */}
+          <div className="flex items-center justify-between p-5 border-b border-gray-200 bg-gray-50 flex-shrink-0">
+            <div>
+              <div className="flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-blue-600" />
+                <h2 className="text-xl font-bold text-gray-900 truncate">
+                  {selectedLocRow.name}
+                </h2>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Zone: <span className="font-semibold text-gray-700">{zone.name}</span>
+              </p>
+            </div>
+            <button
+              onClick={() => setSelectedLocRow(null)}
+              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-250 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="flex-1 overflow-y-auto p-5 space-y-4">
+            {/* Stats Cards */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-gray-50 border border-gray-150 p-3.5 rounded-xl">
+                <p className="text-xs text-gray-500 font-semibold uppercase">Unique SKUs</p>
+                <p className="text-xl font-bold text-blue-750 mt-1">{selectedLocRow.itemCount}</p>
+              </div>
+              <div className="bg-gray-50 border border-gray-150 p-3.5 rounded-xl">
+                <p className="text-xs text-gray-500 font-semibold uppercase">Total Quantity</p>
+                <p className="text-xl font-bold text-emerald-700 mt-1">{fmt(selectedLocRow.quantity)}</p>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="flex flex-wrap gap-2 pt-2 pb-1">
+              {canManage && (
+                <>
+                  <button
+                    onClick={() => {
+                      setForm({ type: 'IN', sku: '', location_name: selectedLocRow.name, quantity: '', unit: 'kg', cost_per_unit: '', remarks: '' });
+                      setIsAddingLocation(false);
+                      setShowAddStock(true);
+                    }}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors shadow-sm"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Stock
+                  </button>
+                  <button
+                    onClick={() => {
+                      setTransferLocForm({ targetZoneId: '', targetLocation: selectedLocRow.name });
+                      setShowTransferLocation(true);
+                    }}
+                    className="flex items-center gap-1 px-3 py-1.5 border border-gray-200 text-gray-700 hover:bg-gray-50 bg-white rounded-lg text-xs font-bold transition-colors shadow-sm"
+                  >
+                    <ArrowRightLeft className="w-3.5 h-3.5 text-gray-500" /> Transfer Location
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditLocName(selectedLocRow.name);
+                      setShowEditLocation(true);
+                    }}
+                    className="flex items-center gap-1 px-3 py-1.5 border border-gray-200 text-gray-700 hover:bg-gray-50 bg-white rounded-lg text-xs font-bold transition-colors shadow-sm"
+                  >
+                    <Edit className="w-3.5 h-3.5 text-gray-500" /> Rename
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleDeleteLocation(selectedLocRow.name);
+                      setSelectedLocRow(null);
+                    }}
+                    className="flex items-center gap-1 px-3 py-1.5 border border-red-200 text-red-650 hover:bg-red-50 bg-white rounded-lg text-xs font-bold transition-colors shadow-sm"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-red-550" /> Delete Location
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Items List */}
+            <div className="space-y-2.5">
+              <h3 className="text-sm font-bold text-gray-900 border-b border-gray-100 pb-1.5 flex items-center gap-1.5">
+                <Package className="w-4 h-4 text-blue-600" /> Items at this Location
+              </h3>
+              
+              {stock.filter((s: any) => (s.location_name || 'Storage Area') === selectedLocRow.name && (s.quantity ?? 0) > 0).length === 0 ? (
+                <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                  <Package className="w-8 h-8 text-gray-300 mx-auto mb-1" />
+                  <p className="text-xs text-gray-400">No stock left at this location</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {stock
+                    .filter((s: any) => (s.location_name || 'Storage Area') === selectedLocRow.name && (s.quantity ?? 0) > 0)
+                    .map((item: any, idx: number) => {
+                      const value = (item.quantity ?? 0) * (item.sku?.cost_per_unit ?? 0);
+                      return (
+                        <div key={idx} className="bg-white border border-gray-150 p-3 rounded-xl hover:shadow-sm transition-shadow flex items-center justify-between">
+                          <div className="min-w-0 pr-3">
+                            <p className="text-xs text-gray-400 font-mono font-semibold">{item.sku?.sku_code ?? '—'}</p>
+                            <p className="text-sm font-bold text-gray-800 truncate mt-0.5" title={item.sku?.name}>{item.sku?.name ?? '—'}</p>
+                            {isAdmin && (
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                Value: <span className="font-semibold text-amber-600">{fmtCurrency(value)}</span>
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-4 flex-shrink-0">
+                            <div className="text-right">
+                              <p className="text-sm font-black text-gray-900">{fmt(item.quantity)}</p>
+                              <p className="text-xs text-gray-400 font-medium uppercase mt-0.5">{item.sku?.unit_type || 'kg'}</p>
+                            </div>
+                            
+                            {canManage && (
+                              <div className="flex gap-1.5 border-l border-gray-150 pl-3">
+                                <button
+                                  onClick={() => {
+                                    setSelectedSkuForTransfer(item);
+                                    setTransferItemForm({ targetZoneId: '', targetLocation: selectedLocRow.name, quantity: '' });
+                                    setShowTransferItemModal(true);
+                                  }}
+                                  title="Transfer item to another location/zone"
+                                  className="p-1 text-gray-450 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                >
+                                  <ArrowRightLeft className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setSelectedSkuForRemove(item);
+                                    setRemoveStockQty('');
+                                    setRemoveStockRemarks('');
+                                    setShowRemoveStockModal(true);
+                                  }}
+                                  title="Remove / Consume Stock"
+                                  className="p-1 text-gray-450 hover:text-red-650 hover:bg-red-50 rounded transition-colors"
+                                >
+                                  <Minus className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Remove Stock Modal ────────────────────────────────────────────────── */}
+      {showRemoveStockModal && selectedSkuForRemove && selectedLocRow && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Remove Stock</h3>
+              <button onClick={() => setShowRemoveStockModal(false)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+            <div className="bg-red-50/65 border border-red-100 p-3.5 rounded-xl mb-4 text-sm text-red-950 font-semibold">
+              <p>SKU: {selectedSkuForRemove.sku?.name} ({selectedSkuForRemove.sku?.sku_code})</p>
+              <p className="mt-1 font-black text-xs text-red-650">Available at {selectedLocRow.name}: {fmt(selectedSkuForRemove.quantity)} {selectedSkuForRemove.sku?.unit_type || 'kg'}</p>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">Quantity to Remove *</label>
+                <input
+                  type="number"
+                  value={removeStockQty}
+                  onChange={e => setRemoveStockQty(e.target.value)}
+                  placeholder={`Max ${selectedSkuForRemove.quantity}`}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-red-500"
+                  min="0.01"
+                  max={selectedSkuForRemove.quantity}
+                  step="0.01"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">Remarks / Reason</label>
+                <input
+                  value={removeStockRemarks}
+                  onChange={e => setRemoveStockRemarks(e.target.value)}
+                  placeholder="e.g. Issued to production, defect disposal"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2.5 mt-5 pt-4 border-t border-gray-100">
+              <button onClick={() => setShowRemoveStockModal(false)} className="px-4 py-2 border border-gray-200 rounded-lg text-[15px] font-medium text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
+              <button onClick={handleRemoveSkuStock} disabled={!removeStockQty || Number(removeStockQty) <= 0} className="px-4 py-2 bg-red-650 hover:bg-red-700 text-white rounded-lg text-[15px] font-semibold disabled:opacity-50 transition-colors">Remove Stock</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Transfer Item Modal ───────────────────────────────────────────────── */}
+      {showTransferItemModal && selectedSkuForTransfer && selectedLocRow && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Transfer Item Stock</h3>
+              <button onClick={() => setShowTransferItemModal(false)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+            <div className="bg-blue-50/65 border border-blue-100 p-3.5 rounded-xl mb-4 text-sm text-blue-950 font-semibold">
+              <p>SKU: {selectedSkuForTransfer.sku?.name}</p>
+              <p className="mt-1 font-black text-xs text-blue-650">Available at {selectedLocRow.name}: {fmt(selectedSkuForTransfer.quantity)} {selectedSkuForTransfer.sku?.unit_type || 'kg'}</p>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">Destination Zone *</label>
+                <select
+                  value={transferItemForm.targetZoneId}
+                  onChange={e => setTransferItemForm({ ...transferItemForm, targetZoneId: e.target.value })}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  <option value="">Select destination zone...</option>
+                  {zones.map((z: any) => {
+                    const fact = factories.find(f => f._id === (z.factory_id?._id || z.factory_id));
+                    const fl = floors.find(f => f._id === (z.floor_id?._id || z.floor_id));
+                    return (
+                      <option key={z._id} value={z._id}>
+                        {fact?.name || 'Factory'} — {fl?.name || 'Floor'} — {z.name}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">Destination Location *</label>
+                <input
+                  value={transferItemForm.targetLocation}
+                  onChange={e => setTransferItemForm({ ...transferItemForm, targetLocation: e.target.value })}
+                  placeholder="e.g. Left Shelf"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">Quantity to Transfer *</label>
+                <input
+                  type="number"
+                  value={transferItemForm.quantity}
+                  onChange={e => setTransferItemForm({ ...transferItemForm, quantity: e.target.value })}
+                  placeholder={`Max ${selectedSkuForTransfer.quantity}`}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  min="0.01"
+                  max={selectedSkuForTransfer.quantity}
+                  step="0.01"
+                  required
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2.5 mt-5 pt-4 border-t border-gray-100">
+              <button onClick={() => setShowTransferItemModal(false)} className="px-4 py-2 border border-gray-200 rounded-lg text-[15px] font-medium text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
+              <button
+                onClick={handleTransferSkuStock}
+                disabled={!transferItemForm.targetZoneId || !transferItemForm.targetLocation.trim() || !transferItemForm.quantity || Number(transferItemForm.quantity) <= 0}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[15px] font-semibold disabled:opacity-50 transition-colors"
               >
                 Transfer Stock
