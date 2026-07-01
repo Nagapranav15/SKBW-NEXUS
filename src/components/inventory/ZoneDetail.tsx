@@ -127,6 +127,9 @@ const ZoneDetail: React.FC<Props> = ({
   const [selectedSkuForEdit, setSelectedSkuForEdit] = useState<any>(null);
   const [editStockQty, setEditStockQty] = useState('');
   const [editStockRemarks, setEditStockRemarks] = useState('');
+  const [selectedLocOption, setSelectedLocOption] = useState('');
+  const [selectedTransferLocOption, setSelectedTransferLocOption] = useState('');
+  const [selectedTransferItemLocOption, setSelectedTransferItemLocOption] = useState('');
 
   useEffect(() => {
     setZone(initialZone);
@@ -1060,14 +1063,37 @@ const ZoneDetail: React.FC<Props> = ({
                 <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">
                   Location Name {isAddingLocation ? '*' : ''}
                 </label>
-                <input
-                  value={form.location_name || ''}
-                  onChange={e => setForm({ ...form, location_name: e.target.value })}
-                  placeholder="e.g. Left Shelf"
-                  list="existing-locations"
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  required={isAddingLocation}
-                />
+                <select
+                  value={selectedLocOption}
+                  onChange={e => {
+                    setSelectedLocOption(e.target.value);
+                    if (e.target.value !== '__new__') {
+                      setForm({ ...form, location_name: e.target.value });
+                    } else {
+                      setForm({ ...form, location_name: '' });
+                    }
+                  }}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                >
+                  <option value="">Select location...</option>
+                  {existingLocations.map((loc, idx) => (
+                    <option key={idx} value={loc}>{loc}</option>
+                  ))}
+                  <option value="__new__">+ Create New Location...</option>
+                </select>
+
+                {selectedLocOption === '__new__' && (
+                  <div className="mt-2.5 animate-in slide-in-from-top-1 duration-150">
+                    <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">New Location Name *</label>
+                    <input
+                      value={form.location_name || ''}
+                      onChange={e => setForm({ ...form, location_name: e.target.value })}
+                      placeholder="e.g. Left Shelf"
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      required
+                    />
+                  </div>
+                )}
               </div>
               {!isAddingLocation && (
                 <div>
@@ -1208,14 +1234,38 @@ const ZoneDetail: React.FC<Props> = ({
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">Destination Location Name *</label>
-                <input
-                  value={transferLocForm.targetLocation}
-                  onChange={e => setTransferLocForm({ ...transferLocForm, targetLocation: e.target.value })}
-                  placeholder="e.g. Left Shelf"
-                  list="existing-locations"
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                <select
+                  value={selectedTransferLocOption}
+                  onChange={e => {
+                    setSelectedTransferLocOption(e.target.value);
+                    if (e.target.value !== '__new__') {
+                      setTransferLocForm({ ...transferLocForm, targetLocation: e.target.value });
+                    } else {
+                      setTransferLocForm({ ...transferLocForm, targetLocation: '' });
+                    }
+                  }}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                   required
-                />
+                >
+                  <option value="">Select location...</option>
+                  {existingLocations.map((loc, idx) => (
+                    <option key={idx} value={loc}>{loc}</option>
+                  ))}
+                  <option value="__new__">+ Create New Location...</option>
+                </select>
+
+                {selectedTransferLocOption === '__new__' && (
+                  <div className="mt-2.5 animate-in slide-in-from-top-1 duration-150">
+                    <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">New Location Name *</label>
+                    <input
+                      value={transferLocForm.targetLocation}
+                      onChange={e => setTransferLocForm({ ...transferLocForm, targetLocation: e.target.value })}
+                      placeholder="e.g. Left Shelf"
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex justify-end gap-2.5 mt-5 pt-4 border-t border-gray-100">
@@ -1576,14 +1626,38 @@ const ZoneDetail: React.FC<Props> = ({
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">Destination Location *</label>
-                      <input
-                        value={transferItemForm.targetLocation}
-                        onChange={e => setTransferItemForm({ ...transferItemForm, targetLocation: e.target.value })}
-                        placeholder="e.g. Left Shelf"
-                        list="existing-locations"
-                        className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      <select
+                        value={selectedTransferItemLocOption}
+                        onChange={e => {
+                          setSelectedTransferItemLocOption(e.target.value);
+                          if (e.target.value !== '__new__') {
+                            setTransferItemForm({ ...transferItemForm, targetLocation: e.target.value });
+                          } else {
+                            setTransferItemForm({ ...transferItemForm, targetLocation: '' });
+                          }
+                        }}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                         required
-                      />
+                      >
+                        <option value="">Select location...</option>
+                        {existingLocations.map((loc, idx) => (
+                          <option key={idx} value={loc}>{loc}</option>
+                        ))}
+                        <option value="__new__">+ Create New Location...</option>
+                      </select>
+
+                      {selectedTransferItemLocOption === '__new__' && (
+                        <div className="mt-2.5 animate-in slide-in-from-top-1 duration-150">
+                          <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">New Location Name *</label>
+                          <input
+                            value={transferItemForm.targetLocation}
+                            onChange={e => setTransferItemForm({ ...transferItemForm, targetLocation: e.target.value })}
+                            placeholder="e.g. Left Shelf"
+                            className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required
+                          />
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">Quantity to Transfer *</label>
@@ -1777,12 +1851,6 @@ const ZoneDetail: React.FC<Props> = ({
       {openMenuId && (
         <div className="fixed inset-0 z-[5]" onClick={() => setOpenMenuId(null)} />
       )}
-
-      <datalist id="existing-locations">
-        {existingLocations.map((loc, idx) => (
-          <option key={idx} value={loc} />
-        ))}
-      </datalist>
     </div>
   );
 };
