@@ -227,7 +227,11 @@ exports.getZoneStock = async (req, res) => {
     const pipeline = [
       { $match: { ...f, $or: [{ to_zone: toObjectId(zoneId) }, { from_zone: toObjectId(zoneId) }] } },
       { $group: {
-        _id: "$sku",
+        _id: {
+          sku: "$sku",
+          location_code: "$location_code",
+          location_name: "$location_name"
+        },
         qty: { $sum: {
           $cond: [{ $eq: ["$to_zone", toObjectId(zoneId)] }, "$quantity", { $multiply: ["$quantity", -1] }]
         }}
@@ -237,12 +241,14 @@ exports.getZoneStock = async (req, res) => {
     const results = await MfgMovement.aggregate(pipeline);
 
     // Populate SKU info
-    const skuIds = results.map(r => r._id);
+    const skuIds = results.map(r => r._id.sku);
     const skuDocs = await Sku.find({ _id: { $in: skuIds } });
     const skuMap = {}; skuDocs.forEach(s => { skuMap[s._id.toString()] = s; });
 
     const stock = results.map(r => ({
-      sku: skuMap[r._id.toString()] || null,
+      sku: skuMap[r._id.sku.toString()] || null,
+      location_code: r._id.location_code || "",
+      location_name: r._id.location_name || "",
       quantity: r.qty
     }));
 

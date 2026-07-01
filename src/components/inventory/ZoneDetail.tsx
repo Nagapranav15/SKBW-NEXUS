@@ -94,9 +94,10 @@ const ZoneDetail: React.FC<Props> = ({
   const [showEditZone, setShowEditZone] = useState(false);
   const [showAllItems, setShowAllItems] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [isAddingLocation, setIsAddingLocation] = useState(false);
 
   const [form, setForm] = useState({
-    type: 'IN', sku: '', quantity: '', unit: 'kg', cost_per_unit: '', remarks: ''
+    type: 'IN', sku: '', location_code: '', location_name: '', quantity: '', unit: 'kg', cost_per_unit: '', remarks: ''
   });
   const [editForm, setEditForm] = useState({
     zone_code: '', name: '', description: '', factory_id: '', floor_id: '', status: 'active'
@@ -174,21 +175,49 @@ const ZoneDetail: React.FC<Props> = ({
   const totalUnits = zone._id === 'mock-z1' ? 2450 : stock.reduce((a: number, s: any) => a + (s.quantity ?? 0), 0);
   const totalValue = zone._id === 'mock-z1' ? 1248750 : stock.reduce((a: number, s: any) => a + (s.quantity ?? 0) * (s.sku?.cost_per_unit ?? 0), 0);
 
-  const locationRows = zone._id === 'mock-z1'
-    ? [
+  const locationRows = React.useMemo(() => {
+    if (zone._id === 'mock-z1') {
+      return [
         { _id: 'mock-loc-1', code: 'A1', area: 'Left Side Area', status: 'active', itemCount: 6, quantity: 850, value: 425300 },
         { _id: 'mock-loc-2', code: 'A2', area: 'Middle Area', status: 'active', itemCount: 4, quantity: 1100, value: 580450 },
         { _id: 'mock-loc-3', code: 'A3', area: 'Right Side Area', status: 'active', itemCount: 2, quantity: 500, value: 242100 },
-      ]
-    : stock.map((s: any, idx: number) => ({
-        _id: s._id ?? idx,
-        code: s.location_code ?? `A${idx + 1}`,
-        area: s.location_name ?? s.sku?.name ?? 'Storage Area',
-        status: 'active',
-        itemCount: 1,
-        quantity: s.quantity ?? 0,
-        value: (s.quantity ?? 0) * (s.sku?.cost_per_unit ?? 0)
-      }));
+      ];
+    }
+
+    const groups: Record<string, { code: string; area: string; status: string; skus: Set<string>; quantity: number; value: number }> = {};
+    
+    stock.forEach((s: any, idx: number) => {
+      const code = s.location_code || `A${idx + 1}`;
+      const area = s.location_name || s.sku?.name || 'Storage Area';
+      
+      if (!groups[code]) {
+        groups[code] = {
+          code,
+          area,
+          status: 'active',
+          skus: new Set(),
+          quantity: 0,
+          value: 0
+        };
+      }
+      
+      if (s.sku?._id) {
+        groups[code].skus.add(s.sku._id);
+      }
+      groups[code].quantity += s.quantity ?? 0;
+      groups[code].value += (s.quantity ?? 0) * (s.sku?.cost_per_unit ?? 0);
+    });
+
+    return Object.entries(groups).map(([code, g], idx) => ({
+      _id: `loc-${code}-${idx}`,
+      code: g.code,
+      area: g.area,
+      status: g.status,
+      itemCount: g.skus.size || 1,
+      quantity: g.quantity,
+      value: g.value
+    }));
+  }, [zone._id, stock]);
 
   const topItems = [...stock]
     .sort((a: any, b: any) => (b.quantity ?? 0) - (a.quantity ?? 0))
@@ -208,6 +237,8 @@ const ZoneDetail: React.FC<Props> = ({
         quantity: Number(form.quantity),
         unit: form.unit,
         remarks: form.remarks || '',
+        location_code: form.location_code || '',
+        location_name: form.location_name || '',
         company: selectedCompany?._id
       };
       if (form.type === 'IN') data.to_zone = zone._id;
@@ -217,9 +248,9 @@ const ZoneDetail: React.FC<Props> = ({
       setShowAddStock(false);
 
       const skuObj = skus.find(s => s._id === form.sku);
-      await logActivity('CREATE', zone.name || zone.zone_code, `Recorded stock movement: ${form.type} ${form.quantity} ${form.unit} of SKU: ${skuObj?.name || 'Unknown'} (${skuObj?.sku_code || ''}) in Zone: ${zone.zone_code}`);
+      await logActivity('CREATE', zone.name, `Recorded stock movement: ${form.type} ${form.quantity} ${form.unit} of SKU: ${skuObj?.name || 'Unknown'} (${skuObj?.sku_code || ''}) at Location: ${form.location_code || 'Default'} in Zone: ${zone.name}`);
 
-      setForm({ type: 'IN', sku: '', quantity: '', unit: 'kg', cost_per_unit: '', remarks: '' });
+      setForm({ type: 'IN', sku: '', location_code: '', location_name: '', quantity: '', unit: 'kg', cost_per_unit: '', remarks: '' });
       load();
       showToast('Stock updated successfully', 'success');
     } catch (e: any) {
@@ -249,7 +280,7 @@ const ZoneDetail: React.FC<Props> = ({
       if (newFactory) setFactory(newFactory);
       if (newFloor) setFloor(newFloor);
       onZoneUpdated(updated);
-      await logActivity('UPDATE', updated.name || updated.zone_code, `Updated Zone: ${updated.name || updated.zone_code}`);
+      await logActivity('UPDATE', updated.name, `Updated Zone: ${updated.name}`);
       setShowEditZone(false);
       showToast('Zone updated', 'success');
     } catch (e: any) {
@@ -258,7 +289,7 @@ const ZoneDetail: React.FC<Props> = ({
   };
 
   const handleDeleteZone = async () => {
-    if (!window.confirm(`Delete zone "${zone.zone_code}"? This will move it to the Recycle Bin.`)) return;
+    if (!window.confirm(`Delete zone "${zone.name}"? This will move it to the Recycle Bin.`)) return;
     try {
       await mfgApi.deleteZone(zone._id);
       showToast('Zone deleted', 'success');
@@ -294,7 +325,7 @@ const ZoneDetail: React.FC<Props> = ({
               </div>
               <div>
                 <div className="flex items-center gap-2.5 flex-wrap">
-                  <h1 className="text-2xl font-black text-gray-900 leading-tight">{zone.name || zone.zone_code}</h1>
+                  <h1 className="text-2xl font-black text-gray-900 leading-tight">{zone.name || 'Unnamed Zone'}</h1>
                   <span className={`text-[11px] px-2 py-0.5 rounded font-extrabold tracking-wider bg-green-50 text-green-700 uppercase`}>
                     ACTIVE
                   </span>
@@ -304,7 +335,7 @@ const ZoneDetail: React.FC<Props> = ({
                   <ChevronRight className="w-3.5 h-3.5 text-gray-300" />
                   <span>{floor?.name ?? 'Ground Floor'}</span>
                   <ChevronRight className="w-3.5 h-3.5 text-gray-300" />
-                  <span className="text-gray-700">{zone.name || zone.zone_code}</span>
+                  <span className="text-gray-700">{zone.name || 'Unnamed Zone'}</span>
                 </p>
               </div>
             </div>
@@ -388,7 +419,11 @@ const ZoneDetail: React.FC<Props> = ({
                   <h2 className="text-base font-bold text-gray-900">Locations in this Zone</h2>
                   {canManage && (
                     <button
-                      onClick={() => showToast('Location management coming soon', 'info')}
+                      onClick={() => {
+                        setForm({ type: 'IN', sku: '', location_code: '', location_name: '', quantity: '', unit: 'kg', cost_per_unit: '', remarks: '' });
+                        setIsAddingLocation(true);
+                        setShowAddStock(true);
+                      }}
                       className="flex items-center gap-1.5 px-3.5 py-1.5 border border-gray-200 rounded-xl text-sm font-bold text-blue-600 hover:bg-blue-50/50 bg-white transition-colors shadow-sm"
                     >
                       <Plus className="w-3.5 h-3.5" /> Add Location
@@ -402,7 +437,11 @@ const ZoneDetail: React.FC<Props> = ({
                     <p className="text-sm text-gray-400">No locations recorded in this zone yet</p>
                     {canManage && (
                       <button
-                        onClick={() => setShowAddStock(true)}
+                        onClick={() => {
+                          setForm({ type: 'IN', sku: '', location_code: '', location_name: '', quantity: '', unit: 'kg', cost_per_unit: '', remarks: '' });
+                          setIsAddingLocation(true);
+                          setShowAddStock(true);
+                        }}
                         className="mt-2 text-sm text-blue-600 hover:underline font-semibold"
                       >
                         Add stock to create a location
@@ -482,7 +521,11 @@ const ZoneDetail: React.FC<Props> = ({
                     )}
                     {canManage && (
                       <button
-                        onClick={() => setShowAddStock(true)}
+                        onClick={() => {
+                          setForm({ type: 'IN', sku: '', location_code: '', location_name: '', quantity: '', unit: 'kg', cost_per_unit: '', remarks: '' });
+                          setIsAddingLocation(false);
+                          setShowAddStock(true);
+                        }}
                         className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-sm transition-colors"
                       >
                         <Plus className="w-3.5 h-3.5" /> Add Stock
@@ -497,7 +540,11 @@ const ZoneDetail: React.FC<Props> = ({
                     <p className="text-sm text-gray-400">No stock recorded in this zone</p>
                     {canManage && (
                       <button
-                        onClick={() => setShowAddStock(true)}
+                        onClick={() => {
+                          setForm({ type: 'IN', sku: '', location_code: '', location_name: '', quantity: '', unit: 'kg', cost_per_unit: '', remarks: '' });
+                          setIsAddingLocation(false);
+                          setShowAddStock(true);
+                        }}
                         className="mt-2 flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold mx-auto hover:bg-emerald-700 transition-colors shadow-sm"
                       >
                         <Plus className="w-3.5 h-3.5" /> Add Stock
@@ -597,21 +644,49 @@ const ZoneDetail: React.FC<Props> = ({
           <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between mb-5">
               <div>
-                <h3 className="text-lg font-bold text-gray-900">Add / Record Stock</h3>
-                <p className="text-sm text-gray-500 mt-0.5">Zone: <span className="font-semibold text-gray-700">{zone.zone_code}</span></p>
+                <h3 className="text-lg font-bold text-gray-900">{isAddingLocation ? 'Add Location' : 'Add / Record Stock'}</h3>
+                <p className="text-sm text-gray-500 mt-0.5">Zone: <span className="font-semibold text-gray-700">{zone.name}</span></p>
               </div>
               <button onClick={() => setShowAddStock(false)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
                 <X className="w-4 h-4 text-gray-500" />
               </button>
             </div>
             <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">Movement Type</label>
-                <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                  <option value="IN">IN — Add stock to zone</option>
-                  <option value="OUT">OUT — Remove stock from zone</option>
-                </select>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">
+                    Location Code {isAddingLocation ? '*' : ''}
+                  </label>
+                  <input
+                    value={form.location_code || ''}
+                    onChange={e => setForm({ ...form, location_code: e.target.value.toUpperCase() })}
+                    placeholder="e.g. A1"
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    required={isAddingLocation}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">
+                    Location Name / Area {isAddingLocation ? '*' : ''}
+                  </label>
+                  <input
+                    value={form.location_name || ''}
+                    onChange={e => setForm({ ...form, location_name: e.target.value })}
+                    placeholder="e.g. Left Shelf"
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    required={isAddingLocation}
+                  />
+                </div>
               </div>
+              {!isAddingLocation && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">Movement Type</label>
+                  <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    <option value="IN">IN — Add stock to zone</option>
+                    <option value="OUT">OUT — Remove stock from zone</option>
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">SKU *</label>
                 <select
@@ -686,22 +761,16 @@ const ZoneDetail: React.FC<Props> = ({
               </button>
             </div>
             <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">Zone Code</label>
-                  <input value={editForm.zone_code} onChange={e => setEditForm({ ...editForm, zone_code: e.target.value.toUpperCase() })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[15px] font-mono focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">Status</label>
-                  <select value={editForm.status} onChange={e => setEditForm({ ...editForm, status: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">Status</label>
+                <select value={editForm.status} onChange={e => setEditForm({ ...editForm, status: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">Name</label>
-                <input value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. Zone A" />
+                <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">Name *</label>
+                <input value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. Zone A" required />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">Description</label>

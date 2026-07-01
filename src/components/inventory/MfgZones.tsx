@@ -256,13 +256,17 @@ const MfgZones: React.FC = () => {
           await logActivity('CREATE', form.name, `Created Floor: ${form.name} under Factory: ${fact?.name || 'Unknown'}`);
         }
       } else if (showModal === 'zone') {
+        const zoneForm = { ...form };
+        if (!zoneForm.zone_code) {
+          zoneForm.zone_code = (zoneForm.name || '').trim().replace(/\s+/g, '_').toUpperCase() + '_' + Math.random().toString(36).substring(2, 6).toUpperCase();
+        }
         if (editId) {
-          await mfgApi.updateZone(editId, form);
-          await logActivity('UPDATE', form.name || form.zone_code, `Updated Zone: ${form.name || form.zone_code}`);
+          await mfgApi.updateZone(editId, zoneForm);
+          await logActivity('UPDATE', zoneForm.name, `Updated Zone: ${zoneForm.name}`);
         } else {
-          await mfgApi.createZone({ ...form, company: selectedCompany?._id });
-          const fl = floors.find(f => f._id === form.floor_id);
-          await logActivity('CREATE', form.name || form.zone_code, `Created Zone: ${form.name || form.zone_code} on Floor: ${fl?.name || 'Unknown'}`);
+          await mfgApi.createZone({ ...zoneForm, company: selectedCompany?._id });
+          const fl = floors.find(f => f._id === zoneForm.floor_id);
+          await logActivity('CREATE', zoneForm.name, `Created Zone: ${zoneForm.name} on Floor: ${fl?.name || 'Unknown'}`);
         }
       }
       setShowModal(null); setForm({}); setEditId(null);
@@ -701,7 +705,7 @@ const MfgZones: React.FC = () => {
             }
             if (e.key === 'Delete') {
               e.preventDefault();
-              handleDelete('zone', item._id, item.name || item.zone_code);
+              handleDelete('zone', item._id, item.name);
               return;
             }
           } else if (showViewAllModal === 'locations') {
@@ -958,7 +962,7 @@ const MfgZones: React.FC = () => {
           const current = nodes.find(n => n.id === treeHighlight.id);
           if (!current) return;
           e.preventDefault();
-          handleDelete(current.type, current.id, current.data.name || current.data.zone_code);
+          handleDelete(current.type, current.id, current.data.name);
           return;
         }
       }
@@ -1410,7 +1414,7 @@ const MfgZones: React.FC = () => {
                                       <div className="flex items-center gap-2 min-w-0">
                                         <MapPin className={`w-3.5 h-3.5 flex-shrink-0 ${isSelected ? 'text-blue-500' : 'text-gray-400'}`} />
                                         <span className={`text-[13px] truncate ${isSelected ? 'text-blue-700 font-bold' : 'text-gray-700 font-semibold'}`}>
-                                          {zone.name || zone.zone_code}
+                                          {zone.name || 'Unnamed Zone'}
                                         </span>
                                       </div>
                                       <span className={`text-[11px] flex-shrink-0 ml-1 ${isSelected ? 'text-blue-600 font-bold' : 'text-gray-400 font-medium'}`}>
@@ -1500,9 +1504,8 @@ const MfgZones: React.FC = () => {
               onBack={() => { setSelectedZone(null); loadAll(); }}
               onZoneUpdated={(updated) => setSelectedZone(updated)}
               onZoneDeleted={(deletedZone) => {
-                if (deletedZone) {
-                  addToRecycleBin('zone', deletedZone.name || deletedZone.zone_code, deletedZone);
-                  logActivity('DELETE', deletedZone.name || deletedZone.zone_code, `Deleted Zone: ${deletedZone.name || deletedZone.zone_code}`);
+                  addToRecycleBin('zone', deletedZone.name, deletedZone);
+                  logActivity('DELETE', deletedZone.name, `Deleted Zone: ${deletedZone.name}`);
                 }
                 setSelectedZone(null);
                 loadAll();
@@ -1631,31 +1634,21 @@ const MfgZones: React.FC = () => {
                       }
                     </select>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Zone Code *</label>
-                      <input
-                        value={form.zone_code || ''}
-                        onChange={e => setForm({ ...form, zone_code: e.target.value.toUpperCase() })}
-                        placeholder="e.g. A1"
-                        className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Status</label>
-                      <select value={form.status || 'active'} onChange={e => setForm({ ...form, status: e.target.value })} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                      </select>
-                    </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Status</label>
+                    <select value={form.status || 'active'} onChange={e => setForm({ ...form, status: e.target.value })} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Name</label>
+                    <label className="block text-sm font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Name *</label>
                     <input
                       value={form.name || ''}
                       onChange={e => setForm({ ...form, name: e.target.value })}
                       placeholder="e.g. Zone A"
                       className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
                     />
                   </div>
                   <div>
@@ -1859,13 +1852,12 @@ const MfgZones: React.FC = () => {
                           <div key={item._id} className="flex justify-between items-center bg-white p-3 border border-gray-100 rounded-lg text-sm">
                             <div>
                               <p className="font-bold text-gray-850">
-                                {item.name || item.zone_code}
+                                {item.name}
                               </p>
                               <p className="text-xs text-gray-400 mt-0.5">
-                                {group.type === 'zone' && `Code: ${item.zone_code}`}
                                 {group.type === 'floor' && `Factory: ${factories.find(f => f._id === (item.factory_id?._id || item.factory_id))?.name || 'Unknown'}`}
                                 {group.type === 'factory' && `Code: ${item.code}`}
-                                <span className="mx-1.5">|</span>
+                                {group.type !== 'zone' && <span className="mx-1.5">|</span>}
                                 Status: <span className="font-semibold uppercase">{item.status ?? 'active'}</span>
                               </p>
                             </div>
@@ -1887,7 +1879,7 @@ const MfgZones: React.FC = () => {
                               </button>
                               <button
                                 onClick={async () => {
-                                  await handleDelete(group.type, item._id, item.name || item.zone_code);
+                                  await handleDelete(group.type, item._id, item.name);
                                   handleFindDuplicates(); // re-scan duplicates
                                 }}
                                 className="px-2.5 py-1 text-xs bg-red-50 hover:bg-red-100 text-red-650 border border-red-200 rounded font-semibold transition-colors flex items-center gap-1"
@@ -2081,8 +2073,7 @@ const MfgZones: React.FC = () => {
                       return (
                         <tr key={zone._id} className="hover:bg-gray-50/50 transition-colors">
                           <td className="px-4 py-3">
-                            <div className="font-semibold text-gray-900">{zone.name || zone.zone_code}</div>
-                            <div className="text-xs text-gray-450 mt-0.5">Code: {zone.zone_code}</div>
+                            <div className="font-semibold text-gray-900">{zone.name || 'Unnamed Zone'}</div>
                           </td>
                           <td className="px-4 py-3 text-gray-650 font-medium">
                             <span className="text-[13px]">{factName}</span>
@@ -2283,7 +2274,6 @@ const MfgZones: React.FC = () => {
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">#</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Zone Name</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Code</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Factory & Floor</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                         <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
@@ -2301,10 +2291,9 @@ const MfgZones: React.FC = () => {
                             onMouseEnter={() => setHighlightedViewAllIdx(idx)}
                           >
                             <td className="px-4 py-3 text-gray-400 font-medium">{idx + 1}</td>
-                            <td className="px-4 py-3 text-gray-900 font-semibold truncate max-w-[150px]" title={item.name || item.zone_code}>
-                              {item.name || item.zone_code}
+                            <td className="px-4 py-3 text-gray-900 font-semibold truncate max-w-[150px]" title={item.name || 'Unnamed Zone'}>
+                              {item.name || 'Unnamed Zone'}
                             </td>
-                            <td className="px-4 py-3 text-gray-505 font-mono">{item.zone_code}</td>
                             <td className="px-4 py-3 text-gray-505 truncate max-w-[200px]" title={`${parentFactory} - ${parentFloor}`}>
                               {parentFactory} • {parentFloor}
                             </td>
@@ -2342,7 +2331,7 @@ const MfgZones: React.FC = () => {
                                 <Edit className="w-3.5 h-3.5" /> Edit
                               </button>
                               <button
-                                onClick={() => handleDelete('zone', item._id, item.name || item.zone_code)}
+                                onClick={() => handleDelete('zone', item._id, item.name)}
                                 className="px-2.5 py-1 text-xs bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded hover:bg-red-100 transition-colors inline-flex items-center gap-1"
                               >
                                 <Trash2 className="w-3.5 h-3.5" /> Delete
@@ -2385,8 +2374,8 @@ const MfgZones: React.FC = () => {
                               onMouseEnter={() => setHighlightedViewAllIdx(idx)}
                             >
                               <td className="px-4 py-3 text-gray-400 font-medium">{idx + 1}</td>
-                              <td className="px-4 py-3 text-gray-900 font-semibold truncate max-w-[150px]" title={item.name || item.zone_code}>
-                                {item.name || item.zone_code}
+                              <td className="px-4 py-3 text-gray-900 font-semibold truncate max-w-[150px]" title={item.name || 'Unnamed Zone'}>
+                                {item.name || 'Unnamed Zone'}
                               </td>
                               <td className="px-4 py-3 text-gray-505 truncate max-w-[200px]" title={`${parentFactory} - ${parentFloor}`}>
                                 {parentFactory} • {parentFloor}

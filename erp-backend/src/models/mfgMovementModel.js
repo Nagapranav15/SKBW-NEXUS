@@ -12,6 +12,8 @@ const mfgMovementSchema = new mongoose.Schema({
   cost_per_unit: { type: Number, default: 0 },
   remarks: { type: String, default: "" },
   source: { type: String, enum: ["production", "purchase", "dispatch", "usage", "transfer", "adjustment"], default: "production" },
+  location_code: { type: String, default: "" },
+  location_name: { type: String, default: "" },
   company: { type: mongoose.Schema.Types.ObjectId, ref: "Company", required: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" }
 }, { timestamps: true });
