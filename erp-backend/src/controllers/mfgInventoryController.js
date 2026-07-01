@@ -111,7 +111,7 @@ exports.getMovements = async (req, res) => {
 
 exports.recordMovement = async (req, res) => {
   try {
-    const { type, from_zone, to_zone, sku, quantity, unit, gsm_used, books_per_gbl, cost_per_unit, remarks, company } = req.body;
+    const { type, from_zone, to_zone, sku, quantity, unit, gsm_used, books_per_gbl, cost_per_unit, location_name, from_location_name, remarks, company } = req.body;
     if (!type || !sku || !quantity || quantity <= 0) return res.status(400).json({ msg: "type, sku, and positive quantity are required" });
 
     // Validate zone requirements
@@ -128,6 +128,8 @@ exports.recordMovement = async (req, res) => {
     const movement = await MfgMovement.create({
       type, from_zone: from_zone || null, to_zone: to_zone || null,
       sku, quantity, unit, gsm_used, books_per_gbl, cost_per_unit: cost_per_unit || 0,
+      location_name: location_name || "",
+      from_location_name: from_location_name || "",
       remarks: remarks || "", company, createdBy: req.user.id
     });
 

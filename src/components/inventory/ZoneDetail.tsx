@@ -123,6 +123,10 @@ const ZoneDetail: React.FC<Props> = ({
   const [selectedSkuForTransfer, setSelectedSkuForTransfer] = useState<any>(null);
   const [transferItemForm, setTransferItemForm] = useState({ targetZoneId: '', targetLocation: '', quantity: '' });
   const [dropdownLocName, setDropdownLocName] = useState('');
+  const [showEditStockModal, setShowEditStockModal] = useState(false);
+  const [selectedSkuForEdit, setSelectedSkuForEdit] = useState<any>(null);
+  const [editStockQty, setEditStockQty] = useState('');
+  const [editStockRemarks, setEditStockRemarks] = useState('');
 
   useEffect(() => {
     setZone(initialZone);
@@ -495,6 +499,75 @@ const ZoneDetail: React.FC<Props> = ({
       showToast('Stock item transferred successfully', 'success');
     } catch (e: any) {
       showToast(e.response?.data?.msg || 'Failed to transfer item', 'error');
+    }
+  };
+
+  const handleEditSkuStock = async () => {
+    const sourceLocName = selectedLocRow ? selectedLocRow.name : dropdownLocName;
+    if (!sourceLocName || !selectedSkuForEdit || !editStockQty) return;
+
+    const newQty = Number(editStockQty);
+    if (newQty < 0) {
+      showToast('Quantity cannot be negative', 'error');
+      return;
+    }
+
+    const currentQty = selectedSkuForEdit.quantity ?? 0;
+    const diff = newQty - currentQty;
+
+    if (diff === 0) {
+      setShowEditStockModal(false);
+      return;
+    }
+
+    try {
+      const targetSkuId = typeof selectedSkuForEdit.sku === 'object' ? selectedSkuForEdit.sku?._id : selectedSkuForEdit.sku;
+      const targetSkuName = typeof selectedSkuForEdit.sku === 'object' ? selectedSkuForEdit.sku?.name : (skus.find(s => s._id === selectedSkuForEdit.sku)?.name || 'Unknown Item');
+      const targetSkuUnit = typeof selectedSkuForEdit.sku === 'object' ? (selectedSkuForEdit.sku?.unit_type || 'kg') : (skus.find(s => s._id === selectedSkuForEdit.sku)?.unit_type || 'kg');
+
+      if (zone._id.startsWith('mock-')) {
+        const updatedStock = stock.map((s: any) => {
+          if ((s.location_name || 'Storage Area') === sourceLocName && (s.sku?._id === targetSkuId || s.sku === targetSkuId)) {
+            return { ...s, quantity: newQty };
+          }
+          return s;
+        });
+        setStock(updatedStock);
+        setShowEditStockModal(false);
+        showToast('Stock quantity updated successfully (mock)', 'success');
+        return;
+      }
+
+      const movementType = diff > 0 ? 'IN' : 'OUT';
+      const movementQty = Math.abs(diff);
+
+      const movementData: any = {
+        type: movementType,
+        sku: targetSkuId,
+        quantity: movementQty,
+        unit: targetSkuUnit,
+        remarks: editStockRemarks.trim() || `Stock adjusted from ${currentQty} to ${newQty}`,
+        location_name: sourceLocName,
+        company: selectedCompany?._id
+      };
+
+      if (movementType === 'IN') {
+        movementData.to_zone = zone._id;
+      } else {
+        movementData.from_zone = zone._id;
+      }
+
+      await mfgApi.recordMovement(movementData);
+
+      await logActivity('UPDATE', zone.name, `Adjusted SKU: ${targetSkuName} at Location: "${sourceLocName}" from ${currentQty} to ${newQty} ${targetSkuUnit} (created ${movementType} movement of ${movementQty})`);
+
+      setShowEditStockModal(false);
+      setEditStockQty('');
+      setEditStockRemarks('');
+      load();
+      showToast('Stock updated successfully', 'success');
+    } catch (e: any) {
+      showToast(e.response?.data?.msg || 'Failed to adjust stock', 'error');
     }
   };
 
@@ -872,6 +945,19 @@ const ZoneDetail: React.FC<Props> = ({
                                       className="p-1 hover:bg-blue-50 text-gray-400 hover:text-blue-600 rounded transition-colors"
                                     >
                                       <ArrowRightLeft className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setSelectedSkuForEdit(s);
+                                        setDropdownLocName('');
+                                        setEditStockQty(String(s.quantity ?? ''));
+                                        setEditStockRemarks('');
+                                        setShowEditStockModal(true);
+                                      }}
+                                      title="Edit stock of this item"
+                                      className="p-1 hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 rounded transition-colors"
+                                    >
+                                      <Edit className="w-3.5 h-3.5" />
                                     </button>
                                     <button
                                       onClick={() => {
@@ -1271,6 +1357,18 @@ const ZoneDetail: React.FC<Props> = ({
                                 </button>
                                 <button
                                   onClick={() => {
+                                    setSelectedSkuForEdit(item);
+                                    setEditStockQty(String(item.quantity ?? ''));
+                                    setEditStockRemarks('');
+                                    setShowEditStockModal(true);
+                                  }}
+                                  title="Edit Stock Details"
+                                  className="p-1 text-gray-450 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => {
                                     setSelectedSkuForRemove(item);
                                     setRemoveStockQty('');
                                     setRemoveStockRemarks('');
@@ -1503,6 +1601,108 @@ const ZoneDetail: React.FC<Props> = ({
                       className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[15px] font-semibold disabled:opacity-50 transition-colors"
                     >
                       Transfer Stock
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit Stock Modal ──────────────────────────────────────────────────── */}
+      {showEditStockModal && selectedSkuForEdit && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900 font-sans">Edit Stock Availability</h3>
+              <button onClick={() => setShowEditStockModal(false)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+
+            {(() => {
+              const targetSkuId = typeof selectedSkuForEdit.sku === 'object' ? selectedSkuForEdit.sku?._id : selectedSkuForEdit.sku;
+              const targetSkuName = typeof selectedSkuForEdit.sku === 'object' ? selectedSkuForEdit.sku?.name : (skus.find(s => s._id === selectedSkuForEdit.sku)?.name || 'Unknown Item');
+              const targetSkuCode = typeof selectedSkuForEdit.sku === 'object' ? selectedSkuForEdit.sku?.sku_code : (skus.find(s => s._id === selectedSkuForEdit.sku)?.sku_code || 'N/A');
+              const targetSkuUnit = typeof selectedSkuForEdit.sku === 'object' ? (selectedSkuForEdit.sku?.unit_type || 'kg') : (skus.find(s => s._id === selectedSkuForEdit.sku)?.unit_type || 'kg');
+
+              const matchedLocStock = dropdownLocName 
+                ? stock.find(s => (s.sku?._id === targetSkuId || s.sku === targetSkuId) && (s.location_name || 'Storage Area') === dropdownLocName)
+                : null;
+              const availableQty = selectedLocRow 
+                ? (selectedSkuForEdit.quantity ?? 0) 
+                : (matchedLocStock ? (matchedLocStock.quantity ?? 0) : 0);
+
+              const locationsWithStock = stock.filter(s => (s.sku?._id === targetSkuId || s.sku === targetSkuId) && (s.quantity ?? 0) > 0);
+
+              return (
+                <>
+                  <div className="bg-emerald-50/65 border border-emerald-100 p-3.5 rounded-xl mb-4 text-sm text-emerald-950 font-semibold">
+                    <p>SKU: {targetSkuName} ({targetSkuCode})</p>
+                    {selectedLocRow ? (
+                      <p className="mt-1 font-black text-xs text-emerald-650">Current Stock at {selectedLocRow.name}: {fmt(availableQty)} {targetSkuUnit}</p>
+                    ) : dropdownLocName ? (
+                      <p className="mt-1 font-black text-xs text-emerald-650">Current Stock at {dropdownLocName}: {fmt(availableQty)} {targetSkuUnit}</p>
+                    ) : (
+                      <p className="mt-1 font-black text-xs text-emerald-650">Select a location to edit its stock</p>
+                    )}
+                  </div>
+                  <div className="space-y-3">
+                    {!selectedLocRow && (
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">Select Location to Edit *</label>
+                        <select
+                          value={dropdownLocName}
+                          onChange={e => {
+                            setDropdownLocName(e.target.value);
+                            const matched = stock.find(s => (s.sku?._id === targetSkuId || s.sku === targetSkuId) && (s.location_name || 'Storage Area') === e.target.value);
+                            setEditStockQty(matched ? String(matched.quantity ?? '') : '');
+                          }}
+                          className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          required
+                        >
+                          <option value="">Select location...</option>
+                          {locationsWithStock.map((s: any, idx: number) => (
+                            <option key={idx} value={s.location_name || 'Storage Area'}>
+                              {s.location_name || 'Storage Area'} ({fmt(s.quantity)} available)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">New Stock Quantity *</label>
+                      <input
+                        type="number"
+                        value={editStockQty}
+                        onChange={e => setEditStockQty(e.target.value)}
+                        placeholder="Enter new quantity"
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        min="0"
+                        step="0.01"
+                        required
+                        disabled={!selectedLocRow && !dropdownLocName}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">Adjustment Reason / Remarks</label>
+                      <input
+                        value={editStockRemarks}
+                        onChange={e => setEditStockRemarks(e.target.value)}
+                        placeholder="e.g. Stock recount, physical audit adjustment"
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2.5 mt-5 pt-4 border-t border-gray-100">
+                    <button onClick={() => setShowEditStockModal(false)} className="px-4 py-2 border border-gray-200 rounded-lg text-[15px] font-medium text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
+                    <button
+                      onClick={handleEditSkuStock}
+                      disabled={!editStockQty || Number(editStockQty) < 0 || (!selectedLocRow && !dropdownLocName)}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[15px] font-semibold disabled:opacity-50 transition-colors"
+                    >
+                      Save Changes
                     </button>
                   </div>
                 </>

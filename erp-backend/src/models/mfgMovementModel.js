@@ -6,7 +6,7 @@ const mfgMovementSchema = new mongoose.Schema({
   to_zone: { type: mongoose.Schema.Types.ObjectId, ref: "Zone", default: null },
   sku: { type: mongoose.Schema.Types.ObjectId, ref: "Sku", required: true },
   quantity: { type: Number, required: true },
-  unit: { type: String, enum: ["kg", "pcs", "gbl"], required: true },
+  unit: { type: String, required: true },
   gsm_used: { type: Number, default: null },
   books_per_gbl: { type: Number, default: null },
   cost_per_unit: { type: Number, default: 0 },
