@@ -6,7 +6,14 @@ const Sku = require("../models/skuModel");
 const MfgMovement = require("../models/mfgMovementModel");
 const Bom = require("../models/bomModel");
 
-const toObjectId = (id) => new mongoose.Types.ObjectId(id);
+const toObjectId = (id) => {
+  if (!id) return null;
+  try {
+    return new mongoose.Types.ObjectId(id.toString());
+  } catch (e) {
+    return null;
+  }
+};
 
 // ─── FACTORIES ───
 exports.getFactories = async (req, res) => {
@@ -146,15 +153,17 @@ const getZoneSkuStock = async (zoneId, skuId, companyId) => {
   const pipeline = [
     { $match: { company: toObjectId(companyId), sku: toObjectId(skuId) } },
     { $match: { $or: [{ to_zone: toObjectId(zoneId) }, { from_zone: toObjectId(zoneId) }] } },
+    { $project: {
+      entries: [
+        { zone: "$from_zone", qty: { $multiply: ["$quantity", -1] } },
+        { zone: "$to_zone", qty: "$quantity" }
+      ]
+    }},
+    { $unwind: "$entries" },
+    { $match: { "entries.zone": toObjectId(zoneId) } },
     { $group: {
       _id: null,
-      total: { $sum: {
-        $cond: [
-          { $eq: ["$to_zone", toObjectId(zoneId)] },
-          "$quantity",
-          { $multiply: ["$quantity", -1] }
-        ]
-      }}
+      total: { $sum: "$entries.qty" }
     }}
   ];
   const result = await MfgMovement.aggregate(pipeline);
