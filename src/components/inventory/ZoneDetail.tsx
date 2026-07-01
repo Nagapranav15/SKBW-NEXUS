@@ -235,6 +235,10 @@ const ZoneDetail: React.FC<Props> = ({
     }));
   }, [zone._id, stock]);
 
+  const existingLocations = React.useMemo(() => {
+    return Array.from(new Set(stock.map((s: any) => s.location_name || 'Storage Area'))).filter(Boolean);
+  }, [stock]);
+
   const topItems = [...stock]
     .sort((a: any, b: any) => (b.quantity ?? 0) - (a.quantity ?? 0))
     .slice(0, showAllItems ? undefined : 5);
@@ -1060,6 +1064,7 @@ const ZoneDetail: React.FC<Props> = ({
                   value={form.location_name || ''}
                   onChange={e => setForm({ ...form, location_name: e.target.value })}
                   placeholder="e.g. Left Shelf"
+                  list="existing-locations"
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   required={isAddingLocation}
                 />
@@ -1153,6 +1158,7 @@ const ZoneDetail: React.FC<Props> = ({
                   value={editLocName}
                   onChange={e => setEditLocName(e.target.value)}
                   placeholder="e.g. Left Shelf"
+                  list="existing-locations"
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
@@ -1206,6 +1212,7 @@ const ZoneDetail: React.FC<Props> = ({
                   value={transferLocForm.targetLocation}
                   onChange={e => setTransferLocForm({ ...transferLocForm, targetLocation: e.target.value })}
                   placeholder="e.g. Left Shelf"
+                  list="existing-locations"
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
@@ -1573,6 +1580,7 @@ const ZoneDetail: React.FC<Props> = ({
                         value={transferItemForm.targetLocation}
                         onChange={e => setTransferItemForm({ ...transferItemForm, targetLocation: e.target.value })}
                         placeholder="e.g. Left Shelf"
+                        list="existing-locations"
                         className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-blue-500"
                         required
                       />
@@ -1769,6 +1777,12 @@ const ZoneDetail: React.FC<Props> = ({
       {openMenuId && (
         <div className="fixed inset-0 z-[5]" onClick={() => setOpenMenuId(null)} />
       )}
+
+      <datalist id="existing-locations">
+        {existingLocations.map((loc, idx) => (
+          <option key={idx} value={loc} />
+        ))}
+      </datalist>
     </div>
   );
 };

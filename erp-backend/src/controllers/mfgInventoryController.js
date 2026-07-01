@@ -234,7 +234,13 @@ exports.getZoneStock = async (req, res) => {
           $cond: [
             { $eq: ["$to_zone", toObjectId(zoneId)] },
             "$location_name",
-            { $ifNull: ["$from_location_name", "$location_name"] }
+            {
+              $cond: [
+                { $and: [{ $ne: ["$from_location_name", null] }, { $ne: ["$from_location_name", ""] }] },
+                "$from_location_name",
+                "$location_name"
+              ]
+            }
           ]
         },
         qty: {
@@ -532,7 +538,13 @@ exports.transferLocationInZone = async (req, res) => {
           $cond: [
             { $eq: ["$to_zone", toObjectId(zoneId)] },
             "$location_name",
-            { $ifNull: ["$from_location_name", "$location_name"] }
+            {
+              $cond: [
+                { $and: [{ $ne: ["$from_location_name", null] }, { $ne: ["$from_location_name", ""] }] },
+                "$from_location_name",
+                "$location_name"
+              ]
+            }
           ]
         },
         qty: {
@@ -554,10 +566,8 @@ exports.transferLocationInZone = async (req, res) => {
     }
 
     // 2. For each stock item, record a TRANSFER movement
-    const sampleMovement = await MfgMovement.findOne({
-      $or: [{ to_zone: toObjectId(zoneId) }, { from_zone: toObjectId(zoneId) }]
-    });
-    const company = sampleMovement ? sampleMovement.company : null;
+    const zoneDoc = await Zone.findById(zoneId);
+    const company = zoneDoc ? zoneDoc.company : null;
     if (!company) {
       return res.status(400).json({ msg: "Unable to identify company for the transfer" });
     }
