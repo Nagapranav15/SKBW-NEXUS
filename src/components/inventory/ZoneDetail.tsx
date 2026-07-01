@@ -97,11 +97,18 @@ const ZoneDetail: React.FC<Props> = ({
   const [isAddingLocation, setIsAddingLocation] = useState(false);
 
   const [form, setForm] = useState({
-    type: 'IN', sku: '', location_code: '', location_name: '', quantity: '', unit: 'kg', cost_per_unit: '', remarks: ''
+    type: 'IN', sku: '', location_name: '', quantity: '', unit: 'kg', cost_per_unit: '', remarks: ''
   });
   const [editForm, setEditForm] = useState({
     zone_code: '', name: '', description: '', factory_id: '', floor_id: '', status: 'active'
   });
+
+  const [zones, setZones] = useState<any[]>([]);
+  const [showEditLocation, setShowEditLocation] = useState(false);
+  const [showTransferLocation, setShowTransferLocation] = useState(false);
+  const [selectedLocRow, setSelectedLocRow] = useState<any>(null);
+  const [editLocName, setEditLocName] = useState('');
+  const [transferLocForm, setTransferLocForm] = useState({ targetZoneId: '', targetLocation: '' });
 
   useEffect(() => {
     setZone(initialZone);
@@ -156,14 +163,16 @@ const ZoneDetail: React.FC<Props> = ({
         ]);
         setSkus(MOCK_SKUS);
       } else {
-        const [s, m, sk] = await Promise.all([
+        const [s, m, sk, zList] = await Promise.all([
           mfgApi.getZoneStock(zone._id, selectedCompany?._id),
           mfgApi.getZoneMovements(zone._id, selectedCompany?._id, 20),
-          mfgApi.getSkus(selectedCompany?._id)
+          mfgApi.getSkus(selectedCompany?._id),
+          mfgApi.getZones(selectedCompany?._id)
         ]);
         setStock(s.data ?? []);
         setMovements(m.data ?? []);
         setSkus(sk.data ?? []);
+        setZones(zList.data ?? []);
       }
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
@@ -178,22 +187,20 @@ const ZoneDetail: React.FC<Props> = ({
   const locationRows = React.useMemo(() => {
     if (zone._id === 'mock-z1') {
       return [
-        { _id: 'mock-loc-1', code: 'A1', area: 'Left Side Area', status: 'active', itemCount: 6, quantity: 850, value: 425300 },
-        { _id: 'mock-loc-2', code: 'A2', area: 'Middle Area', status: 'active', itemCount: 4, quantity: 1100, value: 580450 },
-        { _id: 'mock-loc-3', code: 'A3', area: 'Right Side Area', status: 'active', itemCount: 2, quantity: 500, value: 242100 },
+        { _id: 'mock-loc-1', name: 'Left Side Area', status: 'active', itemCount: 6, quantity: 850, value: 425300 },
+        { _id: 'mock-loc-2', name: 'Middle Area', status: 'active', itemCount: 4, quantity: 1100, value: 580450 },
+        { _id: 'mock-loc-3', name: 'Right Side Area', status: 'active', itemCount: 2, quantity: 500, value: 242100 },
       ];
     }
 
-    const groups: Record<string, { code: string; area: string; status: string; skus: Set<string>; quantity: number; value: number }> = {};
+    const groups: Record<string, { name: string; status: string; skus: Set<string>; quantity: number; value: number }> = {};
     
     stock.forEach((s: any, idx: number) => {
-      const code = s.location_code || `A${idx + 1}`;
-      const area = s.location_name || s.sku?.name || 'Storage Area';
+      const name = s.location_name || 'Storage Area';
       
-      if (!groups[code]) {
-        groups[code] = {
-          code,
-          area,
+      if (!groups[name]) {
+        groups[name] = {
+          name,
           status: 'active',
           skus: new Set(),
           quantity: 0,
@@ -202,16 +209,15 @@ const ZoneDetail: React.FC<Props> = ({
       }
       
       if (s.sku?._id) {
-        groups[code].skus.add(s.sku._id);
+        groups[name].skus.add(s.sku._id);
       }
-      groups[code].quantity += s.quantity ?? 0;
-      groups[code].value += (s.quantity ?? 0) * (s.sku?.cost_per_unit ?? 0);
+      groups[name].quantity += s.quantity ?? 0;
+      groups[name].value += (s.quantity ?? 0) * (s.sku?.cost_per_unit ?? 0);
     });
 
-    return Object.entries(groups).map(([code, g], idx) => ({
-      _id: `loc-${code}-${idx}`,
-      code: g.code,
-      area: g.area,
+    return Object.entries(groups).map(([name, g], idx) => ({
+      _id: `loc-${name}-${idx}`,
+      name: g.name,
       status: g.status,
       itemCount: g.skus.size || 1,
       quantity: g.quantity,
@@ -237,7 +243,6 @@ const ZoneDetail: React.FC<Props> = ({
         quantity: Number(form.quantity),
         unit: form.unit,
         remarks: form.remarks || '',
-        location_code: form.location_code || '',
         location_name: form.location_name || '',
         company: selectedCompany?._id
       };
@@ -248,13 +253,81 @@ const ZoneDetail: React.FC<Props> = ({
       setShowAddStock(false);
 
       const skuObj = skus.find(s => s._id === form.sku);
-      await logActivity('CREATE', zone.name, `Recorded stock movement: ${form.type} ${form.quantity} ${form.unit} of SKU: ${skuObj?.name || 'Unknown'} (${skuObj?.sku_code || ''}) at Location: ${form.location_code || 'Default'} in Zone: ${zone.name}`);
+      await logActivity('CREATE', zone.name, `Recorded stock movement: ${form.type} ${form.quantity} ${form.unit} of SKU: ${skuObj?.name || 'Unknown'} (${skuObj?.sku_code || ''}) at Location: ${form.location_name || 'Storage Area'} in Zone: ${zone.name}`);
 
-      setForm({ type: 'IN', sku: '', location_code: '', location_name: '', quantity: '', unit: 'kg', cost_per_unit: '', remarks: '' });
+      setForm({ type: 'IN', sku: '', location_name: '', quantity: '', unit: 'kg', cost_per_unit: '', remarks: '' });
       load();
       showToast('Stock updated successfully', 'success');
     } catch (e: any) {
       showToast(e.response?.data?.msg || 'Failed to record stock', 'error');
+    }
+  };
+
+  const handleRenameLocation = async () => {
+    if (!selectedLocRow || !editLocName.trim()) return;
+    try {
+      if (zone._id.startsWith('mock-')) {
+        const updatedStock = stock.map((s: any) => {
+          if (s.location_name === selectedLocRow.name) {
+            return { ...s, location_name: editLocName.trim() };
+          }
+          return s;
+        });
+        setStock(updatedStock);
+        setShowEditLocation(false);
+        showToast('Location renamed successfully (mock)', 'success');
+        return;
+      }
+      await mfgApi.renameLocation(zone._id, selectedLocRow.name, editLocName.trim());
+      await logActivity('UPDATE', zone.name, `Renamed Location from "${selectedLocRow.name}" to "${editLocName.trim()}" in Zone: ${zone.name}`);
+      setShowEditLocation(false);
+      load();
+      showToast('Location renamed successfully', 'success');
+    } catch (e: any) {
+      showToast(e.response?.data?.msg || 'Failed to rename location', 'error');
+    }
+  };
+
+  const handleTransferLocation = async () => {
+    if (!selectedLocRow || !transferLocForm.targetZoneId || !transferLocForm.targetLocation.trim()) return;
+    try {
+      if (zone._id.startsWith('mock-')) {
+        const remainingStock = stock.filter((s: any) => s.location_name !== selectedLocRow.name);
+        setStock(remainingStock);
+        setShowTransferLocation(false);
+        showToast('Location stock transferred successfully (mock)', 'success');
+        return;
+      }
+      await mfgApi.transferLocation(zone._id, {
+        sourceLocation: selectedLocRow.name,
+        targetZoneId: transferLocForm.targetZoneId,
+        targetLocation: transferLocForm.targetLocation.trim()
+      });
+      const destZone = zones.find(z => z._id === transferLocForm.targetZoneId);
+      await logActivity('UPDATE', zone.name, `Transferred all stock from Location "${selectedLocRow.name}" in Zone: ${zone.name} to Location "${transferLocForm.targetLocation.trim()}" in Zone: ${destZone?.name || 'Unknown'}`);
+      setShowTransferLocation(false);
+      load();
+      showToast('Location stock transferred successfully', 'success');
+    } catch (e: any) {
+      showToast(e.response?.data?.msg || 'Failed to transfer location', 'error');
+    }
+  };
+
+  const handleDeleteLocation = async (locName: string) => {
+    if (!window.confirm(`Are you sure you want to delete the location "${locName}" and all its stock movements? This action cannot be undone.`)) return;
+    try {
+      if (zone._id.startsWith('mock-')) {
+        const remainingStock = stock.filter((s: any) => s.location_name !== locName);
+        setStock(remainingStock);
+        showToast('Location and stock movements deleted successfully (mock)', 'success');
+        return;
+      }
+      await mfgApi.deleteLocation(zone._id, locName);
+      await logActivity('DELETE', zone.name, `Deleted Location: "${locName}" and its stock movements in Zone: ${zone.name}`);
+      load();
+      showToast('Location and stock movements deleted successfully', 'success');
+    } catch (e: any) {
+      showToast(e.response?.data?.msg || 'Failed to delete location', 'error');
     }
   };
 
@@ -420,7 +493,7 @@ const ZoneDetail: React.FC<Props> = ({
                   {canManage && (
                     <button
                       onClick={() => {
-                        setForm({ type: 'IN', sku: '', location_code: '', location_name: '', quantity: '', unit: 'kg', cost_per_unit: '', remarks: '' });
+                        setForm({ type: 'IN', sku: '', location_name: '', quantity: '', unit: 'kg', cost_per_unit: '', remarks: '' });
                         setIsAddingLocation(true);
                         setShowAddStock(true);
                       }}
@@ -438,7 +511,7 @@ const ZoneDetail: React.FC<Props> = ({
                     {canManage && (
                       <button
                         onClick={() => {
-                          setForm({ type: 'IN', sku: '', location_code: '', location_name: '', quantity: '', unit: 'kg', cost_per_unit: '', remarks: '' });
+                          setForm({ type: 'IN', sku: '', location_name: '', quantity: '', unit: 'kg', cost_per_unit: '', remarks: '' });
                           setIsAddingLocation(true);
                           setShowAddStock(true);
                         }}
@@ -449,12 +522,11 @@ const ZoneDetail: React.FC<Props> = ({
                     )}
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto min-h-[240px]">
                     <table className="w-full text-left">
                       <thead>
                         <tr className="bg-gray-50/55 text-xs text-gray-500 uppercase tracking-wider border-b border-gray-100">
-                          <th className="px-5 py-3 font-bold">Location Code</th>
-                          <th className="px-5 py-3 font-bold">Location Name / Area</th>
+                          <th className="px-5 py-3 font-bold">Location</th>
                           <th className="px-5 py-3 font-bold text-center">Status</th>
                           <th className="px-5 py-3 font-bold text-center">Items</th>
                           <th className="px-5 py-3 font-bold text-right">Quantity</th>
@@ -465,8 +537,7 @@ const ZoneDetail: React.FC<Props> = ({
                       <tbody className="divide-y divide-gray-100/70">
                         {locationRows.map(loc => (
                           <tr key={loc._id} className="hover:bg-gray-50/40 transition-colors">
-                            <td className="px-5 py-3 text-sm font-bold font-mono text-gray-900">{loc.code}</td>
-                            <td className="px-5 py-3 text-sm text-gray-600 font-medium">{loc.area}</td>
+                            <td className="px-5 py-3 text-sm text-gray-800 font-semibold">{loc.name}</td>
                             <td className="px-5 py-3 text-center">
                               <span className="text-[10px] px-2 py-0.5 rounded font-extrabold tracking-wider bg-green-50 text-green-700 uppercase">
                                 ACTIVE
@@ -478,20 +549,41 @@ const ZoneDetail: React.FC<Props> = ({
                             <td className="px-5 py-3 text-center relative">
                               <button
                                 onClick={() => setOpenMenuId(openMenuId === String(loc._id) ? null : String(loc._id))}
-                                className="p-1.5 hover:bg-gray-105 hover:bg-gray-100 rounded-lg transition-colors inline-block text-gray-400 hover:text-gray-700"
+                                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors inline-block text-gray-400 hover:text-gray-700"
                               >
                                 <MoreVertical className="w-4 h-4" />
                               </button>
                               {openMenuId === String(loc._id) && (
-                                <div className="absolute right-6 top-full mt-0.5 w-32 bg-white rounded-lg shadow-lg border border-gray-200 z-10 py-1">
-                                  <button
-                                    onClick={() => { setOpenMenuId(null); showToast('Edit location coming soon', 'info'); }}
-                                    className="w-full text-left px-3.5 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                  ><Edit className="w-3.5 h-3.5" /> Edit</button>
-                                  <button
-                                    onClick={() => { setOpenMenuId(null); showToast('Transfer stock coming soon', 'info'); }}
-                                    className="w-full text-left px-3.5 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                  ><ArrowRightLeft className="w-3.5 h-3.5" /> Transfer</button>
+                                <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-xl shadow-xl border border-gray-200 z-30 py-1 divide-y divide-gray-100">
+                                  <div className="py-0.5">
+                                    <button
+                                      onClick={() => {
+                                        setSelectedLocRow(loc);
+                                        setEditLocName(loc.name);
+                                        setShowEditLocation(true);
+                                        setOpenMenuId(null);
+                                      }}
+                                      className="w-full text-left px-3.5 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                    ><Edit className="w-3.5 h-3.5 text-gray-500" /> Edit</button>
+                                    <button
+                                      onClick={() => {
+                                        setSelectedLocRow(loc);
+                                        setTransferLocForm({ targetZoneId: '', targetLocation: '' });
+                                        setShowTransferLocation(true);
+                                        setOpenMenuId(null);
+                                      }}
+                                      className="w-full text-left px-3.5 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                    ><ArrowRightLeft className="w-3.5 h-3.5 text-gray-500" /> Transfer</button>
+                                  </div>
+                                  <div className="py-0.5">
+                                    <button
+                                      onClick={() => {
+                                        handleDeleteLocation(loc.name);
+                                        setOpenMenuId(null);
+                                      }}
+                                      className="w-full text-left px-3.5 py-2 text-sm text-red-650 hover:bg-red-50 flex items-center gap-2"
+                                    ><Trash2 className="w-3.5 h-3.5 text-red-500" /> Delete</button>
+                                  </div>
                                 </div>
                               )}
                             </td>
@@ -522,7 +614,7 @@ const ZoneDetail: React.FC<Props> = ({
                     {canManage && (
                       <button
                         onClick={() => {
-                          setForm({ type: 'IN', sku: '', location_code: '', location_name: '', quantity: '', unit: 'kg', cost_per_unit: '', remarks: '' });
+                          setForm({ type: 'IN', sku: '', location_name: '', quantity: '', unit: 'kg', cost_per_unit: '', remarks: '' });
                           setIsAddingLocation(false);
                           setShowAddStock(true);
                         }}
@@ -541,7 +633,7 @@ const ZoneDetail: React.FC<Props> = ({
                     {canManage && (
                       <button
                         onClick={() => {
-                          setForm({ type: 'IN', sku: '', location_code: '', location_name: '', quantity: '', unit: 'kg', cost_per_unit: '', remarks: '' });
+                          setForm({ type: 'IN', sku: '', location_name: '', quantity: '', unit: 'kg', cost_per_unit: '', remarks: '' });
                           setIsAddingLocation(false);
                           setShowAddStock(true);
                         }}
@@ -652,31 +744,17 @@ const ZoneDetail: React.FC<Props> = ({
               </button>
             </div>
             <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">
-                    Location Code {isAddingLocation ? '*' : ''}
-                  </label>
-                  <input
-                    value={form.location_code || ''}
-                    onChange={e => setForm({ ...form, location_code: e.target.value.toUpperCase() })}
-                    placeholder="e.g. A1"
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    required={isAddingLocation}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">
-                    Location Name / Area {isAddingLocation ? '*' : ''}
-                  </label>
-                  <input
-                    value={form.location_name || ''}
-                    onChange={e => setForm({ ...form, location_name: e.target.value })}
-                    placeholder="e.g. Left Shelf"
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    required={isAddingLocation}
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">
+                  Location Name {isAddingLocation ? '*' : ''}
+                </label>
+                <input
+                  value={form.location_name || ''}
+                  onChange={e => setForm({ ...form, location_name: e.target.value })}
+                  placeholder="e.g. Left Shelf"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  required={isAddingLocation}
+                />
               </div>
               {!isAddingLocation && (
                 <div>
@@ -744,6 +822,95 @@ const ZoneDetail: React.FC<Props> = ({
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[15px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Record Movement
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit Location Modal ──────────────────────────────────────────────── */}
+      {showEditLocation && selectedLocRow && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-bold text-gray-900">Edit Location</h3>
+              <button onClick={() => setShowEditLocation(false)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">Location Name *</label>
+                <input
+                  value={editLocName}
+                  onChange={e => setEditLocName(e.target.value)}
+                  placeholder="e.g. Left Shelf"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2.5 mt-5 pt-4 border-t border-gray-100">
+              <button onClick={() => setShowEditLocation(false)} className="px-4 py-2 border border-gray-200 rounded-lg text-[15px] font-medium text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
+              <button onClick={handleRenameLocation} disabled={!editLocName.trim()} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[15px] font-semibold disabled:opacity-50 transition-colors">Save Changes</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Transfer Location Modal ──────────────────────────────────────────── */}
+      {showTransferLocation && selectedLocRow && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-bold text-gray-900">Transfer Location Stock</h3>
+              <button onClick={() => setShowTransferLocation(false)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">
+              Transfer all stock from Location <span className="font-bold text-gray-800">"{selectedLocRow.name}"</span> to another location or zone.
+            </p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">Destination Zone *</label>
+                <select
+                  value={transferLocForm.targetZoneId}
+                  onChange={e => setTransferLocForm({ ...transferLocForm, targetZoneId: e.target.value })}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  <option value="">Select destination zone...</option>
+                  {zones.map((z: any) => {
+                    const fact = factories.find(f => f._id === (z.factory_id?._id || z.factory_id));
+                    const fl = floors.find(f => f._id === (z.floor_id?._id || z.floor_id));
+                    return (
+                      <option key={z._id} value={z._id}>
+                        {fact?.name || 'Factory'} — {fl?.name || 'Floor'} — {z.name}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">Destination Location Name *</label>
+                <input
+                  value={transferLocForm.targetLocation}
+                  onChange={e => setTransferLocForm({ ...transferLocForm, targetLocation: e.target.value })}
+                  placeholder="e.g. Left Shelf"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2.5 mt-5 pt-4 border-t border-gray-100">
+              <button onClick={() => setShowTransferLocation(false)} className="px-4 py-2 border border-gray-200 rounded-lg text-[15px] font-medium text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
+              <button
+                onClick={handleTransferLocation}
+                disabled={!transferLocForm.targetZoneId || !transferLocForm.targetLocation.trim()}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[15px] font-semibold disabled:opacity-50 transition-colors"
+              >
+                Transfer Stock
               </button>
             </div>
           </div>

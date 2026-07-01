@@ -40,6 +40,9 @@ router.get("/stock", auth, rbac(view), ctrl.getInventoryStock);
 router.get("/zones-stock", auth, rbac(view), ctrl.getZonesWithStock);
 router.get("/zones/:zoneId/stock", auth, rbac(view), ctrl.getZoneStock);
 router.get("/zones/:zoneId/movements", auth, rbac(view), ctrl.getZoneMovements);
+router.put("/zones/:zoneId/locations/rename", auth, rbac(manage), ctrl.renameLocation);
+router.post("/zones/:zoneId/locations/transfer", auth, rbac(manage), ctrl.transferLocationInZone);
+router.delete("/zones/:zoneId/locations", auth, rbac(manage), ctrl.deleteLocationInZone);
 router.get("/dashboard-stats", auth, rbac(view), ctrl.getInventoryDashboardStats);
 router.get("/analytics", auth, rbac(view), ctrl.getAnalytics);
 

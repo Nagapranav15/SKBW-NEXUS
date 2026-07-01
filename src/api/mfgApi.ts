@@ -44,3 +44,8 @@ export const createBom = (data: any) => api.post(`${MFG}/boms`, data);
 export const updateBom = (id: string, data: any) => api.put(`${MFG}/boms/${id}`, data);
 export const deleteBom = (id: string) => api.delete(`${MFG}/boms/${id}`);
 export const executeBom = (data: any) => api.post(`${MFG}/boms/execute`, data);
+
+// Location Management
+export const renameLocation = (zoneId: string, oldName: string, newName: string) => api.put(`${MFG}/zones/${zoneId}/locations/rename`, { oldName, newName });
+export const transferLocation = (zoneId: string, data: { sourceLocation: string; targetZoneId: string; targetLocation: string }) => api.post(`${MFG}/zones/${zoneId}/locations/transfer`, data);
+export const deleteLocation = (zoneId: string, locationName: string) => api.delete(`${MFG}/zones/${zoneId}/locations`, { params: { location_name: locationName } });

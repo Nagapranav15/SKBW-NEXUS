@@ -226,15 +226,25 @@ exports.getZoneStock = async (req, res) => {
     // Get all movements involving this zone
     const pipeline = [
       { $match: { ...f, $or: [{ to_zone: toObjectId(zoneId) }, { from_zone: toObjectId(zoneId) }] } },
+      { $project: {
+        sku: 1,
+        location_name: {
+          $cond: [
+            { $eq: ["$to_zone", toObjectId(zoneId)] },
+            "$location_name",
+            { $ifNull: ["$from_location_name", "$location_name"] }
+          ]
+        },
+        qty: {
+          $cond: [{ $eq: ["$to_zone", toObjectId(zoneId)] }, "$quantity", { $multiply: ["$quantity", -1] }]
+        }
+      }},
       { $group: {
         _id: {
           sku: "$sku",
-          location_code: "$location_code",
           location_name: "$location_name"
         },
-        qty: { $sum: {
-          $cond: [{ $eq: ["$to_zone", toObjectId(zoneId)] }, "$quantity", { $multiply: ["$quantity", -1] }]
-        }}
+        qty: { $sum: "$qty" }
       }},
       { $match: { qty: { $gt: 0 } } }
     ];
@@ -247,8 +257,7 @@ exports.getZoneStock = async (req, res) => {
 
     const stock = results.map(r => ({
       sku: skuMap[r._id.sku.toString()] || null,
-      location_code: r._id.location_code || "",
-      location_name: r._id.location_name || "",
+      location_name: r._id.location_name || "Storage Area",
       quantity: r.qty
     }));
 
@@ -448,3 +457,125 @@ exports.getAnalytics = async (req, res) => {
     res.json({ byType, byCategory, daily });
   } catch (e) { res.status(500).json({ msg: e.message }); }
 };
+
+// ─── LOCATION MANAGEMENT ───
+exports.renameLocation = async (req, res) => {
+  try {
+    const { zoneId } = req.params;
+    const { oldName, newName } = req.body;
+    if (!oldName || !newName) return res.status(400).json({ msg: "oldName and newName are required" });
+
+    // Update all movements where to_zone is zoneId and location_name is oldName
+    await MfgMovement.updateMany(
+      { to_zone: toObjectId(zoneId), location_name: oldName },
+      { $set: { location_name: newName } }
+    );
+
+    // Update all movements where from_zone is zoneId and from_location_name/location_name is oldName
+    await MfgMovement.updateMany(
+      { from_zone: toObjectId(zoneId), location_name: oldName },
+      { $set: { location_name: newName } }
+    );
+    await MfgMovement.updateMany(
+      { from_zone: toObjectId(zoneId), from_location_name: oldName },
+      { $set: { from_location_name: newName } }
+    );
+
+    res.json({ msg: "Location renamed successfully" });
+  } catch (e) {
+    res.status(500).json({ msg: e.message });
+  }
+};
+
+exports.deleteLocationInZone = async (req, res) => {
+  try {
+    const { zoneId } = req.params;
+    const { location_name } = req.query;
+    if (!location_name) return res.status(400).json({ msg: "location_name is required" });
+
+    // Delete all movements where to_zone is zoneId and location_name is location_name
+    // OR from_zone is zoneId and from_location_name/location_name is location_name
+    await MfgMovement.deleteMany({
+      $or: [
+        { to_zone: toObjectId(zoneId), location_name },
+        { from_zone: toObjectId(zoneId), location_name },
+        { from_zone: toObjectId(zoneId), from_location_name: location_name }
+      ]
+    });
+
+    res.json({ msg: "Location and all its stock movements deleted successfully" });
+  } catch (e) {
+    res.status(500).json({ msg: e.message });
+  }
+};
+
+exports.transferLocationInZone = async (req, res) => {
+  try {
+    const { zoneId } = req.params;
+    const { sourceLocation, targetZoneId, targetLocation } = req.body;
+    if (!sourceLocation || !targetZoneId || !targetLocation) {
+      return res.status(400).json({ msg: "sourceLocation, targetZoneId, and targetLocation are required" });
+    }
+
+    // 1. Compute current stock of sourceLocation in zoneId
+    const pipeline = [
+      { $match: { $or: [{ to_zone: toObjectId(zoneId) }, { from_zone: toObjectId(zoneId) }] } },
+      { $project: {
+        sku: 1,
+        unit: 1,
+        location_name: {
+          $cond: [
+            { $eq: ["$to_zone", toObjectId(zoneId)] },
+            "$location_name",
+            { $ifNull: ["$from_location_name", "$location_name"] }
+          ]
+        },
+        qty: {
+          $cond: [{ $eq: ["$to_zone", toObjectId(zoneId)] }, "$quantity", { $multiply: ["$quantity", -1] }]
+        }
+      }},
+      { $match: { location_name: sourceLocation } },
+      { $group: {
+        _id: "$sku",
+        qty: { $sum: "$qty" },
+        unit: { $first: "$unit" }
+      }},
+      { $match: { qty: { $gt: 0 } } }
+    ];
+    const stockItems = await MfgMovement.aggregate(pipeline);
+
+    if (stockItems.length === 0) {
+      return res.status(400).json({ msg: "No active stock found in the source location to transfer" });
+    }
+
+    // 2. For each stock item, record a TRANSFER movement
+    const sampleMovement = await MfgMovement.findOne({
+      $or: [{ to_zone: toObjectId(zoneId) }, { from_zone: toObjectId(zoneId) }]
+    });
+    const company = sampleMovement ? sampleMovement.company : null;
+    if (!company) {
+      return res.status(400).json({ msg: "Unable to identify company for the transfer" });
+    }
+
+    const movementsToCreate = stockItems.map(item => ({
+      type: "TRANSFER",
+      from_zone: toObjectId(zoneId),
+      to_zone: toObjectId(targetZoneId),
+      sku: item._id,
+      quantity: item.qty,
+      unit: item.unit || "kg",
+      from_location_name: sourceLocation,
+      location_name: targetLocation,
+      company: company,
+      createdBy: req.user?._id,
+      remarks: `Transferred location stock from ${sourceLocation} to ${targetLocation}`
+    }));
+
+    await MfgMovement.insertMany(movementsToCreate);
+
+    res.json({ msg: `Transferred ${movementsToCreate.length} item(s) successfully` });
+  } catch (e) {
+    res.status(500).json({ msg: e.message });
+  }
+};
+
