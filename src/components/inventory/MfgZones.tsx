@@ -1504,9 +1504,8 @@ const MfgZones: React.FC = () => {
               onBack={() => { setSelectedZone(null); loadAll(); }}
               onZoneUpdated={(updated) => setSelectedZone(updated)}
               onZoneDeleted={(deletedZone) => {
-                  addToRecycleBin('zone', deletedZone.name, deletedZone);
-                  logActivity('DELETE', deletedZone.name, `Deleted Zone: ${deletedZone.name}`);
-                }
+                addToRecycleBin('zone', deletedZone.name, deletedZone);
+                logActivity('DELETE', deletedZone.name, `Deleted Zone: ${deletedZone.name}`);
                 setSelectedZone(null);
                 loadAll();
               }}
