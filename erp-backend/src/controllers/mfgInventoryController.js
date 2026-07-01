@@ -257,11 +257,13 @@ exports.getZoneStock = async (req, res) => {
     const skuDocs = await Sku.find({ _id: { $in: skuIds } });
     const skuMap = {}; skuDocs.forEach(s => { skuMap[s._id.toString()] = s; });
 
-    const stock = results.map(r => ({
-      sku: skuMap[r._id.sku.toString()] || null,
-      location_name: r._id.location_name || "Storage Area",
-      quantity: r.qty
-    }));
+    const stock = results
+      .map(r => ({
+        sku: skuMap[r._id.sku.toString()] || null,
+        location_name: r._id.location_name || "Storage Area",
+        quantity: r.qty
+      }))
+      .filter(s => s.sku !== null);
 
     res.json(stock);
   } catch (e) { res.status(500).json({ msg: e.message }); }
@@ -280,7 +282,7 @@ exports.getZoneMovements = async (req, res) => {
       .populate("from_zone", "zone_code name").populate("to_zone", "zone_code name")
       .populate("createdBy", "fullName");
 
-    res.json(movements);
+    res.json(movements.filter(m => m.sku !== null));
   } catch (e) { res.status(500).json({ msg: e.message }); }
 };
 
@@ -346,7 +348,8 @@ exports.getZonesWithStock = async (req, res) => {
 
       Object.entries(data.skus).forEach(([skuId, qty]) => {
         const finalQty = Math.max(0, qty);
-        if (finalQty > 0) {
+        const skuExists = skuDocs.some(s => s._id.toString() === skuId);
+        if (finalQty > 0 && skuExists) {
           zoneSkuCount++;
           zoneTotalQty += finalQty;
           zoneStockValue += finalQty * (skuCostMap[skuId] || 0);
@@ -377,7 +380,7 @@ exports.getInventoryDashboardStats = async (req, res) => {
         .populate("sku", "sku_code name category unit_type")
         .populate("from_zone", "zone_code").populate("to_zone", "zone_code")
     ]);
-    res.json({ totalZones: zones, activeSkus: skus, recentMovements: movements });
+    res.json({ totalZones: zones, activeSkus: skus, recentMovements: movements.filter(m => m.sku !== null) });
   } catch (e) { res.status(500).json({ msg: e.message }); }
 };
 

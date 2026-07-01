@@ -265,7 +265,7 @@ const ZoneDetail: React.FC<Props> = ({
               _id: `mock-stock-${Date.now()}`,
               sku: skuObj || { _id: form.sku, name: 'Added Item', sku_code: 'SKU-NEW', unit_type: form.unit },
               quantity: Number(form.quantity),
-              location_name: form.location_name || 'Storage Area'
+              location_name: form.location_name?.trim() || 'Storage Area'
             }
           ]);
         }
@@ -280,8 +280,8 @@ const ZoneDetail: React.FC<Props> = ({
         sku: form.sku,
         quantity: Number(form.quantity),
         unit: form.unit,
-        remarks: form.remarks || '',
-        location_name: form.location_name || '',
+        remarks: form.remarks?.trim() || '',
+        location_name: form.location_name?.trim() || '',
         company: selectedCompany?._id
       };
       if (form.type === 'IN') data.to_zone = zone._id;
