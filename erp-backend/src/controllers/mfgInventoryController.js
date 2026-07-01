@@ -229,30 +229,35 @@ exports.getZoneStock = async (req, res) => {
     const pipeline = [
       { $match: { ...f, $or: [{ to_zone: toObjectId(zoneId) }, { from_zone: toObjectId(zoneId) }] } },
       { $project: {
-        sku: 1,
-        location_name: {
-          $cond: [
-            { $eq: ["$to_zone", toObjectId(zoneId)] },
-            "$location_name",
-            {
+        entries: [
+          {
+            zone: "$from_zone",
+            location_name: {
               $cond: [
                 { $and: [{ $ne: ["$from_location_name", null] }, { $ne: ["$from_location_name", ""] }] },
                 "$from_location_name",
                 "$location_name"
               ]
-            }
-          ]
-        },
-        qty: {
-          $cond: [{ $eq: ["$to_zone", toObjectId(zoneId)] }, "$quantity", { $multiply: ["$quantity", -1] }]
-        }
+            },
+            qty: { $multiply: ["$quantity", -1] },
+            sku: "$sku"
+          },
+          {
+            zone: "$to_zone",
+            location_name: "$location_name",
+            qty: "$quantity",
+            sku: "$sku"
+          }
+        ]
       }},
+      { $unwind: "$entries" },
+      { $match: { "entries.zone": toObjectId(zoneId) } },
       { $group: {
         _id: {
-          sku: "$sku",
-          location_name: "$location_name"
+          sku: "$entries.sku",
+          location_name: "$entries.location_name"
         },
-        qty: { $sum: "$qty" }
+        qty: { $sum: "$entries.qty" }
       }},
       { $match: { qty: { $gt: 0 } } }
     ];
@@ -532,29 +537,33 @@ exports.transferLocationInZone = async (req, res) => {
     const pipeline = [
       { $match: { $or: [{ to_zone: toObjectId(zoneId) }, { from_zone: toObjectId(zoneId) }] } },
       { $project: {
-        sku: 1,
         unit: 1,
-        location_name: {
-          $cond: [
-            { $eq: ["$to_zone", toObjectId(zoneId)] },
-            "$location_name",
-            {
+        entries: [
+          {
+            zone: "$from_zone",
+            location_name: {
               $cond: [
                 { $and: [{ $ne: ["$from_location_name", null] }, { $ne: ["$from_location_name", ""] }] },
                 "$from_location_name",
                 "$location_name"
               ]
-            }
-          ]
-        },
-        qty: {
-          $cond: [{ $eq: ["$to_zone", toObjectId(zoneId)] }, "$quantity", { $multiply: ["$quantity", -1] }]
-        }
+            },
+            qty: { $multiply: ["$quantity", -1] },
+            sku: "$sku"
+          },
+          {
+            zone: "$to_zone",
+            location_name: "$location_name",
+            qty: "$quantity",
+            sku: "$sku"
+          }
+        ]
       }},
-      { $match: { location_name: sourceLocation } },
+      { $unwind: "$entries" },
+      { $match: { "entries.zone": toObjectId(zoneId), "entries.location_name": sourceLocation } },
       { $group: {
-        _id: "$sku",
-        qty: { $sum: "$qty" },
+        _id: "$entries.sku",
+        qty: { $sum: "$entries.qty" },
         unit: { $first: "$unit" }
       }},
       { $match: { qty: { $gt: 0 } } }

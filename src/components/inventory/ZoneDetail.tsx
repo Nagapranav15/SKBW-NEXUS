@@ -472,14 +472,31 @@ const ZoneDetail: React.FC<Props> = ({
       const targetSkuUnit = typeof selectedSkuForTransfer.sku === 'object' ? (selectedSkuForTransfer.sku?.unit_type || 'kg') : (skus.find(s => s._id === selectedSkuForTransfer.sku)?.unit_type || 'kg');
 
       if (zone._id.startsWith('mock-')) {
-        const updatedStock = stock.map((s: any) => {
+        let added = false;
+        let updatedStock = stock.map((s: any) => {
           if ((s.location_name || 'Storage Area') === sourceLocName && (s.sku?._id === targetSkuId || s.sku === targetSkuId)) {
             return { ...s, quantity: Math.max(0, (s.quantity ?? 0) - qtyNum) };
           }
+          if (transferItemForm.targetZoneId === zone._id && (s.location_name || 'Storage Area') === transferItemForm.targetLocation.trim() && (s.sku?._id === targetSkuId || s.sku === targetSkuId)) {
+            added = true;
+            return { ...s, quantity: (s.quantity ?? 0) + qtyNum };
+          }
           return s;
         });
+
+        if (transferItemForm.targetZoneId === zone._id && !added) {
+          const skuObj = typeof selectedSkuForTransfer.sku === 'object' ? selectedSkuForTransfer.sku : skus.find(s => s._id === targetSkuId);
+          updatedStock.push({
+            _id: `mock-stock-${Date.now()}`,
+            sku: skuObj || { _id: targetSkuId, name: targetSkuName, sku_code: 'SKU-NEW', unit_type: targetSkuUnit },
+            quantity: qtyNum,
+            location_name: transferItemForm.targetLocation.trim()
+          });
+        }
+
         setStock(updatedStock);
         setShowTransferItemModal(false);
+        setTransferItemForm({ targetZoneId: '', targetLocation: '', quantity: '' });
         showToast('Stock item transferred successfully (mock)', 'success');
         return;
       }
