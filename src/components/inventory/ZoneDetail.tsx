@@ -1078,38 +1078,50 @@ const ZoneDetail: React.FC<Props> = ({
             <div className="space-y-3">
               <div>
                 <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">
-                  Location Name {isAddingLocation ? '*' : ''}
+                  Location Name *
                 </label>
-                <select
-                  value={selectedLocOption}
-                  onChange={e => {
-                    setSelectedLocOption(e.target.value);
-                    if (e.target.value !== '__new__') {
-                      setForm({ ...form, location_name: e.target.value });
-                    } else {
-                      setForm({ ...form, location_name: '' });
-                    }
-                  }}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
-                >
-                  <option value="">Select location...</option>
-                  {existingLocations.map((loc, idx) => (
-                    <option key={idx} value={loc}>{loc}</option>
-                  ))}
-                  <option value="__new__">+ Create New Location...</option>
-                </select>
+                {isAddingLocation ? (
+                  <input
+                    value={form.location_name || ''}
+                    onChange={e => setForm({ ...form, location_name: e.target.value })}
+                    placeholder="e.g. Left Shelf"
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    required
+                  />
+                ) : (
+                  <>
+                    <select
+                      value={selectedLocOption}
+                      onChange={e => {
+                        setSelectedLocOption(e.target.value);
+                        if (e.target.value !== '__new__') {
+                          setForm({ ...form, location_name: e.target.value });
+                        } else {
+                          setForm({ ...form, location_name: '' });
+                        }
+                      }}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                    >
+                      <option value="">Select location...</option>
+                      {existingLocations.map((loc, idx) => (
+                        <option key={idx} value={loc}>{loc}</option>
+                      ))}
+                      <option value="__new__">+ Create New Location...</option>
+                    </select>
 
-                {selectedLocOption === '__new__' && (
-                  <div className="mt-2.5 animate-in slide-in-from-top-1 duration-150">
-                    <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">New Location Name *</label>
-                    <input
-                      value={form.location_name || ''}
-                      onChange={e => setForm({ ...form, location_name: e.target.value })}
-                      placeholder="e.g. Left Shelf"
-                      className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                      required
-                    />
-                  </div>
+                    {selectedLocOption === '__new__' && (
+                      <div className="mt-2.5 animate-in slide-in-from-top-1 duration-150">
+                        <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">New Location Name *</label>
+                        <input
+                          value={form.location_name || ''}
+                          onChange={e => setForm({ ...form, location_name: e.target.value })}
+                          placeholder="e.g. Left Shelf"
+                          className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          required
+                        />
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
               {!isAddingLocation && (
