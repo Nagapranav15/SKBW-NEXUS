@@ -5864,8 +5864,6 @@ const PartyManagement: React.FC = () => {
                 }
                 if (currentType === 'transporter') {
                   return [
-                    { label: 'Assigned Regions', value: '-', color: 'blue', isText: true },
-                    { label: 'Assigned Cities', value: '-', color: 'indigo', isText: true },
                     { label: 'Assigned Custs', value: viewingCustomer.customerCount || 0, color: 'purple' }
                   ];
                 }
@@ -6830,6 +6828,7 @@ const PartyManagement: React.FC = () => {
                                 key={cust._id}
                                 onClick={() => {
                                   setViewingCustomer(cust);
+                                  setCurrentType('customer');
                                 }}
                                 className="p-3 border border-gray-200 hover:border-blue-400 rounded-xl bg-white flex flex-col justify-between hover:shadow-xs hover:bg-blue-50/5 transition-all cursor-pointer group min-w-0"
                                 title={`View profile of ${cust.firmName || cust.contactName}`}

@@ -1881,7 +1881,7 @@ const MfgZones: React.FC = () => {
                                   await handleDelete(group.type, item._id, item.name);
                                   handleFindDuplicates(); // re-scan duplicates
                                 }}
-                                className="px-2.5 py-1 text-xs bg-red-50 hover:bg-red-100 text-red-650 border border-red-200 rounded font-semibold transition-colors flex items-center gap-1"
+                                className="px-2.5 py-1 text-xs bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded font-semibold transition-colors flex items-center gap-1"
                               >
                                 <Trash2 className="w-3 h-3" /> Delete
                               </button>

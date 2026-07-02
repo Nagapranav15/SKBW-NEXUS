@@ -861,7 +861,7 @@ const ZoneDetail: React.FC<Props> = ({
                                         handleDeleteLocation(loc.name);
                                         setOpenMenuId(null);
                                       }}
-                                      className="w-full text-left px-3.5 py-2 text-sm text-red-650 hover:bg-red-50 flex items-center gap-2"
+                                      className="w-full text-left px-3.5 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
                                     ><Trash2 className="w-3.5 h-3.5 text-red-500" /> Delete</button>
                                   </div>
                                 </div>
@@ -1388,7 +1388,7 @@ const ZoneDetail: React.FC<Props> = ({
                       handleDeleteLocation(selectedLocRow.name);
                       setSelectedLocRow(null);
                     }}
-                    className="flex items-center gap-1 px-3 py-1.5 border border-red-200 text-red-650 hover:bg-red-50 bg-white rounded-lg text-xs font-bold transition-colors shadow-sm"
+                    className="flex items-center gap-1 px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 bg-white rounded-lg text-xs font-bold transition-colors shadow-sm"
                   >
                     <Trash2 className="w-3.5 h-3.5 text-red-550" /> Delete Location
                   </button>
@@ -1511,11 +1511,11 @@ const ZoneDetail: React.FC<Props> = ({
                   <div className="bg-red-50/65 border border-red-100 p-3.5 rounded-xl mb-4 text-sm text-red-950 font-semibold">
                     <p>SKU: {targetSkuName} ({targetSkuCode})</p>
                     {selectedLocRow ? (
-                      <p className="mt-1 font-black text-xs text-red-650">Available at {selectedLocRow.name}: {fmt(availableQty)} {targetSkuUnit}</p>
+                      <p className="mt-1 font-black text-xs text-red-600">Available at {selectedLocRow.name}: {fmt(availableQty)} {targetSkuUnit}</p>
                     ) : dropdownLocName ? (
-                      <p className="mt-1 font-black text-xs text-red-650">Available at {dropdownLocName}: {fmt(availableQty)} {targetSkuUnit}</p>
+                      <p className="mt-1 font-black text-xs text-red-600">Available at {dropdownLocName}: {fmt(availableQty)} {targetSkuUnit}</p>
                     ) : (
-                      <p className="mt-1 font-black text-xs text-red-650">Select a location to view available stock</p>
+                      <p className="mt-1 font-black text-xs text-red-600">Select a location to view available stock</p>
                     )}
                   </div>
                   <div className="space-y-3">
@@ -1567,7 +1567,7 @@ const ZoneDetail: React.FC<Props> = ({
                     <button
                       onClick={handleRemoveSkuStock}
                       disabled={!removeStockQty || Number(removeStockQty) <= 0 || Number(removeStockQty) > availableQty}
-                      className="px-4 py-2 bg-red-650 hover:bg-red-700 text-white rounded-lg text-[15px] font-semibold disabled:opacity-50 transition-colors"
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-[15px] font-semibold disabled:opacity-50 transition-colors"
                     >
                       Remove Stock
                     </button>
