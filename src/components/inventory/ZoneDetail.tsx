@@ -757,7 +757,8 @@ const ZoneDetail: React.FC<Props> = ({
                   {canManage && (
                     <button
                       onClick={() => {
-                        setForm({ type: 'IN', sku: '', location_name: '', quantity: '', unit: 'kg', cost_per_unit: '', remarks: '' });
+                        setForm({ type: 'IN', sku: '', location_name: '', quantity: '1', unit: 'kg', cost_per_unit: '', remarks: '' });
+                        setSelectedLocOption('');
                         setIsAddingLocation(true);
                         setShowAddStock(true);
                       }}
@@ -775,7 +776,8 @@ const ZoneDetail: React.FC<Props> = ({
                     {canManage && (
                       <button
                         onClick={() => {
-                          setForm({ type: 'IN', sku: '', location_name: '', quantity: '', unit: 'kg', cost_per_unit: '', remarks: '' });
+                          setForm({ type: 'IN', sku: '', location_name: '', quantity: '1', unit: 'kg', cost_per_unit: '', remarks: '' });
+                          setSelectedLocOption('');
                           setIsAddingLocation(true);
                           setShowAddStock(true);
                         }}
@@ -957,7 +959,7 @@ const ZoneDetail: React.FC<Props> = ({
                               )}
                               <td className="px-5 py-3 text-center">
                                 {canManage && (
-                                  <div className="inline-flex gap-2 justify-center">
+                                  <div className="inline-flex gap-1.5 justify-center">
                                     <button
                                       onClick={() => {
                                         setSelectedSkuForTransfer(s);
@@ -966,7 +968,7 @@ const ZoneDetail: React.FC<Props> = ({
                                         setShowTransferItemModal(true);
                                       }}
                                       title="Transfer stock of this item"
-                                      className="p-1 hover:bg-blue-50 text-gray-400 hover:text-blue-600 rounded transition-colors"
+                                      className="p-1.5 bg-blue-50 text-blue-650 hover:bg-blue-100 rounded-lg transition-colors border border-blue-100/40 shadow-sm"
                                     >
                                       <ArrowRightLeft className="w-3.5 h-3.5" />
                                     </button>
@@ -979,7 +981,7 @@ const ZoneDetail: React.FC<Props> = ({
                                         setShowEditStockModal(true);
                                       }}
                                       title="Edit stock of this item"
-                                      className="p-1 hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 rounded transition-colors"
+                                      className="p-1.5 bg-emerald-50 text-emerald-650 hover:bg-emerald-100 rounded-lg transition-colors border border-emerald-100/40 shadow-sm"
                                     >
                                       <Edit className="w-3.5 h-3.5" />
                                     </button>
@@ -992,9 +994,9 @@ const ZoneDetail: React.FC<Props> = ({
                                         setShowRemoveStockModal(true);
                                       }}
                                       title="Remove stock of this item"
-                                      className="p-1 hover:bg-red-50 text-gray-400 hover:text-red-650 rounded transition-colors"
+                                      className="p-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors border border-red-100/40 shadow-sm animate-pulse-slow"
                                     >
-                                      <Minus className="w-3.5 h-3.5" />
+                                      <Minus className="w-3.5 h-3.5 font-bold" />
                                     </button>
                                   </div>
                                 )}
@@ -1171,7 +1173,7 @@ const ZoneDetail: React.FC<Props> = ({
                   </select>
                 </div>
               </div>
-              {isAdmin && (
+              {isAdmin && !isAddingLocation && (
                 <div>
                   <label className="block text-sm font-semibold text-gray-600 mb-1 uppercase tracking-wide">Cost / Unit (₹)</label>
                   <input type="number" value={form.cost_per_unit} onChange={e => setForm({ ...form, cost_per_unit: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="0.00" />
@@ -1437,7 +1439,7 @@ const ZoneDetail: React.FC<Props> = ({
                                     setShowTransferItemModal(true);
                                   }}
                                   title="Transfer item to another location/zone"
-                                  className="p-1 text-gray-450 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                  className="p-1.5 bg-blue-50 text-blue-650 hover:bg-blue-100 rounded-lg transition-colors border border-blue-100/40 shadow-sm"
                                 >
                                   <ArrowRightLeft className="w-3.5 h-3.5" />
                                 </button>
@@ -1449,7 +1451,7 @@ const ZoneDetail: React.FC<Props> = ({
                                     setShowEditStockModal(true);
                                   }}
                                   title="Edit Stock Details"
-                                  className="p-1 text-gray-450 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
+                                  className="p-1.5 bg-emerald-50 text-emerald-655 hover:bg-emerald-100 rounded-lg transition-colors border border-emerald-100/40 shadow-sm"
                                 >
                                   <Edit className="w-3.5 h-3.5" />
                                 </button>
@@ -1461,9 +1463,9 @@ const ZoneDetail: React.FC<Props> = ({
                                     setShowRemoveStockModal(true);
                                   }}
                                   title="Remove / Consume Stock"
-                                  className="p-1 text-gray-450 hover:text-red-650 hover:bg-red-50 rounded transition-colors"
+                                  className="p-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors border border-red-100/40 shadow-sm"
                                 >
-                                  <Minus className="w-3.5 h-3.5" />
+                                  <Minus className="w-3.5 h-3.5 font-bold" />
                                 </button>
                               </div>
                             )}
