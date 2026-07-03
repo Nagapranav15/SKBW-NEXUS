@@ -699,6 +699,7 @@ const PartyManagement: React.FC = () => {
   const [cityCustomers, setCityCustomers] = useState<any[]>([]);
   const [cityCustomersLoading, setCityCustomersLoading] = useState(false);
   const [cityCustomersSearchText, setCityCustomersSearchText] = useState('');
+  const [popupCustomerDetails, setPopupCustomerDetails] = useState<any>(null);
 
   // Inline city panel customer list state
   const [inlineCityCustomers, setInlineCityCustomers] = useState<any[]>([]);
@@ -6827,8 +6828,7 @@ const PartyManagement: React.FC = () => {
                               <div
                                 key={cust._id}
                                 onClick={() => {
-                                  setViewingCustomer(cust);
-                                  setCurrentType('customer');
+                                  setPopupCustomerDetails(cust);
                                 }}
                                 className="p-3 border border-gray-200 hover:border-blue-400 rounded-xl bg-white flex flex-col justify-between hover:shadow-xs hover:bg-blue-50/5 transition-all cursor-pointer group min-w-0"
                                 title={`View profile of ${cust.firmName || cust.contactName}`}
@@ -7158,6 +7158,355 @@ const PartyManagement: React.FC = () => {
               <button
                 onClick={() => setSelectedCityName(null)}
                 className="px-5 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 font-medium text-sm transition-colors shadow-xs"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Customer Details Popup Modal (Inside city drawer) */}
+      {popupCustomerDetails && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-100">
+          <div className="relative bg-white rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[90vh] border border-gray-150 animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-2xl flex justify-between items-center">
+              <div className="flex-1 min-w-0 pr-4">
+                <div className="flex items-center space-x-2.5">
+                  <Building2 className="w-5 h-5 text-blue-600 shrink-0" />
+                  <h2 className="text-lg font-bold text-gray-900 truncate">
+                    {popupCustomerDetails.firmName || popupCustomerDetails.contactName}
+                  </h2>
+                  <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full uppercase border ${
+                    popupCustomerDetails.status === 'active' ? 'bg-green-50 border-green-200 text-green-700' :
+                    popupCustomerDetails.status === 'inactive' ? 'bg-red-50 border-red-200 text-red-700' :
+                    'bg-yellow-50 border-yellow-200 text-yellow-755'
+                  }`}>
+                    {popupCustomerDetails.status || 'active'}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 font-mono mt-1">
+                  Customer Code: <span className="font-semibold text-blue-600">{popupCustomerDetails.code || popupCustomerDetails._id?.slice(-6).toUpperCase() || 'N/A'}</span>
+                </p>
+              </div>
+              <button
+                onClick={() => setPopupCustomerDetails(null)}
+                className="p-1.5 text-gray-400 hover:text-gray-650 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-4 bg-white text-gray-950">
+              {/* Basic Info Section */}
+              <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
+                  <User className="w-4 h-4 text-gray-500" /> Basic Information
+                </h3>
+                <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-sm">
+                  <div>
+                    <span className="block text-xs text-gray-400 font-medium">Contact Person</span>
+                    <span className="font-semibold text-gray-900">{getContactPersonForCard(popupCustomerDetails)}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-400 font-medium">Mobile Number</span>
+                    <div className="flex items-center space-x-1.5">
+                      {popupCustomerDetails.phone ? (
+                        <>
+                          <a
+                            href={`tel:${popupCustomerDetails.phone.replace(/\D/g, '')}`}
+                            className="font-semibold text-blue-600 hover:text-blue-800 hover:underline truncate"
+                            title={`Call ${popupCustomerDetails.phone}`}
+                          >
+                            {popupCustomerDetails.phone}
+                          </a>
+                          <a
+                            href={getWhatsAppLink(popupCustomerDetails.phone)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center"
+                          >
+                            <WhatsAppIcon />
+                          </a>
+                        </>
+                      ) : (
+                        <span className="font-semibold text-gray-900">-</span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-400 font-medium">WhatsApp Number</span>
+                    <div className="flex items-center space-x-1.5">
+                      {popupCustomerDetails.whatsapp ? (
+                        <>
+                          <a
+                            href={`tel:${popupCustomerDetails.whatsapp.replace(/\D/g, '')}`}
+                            className="font-semibold text-blue-600 hover:text-blue-800 hover:underline truncate"
+                            title={`Call ${popupCustomerDetails.whatsapp}`}
+                          >
+                            {popupCustomerDetails.whatsapp}
+                          </a>
+                          <a
+                            href={getWhatsAppLink(popupCustomerDetails.whatsapp)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center"
+                          >
+                            <WhatsAppIcon />
+                          </a>
+                        </>
+                      ) : (
+                        <span className="font-semibold text-gray-500 text-sm italic">Same as Mobile</span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-400 font-medium">Alternate Mobile</span>
+                    <div className="flex items-center space-x-1.5">
+                      {popupCustomerDetails.altPhone ? (
+                        <>
+                          <a
+                            href={`tel:${popupCustomerDetails.altPhone.replace(/\D/g, '')}`}
+                            className="font-semibold text-blue-600 hover:text-blue-800 hover:underline truncate"
+                            title={`Call ${popupCustomerDetails.altPhone}`}
+                          >
+                            {popupCustomerDetails.altPhone}
+                          </a>
+                          <a
+                            href={getWhatsAppLink(popupCustomerDetails.altPhone)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center"
+                          >
+                            <WhatsAppIcon />
+                          </a>
+                        </>
+                      ) : (
+                        <span className="font-semibold text-gray-900">-</span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-400 font-medium">Email ID</span>
+                    {popupCustomerDetails.email ? (
+                      <a
+                        href={`mailto:${popupCustomerDetails.email}`}
+                        className="font-semibold text-blue-600 hover:text-blue-800 hover:underline truncate block"
+                        title={`Email ${popupCustomerDetails.email}`}
+                      >
+                        {popupCustomerDetails.email}
+                      </a>
+                    ) : (
+                      <span className="font-semibold text-gray-900 block truncate">-</span>
+                    )}
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-400 font-medium">GST Number</span>
+                    <span className="font-semibold text-gray-900">{popupCustomerDetails.gstNumber || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-400 font-medium">Aadhar Number</span>
+                    <span className="font-semibold text-gray-900">{popupCustomerDetails.aadharNumber || '-'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Address Section */}
+              <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-gray-500" /> Address Information
+                </h3>
+                <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-sm text-gray-900">
+                  <div>
+                    <span className="block text-xs text-gray-400 font-medium">Door / Flat No.</span>
+                    <span className="font-semibold">{popupCustomerDetails.doorNo || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-400 font-medium">Street Name</span>
+                    <span className="font-semibold">{popupCustomerDetails.streetName || '-'}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="block text-xs text-gray-400 font-medium">Address Line 1</span>
+                    <span className="font-semibold">{popupCustomerDetails.address1 || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-400 font-medium">Area / Locality</span>
+                    <span className="font-semibold">{popupCustomerDetails.area || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-400 font-medium">Landmark</span>
+                    <span className="font-semibold">{popupCustomerDetails.landmark || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-400 font-medium">City / Town</span>
+                    <span className="font-semibold">{popupCustomerDetails.city || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-400 font-medium">District</span>
+                    <span className="font-semibold">{popupCustomerDetails.district || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-400 font-medium">State</span>
+                    <span className="font-semibold">{popupCustomerDetails.state || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-400 font-medium">Pincode</span>
+                    <span className="font-semibold">{popupCustomerDetails.pincode || '-'}</span>
+                  </div>
+                  <div className="col-span-2 pt-2 border-t border-gray-200/60">
+                    {popupCustomerDetails.gpsLocation ? (
+                      <a
+                        href={popupCustomerDetails.gpsLocation}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-center space-x-2 w-full p-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg border border-blue-200 text-xs font-semibold transition-colors"
+                      >
+                        <MapPin className="w-4 h-4 text-blue-600" />
+                        <span>Open Location on Google Maps</span>
+                      </a>
+                    ) : (
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                          `${popupCustomerDetails.firmName || ''} ${popupCustomerDetails.streetName || ''} ${popupCustomerDetails.city || ''} ${popupCustomerDetails.pincode || ''}`.trim()
+                        )}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-center space-x-2 w-full p-2 bg-gray-50 hover:bg-gray-100 text-gray-600 rounded-lg border border-gray-200 text-xs font-semibold transition-colors"
+                      >
+                        <MapPin className="w-4 h-4 text-gray-500" />
+                        <span>Search Address on Google Maps</span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Business Details Section */}
+              <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
+                  <Building className="w-4 h-4 text-gray-500" /> Business Details
+                </h3>
+                <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-sm text-gray-900">
+                  <div>
+                    <span className="block text-xs text-gray-400 font-medium">Assigned Region</span>
+                    <span className="inline-flex px-2 py-0.5 mt-0.5 text-xs font-semibold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-150">
+                      {popupCustomerDetails.route || 'No Region'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-400 font-medium">Assigned Agent</span>
+                    <span className="font-semibold">
+                      {(() => {
+                        const routeDoc = allRoutes.find(r => r.name === popupCustomerDetails.route);
+                        return routeDoc?.assignedAgent || popupCustomerDetails.agentAssigned || 'No Agent';
+                      })()}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-400 font-medium">Credit Days Limit</span>
+                    <span className="font-semibold">{popupCustomerDetails.creditDays || 0} Days</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-400 font-medium">Credit Limit</span>
+                    <span className="font-semibold">₹{(popupCustomerDetails.creditLimit || 0).toLocaleString('en-IN')}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-400 font-medium">Opening Balance</span>
+                    <span className="font-semibold">₹{(popupCustomerDetails.openingBalance || 0).toLocaleString('en-IN')}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-400 font-medium">Outstanding Balance</span>
+                    {(() => {
+                      const balance = popupCustomerDetails.outstandingBalance !== undefined ? popupCustomerDetails.outstandingBalance : (popupCustomerDetails.outstanding || 0);
+                      const info = getOutstandingInfo('customer', balance);
+                      return (
+                        <div className="flex flex-col mt-0.5">
+                          <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded border ${info.colorClass} w-fit`}>
+                            {info.formatted}
+                          </span>
+                          <span className="text-[10px] text-gray-450 mt-0.5 font-medium leading-none">
+                            {info.label}
+                          </span>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                  <div className="col-span-2">
+                    <span className="block text-xs text-gray-400 font-medium">Preferred Transport</span>
+                    <span className="font-semibold">{popupCustomerDetails.preferredTransport || 'Direct Delivery'}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="block text-xs text-gray-400 font-medium">Tags</span>
+                    {Array.isArray(popupCustomerDetails.tags) && popupCustomerDetails.tags.length > 0 ? (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {popupCustomerDetails.tags.map((tag: string, idx: number) => {
+                          const colors = getTagColor(tag);
+                          return (
+                            <span
+                              key={idx}
+                              className={`inline-flex px-2 py-0.5 text-xs font-bold rounded border shadow-3xs ${colors.bg} ${colors.text} ${colors.border}`}
+                            >
+                              {tag}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <span className="text-gray-400 mt-1 block text-sm">-</span>
+                    )}
+                  </div>
+                  {popupCustomerDetails.remarks && (
+                    <div className="col-span-2">
+                      <span className="block text-xs text-gray-400 font-medium">Remarks / Special Instructions</span>
+                      <p className="text-xs text-gray-600 bg-white border border-gray-150 rounded-lg p-2 mt-1 leading-relaxed whitespace-pre-line font-medium text-gray-800">
+                        {popupCustomerDetails.remarks}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Attached Photos */}
+              {(popupCustomerDetails.customerPhoto || popupCustomerDetails.shopPhoto) && (
+                <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-150 space-y-3">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
+                    <Camera className="w-4 h-4 text-gray-500" /> Attached Photos
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    {popupCustomerDetails.customerPhoto && (
+                      <div>
+                        <span className="block text-xs text-gray-400 font-medium mb-1.5">Customer Photo</span>
+                        <img
+                          src={popupCustomerDetails.customerPhoto}
+                          alt="Customer"
+                          className="w-full h-40 object-cover rounded-xl border border-gray-200 cursor-zoom-in hover:opacity-95 transition-opacity"
+                          onClick={() => setZoomedImage(popupCustomerDetails.customerPhoto)}
+                        />
+                      </div>
+                    )}
+                    {popupCustomerDetails.shopPhoto && (
+                      <div>
+                        <span className="block text-xs text-gray-450 font-medium mb-1.5">Shop Photo</span>
+                        <img
+                          src={popupCustomerDetails.shopPhoto}
+                          alt="Shop"
+                          className="w-full h-40 object-cover rounded-xl border border-gray-200 cursor-zoom-in hover:opacity-95 transition-opacity"
+                          onClick={() => setZoomedImage(popupCustomerDetails.shopPhoto)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl text-right">
+              <button
+                onClick={() => setPopupCustomerDetails(null)}
+                className="px-5 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 font-semibold text-sm transition-colors shadow-xs"
               >
                 Close
               </button>
