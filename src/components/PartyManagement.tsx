@@ -7174,7 +7174,7 @@ const PartyManagement: React.FC = () => {
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-2xl flex justify-between items-center">
               <div className="flex-1 min-w-0 pr-4">
                 <div className="flex items-center space-x-2.5">
-                  <Building2 className="w-5 h-5 text-blue-600 shrink-0" />
+                  <Building className="w-5 h-5 text-blue-600 shrink-0" />
                   <h2 className="text-lg font-bold text-gray-900 truncate">
                     {popupCustomerDetails.firmName || popupCustomerDetails.contactName}
                   </h2>
