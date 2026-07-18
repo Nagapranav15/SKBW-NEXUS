@@ -22,7 +22,8 @@ import {
   MapPin,
   Truck,
   ArrowRightLeft,
-  FileText
+  FileText,
+  Coins
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DataManager from './DataManager';
@@ -31,13 +32,16 @@ const Layout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
   const [salesDropdownOpen, setSalesDropdownOpen] = useState(false);
   const [masterDropdownOpen, setMasterDropdownOpen] = useState(() => {
-    return window.location.pathname.startsWith('/party') || window.location.pathname.startsWith('/inventory');
+    return window.location.pathname.startsWith('/party') || window.location.pathname.startsWith('/inventory') || window.location.pathname.startsWith('/inventory-v2');
   });
   const [partyDropdownOpen, setPartyDropdownOpen] = useState(() => {
     return window.location.pathname.startsWith('/party');
   });
   const [inventoryDropdownOpen, setInventoryDropdownOpen] = useState(() => {
     return window.location.pathname.startsWith('/inventory');
+  });
+  const [mfgV2DropdownOpen, setMfgV2DropdownOpen] = useState(() => {
+    return window.location.pathname.startsWith('/inventory-v2');
   });
   const [showDataManager, setShowDataManager] = useState(false);
   const navigate = useNavigate();
@@ -231,6 +235,19 @@ const Layout: React.FC = () => {
   const hasInventoryAccess = visibleInventoryItems.length > 0;
   const isInventoryActive = () => location.pathname.startsWith('/inventory');
 
+  const inventoryV2Items = [
+    { icon: LayoutGrid, label: 'Dashboard', path: '/inventory-v2/dashboard', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
+    { icon: Package, label: 'Item Master', path: '/inventory-v2/skus', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
+    { icon: Coins, label: 'Purchase List', path: '/inventory-v2/purchases', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
+    { icon: Database, label: 'Batch Stock List', path: '/inventory-v2/batch-stock', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
+    { icon: FileText, label: 'Inventory Ledger', path: '/inventory-v2/ledger', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
+    { icon: Warehouse, label: 'Warehouse Setup', path: '/inventory-v2/warehouse', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
+    { icon: ArrowRightLeft, label: 'Transactions (Test)', path: '/inventory-v2/testing-transactions', permission: ['MANAGE_INVENTORY', 'MANAGE_ITEMS'] },
+  ];
+  const visibleInventoryV2Items = inventoryV2Items.filter(item => hasPermission(item.permission));
+  const hasInventoryV2Access = visibleInventoryV2Items.length > 0;
+  const isInventoryV2Active = () => location.pathname.startsWith('/inventory-v2');
+
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
       case 'admin': return 'bg-red-100 text-red-700';
@@ -336,11 +353,11 @@ const Layout: React.FC = () => {
           })}
 
           {/* Master Dropdown */}
-          {(hasPartyAccess || hasInventoryAccess) && (
+          {(hasPartyAccess || hasInventoryAccess || hasInventoryV2Access) && (
             <div className="relative">
               <button
                 onClick={() => setMasterDropdownOpen(!masterDropdownOpen)}
-                className={getDropdownPrimaryClass(isPartyActive() || isInventoryActive())}
+                className={getDropdownPrimaryClass(isPartyActive() || isInventoryActive() || isInventoryV2Active())}
               >
                 <div className="flex items-center space-x-3">
                   <LayoutGrid className="w-5 h-5 text-blue-600" />
@@ -453,6 +470,43 @@ const Layout: React.FC = () => {
                               </button>
                             );
                           })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Manufacturing Inventory (Beta) Section */}
+                  {hasInventoryV2Access && (
+                    <div>
+                      <button
+                        onClick={() => setMfgV2DropdownOpen(!mfgV2DropdownOpen)}
+                        className={`w-full flex items-center justify-between px-2 py-1 rounded-lg text-sm font-semibold transition-colors ${
+                          isInventoryV2Active()
+                            ? 'text-blue-700 bg-blue-50/40'
+                            : 'text-gray-650 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-1.5">
+                          <Warehouse className="w-3.5 h-3.5 text-blue-500" />
+                          <span>Mfg Inventory (Beta)</span>
+                        </div>
+                        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${mfgV2DropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      
+                      {mfgV2DropdownOpen && (
+                        <div className="mt-1 ml-2 pl-2 border-l border-gray-150 space-y-0.5">
+                          {visibleInventoryV2Items.map((item) => (
+                            <button
+                              key={item.path}
+                              onClick={() => handleNavigate(item.path)}
+                              className={`${getSubItemClass(item.path)} flex items-center justify-between gap-2 pr-2`}
+                            >
+                              <div className="flex items-center gap-2">
+                                {item.icon && <item.icon className="w-3.5 h-3.5 shrink-0 text-gray-500" />}
+                                <span>{item.label}</span>
+                              </div>
+                            </button>
+                          ))}
                         </div>
                       )}
                     </div>

@@ -113,22 +113,22 @@ const getOutstandingInfo = (type: 'customer' | 'vendor' | string, balance: numbe
     }
   } else {
     // Vendor
-    if (val < 0) {
-      // We owe vendor -> RED
-      const absVal = Math.abs(val);
+    if (val > 0) {
+      // Positive: We owe vendor -> RED
       return {
         colorClass: 'bg-red-50 border-red-200 text-red-700',
         textClass: 'text-red-700 font-semibold',
-        label: 'We have to pay',
-        formatted: `₹${absVal.toLocaleString('en-IN')}`
+        label: 'We owe vendor',
+        formatted: `₹${val.toLocaleString('en-IN')}`
       };
-    } else if (val > 0) {
-      // Vendor owes us -> GREEN
+    } else if (val < 0) {
+      // Negative: Vendor owes us (Advance) -> GREEN
+      const absVal = Math.abs(val);
       return {
         colorClass: 'bg-green-50 border-green-200 text-green-700',
         textClass: 'text-green-700 font-semibold',
-        label: 'Vendor owes us',
-        formatted: `₹${val.toLocaleString('en-IN')}`
+        label: 'Vendor owes us (Advance)',
+        formatted: `₹${absVal.toLocaleString('en-IN')}`
       };
     } else {
       return {

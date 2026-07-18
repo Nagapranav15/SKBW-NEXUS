@@ -1,0 +1,542 @@
+const mongoose = require("mongoose");
+const PurchaseInvoiceV2 = require("../models/purchaseInvoiceV2Model");
+const Party = require("../models/partyModel");
+const SkuV2 = require("../models/skuV2Model");
+const WarehouseLocationV2 = require("../models/warehouseLocationV2Model");
+const InventoryLedger = require("../models/inventoryLedgerModelV2");
+const Sequence = require("../models/sequenceModel");
+const Transaction = require("../models/transactionModel");
+
+const toObjectId = (id) => {
+  if (!id) return null;
+  try {
+    return new mongoose.Types.ObjectId(id);
+  } catch (e) {
+    return null;
+  }
+};
+
+const generateTransactionId = (date) => {
+  const d = new Date(date);
+  const ymd = d.toISOString().split("T")[0].replace(/-/g, "");
+  const rand = Math.floor(1000 + Math.random() * 9000);
+  return `TXN-${ymd}-${rand}`;
+};
+
+exports.createPurchaseInvoice = async (req, res, next) => {
+  try {
+    const { invoiceNumber, vendorId, items, taxAmount = 0, freight = 0, craneCharges = 0, otherCharges = 0, dueDate, remarks, company } = req.body;
+
+    if (!company) {
+      return res.status(400).json({ msg: "company is required" });
+    }
+    if (!vendorId || !items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ msg: "Vendor and items are required" });
+    }
+
+    const companyObjId = toObjectId(company);
+
+    // 1. Validate Vendor
+    const vendor = await Party.findOne({ _id: toObjectId(vendorId), type: "vendor", company: companyObjId });
+    if (!vendor) {
+      return res.status(400).json({ msg: "Vendor not found or mismatch for this company" });
+    }
+
+    // 2. Validate Items, SKUs, and Location Hierarchies
+    const validatedItems = [];
+    let subTotal = 0;
+
+    for (const item of items) {
+      const { skuId, quantity, purchasePrice, lotNumber, locationId, reels } = item;
+      
+      if (!skuId || !quantity || !purchasePrice || !lotNumber || !locationId) {
+        return res.status(400).json({ msg: "Missing fields in purchase items" });
+      }
+
+      const qty = Number(quantity);
+      const price = Number(purchasePrice);
+      if (qty <= 0 || price <= 0) {
+        return res.status(400).json({ msg: "Quantity and price must be greater than zero" });
+      }
+
+      // Check SKU
+      const sku = await SkuV2.findOne({ _id: toObjectId(skuId), company: companyObjId });
+      if (!sku) {
+        return res.status(400).json({ msg: `SKU '${skuId}' not found` });
+      }
+      if (sku.category !== "Raw Material" && sku.category !== "Consumables") {
+        return res.status(400).json({ msg: `Only Raw Materials or Consumables can be purchased (SKU: ${sku.skuCode})` });
+      }
+
+      // Resolve Location Hierarchy
+      const location = await WarehouseLocationV2.findOne({ _id: toObjectId(locationId), company: companyObjId });
+      if (!location) {
+        return res.status(400).json({ msg: `Storage Location '${locationId}' not found` });
+      }
+      if (location.level !== "Storage Location") {
+        return res.status(400).json({ msg: `Location '${location.name}' is not a Storage Location node` });
+      }
+
+      const zone = await WarehouseLocationV2.findOne({ _id: location.parentId, company: companyObjId });
+      if (!zone || zone.level !== "Zone") {
+        return res.status(400).json({ msg: `Hierarchy error for location '${location.name}': parent must be a Zone` });
+      }
+
+      const floor = await WarehouseLocationV2.findOne({ _id: zone.parentId, company: companyObjId });
+      if (!floor || floor.level !== "Floor") {
+        return res.status(400).json({ msg: `Hierarchy error for zone '${zone.name}': parent must be a Floor` });
+      }
+
+      const warehouse = await WarehouseLocationV2.findOne({ _id: floor.parentId, company: companyObjId });
+      if (!warehouse || warehouse.level !== "Factory") {
+        return res.status(400).json({ msg: `Hierarchy error for floor '${floor.name}': parent must be a Factory` });
+      }
+
+      const itemTotal = qty * price;
+      subTotal += itemTotal;
+
+      validatedItems.push({
+        skuId: sku._id,
+        quantity: qty,
+        unit: sku.unit,
+        purchasePrice: price,
+        totalPrice: itemTotal,
+        lotNumber,
+        locationId: location._id,
+        reels: reels || [],
+        // Cached hierarchies for ledger creation
+        warehouseId: warehouse._id,
+        floorId: floor._id,
+        zoneId: zone._id
+      });
+    }
+
+    const grandTotal = subTotal + Number(taxAmount) + Number(freight) + Number(craneCharges) + Number(otherCharges);
+
+    // 3. Generate sequential invoice number if not manually specified
+    let finalInvoiceNo = invoiceNumber;
+    if (!finalInvoiceNo) {
+      const seqDoc = await Sequence.findOneAndUpdate(
+        { prefix: "PB" },
+        { $inc: { sequence: 1 } },
+        { new: true, upsert: true }
+      );
+      finalInvoiceNo = `PB-${String(seqDoc.sequence).padStart(6, '0')}`;
+    } else {
+      const exists = await PurchaseInvoiceV2.findOne({ invoiceNumber: finalInvoiceNo, company: companyObjId });
+      if (exists) {
+        return res.status(400).json({ msg: `Purchase Invoice '${finalInvoiceNo}' already exists` });
+      }
+    }
+
+    // 4. Save Purchase Invoice
+    const invoice = new PurchaseInvoiceV2({
+      invoiceNumber: finalInvoiceNo,
+      vendorId: vendor._id,
+      items: validatedItems,
+      subTotal,
+      taxAmount: Number(taxAmount),
+      freight: Number(freight),
+      craneCharges: Number(craneCharges),
+      otherCharges: Number(otherCharges),
+      grandTotal,
+      dueDate: dueDate ? new Date(dueDate) : undefined,
+      remarks: remarks || "",
+      createdBy: toObjectId(req.user.id),
+      company: companyObjId,
+      status: "Posted"
+    });
+    await invoice.save();
+
+    // 5. Inward stock using V2 Ledger Engine for each item
+    for (const valItem of validatedItems) {
+      const seqDoc = await Sequence.findOneAndUpdate(
+        { prefix: "IL" },
+        { $inc: { sequence: 1 } },
+        { new: true, upsert: true }
+      );
+      const transactionNumber = `IL-${String(seqDoc.sequence).padStart(8, '0')}`;
+
+      const newLedgerEntry = new InventoryLedger({
+        transactionNumber,
+        transactionType: "Purchase",
+        skuId: valItem.skuId,
+        quantity: valItem.quantity,
+        unit: valItem.unit,
+        direction: "IN",
+        referenceType: "PurchaseInvoice",
+        referenceId: finalInvoiceNo,
+        batchNumber: finalInvoiceNo,
+        warehouseId: valItem.warehouseId,
+        floorId: valItem.floorId,
+        zoneId: valItem.zoneId,
+        locationId: valItem.locationId,
+        remarks: `Lot: ${valItem.lotNumber}. Inwarded via invoice ${finalInvoiceNo}`,
+        createdBy: toObjectId(req.user.id),
+        company: companyObjId,
+        status: "Posted"
+      });
+      await newLedgerEntry.save();
+    }
+
+    // 6. Automatically increase Vendor's outstanding liability
+    const prevOutstanding = vendor.outstanding || 0;
+    const prevOutstandingBal = vendor.outstandingBalance || 0;
+    vendor.outstanding = prevOutstanding + grandTotal;
+    vendor.outstandingBalance = prevOutstandingBal + grandTotal;
+    await vendor.save();
+
+    // 7. Write to financial Transaction list (liability record)
+    const financialTx = new Transaction({
+      transactionId: generateTransactionId(new Date()),
+      date: new Date(),
+      type: "credit",
+      category: "Purchase Invoice V2",
+      subcategory: "Material Inward",
+      amount: grandTotal,
+      partyId: vendor._id,
+      partyName: vendor.firmName || vendor.ownerName,
+      description: `Inwarded materials under invoice ${finalInvoiceNo}`,
+      company: companyObjId,
+      createdBy: toObjectId(req.user.id),
+      source: "system",
+      source_type: "PURCHASE"
+    });
+    await financialTx.save();
+
+    res.status(201).json(invoice);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getPurchaseInvoices = async (req, res, next) => {
+  try {
+    const { companyId, vendorId, paymentStatus, search, page = 1, limit = 20 } = req.query;
+    if (!companyId) {
+      return res.status(400).json({ msg: "companyId query parameter is required" });
+    }
+
+    const query = { company: toObjectId(companyId) };
+    if (vendorId) query.vendorId = toObjectId(vendorId);
+    if (paymentStatus) query.paymentStatus = paymentStatus;
+
+    if (search) {
+      query.$or = [
+        { invoiceNumber: { $regex: search, $options: "i" } },
+        { remarks: { $regex: search, $options: "i" } }
+      ];
+    }
+
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const [invoices, total] = await Promise.all([
+      PurchaseInvoiceV2.find(query)
+        .populate("vendorId", "firmName ownerName phone contactName email outstanding")
+        .populate("items.skuId", "skuCode name category unit gsm ruleType")
+        .populate("items.locationId", "name level")
+        .populate("createdBy", "fullName")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit)),
+      PurchaseInvoiceV2.countDocuments(query)
+    ]);
+
+    res.json({
+      invoices,
+      total,
+      page: Number(page),
+      limit: Number(limit)
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.recordPurchasePayment = async (req, res, next) => {
+  try {
+    const { vendorId, amount, paymentMethod, referenceId, invoiceId, remarks, company } = req.body;
+
+    if (!company) {
+      return res.status(400).json({ msg: "company is required" });
+    }
+    if (!vendorId || !amount) {
+      return res.status(400).json({ msg: "Vendor and amount are required" });
+    }
+
+    const payAmount = Number(amount);
+    if (isNaN(payAmount) || payAmount <= 0) {
+      return res.status(400).json({ msg: "Amount must be a positive number" });
+    }
+
+    const companyObjId = toObjectId(company);
+
+    // 1. Find Vendor
+    const vendor = await Party.findOne({ _id: toObjectId(vendorId), type: "vendor", company: companyObjId });
+    if (!vendor) {
+      return res.status(400).json({ msg: "Vendor not found or mismatch" });
+    }
+
+    // 2. Resolve Payment allocation
+    let updatedInvoice = null;
+    if (invoiceId) {
+      const invoice = await PurchaseInvoiceV2.findOne({ _id: toObjectId(invoiceId), company: companyObjId });
+      if (!invoice) {
+        return res.status(400).json({ msg: "Invoice not found or mismatch" });
+      }
+
+      invoice.paidAmount = (invoice.paidAmount || 0) + payAmount;
+      if (invoice.paidAmount >= invoice.grandTotal) {
+        invoice.paymentStatus = "Paid";
+      } else if (invoice.paidAmount > 0) {
+        invoice.paymentStatus = "Partially Paid";
+      } else {
+        invoice.paymentStatus = "Unpaid";
+      }
+
+      await invoice.save();
+      updatedInvoice = invoice;
+    }
+
+    // 3. Automatically decrease Vendor's outstanding liability
+    const prevOutstanding = vendor.outstanding || 0;
+    const prevOutstandingBal = vendor.outstandingBalance || 0;
+    vendor.outstanding = Math.max(prevOutstanding - payAmount, 0);
+    vendor.outstandingBalance = Math.max(prevOutstandingBal - payAmount, 0);
+    await vendor.save();
+
+    // 4. Record financial Transaction log (debit payment out)
+    const financialTx = new Transaction({
+      transactionId: generateTransactionId(new Date()),
+      date: new Date(),
+      type: "debit", // Cash outflow reducing vendor liability
+      category: "Purchase Payment V2",
+      subcategory: paymentMethod || "bank_transfer",
+      amount: payAmount,
+      partyId: vendor._id,
+      partyName: vendor.firmName || vendor.ownerName,
+      description: remarks || `Paid vendor JK Paper. Ref: ${referenceId || 'N/A'}. Allocated to: ${invoiceId ? 'Specific invoice' : 'On account'}`,
+      paymentMethod: paymentMethod || "bank_transfer",
+      referenceId: referenceId || "",
+      company: companyObjId,
+      createdBy: toObjectId(req.user.id),
+      source: "system",
+      source_type: "PURCHASE"
+    });
+    await financialTx.save();
+
+    res.json({
+      msg: "Purchase payment logged successfully",
+      vendorOutstanding: vendor.outstanding,
+      invoice: updatedInvoice
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.editPurchaseInvoice = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { items, taxAmount = 0, freight = 0, craneCharges = 0, otherCharges = 0, dueDate, remarks, company } = req.body;
+
+    if (!company) {
+      return res.status(400).json({ msg: "company is required" });
+    }
+    const companyObjId = toObjectId(company);
+
+    const invoice = await PurchaseInvoiceV2.findOne({ _id: toObjectId(id), company: companyObjId });
+    if (!invoice) {
+      return res.status(404).json({ msg: "Purchase Invoice not found" });
+    }
+
+    const vendor = await Party.findOne({ _id: invoice.vendorId, company: companyObjId });
+    if (!vendor) {
+      return res.status(400).json({ msg: "Vendor associated with invoice not found" });
+    }
+
+    // Validate SKU/Locations
+    const validatedItems = [];
+    let subTotal = 0;
+
+    for (const item of items) {
+      const { skuId, quantity, purchasePrice, lotNumber, locationId, reels } = item;
+      
+      if (!skuId || !quantity || !purchasePrice || !lotNumber || !locationId) {
+        return res.status(400).json({ msg: "Missing fields in purchase items" });
+      }
+
+      const qty = Number(quantity);
+      const price = Number(purchasePrice);
+      if (qty <= 0 || price <= 0) {
+        return res.status(400).json({ msg: "Quantity and price must be greater than zero" });
+      }
+
+      const sku = await SkuV2.findOne({ _id: toObjectId(skuId), company: companyObjId });
+      if (!sku) {
+        return res.status(400).json({ msg: `SKU '${skuId}' not found` });
+      }
+
+      const location = await WarehouseLocationV2.findOne({ _id: toObjectId(locationId), company: companyObjId });
+      if (!location || location.level !== "Storage Location") {
+        return res.status(400).json({ msg: `Location '${locationId}' is not a valid Storage Location` });
+      }
+
+      const zone = await WarehouseLocationV2.findOne({ _id: location.parentId, company: companyObjId });
+      const floor = await WarehouseLocationV2.findOne({ _id: zone?.parentId, company: companyObjId });
+      const warehouse = await WarehouseLocationV2.findOne({ _id: floor?.parentId, company: companyObjId });
+
+      if (!zone || !floor || !warehouse) {
+        return res.status(400).json({ msg: `Hierarchy resolution error for location ${location.name}` });
+      }
+
+      const itemTotal = qty * price;
+      subTotal += itemTotal;
+
+      validatedItems.push({
+        skuId: sku._id,
+        quantity: qty,
+        unit: sku.unit,
+        purchasePrice: price,
+        totalPrice: itemTotal,
+        lotNumber,
+        locationId: location._id,
+        reels: reels || [],
+        warehouseId: warehouse._id,
+        floorId: floor._id,
+        zoneId: zone._id
+      });
+    }
+
+    const newGrandTotal = subTotal + Number(taxAmount) + Number(freight) + Number(craneCharges) + Number(otherCharges);
+    
+    // Check if new grand total is less than already paid amount
+    if (newGrandTotal < (invoice.paidAmount || 0)) {
+      return res.status(400).json({ msg: `Cannot edit invoice to amount ₹${newGrandTotal} which is less than the already paid amount of ₹${invoice.paidAmount}` });
+    }
+
+    const oldGrandTotal = invoice.grandTotal;
+    const diff = newGrandTotal - oldGrandTotal;
+
+    // Update Vendor Outstanding
+    vendor.outstanding = Math.max((vendor.outstanding || 0) + diff, 0);
+    vendor.outstandingBalance = Math.max((vendor.outstandingBalance || 0) + diff, 0);
+    await vendor.save();
+
+    // Update financial Transaction
+    await Transaction.findOneAndUpdate(
+      { 
+        company: companyObjId, 
+        partyId: vendor._id,
+        source_type: "PURCHASE", 
+        description: { $regex: invoice.invoiceNumber } 
+      },
+      { $set: { amount: newGrandTotal } }
+    );
+
+    // Delete old stock ledger entries and inward new ones
+    await InventoryLedger.deleteMany({ referenceType: "PurchaseInvoice", referenceId: invoice.invoiceNumber, company: companyObjId });
+
+    for (const valItem of validatedItems) {
+      const seqDoc = await Sequence.findOneAndUpdate(
+        { prefix: "IL" },
+        { $inc: { sequence: 1 } },
+        { new: true, upsert: true }
+      );
+      const transactionNumber = `IL-${String(seqDoc.sequence).padStart(8, '0')}`;
+
+      const newLedgerEntry = new InventoryLedger({
+        transactionNumber,
+        transactionType: "Purchase",
+        skuId: valItem.skuId,
+        quantity: valItem.quantity,
+        unit: valItem.unit,
+        direction: "IN",
+        referenceType: "PurchaseInvoice",
+        referenceId: invoice.invoiceNumber,
+        batchNumber: invoice.invoiceNumber,
+        warehouseId: valItem.warehouseId,
+        floorId: valItem.floorId,
+        zoneId: valItem.zoneId,
+        locationId: valItem.locationId,
+        remarks: `Lot: ${valItem.lotNumber}. Inwarded via invoice ${invoice.invoiceNumber}`,
+        createdBy: toObjectId(req.user.id),
+        company: companyObjId,
+        status: "Posted"
+      });
+      await newLedgerEntry.save();
+    }
+
+    // Update Invoice document
+    invoice.items = validatedItems;
+    invoice.subTotal = subTotal;
+    invoice.taxAmount = Number(taxAmount);
+    invoice.freight = Number(freight);
+    invoice.craneCharges = Number(craneCharges);
+    invoice.otherCharges = Number(otherCharges);
+    invoice.grandTotal = newGrandTotal;
+    invoice.dueDate = dueDate ? new Date(dueDate) : undefined;
+    invoice.remarks = remarks || "";
+    
+    if (invoice.paidAmount >= newGrandTotal) {
+      invoice.paymentStatus = "Paid";
+    } else if (invoice.paidAmount > 0) {
+      invoice.paymentStatus = "Partially Paid";
+    } else {
+      invoice.paymentStatus = "Unpaid";
+    }
+
+    await invoice.save();
+
+    res.json(invoice);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.deletePurchaseInvoice = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { company } = req.query;
+
+    if (!company) {
+      return res.status(400).json({ msg: "company query parameter is required" });
+    }
+    const companyObjId = toObjectId(company);
+
+    const invoice = await PurchaseInvoiceV2.findOne({ _id: toObjectId(id), company: companyObjId });
+    if (!invoice) {
+      return res.status(404).json({ msg: "Purchase Invoice not found" });
+    }
+
+    // Do not allow deleting paid invoices
+    if (invoice.paidAmount > 0) {
+      return res.status(400).json({ msg: "Cannot delete an invoice that has payments recorded. Please void the payments first." });
+    }
+
+    const vendor = await Party.findOne({ _id: invoice.vendorId, company: companyObjId });
+    if (vendor) {
+      vendor.outstanding = Math.max((vendor.outstanding || 0) - invoice.grandTotal, 0);
+      vendor.outstandingBalance = Math.max((vendor.outstandingBalance || 0) - invoice.grandTotal, 0);
+      await vendor.save();
+    }
+
+    // Delete financial Transaction
+    await Transaction.deleteOne({
+      company: companyObjId,
+      partyId: invoice.vendorId,
+      source_type: "PURCHASE",
+      description: { $regex: invoice.invoiceNumber }
+    });
+
+    // Delete stock ledger entries
+    await InventoryLedger.deleteMany({ referenceType: "PurchaseInvoice", referenceId: invoice.invoiceNumber, company: companyObjId });
+
+    // Delete invoice document
+    await PurchaseInvoiceV2.deleteOne({ _id: invoice._id });
+
+    res.json({ msg: "Purchase invoice deleted successfully" });
+  } catch (err) {
+    next(err);
+  }
+};

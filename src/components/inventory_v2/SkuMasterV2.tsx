@@ -1,0 +1,634 @@
+import React, { useEffect, useState } from 'react';
+import { Package, Search, Plus, Download, Upload, X, Eye, Edit, Trash2, RefreshCw, Layers } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { getSkusV2, bulkImportSkusV2, deleteSkuV2, SkuV2 } from '../../api/mfgApiV2';
+import AddSkuDrawerV2 from './AddSkuDrawerV2';
+import { showToast } from '../ui/Toast';
+import * as XLSX from 'xlsx';
+
+const SkuMasterV2: React.FC = () => {
+  const { selectedCompany } = useAuth();
+  const [skus, setSkus] = useState<SkuV2[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  
+  // Drawer & Modal states
+  const [showAddDrawer, setShowAddDrawer] = useState(false);
+  const [editSku, setEditSku] = useState<SkuV2 | null>(null);
+  const [deleteConfirmSku, setDeleteConfirmSku] = useState<SkuV2 | null>(null);
+  const [selectedSkuDetails, setSelectedSkuDetails] = useState<SkuV2 | null>(null);
+  const [showImportDrawer, setShowImportDrawer] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importLoading, setImportLoading] = useState(false);
+  const [importError, setImportError] = useState('');
+  const [importSuccessMsg, setImportSuccessMsg] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    if (selectedCompany?._id) {
+      loadSkus();
+    }
+  }, [selectedCompany?._id, categoryFilter, statusFilter]);
+
+  const loadSkus = async () => {
+    setLoading(true);
+    try {
+      const data = await getSkusV2(
+        selectedCompany?._id || '', 
+        categoryFilter || undefined, 
+        search || undefined,
+        statusFilter || undefined
+      );
+      setSkus(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    loadSkus();
+  };
+
+  const handleExport = () => {
+    const dataToExport = skus.map(s => ({
+      'SKU Code': s.skuCode,
+      'SKU Name': s.name,
+      'Category': s.category,
+      'Unit': s.unit,
+      'GSM': s.gsm || 'N/A',
+      'Width': s.width || 'N/A',
+      'Length': s.length || 'N/A',
+      'Brand': s.brand || 'N/A',
+      'Rule Type': s.ruleType || 'N/A',
+      'Status': s.status
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'SKUs V2');
+    XLSX.writeFile(wb, `SKU_Master_V2_${selectedCompany?.name || 'export'}.xlsx`);
+  };
+
+  const handleBulkImport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!importText.trim()) {
+      setImportError('Please enter some JSON array data.');
+      return;
+    }
+    setImportError('');
+    setImportSuccessMsg('');
+    setImportLoading(true);
+    try {
+      let parsed;
+      try {
+        parsed = JSON.parse(importText);
+      } catch (err) {
+        setImportError('Invalid JSON format. Please paste a valid JSON array.');
+        setImportLoading(false);
+        return;
+      }
+
+      if (!Array.isArray(parsed)) {
+        setImportError('JSON must be an array of objects.');
+        setImportLoading(false);
+        return;
+      }
+
+      const res = await bulkImportSkusV2(parsed, selectedCompany?._id || '');
+      setImportSuccessMsg(res.msg);
+      setImportText('');
+      loadSkus();
+    } catch (err: any) {
+      console.error(err);
+      setImportError(err.response?.data?.msg || 'Failed to import SKUs');
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  // Optimistic Save SKU handler (handles both Add and Edit)
+  const handleSaveSkuSuccess = (savedSku: SkuV2) => {
+    setShowAddDrawer(false);
+    
+    // Apply optimistic state update directly to Sku Master table state
+    setSkus(prev => {
+      const idx = prev.findIndex(item => item._id === savedSku._id);
+      if (idx > -1) {
+        // Edit Mode: Replace updated SKU
+        const updated = [...prev];
+        updated[idx] = savedSku;
+        return updated;
+      } else {
+        // Create Mode: Prepend new SKU
+        return [savedSku, ...prev];
+      }
+    });
+
+    showToast(editSku ? 'SKU updated successfully' : 'SKU created successfully', 'success');
+    setEditSku(null);
+  };
+
+  // Optimistic Delete SKU handler
+  const handleDeleteSku = async () => {
+    if (!deleteConfirmSku?._id) return;
+    
+    const targetId = deleteConfirmSku._id;
+    const targetCode = deleteConfirmSku.skuCode;
+    const originalSkus = [...skus];
+
+    // Optimistic UI Update: Immediately remove SKU from the local list
+    setSkus(prev => prev.filter(s => s._id !== targetId));
+    setDeleteConfirmSku(null);
+    setIsDeleting(true);
+
+    try {
+      await deleteSkuV2(targetId, selectedCompany?._id || '');
+      showToast(`SKU '${targetCode}' deleted successfully`, 'success');
+    } catch (err: any) {
+      console.error(err);
+      // Rollback UI update on failure
+      setSkus(originalSkus);
+      showToast(err.response?.data?.msg || `Failed to delete SKU '${targetCode}'`, 'error');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Local unit filter
+  const [unitFilter, setUnitFilter] = useState('');
+
+  // Local filtering
+  const filteredSkus = skus.filter(s => {
+    if (unitFilter && s.unit !== unitFilter) return false;
+    return true;
+  });
+
+  // Calculate dynamic stats
+  const totalItems = skus.length;
+  const rawMaterialsCount = skus.filter(s => s.category === 'Raw Material').length;
+  const semiFinishedCount = skus.filter(s => s.category === 'Semi Finished').length;
+  const finishedGoodsCount = skus.filter(s => s.category === 'Finished Goods').length;
+
+  // Extract unique units for unit filter dropdown
+  const uniqueUnits = Array.from(new Set(skus.map(s => s.unit)));
+
+  // Helper to format Size
+  const formatSize = (s: SkuV2) => {
+    if (s.width && s.length) {
+      return `${s.width} x ${s.length} cm`;
+    } else if (s.width) {
+      return `${s.width} cm`;
+    }
+    return '—';
+  };
+
+  return (
+    <div className="space-y-6 ">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+              <Package className="w-5 h-5" />
+            </span>
+            <div>
+              <h1 className="text-xl font-black text-gray-900 tracking-tight">
+                Item Master
+              </h1>
+              <p className="text-xs text-gray-500 mt-0.5">Create and manage all items in the system</p>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowImportDrawer(true)}
+            className="flex items-center gap-1.5 px-4 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 bg-white rounded-xl text-xs font-semibold shadow-sm transition-all"
+          >
+            <Upload className="w-3.5 h-3.5" /> Import Items
+          </button>
+          <button
+            onClick={() => {
+              setEditSku(null);
+              setShowAddDrawer(true);
+            }}
+            className="flex items-center gap-1.5 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md transition-all hover:scale-[1.02]"
+          >
+            <Plus className="w-3.5 h-3.5" /> Add Item
+          </button>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total Items */}
+        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
+            <Package className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Total Items</span>
+            <span className="text-2xl font-black text-gray-900">{totalItems}</span>
+            <span className="text-[10px] text-gray-500 mt-0.5 block">All Items</span>
+          </div>
+        </div>
+
+        {/* Raw Materials */}
+        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl">
+            <RefreshCw className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Raw Materials</span>
+            <span className="text-2xl font-black text-gray-900">{rawMaterialsCount}</span>
+            <span className="text-[10px] text-gray-500 mt-0.5 block">Items</span>
+          </div>
+        </div>
+
+        {/* Semi-Finished */}
+        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl">
+            <Layers className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Semi-Finished</span>
+            <span className="text-2xl font-black text-gray-900">{semiFinishedCount}</span>
+            <span className="text-[10px] text-gray-500 mt-0.5 block">Items</span>
+          </div>
+        </div>
+
+        {/* Finished Goods */}
+        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
+            <Package className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Finished Goods</span>
+            <span className="text-2xl font-black text-gray-900">{finishedGoodsCount}</span>
+            <span className="text-[10px] text-gray-500 mt-0.5 block">Items</span>
+          </div>
+        </div>
+      </div>      {/* Main Content Layout */}
+      <div className="space-y-4">
+        {/* Filters */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <form onSubmit={handleSearchSubmit} className="flex-1 w-full relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <input
+              type="text"
+              placeholder="Search items by name, code, brand..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50/50 focus:bg-white transition-all text-gray-900"
+            />
+          </form>
+          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+            <select
+              value={categoryFilter}
+              onChange={e => setCategoryFilter(e.target.value)}
+              className="w-full sm:w-36 px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-700"
+            >
+              <option value="">All Categories</option>
+              <option value="Raw Material">Raw Material</option>
+              <option value="Semi Finished">Semi-Finished</option>
+              <option value="Finished Goods">Finished Goods</option>
+            </select>
+            <select
+              value={unitFilter}
+              onChange={e => setUnitFilter(e.target.value)}
+              className="w-full sm:w-28 px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-700"
+            >
+              <option value="">All Units</option>
+              {uniqueUnits.map(u => (
+                <option key={u} value={u}>{u.toUpperCase()}</option>
+              ))}
+            </select>
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              className="w-full sm:w-28 px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-700"
+            >
+              <option value="">All Status</option>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+            <button
+              onClick={() => {
+                setSearch('');
+                setCategoryFilter('');
+                setUnitFilter('');
+                setStatusFilter('');
+              }}
+              className="p-2 text-gray-400 hover:text-blue-600 bg-gray-50 hover:bg-gray-200 rounded-xl transition-all"
+              title="Reset Filters"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* SKU Table */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          {loading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : filteredSkus.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-gray-100/60 text-gray-500 uppercase font-bold border-b border-gray-200 text-[10px]">
+                    <th className="px-5 py-3">Item Code</th>
+                    <th className="px-5 py-3">Item Name</th>
+                    <th className="px-5 py-3">Category</th>
+                    <th className="px-5 py-3">Unit</th>
+                    <th className="px-5 py-3">Brand</th>
+                    <th className="px-5 py-3 text-center">GSM</th>
+                    <th className="px-5 py-3 text-center">Size</th>
+                    <th className="px-5 py-3 text-center">Pages</th>
+                    <th className="px-5 py-3 text-center">Books/GBL</th>
+                    <th className="px-5 py-3 text-center">Status</th>
+                    <th className="px-5 py-3 text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 text-gray-700">
+                  {filteredSkus.map((s) => (
+                    <tr 
+                      key={s._id} 
+                      onClick={() => setSelectedSkuDetails(s)}
+                      className="hover:bg-gray-50/40 transition-colors cursor-pointer"
+                    >
+                      <td className="px-5 py-3 font-bold font-mono text-blue-600">{s.skuCode}</td>
+                      <td className="px-5 py-3 font-semibold text-gray-800">{s.name}</td>
+                      <td className="px-5 py-3">
+                        <span className={`text-[10px] px-2 py-0.5 rounded font-bold inline-block ${
+                          s.category === 'Raw Material' ? 'bg-amber-50 text-amber-700' :
+                          s.category === 'Semi Finished' ? 'bg-purple-50 text-purple-700' :
+                          'bg-emerald-50 text-emerald-700'
+                        }`}>
+                          {s.category}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 font-bold text-gray-500 uppercase font-mono">{s.unit}</td>
+                      <td className="px-5 py-3 font-medium text-gray-600">{s.brand || '—'}</td>
+                      <td className="px-5 py-3 text-center font-semibold text-gray-600">{s.gsm || '—'}</td>
+                      <td className="px-5 py-3 text-center font-medium text-gray-600">{formatSize(s)}</td>
+                      <td className="px-5 py-3 text-center font-bold text-gray-700">{(s as any).pages || '—'}</td>
+                      <td className="px-5 py-3 text-center font-bold text-gray-700">{(s as any).booksGbl || '—'}</td>
+                      <td className="px-5 py-3 text-center">
+                        <span className={`text-[10px] px-2 py-0.5 rounded font-extrabold uppercase inline-block ${
+                          s.status === 'Active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          {s.status}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-center" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => setSelectedSkuDetails(s)}
+                            className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                            title="View Details"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditSku(s);
+                              setShowAddDrawer(true);
+                            }}
+                            className="p-1 text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                            title="Edit SKU"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setDeleteConfirmSku(s)}
+                            className="p-1 text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                            title="Delete SKU"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-16 text-gray-400">
+              <Package className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+              <p className="text-sm font-semibold">No items registered yet</p>
+              <p className="text-xs text-gray-500 mt-1">Register a new raw, semi-finished, or finished SKU using the "+ Add Item" button.</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Add/Edit SKU Slide-Over */}
+      {showAddDrawer && (
+        <AddSkuDrawerV2
+          companyId={selectedCompany?._id || ''}
+          editSku={editSku}
+          onClose={() => {
+            setShowAddDrawer(false);
+            setEditSku(null);
+          }}
+          onSaveSuccess={handleSaveSkuSuccess}
+        />
+      )}
+
+      {/* Sleek Modal: Delete Confirmation */}
+      {deleteConfirmSku && (
+        <div className="fixed inset-0 z-50 overflow-hidden flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-in fade-in duration-100">
+          <div className="relative bg-white rounded-2xl max-w-sm w-full shadow-2xl flex flex-col border border-gray-200 animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 bg-gray-50 rounded-t-2xl flex justify-between items-center">
+              <h2 className="text-sm font-bold text-gray-900">Confirm Deletion</h2>
+              <button
+                onClick={() => setDeleteConfirmSku(null)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-4.5 h-4.5" />
+              </button>
+            </div>
+            <div className="p-5 text-gray-800 space-y-3">
+              <p className="text-xs font-semibold leading-relaxed">
+                Are you sure you want to delete SKU <span className="font-bold font-mono text-red-600">{deleteConfirmSku.skuCode}</span>?
+              </p>
+              <p className="text-[11px] text-gray-400">
+                This action is non-reversible. Deletion will be rejected if the SKU contains active ledger transactions.
+              </p>
+            </div>
+            <div className="px-5 py-3 border-t border-gray-100 bg-gray-50 flex justify-end gap-2">
+              <button
+                onClick={() => setDeleteConfirmSku(null)}
+                className="px-3.5 py-1.5 border border-gray-200 rounded-lg text-xs font-bold text-gray-600 bg-white hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteSku}
+                className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow-3xs"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Import Slide-Over Drawer */}
+      {showImportDrawer && (
+        <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-3xs" onClick={() => setShowImportDrawer(false)} />
+          <div className="relative w-full max-w-lg bg-white shadow-2xl h-full flex flex-col z-10 animate-in slide-in-from-right duration-250">
+            <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-bold text-gray-900">Bulk Import SKUs (JSON Array)</h2>
+                <p className="text-[11px] text-gray-500 mt-0.5">Parse and ingest multiple SKUs in a single payload</p>
+              </div>
+              <button
+                onClick={() => setShowImportDrawer(false)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleBulkImport} className="flex-1 overflow-y-auto p-5 space-y-4">
+              {importError && (
+                <div className="p-3 bg-red-50 border border-red-150 rounded-xl text-xs font-semibold text-red-700">
+                  {importError}
+                </div>
+              )}
+              {importSuccessMsg && (
+                <div className="p-3 bg-green-50 border border-green-150 rounded-xl text-xs font-semibold text-green-700">
+                  {importSuccessMsg}
+                </div>
+              )}
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Paste JSON Array *</label>
+                <textarea
+                  placeholder={`[\n  {\n    "skuCode": "RM-REEL-70GSM",\n    "name": "Century Maplitho Reel 70 GSM",\n    "category": "Raw Material",\n    "unit": "kg",\n    "gsm": 70,\n    "brand": "Century"\n  }\n]`}
+                  value={importText}
+                  onChange={e => setImportText(e.target.value)}
+                  className="w-full h-96 px-3 py-2 border border-gray-200 rounded-lg text-xs font-mono focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white"
+                  required
+                />
+              </div>
+            </form>
+            <div className="px-5 py-3.5 border-t border-gray-100 bg-gray-50 flex justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowImportDrawer(false)}
+                className="px-4 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 bg-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                onClick={handleBulkImport}
+                disabled={importLoading}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5"
+              >
+                {importLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
+                Ingest Array
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SKU Details Side-Over Drawer */}
+      {selectedSkuDetails && (
+        <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-3xs" onClick={() => setSelectedSkuDetails(null)} />
+          <div className="relative w-full max-w-lg bg-white shadow-2xl h-full flex flex-col z-10 animate-in slide-in-from-right duration-250">
+            <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-bold text-gray-900">SKU Detailed Information</h2>
+                <p className="text-[11px] text-gray-500 mt-0.5">Attributes & parameters associated with this item</p>
+              </div>
+              <button
+                onClick={() => setSelectedSkuDetails(null)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-blue-600" /> General Specifications
+                </h3>
+                <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs text-gray-900">
+                  <div>
+                    <span className="block text-[10px] text-gray-400 font-medium uppercase">SKU Code</span>
+                    <span className="font-bold font-mono text-sm">{selectedSkuDetails.skuCode}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-gray-400 font-medium uppercase">Category</span>
+                    <span className="font-semibold text-blue-600">{selectedSkuDetails.category}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="block text-[10px] text-gray-400 font-medium uppercase">SKU Name</span>
+                    <span className="font-bold">{selectedSkuDetails.name}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-gray-400 font-medium uppercase">GSM</span>
+                    <span className="font-semibold">{selectedSkuDetails.gsm || '—'} GSM</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-gray-400 font-medium uppercase">Dimensions (W x L)</span>
+                    <span className="font-semibold">{formatSize(selectedSkuDetails)}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-gray-400 font-medium uppercase">Rule Type</span>
+                    <span className="font-semibold">{selectedSkuDetails.ruleType || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-gray-400 font-medium uppercase">Pages</span>
+                    <span className="font-semibold">{(selectedSkuDetails as any).pages || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-gray-400 font-medium uppercase">Books / GBL</span>
+                    <span className="font-semibold">{(selectedSkuDetails as any).booksGbl || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-gray-400 font-medium uppercase">Brand</span>
+                    <span className="font-semibold">{selectedSkuDetails.brand || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-gray-400 font-medium uppercase">Default Unit</span>
+                    <span className="font-semibold font-mono">{selectedSkuDetails.unit}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-gray-400 font-medium uppercase">Status</span>
+                    <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-extrabold uppercase ${
+                      selectedSkuDetails.status === 'Active' ? 'bg-green-50 text-green-700' : 'bg-gray-200 text-gray-500'
+                    }`}>
+                      {selectedSkuDetails.status}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="px-5 py-3.5 border-t border-gray-100 bg-gray-50 text-right">
+              <button
+                onClick={() => setSelectedSkuDetails(null)}
+                className="px-5 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 font-semibold text-xs shadow-3xs"
+              >
+                Close Window
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default SkuMasterV2;

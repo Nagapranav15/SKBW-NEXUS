@@ -17,6 +17,7 @@ const transactionRoutes = require("./routes/transactionRoutes");
 const warehouseRoutes = require("./routes/warehouseRoutes");
 const inventoryRoutes = require("./routes/inventoryRoutes");
 const mfgInventoryRoutes = require("./routes/mfgInventoryRoutes");
+const mfgInventoryV2Routes = require("./routes/mfgInventoryV2Routes");
 const activityLogRoutes = require("./routes/activityLogRoutes");
 const dataManagerRoutes = require("./routes/dataManagerRoutes");
 
@@ -65,6 +66,7 @@ app.use("/api/transactions", transactionRoutes);
 app.use("/api/warehouses", warehouseRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/mfg", mfgInventoryRoutes);
+app.use("/api/v2", mfgInventoryV2Routes);
 app.use("/api/activity-logs", activityLogRoutes);
 app.use("/api/data-manager", dataManagerRoutes);
 
