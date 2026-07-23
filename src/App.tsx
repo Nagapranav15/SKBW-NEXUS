@@ -36,18 +36,7 @@ import PurchaseInvoicePage from './components/inventory_v2/purchases/pages/Purch
 import InventoryBalanceV2 from './components/inventory_v2/InventoryBalanceV2';
 import BatchStockV2 from './components/inventory_v2/BatchStockV2';
 
-import { useEffect } from 'react';
-
 function App() {
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (window.location.pathname !== '/login') {
-        window.location.reload();
-      }
-    }, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
   return (
     <AuthProvider>
       <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>

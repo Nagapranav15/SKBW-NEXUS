@@ -38,9 +38,14 @@ const InventoryLedgerPage: React.FC = () => {
   }, [selectedCompany?._id]);
 
   useEffect(() => {
-    if (selectedCompany?._id) {
-      loadLedger();
-    }
+    if (!selectedCompany?._id) return;
+    loadLedger(true);
+
+    const interval = setInterval(() => {
+      loadLedger(false);
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, [selectedCompany?._id, page, skuFilter, locFilter, typeFilter, directionFilter, startDate, endDate]);
 
   const loadFilterData = async () => {
@@ -56,8 +61,10 @@ const InventoryLedgerPage: React.FC = () => {
     }
   };
 
-  const loadLedger = async () => {
-    setLoading(true);
+  const loadLedger = async (showLoading = true) => {
+    if (showLoading) {
+      setLoading(true);
+    }
     try {
       const res = await fetchInventoryLedger({
         companyId: selectedCompany?._id || '',
@@ -73,10 +80,19 @@ const InventoryLedgerPage: React.FC = () => {
       });
       setEntries(res.entries);
       setTotal(res.total);
+      
+      if (selectedEntry) {
+        const updated = res.entries.find((entry: any) => entry._id === selectedEntry._id);
+        if (updated) {
+          setSelectedEntry(updated);
+        }
+      }
     } catch (e) {
       console.error(e);
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   };
 
