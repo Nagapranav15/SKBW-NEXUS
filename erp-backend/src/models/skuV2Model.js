@@ -6,8 +6,12 @@ const skuV2Schema = new mongoose.Schema({
   category: { 
     type: String, 
     required: true, 
-    enum: ["Raw Material", "Semi Finished", "Finished Goods"],
     index: true
+  },
+  paperType: {
+    type: String,
+    enum: ["Reels", "Sheets", "None"],
+    default: "None"
   },
   unit: { type: String, required: true },
   gsm: { type: Number, required: false },
@@ -16,8 +20,7 @@ const skuV2Schema = new mongoose.Schema({
   brand: { type: String, default: "" },
   ruleType: { 
     type: String, 
-    required: false, 
-    enum: ["Plain", "Single Line", "Double Line", "Square Ruled", "Four Line", "Unruled"] 
+    required: false
   },
   pages: { type: Number, required: false },
   booksGbl: { type: Number, required: false },

@@ -46,4 +46,8 @@ router.put("/purchases/invoices/:id", auth, rbac(manage), purchaseCtrl.editPurch
 router.delete("/purchases/invoices/:id", auth, rbac(manage), purchaseCtrl.deletePurchaseInvoice);
 router.post("/purchases/payments", auth, rbac(manage), purchaseCtrl.recordPurchasePayment);
 
+// Metadata routes
+router.get("/metadata", auth, ctrl.getMetadata);
+router.post("/metadata", auth, ctrl.updateMetadata);
+
 module.exports = router;

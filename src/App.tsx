@@ -35,6 +35,7 @@ import TestingTransactionsV2 from './components/inventory_v2/TestingTransactions
 import PurchaseInvoicePage from './components/inventory_v2/purchases/pages/PurchaseInvoicePage';
 import InventoryBalanceV2 from './components/inventory_v2/InventoryBalanceV2';
 import BatchStockV2 from './components/inventory_v2/BatchStockV2';
+import SettingsPage from './components/inventory_v2/SettingsPage';
 
 function App() {
   return (
@@ -95,6 +96,7 @@ function App() {
               <Route path="inventory-v2/purchases" element={<PurchaseInvoicePage />} />
               <Route path="inventory-v2/batch-stock" element={<BatchStockV2 />} />
               <Route path="inventory-v2/testing-transactions" element={<TestingTransactionsV2 />} />
+              <Route path="inventory-v2/settings" element={<SettingsPage />} />
               <Route path="inventory-v2/balances" element={<InventoryBalanceV2 />} />
             </Route>
             <Route path="*" element={<Navigate to="/login" replace />} />

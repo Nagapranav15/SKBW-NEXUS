@@ -4,6 +4,7 @@ const WarehouseLocationV2 = require("../models/warehouseLocationV2Model");
 const InventoryLedgerV2 = require("../models/inventoryLedgerV2Model");
 const InventoryLedger = require("../models/inventoryLedgerModelV2");
 const Sequence = require("../models/sequenceModel");
+const Metadata = require("../models/metadataModel");
 
 const toObjectId = (id) => {
   if (!id) return null;
@@ -1134,6 +1135,45 @@ exports.createInventoryLedgerEntry = async (req, res, next) => {
 
     await newEntry.save();
     res.status(201).json(newEntry);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getMetadata = async (req, res, next) => {
+  try {
+    const { companyId } = req.query;
+    if (!companyId) {
+      return res.status(400).json({ msg: "companyId query parameter is required" });
+    }
+    const companyObjId = toObjectId(companyId);
+    let doc = await Metadata.findOne({ company: companyObjId });
+    if (!doc) {
+      doc = new Metadata({ company: companyObjId });
+      await doc.save();
+    }
+    res.json(doc);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.updateMetadata = async (req, res, next) => {
+  try {
+    const { companyId, units, categories, ruleTypes } = req.body;
+    if (!companyId) {
+      return res.status(400).json({ msg: "companyId is required" });
+    }
+    const companyObjId = toObjectId(companyId);
+    let doc = await Metadata.findOne({ company: companyObjId });
+    if (!doc) {
+      doc = new Metadata({ company: companyObjId });
+    }
+    if (units) doc.units = units;
+    if (categories) doc.categories = categories;
+    if (ruleTypes) doc.ruleTypes = ruleTypes;
+    await doc.save();
+    res.json(doc);
   } catch (err) {
     next(err);
   }

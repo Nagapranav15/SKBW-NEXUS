@@ -4,13 +4,14 @@ export interface SkuV2 {
   _id?: string;
   skuCode: string;
   name: string;
-  category: 'Raw Material' | 'Semi Finished' | 'Finished Goods';
+  category: string;
+  paperType?: 'Reels' | 'Sheets' | 'None';
   unit: string;
   gsm?: number;
   width?: number;
   length?: number;
   brand?: string;
-  ruleType?: 'Plain' | 'Single Line' | 'Double Line' | 'Square Ruled' | 'Four Line' | 'Unruled';
+  ruleType?: string;
   status: 'Active' | 'Inactive';
   createdAt?: string;
 }
@@ -171,5 +172,25 @@ export const getDashboardStatsV2 = async (companyId: string): Promise<{
   const response = await api.get('/v2/dashboard', {
     params: { companyId }
   });
+  return response.data;
+};
+
+export interface MetadataV2 {
+  _id?: string;
+  company: string;
+  units: string[];
+  categories: string[];
+  ruleTypes: string[];
+}
+
+export const getMetadataV2 = async (companyId: string): Promise<MetadataV2> => {
+  const response = await api.get('/v2/metadata', {
+    params: { companyId }
+  });
+  return response.data;
+};
+
+export const updateMetadataV2 = async (metadataData: { companyId: string; units?: string[]; categories?: string[]; ruleTypes?: string[] }): Promise<MetadataV2> => {
+  const response = await api.post('/v2/metadata', metadataData);
   return response.data;
 };

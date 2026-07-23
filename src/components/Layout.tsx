@@ -617,6 +617,12 @@ const Layout: React.FC = () => {
                 >
                   Switch Company
                 </button>
+                <button
+                  onClick={() => handleNavigate('/inventory-v2/settings')}
+                  className={getSubItemClass('/inventory-v2/settings')}
+                >
+                  Custom Options
+                </button>
               </div>
             )}
           </div>

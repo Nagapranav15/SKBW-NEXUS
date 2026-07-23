@@ -129,12 +129,12 @@ const PurchaseInvoicePage: React.FC = () => {
   const loadFilterData = async () => {
     try {
       const [vendorRes, skuRes, locRes] = await Promise.all([
-        getParties({ company: selectedCompany?._id || '' }),
+        getParties({ company: selectedCompany?._id || '', type: 'vendor', limit: 1000 }),
         getSkusV2(selectedCompany?._id || ''),
         getWarehouseHierarchyV2(selectedCompany?._id || '')
       ]);
       const vendorList = vendorRes && (vendorRes as any).parties ? (vendorRes as any).parties : (Array.isArray(vendorRes) ? vendorRes : []);
-      setVendors(vendorList.filter((p: any) => p.type === 'vendor'));
+      setVendors(vendorList);
       setSkus(skuRes);
       setLocations(locRes);
     } catch (e) {
