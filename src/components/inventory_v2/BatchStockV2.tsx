@@ -45,26 +45,66 @@ const BatchStockV2: React.FC = () => {
   const limit = 20;
 
   useEffect(() => {
-    if (selectedCompany?._id) {
-      loadData();
-    }
+    if (!selectedCompany?._id) return;
+    loadData(true);
+
+    const interval = setInterval(() => {
+      loadData(false);
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, [selectedCompany?._id]);
 
   useEffect(() => {
-    if (balances.length > 0 && !selectedLot) {
-      setSelectedLot(balances[0]);
+    if (balances.length > 0) {
+      if (!selectedLot) {
+        setSelectedLot(balances[0]);
+      } else {
+        const updated = balances.find((b: any) => 
+          b._id === selectedLot._id || 
+          (b.batchNumber === selectedLot.batchNumber && 
+           (b.sku?._id || b.skuId) === (selectedLot.sku?._id || selectedLot.skuId) && 
+           (b.location?._id || b.locationId) === (selectedLot.location?._id || selectedLot.locationId))
+        );
+        if (updated) {
+          setSelectedLot(updated);
+        }
+      }
     }
   }, [balances]);
 
   // Load ledger history when transitioning to details sub-page
   useEffect(() => {
     if (selectedDetailLot && selectedCompany?._id) {
-      loadLedgerHistory();
+      loadLedgerHistory(true);
+      
+      const interval = setInterval(() => {
+        loadLedgerHistory(false);
+      }, 5000);
+
+      return () => clearInterval(interval);
     }
   }, [selectedDetailLot, selectedCompany?._id]);
 
-  const loadData = async () => {
-    setLoading(true);
+  // Sync selectedDetailLot with fresh balances silently
+  useEffect(() => {
+    if (selectedDetailLot && balances.length > 0) {
+      const updated = balances.find((b: any) => 
+        b._id === selectedDetailLot._id || 
+        (b.batchNumber === selectedDetailLot.batchNumber && 
+         (b.sku?._id || b.skuId) === (selectedDetailLot.sku?._id || selectedDetailLot.skuId) && 
+         (b.location?._id || b.locationId) === (selectedDetailLot.location?._id || selectedDetailLot.locationId))
+      );
+      if (updated) {
+        setSelectedDetailLot(updated);
+      }
+    }
+  }, [balances, selectedDetailLot]);
+
+  const loadData = async (showLoading = true) => {
+    if (showLoading) {
+      setLoading(true);
+    }
     try {
       const [balData, hierData, invData] = await Promise.all([
         getBalancesV2(selectedCompany?._id || '', undefined, true),
@@ -76,15 +116,21 @@ const BatchStockV2: React.FC = () => {
       setInvoices(invData.invoices || []);
     } catch (e) {
       console.error(e);
-      showToast('Failed to load batch stock details', 'error');
+      if (showLoading) {
+        showToast('Failed to load batch stock details', 'error');
+      }
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   };
 
-  const loadLedgerHistory = async () => {
+  const loadLedgerHistory = async (showLoading = true) => {
     if (!selectedDetailLot) return;
-    setLedgerLoading(true);
+    if (showLoading) {
+      setLedgerLoading(true);
+    }
     try {
       const history = await getLedgerV2({
         companyId: selectedCompany?._id || '',
@@ -94,9 +140,13 @@ const BatchStockV2: React.FC = () => {
       setLedgerHistory(history);
     } catch (e) {
       console.error(e);
-      showToast('Failed to load transaction history', 'error');
+      if (showLoading) {
+        showToast('Failed to load transaction history', 'error');
+      }
     } finally {
-      setLedgerLoading(false);
+      if (showLoading) {
+        setLedgerLoading(false);
+      }
     }
   };
 

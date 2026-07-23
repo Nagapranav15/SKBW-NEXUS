@@ -92,24 +92,37 @@ const PurchaseInvoicePage: React.FC = () => {
   }, [selectedCompany?._id]);
 
   useEffect(() => {
-    if (selectedCompany?._id) {
-      loadInvoices();
-    }
+    if (!selectedCompany?._id) return;
+    loadInvoices(true);
+
+    const interval = setInterval(() => {
+      loadInvoices(false);
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, [selectedCompany?._id, page, vendorFilter, statusFilter]);
 
   // Load balances when detailed invoice is selected
   useEffect(() => {
-    if (selectedCompany?._id && selectedInvoice) {
-      loadBalances();
-    }
+    if (!selectedCompany?._id || !selectedInvoice) return;
+    loadBalances(true);
+
+    const interval = setInterval(() => {
+      loadBalances(false);
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, [selectedCompany?._id, selectedInvoice]);
 
-  const loadBalances = async () => {
+  const loadBalances = async (showLoading = true) => {
     try {
       const bals = await getBalancesV2(selectedCompany?._id || '', undefined, true);
       setInventoryBalances(bals);
     } catch (e) {
       console.error(e);
+      if (showLoading) {
+        showToast('Failed to load inventory balances', 'error');
+      }
     }
   };
 
@@ -130,8 +143,10 @@ const PurchaseInvoicePage: React.FC = () => {
     }
   };
 
-  const loadInvoices = async () => {
-    setLoading(true);
+  const loadInvoices = async (showLoading = true) => {
+    if (showLoading) {
+      setLoading(true);
+    }
     try {
       const res = await getPurchaseInvoicesV2({
         companyId: selectedCompany?._id || '',
@@ -141,11 +156,22 @@ const PurchaseInvoicePage: React.FC = () => {
       });
       setInvoices(res.invoices || []);
       setTotal(res.total || 0);
+
+      if (selectedInvoice) {
+        const updated = (res.invoices || []).find((inv: any) => inv._id === selectedInvoice._id);
+        if (updated) {
+          setSelectedInvoice(updated);
+        }
+      }
     } catch (e) {
       console.error(e);
-      showToast('Failed to load purchase batches', 'error');
+      if (showLoading) {
+        showToast('Failed to load purchase batches', 'error');
+      }
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   };
 
