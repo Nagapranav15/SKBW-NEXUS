@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight, X, FileText, Trash2, Calendar, Coins, Download, Upload, HelpCircle, Check, Eye, MoreVertical, Edit, Printer, ArrowRight, Layers } from 'lucide-react';
+import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight, X, FileText, Trash2, Calendar, Coins, Download, Upload, HelpCircle, Check, Eye, MoreVertical, Edit, Printer, ArrowRight, Layers, IndianRupee } from 'lucide-react';
 import { useAuth } from '../../../../context/AuthContext';
 import { getParties } from '../../../../api/partyApi';
 import { getSkusV2, getWarehouseHierarchyV2, recordTransferV2, SkuV2, WarehouseLocationV2, getBalancesV2 } from '../../../../api/mfgApiV2';
@@ -1252,7 +1252,7 @@ const PurchaseInvoicePage: React.FC = () => {
             </div>
             <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
               <div className="p-3 bg-orange-50 text-orange-600 rounded-2xl">
-                <Coins className="w-6 h-6" />
+                <IndianRupee className="w-6 h-6" />
               </div>
               <div>
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Value</span>

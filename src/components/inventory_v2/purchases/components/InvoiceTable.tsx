@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, FileText, MoreVertical } from 'lucide-react';
+import { Eye, FileText, Trash2 } from 'lucide-react';
 import { PurchaseInvoiceV2 } from '../services/purchaseService';
 
 interface InvoiceTableProps {
@@ -114,10 +114,11 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
                           <FileText className="w-3.5 h-3.5" />
                         </button>
                         <button
-                          className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg transition-colors"
-                          title="More Actions"
+                          onClick={() => onDeleteInvoice(inv)}
+                          className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-100/50 shadow-3xs"
+                          title="Delete Purchase Batch"
                         >
-                          <MoreVertical className="w-3.5 h-3.5" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </td>
