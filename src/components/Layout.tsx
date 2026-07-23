@@ -23,26 +23,37 @@ import {
   Truck,
   ArrowRightLeft,
   FileText,
-  Coins
+  Coins,
+  RefreshCw,
+  Settings
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DataManager from './DataManager';
 
 const Layout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
-  const [salesDropdownOpen, setSalesDropdownOpen] = useState(false);
-  const [masterDropdownOpen, setMasterDropdownOpen] = useState(() => {
-    return window.location.pathname.startsWith('/party') || window.location.pathname.startsWith('/inventory') || window.location.pathname.startsWith('/inventory-v2');
-  });
-  const [partyDropdownOpen, setPartyDropdownOpen] = useState(() => {
-    return window.location.pathname.startsWith('/party');
-  });
-  const [inventoryDropdownOpen, setInventoryDropdownOpen] = useState(() => {
-    return window.location.pathname.startsWith('/inventory');
-  });
-  const [mfgV2DropdownOpen, setMfgV2DropdownOpen] = useState(() => {
-    return window.location.pathname.startsWith('/inventory-v2');
-  });
+  const [mastersOpen, setMastersOpen] = useState(() => 
+    ['/inventory-v2/skus', '/party/customers', '/party/agents', '/party/routes', '/party/markets', '/party/transporters'].includes(window.location.pathname)
+  );
+  const [purchaseOpen, setPurchaseOpen] = useState(() => 
+    ['/inventory-v2/purchases', '/party/vendors'].includes(window.location.pathname)
+  );
+  const [inventoryOpen, setInventoryOpen] = useState(() => 
+    ['/inventory-v2/batch-stock', '/inventory-v2/warehouse'].includes(window.location.pathname) || (window.location.pathname === '/inventory-v2/ledger' && !document.referrer.includes('purchase'))
+  );
+  const [conversionsOpen, setConversionsOpen] = useState(() => 
+    ['/inventory/bom', '/inventory/movements', '/inventory-v2/testing-transactions'].includes(window.location.pathname)
+  );
+  const [productionOpen, setProductionOpen] = useState(() => 
+    ['/inventory/dashboard', '/inventory/analytics'].includes(window.location.pathname)
+  );
+  const [salesOpen, setSalesOpen] = useState(() => 
+    window.location.pathname.startsWith('/sales') && window.location.pathname !== '/sales/reports'
+  );
+  const [reportsOpen, setReportsOpen] = useState(() => 
+    ['/sales/reports', '/inventory/reports', '/analyzer', '/transactions'].includes(window.location.pathname)
+  );
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [showDataManager, setShowDataManager] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -187,66 +198,82 @@ const Layout: React.FC = () => {
     navigate('/login');
   };
 
-  const menuItems = [
-    { icon: Home, label: 'Dashboard', path: '/dashboard', permission: 'VIEW_DASHBOARD' },
-    { icon: Package, label: 'Items', path: '/items', permission: ['MANAGE_ITEMS', 'VIEW_ITEMS'] },
-  ];
+  const isActive = (path: string) => location.pathname === path;
 
-  const partyItems = [
-    { icon: Users, label: 'Customers', path: '/party/customers', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
-    { icon: Store, label: 'Vendors', path: '/party/vendors', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
-    { icon: Briefcase, label: 'Agents', path: '/party/agents', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
-    { icon: Compass, label: 'Regions', path: '/party/routes', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
-    { icon: MapPin, label: 'Cities', path: '/party/markets', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
-    { icon: Truck, label: 'Transporters', path: '/party/transporters', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
+  // Masters
+  const mastersItems = [
+    { label: 'Item Master', path: '/inventory-v2/skus', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
+    { label: 'Customers', path: '/party/customers', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
+    { label: 'Agents', path: '/party/agents', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
+    { label: 'Regions', path: '/party/routes', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
+    { label: 'Cities', path: '/party/markets', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
+    { label: 'Transporters', path: '/party/transporters', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
   ];
+  const visibleMastersItems = mastersItems.filter(item => hasPermission(item.permission));
+  const hasMastersAccess = visibleMastersItems.length > 0;
+  const isMastersActive = () => ['/inventory-v2/skus', '/party/customers', '/party/agents', '/party/routes', '/party/markets', '/party/transporters'].includes(location.pathname);
 
+  // Purchase
+  const purchaseItems = [
+    { label: 'Purchase Batches', path: '/inventory-v2/purchases', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
+    { label: 'Suppliers', path: '/party/vendors', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
+    { label: 'Purchase Ledger', path: '/inventory-v2/ledger', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
+  ];
+  const visiblePurchaseItems = purchaseItems.filter(item => hasPermission(item.permission));
+  const hasPurchaseAccess = visiblePurchaseItems.length > 0;
+  const isPurchaseActive = () => ['/inventory-v2/purchases', '/party/vendors'].includes(location.pathname) || (location.pathname === '/inventory-v2/ledger' && document.referrer.includes('purchase'));
+
+  // Inventory
+  const inventoryV2Items = [
+    { label: 'Batch Stock / Lots', path: '/inventory-v2/batch-stock', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
+    { label: 'Stock Ledger', path: '/inventory-v2/ledger', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
+    { label: 'Warehouse Setup', path: '/inventory-v2/warehouse', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
+  ];
+  const visibleInventoryV2Items = inventoryV2Items.filter(item => hasPermission(item.permission));
+  const hasInventoryV2Access = visibleInventoryV2Items.length > 0;
+  const isInventoryV2Active = () => ['/inventory-v2/batch-stock', '/inventory-v2/warehouse'].includes(location.pathname) || (location.pathname === '/inventory-v2/ledger' && !document.referrer.includes('purchase'));
+
+  // Conversions
+  const conversionsItems = [
+    { label: 'BOM & Assembly', path: '/inventory/bom', permission: ['MANAGE_INVENTORY', 'MANAGE_ITEMS'] },
+    { label: 'Movements', path: '/inventory/movements', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
+    { label: 'Transactions (Test)', path: '/inventory-v2/testing-transactions', permission: ['MANAGE_INVENTORY', 'MANAGE_ITEMS'] },
+  ];
+  const visibleConversionsItems = conversionsItems.filter(item => hasPermission(item.permission));
+  const hasConversionsAccess = visibleConversionsItems.length > 0;
+  const isConversionsActive = () => ['/inventory/bom', '/inventory/movements', '/inventory-v2/testing-transactions'].includes(location.pathname);
+
+  // Production
+  const productionItems = [
+    { label: 'Mfg Dashboard', path: '/inventory/dashboard', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
+    { label: 'Mfg Analytics', path: '/inventory/analytics', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
+  ];
+  const visibleProductionItems = productionItems.filter(item => hasPermission(item.permission));
+  const hasProductionAccess = visibleProductionItems.length > 0;
+  const isProductionActive = () => ['/inventory/dashboard', '/inventory/analytics'].includes(location.pathname);
+
+  // Sales
   const salesItems = [
     { label: 'Quotes', path: '/sales/quotes', permission: ['MANAGE_QUOTES', 'VIEW_QUOTES', 'CREATE_QUOTES'] },
     { label: 'Sale Orders', path: '/sales/orders', permission: ['MANAGE_ORDERS', 'VIEW_ORDERS', 'CREATE_ORDERS'] },
     { label: 'Pending Orders', path: '/sales/pending', permission: ['MANAGE_ORDERS', 'VIEW_ORDERS'] },
     { label: 'Delivery Challan', path: '/sales/delivery-challan', permission: ['MANAGE_DELIVERY', 'VIEW_DELIVERY'] },
     { label: 'Digital Dispatch', path: '/sales/digital-dispatch', permission: 'MANAGE_DISPATCH' },
-    { label: 'Reports', path: '/sales/reports', permission: ['MANAGE_REPORTS', 'VIEW_REPORTS'] },
   ];
-
-  const isActive = (path: string) => location.pathname === path;
-  const isSalesActive = () => location.pathname.startsWith('/sales');
-
-  // Filter menu items based on permissions
-  const visibleMenuItems = menuItems.filter(item => hasPermission(item.permission));
   const visibleSalesItems = salesItems.filter(item => hasPermission(item.permission));
   const hasSalesAccess = visibleSalesItems.length > 0;
+  const isSalesActive = () => location.pathname.startsWith('/sales') && location.pathname !== '/sales/reports';
 
-  const visiblePartyItems = partyItems.filter(item => hasPermission(item.permission));
-  const hasPartyAccess = visiblePartyItems.length > 0;
-  const isPartyActive = () => location.pathname.startsWith('/party');
-
-  const inventoryItems = [
-    { icon: LayoutGrid, label: 'Dashboard', path: '/inventory/dashboard', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
-    { icon: Package, label: 'SKU Master', path: '/inventory/skus', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
-    { icon: Layers, label: 'BOM & Assembly', path: '/inventory/bom', permission: ['MANAGE_INVENTORY', 'MANAGE_ITEMS'] },
-    { icon: Warehouse, label: 'Zones', path: '/inventory/zones', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
-    { icon: ArrowRightLeft, label: 'Movements', path: '/inventory/movements', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
-    { icon: BarChart3, label: 'Analytics', path: '/inventory/analytics', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
-    { icon: FileText, label: 'Reports', path: '/inventory/reports', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
+  // Reports
+  const reportsItems = [
+    { label: 'Sales Reports', path: '/sales/reports', permission: ['MANAGE_REPORTS', 'VIEW_REPORTS'] },
+    { label: 'Mfg Reports', path: '/inventory/reports', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
+    { label: 'Analyzer', path: '/analyzer', permission: ['MANAGE_REPORTS', 'VIEW_REPORTS'] },
+    { label: 'Transactions', path: '/transactions', permission: ['MANAGE_REPORTS', 'VIEW_REPORTS', 'VIEW_TRANSACTIONS'] },
   ];
-  const visibleInventoryItems = inventoryItems.filter(item => hasPermission(item.permission));
-  const hasInventoryAccess = visibleInventoryItems.length > 0;
-  const isInventoryActive = () => location.pathname.startsWith('/inventory');
-
-  const inventoryV2Items = [
-    { icon: LayoutGrid, label: 'Dashboard', path: '/inventory-v2/dashboard', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
-    { icon: Package, label: 'Item Master', path: '/inventory-v2/skus', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
-    { icon: Coins, label: 'Purchase List', path: '/inventory-v2/purchases', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
-    { icon: Database, label: 'Batch Stock List', path: '/inventory-v2/batch-stock', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
-    { icon: FileText, label: 'Inventory Ledger', path: '/inventory-v2/ledger', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
-    { icon: Warehouse, label: 'Warehouse Setup', path: '/inventory-v2/warehouse', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
-    { icon: ArrowRightLeft, label: 'Transactions (Test)', path: '/inventory-v2/testing-transactions', permission: ['MANAGE_INVENTORY', 'MANAGE_ITEMS'] },
-  ];
-  const visibleInventoryV2Items = inventoryV2Items.filter(item => hasPermission(item.permission));
-  const hasInventoryV2Access = visibleInventoryV2Items.length > 0;
-  const isInventoryV2Active = () => location.pathname.startsWith('/inventory-v2');
+  const visibleReportsItems = reportsItems.filter(item => hasPermission(item.permission));
+  const hasReportsAccess = visibleReportsItems.length > 0;
+  const isReportsActive = () => ['/sales/reports', '/inventory/reports', '/analyzer', '/transactions'].includes(location.pathname);
 
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
@@ -259,27 +286,27 @@ const Layout: React.FC = () => {
 
   const getPrimaryClass = (path: string) => {
     const active = isActive(path);
-    return `w-full flex items-center space-x-3 px-3 py-2 transition-all duration-150 ${
+    return `w-full flex items-center space-x-3 px-3 py-2.5 transition-all duration-150 rounded-lg text-sm font-semibold ${
       active
-        ? 'border-l-4 border-blue-600 bg-gradient-to-r from-blue-100 to-blue-50/30 text-blue-700 font-semibold rounded-r-lg rounded-l-none shadow-xs'
-        : 'border-l-4 border-transparent text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-lg'
+        ? 'bg-blue-50/70 text-blue-600'
+        : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
     }`;
   };
 
   const getDropdownPrimaryClass = (activeCondition: boolean) => {
-    return `w-full flex items-center justify-between px-3 py-2 transition-all duration-150 ${
+    return `w-full flex items-center justify-between px-3 py-2.5 transition-all duration-150 rounded-lg text-sm font-semibold ${
       activeCondition
-        ? 'border-l-4 border-blue-600 bg-gradient-to-r from-blue-100 to-blue-50/30 text-blue-700 font-semibold rounded-r-lg rounded-l-none shadow-xs'
-        : 'border-l-4 border-transparent text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-lg'
+        ? 'bg-blue-50/70 text-blue-600'
+        : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
     }`;
   };
 
   const getSubItemClass = (path: string) => {
     const active = isActive(path);
-    return `w-full text-left px-3 py-1.5 transition-all duration-150 text-[13px] ${
+    return `w-full text-left px-4 py-2 transition-all duration-150 text-[13px] rounded-md font-semibold ${
       active
-        ? 'border-l-4 border-blue-500 bg-gradient-to-r from-blue-50/80 to-blue-50/10 text-blue-600 font-semibold rounded-r-lg rounded-l-none'
-        : 'border-l-4 border-transparent text-gray-650 hover:bg-gray-50 hover:text-gray-900 rounded-lg'
+        ? 'bg-blue-50/70 text-blue-600'
+        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
     }`;
   };
 
@@ -304,19 +331,12 @@ const Layout: React.FC = () => {
           <div className="flex items-center justify-between">
             {sidebarOpen && (
               <div className="flex items-center space-x-3">
-                {selectedCompany?.logo ? (
-                  <img src={selectedCompany.logo} alt={selectedCompany.name} className="w-8 h-8 rounded-full object-cover" />
-                ) : (
-                  <Building2 className="w-8 h-8 text-blue-600" />
-                )}
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-600 shrink-0 shadow-sm border border-blue-500/20">
+                  <Building2 className="w-6 h-6" />
+                </div>
                 <div>
-                  <h2 className="font-semibold text-gray-900 text-sm">{selectedCompany?.name || 'SKBW ERP'}</h2>
-                  <div className="flex items-center space-x-2">
-                    <p className="text-xs text-gray-500">{user?.fullName}</p>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${getRoleBadgeColor(user?.role || '')}`}>
-                      {user?.role?.toUpperCase()}
-                    </span>
-                  </div>
+                  <h2 className="font-bold text-gray-900 text-sm leading-tight">SKBW CORE</h2>
+                  <p className="text-[11px] text-gray-500 font-medium leading-tight">Sri Krishna Binding Works</p>
                 </div>
               </div>
             )}
@@ -330,187 +350,173 @@ const Layout: React.FC = () => {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          {visibleMenuItems.map((item) => {
-            const shortcut = item.path === '/dashboard' ? 'D' : 'I';
-            return (
+        <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
+          {/* Dashboard */}
+          <button
+            onClick={() => handleNavigate('/dashboard')}
+            className={`${getPrimaryClass('/dashboard')} flex items-center justify-between`}
+          >
+            <div className="flex items-center space-x-3">
+              <Home className={`w-5 h-5 ${isActive('/dashboard') ? 'text-blue-600' : 'text-gray-500'}`} />
+              {sidebarOpen && <span className={isActive('/dashboard') ? 'text-blue-700 font-bold' : 'text-gray-700'}>Dashboard</span>}
+            </div>
+          </button>
+
+          {/* Masters Dropdown */}
+          {hasMastersAccess && (
+            <div>
               <button
-                key={item.path}
-                onClick={() => handleNavigate(item.path)}
-                className={`${getPrimaryClass(item.path)} flex items-center justify-between`}
+                onClick={() => setMastersOpen(!mastersOpen)}
+                className={getDropdownPrimaryClass(isMastersActive() || mastersOpen)}
               >
                 <div className="flex items-center space-x-3">
-                  <item.icon className="w-5 h-5" />
-                  {sidebarOpen && <span>{item.label}</span>}
+                  <Package className={`w-5 h-5 ${(isMastersActive() || mastersOpen) ? 'text-blue-600' : 'text-gray-500'}`} />
+                  {sidebarOpen && <span className={(isMastersActive() || mastersOpen) ? 'text-blue-700 font-bold' : 'text-gray-700'}>Masters</span>}
                 </div>
                 {sidebarOpen && (
-                  <kbd className="hidden sm:inline-block font-mono text-[9px] text-gray-400 bg-gray-100 border border-gray-200 px-1.5 rounded select-none">
-                    {shortcut}
-                  </kbd>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${mastersOpen ? 'rotate-180 text-blue-600' : 'text-gray-400'}`} />
                 )}
               </button>
-            );
-          })}
+              
+              {mastersOpen && sidebarOpen && (
+                <div className="mt-1 ml-4 pl-2 border-l border-gray-150 space-y-0.5 animate-in fade-in duration-100">
+                  {visibleMastersItems.map((item) => (
+                    <button
+                      key={item.path}
+                      onClick={() => handleNavigate(item.path)}
+                      className={getSubItemClass(item.path)}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
-          {/* Master Dropdown */}
-          {(hasPartyAccess || hasInventoryAccess || hasInventoryV2Access) && (
-            <div className="relative">
+          {/* Purchase Dropdown */}
+          {hasPurchaseAccess && (
+            <div>
               <button
-                onClick={() => setMasterDropdownOpen(!masterDropdownOpen)}
-                className={getDropdownPrimaryClass(isPartyActive() || isInventoryActive() || isInventoryV2Active())}
+                onClick={() => setPurchaseOpen(!purchaseOpen)}
+                className={getDropdownPrimaryClass(isPurchaseActive() || purchaseOpen)}
               >
                 <div className="flex items-center space-x-3">
-                  <LayoutGrid className="w-5 h-5 text-blue-600" />
-                  {sidebarOpen && <span className="text-base font-bold text-gray-955">Masters</span>}
+                  <LayoutGrid className={`w-5 h-5 ${(isPurchaseActive() || purchaseOpen) ? 'text-blue-600' : 'text-gray-500'}`} />
+                  {sidebarOpen && <span className={(isPurchaseActive() || purchaseOpen) ? 'text-blue-700 font-bold' : 'text-gray-700'}>Purchase</span>}
                 </div>
                 {sidebarOpen && (
-                  <ChevronDown className={`w-4 h-4 transition-transform ${masterDropdownOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-4 h-4 transition-transform ${purchaseOpen ? 'rotate-180 text-blue-600' : 'text-gray-400'}`} />
                 )}
               </button>
+              
+              {purchaseOpen && sidebarOpen && (
+                <div className="mt-1 ml-4 pl-2 border-l border-gray-150 space-y-0.5 animate-in fade-in duration-100">
+                  {visiblePurchaseItems.map((item) => (
+                    <button
+                      key={item.path}
+                      onClick={() => handleNavigate(item.path)}
+                      className={getSubItemClass(item.path)}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
-              {masterDropdownOpen && sidebarOpen && (
-                <div className="mt-2 ml-4 pl-2 border-l border-gray-100 space-y-3">
-                  {/* Party Section */}
-                  {hasPartyAccess && (
-                    <div>
-                      <button
-                        onClick={() => setPartyDropdownOpen(!partyDropdownOpen)}
-                        className={`w-full flex items-center justify-between px-2 py-1 rounded-lg text-sm font-semibold transition-colors ${
-                          isPartyActive()
-                            ? 'text-blue-700 bg-blue-50/40'
-                            : 'text-gray-650 hover:bg-gray-50'
-                        }`}
-                      >
-                        <div className="flex items-center space-x-1.5">
-                          <Users className="w-3.5 h-3.5 text-gray-500" />
-                          <span>Party</span>
-                        </div>
-                        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${partyDropdownOpen ? 'rotate-180' : ''}`} />
-                      </button>
-                      
-                      {partyDropdownOpen && (
-                        <div className="mt-1 ml-2 pl-2 border-l border-gray-150 space-y-0.5">
-                          {visiblePartyItems.map((item) => {
-                            let shortcut = '';
-                            if (item.path === '/party/customers') shortcut = 'C / Alt+1';
-                            else if (item.path === '/party/vendors') shortcut = 'V / Alt+2';
-                            else if (item.path === '/party/agents') shortcut = 'A / Alt+3';
-                            else if (item.path === '/party/routes') shortcut = 'R / Alt+4';
-                            else if (item.path === '/party/markets') shortcut = 'Y / Alt+5';
-                            else if (item.path === '/party/transporters') shortcut = 'T / Alt+6';
+          {/* Inventory Dropdown */}
+          {hasInventoryV2Access && (
+            <div>
+              <button
+                onClick={() => setInventoryOpen(!inventoryOpen)}
+                className={getDropdownPrimaryClass(isInventoryV2Active() || inventoryOpen)}
+              >
+                <div className="flex items-center space-x-3">
+                  <Users className={`w-5 h-5 ${(isInventoryV2Active() || inventoryOpen) ? 'text-blue-600' : 'text-gray-500'}`} />
+                  {sidebarOpen && <span className={(isInventoryV2Active() || inventoryOpen) ? 'text-blue-700 font-bold' : 'text-gray-700'}>Inventory</span>}
+                </div>
+                {sidebarOpen && (
+                  <ChevronDown className={`w-4 h-4 transition-transform ${inventoryOpen ? 'rotate-180 text-blue-600' : 'text-gray-400'}`} />
+                )}
+              </button>
+              
+              {inventoryOpen && sidebarOpen && (
+                <div className="mt-1 ml-4 pl-2 border-l border-gray-150 space-y-0.5 animate-in fade-in duration-100">
+                  {visibleInventoryV2Items.map((item) => (
+                    <button
+                      key={item.path}
+                      onClick={() => handleNavigate(item.path)}
+                      className={getSubItemClass(item.path)}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
-                            return (
-                              <button
-                                key={item.path}
-                                onClick={() => handleNavigate(item.path)}
-                                className={`${getSubItemClass(item.path)} flex items-center justify-between gap-2 pr-2`}
-                              >
-                                <div className="flex items-center gap-2">
-                                  <item.icon className="w-4 h-4 shrink-0" />
-                                  <span>{item.label}</span>
-                                </div>
-                                {shortcut && sidebarOpen && (
-                                  <kbd className="hidden sm:inline-block font-mono text-[9px] text-gray-400 bg-gray-100/80 border border-gray-200 px-1 rounded select-none pointer-events-none opacity-80">
-                                    {shortcut}
-                                  </kbd>
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )}
+          {/* Conversions Dropdown */}
+          {hasConversionsAccess && (
+            <div>
+              <button
+                onClick={() => setConversionsOpen(!conversionsOpen)}
+                className={getDropdownPrimaryClass(isConversionsActive() || conversionsOpen)}
+              >
+                <div className="flex items-center space-x-3">
+                  <RefreshCw className={`w-5 h-5 ${(isConversionsActive() || conversionsOpen) ? 'text-blue-600' : 'text-gray-500'}`} />
+                  {sidebarOpen && <span className={(isConversionsActive() || conversionsOpen) ? 'text-blue-700 font-bold' : 'text-gray-700'}>Conversions</span>}
+                </div>
+                {sidebarOpen && (
+                  <ChevronDown className={`w-4 h-4 transition-transform ${conversionsOpen ? 'rotate-180 text-blue-600' : 'text-gray-400'}`} />
+                )}
+              </button>
+              
+              {conversionsOpen && sidebarOpen && (
+                <div className="mt-1 ml-4 pl-2 border-l border-gray-150 space-y-0.5 animate-in fade-in duration-100">
+                  {visibleConversionsItems.map((item) => (
+                    <button
+                      key={item.path}
+                      onClick={() => handleNavigate(item.path)}
+                      className={getSubItemClass(item.path)}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
-                  {/* Inventory Section */}
-                  {hasInventoryAccess && (
-                    <div>
-                      <button
-                        onClick={() => setInventoryDropdownOpen(!inventoryDropdownOpen)}
-                        className={`w-full flex items-center justify-between px-2 py-1 rounded-lg text-sm font-semibold transition-colors ${
-                          isInventoryActive()
-                            ? 'text-blue-700 bg-blue-50/40'
-                            : 'text-gray-650 hover:bg-gray-50'
-                        }`}
-                      >
-                        <div className="flex items-center space-x-1.5">
-                          <Package className="w-3.5 h-3.5 text-gray-500" />
-                          <span>Inventory</span>
-                        </div>
-                        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${inventoryDropdownOpen ? 'rotate-180' : ''}`} />
-                      </button>
-                      
-                      {inventoryDropdownOpen && (
-                        <div className="mt-1 ml-2 pl-2 border-l border-gray-150 space-y-0.5">
-                          {visibleInventoryItems.map((item) => {
-                            let shortcut = '';
-                            if (item.path === '/inventory/dashboard') shortcut = 'H';
-                            else if (item.path === '/inventory/skus') shortcut = 'K';
-                            else if (item.path === '/inventory/bom') shortcut = 'B';
-                            else if (item.path === '/inventory/zones') shortcut = 'Z';
-                            else if (item.path === '/inventory/movements') shortcut = 'M';
-                            else if (item.path === '/inventory/analytics') shortcut = 'N';
-                            else if (item.path === '/inventory/reports') shortcut = 'P';
-
-                            return (
-                              <button
-                                key={item.path}
-                                onClick={() => handleNavigate(item.path)}
-                                className={`${getSubItemClass(item.path)} flex items-center justify-between gap-2 pr-2`}
-                              >
-                                <div className="flex items-center gap-2">
-                                  {item.icon && <item.icon className="w-3.5 h-3.5 shrink-0 text-gray-500" />}
-                                  <span>{item.label}</span>
-                                </div>
-                                {shortcut && sidebarOpen && (
-                                  <kbd className="hidden sm:inline-block font-mono text-[9px] text-gray-400 bg-gray-100/80 border border-gray-200 px-1 rounded select-none pointer-events-none opacity-80">
-                                    {shortcut}
-                                  </kbd>
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Manufacturing Inventory (Beta) Section */}
-                  {hasInventoryV2Access && (
-                    <div>
-                      <button
-                        onClick={() => setMfgV2DropdownOpen(!mfgV2DropdownOpen)}
-                        className={`w-full flex items-center justify-between px-2 py-1 rounded-lg text-sm font-semibold transition-colors ${
-                          isInventoryV2Active()
-                            ? 'text-blue-700 bg-blue-50/40'
-                            : 'text-gray-650 hover:bg-gray-50'
-                        }`}
-                      >
-                        <div className="flex items-center space-x-1.5">
-                          <Warehouse className="w-3.5 h-3.5 text-blue-500" />
-                          <span>Mfg Inventory (Beta)</span>
-                        </div>
-                        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${mfgV2DropdownOpen ? 'rotate-180' : ''}`} />
-                      </button>
-                      
-                      {mfgV2DropdownOpen && (
-                        <div className="mt-1 ml-2 pl-2 border-l border-gray-150 space-y-0.5">
-                          {visibleInventoryV2Items.map((item) => (
-                            <button
-                              key={item.path}
-                              onClick={() => handleNavigate(item.path)}
-                              className={`${getSubItemClass(item.path)} flex items-center justify-between gap-2 pr-2`}
-                            >
-                              <div className="flex items-center gap-2">
-                                {item.icon && <item.icon className="w-3.5 h-3.5 shrink-0 text-gray-500" />}
-                                <span>{item.label}</span>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
+          {/* Production Dropdown */}
+          {hasProductionAccess && (
+            <div>
+              <button
+                onClick={() => setProductionOpen(!productionOpen)}
+                className={getDropdownPrimaryClass(isProductionActive() || productionOpen)}
+              >
+                <div className="flex items-center space-x-3">
+                  <BarChart3 className={`w-5 h-5 ${(isProductionActive() || productionOpen) ? 'text-blue-600' : 'text-gray-500'}`} />
+                  {sidebarOpen && <span className={(isProductionActive() || productionOpen) ? 'text-blue-700 font-bold' : 'text-gray-700'}>Production</span>}
+                </div>
+                {sidebarOpen && (
+                  <ChevronDown className={`w-4 h-4 transition-transform ${productionOpen ? 'rotate-180 text-blue-600' : 'text-gray-400'}`} />
+                )}
+              </button>
+              
+              {productionOpen && sidebarOpen && (
+                <div className="mt-1 ml-4 pl-2 border-l border-gray-150 space-y-0.5 animate-in fade-in duration-100">
+                  {visibleProductionItems.map((item) => (
+                    <button
+                      key={item.path}
+                      onClick={() => handleNavigate(item.path)}
+                      className={getSubItemClass(item.path)}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
@@ -518,22 +524,22 @@ const Layout: React.FC = () => {
 
           {/* Sales Dropdown */}
           {hasSalesAccess && (
-            <div className="relative">
+            <div>
               <button
-                onClick={() => setSalesDropdownOpen(!salesDropdownOpen)}
-                className={getDropdownPrimaryClass(isSalesActive())}
+                onClick={() => setSalesOpen(!salesOpen)}
+                className={getDropdownPrimaryClass(isSalesActive() || salesOpen)}
               >
                 <div className="flex items-center space-x-3">
-                  <ShoppingCart className="w-5 h-5" />
-                  {sidebarOpen && <span>Sales</span>}
+                  <ShoppingCart className={`w-5 h-5 ${(isSalesActive() || salesOpen) ? 'text-blue-600' : 'text-gray-500'}`} />
+                  {sidebarOpen && <span className={(isSalesActive() || salesOpen) ? 'text-blue-700 font-bold' : 'text-gray-700'}>Sales</span>}
                 </div>
                 {sidebarOpen && (
-                  <ChevronDown className={`w-4 h-4 transition-transform ${salesDropdownOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-4 h-4 transition-transform ${salesOpen ? 'rotate-180 text-blue-600' : 'text-gray-400'}`} />
                 )}
               </button>
 
-              {salesDropdownOpen && sidebarOpen && (
-                <div className="mt-2 ml-4 space-y-1">
+              {salesOpen && sidebarOpen && (
+                <div className="mt-1 ml-4 pl-2 border-l border-gray-150 space-y-0.5 animate-in fade-in duration-100">
                   {visibleSalesItems.map((item) => (
                     <button
                       key={item.path}
@@ -548,75 +554,72 @@ const Layout: React.FC = () => {
             </div>
           )}
 
-          {/* Data Management - Admin only */}
-          {hasRole('admin') && (
-            <button
-              onClick={() => setShowDataManager(true)}
-              className="w-full flex items-center justify-between px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <div className="flex items-center space-x-3">
-                <Database className="w-5 h-5" />
-                {sidebarOpen && <span>Data Manager</span>}
-              </div>
-              {sidebarOpen && (
-                <kbd className="hidden sm:inline-block font-mono text-[9px] text-gray-400 bg-gray-100 border border-gray-200 px-1.5 rounded select-none">
-                  G
-                </kbd>
-              )}
-            </button>
-          )}
+          {/* Reports Dropdown */}
+          {hasReportsAccess && (
+            <div>
+              <button
+                onClick={() => setReportsOpen(!reportsOpen)}
+                className={getDropdownPrimaryClass(isReportsActive() || reportsOpen)}
+              >
+                <div className="flex items-center space-x-3">
+                  <FileText className={`w-5 h-5 ${(isReportsActive() || reportsOpen) ? 'text-blue-600' : 'text-gray-500'}`} />
+                  {sidebarOpen && <span className={(isReportsActive() || reportsOpen) ? 'text-blue-700 font-bold' : 'text-gray-700'}>Reports</span>}
+                </div>
+                {sidebarOpen && (
+                  <ChevronDown className={`w-4 h-4 transition-transform ${reportsOpen ? 'rotate-180 text-blue-600' : 'text-gray-400'}`} />
+                )}
+              </button>
 
-          {/* Transactions — visible to admin, manager (view) */}
-          {hasPermission(['MANAGE_REPORTS', 'VIEW_REPORTS', 'VIEW_TRANSACTIONS']) && (
-            <button
-              onClick={() => handleNavigate('/transactions')}
-              className={`${getPrimaryClass('/transactions')} flex items-center justify-between`}
-            >
-              <div className="flex items-center space-x-3">
-                <ArrowDownToLine className="w-5 h-5" />
-                {sidebarOpen && <span>Transactions</span>}
-              </div>
-              {sidebarOpen && (
-                <kbd className="hidden sm:inline-block font-mono text-[9px] text-gray-400 bg-gray-100 border border-gray-200 px-1.5 rounded select-none">
-                  X
-                </kbd>
+              {reportsOpen && sidebarOpen && (
+                <div className="mt-1 ml-4 pl-2 border-l border-gray-150 space-y-0.5 animate-in fade-in duration-100">
+                  {visibleReportsItems.map((item) => (
+                    <button
+                      key={item.path}
+                      onClick={() => handleNavigate(item.path)}
+                      className={getSubItemClass(item.path)}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
               )}
-            </button>
-          )}
-
-          {/* Analyzer — visible to admin, manager */}
-          {hasPermission(['MANAGE_REPORTS', 'VIEW_REPORTS']) && (
-            <button
-              onClick={() => handleNavigate('/analyzer')}
-              className={`${getPrimaryClass('/analyzer')} flex items-center justify-between`}
-            >
-              <div className="flex items-center space-x-3">
-                <BarChart3 className="w-5 h-5" />
-                {sidebarOpen && <span>Analyzer</span>}
-              </div>
-              {sidebarOpen && (
-                <kbd className="hidden sm:inline-block font-mono text-[9px] text-gray-400 bg-gray-100 border border-gray-200 px-1.5 rounded select-none">
-                  L
-                </kbd>
-              )}
-            </button>
-          )}
-
-          {/* Change Company */}
-          <button
-            onClick={() => handleNavigate('/company-selection')}
-            className="w-full flex items-center justify-between px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <div className="flex items-center space-x-3">
-              <Building2 className="w-5 h-5" />
-              {sidebarOpen && <span>Switch Company</span>}
             </div>
-            {sidebarOpen && (
-              <kbd className="hidden sm:inline-block font-mono text-[9px] text-gray-400 bg-gray-100 border border-gray-200 px-1.5 rounded select-none">
-                S
-              </kbd>
+          )}
+
+          {/* Settings Dropdown */}
+          <div>
+            <button
+              onClick={() => setSettingsOpen(!settingsOpen)}
+              className={getDropdownPrimaryClass(settingsOpen)}
+            >
+              <div className="flex items-center space-x-3">
+                <Settings className={`w-5 h-5 ${settingsOpen ? 'text-blue-600' : 'text-gray-500'}`} />
+                {sidebarOpen && <span className={settingsOpen ? 'text-blue-700 font-bold' : 'text-gray-700'}>Settings</span>}
+              </div>
+              {sidebarOpen && (
+                <ChevronDown className={`w-4 h-4 transition-transform ${settingsOpen ? 'rotate-180 text-blue-600' : 'text-gray-400'}`} />
+              )}
+            </button>
+
+            {settingsOpen && sidebarOpen && (
+              <div className="mt-1 ml-4 pl-2 border-l border-gray-150 space-y-0.5 animate-in fade-in duration-100">
+                {hasRole('admin') && (
+                  <button
+                    onClick={() => setShowDataManager(true)}
+                    className={getSubItemClass('/data-manager')}
+                  >
+                    Data Manager
+                  </button>
+                )}
+                <button
+                  onClick={() => handleNavigate('/company-selection')}
+                  className={getSubItemClass('/company-selection')}
+                >
+                  Switch Company
+                </button>
+              </div>
             )}
-          </button>
+          </div>
         </nav>
 
         {/* Logout */}

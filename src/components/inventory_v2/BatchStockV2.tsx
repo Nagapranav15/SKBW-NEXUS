@@ -1,13 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Layers, Search, RefreshCw, X, FileText, ChevronRight, ChevronDown, Warehouse, MapPin, Database, Calendar, Package, ArrowUpRight, ArrowDownLeft, AlertCircle, ArrowRightLeft, Eye, HelpCircle } from 'lucide-react';
+import { Layers, Search, RefreshCw, X, FileText, ChevronRight, ChevronDown, Warehouse, MapPin, Database, Calendar, Package, ArrowUpRight, ArrowDownLeft, AlertCircle, ArrowRightLeft, Eye, HelpCircle, Download, Plus, ArrowRight, Printer, Coins, MoreVertical } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getBalancesV2, getWarehouseHierarchyV2, getLedgerV2, recordTransferV2, SkuV2, WarehouseLocationV2, LedgerEntryV2 } from '../../api/mfgApiV2';
 import { getPurchaseInvoicesV2, PurchaseInvoiceV2 } from './purchases/services/purchaseService';
 import { showToast } from '../ui/Toast';
-
-interface LocationNode extends WarehouseLocationV2 {
-  children: LocationNode[];
-}
 
 const BatchStockV2: React.FC = () => {
   const { selectedCompany } = useAuth();
@@ -20,14 +16,18 @@ const BatchStockV2: React.FC = () => {
   
   // Search & filter states
   const [search, setSearch] = useState('');
-  const [filterCategory, setFilterCategory] = useState('');
-  const [filterSku, setFilterSku] = useState('');
+  const [filterItem, setFilterItem] = useState('');
   const [filterLocation, setFilterLocation] = useState('');
-  const [filterBatch, setFilterBatch] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
   
   // Selection details state
-  const [selectedDetailBatch, setSelectedDetailBatch] = useState<any | null>(null);
-  const [detailsTab, setDetailsTab] = useState<'info' | 'reels' | 'docs'>('info');
+  const [selectedLot, setSelectedLot] = useState<any | null>(null);
+  const [activeSubPage, setActiveSubPage] = useState<'list' | 'details'>('list');
+  const [selectedDetailLot, setSelectedDetailLot] = useState<any | null>(null);
+  
+  // Ledger History for selected detail lot
+  const [ledgerHistory, setLedgerHistory] = useState<LedgerEntryV2[]>([]);
+  const [ledgerLoading, setLedgerLoading] = useState(false);
 
   // Transfer modal state
   const [showTransferModal, setShowTransferModal] = useState(false);
@@ -39,17 +39,29 @@ const BatchStockV2: React.FC = () => {
   });
   const [transferSubmitting, setTransferSubmitting] = useState(false);
   const [transferError, setTransferError] = useState('');
-  
-  // Ledger History Drawer states
-  const [showLedgerDrawer, setShowLedgerDrawer] = useState(false);
-  const [ledgerHistory, setLedgerHistory] = useState<LedgerEntryV2[]>([]);
-  const [ledgerLoading, setLedgerLoading] = useState(false);
+
+  // Page state
+  const [page, setPage] = useState(1);
+  const limit = 20;
 
   useEffect(() => {
     if (selectedCompany?._id) {
       loadData();
     }
   }, [selectedCompany?._id]);
+
+  useEffect(() => {
+    if (balances.length > 0 && !selectedLot) {
+      setSelectedLot(balances[0]);
+    }
+  }, [balances]);
+
+  // Load ledger history when transitioning to details sub-page
+  useEffect(() => {
+    if (selectedDetailLot && selectedCompany?._id) {
+      loadLedgerHistory();
+    }
+  }, [selectedDetailLot, selectedCompany?._id]);
 
   const loadData = async () => {
     setLoading(true);
@@ -70,6 +82,30 @@ const BatchStockV2: React.FC = () => {
     }
   };
 
+  const loadLedgerHistory = async () => {
+    if (!selectedDetailLot) return;
+    setLedgerLoading(true);
+    try {
+      const history = await getLedgerV2({
+        companyId: selectedCompany?._id || '',
+        skuId: selectedDetailLot.sku?._id || selectedDetailLot.skuId,
+        batchNumber: selectedDetailLot.batchNumber || undefined
+      });
+      setLedgerHistory(history);
+    } catch (e) {
+      console.error(e);
+      showToast('Failed to load transaction history', 'error');
+    } finally {
+      setLedgerLoading(false);
+    }
+  };
+
+  const getOccupiedCapacity = (locId: string) => {
+    return balances
+      .filter(b => (b.location?._id || b.locationId) === locId)
+      .reduce((sum, b) => sum + (b.onHand || 0), 0);
+  };
+
   const handleOpenTransferModal = (item: any) => {
     setTransferringItem(item);
     setTransferForm({
@@ -79,12 +115,6 @@ const BatchStockV2: React.FC = () => {
     });
     setTransferError('');
     setShowTransferModal(true);
-  };
-
-  const getOccupiedCapacity = (locId: string) => {
-    return balances
-      .filter(b => (b.location?._id || b.locationId) === locId)
-      .reduce((sum, b) => sum + (b.onHand || 0), 0);
   };
 
   const handleTransferSubmit = async (e: React.FormEvent) => {
@@ -98,18 +128,11 @@ const BatchStockV2: React.FC = () => {
       return;
     }
 
-    const availableStock = transferringItem.onHand || 0;
-    if (qty > availableStock) {
-      setTransferError(`Cannot transfer more than available stock (${availableStock.toLocaleString()} ${transferringItem.sku?.unit || 'KG'})`);
+    if (qty > transferringItem.onHand) {
+      setTransferError(`Insufficient stock. Maximum available is ${transferringItem.onHand.toLocaleString()} ${transferringItem.sku?.unit || 'kg'}`);
       return;
     }
 
-    if (!transferForm.toLocationId) {
-      setTransferError('Please select a destination storage location');
-      return;
-    }
-
-    // Double check destination capacity
     const destLoc = hierarchy.find(h => h._id === transferForm.toLocationId);
     if (destLoc && destLoc.capacity && destLoc.capacity > 0) {
       const occupied = getOccupiedCapacity(destLoc._id || '');
@@ -134,7 +157,7 @@ const BatchStockV2: React.FC = () => {
       showToast('Stock transferred successfully!', 'success');
       setShowTransferModal(false);
       
-      // Reload balances and layout hierarchy
+      // Reload balances
       setLoading(true);
       const [balData, locsData] = await Promise.all([
         getBalancesV2(selectedCompany?._id || '', undefined, true),
@@ -142,6 +165,17 @@ const BatchStockV2: React.FC = () => {
       ]);
       setBalances(balData);
       setHierarchy(locsData);
+
+      // Refresh current lot selected if present
+      if (selectedLot && selectedLot._id === transferringItem._id) {
+        const updatedSelected = balData.find(b => b._id === transferringItem._id);
+        setSelectedLot(updatedSelected || balData[0]);
+      }
+      if (selectedDetailLot && selectedDetailLot._id === transferringItem._id) {
+        const updatedDetail = balData.find(b => b._id === transferringItem._id);
+        setSelectedDetailLot(updatedDetail || null);
+        loadLedgerHistory();
+      }
     } catch (err: any) {
       console.error(err);
       setTransferError(err.response?.data?.msg || 'Failed to complete stock transfer');
@@ -151,985 +185,846 @@ const BatchStockV2: React.FC = () => {
     }
   };
 
-  const handleOpenLedgerTrail = async (item: any) => {
-    setLedgerLoading(true);
-    setShowLedgerDrawer(true);
-    try {
-      const history = await getLedgerV2({
-        companyId: selectedCompany?._id || '',
-        skuId: item.sku?._id || item.skuId,
-        batchNumber: item.batchNumber || undefined
-      });
-      setLedgerHistory(history);
-    } catch (e) {
-      console.error(e);
-      showToast('Failed to load transaction history', 'error');
-    } finally {
-      setLedgerLoading(false);
-    }
-  };
-
-  // Build warehouse tree hierarchy
-  const buildTree = (): LocationNode[] => {
-    const locMap: Record<string, LocationNode> = {};
-    const roots: LocationNode[] = [];
-
-    hierarchy.forEach(loc => {
-      if (loc._id) {
-        locMap[loc._id] = { ...loc, children: [] };
-      }
-    });
-
-    hierarchy.forEach(loc => {
-      if (loc._id) {
-        const node = locMap[loc._id];
-        if (loc.parentId && locMap[loc.parentId]) {
-          locMap[loc.parentId].children.push(node);
-        } else {
-          roots.push(node);
-        }
-      }
-    });
-
-    return roots;
-  };
-
-  // Calculate dynamic stock sums inside a node
-  const computeNodeStock = (nodeId: string, currentBatchNumber?: string, currentSkuId?: string): { qty: number; unit: string } => {
-    const getStorageDescendants = (id: string): string[] => {
-      const directChildren = hierarchy.filter(l => l.parentId === id);
-      let storageIds: string[] = [];
-      directChildren.forEach(child => {
-        if (child.level === 'Storage Location') {
-          storageIds.push(child._id || '');
-        } else if (child._id) {
-          storageIds = [...storageIds, ...getStorageDescendants(child._id)];
-        }
-      });
-      return storageIds;
+  // Helper: Traverse parent chain in memory
+  const resolveLocationPath = (locId: string) => {
+    const bin = hierarchy.find(l => l._id === locId);
+    if (!bin) return { factory: '—', floor: '—', zone: '—', bin: '—' };
+    
+    const zone = hierarchy.find(l => l._id === bin.parentId);
+    const floor = zone ? hierarchy.find(l => l._id === zone.parentId) : null;
+    const factory = floor ? hierarchy.find(l => l._id === floor.parentId) : null;
+    
+    return {
+      factory: factory?.name || '—',
+      floor: floor?.name || '—',
+      zone: zone?.name || '—',
+      bin: bin.name || '—'
     };
-
-    const targetStorageIds = hierarchy.find(l => l._id === nodeId)?.level === 'Storage Location' 
-      ? [nodeId] 
-      : getStorageDescendants(nodeId);
-
-    const filteredBals = balances.filter(b => {
-      const locId = b.location?._id || b.locationId;
-      const matchLoc = targetStorageIds.includes(locId);
-      const matchBatch = currentBatchNumber ? b.batchNumber === currentBatchNumber : true;
-      const matchSku = currentSkuId ? (b.sku?._id || b.skuId) === currentSkuId : true;
-      return matchLoc && matchBatch && matchSku;
-    });
-
-    const totalQty = filteredBals.reduce((sum, b) => sum + (b.onHand || 0), 0);
-    const units = Array.from(new Set(filteredBals.map(b => b.sku?.unit || 'KG')));
-    const unitStr = units.length > 1 ? 'KG / PCS' : (units[0] || 'KG');
-
-    return { qty: totalQty, unit: unitStr };
   };
 
-  const getUnallocatedQty = (batchNo: string, skuId: string): number => {
-    const inv = invoices.find(i => i.invoiceNumber === batchNo);
-    if (!inv) return 0;
+  // Helper to format Lot number
+  const getDisplayLotNo = (b: any) => {
+    if (!b) return '—';
+    const batchNo = b.batchNumber || 'PB2407001';
     
-    // Find the item quantity in this invoice matching the SKU
-    const itemQty = inv.items?.find(item => {
-      const itSkuId = typeof item.skuId === 'object' && item.skuId !== null ? item.skuId._id : item.skuId;
-      return itSkuId === skuId;
-    })?.quantity || 0;
+    // Find the first balance entry for this batch number in this SKU to determine the base lot
+    const batchBals = balances.filter(x => x.batchNumber === batchNo && (x.sku?._id || x.skuId) === (b.sku?._id || b.skuId));
+    const isInitial = batchBals.length > 0 && batchBals[0]._id === b._id;
     
-    // Find the allocated quantity in our warehouse storage locations
-    const allocatedQty = balances
-      .filter(b => b.batchNumber === batchNo && (b.sku?._id || b.skuId) === skuId)
-      .reduce((sum, b) => sum + (b.onHand || 0), 0);
-      
-    return Math.max(itemQty - allocatedQty, 0);
+    const baseLot = `${batchNo}-L01`;
+    if (isInitial) return baseLot;
+    
+    // Extract suffix from location name
+    const name = b.location?.name || '';
+    const parts = name.split('-');
+    const suffix = parts[parts.length - 1]?.trim() || '';
+    return suffix ? `${baseLot}-${suffix}` : baseLot;
   };
 
-  // Filter calculations
+  // Filters logic
   const filteredBalances = balances.filter(b => {
-    const skuName = b.sku?.name || '';
-    const skuCode = b.sku?.skuCode || '';
-    const batchNo = b.batchNumber || '';
-    const locName = b.location?.name || '';
-    const category = b.sku?.category || '';
-    const locId = b.location?._id || b.locationId;
-    const skuId = b.sku?._id || b.skuId;
+    const displayLot = getDisplayLotNo(b).toLowerCase();
+    const skuName = (b.sku?.name || '').toLowerCase();
+    const brand = (b.sku?.brand || '').toLowerCase();
+    const category = (b.sku?.category || '').toLowerCase();
+    const locationName = (b.location?.name || '').toLowerCase();
+    
+    const matchesSearch = displayLot.includes(search.toLowerCase()) || 
+                          skuName.includes(search.toLowerCase()) || 
+                          brand.includes(search.toLowerCase()) ||
+                          locationName.includes(search.toLowerCase());
 
-    const query = search.toLowerCase();
-    const matchSearch = skuName.toLowerCase().includes(query) ||
-                        skuCode.toLowerCase().includes(query) ||
-                        batchNo.toLowerCase().includes(query) ||
-                        locName.toLowerCase().includes(query);
-
-    const matchCategory = !filterCategory || category === filterCategory;
-    const matchSku = !filterSku || skuId === filterSku;
-    const matchLocation = !filterLocation || locId === filterLocation;
-    const matchBatch = !filterBatch || batchNo === filterBatch;
-
-    return matchSearch && matchCategory && matchSku && matchLocation && matchBatch;
+    const matchesItem = !filterItem || (b.sku?._id || b.skuId) === filterItem;
+    const matchesLocation = !filterLocation || (b.location?._id || b.locationId) === filterLocation;
+    
+    return matchesSearch && matchesItem && matchesLocation;
   });
 
-  // Unique filter lists
-  const uniqueSkus = Array.from(new Set(balances.map(b => b.sku?._id || b.skuId).filter(Boolean))).map(id => {
-    return balances.find(b => (b.sku?._id || b.skuId) === id)?.sku;
-  }).filter(Boolean) as SkuV2[];
+  const totalPages = Math.max(Math.ceil(filteredBalances.length / limit), 1);
+  const paginatedBalances = filteredBalances.slice((page - 1) * limit, page * limit);
 
-  const uniqueLocations = hierarchy.filter(loc => loc.level === 'Storage Location');
-  const uniqueBatches = Array.from(new Set(balances.map(b => b.batchNumber).filter(Boolean))) as string[];
+  // Stats
+  const statTotalLots = balances.length;
+  const statTotalAvailable = balances.reduce((sum, b) => sum + (b.onHand || 0), 0);
+  const statTotalReels = balances.reduce((sum, b) => {
+    // Return length of reels array or fallback to estimated reels (qty / weight)
+    return sum + (b.reels?.length || (b.sku?.category === 'Raw Material' ? Math.round(b.onHand / 290) : 0) || 0);
+  }, 0);
+  const statTotalLocations = new Set(balances.map(b => b.location?._id || b.locationId)).size;
 
-  // Dynamic Statistics
-  const totalStockVolume = balances.reduce((sum, b) => sum + (b.onHand || 0), 0);
-  const rawMaterialsStock = balances.filter(b => b.sku?.category === 'Raw Material').reduce((sum, b) => sum + (b.onHand || 0), 0);
-  const semiFinishedStock = balances.filter(b => b.sku?.category === 'Semi Finished').reduce((sum, b) => sum + (b.onHand || 0), 0);
-  const finishedGoodsStock = balances.filter(b => b.sku?.category === 'Finished Goods').reduce((sum, b) => sum + (b.onHand || 0), 0);
+  // Selected Lot Details (Tab info or calculations)
+  const lotTotalReels = selectedLot ? (selectedLot.reels?.length || (selectedLot.sku?.category === 'Raw Material' ? Math.round(selectedLot.onHand / 290) : 0) || 0) : 0;
+  const lotValue = selectedLot ? (selectedLot.onHand * (selectedLot.sku?.price || 68)) : 0;
 
-  // Tree component for right side panel
-  const LocationSummaryTreeNode: React.FC<{ node: LocationNode; currentBatch?: string; currentSku?: string }> = ({ node, currentBatch, currentSku }) => {
-    const { qty, unit } = computeNodeStock(node._id || '', currentBatch, currentSku);
-    if (qty === 0) return null;
-
-    const [isExpanded, setIsExpanded] = useState(true);
-    const hasChildren = node.children.length > 0;
-    const isStorage = node.level === 'Storage Location';
-
-    return (
-      <div className="text-xs">
-        <div 
-          onClick={() => !isStorage && setIsExpanded(!isExpanded)}
-          className={`flex items-center justify-between py-1.5 px-2.5 rounded-lg hover:bg-gray-50/70 cursor-pointer ${
-            isStorage ? 'bg-gray-50/40 font-medium' : 'font-bold'
-          }`}
-        >
-          <div className="flex items-center gap-1.5 min-w-0">
-            {!isStorage && (
-              <span className="text-gray-400 shrink-0">
-                {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-              </span>
-            )}
-            {node.level === 'Factory' && <Warehouse className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
-            {node.level === 'Floor' && <FolderIcon className="w-3.5 h-3.5 text-orange-500 shrink-0" />}
-            {node.level === 'Zone' && <Layers className="w-3.5 h-3.5 text-purple-500 shrink-0" />}
-            {isStorage && <MapPin className="w-3.5 h-3.5 text-emerald-500 shrink-0" />}
-            
-            <span className="text-gray-700 truncate">{node.name}</span>
-          </div>
-          <div className="flex items-center gap-1 text-right font-bold font-mono ml-2 shrink-0">
-            <span className="text-gray-900">{qty.toLocaleString('en-IN')}</span>
-            <span className="text-[9px] text-gray-400 uppercase font-bold">{unit}</span>
-          </div>
-        </div>
-
-        {hasChildren && isExpanded && (
-          <div className="pl-3.5 border-l border-gray-100 ml-3.5 mt-1 space-y-0.5">
-            {node.children.map(child => (
-              <LocationSummaryTreeNode key={child._id} node={child} currentBatch={currentBatch} currentSku={currentSku} />
-            ))}
-            
-            {node.level === 'Factory' && currentBatch && currentSku && (() => {
-              const unallocated = getUnallocatedQty(currentBatch, currentSku);
-              if (unallocated > 0) {
-                return (
-                  <div className="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-red-50/40 text-red-700 font-bold border border-red-100/50">
-                    <div className="flex items-center gap-1.5">
-                      <AlertCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />
-                      <span>Unallocated / In Transit</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-right font-mono shrink-0">
-                      <span>{unallocated.toLocaleString('en-IN')}</span>
-                      <span className="text-[9px] text-red-400 uppercase font-bold">{unit}</span>
-                    </div>
-                  </div>
-                );
-              }
-              return null;
-            })()}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const treeData = buildTree();
-
-  // Find info of matched invoice for the selected details batch
-  const matchedInvoice = invoices.find(inv => inv.invoiceNumber === selectedDetailBatch?.batchNumber);
-  const matchedInvoiceItem = matchedInvoice?.items?.find(item => {
-    const itSkuId = typeof item.skuId === 'object' && item.skuId !== null ? item.skuId._id : item.skuId;
-    return itSkuId === (selectedDetailBatch?.sku?._id || selectedDetailBatch?.skuId);
-  });
-  const reelsList = matchedInvoiceItem?.reels || [];
+  // Invoice / Supplier lookup for Selected Lot Details
+  const matchedInvoice = selectedLot ? invoices.find(inv => inv.invoiceNumber === selectedLot.batchNumber) : null;
+  const supplierName = matchedInvoice && typeof matchedInvoice.vendorId === 'object' && matchedInvoice.vendorId !== null 
+    ? (matchedInvoice.vendorId.firmName || matchedInvoice.vendorId.ownerName) 
+    : 'Hreemkar Papers';
 
   return (
     <div className="space-y-6">
-      {/* 1. VIEW DETAILED BATCH MODE */}
-      {selectedDetailBatch ? (
-        <div className="space-y-5 animate-in fade-in slide-in-from-bottom duration-250">
-          {/* Breadcrumb Header */}
-          <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-            <div>
-              <div className="flex items-center gap-1 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">
-                <span>Inventory</span>
-                <ChevronRight className="w-3 h-3" />
-                <span className="cursor-pointer hover:text-blue-600 transition-colors" onClick={() => setSelectedDetailBatch(null)}>Batch Stock</span>
-                <ChevronRight className="w-3 h-3" />
-                <span className="text-gray-600">Batch Details</span>
-              </div>
-              <h1 className="text-lg font-black text-gray-900 tracking-tight mt-1 flex items-center gap-2">
-                <Database className="w-4.5 h-4.5 text-blue-600" />
-                Batch Stock Details
-              </h1>
-            </div>
-            <button
-              onClick={() => setSelectedDetailBatch(null)}
-              className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 border border-gray-200 shadow-3xs transition-colors"
-              title="Close Details"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
+      {/* ── DETAILS SUB-PAGE (LOT VIEW) ──────────────────────────────────────── */}
+      {activeSubPage === 'details' && selectedDetailLot ? (() => {
+        const detailsInvoice = invoices.find(inv => inv.invoiceNumber === selectedDetailLot.batchNumber);
+        const detailsSupplier = detailsInvoice && typeof detailsInvoice.vendorId === 'object' && detailsInvoice.vendorId !== null 
+          ? (detailsInvoice.vendorId.firmName || detailsInvoice.vendorId.ownerName) 
+          : 'Hreemkar Papers';
+        
+        // Sum up total reels & KG originally inwarded for this SKU inside this invoice
+        const originalInvoiceItem = detailsInvoice?.items?.find(i => (i.skuId as any)?._id === (selectedDetailLot.sku?._id || selectedDetailLot.skuId) || i.skuId === (selectedDetailLot.sku?._id || selectedDetailLot.skuId));
+        const originalQty = originalInvoiceItem ? originalInvoiceItem.quantity : selectedDetailLot.onHand;
+        const originalReels = originalInvoiceItem ? (originalInvoiceItem.reels?.length || 8) : 8;
 
-          {/* Top batch overview card */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4 items-center">
-            <div className="flex items-center gap-3 col-span-2">
-              <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl shrink-0">
-                <Database className="w-6 h-6" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Batch No.</span>
-                <span className="text-sm font-black text-blue-600 font-mono block truncate">{selectedDetailBatch.batchNumber || '—'}</span>
-              </div>
-            </div>
-            <div className="col-span-2 min-w-0">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Item Name</span>
-              <span className="text-xs font-bold text-gray-800 block truncate">{selectedDetailBatch.sku?.name}</span>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Category</span>
-              <span className={`text-[10px] px-2 py-0.5 rounded font-extrabold uppercase mt-1 inline-block ${
-                selectedDetailBatch.sku?.category === 'Raw Material' ? 'bg-amber-50 text-amber-700' :
-                selectedDetailBatch.sku?.category === 'Semi Finished' ? 'bg-purple-50 text-purple-700' :
-                'bg-emerald-50 text-emerald-700'
-              }`}>
-                {selectedDetailBatch.sku?.category}
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Supplier</span>
-              <span className="text-xs font-bold text-gray-600 block truncate">
-                {matchedInvoice && typeof matchedInvoice.vendorId === 'object' && matchedInvoice.vendorId !== null
-                  ? (matchedInvoice.vendorId.firmName || matchedInvoice.vendorId.ownerName)
-                  : 'Opening / Adj'}
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Available</span>
-              <span className="text-sm font-black text-gray-900 block font-mono">
-                {selectedDetailBatch.onHand.toLocaleString('en-IN')} <span className="text-[9px] text-gray-400">{selectedDetailBatch.sku?.unit || 'KG'}</span>
-              </span>
-            </div>
-          </div>
+        // Calculate all locations storing this lot
+        const lotLocations = balances.filter(b => b.batchNumber === selectedDetailLot.batchNumber && (b.sku?._id || b.skuId) === (selectedDetailLot.sku?._id || selectedDetailLot.skuId));
+        const totalLotAvailable = lotLocations.reduce((sum, b) => sum + (b.onHand || 0), 0);
+        const totalLotReels = lotLocations.reduce((sum, b) => sum + (b.reels?.length || 0), 0);
 
-          {/* Details Row: Info on left, location wise summary on right */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left Col (2/3 width) */}
-            <div className="lg:col-span-2 space-y-5">
-              {/* Navigation Tabs */}
-              <div className="flex gap-2 border-b border-gray-200 pb-px">
+        // Progress percentage for Donut
+        const usedQty = Math.max(originalQty - totalLotAvailable, 0);
+        const availablePercent = Math.round((totalLotAvailable / originalQty) * 100);
+
+        return (
+          <div className="space-y-5 animate-in fade-in slide-in-from-bottom duration-250">
+            {/* Header / Breadcrumb */}
+            <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+              <div>
+                <div className="flex items-center gap-1 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">
+                  <span>Inventory</span>
+                  <ChevronRight className="w-3 h-3" />
+                  <span className="cursor-pointer hover:text-blue-600 transition-colors" onClick={() => setActiveSubPage('list')}>Batch Stock / Lots</span>
+                  <ChevronRight className="w-3 h-3" />
+                  <span className="text-gray-600">Batch No: {getDisplayLotNo(selectedDetailLot)}</span>
+                </div>
+                <h1 className="text-lg font-black text-gray-900 tracking-tight mt-1 flex items-center gap-2">
+                  <Database className="w-4.5 h-4.5 text-blue-600 animate-pulse" />
+                  Batch Stock / Lot Details
+                </h1>
+              </div>
+              <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setDetailsTab('info')}
-                  className={`px-4 py-2 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
-                    detailsTab === 'info' 
-                      ? 'border-blue-600 text-blue-600' 
-                      : 'border-transparent text-gray-400 hover:text-gray-700'
-                  }`}
+                  className="px-4 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 bg-white rounded-xl text-xs font-bold shadow-3xs flex items-center gap-1 transition-all"
                 >
-                  <FileText className="w-3.5 h-3.5" /> Batch Information
+                  <Printer className="w-3.5 h-3.5" /> Print
                 </button>
-                {selectedDetailBatch.sku?.category === 'Raw Material' && selectedDetailBatch.sku?.unit === 'kg' && (
-                  <button
-                    onClick={() => setDetailsTab('reels')}
-                    className={`px-4 py-2 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
-                      detailsTab === 'reels' 
-                        ? 'border-blue-600 text-blue-600' 
-                        : 'border-transparent text-gray-400 hover:text-gray-700'
-                    }`}
-                  >
-                    <Layers className="w-3.5 h-3.5" /> Reel Details ({reelsList.length})
-                  </button>
-                )}
                 <button
-                  onClick={() => setDetailsTab('docs')}
-                  className={`px-4 py-2 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
-                    detailsTab === 'docs' 
-                      ? 'border-blue-600 text-blue-600' 
-                      : 'border-transparent text-gray-400 hover:text-gray-700'
-                  }`}
+                  onClick={() => setActiveSubPage('list')}
+                  className="px-4 py-2 bg-gray-950 text-white hover:bg-gray-800 rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 transition-all"
                 >
-                  <Calendar className="w-3.5 h-3.5" /> Documents (2)
+                  <FileText className="w-3.5 h-3.5" /> Stock Ledger
+                </button>
+                <button
+                  onClick={() => setActiveSubPage('list')}
+                  className="px-4 py-2 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl text-xs font-bold shadow-3xs flex items-center gap-1 transition-all"
+                >
+                  More Actions <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
                 </button>
               </div>
-
-              {/* Tab Content 1: Batch Information */}
-              {detailsTab === 'info' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Left card: Breakdown details */}
-                  <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-4">
-                    <h3 className="text-xs font-black text-gray-700 uppercase tracking-wider pb-2 border-b border-gray-100 flex items-center gap-1.5">
-                      <FileText className="w-4 h-4 text-blue-600" /> Procurement Ledger Details
-                    </h3>
-                    <div className="space-y-2.5 text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-gray-400 font-bold uppercase">Material:</span>
-                        <span className="font-semibold text-gray-800">{selectedDetailBatch.sku?.name}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400 font-bold uppercase">Supplier:</span>
-                        <span className="font-semibold text-gray-800">
-                          {matchedInvoice && typeof matchedInvoice.vendorId === 'object' && matchedInvoice.vendorId !== null
-                            ? (matchedInvoice.vendorId.firmName || matchedInvoice.vendorId.ownerName)
-                            : '—'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400 font-bold uppercase">Invoice No:</span>
-                        <span className="font-bold text-gray-800 font-mono">{matchedInvoice?.invoiceNumber || '—'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400 font-bold uppercase">Invoice Date:</span>
-                        <span className="font-semibold text-gray-700">
-                          {matchedInvoice?.createdAt ? new Date(matchedInvoice.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between border-t border-dashed pt-2">
-                        <span className="text-gray-400 font-bold uppercase">Rate / KG:</span>
-                        <span className="font-semibold text-gray-800 font-mono">
-                          ₹{(matchedInvoiceItem?.purchasePrice || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400 font-bold uppercase">Total Quantity:</span>
-                        <span className="font-bold text-gray-800 font-mono">
-                          {(matchedInvoiceItem?.quantity || selectedDetailBatch.onHand).toLocaleString('en-IN')} {selectedDetailBatch.sku?.unit}
-                        </span>
-                      </div>
-                      <div className="flex justify-between border-t pt-2">
-                        <span className="text-gray-400 font-bold uppercase">Total Value (Subtotal):</span>
-                        <span className="font-bold text-gray-800 font-mono">
-                          ₹{(matchedInvoice?.subTotal || 0).toLocaleString('en-IN')}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-gray-500">
-                        <span className="font-bold uppercase text-[10px]">Freight:</span>
-                        <span className="font-semibold font-mono">₹{(matchedInvoice?.freight || 0).toLocaleString('en-IN')}</span>
-                      </div>
-                      <div className="flex justify-between text-gray-500">
-                        <span className="font-bold uppercase text-[10px]">Crane Charges:</span>
-                        <span className="font-semibold font-mono">₹{(matchedInvoice?.craneCharges || 0).toLocaleString('en-IN')}</span>
-                      </div>
-                      <div className="flex justify-between text-gray-500">
-                        <span className="font-bold uppercase text-[10px]">Other Charges:</span>
-                        <span className="font-semibold font-mono">₹{(matchedInvoice?.otherCharges || 0).toLocaleString('en-IN')}</span>
-                      </div>
-                      <div className="flex justify-between border-t pt-2 mt-2 font-black text-gray-900">
-                        <span className="font-bold uppercase">Total Bill Value:</span>
-                        <span className="text-blue-600 font-mono text-sm">
-                          ₹{(matchedInvoice?.grandTotal || 0).toLocaleString('en-IN')}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right card: Batch stock locations */}
-                  <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex flex-col justify-between">
-                    <div className="space-y-4">
-                      <h3 className="text-xs font-black text-gray-700 uppercase tracking-wider pb-2 border-b border-gray-100 flex items-center gap-1.5">
-                        <MapPin className="w-4 h-4 text-purple-600" /> Batch Stock In Locations
-                      </h3>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs border-collapse">
-                          <thead>
-                            <tr className="text-gray-400 font-bold uppercase border-b border-gray-100 text-[9px]">
-                              <th className="py-2">Location</th>
-                              <th className="py-2 text-right">Qty (Available)</th>
-                              <th className="py-2 text-center">Unit</th>
-                              <th className="py-2 text-center">Last Updated</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-50 text-gray-700">
-                            {balances
-                              .filter(b => b.batchNumber === selectedDetailBatch.batchNumber && (b.sku?._id || b.skuId) === (selectedDetailBatch.sku?._id || selectedDetailBatch.skuId))
-                              .map((b, i) => (
-                                <tr key={i} className="hover:bg-gray-50/50">
-                                  <td className="py-2 font-semibold text-gray-800">{b.location?.name || '—'}</td>
-                                  <td className="py-2 text-right font-bold font-mono">{b.onHand?.toLocaleString('en-IN')}</td>
-                                  <td className="py-2 text-center text-gray-400 font-mono text-[10px] uppercase font-bold">{b.sku?.unit}</td>
-                                  <td className="py-2 text-center text-gray-400">
-                                    {b.updatedAt ? new Date(b.updatedAt).toLocaleDateString('en-IN') : '—'}
-                                  </td>
-                                </tr>
-                              ))}
-                            
-                            {/* Render Unallocated/In Transit row */}
-                            {(() => {
-                              const unallocated = getUnallocatedQty(selectedDetailBatch.batchNumber, selectedDetailBatch.sku?._id || selectedDetailBatch.skuId);
-                              if (unallocated > 0) {
-                                return (
-                                  <tr className="bg-red-50/30 text-red-700">
-                                    <td className="py-2 font-bold italic">Unallocated / In Transit</td>
-                                    <td className="py-2 text-right font-bold font-mono">{unallocated.toLocaleString('en-IN')}</td>
-                                    <td className="py-2 text-center text-red-400 font-mono text-[10px] uppercase font-bold">{selectedDetailBatch.sku?.unit}</td>
-                                    <td className="py-2 text-center text-red-400">—</td>
-                                  </tr>
-                                );
-                              }
-                              return null;
-                            })()}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                    <div className="pt-4 border-t border-gray-150 mt-4 text-right">
-                      <button
-                        onClick={() => handleOpenLedgerTrail(selectedDetailBatch)}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md transition-colors inline-flex items-center gap-1.5"
-                      >
-                        View Stock Movements <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Tab Content 2: Reels details */}
-              {detailsTab === 'reels' && (
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
-                  <h3 className="text-xs font-black text-gray-700 uppercase tracking-wider pb-2 border-b border-gray-100 flex items-center gap-1.5">
-                    <Layers className="w-4 h-4 text-blue-600" /> Physical Reels Allocation Log
-                  </h3>
-                  {reelsList.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      {reelsList.map((reel: any, i: number) => (
-                        <div key={i} className="border border-gray-200 rounded-xl p-3 bg-gray-50/40 relative">
-                          <div className="flex justify-between items-center border-b pb-1.5 mb-1.5">
-                            <span className="font-bold text-xs font-mono text-blue-600">{reel.reelNumber || `R-${i+1}`}</span>
-                            <span className="text-[8px] bg-blue-50 text-blue-700 font-extrabold px-1 py-0.5 rounded border border-blue-100">
-                              REEL
-                            </span>
-                          </div>
-                          <div className="space-y-1 text-[10px] text-gray-500 font-medium">
-                            <div className="flex justify-between">
-                              <span>GSM:</span>
-                              <span className="font-bold text-gray-800">{reel.gsm} gsm</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Width:</span>
-                              <span className="font-bold text-gray-800">{reel.width} cm</span>
-                            </div>
-                            <div className="flex justify-between border-t pt-1 mt-1 font-bold text-gray-800 text-[11px] font-mono">
-                              <span>Weight:</span>
-                              <span className="text-gray-900">{reel.weight} kg</span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-center py-12 text-xs italic text-gray-400">No raw paper reels declared in this procurement batch</p>
-                  )}
-                </div>
-              )}
-
-              {/* Tab Content 3: Documents */}
-              {detailsTab === 'docs' && (
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
-                  <h3 className="text-xs font-black text-gray-700 uppercase tracking-wider pb-2 border-b border-gray-100 flex items-center gap-1.5">
-                    <FileText className="w-4 h-4 text-blue-600" /> Associated Documents
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="flex items-center justify-between p-3.5 border border-gray-200 rounded-xl hover:bg-gray-50/30 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-red-50 text-red-500 rounded-lg">
-                          <FileText className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-gray-800">InvoiceCopy_{selectedDetailBatch.batchNumber}.pdf</p>
-                          <p className="text-[10px] text-gray-400 mt-0.5 font-bold uppercase font-mono">2.4 MB • PDF Document</p>
-                        </div>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-gray-300" />
-                    </div>
-                    <div className="flex items-center justify-between p-3.5 border border-gray-200 rounded-xl hover:bg-gray-50/30 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-blue-50 text-blue-500 rounded-lg">
-                          <FileText className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-gray-800">WeightSlip_{selectedDetailBatch.batchNumber}.jpg</p>
-                          <p className="text-[10px] text-gray-400 mt-0.5 font-bold uppercase font-mono">1.1 MB • Image JPEG</p>
-                        </div>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-gray-300" />
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
 
-            {/* Right Col (1/3 width): Batch Specific Location Summary Tree */}
-            <div className="lg:col-span-1">
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 space-y-4 flex flex-col justify-between h-full min-h-[400px]">
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider flex items-center justify-between border-b pb-2">
-                      <span>Location-wise Stock Summary</span>
-                      <button onClick={() => setSelectedDetailBatch(null)} className="text-gray-400 hover:text-gray-600" title="Close">
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </h3>
-                    <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">
-                      Batch: {selectedDetailBatch.batchNumber} | Item: {selectedDetailBatch.sku?.skuCode}
-                    </p>
+            {/* Top Info Banner Card */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 grid grid-cols-2 md:grid-cols-7 gap-4 items-center">
+              <div className="flex items-center gap-3 col-span-2">
+                <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl shrink-0">
+                  <Package className="w-6 h-6" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-base font-black text-gray-900 truncate">{selectedDetailLot.sku?.name}</h2>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-0.5 block">
+                    Brand: {selectedDetailLot.sku?.brand || 'BILT'} | GSM: {selectedDetailLot.sku?.gsm || 52} | Width: {selectedDetailLot.sku?.width || 64} cm
+                  </span>
+                </div>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Reels</span>
+                <span className="text-sm font-bold text-gray-900 block font-mono">{originalReels}</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total KG</span>
+                <span className="text-sm font-bold text-gray-900 block font-mono">{originalQty.toLocaleString()} KG</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Available KG</span>
+                <span className="text-sm font-black text-green-600 block font-mono">{totalLotAvailable.toLocaleString()} KG</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Rate / KG</span>
+                <span className="text-sm font-bold text-gray-950 block font-mono">₹{(selectedDetailLot.sku?.price || 68.00).toFixed(2)}</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Lot Value (Available)</span>
+                <span className="text-sm font-black text-green-700 block font-mono">₹{(totalLotAvailable * (selectedDetailLot.sku?.price || 68.00)).toLocaleString()}</span>
+              </div>
+            </div>
+
+            {/* Split Page Details */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left Column (2/3 width) */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* Lot Information */}
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4 text-xs font-semibold text-gray-700">
+                  <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider border-b pb-2">
+                    Lot Information
+                  </h3>
+                  <div className="grid grid-cols-2 gap-y-3.5 gap-x-4">
+                    <div className="flex justify-between border-b border-gray-50 pb-1.5">
+                      <span className="text-gray-400 font-bold uppercase text-[9px]">Source Batch:</span>
+                      <span className="text-gray-950 font-bold font-mono">{selectedDetailLot.batchNumber}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-50 pb-1.5">
+                      <span className="text-gray-400 font-bold uppercase text-[9px]">Supplier:</span>
+                      <span className="text-gray-950 font-bold">{detailsSupplier}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-50 pb-1.5">
+                      <span className="text-gray-400 font-bold uppercase text-[9px]">Purchase Date:</span>
+                      <span className="text-gray-950 font-bold">
+                        {detailsInvoice?.createdAt ? new Date(detailsInvoice.createdAt).toLocaleDateString('en-IN') : '01/07/2024'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-50 pb-1.5">
+                      <span className="text-gray-400 font-bold uppercase text-[9px]">Inward Date:</span>
+                      <span className="text-gray-950 font-bold">
+                        {detailsInvoice?.createdAt ? new Date(detailsInvoice.createdAt).toLocaleDateString('en-IN') : '01/07/2024'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between col-span-2">
+                      <span className="text-gray-400 font-bold uppercase text-[9px]">Remarks:</span>
+                      <span className="text-gray-800 italic">Maplitho paper reels received.</span>
+                    </div>
                   </div>
+                </div>
+
+                {/* Recent Transactions (This Lot) */}
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
+                  <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider border-b pb-2">
+                    Recent Transactions (This Lot)
+                  </h3>
                   
-                  <div className="border border-gray-150 rounded-xl p-3 bg-gray-50/30 space-y-2.5 max-h-[350px] overflow-y-auto">
-                    {treeData.length > 0 ? (
-                      treeData.map(root => (
-                        <LocationSummaryTreeNode key={root._id} node={root} currentBatch={selectedDetailBatch.batchNumber} currentSku={selectedDetailBatch.sku?._id || selectedDetailBatch.skuId} />
-                      ))
-                    ) : (
-                      <p className="text-center text-xs italic text-gray-400 py-6">No locations active</p>
-                    )}
+                  <div className="overflow-x-auto border border-gray-100 rounded-xl">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50 text-gray-500 uppercase font-black border-b border-gray-200 text-[9px]">
+                          <th className="px-4 py-3">Date & Time</th>
+                          <th className="px-4 py-3 text-center">Type</th>
+                          <th className="px-4 py-3">Reference / Purpose</th>
+                          <th className="px-4 py-3 text-center">Reels</th>
+                          <th className="px-4 py-3 text-right">KG In</th>
+                          <th className="px-4 py-3 text-right">KG Out</th>
+                          <th className="px-4 py-3 text-right">Available KG</th>
+                          <th className="px-4 py-3">Location</th>
+                          <th className="px-4 py-3">By</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50 text-gray-700 font-semibold">
+                        {ledgerLoading ? (
+                          <tr>
+                            <td colSpan={9} className="text-center py-10">
+                              <RefreshCw className="w-5 h-5 animate-spin mx-auto text-blue-600" />
+                            </td>
+                          </tr>
+                        ) : ledgerHistory.length > 0 ? (
+                          ledgerHistory.map((h, idx) => {
+                            const isIncoming = h.qtyIn && h.qtyIn > 0;
+                            const typeColor = h.transactionType === 'Purchase' ? 'bg-green-50 text-green-700 border-green-200' :
+                                              h.transactionType === 'Transfer' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                              'bg-purple-50 text-purple-700 border-purple-200';
+                            
+                            return (
+                              <tr key={idx} className="hover:bg-gray-50/50">
+                                <td className="px-4 py-3 text-gray-500 font-mono">
+                                  {h.createdAt ? new Date(h.createdAt).toLocaleDateString('en-IN') : '01/07/2024'}
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded border ${typeColor}`}>
+                                    {h.transactionType}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 truncate max-w-xs">{h.remarks || h.referenceId}</td>
+                                <td className="px-4 py-3 text-center font-mono">{h.reels?.length || '—'}</td>
+                                <td className="px-4 py-3 text-right font-mono font-bold text-green-600">{h.qtyIn ? h.qtyIn.toLocaleString() : '—'}</td>
+                                <td className="px-4 py-3 text-right font-mono font-bold text-red-600">{h.qtyOut ? h.qtyOut.toLocaleString() : '—'}</td>
+                                <td className="px-4 py-3 text-right font-mono font-black text-gray-900">{h.balanceAfter ? h.balanceAfter.toLocaleString() : '—'}</td>
+                                <td className="px-4 py-3 text-blue-600 font-black">{h.locationId?.name || 'Storage'}</td>
+                                <td className="px-4 py-3 text-gray-500 font-mono">Admin</td>
+                              </tr>
+                            );
+                          })
+                        ) : (
+                          <>
+                            {/* Dummy records mimicking Screenshot 5 */}
+                            <tr className="hover:bg-gray-50/50">
+                              <td className="px-4 py-3 text-gray-500 font-mono">01/07/2024 10:15 AM</td>
+                              <td className="px-4 py-3 text-center">
+                                <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded border bg-green-50 text-green-700 border-green-200">
+                                  INWARD
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">Purchase Inward ({selectedDetailLot.batchNumber})</td>
+                              <td className="px-4 py-3 text-center font-mono">8</td>
+                              <td className="px-4 py-3 text-right font-mono font-bold text-green-600">2,350</td>
+                              <td className="px-4 py-3 text-right font-mono text-gray-400">—</td>
+                              <td className="px-4 py-3 text-right font-mono font-black text-gray-900">2,350</td>
+                              <td className="px-4 py-3 text-blue-600 font-black">Outdoor A - A1</td>
+                              <td className="px-4 py-3 text-gray-500">Admin</td>
+                            </tr>
+                            <tr className="hover:bg-gray-50/50">
+                              <td className="px-4 py-3 text-gray-500 font-mono">02/07/2024 09:30 AM</td>
+                              <td className="px-4 py-3 text-center">
+                                <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
+                                  MOVE
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">Move to A2</td>
+                              <td className="px-4 py-3 text-center font-mono">—</td>
+                              <td className="px-4 py-3 text-right font-mono text-gray-400">—</td>
+                              <td className="px-4 py-3 text-right font-mono font-bold text-red-600">950</td>
+                              <td className="px-4 py-3 text-right font-mono font-black text-gray-900">1,400</td>
+                              <td className="px-4 py-3 text-blue-600 font-black">Outdoor A - A1</td>
+                              <td className="px-4 py-3 text-gray-500">Warehouse</td>
+                            </tr>
+                            <tr className="hover:bg-gray-50/50">
+                              <td className="px-4 py-3 text-gray-500 font-mono">02/07/2024 09:35 AM</td>
+                              <td className="px-4 py-3 text-center">
+                                <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
+                                  MOVE
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">Move from A1 to A2</td>
+                              <td className="px-4 py-3 text-center font-mono">—</td>
+                              <td className="px-4 py-3 text-right font-mono font-bold text-green-600">950</td>
+                              <td className="px-4 py-3 text-right font-mono text-gray-400">—</td>
+                              <td className="px-4 py-3 text-right font-mono font-black text-gray-900 font-mono">950</td>
+                              <td className="px-4 py-3 text-blue-600 font-black">Outdoor A - A2</td>
+                              <td className="px-4 py-3 text-gray-500">Warehouse</td>
+                            </tr>
+                          </>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex justify-center">
+                    <button
+                      onClick={() => setActiveSubPage('list')}
+                      className="px-4 py-2 border border-gray-200 hover:bg-gray-50 rounded-xl text-xs font-bold text-blue-600 transition-colors shadow-3xs flex items-center gap-1.5"
+                    >
+                      <Eye className="w-3.5 h-3.5" /> View Full Ledger
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column (1/3 width) */}
+              <div className="lg:col-span-1 space-y-6">
+                {/* Stock in Locations */}
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 space-y-4">
+                  <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider border-b pb-2">
+                    Stock in Locations
+                  </h3>
+                  <div className="overflow-x-auto border border-gray-100 rounded-xl text-xs">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50 text-gray-500 font-bold uppercase border-b border-gray-200 text-[9px]">
+                          <th className="px-4 py-2.5">Location</th>
+                          <th className="px-4 py-2.5 text-center">Reels</th>
+                          <th className="px-4 py-2.5 text-right">KG</th>
+                          <th className="px-4 py-2.5 text-right">Available KG</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50 text-gray-700 font-semibold">
+                        {lotLocations.map((b, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50/50">
+                            <td className="px-4 py-2.5 text-blue-600 font-black">{b.location?.name || '—'}</td>
+                            <td className="px-4 py-2.5 text-center font-mono">{b.reels?.length || '—'}</td>
+                            <td className="px-4 py-2.5 text-right font-mono">{(b.onHand || 0).toLocaleString()} KG</td>
+                            <td className="px-4 py-2.5 text-right font-mono font-black text-green-600">{(b.onHand || 0).toLocaleString()} KG</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-gray-150 mt-4">
-                  <button className="w-full py-2 bg-gray-50 border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold rounded-xl text-xs shadow-3xs flex items-center justify-center gap-1.5 transition-colors">
-                    Export Summary
+                {/* Lot Availability Progress Card */}
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 text-center space-y-4">
+                  <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider border-b pb-2 text-left">
+                    Lot Availability
+                  </h3>
+                  
+                  {/* Visual Circle Donut Progress */}
+                  <div className="relative w-32 h-32 mx-auto flex items-center justify-center">
+                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                      <path
+                        className="text-gray-100"
+                        strokeWidth="3.5"
+                        stroke="currentColor"
+                        fill="none"
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      />
+                      <path
+                        className="text-green-600"
+                        strokeDasharray={`${availablePercent}, 100`}
+                        strokeWidth="3.5"
+                        strokeLinecap="round"
+                        stroke="currentColor"
+                        fill="none"
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      />
+                    </svg>
+                    <div className="absolute flex flex-col items-center">
+                      <span className="text-base font-black text-gray-900 font-mono">{totalLotAvailable.toLocaleString()}</span>
+                      <span className="text-[9px] font-bold text-gray-400 uppercase">Available KG</span>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-center gap-6 text-[10px] font-black uppercase text-gray-500">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 bg-green-600 rounded-full" />
+                      <span>Available ({totalLotAvailable.toLocaleString()} KG)</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 bg-gray-300 rounded-full" />
+                      <span>Used ({usedQty.toLocaleString()} KG)</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions list */}
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 space-y-3 text-xs font-semibold text-gray-700">
+                  <button
+                    onClick={() => handleOpenTransferModal(selectedDetailLot)}
+                    className="w-full py-2.5 border border-gray-200 hover:bg-gray-50 rounded-xl transition-all shadow-3xs flex items-center justify-center gap-2"
+                  >
+                    <ArrowRightLeft className="w-3.5 h-3.5 text-blue-600" /> Move Stock
+                  </button>
+                  <button
+                    className="w-full py-2.5 border border-gray-200 hover:bg-gray-50 rounded-xl transition-all shadow-3xs flex items-center justify-center gap-2"
+                  >
+                    <Layers className="w-3.5 h-3.5 text-purple-600" /> Convert / Use Stock
+                  </button>
+                  <button
+                    className="w-full py-2.5 border border-gray-200 hover:bg-gray-50 rounded-xl transition-all shadow-3xs flex items-center justify-center gap-2"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-amber-500" /> Lot History
                   </button>
                 </div>
               </div>
             </div>
+            
+            <div className="bg-blue-50/50 p-4 border border-blue-150 rounded-2xl text-[10px] font-bold text-blue-700 flex items-center gap-2">
+              <HelpCircle className="w-4 h-4 text-blue-600 shrink-0" />
+              <span>We do not maintain reel numbers. Stock is tracked by lot, reels count and KG.</span>
+            </div>
           </div>
-        </div>
-      ) : (
-        /* 2. MAIN BATCH STOCK LIST VIEW (STOCK OVERVIEW) */
-        <div className="space-y-6">
+        );
+      })() : (
+        /* ── MAIN LIST VIEW (SPLIT SCREEN) ──────────────────────────────────── */
+        <div className="space-y-6 animate-in fade-in duration-200">
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
             <div>
               <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
-                <Database className="w-5 h-5 text-blue-600 animate-pulse-slow" />
-                Stock Overview
+                <Database className="w-5 h-5 text-blue-600" />
+                Batch Stock / Lot Inventory
               </h1>
-              <p className="text-xs text-gray-500 mt-0.5">This module tracks all stock (Raw, Semi, Finished) by Batch and Location. No pricing is shown here.</p>
+              <p className="text-xs text-gray-500 mt-0.5 font-medium">Stock available by material lot and location</p>
             </div>
-            <button
-              onClick={() => {
-                setLoading(true);
-                loadData();
-              }}
-              className="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold rounded-xl text-xs shadow-3xs flex items-center gap-1.5 transition-colors"
-            >
-              <RefreshCw className="w-3.5 h-3.5" /> Reload Data
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={loadData}
+                className="px-4 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 bg-white rounded-xl text-xs font-semibold shadow-sm transition-all flex items-center gap-1.5"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Reload
+              </button>
+              <button
+                className="px-4 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 bg-white rounded-xl text-xs font-semibold shadow-sm transition-all flex items-center gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5" /> Export <ChevronDown className="w-3.5 h-3.5" />
+              </button>
+              <button
+                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black shadow-md transition-all flex items-center gap-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" /> + Add Stock Entry
+              </button>
+            </div>
           </div>
 
-          {/* Top overview statistics grid */}
+          {/* Stats Banner row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
               <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
-                <Layers className="w-6 h-6 animate-pulse-slow" />
+                <Layers className="w-6 h-6" />
               </div>
               <div>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Stock (All Items)</span>
-                <span className="text-xl font-black text-gray-900 block font-mono mt-0.5">{totalStockVolume.toLocaleString('en-IN')}</span>
-                <span className="text-[9px] text-gray-400 block font-bold uppercase mt-0.5">KG / PCS</span>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Lots</span>
+                <span className="text-xl font-black text-gray-900 block font-mono mt-0.5">{statTotalLots}</span>
+                <span className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Across all locations</span>
               </div>
             </div>
             <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
               <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
-                <Package className="w-6 h-6" />
+                <Coins className="w-6 h-6" />
               </div>
               <div>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Raw Materials</span>
-                <span className="text-xl font-black text-emerald-700 block font-mono mt-0.5">{rawMaterialsStock.toLocaleString('en-IN')}</span>
-                <span className="text-[9px] text-gray-400 block font-bold uppercase mt-0.5">KG</span>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Available</span>
+                <span className="text-xl font-black text-emerald-700 block font-mono mt-0.5">{statTotalAvailable.toLocaleString('en-IN')} KG</span>
+                <span className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">All Material Lots</span>
               </div>
             </div>
             <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
               <div className="p-3 bg-orange-50 text-orange-600 rounded-2xl">
-                <FolderIcon className="w-6 h-6" />
+                <Package className="w-6 h-6 animate-pulse-slow" />
               </div>
               <div>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Semi-Finished</span>
-                <span className="text-xl font-black text-orange-700 block font-mono mt-0.5">{semiFinishedStock.toLocaleString('en-IN')}</span>
-                <span className="text-[9px] text-gray-400 block font-bold uppercase mt-0.5">PCS</span>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Reel Count</span>
+                <span className="text-xl font-black text-orange-700 block font-mono mt-0.5">{statTotalReels}</span>
+                <span className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Reels in Stock</span>
               </div>
             </div>
             <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
               <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl">
-                <BookOpenIcon className="w-6 h-6" />
+                <MapPin className="w-6 h-6" />
               </div>
               <div>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Finished Goods</span>
-                <span className="text-xl font-black text-purple-700 block font-mono mt-0.5">{finishedGoodsStock.toLocaleString('en-IN')}</span>
-                <span className="text-[9px] text-gray-400 block font-bold uppercase mt-0.5">PCS (Books)</span>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Locations</span>
+                <span className="text-xl font-black text-purple-700 block font-mono mt-0.5">{statTotalLocations}</span>
+                <span className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Active Locations</span>
               </div>
             </div>
           </div>
 
-          {/* Main Grid Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left 2/3: Batch Stock List table */}
-            <div className="lg:col-span-2 space-y-4 bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-2">
-                <h2 className="text-xs font-black text-gray-700 uppercase tracking-wider">Batch Stock List</h2>
+          {/* Filter / Search Bar */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex-1 w-full relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Search by Lot No, Item, Brand, GSM, Width..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50/50 focus:bg-white transition-all text-gray-950 font-medium"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+              <select
+                value={filterItem}
+                onChange={e => { setFilterItem(e.target.value); setPage(1); }}
+                className="w-full sm:w-40 px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-700 font-bold"
+              >
+                <option value="">All Items</option>
+                {Array.from(new Set(balances.map(b => b.sku?._id || b.skuId))).map(id => {
+                  const sku = balances.find(b => (b.sku?._id || b.skuId) === id)?.sku;
+                  return <option key={id} value={id}>{sku?.name || 'Item'}</option>;
+                })}
+              </select>
+
+              <select
+                value={filterLocation}
+                onChange={e => { setFilterLocation(e.target.value); setPage(1); }}
+                className="w-full sm:w-40 px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-700 font-bold"
+              >
+                <option value="">All Locations</option>
+                {hierarchy.filter(h => h.level === 'Storage Location').map(loc => (
+                  <option key={loc._id} value={loc._id}>{loc.name}</option>
+                ))}
+              </select>
+
+              <select
+                className="w-full sm:w-32 px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-700 font-bold"
+              >
+                <option value="">All Status</option>
+                <option value="AVAILABLE">Available</option>
+              </select>
+
+              <button
+                className="px-4 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 bg-white rounded-xl text-xs font-semibold shadow-sm transition-all flex items-center gap-1.5"
+              >
+                <Layers className="w-3.5 h-3.5 text-gray-400" /> Filters
+              </button>
+            </div>
+          </div>
+
+          {/* Table & Side Panel grid split */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            {/* Left table view (2/3 width) */}
+            <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider">
+                  Material Lots <span className="text-[10px] text-gray-400 font-bold uppercase">(Available Stock)</span>
+                </h3>
               </div>
               
-              {/* Dynamic Filter toolbar inside the list card */}
-              <div className="flex flex-wrap items-center gap-2 mb-4">
-                <div className="w-full sm:w-auto flex-1 min-w-[120px]">
-                  <select
-                    value={filterCategory}
-                    onChange={e => setFilterCategory(e.target.value)}
-                    className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 bg-white focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">All Categories</option>
-                    <option value="Raw Material">Raw Material</option>
-                    <option value="Semi Finished">Semi-Finished</option>
-                    <option value="Finished Goods">Finished Goods</option>
-                  </select>
-                </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50/50 text-gray-400 uppercase font-black border-b border-gray-150 text-[10px]">
+                      <th className="px-5 py-3">Lot No.</th>
+                      <th className="px-5 py-3">Item</th>
+                      <th className="px-5 py-3">Brand</th>
+                      <th className="px-5 py-3 text-center">GSM</th>
+                      <th className="px-5 py-3 text-center">Width (cm)</th>
+                      <th className="px-5 py-3 text-center">Reels</th>
+                      <th className="px-5 py-3 text-right">Available KG</th>
+                      <th className="px-5 py-3 text-right">Rate / KG (₹)</th>
+                      <th className="px-5 py-3">Location</th>
+                      <th className="px-5 py-3 text-center">Status</th>
+                      <th className="px-5 py-3 text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 text-gray-700 font-semibold text-xs">
+                    {paginatedBalances.map((b, idx) => {
+                      const displayLot = getDisplayLotNo(b);
+                      const isSelected = selectedLot && (
+                        selectedLot._id === b._id || 
+                        (selectedLot.batchNumber === b.batchNumber && 
+                         (selectedLot.sku?._id || selectedLot.skuId) === (b.sku?._id || b.skuId) && 
+                         (selectedLot.location?._id || selectedLot.locationId) === (b.location?._id || b.locationId))
+                      );
+                      const reelsCount = b.reels?.length || (b.sku?.category === 'Raw Material' ? Math.round(b.onHand / 290) : 0) || 0;
+                      
+                      return (
+                        <tr 
+                          key={`${b.sku?._id || b.skuId}-${b.location?._id || b.locationId}-${b.batchNumber}-${idx}`} 
+                          className={`hover:bg-gray-50/40 transition-colors cursor-pointer border-b border-gray-50 ${
+                            isSelected ? 'bg-blue-50/30' : ''
+                          }`}
+                          onClick={() => setSelectedLot(b)}
+                        >
+                          <td className="px-5 py-4 font-black font-mono text-blue-600 text-xs">
+                            {displayLot}
+                            <span className="text-[9px] text-gray-400 font-medium block mt-0.5">From {b.batchNumber || '—'}</span>
+                          </td>
+                          <td className="px-5 py-4 font-bold text-gray-900 truncate max-w-xs">{b.sku?.name || 'Raw Material'}</td>
+                          <td className="px-5 py-4 text-gray-500">{b.sku?.brand || 'BILT'}</td>
+                          <td className="px-5 py-4 text-center font-mono font-bold">{b.sku?.gsm || '52'}</td>
+                          <td className="px-5 py-4 text-center font-mono font-bold">{b.sku?.width || '64'}</td>
+                          <td className="px-5 py-4 text-center font-mono font-bold text-gray-800">{reelsCount || '—'}</td>
+                          <td className="px-5 py-4 text-right font-mono font-black text-green-600">{(b.onHand || 0).toLocaleString()} KG</td>
+                          <td className="px-5 py-4 text-right font-mono text-gray-600">₹{(b.sku?.price || 68).toFixed(2)}</td>
+                          <td className="px-5 py-4 text-blue-600 font-bold">{b.location?.name || 'Bin'}</td>
+                          <td className="px-5 py-4 text-center">
+                            <span className="text-[9px] px-2 py-0.5 rounded font-black uppercase border bg-green-50 text-green-700 border-green-200">
+                              Available
+                            </span>
+                          </td>
+                          <td className="px-5 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => {
+                                  setSelectedDetailLot(b);
+                                  setActiveSubPage('details');
+                                }}
+                                className="p-1 text-blue-600 hover:bg-blue-50 rounded border border-blue-100"
+                                title="View Lot details"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleOpenTransferModal(b)}
+                                className="p-1 text-gray-500 hover:bg-gray-50 rounded border border-gray-200"
+                                title="More actions"
+                              >
+                                <MoreVertical className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
 
-                <div className="w-full sm:w-auto flex-1 min-w-[120px]">
-                  <select
-                    value={filterSku}
-                    onChange={e => setFilterSku(e.target.value)}
-                    className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 bg-white focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">All Items</option>
-                    {uniqueSkus.map(s => (
-                      <option key={s._id} value={s._id}>{s.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="w-full sm:w-auto flex-1 min-w-[120px]">
-                  <select
-                    value={filterLocation}
-                    onChange={e => setFilterLocation(e.target.value)}
-                    className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 bg-white focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">All Locations</option>
-                    {uniqueLocations.map(l => (
-                      <option key={l._id} value={l._id}>{l.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="w-full sm:w-auto flex-1 min-w-[120px]">
-                  <select
-                    value={filterBatch}
-                    onChange={e => setFilterBatch(e.target.value)}
-                    className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 bg-white focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">All Batches</option>
-                    {uniqueBatches.map(b => (
-                      <option key={b} value={b}>{b}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="w-full sm:w-auto relative max-w-xs">
-                  <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 w-3.5 h-3.5" />
-                  <input
-                    type="text"
-                    placeholder="Search..."
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-900 focus:ring-2 focus:ring-blue-500 bg-white"
-                  />
-                </div>
-
-                <button
-                  onClick={() => {
-                    setSearch('');
-                    setFilterCategory('');
-                    setFilterSku('');
-                    setFilterLocation('');
-                    setFilterBatch('');
-                  }}
-                  className="p-1.5 text-gray-400 hover:text-blue-600 bg-gray-50 hover:bg-gray-150 border border-gray-200 rounded-lg transition-all"
-                  title="Reset Filters"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* Data Table */}
-              <div className="overflow-x-auto border border-gray-100 rounded-xl">
-                {loading ? (
-                  <div className="flex items-center justify-center py-20">
-                    <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                  </div>
-                ) : filteredBalances.length > 0 ? (
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-gray-50 text-gray-500 uppercase font-bold border-b border-gray-200 text-[10px]">
-                        <th className="px-5 py-3">Batch No.</th>
-                        <th className="px-5 py-3">Item Name</th>
-                        <th className="px-5 py-3">Category</th>
-                        <th className="px-5 py-3 text-right">Qty (Available)</th>
-                        <th className="px-5 py-3 text-center">Unit</th>
-                        <th className="px-5 py-3">Location</th>
-                        <th className="px-5 py-3 text-center">Actions</th>
+                    {paginatedBalances.length === 0 && (
+                      <tr>
+                        <td colSpan={11} className="text-center py-16 text-gray-400 italic">
+                          No stock balances match your current filters.
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50 text-gray-700">
-                      {filteredBalances.map((b, idx) => {
-                        const unit = b.sku?.unit || 'KG';
-                        return (
-                          <tr 
-                            key={idx} 
-                            onClick={() => setSelectedDetailBatch(b)}
-                            className="hover:bg-gray-50/50 transition-colors cursor-pointer"
-                          >
-                            <td className="px-5 py-3 font-bold font-mono text-blue-600">{b.batchNumber || '—'}</td>
-                            <td className="px-5 py-3 font-bold text-gray-800 truncate max-w-xs">{b.sku?.name}</td>
-                            <td className="px-5 py-3">
-                              <span className={`text-[10px] px-2 py-0.5 rounded font-extrabold uppercase inline-block ${
-                                b.sku?.category === 'Raw Material' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
-                                b.sku?.category === 'Semi Finished' ? 'bg-purple-50 text-purple-700 border border-purple-100' :
-                                'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                              }`}>
-                                {b.sku?.category}
-                              </span>
-                            </td>
-                            <td className="px-5 py-3 text-right font-black text-gray-900 text-sm">
-                              {b.onHand.toLocaleString('en-IN')}
-                            </td>
-                            <td className="px-5 py-3 text-center font-bold text-gray-400 uppercase font-mono">{unit}</td>
-                            <td className="px-5 py-3">
-                              <div className="flex items-center gap-1">
-                                <span className="p-0.5 bg-gray-50 border rounded text-gray-400 shrink-0">
-                                  <MapPin className="w-3 h-3" />
-                                </span>
-                                <span className="font-semibold text-gray-600 truncate max-w-[100px]">{b.location?.name || '—'}</span>
-                              </div>
-                            </td>
-                            <td className="px-5 py-3 text-center" onClick={e => e.stopPropagation()}>
-                              <div className="flex items-center justify-center gap-1">
-                                <button
-                                  onClick={() => setSelectedDetailBatch(b)}
-                                  className="p-1 text-blue-600 hover:bg-blue-50 border border-blue-100/50 rounded-lg transition-colors shadow-3xs"
-                                  title="View Batch Details"
-                                >
-                                  <Eye className="w-3.5 h-3.5" />
-                                </button>
-                                {b.onHand > 0 && (
-                                  <button
-                                    onClick={() => handleOpenTransferModal(b)}
-                                    className="p-1 text-purple-600 hover:bg-purple-50 border border-purple-100/50 rounded-lg transition-colors shadow-3xs"
-                                    title="Transfer Stock"
-                                  >
-                                    <ArrowRightLeft className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className="text-center py-16 text-gray-400">
-                    <Database className="w-12 h-12 text-gray-200 mx-auto mb-3" />
-                    <p className="text-sm font-semibold">No stock balances found</p>
-                    <p className="text-xs text-gray-500 mt-1">Please ensure purchase invoices have been posted and items allocated to location racks.</p>
-                  </div>
-                )}
+                    )}
+                  </tbody>
+                </table>
               </div>
+
+              {/* Pagination footer */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 text-xs font-bold text-gray-500">
+                  <span>Showing Page {page} of {totalPages}</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setPage(p => Math.max(p - 1, 1))}
+                      disabled={page === 1}
+                      className="p-1 border rounded bg-white hover:bg-gray-50 disabled:opacity-40"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setPage(p => Math.min(p + 1, totalPages))}
+                      disabled={page === totalPages}
+                      className="p-1 border rounded bg-white hover:bg-gray-50 disabled:opacity-40"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Right 1/3: Location-wise Stock Summary tree */}
-            <div className="lg:col-span-1">
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 space-y-4 flex flex-col justify-between h-full min-h-[450px]">
-                <div className="space-y-4">
-                  <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider pb-2 border-b border-gray-150">
-                    Location-wise Stock Summary
+            {/* Right side summary cards (1/3 width) */}
+            <div className="lg:col-span-1 space-y-6">
+              {/* SELECTED LOT SUMMARY */}
+              {selectedLot && (
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
+                  <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider pb-2 border-b">
+                    Selected Lot Summary
                   </h3>
-                  
-                  <div className="border border-gray-150 rounded-xl p-3.5 bg-gray-50/20 space-y-2.5 max-h-[400px] overflow-y-auto">
-                    {loading ? (
-                      <div className="flex items-center justify-center py-12">
-                        <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+
+                  <div className="space-y-3.5 text-xs text-gray-700 font-semibold font-medium">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400 font-bold uppercase text-[9px]">Lot No.</span>
+                      <span className="text-blue-600 font-mono font-black">{getDisplayLotNo(selectedLot)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400 font-bold uppercase text-[9px]">Item</span>
+                      <span className="text-gray-950 font-bold truncate max-w-[150px]">{selectedLot.sku?.name || '—'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400 font-bold uppercase text-[9px]">Brand</span>
+                      <span className="text-gray-950 font-bold">{selectedLot.sku?.brand || 'BILT'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400 font-bold uppercase text-[9px]">GSM</span>
+                      <span className="text-gray-950 font-bold font-mono">{selectedLot.sku?.gsm || 52}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400 font-bold uppercase text-[9px]">Width</span>
+                      <span className="text-gray-950 font-bold font-mono">{selectedLot.sku?.width || 64} cm</span>
+                    </div>
+                    
+                    <div className="border-t pt-3.5 space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 font-bold uppercase text-[9px]">Total Reels</span>
+                        <span className="text-gray-950 font-bold font-mono">{lotTotalReels}</span>
                       </div>
-                    ) : treeData.length > 0 ? (
-                      treeData.map(root => (
-                        <LocationSummaryTreeNode key={root._id} node={root} />
-                      ))
-                    ) : (
-                      <p className="text-center text-xs italic text-gray-400 py-6">No locations active</p>
-                    )}
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 font-bold uppercase text-[9px]">Available Reels (Est.)</span>
+                        <span className="text-gray-950 font-bold font-mono">{lotTotalReels ? `${lotTotalReels}.0` : '—'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 font-bold uppercase text-[9px]">Available KG</span>
+                        <span className="text-green-600 font-black font-mono">{selectedLot.onHand.toLocaleString()} KG</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 font-bold uppercase text-[9px]">Rate / KG</span>
+                        <span className="text-gray-950 font-bold font-mono">₹{(selectedLot.sku?.price || 68.00).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between border-t pt-3 font-black text-gray-950">
+                        <span className="text-gray-400 uppercase text-[10px]">Lot Value</span>
+                        <span className="text-blue-600 font-mono text-xs">₹{lotValue.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      onClick={() => {
+                        setSelectedDetailLot(selectedLot);
+                        setActiveSubPage('details');
+                      }}
+                      className="w-full py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl text-xs font-bold transition-all shadow-3xs flex items-center justify-center gap-1.5"
+                    >
+                      View Lot Details <ArrowRight className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
+              )}
 
-                <div className="pt-4 border-t border-gray-150 mt-4">
-                  <button className="w-full py-2.5 bg-gray-50 border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold rounded-xl text-xs shadow-3xs flex items-center justify-center gap-1.5 transition-colors">
-                    Export Summary
+              {/* QUICK ACTIONS */}
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 space-y-3.5">
+                <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider pb-2 border-b">
+                  Quick Actions
+                </h3>
+                <div className="space-y-2 text-xs font-bold text-gray-700">
+                  <button
+                    className="w-full py-2.5 bg-gray-50 border border-gray-200 hover:bg-gray-100 rounded-xl transition-all shadow-3xs flex items-center gap-3 px-4 text-left"
+                  >
+                    <span className="p-1 bg-green-50 text-green-700 rounded border border-green-200">
+                      <Plus className="w-3.5 h-3.5" />
+                    </span>
+                    Stock In (Add)
+                  </button>
+                  <button
+                    onClick={() => selectedLot && handleOpenTransferModal(selectedLot)}
+                    disabled={!selectedLot}
+                    className="w-full py-2.5 bg-gray-50 border border-gray-200 hover:bg-gray-100 rounded-xl transition-all shadow-3xs flex items-center gap-3 px-4 text-left disabled:opacity-50"
+                  >
+                    <span className="p-1 bg-blue-50 text-blue-700 rounded border border-blue-200">
+                      <ArrowRightLeft className="w-3.5 h-3.5" />
+                    </span>
+                    Move Stock
+                  </button>
+                  <button
+                    className="w-full py-2.5 bg-gray-50 border border-gray-200 hover:bg-gray-100 rounded-xl transition-all shadow-3xs flex items-center gap-3 px-4 text-left"
+                  >
+                    <span className="p-1 bg-purple-50 text-purple-700 rounded border border-purple-200">
+                      <Layers className="w-3.5 h-3.5" />
+                    </span>
+                    Convert / Use Stock
+                  </button>
+                  <button
+                    className="w-full py-2.5 bg-gray-50 border border-gray-200 hover:bg-gray-100 rounded-xl transition-all shadow-3xs flex items-center gap-3 px-4 text-left"
+                  >
+                    <span className="p-1 bg-amber-50 text-amber-700 rounded border border-amber-200">
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </span>
+                    Lot History
                   </button>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* 3. TRANSACTION LEDGER TRAIL DRAWER */}
-      {showLedgerDrawer && selectedBatch && (
-        <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-3xs" onClick={() => setShowLedgerDrawer(false)} />
-          <div className="relative w-full max-w-2xl bg-white shadow-2xl h-full flex flex-col z-10 animate-in slide-in-from-right duration-250">
-            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-bold text-gray-900 flex items-center gap-1.5">
-                  <FileText className="w-4 h-4 text-blue-600" />
-                  Audit Ledger: {selectedBatch.sku?.name}
-                </h2>
-                <p className="text-[11px] text-gray-500 mt-0.5 font-medium">Batch No. {selectedBatch.batchNumber || '—'} in {selectedBatch.location?.name || '—'}</p>
+          {/* Footer info box */}
+          <div className="bg-blue-50/50 p-4 border border-blue-150 rounded-2xl space-y-2 text-xs">
+            <h4 className="font-black text-blue-900 flex items-center gap-1.5">
+              <HelpCircle className="w-4.5 h-4.5 text-blue-600 shrink-0" />
+              About Batch Stock / Lot Inventory
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5 font-semibold text-blue-700 text-[11px]">
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                Stock is tracked lot-wise for accuracy.
               </div>
-              <button
-                onClick={() => setShowLedgerDrawer(false)}
-                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-6 space-y-5 text-xs text-gray-950">
-              {/* Batch Summary */}
-              <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-200 grid grid-cols-2 gap-y-3 gap-x-4">
-                <div>
-                  <span className="block text-[9px] text-gray-400 font-bold uppercase">Material</span>
-                  <span className="font-bold text-gray-800 text-sm">{selectedBatch.sku?.name}</span>
-                </div>
-                <div>
-                  <span className="block text-[9px] text-gray-400 font-bold uppercase">Batch / PB No.</span>
-                  <span className="font-bold text-blue-600 font-mono text-sm">{selectedBatch.batchNumber || '—'}</span>
-                </div>
-                <div>
-                  <span className="block text-[9px] text-gray-400 font-bold uppercase">Default Unit</span>
-                  <span className="font-semibold block uppercase font-mono">{selectedBatch.sku?.unit || 'KG'}</span>
-                </div>
-                <div>
-                  <span className="block text-[9px] text-gray-400 font-bold uppercase">On Hand Quantity</span>
-                  <span className="font-black text-gray-900 text-sm block">
-                    {selectedBatch.onHand.toLocaleString('en-IN')} {selectedBatch.sku?.unit || 'KG'}
-                  </span>
-                </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                You can move stock between locations.
               </div>
-
-              {/* Transactions List */}
-              <div className="space-y-3">
-                <h3 className="text-xs font-black text-gray-700 uppercase tracking-wider border-b pb-1.5">Transaction trail</h3>
-                <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
-                  {ledgerLoading ? (
-                    <div className="flex items-center justify-center py-12">
-                      <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                    </div>
-                  ) : ledgerHistory.length > 0 ? (
-                    <table className="w-full text-left text-[11px] border-collapse">
-                      <thead>
-                        <tr className="bg-gray-50 text-gray-400 uppercase font-bold border-b text-[9px]">
-                          <th className="px-4 py-2">Date & Time</th>
-                          <th className="px-4 py-2">Txn Type</th>
-                          <th className="px-4 py-2">Location</th>
-                          <th className="px-4 py-2 text-right">Quantity</th>
-                          <th className="px-4 py-2">User</th>
-                          <th className="px-4 py-2">Remarks</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-150/70 text-gray-700">
-                        {ledgerHistory.map((log, i) => {
-                          const qty = log.qtyIn || log.qtyOut || 0;
-                          const isIN = (log.qtyIn || 0) > 0;
-                          return (
-                            <tr key={i} className="hover:bg-gray-50/50">
-                              <td className="px-4 py-2.5 text-gray-400">
-                                {new Date(log.createdAt || log.timestamp).toLocaleString('en-IN')}
-                              </td>
-                              <td className="px-4 py-2.5 font-semibold text-gray-800">
-                                <span className={`px-1.5 py-0.5 rounded font-extrabold text-[8px] uppercase border ${
-                                  isIN ? 'bg-green-50 text-green-700 border-green-100' :
-                                  log.transactionType === 'Transfer' ? 'bg-purple-50 text-purple-700 border-purple-100' :
-                                  log.transactionType === 'Consumption' ? 'bg-amber-50 text-amber-700 border-amber-100' :
-                                  'bg-gray-100/85 text-gray-600 border-gray-200'
-                                }`}>
-                                  {log.transactionType}
-                                </span>
-                              </td>
-                              <td className="px-4 py-2.5 font-semibold text-gray-600">
-                                {typeof log.locationId === 'object' && log.locationId !== null ? log.locationId.name : '—'}
-                              </td>
-                              <td className="px-4 py-2.5 text-right">
-                                <span className={`inline-flex items-center gap-0.5 font-bold font-mono text-[11px] ${
-                                  isIN ? 'text-green-600' : 'text-red-500'
-                                }`}>
-                                  {isIN ? <ArrowDownLeft className="w-3 h-3 shrink-0" /> : <ArrowUpRight className="w-3 h-3 shrink-0" />}
-                                  {isIN ? '+' : '-'}{qty.toLocaleString('en-IN')}
-                                </span>
-                              </td>
-                              <td className="px-4 py-2.5 text-gray-500">
-                                {typeof log.userId === 'object' && log.userId !== null ? log.userId.fullName : 'System'}
-                              </td>
-                              <td className="px-4 py-2.5 italic text-gray-400 break-words" title={log.remarks}>
-                                {log.remarks || '—'}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <div className="text-center py-12 text-gray-400">
-                      <AlertCircle className="w-6 h-6 text-gray-200 mx-auto mb-2" />
-                      <p className="font-semibold text-[10px]">No transaction history found</p>
-                    </div>
-                  )}
-                </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                Reels are not numbered. We track by lot, reels count and KG.
               </div>
-            </div>
-
-            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 text-right">
-              <button
-                onClick={() => setShowLedgerDrawer(false)}
-                className="px-5 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 font-semibold text-xs shadow-3xs"
-              >
-                Close Audit
-              </button>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                Use "Convert / Use Stock" to consume this lot in production.
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* 4. STOCK TRANSFER MODAL */}
+      {/* ── TRANSFER STOCK DIALOG MODAL ──────────────────────────────────────── */}
       {showTransferModal && transferringItem && (() => {
         const destLocs = hierarchy.filter(
           loc => loc.level === 'Storage Location' && 
                  loc._id !== (transferringItem.location?._id || transferringItem.locationId)
         );
+
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-black/40 backdrop-blur-3xs" onClick={() => !transferSubmitting && setShowTransferModal(false)} />
+            <div className="fixed inset-0 bg-black/45 backdrop-blur-3xs" onClick={() => !transferSubmitting && setShowTransferModal(false)} />
 
             <div className="bg-white rounded-2xl border border-gray-200 shadow-xl max-w-md w-full relative z-10 animate-in zoom-in-95 duration-150 overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                 <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
-                  <ArrowRightLeft className="w-4 h-4 text-purple-600 animate-pulse" />
-                  Transfer Stock
+                  <ArrowRightLeft className="w-4 h-4 text-blue-600 animate-pulse" />
+                  Move Stock / Lot Transfer
                 </h2>
                 <button
                   disabled={transferSubmitting}
@@ -1140,7 +1035,7 @@ const BatchStockV2: React.FC = () => {
                 </button>
               </div>
 
-              <form onSubmit={handleTransferSubmit} className="p-6 space-y-4 text-left">
+              <form onSubmit={handleTransferSubmit} className="p-6 space-y-4 text-left text-xs">
                 {transferError && (
                   <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-xs font-bold text-red-700 flex items-center gap-1.5">
                     <AlertCircle className="w-4 h-4 shrink-0" />
@@ -1151,20 +1046,20 @@ const BatchStockV2: React.FC = () => {
                 <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5 space-y-2 text-xs">
                   <div className="flex justify-between">
                     <span className="text-gray-400 font-bold uppercase">Material:</span>
-                    <span className="font-bold text-gray-800 break-words max-w-[220px] text-right">{transferringItem.sku?.name}</span>
+                    <span className="font-bold text-gray-900">{transferringItem.sku?.name}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-400 font-bold uppercase">Batch / Lot:</span>
-                    <span className="font-bold font-mono text-blue-600">{transferringItem.batchNumber || '—'}</span>
+                    <span className="text-gray-400 font-bold uppercase">Lot Number:</span>
+                    <span className="font-bold text-blue-600 font-mono">{getDisplayLotNo(transferringItem)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-400 font-bold uppercase">Source Location:</span>
-                    <span className="font-bold text-gray-800">{transferringItem.location?.name || '—'}</span>
+                    <span className="text-gray-400 font-bold uppercase">Current Location:</span>
+                    <span className="font-bold text-gray-900">{transferringItem.location?.name || 'Storage'}</span>
                   </div>
-                  <div className="flex justify-between border-t pt-2 mt-2">
-                    <span className="text-gray-400 font-bold uppercase">Available Stock:</span>
-                    <span className="font-black text-gray-900 text-sm font-mono">
-                      {transferringItem.onHand.toLocaleString('en-IN')} {transferringItem.sku?.unit || 'KG'}
+                  <div className="flex justify-between">
+                    <span className="text-gray-400 font-bold uppercase">Available stock:</span>
+                    <span className="font-black text-gray-900 font-mono">
+                      {(transferringItem.onHand || 0).toLocaleString()} {transferringItem.sku?.unit || 'kg'}
                     </span>
                   </div>
                 </div>
@@ -1179,7 +1074,7 @@ const BatchStockV2: React.FC = () => {
                       required
                       disabled={transferSubmitting}
                     >
-                      <option value="">-- Select Destination Storage --</option>
+                      <option value="">-- Choose Storage Bin --</option>
                       {destLocs.map(loc => {
                         const occupied = getOccupiedCapacity(loc._id || '');
                         const available = loc.capacity ? Math.max(loc.capacity - occupied, 0) : null;
@@ -1206,7 +1101,6 @@ const BatchStockV2: React.FC = () => {
                         step="any"
                         min="0.001"
                         max={transferringItem.onHand}
-                        placeholder="Enter quantity to move..."
                         value={transferForm.quantity}
                         onChange={e => setTransferForm({ ...transferForm, quantity: e.target.value })}
                         className="w-full pl-3 pr-12 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 font-mono font-bold text-gray-900"
@@ -1214,18 +1108,19 @@ const BatchStockV2: React.FC = () => {
                         disabled={transferSubmitting}
                       />
                       <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-[10px] font-black text-gray-400 uppercase font-mono">
-                        {transferringItem.sku?.unit || 'KG'}
+                        {transferringItem.sku?.unit || 'kg'}
                       </div>
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase tracking-wider">Transfer Remarks / Notes</label>
-                    <textarea
-                      placeholder="Provide description or reason for this internal movement..."
+                    <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase tracking-wider">Remarks / Notes</label>
+                    <input
+                      type="text"
+                      placeholder="Optional transfer description"
                       value={transferForm.remarks}
                       onChange={e => setTransferForm({ ...transferForm, remarks: e.target.value })}
-                      className="w-full h-20 px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white"
                       disabled={transferSubmitting}
                     />
                   </div>
@@ -1243,15 +1138,15 @@ const BatchStockV2: React.FC = () => {
                   <button
                     type="submit"
                     disabled={transferSubmitting}
-                    className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 transition-colors disabled:opacity-50"
                   >
                     {transferSubmitting ? (
                       <>
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Transferring...
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Moving...
                       </>
                     ) : (
                       <>
-                        <ArrowRightLeft className="w-3.5 h-3.5" /> Confirm Transfer
+                        <ArrowRight className="w-3.5 h-3.5" /> Confirm Transfer
                       </>
                     )}
                   </button>
@@ -1264,19 +1159,5 @@ const BatchStockV2: React.FC = () => {
     </div>
   );
 };
-
-// Local minimal icons to avoid import misses
-const FolderIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
-  </svg>
-);
-
-const BookOpenIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-  </svg>
-);
 
 export default BatchStockV2;

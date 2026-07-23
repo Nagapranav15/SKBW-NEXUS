@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight, X, FileText, Trash2, Calendar, Coins, Download, Upload, HelpCircle, Check } from 'lucide-react';
+import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight, X, FileText, Trash2, Calendar, Coins, Download, Upload, HelpCircle, Check, Eye, MoreVertical, Edit, Printer, ArrowRight, Layers } from 'lucide-react';
 import { useAuth } from '../../../../context/AuthContext';
 import { getParties } from '../../../../api/partyApi';
-import { getSkusV2, getWarehouseHierarchyV2, SkuV2, WarehouseLocationV2 } from '../../../../api/mfgApiV2';
+import { getSkusV2, getWarehouseHierarchyV2, recordTransferV2, SkuV2, WarehouseLocationV2, getBalancesV2 } from '../../../../api/mfgApiV2';
 import { 
   getPurchaseInvoicesV2, 
   createPurchaseInvoiceV2, 
@@ -10,10 +10,9 @@ import {
   updatePurchaseInvoiceV2,
   deletePurchaseInvoiceV2,
   PurchaseInvoiceV2, 
-  PurchaseInvoiceItemV2 
+  PurchaseInvoiceItemV2
 } from '../services/purchaseService';
 import InvoiceTable from '../components/InvoiceTable';
-import VendorBalanceCard from '../components/VendorBalanceCard';
 import { showToast } from '../../../ui/Toast';
 import * as XLSX from 'xlsx';
 
@@ -25,6 +24,7 @@ const PurchaseInvoicePage: React.FC = () => {
   const [vendors, setVendors] = useState<any[]>([]);
   const [skus, setSkus] = useState<SkuV2[]>([]);
   const [locations, setLocations] = useState<WarehouseLocationV2[]>([]);
+  const [inventoryBalances, setInventoryBalances] = useState<any[]>([]);
   
   // States
   const [loading, setLoading] = useState(true);
@@ -35,11 +35,23 @@ const PurchaseInvoicePage: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [limit] = useState(20);
 
-  // Selected drawers
+  // Navigation states
+  const [activeSubPage, setActiveSubPage] = useState<'list' | 'new' | 'details'>('list');
   const [selectedInvoice, setSelectedInvoice] = useState<PurchaseInvoiceV2 | null>(null);
-  const [showAddDrawer, setShowAddDrawer] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
   
+  // Details tabs
+  const [detailsTab, setDetailsTab] = useState<'lots' | 'allocation' | 'docs' | 'history'>('lots');
+
+  // Allocation Modal state
+  const [showAllocateModal, setShowAllocateModal] = useState(false);
+  const [allocateForm, setAllocateForm] = useState({
+    itemIndex: 0,
+    toLocationId: '',
+    quantity: ''
+  });
+  const [allocateSubmitting, setAllocateSubmitting] = useState(false);
+  const [allocateError, setAllocateError] = useState('');
+
   // Form states: Add Invoice
   const [invoiceForm, setInvoiceForm] = useState({
     invoiceNumber: '',
@@ -47,17 +59,19 @@ const PurchaseInvoicePage: React.FC = () => {
     taxAmount: '0',
     freight: '0',
     craneCharges: '0',
+    loadingUnloading: '0',
     otherCharges: '0',
     dueDate: '',
-    remarks: '',
     items: [
       { 
         skuId: '', 
+        brand: '',
+        gsm: '',
+        width: '',
+        reelsCount: '',
         quantity: '', 
         purchasePrice: '', 
-        lotNumber: '', 
-        locationId: '',
-        reels: [] as { reelNumber: string; gsm: number; width: number; weight: number }[]
+        lotNumber: ''
       }
     ]
   });
@@ -67,19 +81,7 @@ const PurchaseInvoicePage: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
 
-  // Form states: Record Payment
-  const [paymentForm, setPaymentForm] = useState({
-    vendorId: '',
-    invoiceId: '',
-    amount: '',
-    paymentMethod: 'bank_transfer',
-    referenceId: '',
-    remarks: ''
-  });
-  const [payLoading, setPayLoading] = useState(false);
-  const [payError, setPayError] = useState('');
-
-  // Date range filters (mocked/local filter for mockup 2)
+  // Date range filters
   const [startDate, setStartDate] = useState('2024-06-01');
   const [endDate, setEndDate] = useState('2024-06-30');
 
@@ -95,19 +97,36 @@ const PurchaseInvoicePage: React.FC = () => {
     }
   }, [selectedCompany?._id, page, vendorFilter, statusFilter]);
 
+  // Load balances when detailed invoice is selected
+  useEffect(() => {
+    if (selectedCompany?._id && selectedInvoice) {
+      loadBalances();
+    }
+  }, [selectedCompany?._id, selectedInvoice]);
+
+  const loadBalances = async () => {
+    try {
+      const bals = await getBalancesV2(selectedCompany?._id || '', undefined, true);
+      setInventoryBalances(bals);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const loadFilterData = async () => {
     try {
       const [vendorRes, skuRes, locRes] = await Promise.all([
-        getParties({ company: selectedCompany?._id, type: 'vendor', limit: 1000 }),
+        getParties({ company: selectedCompany?._id || '' }),
         getSkusV2(selectedCompany?._id || ''),
         getWarehouseHierarchyV2(selectedCompany?._id || '')
       ]);
-      setVendors(vendorRes.data.parties || []);
-      setSkus(skuRes.filter(s => s.status === 'Active' && (s.category === 'Raw Material' || s.category === 'Consumables')));
-      setLocations(locRes.filter(l => l.level === 'Storage Location' && l.status === 'Active'));
+      const vendorList = vendorRes && (vendorRes as any).parties ? (vendorRes as any).parties : (Array.isArray(vendorRes) ? vendorRes : []);
+      setVendors(vendorList.filter((p: any) => p.type === 'vendor'));
+      setSkus(skuRes);
+      setLocations(locRes);
     } catch (e) {
       console.error(e);
-      showToast('Failed to load form master values', 'error');
+      showToast('Failed to load filters data', 'error');
     }
   };
 
@@ -117,15 +136,14 @@ const PurchaseInvoicePage: React.FC = () => {
       const res = await getPurchaseInvoicesV2({
         companyId: selectedCompany?._id || '',
         vendorId: vendorFilter || undefined,
-        paymentStatus: statusFilter || undefined,
-        search: search || undefined,
         page,
         limit
       });
-      setInvoices(res.invoices);
-      setTotal(res.total);
+      setInvoices(res.invoices || []);
+      setTotal(res.total || 0);
     } catch (e) {
       console.error(e);
+      showToast('Failed to load purchase batches', 'error');
     } finally {
       setLoading(false);
     }
@@ -159,97 +177,48 @@ const PurchaseInvoicePage: React.FC = () => {
       };
     });
 
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Purchases');
-    XLSX.writeFile(wb, `Purchase_Batches_${selectedCompany?.name || 'export'}.xlsx`);
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Purchase Batches');
+    XLSX.writeFile(workbook, `Purchase_Batches_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
-  // Add Item Row in Invoice
+  // Add Item Lot Row
   const handleAddItemRow = () => {
     setInvoiceForm({
       ...invoiceForm,
       items: [
-        ...invoiceForm.items, 
-        { skuId: '', quantity: '', purchasePrice: '', lotNumber: '', locationId: '', reels: [] }
+        ...invoiceForm.items,
+        { skuId: '', brand: '', gsm: '', width: '', reelsCount: '', quantity: '', purchasePrice: '', lotNumber: '' }
       ]
     });
   };
 
-  // Remove Item Row in Invoice
-  const handleRemoveItemRow = (index: number) => {
-    if (invoiceForm.items.length === 1) return;
-    const newItems = invoiceForm.items.filter((_, i) => i !== index);
-    setInvoiceForm({ ...invoiceForm, items: newItems });
+  // Remove Item Lot Row
+  const handleRemoveItemRow = (idx: number) => {
+    const updated = [...invoiceForm.items];
+    updated.splice(idx, 1);
+    setInvoiceForm({ ...invoiceForm, items: updated });
   };
 
-  // Update Item value
-  const handleItemValChange = (index: number, key: string, val: string) => {
-    const newItems = [...invoiceForm.items];
-    newItems[index] = { ...newItems[index], [key]: val };
-    setInvoiceForm({ ...invoiceForm, items: newItems });
-  };
-
-  // Dynamic Reels Handlers
-  const handleAddReel = (itemIdx: number) => {
-    const newItems = [...invoiceForm.items];
-    const reels = newItems[itemIdx].reels || [];
-    const sku = skus.find(s => s._id === newItems[itemIdx].skuId);
+  // Value Change inside Form Rows
+  const handleItemRowChange = (idx: number, field: string, value: string) => {
+    const updated = [...invoiceForm.items];
+    const item = { ...updated[idx], [field]: value };
     
-    reels.push({
-      reelNumber: `R-${String(reels.length + 1).padStart(4, '0')}`,
-      gsm: sku?.gsm || 52,
-      width: sku?.width || 64,
-      weight: 0
-    });
-    newItems[itemIdx].reels = reels;
-    setInvoiceForm({ ...invoiceForm, items: newItems });
-  };
-
-  const handleRemoveReel = (itemIdx: number, reelIdx: number) => {
-    const newItems = [...invoiceForm.items];
-    const reels = (newItems[itemIdx].reels || []).filter((_, i) => i !== reelIdx);
-    newItems[itemIdx].reels = reels;
+    // Auto-populate default SKU variables if skuId changed
+    if (field === 'skuId') {
+      const selectedSku = skus.find(s => s._id === value);
+      if (selectedSku) {
+        item.brand = selectedSku.brand || '';
+        item.gsm = String(selectedSku.gsm || '');
+        item.width = String(selectedSku.width || '');
+      }
+    }
     
-    // Recalculate quantity based on reel weights
-    const totalWeight = reels.reduce((sum, r) => sum + (r.weight || 0), 0);
-    newItems[itemIdx].quantity = reels.length > 0 ? String(totalWeight) : '';
-
-    setInvoiceForm({ ...invoiceForm, items: newItems });
+    updated[idx] = item;
+    setInvoiceForm({ ...invoiceForm, items: updated });
   };
-
-  const handleReelChange = (itemIdx: number, reelIdx: number, key: string, val: string) => {
-    const newItems = [...invoiceForm.items];
-    const reels = [...(newItems[itemIdx].reels || [])];
-    
-    reels[reelIdx] = {
-      ...reels[reelIdx],
-      [key]: key === 'reelNumber' ? val : Number(val) || 0
-    };
-    newItems[itemIdx].reels = reels;
-
-    // Recalculate quantity based on reel weights
-    const totalWeight = reels.reduce((sum, r) => sum + (r.weight || 0), 0);
-    newItems[itemIdx].quantity = String(totalWeight);
-
-    setInvoiceForm({ ...invoiceForm, items: newItems });
-  };
-
-  // Calculate invoice subtotal
-  const calculateSubtotal = () => {
-    return invoiceForm.items.reduce((sum, item) => {
-      const qty = Number(item.quantity) || 0;
-      const price = Number(item.purchasePrice) || 0;
-      return sum + (qty * price);
-    }, 0);
-  };
-
-  const subTotalVal = calculateSubtotal();
-  const grandTotalVal = subTotalVal + 
-    (Number(invoiceForm.taxAmount) || 0) + 
-    (Number(invoiceForm.freight) || 0) + 
-    (Number(invoiceForm.craneCharges) || 0) + 
-    (Number(invoiceForm.otherCharges) || 0);
 
   // Submit Invoice Creation
   const handleInvoiceSubmit = async (e: React.FormEvent) => {
@@ -257,36 +226,81 @@ const PurchaseInvoicePage: React.FC = () => {
     setAddError('');
 
     if (!invoiceForm.vendorId) {
-      setAddError('Please select a Vendor');
+      setAddError('Please select a Supplier');
       return;
     }
 
-    // Validate item inputs
+    const firstStorage = locations.find(loc => loc.level === 'Storage Location');
+    if (!firstStorage) {
+      setAddError('No storage location defined in the database. Please complete warehouse setup first.');
+      return;
+    }
+
+    const finalInvoiceNumber = invoiceForm.invoiceNumber || `PB${new Date().toISOString().slice(2, 10).replace(/-/g, '')}`;
+
+    // Format validated items
+    const validatedItems = [];
     for (let i = 0; i < invoiceForm.items.length; i++) {
       const item = invoiceForm.items[i];
-      if (!item.skuId || !item.quantity || !item.purchasePrice || !item.lotNumber || !item.locationId) {
-        setAddError(`Please fill all fields in row ${i + 1}`);
+      if (!item.skuId || !item.quantity || !item.purchasePrice) {
+        setAddError(`Please fill all required fields in row ${i + 1}`);
         return;
       }
-      if (Number(item.quantity) <= 0 || Number(item.purchasePrice) <= 0) {
+      
+      const qty = Number(item.quantity);
+      const price = Number(item.purchasePrice);
+      const reelsCount = Number(item.reelsCount) || 0;
+      
+      if (qty <= 0 || price <= 0) {
         setAddError(`Quantity and price must be positive numbers in row ${i + 1}`);
         return;
       }
+
+      // Generate reels log array dynamically based on count
+      const reelsArray = [];
+      const weightPerReel = reelsCount > 0 ? Number((qty / reelsCount).toFixed(2)) : 0;
+      for (let r = 0; r < reelsCount; r++) {
+        reelsArray.push({
+          reelNumber: `${finalInvoiceNumber}-R${r + 1}`,
+          gsm: Number(item.gsm) || 0,
+          width: Number(item.width) || 0,
+          weight: weightPerReel
+        });
+      }
+
+      validatedItems.push({
+        skuId: item.skuId,
+        quantity: qty,
+        unit: 'kg', // Default raw material unit
+        purchasePrice: price,
+        totalPrice: qty * price,
+        lotNumber: `${finalInvoiceNumber}-L0${i + 1}`,
+        locationId: firstStorage._id || '', // Default allocation to virtual storage location
+        reels: reelsArray
+      });
     }
+
+    const matTotal = validatedItems.reduce((sum, item) => sum + item.totalPrice, 0);
+    const tax = Number(invoiceForm.taxAmount) || 0;
+    const freight = Number(invoiceForm.freight) || 0;
+    const crane = Number(invoiceForm.craneCharges) || 0;
+    const loading = Number(invoiceForm.loadingUnloading) || 0;
+    const other = Number(invoiceForm.otherCharges) || 0;
 
     setAddLoading(true);
     try {
       const invoiceData = {
-        invoiceNumber: invoiceForm.invoiceNumber || undefined,
+        invoiceNumber: finalInvoiceNumber,
         vendorId: invoiceForm.vendorId,
-        items: invoiceForm.items,
-        taxAmount: Number(invoiceForm.taxAmount) || 0,
-        freight: Number(invoiceForm.freight) || 0,
-        craneCharges: Number(invoiceForm.craneCharges) || 0,
-        otherCharges: Number(invoiceForm.otherCharges) || 0,
-        dueDate: invoiceForm.dueDate || undefined,
-        remarks: invoiceForm.remarks,
-        company: selectedCompany?._id
+        items: validatedItems,
+        taxAmount: tax,
+        freight,
+        craneCharges: crane,
+        otherCharges: loading + other, // Combined loading and other charges
+        subTotal: matTotal,
+        grandTotal: matTotal + tax + freight + crane + loading + other,
+        company: selectedCompany?._id,
+        status: 'Posted'
       };
 
       if (isEditing && editingInvoiceId) {
@@ -297,22 +311,10 @@ const PurchaseInvoicePage: React.FC = () => {
         showToast('Purchase invoice inwarded successfully!', 'success');
       }
 
-      setShowAddDrawer(false);
+      setActiveSubPage('list');
       setIsEditing(false);
       setEditingInvoiceId(null);
-      setInvoiceForm({
-        invoiceNumber: '',
-        vendorId: '',
-        taxAmount: '0',
-        freight: '0',
-        craneCharges: '0',
-        otherCharges: '0',
-        dueDate: '',
-        remarks: '',
-        items: [{ skuId: '', quantity: '', purchasePrice: '', lotNumber: '', locationId: '', reels: [] }]
-      });
       loadInvoices();
-      loadFilterData();
     } catch (err: any) {
       console.error(err);
       setAddError(err.response?.data?.msg || 'Failed to submit purchase invoice');
@@ -330,20 +332,22 @@ const PurchaseInvoicePage: React.FC = () => {
       taxAmount: String(invoice.taxAmount || 0),
       freight: String(invoice.freight || 0),
       craneCharges: String(invoice.craneCharges || 0),
+      loadingUnloading: '0', // Defaults
       otherCharges: String(invoice.otherCharges || 0),
       dueDate: invoice.dueDate ? invoice.dueDate.split('T')[0] : '',
-      remarks: invoice.remarks || '',
       items: invoice.items.map(item => ({
         skuId: typeof item.skuId === 'object' && item.skuId !== null ? item.skuId._id : (item.skuId || ''),
+        brand: (item.skuId as any)?.brand || '',
+        gsm: String((item.skuId as any)?.gsm || ''),
+        width: String((item.skuId as any)?.width || ''),
+        reelsCount: String(item.reels?.length || ''),
         quantity: String(item.quantity),
         purchasePrice: String(item.purchasePrice),
-        lotNumber: item.lotNumber,
-        locationId: typeof item.locationId === 'object' && item.locationId !== null ? item.locationId._id : (item.locationId || ''),
-        reels: item.reels || []
+        lotNumber: item.lotNumber || ''
       }))
     });
     setAddError('');
-    setShowAddDrawer(true);
+    setActiveSubPage('new');
   };
 
   const handleDeleteInvoice = async (invoice: PurchaseInvoiceV2) => {
@@ -354,925 +358,1188 @@ const PurchaseInvoicePage: React.FC = () => {
       await deletePurchaseInvoiceV2(invoice._id || '', selectedCompany?._id || '');
       showToast('Purchase invoice deleted successfully!', 'success');
       loadInvoices();
-      loadFilterData();
-    } catch (err: any) {
-      console.error(err);
-      showToast(err.response?.data?.msg || 'Failed to delete purchase invoice', 'error');
+    } catch (e) {
+      console.error(e);
+      showToast('Failed to delete purchase invoice', 'error');
     }
   };
 
-  // Submit Payment Recording
-  const handlePaymentSubmit = async (e: React.FormEvent) => {
+  // Perform Location Allocation Submit
+  const handleAllocateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setPayError('');
+    if (!selectedInvoice) return;
+    setAllocateError('');
 
-    const amt = Number(paymentForm.amount);
-    if (!paymentForm.vendorId) {
-      setPayError('Vendor is required');
-      return;
-    }
-    if (isNaN(amt) || amt <= 0) {
-      setPayError('Payment amount must be greater than zero');
+    const lotItem = selectedInvoice.items[allocateForm.itemIndex];
+    const qty = Number(allocateForm.quantity);
+    if (isNaN(qty) || qty <= 0) {
+      setAllocateError('Please enter a valid allocation weight');
       return;
     }
 
-    setPayLoading(true);
+    if (!allocateForm.toLocationId) {
+      setAllocateError('Please select a destination storage area');
+      return;
+    }
+
+    // Default source location (where initially inwarded)
+    const fromLocationId = typeof lotItem.locationId === 'object' && lotItem.locationId !== null 
+      ? (lotItem.locationId as any)._id 
+      : lotItem.locationId;
+
+    setAllocateSubmitting(true);
     try {
-      await recordPurchasePaymentV2({
-        vendorId: paymentForm.vendorId,
-        amount: amt,
-        paymentMethod: paymentForm.paymentMethod,
-        referenceId: paymentForm.referenceId,
-        invoiceId: paymentForm.invoiceId || undefined,
-        remarks: paymentForm.remarks,
-        company: selectedCompany?._id || ''
+      await recordTransferV2({
+        skuId: typeof lotItem.skuId === 'object' && lotItem.skuId !== null ? (lotItem.skuId as any)._id : lotItem.skuId,
+        fromLocationId: fromLocationId as string,
+        toLocationId: allocateForm.toLocationId,
+        quantity: qty,
+        remarks: `Location Allocation: ${selectedInvoice.invoiceNumber}`,
+        company: selectedCompany?._id || '',
+        batchNumber: selectedInvoice.invoiceNumber
       });
 
-      showToast('Vendor payment registered successfully!', 'success');
-      setShowPaymentModal(false);
-      setPaymentForm({ vendorId: '', invoiceId: '', amount: '', paymentMethod: 'bank_transfer', referenceId: '', remarks: '' });
-      loadInvoices();
-      loadFilterData();
+      showToast('Stock allocated successfully!', 'success');
+      setShowAllocateModal(false);
+      setAllocateForm({ itemIndex: 0, toLocationId: '', quantity: '' });
+      loadBalances();
     } catch (err: any) {
       console.error(err);
-      setPayError(err.response?.data?.msg || 'Failed to record payment');
+      setAllocateError(err.response?.data?.msg || 'Failed to allocate stock to location');
     } finally {
-      setPayLoading(false);
+      setAllocateSubmitting(false);
     }
+  };
+
+  // Helper: Traverse parent chain in memory
+  const resolveLocationPath = (locId: string) => {
+    const bin = locations.find(l => l._id === locId);
+    if (!bin) return { factory: '—', floor: '—', zone: '—', bin: '—' };
+    
+    const zone = locations.find(l => l._id === bin.parentId);
+    const floor = zone ? locations.find(l => l._id === zone.parentId) : null;
+    const factory = floor ? locations.find(l => l._id === floor.parentId) : null;
+    
+    return {
+      factory: factory?.name || '—',
+      floor: floor?.name || '—',
+      zone: zone?.name || '—',
+      bin: bin.name || '—'
+    };
   };
 
   const totalPages = Math.max(Math.ceil(total / limit), 1);
 
-  // Dynamic statistics calculations for top cards
-  const totalPurchases = total;
-  const totalValue = invoices.reduce((sum, inv) => sum + (inv.subTotal || 0), 0);
-  const totalQtyKG = invoices.reduce((sum, inv) => {
-    return sum + (inv.items?.reduce((s, i) => s + (i.quantity || 0), 0) || 0);
-  }, 0);
-  const pendingReceipts = invoices.filter(inv => inv.status === 'Draft' || inv.paymentStatus === 'Unpaid').length;
+  // Form value aggregation
+  const formLotsCount = invoiceForm.items.length;
+  const formReelsCount = invoiceForm.items.reduce((sum, item) => sum + (Number(item.reelsCount) || 0), 0);
+  const formTotalWeight = invoiceForm.items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+  const formMatTotal = invoiceForm.items.reduce((sum, item) => sum + ((Number(item.quantity) || 0) * (Number(item.purchasePrice) || 0)), 0);
+  const formOtherCharges = (Number(invoiceForm.freight) || 0) + (Number(invoiceForm.craneCharges) || 0) + (Number(invoiceForm.loadingUnloading) || 0) + (Number(invoiceForm.otherCharges) || 0);
+
+  // Dashboard Stats (mocked or loaded)
+  const dashboardTotalBatches = total;
+  const dashboardTotalWeight = invoices.reduce((sum, inv) => sum + (inv.items?.reduce((s, i) => s + (i.quantity || 0), 0) || 0), 0);
+  const dashboardTotalValue = invoices.reduce((sum, inv) => sum + (inv.subTotal || 0), 0);
+  const dashboardPendingReceipts = invoices.filter(inv => inv.status === 'Draft').length;
 
   return (
-    <div className="space-y-6 ">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-              <Coins className="w-5 h-5" />
-            </span>
+    <div className="space-y-6">
+      {/* ── SUB-PAGE 1: NEW/EDIT FORM ─────────────────────────────────────────── */}
+      {activeSubPage === 'new' ? (
+        <div className="space-y-5 animate-in fade-in slide-in-from-bottom duration-200">
+          {/* Breadcrumb Header */}
+          <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
             <div>
-              <h1 className="text-xl font-black text-gray-900 tracking-tight">
-                Purchase List
-              </h1>
-              <p className="text-xs text-gray-500 mt-0.5 font-medium">All Purchase Batches</p>
-            </div>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={handleExportExcel}
-            className="flex items-center gap-1.5 px-4 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 bg-white rounded-xl text-xs font-semibold shadow-sm transition-all"
-          >
-            <Download className="w-3.5 h-3.5" /> Import from Excel
-          </button>
-          <button
-            onClick={() => {
-              setIsEditing(false);
-              setEditingInvoiceId(null);
-              setInvoiceForm({
-                invoiceNumber: '',
-                vendorId: '',
-                taxAmount: '0',
-                freight: '0',
-                craneCharges: '0',
-                otherCharges: '0',
-                dueDate: '',
-                remarks: '',
-                items: [{ skuId: '', quantity: '', purchasePrice: '', lotNumber: '', locationId: '', reels: [] }]
-              });
-              setAddError('');
-              setShowAddDrawer(true);
-            }}
-            className="flex items-center gap-1.5 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md transition-all hover:scale-[1.02]"
-          >
-            <Plus className="w-3.5 h-3.5" /> + New Purchase
-          </button>
-        </div>
-      </div>
-
-      {/* Dynamic Statistics Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Purchases */}
-        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
-            <FileText className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Total Purchases</span>
-            <span className="text-2xl font-black text-gray-900">{totalPurchases}</span>
-            <span className="text-[10px] text-gray-500 mt-0.5 block">This Month</span>
-          </div>
-        </div>
-
-        {/* Total Value */}
-        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
-            <Coins className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Total Value</span>
-            <span className="text-2xl font-black text-emerald-700">₹{totalValue.toLocaleString('en-IN')}</span>
-            <span className="text-[10px] text-gray-500 mt-0.5 block">This Month</span>
-          </div>
-        </div>
-
-        {/* Total Quantity */}
-        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl">
-            <Plus className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Total Quantity</span>
-            <span className="text-2xl font-black text-purple-700">{totalQtyKG.toLocaleString('en-IN')} KG</span>
-            <span className="text-[10px] text-gray-500 mt-0.5 block">This Month</span>
-          </div>
-        </div>
-
-        {/* Pending Receipts */}
-        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-red-50 text-red-600 rounded-2xl">
-            <Calendar className="w-6 h-6 animate-pulse-slow" />
-          </div>
-          <div>
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Pending Receipts</span>
-            <span className="text-2xl font-black text-red-600">{pendingReceipts}</span>
-            <span className="text-[10px] text-gray-500 mt-0.5 block">This Month</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content Layout */}
-      <div className="space-y-4">
-          {/* Search Toolbar */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-            <form onSubmit={handleSearchSubmit} className="flex-1 w-full relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Search by Batch No, Supplier, Material..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50/50 focus:bg-white transition-all text-gray-950 font-medium"
-              />
-            </form>
-            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-              <select
-                value={vendorFilter}
-                onChange={e => { setVendorFilter(e.target.value); setPage(1); }}
-                className="w-full sm:w-40 px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-700"
-              >
-                <option value="">All Suppliers</option>
-                {vendors.map(v => (
-                  <option key={v._id} value={v._id}>{v.firmName || v.ownerName}</option>
-                ))}
-              </select>
-
-              {/* Date pickers mimicking mockup 2 */}
-              <div className="flex items-center gap-1.5 border border-gray-200 rounded-xl p-1 bg-white">
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={e => setStartDate(e.target.value)}
-                  className="text-xs border-0 bg-transparent focus:ring-0 p-1 text-gray-700 w-28"
-                />
-                <span className="text-gray-400 font-bold text-xs">-</span>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={e => setEndDate(e.target.value)}
-                  className="text-xs border-0 bg-transparent focus:ring-0 p-1 text-gray-700 w-28"
-                />
+              <div className="flex items-center gap-1 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">
+                <span>Purchase</span>
+                <ChevronRight className="w-3 h-3" />
+                <span className="cursor-pointer hover:text-blue-600 transition-colors" onClick={() => setActiveSubPage('list')}>Purchase Batches</span>
+                <ChevronRight className="w-3 h-3" />
+                <span className="text-gray-600">New Purchase Batch</span>
               </div>
-
+              <h1 className="text-lg font-black text-gray-900 tracking-tight mt-1 flex items-center gap-2">
+                <Plus className="w-4.5 h-4.5 text-blue-600" />
+                {isEditing ? 'Edit Purchase Batch' : 'New Purchase Batch'}
+              </h1>
+            </div>
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => {
-                  setSearch('');
-                  setVendorFilter('');
-                  setStatusFilter('');
-                  setStartDate('2024-06-01');
-                  setEndDate('2024-06-30');
-                  setPage(1);
-                }}
-                className="p-2 text-gray-400 hover:text-blue-600 bg-gray-50 hover:bg-gray-200 rounded-xl transition-all"
-                title="Reset Filters"
+                type="button"
+                onClick={() => setActiveSubPage('list')}
+                className="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold rounded-xl text-xs shadow-3xs flex items-center gap-1 transition-colors"
               >
-                <RefreshCw className="w-3.5 h-3.5" />
+                <X className="w-3.5 h-3.5" /> Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleInvoiceSubmit}
+                disabled={addLoading}
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-black shadow-md flex items-center gap-1.5 transition-colors"
+              >
+                <Check className="w-3.5 h-3.5" /> Save Purchase Batch
               </button>
             </div>
           </div>
 
-          {/* Invoice Table list */}
-          <InvoiceTable
-            invoices={invoices}
-            loading={loading}
-            onViewDetails={setSelectedInvoice}
-            onEditInvoice={handleEditInvoice}
-            onDeleteInvoice={handleDeleteInvoice}
-            onRecordPayment={(inv) => {
-              setPaymentForm({
-                vendorId: typeof inv.vendorId === 'object' && inv.vendorId !== null ? inv.vendorId._id : (inv.vendorId || ''),
-                invoiceId: inv._id || '',
-                amount: String(Math.max(inv.grandTotal - (inv.paidAmount || 0), 0)),
-                paymentMethod: 'bank_transfer',
-                referenceId: '',
-                remarks: ''
-              });
-              setPayError('');
-              setShowPaymentModal(true);
-            }}
-          />
-
-          {/* Pagination Footer */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between bg-white px-4 py-3 rounded-xl border border-gray-200 shadow-sm text-xs font-semibold text-gray-500">
-              <span>
-                Showing Page <span className="text-gray-900">{page}</span> of <span className="text-gray-900">{totalPages}</span>
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setPage(prev => Math.max(prev - 1, 1))}
-                  disabled={page === 1}
-                  className="p-1.5 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 disabled:opacity-40 transition-colors shadow-3xs flex items-center"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
-                  disabled={page === totalPages}
-                  className="p-1.5 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 disabled:opacity-40 transition-colors shadow-3xs flex items-center"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
+          {addError && (
+            <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-xs font-bold text-red-700 flex items-center gap-2">
+              <AlertCircleIcon className="w-4 h-4 shrink-0" />
+              <span>{addError}</span>
             </div>
           )}
-      </div>
 
-      {/* Slide-Over Drawer: Add/Edit Purchase Invoice */}
-      {showAddDrawer && (
-        <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-3xs" onClick={() => setShowAddDrawer(false)} />
-          <div className="relative w-full max-w-4xl bg-white shadow-2xl h-full flex flex-col z-10 animate-in slide-in-from-right duration-250">
-            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-bold text-gray-900">
-                  {isEditing ? 'Edit Purchase Invoice' : 'Add Purchase & Material Inward'}
-                </h2>
-                <p className="text-[11px] text-gray-500 mt-0.5 font-medium">procure raw items and allot them straight to warehouse rack locations</p>
-              </div>
-              <button
-                onClick={() => setShowAddDrawer(false)}
-                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <form onSubmit={handleInvoiceSubmit} className="flex-1 overflow-y-auto p-6 space-y-6 text-xs text-gray-950">
-              {addError && (
-                <div className="p-3 bg-red-50 border border-red-150 rounded-xl text-xs font-semibold text-red-700">
-                  {addError}
-                </div>
-              )}
-
-              {/* General details */}
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Select Vendor *</label>
-                  <select
-                    value={invoiceForm.vendorId}
-                    onChange={e => setInvoiceForm({ ...invoiceForm, vendorId: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-800 disabled:opacity-60 font-semibold"
-                    required
-                    disabled={isEditing}
-                  >
-                    <option value="">-- Choose Vendor --</option>
-                    {vendors.map(v => (
-                      <option key={v._id} value={v._id}>{v.firmName || v.ownerName}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Batch No. (Optional)</label>
-                  <input
-                    type="text"
-                    placeholder="Auto-generated e.g. PB2406001"
-                    value={invoiceForm.invoiceNumber}
-                    onChange={e => setInvoiceForm({ ...invoiceForm, invoiceNumber: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-mono font-bold"
-                    readOnly={isEditing}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Payment Due Date</label>
-                  <input
-                    type="date"
-                    value={invoiceForm.dueDate}
-                    onChange={e => setInvoiceForm({ ...invoiceForm, dueDate: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-700 font-medium"
-                  />
+          {/* Form Content layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* Left Column (3/4 width) */}
+            <div className="lg:col-span-3 space-y-6">
+              {/* Section 1: Purchase Batch Details */}
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
+                <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider border-b pb-2">
+                  1. Purchase Batch Details
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Batch No. *</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. PB2407001"
+                      value={invoiceForm.invoiceNumber}
+                      onChange={e => setInvoiceForm({ ...invoiceForm, invoiceNumber: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-950 font-mono font-bold"
+                    />
+                    <span className="text-[9px] text-gray-400 font-semibold mt-1 block">Auto-generated if empty</span>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Purchase Date *</label>
+                    <input
+                      type="date"
+                      value={invoiceForm.dueDate}
+                      onChange={e => setInvoiceForm({ ...invoiceForm, dueDate: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Supplier *</label>
+                    <select
+                      value={invoiceForm.vendorId}
+                      onChange={e => setInvoiceForm({ ...invoiceForm, vendorId: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-800 font-semibold"
+                      required
+                    >
+                      <option value="">Select Supplier</option>
+                      {vendors.map(v => (
+                        <option key={v._id} value={v._id}>{v.firmName || v.ownerName}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Purchase Type</label>
+                    <select
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-800 font-semibold"
+                    >
+                      <option value="Raw Material">Raw Material</option>
+                      <option value="Semi Finished">Semi-Finished</option>
+                      <option value="Finished Goods">Finished Goods</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              {/* Items grid */}
-              <div className="space-y-4">
+              {/* Section 2: Material Lots */}
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
                 <div className="flex justify-between items-center border-b pb-2">
-                  <h3 className="text-xs font-black text-gray-700 uppercase">Items Inward Table</h3>
+                  <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider">
+                    2. Material Lots <span className="text-[10px] text-gray-400 font-semibold">(Different materials in this purchase batch)</span>
+                  </h3>
                   <button
                     type="button"
                     onClick={handleAddItemRow}
-                    className="px-3 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg font-bold hover:bg-blue-100 transition-colors"
+                    className="px-3 py-1 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-600 rounded-lg text-xs font-bold transition-all"
                   >
-                    + Add Item Row
+                    + Add Material Lot
                   </button>
                 </div>
 
-                <div className="space-y-4">
-                  {invoiceForm.items.map((item, idx) => {
-                    const matchedSkuId = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any)._id : item.skuId;
-                    const matchedSku = skus.find(s => s._id === matchedSkuId) || (typeof item.skuId === 'object' ? item.skuId : null);
-                    const isReel = matchedSku?.category === 'Raw Material' && matchedSku?.unit === 'kg';
-                    return (
-                      <div key={idx} className="p-4 border border-gray-200 rounded-xl bg-gray-100/60 space-y-4 relative">
-                        {invoiceForm.items.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveItemRow(idx)}
-                            className="absolute top-2 right-2 text-red-500 hover:text-red-700 p-1 border rounded bg-white"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                        <div className="flex flex-wrap items-end gap-3">
-                          <div className="w-full sm:w-56">
-                            <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">SKU (Raw / Consumable) *</label>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50/50 text-gray-400 font-bold uppercase text-[9px] border-b border-gray-150">
+                        <th className="py-2.5 px-2">#</th>
+                        <th className="py-2.5 px-2 w-52">Item *</th>
+                        <th className="py-2.5 px-2">Brand</th>
+                        <th className="py-2.5 px-2 w-16">GSM</th>
+                        <th className="py-2.5 px-2 w-20">Width (cm)</th>
+                        <th className="py-2.5 px-2 w-16 text-center">Reels</th>
+                        <th className="py-2.5 px-2 w-24 text-right">Total KG</th>
+                        <th className="py-2.5 px-2 w-24 text-right">Rate / KG (₹)</th>
+                        <th className="py-2.5 px-2 w-28 text-right">Amount (₹)</th>
+                        <th className="py-2.5 px-2 text-center"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50 text-gray-800 font-semibold">
+                      {invoiceForm.items.map((item, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50/20">
+                          <td className="py-2 px-2 text-gray-400 font-mono text-[10px]">{idx + 1}</td>
+                          <td className="py-2 px-2">
                             <select
                               value={item.skuId}
-                              onChange={e => {
-                                const newSkuId = e.target.value;
-                                const updated = [...invoiceForm.items];
-                                updated[idx] = {
-                                  ...updated[idx],
-                                  skuId: newSkuId,
-                                  reels: []
-                                };
-                                setInvoiceForm({ ...invoiceForm, items: updated });
-                              }}
-                              className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 text-xs font-semibold text-gray-800"
+                              onChange={e => handleItemRowChange(idx, 'skuId', e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 text-xs font-semibold"
                               required
                             >
-                              <option value="">-- Select SKU --</option>
+                              <option value="">Select SKU</option>
                               {skus.map(s => (
-                                <option key={s._id} value={s._id}>{s.name} ({s.skuCode})</option>
+                                <option key={s._id} value={s._id}>{s.name}</option>
                               ))}
                             </select>
-                          </div>
-                          <div className="w-28">
-                            <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Lot Number *</label>
+                          </td>
+                          <td className="py-2 px-2">
                             <input
                               type="text"
-                              placeholder="e.g. LOT-A2"
-                              value={item.lotNumber}
-                              onChange={e => handleItemValChange(idx, 'lotNumber', e.target.value)}
-                              className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg bg-white text-xs font-semibold text-gray-900"
-                              required
+                              value={item.brand}
+                              onChange={e => handleItemRowChange(idx, 'brand', e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs"
                             />
-                          </div>
-                          <div className="w-48">
-                            <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Storage Location *</label>
-                            <select
-                              value={item.locationId}
-                              onChange={e => handleItemValChange(idx, 'locationId', e.target.value)}
-                              className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 text-xs text-gray-800 font-semibold"
-                              required
-                            >
-                              <option value="">-- Choose Location --</option>
-                              {locations.map(l => (
-                                <option key={l._id} value={l._id}>{l.name} ({l.level})</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="w-20">
-                            <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Qty *</label>
+                          </td>
+                          <td className="py-2 px-2">
                             <input
                               type="number"
+                              value={item.gsm}
+                              onChange={e => handleItemRowChange(idx, 'gsm', e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-center"
+                            />
+                          </td>
+                          <td className="py-2 px-2">
+                            <input
+                              type="number"
+                              value={item.width}
+                              onChange={e => handleItemRowChange(idx, 'width', e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-center"
+                            />
+                          </td>
+                          <td className="py-2 px-2">
+                            <input
+                              type="number"
+                              value={item.reelsCount}
+                              onChange={e => handleItemRowChange(idx, 'reelsCount', e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-center"
                               placeholder="0"
+                            />
+                          </td>
+                          <td className="py-2 px-2">
+                            <input
+                              type="number"
                               value={item.quantity}
-                              onChange={e => handleItemValChange(idx, 'quantity', e.target.value)}
-                              className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg bg-white text-xs font-mono font-bold text-gray-900 text-right read-only:bg-gray-100/50"
+                              onChange={e => handleItemRowChange(idx, 'quantity', e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-right font-black"
+                              placeholder="0"
                               required
-                              readOnly={isReel}
                             />
-                          </div>
-                          <div className="w-16">
-                            <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Unit</label>
-                            <input
-                              type="text"
-                              value={matchedSku?.unit || '—'}
-                              className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg bg-gray-100 font-mono text-gray-500 text-center select-none font-bold"
-                              readOnly
-                            />
-                          </div>
-                          <div className="w-24">
-                            <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Cost Per Unit *</label>
+                          </td>
+                          <td className="py-2 px-2">
                             <input
                               type="number"
-                              placeholder="0"
                               value={item.purchasePrice}
-                              onChange={e => handleItemValChange(idx, 'purchasePrice', e.target.value)}
-                              className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg bg-white text-xs font-mono font-semibold text-gray-900 text-right"
+                              onChange={e => handleItemRowChange(idx, 'purchasePrice', e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-right"
+                              placeholder="0.00"
                               required
                             />
-                          </div>
-                          <div className="w-24 text-right pr-2 pb-1.5 font-bold font-mono text-gray-800">
+                          </td>
+                          <td className="py-2 px-2 text-right font-mono font-black text-gray-900 text-xs">
                             ₹{((Number(item.quantity) || 0) * (Number(item.purchasePrice) || 0)).toLocaleString('en-IN')}
-                          </div>
-                        </div>
-
-                        {/* Reels sub-editor */}
-                        {isReel && (
-                          <div className="mt-2 pl-4 border-l-4 border-blue-400 bg-white p-3.5 rounded-xl border border-gray-200 space-y-3">
-                            <div className="flex justify-between items-center border-b pb-1.5">
-                              <span className="font-extrabold text-[10px] text-blue-600 uppercase flex items-center gap-1.5">
-                                🌀 Reel details editor (Total: {(item.reels || []).length} Reels)
-                              </span>
+                          </td>
+                          <td className="py-2 px-2 text-center">
+                            {invoiceForm.items.length > 1 && (
                               <button
                                 type="button"
-                                onClick={() => handleAddReel(idx)}
-                                className="px-2.5 py-0.5 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold text-[10px] shadow-3xs"
+                                onClick={() => handleRemoveItemRow(idx)}
+                                className="text-red-500 hover:text-red-700 p-1 border rounded bg-white hover:bg-red-50"
                               >
-                                + Add Reel
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
-                            </div>
-                            {(item.reels || []).length > 0 ? (
-                              <div className="overflow-x-auto">
-                                <table className="w-full text-left text-[10px]">
-                                  <thead>
-                                    <tr className="bg-gray-100 text-gray-500 font-bold border-b text-[9px] uppercase">
-                                      <th className="px-3 py-1">Reel Number</th>
-                                      <th className="px-3 py-1 text-center">GSM</th>
-                                      <th className="px-3 py-1 text-center">Width (cm)</th>
-                                      <th className="px-3 py-1 text-right">Weight (KG) *</th>
-                                      <th className="px-3 py-1 text-center">Action</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y text-gray-700 font-mono font-semibold">
-                                    {(item.reels || []).map((reel, rIdx) => (
-                                      <tr key={rIdx} className="hover:bg-gray-100/20">
-                                        <td className="px-3 py-1.5">
-                                          <input
-                                            type="text"
-                                            value={reel.reelNumber}
-                                            onChange={(e) => handleReelChange(idx, rIdx, 'reelNumber', e.target.value)}
-                                            className="w-24 px-1.5 py-0.5 border border-gray-200 rounded font-semibold text-[11px]"
-                                            required
-                                          />
-                                        </td>
-                                        <td className="px-3 py-1.5 text-center">
-                                          <input
-                                            type="number"
-                                            value={reel.gsm || ''}
-                                            onChange={(e) => handleReelChange(idx, rIdx, 'gsm', e.target.value)}
-                                            className="w-16 px-1.5 py-0.5 border border-gray-200 rounded text-center text-[11px]"
-                                          />
-                                        </td>
-                                        <td className="px-3 py-1.5 text-center">
-                                          <input
-                                            type="number"
-                                            value={reel.width || ''}
-                                            onChange={(e) => handleReelChange(idx, rIdx, 'width', e.target.value)}
-                                            className="w-16 px-1.5 py-0.5 border border-gray-200 rounded text-center text-[11px]"
-                                          />
-                                        </td>
-                                        <td className="px-3 py-1.5 text-right">
-                                          <input
-                                            type="number"
-                                            value={reel.weight || ''}
-                                            onChange={(e) => handleReelChange(idx, rIdx, 'weight', e.target.value)}
-                                            className="w-20 px-1.5 py-0.5 border border-gray-200 rounded text-right text-[11px] font-black text-gray-900 bg-amber-50/10 focus:bg-white"
-                                            required
-                                          />
-                                        </td>
-                                        <td className="px-3 py-1.5 text-center">
-                                          <button
-                                            type="button"
-                                            onClick={() => handleRemoveReel(idx, rIdx)}
-                                            className="text-red-500 hover:text-red-700 font-bold"
-                                          >
-                                            Remove
-                                          </button>
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            ) : (
-                              <p className="text-[10px] text-gray-400 italic">No reels defined. Click "+ Add Reel" to begin entering reel weights.</p>
                             )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
-              {/* Remarks, Tax & Total block */}
-              <div className="grid grid-cols-2 gap-6 pt-4 border-t">
-                <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase font-semibold">Notes / Remarks</label>
-                  <textarea
-                    placeholder="Procurement invoice summary or notes..."
-                    value={invoiceForm.remarks}
-                    onChange={e => setInvoiceForm({ ...invoiceForm, remarks: e.target.value })}
-                    className="w-full h-28 px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-800"
-                  />
-                </div>
-                <div className="space-y-2 text-right text-xs">
-                  <div className="flex justify-between items-center text-xs font-bold text-gray-500">
-                    <span>Subtotal:</span>
-                    <span className="font-mono text-gray-900 font-black">₹{subTotalVal.toLocaleString('en-IN')}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs font-bold text-gray-500">
-                    <span>Tax (GST) Amount:</span>
-                    <input
-                      type="number"
-                      value={invoiceForm.taxAmount}
-                      onChange={e => setInvoiceForm({ ...invoiceForm, taxAmount: e.target.value })}
-                      className="w-28 text-right px-2.5 py-1 border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500 bg-white text-gray-900 text-xs font-mono font-bold"
-                    />
-                  </div>
-                  <div className="flex justify-between items-center text-xs font-bold text-gray-500">
-                    <span>Freight:</span>
+              {/* Section 3: Other Charges */}
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
+                <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider border-b pb-2">
+                  3. Other Charges
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Freight Charges (₹)</label>
                     <input
                       type="number"
                       value={invoiceForm.freight}
                       onChange={e => setInvoiceForm({ ...invoiceForm, freight: e.target.value })}
-                      className="w-28 text-right px-2.5 py-1 border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500 bg-white text-gray-900 text-xs font-mono font-bold"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-mono text-right"
                     />
                   </div>
-                  <div className="flex justify-between items-center text-xs font-bold text-gray-500">
-                    <span>Crane Charges:</span>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Crane Charges (₹)</label>
                     <input
                       type="number"
                       value={invoiceForm.craneCharges}
                       onChange={e => setInvoiceForm({ ...invoiceForm, craneCharges: e.target.value })}
-                      className="w-28 text-right px-2.5 py-1 border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500 bg-white text-gray-900 text-xs font-mono font-bold"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-mono text-right"
                     />
                   </div>
-                  <div className="flex justify-between items-center text-xs font-bold text-gray-500">
-                    <span>Other Charges:</span>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Loading / Unloading (₹)</label>
+                    <input
+                      type="number"
+                      value={invoiceForm.loadingUnloading}
+                      onChange={e => setInvoiceForm({ ...invoiceForm, loadingUnloading: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-mono text-right"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Other Charges (₹)</label>
                     <input
                       type="number"
                       value={invoiceForm.otherCharges}
                       onChange={e => setInvoiceForm({ ...invoiceForm, otherCharges: e.target.value })}
-                      className="w-28 text-right px-2.5 py-1 border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500 bg-white text-gray-900 text-xs font-mono font-bold"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-mono text-right"
+                      placeholder="e.g. Labour, Tally etc."
                     />
                   </div>
-                  <div className="flex justify-between items-center border-t pt-2 text-sm font-black text-gray-900">
-                    <span>Total Bill Value:</span>
-                    <span className="text-blue-600 font-mono text-base font-black">₹{grandTotalVal.toLocaleString('en-IN')}</span>
-                  </div>
                 </div>
               </div>
-            </form>
-
-            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setShowAddDrawer(false)}
-                className="px-4 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 bg-white hover:bg-gray-50 shadow-3xs"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                onClick={handleInvoiceSubmit}
-                disabled={addLoading}
-                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-md"
-              >
-                {addLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
-                Inward Purchase
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Record Vendor Payment */}
-      {showPaymentModal && (
-        <div className="fixed inset-0 z-50 overflow-hidden flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-in fade-in duration-100">
-          <div className="relative bg-white rounded-2xl max-w-md w-full shadow-2xl flex flex-col border border-gray-200 animate-in fade-in zoom-in-95 duration-150 overflow-hidden text-xs">
-            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-2xl flex justify-between items-center">
-              <h2 className="text-sm font-bold text-gray-900">Record Vendor Payment</h2>
-              <button
-                onClick={() => setShowPaymentModal(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="w-4.5 h-4.5" />
-              </button>
-            </div>
-            
-            <form onSubmit={handlePaymentSubmit} className="p-6 space-y-4">
-              {payError && (
-                <div className="p-3 bg-red-50 border border-red-150 rounded-xl text-xs font-semibold text-red-700">
-                  {payError}
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Select Vendor *</label>
-                <select
-                  value={paymentForm.vendorId}
-                  onChange={e => {
-                    setPaymentForm({ ...paymentForm, vendorId: e.target.value, invoiceId: '' });
-                  }}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold"
-                  required
-                >
-                  <option value="">-- Select Vendor --</option>
-                  {vendors.map(v => (
-                    <option key={v._id} value={v._id}>{v.firmName || v.ownerName} (Owed: ₹{v.outstanding?.toLocaleString('en-IN') || 0})</option>
-                  ))}
-                </select>
-              </div>
-
-              {paymentForm.vendorId && (
-                <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Allocate to Invoice (Optional)</label>
-                  <select
-                    value={paymentForm.invoiceId}
-                    onChange={e => {
-                      const selectedInv = invoices.find(i => i._id === e.target.value);
-                      const bal = selectedInv ? (selectedInv.grandTotal - (selectedInv.paidAmount || 0)) : 0;
-                      setPaymentForm({ 
-                        ...paymentForm, 
-                        invoiceId: e.target.value,
-                        amount: selectedInv ? String(bal) : '' 
-                      });
-                    }}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white"
-                  >
-                    <option value="">-- Apply to Vendor Account Balance --</option>
-                    {invoices
-                      .filter(i => {
-                        const vId = typeof i.vendorId === 'object' && i.vendorId !== null ? i.vendorId._id : i.vendorId;
-                        return vId === paymentForm.vendorId && i.paymentStatus !== 'Paid';
-                      })
-                      .map(i => (
-                        <option key={i._id} value={i._id}>
-                          {i.invoiceNumber} (Total: ₹{i.grandTotal.toLocaleString('en-IN')}, Open: ₹{(i.grandTotal - i.paidAmount).toLocaleString('en-IN')})
-                        </option>
-                      ))}
-                  </select>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Amount Paid (₹) *</label>
-                  <input
-                    type="number"
-                    placeholder="e.g. 15000"
-                    value={paymentForm.amount}
-                    onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 font-bold text-right"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Payment Method *</label>
-                  <select
-                    value={paymentForm.paymentMethod}
-                    onChange={e => setPaymentForm({ ...paymentForm, paymentMethod: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold"
-                    required
-                  >
-                    <option value="bank_transfer">Bank Transfer</option>
-                    <option value="cash">Cash</option>
-                    <option value="upi">UPI / GPay</option>
-                    <option value="cheque">Cheque</option>
-                    <option value="card">Card</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Reference ID / Txn Number</label>
-                <input
-                  type="text"
-                  placeholder="e.g. IMPS-1002302"
-                  value={paymentForm.referenceId}
-                  onChange={e => setPaymentForm({ ...paymentForm, referenceId: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 font-medium"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Remarks / Notes</label>
-                <textarea
-                  placeholder="Additional transaction details..."
-                  value={paymentForm.remarks}
-                  onChange={e => setPaymentForm({ ...paymentForm, remarks: e.target.value })}
-                  className="w-full h-20 px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-800"
-                />
-              </div>
-
-              <div className="pt-4 border-t border-gray-100 flex justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setShowPaymentModal(false)}
-                  className="px-4 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 bg-white hover:bg-gray-50 shadow-3xs"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={payLoading}
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm"
-                >
-                  {payLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
-                  Record Payment
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Invoice Details Drawer / Batch details right panel */}
-      {selectedInvoice && (
-        <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-3xs" onClick={() => setSelectedInvoice(null)} />
-          <div className="relative w-full max-w-3xl bg-white shadow-2xl h-full flex flex-col z-10 animate-in slide-in-from-right duration-250">
-            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-bold text-gray-900 flex items-center gap-1.5">
-                  <FileText className="w-4 h-4 text-blue-600" />
-                  Batch details: {selectedInvoice.invoiceNumber}
-                </h2>
-                <p className="text-[11px] text-gray-500 mt-0.5 font-medium">Batch configurations, specs, and storage details</p>
-              </div>
-              <button
-                onClick={() => setSelectedInvoice(null)}
-                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg"
-              >
-                <X className="w-5 h-5" />
-              </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 text-xs text-gray-950">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Left side: Batch information details */}
-                <div className="bg-gray-50/50 rounded-2xl p-5 border border-gray-200 space-y-4">
-                  <h3 className="text-xs font-black text-blue-600 uppercase tracking-wider border-b pb-1.5 flex items-center justify-between">
-                    <span>Batch Information</span>
-                    <span className="bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded text-[9px] uppercase font-extrabold font-sans">
-                      Received
-                    </span>
+            {/* Right Column (1/4 width) - Summary Panel */}
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 space-y-5 h-full flex flex-col justify-between min-h-[400px]">
+                <div className="space-y-4">
+                  <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider pb-2 border-b">
+                    Batch Summary
                   </h3>
-                  <div className="grid grid-cols-2 gap-y-3.5 gap-x-4 text-xs font-medium">
-                    <div>
-                      <span className="block text-[9px] text-gray-400 font-bold uppercase tracking-wider">Supplier</span>
-                      <span className="font-bold text-gray-800 text-sm block">
-                        {typeof selectedInvoice.vendorId === 'object' && selectedInvoice.vendorId !== null ? (selectedInvoice.vendorId.firmName || selectedInvoice.vendorId.ownerName) : '—'}
-                      </span>
+                  
+                  <div className="space-y-3.5 text-xs text-gray-700">
+                    <div className="flex justify-between font-semibold">
+                      <span className="text-gray-400 font-bold uppercase text-[9px]">Total Lots:</span>
+                      <span className="text-gray-900 font-black">{formLotsCount}</span>
                     </div>
-                    <div>
-                      <span className="block text-[9px] text-gray-400 font-bold uppercase tracking-wider">Invoice No.</span>
-                      <span className="font-bold text-gray-800 text-sm block font-mono">{selectedInvoice.invoiceNumber}</span>
+                    <div className="flex justify-between font-semibold">
+                      <span className="text-gray-400 font-bold uppercase text-[9px]">Total Reels:</span>
+                      <span className="text-gray-900 font-black">{formReelsCount}</span>
                     </div>
-                    <div>
-                      <span className="block text-[9px] text-gray-400 font-bold uppercase tracking-wider">Invoice Date</span>
-                      <span className="font-semibold text-gray-700 block">
-                        {selectedInvoice.createdAt ? new Date(selectedInvoice.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'}
-                      </span>
+                    <div className="flex justify-between font-semibold">
+                      <span className="text-gray-400 font-bold uppercase text-[9px]">Total KG:</span>
+                      <span className="text-gray-900 font-black font-mono">{formTotalWeight.toLocaleString('en-IN')} KG</span>
                     </div>
-                    <div>
-                      <span className="block text-[9px] text-gray-400 font-bold uppercase tracking-wider">Material</span>
-                      <span className="font-bold text-gray-700 block">
-                        {selectedInvoice.items?.[0] && typeof selectedInvoice.items[0].skuId === 'object' && selectedInvoice.items[0].skuId !== null ? (selectedInvoice.items[0].skuId as any).name : 'Raw Material'}
-                      </span>
+                    
+                    <div className="flex justify-between font-semibold border-t pt-3">
+                      <span className="text-gray-400 font-bold uppercase text-[9px]">Material Total:</span>
+                      <span className="text-gray-950 font-black font-mono">₹{formMatTotal.toLocaleString('en-IN')}</span>
                     </div>
-                    <div>
-                      <span className="block text-[9px] text-gray-400 font-bold uppercase tracking-wider">Total Quantity</span>
-                      <span className="font-black text-gray-900 block text-sm">
-                        {selectedInvoice.items?.reduce((sum, item) => sum + (item.quantity || 0), 0).toLocaleString('en-IN')}{' '}
-                        {selectedInvoice.items?.[0] && typeof selectedInvoice.items[0].skuId === 'object' && selectedInvoice.items[0].skuId !== null ? (selectedInvoice.items[0].skuId as any).unit : 'KG'}{' '}
-                        {selectedInvoice.items?.[0]?.reels?.length ? `(${selectedInvoice.items[0].reels.length} Reels)` : ''}
-                      </span>
+
+                    <div className="space-y-2 border-t pt-3">
+                      <span className="text-gray-400 font-bold uppercase text-[9px] block mb-1">Other Charges:</span>
+                      <div className="flex justify-between text-[11px]">
+                        <span>Freight Charges:</span>
+                        <span className="font-mono font-bold">₹{(Number(invoiceForm.freight) || 0).toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="flex justify-between text-[11px]">
+                        <span>Crane Charges:</span>
+                        <span className="font-mono font-bold">₹{(Number(invoiceForm.craneCharges) || 0).toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="flex justify-between text-[11px]">
+                        <span>Loading / Unloading:</span>
+                        <span className="font-mono font-bold">₹{(Number(invoiceForm.loadingUnloading) || 0).toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="flex justify-between text-[11px]">
+                        <span>Other Charges:</span>
+                        <span className="font-mono font-bold">₹{(Number(invoiceForm.otherCharges) || 0).toLocaleString('en-IN')}</span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="block text-[9px] text-gray-400 font-bold uppercase tracking-wider">Rate / KG</span>
-                      <span className="font-semibold text-gray-700 block text-sm font-mono">
-                        ₹{(selectedInvoice.items?.[0]?.purchasePrice || 0).toFixed(2)}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="block text-[9px] text-gray-400 font-bold uppercase tracking-wider">Total Value</span>
-                      <span className="font-bold text-gray-700 block text-sm font-mono">
-                        ₹{(selectedInvoice.subTotal || 0).toLocaleString('en-IN')}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="block text-[9px] text-gray-400 font-bold uppercase tracking-wider">Freight</span>
-                      <span className="font-semibold text-gray-700 block font-mono">₹{(selectedInvoice.freight || 0).toLocaleString('en-IN')}</span>
-                    </div>
-                    <div>
-                      <span className="block text-[9px] text-gray-400 font-bold uppercase tracking-wider">Crane Charges</span>
-                      <span className="font-semibold text-gray-700 block font-mono">₹{(selectedInvoice.craneCharges || 0).toLocaleString('en-IN')}</span>
-                    </div>
-                    <div>
-                      <span className="block text-[9px] text-gray-400 font-bold uppercase tracking-wider">Other Charges</span>
-                      <span className="font-semibold text-gray-700 block font-mono">₹{(selectedInvoice.otherCharges || 0).toLocaleString('en-IN')}</span>
-                    </div>
-                    <div className="col-span-2 border-t pt-2 mt-1">
-                      <span className="block text-[9px] text-gray-400 font-bold uppercase tracking-wider">Total Bill Value</span>
-                      <span className="font-black text-blue-600 block text-base font-mono">
-                        ₹{(selectedInvoice.grandTotal || 0).toLocaleString('en-IN')}
-                      </span>
+
+                    <div className="flex justify-between font-black border-t pt-3.5 text-gray-950">
+                      <span className="text-gray-400 uppercase text-[10px]">Grand Total:</span>
+                      <span className="text-blue-600 font-mono text-base">₹{(formMatTotal + formOtherCharges).toLocaleString('en-IN')}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Right side: Reel Details list if Raw Material reels are present */}
-                <div className="bg-gray-50/50 rounded-2xl p-5 border border-gray-200 space-y-4">
-                  <h3 className="text-xs font-black text-blue-600 uppercase tracking-wider border-b pb-1.5 flex items-center justify-between">
-                    <span>Reel Details</span>
-                    <span className="text-[10px] text-gray-400 font-bold">
-                      {selectedInvoice.items?.[0]?.reels?.length || 0} Reels
-                    </span>
-                  </h3>
-                  {selectedInvoice.items?.[0]?.reels?.length ? (
-                    <div className="border border-gray-300 rounded-xl overflow-hidden bg-white max-h-[300px] overflow-y-auto">
-                      <table className="w-full text-left text-[11px] border-collapse">
+                <div className="border-t border-gray-150 pt-4 bg-gray-50/30 rounded-xl p-3 text-[10px] font-bold text-gray-400 flex items-center gap-1.5">
+                  <HelpCircle className="w-4 h-4 text-gray-400 shrink-0" />
+                  <span>We record only reels and KGs. Reel numbers are not entered.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : activeSubPage === 'details' && selectedInvoice ? (
+        /* ── SUB-PAGE 2: BATCH READ DETAILS VIEW ──────────────────────────────── */
+        <div className="space-y-5 animate-in fade-in slide-in-from-bottom duration-250">
+          {/* Breadcrumb Header */}
+          <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+            <div>
+              <div className="flex items-center gap-1 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">
+                <span>Purchase</span>
+                <ChevronRight className="w-3 h-3" />
+                <span className="cursor-pointer hover:text-blue-600 transition-colors" onClick={() => setActiveSubPage('list')}>Purchase Batches</span>
+                <ChevronRight className="w-3 h-3" />
+                <span className="text-gray-600">{selectedInvoice.invoiceNumber}</span>
+              </div>
+              <h1 className="text-lg font-black text-gray-900 tracking-tight mt-1 flex items-center gap-2">
+                <FileText className="w-4.5 h-4.5 text-blue-600" />
+                Purchase Batch Details
+              </h1>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleEditInvoice(selectedInvoice)}
+                className="px-4 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 bg-white rounded-xl text-xs font-bold shadow-3xs flex items-center gap-1 transition-all"
+              >
+                <Edit className="w-3.5 h-3.5 text-amber-500" /> Edit Batch
+              </button>
+              <button
+                className="px-4 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 bg-white rounded-xl text-xs font-bold shadow-3xs flex items-center gap-1 transition-all"
+              >
+                <Printer className="w-3.5 h-3.5" /> Print
+              </button>
+              <button
+                onClick={() => setActiveSubPage('list')}
+                className="px-4 py-2 bg-gray-900 text-white hover:bg-gray-800 rounded-xl text-xs font-bold shadow-md flex items-center gap-1 transition-all"
+              >
+                More Actions <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Header batch summary card */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4 items-center font-medium">
+            <div className="flex items-center gap-3 col-span-2">
+              <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl shrink-0">
+                <Coins className="w-6 h-6" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Batch No.</span>
+                <span className="text-base font-black text-blue-600 font-mono block truncate">{selectedInvoice.invoiceNumber}</span>
+              </div>
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Supplier</span>
+              <span className="text-xs font-bold text-gray-800 block truncate">
+                {typeof selectedInvoice.vendorId === 'object' && selectedInvoice.vendorId !== null ? (selectedInvoice.vendorId.firmName || selectedInvoice.vendorId.ownerName) : 'Supplier'}
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Purchase Date</span>
+              <span className="text-xs font-bold text-gray-800 block">
+                {selectedInvoice.createdAt ? new Date(selectedInvoice.createdAt).toLocaleDateString('en-IN') : '—'}
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Purchase Type</span>
+              <span className="text-xs font-bold text-gray-800 block">Raw Material</span>
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Lots</span>
+              <span className="text-xs font-bold text-gray-900 block font-mono">{selectedInvoice.items?.length || 0} Lots</span>
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Reels</span>
+              <span className="text-xs font-bold text-gray-900 block font-mono">
+                {selectedInvoice.items?.reduce((sum, item) => sum + (item.reels?.length || 0), 0) || 0}
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total KG</span>
+              <span className="text-xs font-black text-gray-950 block font-mono">
+                {selectedInvoice.items?.reduce((sum, item) => sum + (item.quantity || 0), 0).toLocaleString('en-IN')} KG
+              </span>
+            </div>
+          </div>
+
+          {/* Details Tabs and panels */}
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* Left Column Tabs content (3/4 width) */}
+            <div className="lg:col-span-3 space-y-5">
+              <div className="flex gap-2 border-b border-gray-200 pb-px">
+                <button
+                  onClick={() => setDetailsTab('lots')}
+                  className={`px-4 py-2 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+                    detailsTab === 'lots' 
+                      ? 'border-blue-600 text-blue-600' 
+                      : 'border-transparent text-gray-400 hover:text-gray-700'
+                  }`}
+                >
+                  <FileText className="w-3.5 h-3.5" /> Material Lots
+                </button>
+                <button
+                  onClick={() => setDetailsTab('allocation')}
+                  className={`px-4 py-2 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+                    detailsTab === 'allocation' 
+                      ? 'border-blue-600 text-blue-600' 
+                      : 'border-transparent text-gray-400 hover:text-gray-700'
+                  }`}
+                >
+                  <MapPinIcon className="w-3.5 h-3.5" /> Location Allocation
+                </button>
+                <button
+                  onClick={() => setDetailsTab('docs')}
+                  className={`px-4 py-2 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+                    detailsTab === 'docs' 
+                      ? 'border-blue-600 text-blue-600' 
+                      : 'border-transparent text-gray-400 hover:text-gray-700'
+                  }`}
+                >
+                  <Calendar className="w-3.5 h-3.5" /> Documents
+                </button>
+                <button
+                  onClick={() => setDetailsTab('history')}
+                  className={`px-4 py-2 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+                    detailsTab === 'history' 
+                      ? 'border-blue-600 text-blue-600' 
+                      : 'border-transparent text-gray-400 hover:text-gray-700'
+                  }`}
+                >
+                  <HelpCircle className="w-3.5 h-3.5" /> History / Timeline
+                </button>
+              </div>
+
+              {/* LOTS TAB */}
+              {detailsTab === 'lots' && (
+                <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider">
+                      1. Material Lots <span className="text-[10px] text-gray-400 font-semibold">(Different materials in this purchase batch)</span>
+                    </h3>
+                  </div>
+                  <div className="overflow-x-auto border border-gray-100 rounded-xl">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50 text-gray-500 uppercase font-black border-b border-gray-200 text-[10px] tracking-wider">
+                          <th className="px-4 py-3">#</th>
+                          <th className="px-4 py-3">Item</th>
+                          <th className="px-4 py-3">Brand</th>
+                          <th className="px-4 py-3 text-center">GSM</th>
+                          <th className="px-4 py-3 text-center">Width (cm)</th>
+                          <th className="px-4 py-3 text-center">Reels</th>
+                          <th className="px-4 py-3 text-right">Total KG</th>
+                          <th className="px-4 py-3 text-right">Rate / KG (₹)</th>
+                          <th className="px-4 py-3 text-right">Amount (₹)</th>
+                          <th className="px-4 py-3 text-center">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50 text-gray-700 font-medium">
+                        {selectedInvoice.items?.map((item, idx) => {
+                          const skuName = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any).name : 'Raw Material';
+                          const brand = (item.skuId as any)?.brand || 'BILT';
+                          const gsm = (item.skuId as any)?.gsm || '52';
+                          const width = (item.skuId as any)?.width || '64';
+                          
+                          return (
+                            <tr key={idx} className="hover:bg-gray-50/50">
+                              <td className="px-4 py-3 text-gray-400 font-mono">{idx + 1}</td>
+                              <td className="px-4 py-3 font-bold text-gray-900">{skuName}</td>
+                              <td className="px-4 py-3 text-gray-600">{brand}</td>
+                              <td className="px-4 py-3 text-center font-mono">{gsm}</td>
+                              <td className="px-4 py-3 text-center font-mono">{width}</td>
+                              <td className="px-4 py-3 text-center font-mono font-bold text-gray-800">{item.reels?.length || 0}</td>
+                              <td className="px-4 py-3 text-right font-mono font-black text-gray-950">{(item.quantity || 0).toLocaleString()}</td>
+                              <td className="px-4 py-3 text-right font-mono text-gray-600">₹{(item.purchasePrice || 0).toFixed(2)}</td>
+                              <td className="px-4 py-3 text-right font-mono font-black text-gray-950">₹{(item.totalPrice || 0).toLocaleString()}</td>
+                              <td className="px-4 py-3 text-center">
+                                <span className="text-[9px] px-2 py-0.5 rounded font-black uppercase border bg-green-50 text-green-700 border-green-200">
+                                  Received
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* LOCATION ALLOCATION TAB */}
+              {detailsTab === 'allocation' && (() => {
+                // Find initial location of items
+                const defaultLocationId = selectedInvoice.items?.[0] 
+                  ? (typeof selectedInvoice.items[0].locationId === 'object' && selectedInvoice.items[0].locationId !== null 
+                     ? (selectedInvoice.items[0].locationId as any)._id 
+                     : selectedInvoice.items[0].locationId)
+                  : '';
+
+                // Filter balances to display only physical allocations
+                const physicalBalances = inventoryBalances.filter(
+                  b => b.batchNumber === selectedInvoice.invoiceNumber && 
+                       (b.location?._id || b.locationId) !== defaultLocationId
+                );
+
+                const totalAllocated = physicalBalances.reduce((sum, b) => sum + (b.onHand || 0), 0);
+
+                return (
+                  <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4 shadow-sm">
+                    <div className="flex items-center justify-between border-b pb-3">
+                      <div>
+                        <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider">
+                          2. Location Allocation <span className="text-[10px] text-gray-400 font-semibold">(Where this batch is stored)</span>
+                        </h3>
+                        <p className="text-[11px] text-gray-400 font-bold uppercase mt-1">
+                          Total Allocated: <span className="text-blue-600">{totalAllocated.toLocaleString()} KG</span> across {physicalBalances.length} locations
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setAllocateForm({ itemIndex: 0, toLocationId: '', quantity: '' });
+                          setAllocateError('');
+                          setShowAllocateModal(true);
+                        }}
+                        className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-black shadow-sm transition-all"
+                      >
+                        + Allocate Location
+                      </button>
+                    </div>
+
+                    <div className="overflow-x-auto border border-gray-100 rounded-xl">
+                      <table className="w-full text-left text-xs border-collapse">
                         <thead>
-                          <tr className="bg-gray-50 text-gray-500 font-bold border-b border-gray-200 uppercase text-[9px] font-sans">
-                            <th className="px-3 py-2">Reel No</th>
-                            <th className="px-3 py-2 text-center">GSM</th>
-                            <th className="px-3 py-2 text-center">Width</th>
-                            <th className="px-3 py-2 text-right">Weight (KG)</th>
+                          <tr className="bg-gray-50 text-gray-500 uppercase font-black border-b border-gray-200 text-[10px] tracking-wider">
+                            <th className="px-5 py-3">Location</th>
+                            <th className="px-5 py-3">Factory</th>
+                            <th className="px-5 py-3">Floor</th>
+                            <th className="px-5 py-3">Zone</th>
+                            <th className="px-5 py-3">Rack / Area</th>
+                            <th className="px-5 py-3 text-right">Quantity (KG)</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100 text-gray-700 font-mono font-medium">
-                          {selectedInvoice.items[0].reels.map((reel, rIdx) => (
-                            <tr key={rIdx} className="hover:bg-gray-50/50">
-                              <td className="px-3 py-2 font-bold text-gray-800">{reel.reelNumber}</td>
-                              <td className="px-3 py-2 text-center text-gray-600">{reel.gsm}</td>
-                              <td className="px-3 py-2 text-center text-gray-600">{reel.width} cm</td>
-                              <td className="px-3 py-2 text-right font-black text-gray-900">{reel.weight}</td>
+                        <tbody className="divide-y divide-gray-50 text-gray-700 font-semibold">
+                          {physicalBalances.map((b, i) => {
+                            const paths = resolveLocationPath(b.location?._id || b.locationId);
+                            return (
+                              <tr key={i} className="hover:bg-gray-50/50">
+                                <td className="px-5 py-3 text-blue-600 font-black">{b.location?.name || '—'}</td>
+                                <td className="px-5 py-3">{paths.factory}</td>
+                                <td className="px-5 py-3">{paths.floor}</td>
+                                <td className="px-5 py-3">{paths.zone}</td>
+                                <td className="px-5 py-3">{paths.bin}</td>
+                                <td className="px-5 py-3 text-right font-mono font-black text-gray-900 text-xs">
+                                  {b.onHand.toLocaleString('en-IN')}
+                                </td>
+                              </tr>
+                            );
+                          })}
+
+                          {/* Fallback if no allocation done yet */}
+                          {physicalBalances.length === 0 && (
+                            <tr>
+                              <td colSpan={6} className="text-center py-10 text-gray-400 italic">
+                                Stock is currently placed in initial In-Transit/Unallocated storage. Click "+ Allocate Location" to distribute stock to warehouse layout.
+                              </td>
                             </tr>
-                          ))}
+                          )}
                         </tbody>
                       </table>
                     </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-48 text-gray-400 bg-white rounded-xl border border-dashed border-gray-300 p-4">
-                      <FileText className="w-8 h-8 text-gray-200 mb-2" />
-                      <p className="font-semibold text-[11px]">No Reels Registered</p>
-                      <p className="text-[10px] text-gray-500 mt-0.5 text-center">Reel weight metrics are only recorded for Raw Material KG procurements.</p>
+                  </div>
+                );
+              })()}
+
+              {/* DOCUMENTS TAB */}
+              {detailsTab === 'docs' && (
+                <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4 shadow-sm">
+                  <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider border-b pb-2">
+                    Purchase Documents
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex items-center justify-between p-3.5 border border-gray-200 rounded-xl hover:bg-gray-50/20 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-red-50 text-red-500 rounded-lg">
+                          <FileText className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-gray-800">InvoiceCopy_{selectedInvoice.invoiceNumber}.pdf</p>
+                          <p className="text-[10px] text-gray-400 mt-0.5 font-bold uppercase font-mono">1.8 MB • PDF Document</p>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-gray-300" />
                     </div>
-                  )}
+                  </div>
+                </div>
+              )}
+
+              {/* TIMELINE TAB */}
+              {detailsTab === 'history' && (
+                <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4 shadow-sm">
+                  <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider border-b pb-2">
+                    Procurement Log Timeline
+                  </h3>
+                  <div className="relative border-l border-gray-200 ml-4 pl-6 space-y-6 text-xs text-gray-700">
+                    <div className="relative">
+                      <span className="absolute -left-[30px] top-0.5 p-1 bg-green-100 text-green-700 rounded-full border-2 border-white shadow-3xs">
+                        <Check className="w-3 h-3" />
+                      </span>
+                      <p className="font-bold text-gray-900">Purchase Inward Registered (Posted)</p>
+                      <p className="text-[10px] text-gray-400 font-semibold mt-0.5">
+                        Registered on {selectedInvoice.createdAt ? new Date(selectedInvoice.createdAt).toLocaleString('en-IN') : '—'} by Admin
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right Column Summary card (1/4 width) */}
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 space-y-5 h-full flex flex-col justify-between min-h-[400px]">
+                <div className="space-y-4">
+                  <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider pb-2 border-b">
+                    Batch Summary
+                  </h3>
+                  
+                  <div className="space-y-3.5 text-xs text-gray-700 font-medium">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400 font-bold uppercase text-[9px]">Total Lots (Materials):</span>
+                      <span className="text-gray-900 font-black">{selectedInvoice.items?.length || 0}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400 font-bold uppercase text-[9px]">Total Reels:</span>
+                      <span className="text-gray-900 font-black">
+                        {selectedInvoice.items?.reduce((sum, item) => sum + (item.reels?.length || 0), 0) || 0}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400 font-bold uppercase text-[9px]">Total KG:</span>
+                      <span className="text-gray-900 font-black font-mono">
+                        {selectedInvoice.items?.reduce((sum, item) => sum + (item.quantity || 0), 0).toLocaleString('en-IN')} KG
+                      </span>
+                    </div>
+                    <div className="flex justify-between border-t pt-3">
+                      <span className="text-gray-400 font-bold uppercase text-[9px]">Material Total:</span>
+                      <span className="text-gray-950 font-black font-mono">₹{(selectedInvoice.subTotal || 0).toLocaleString('en-IN')}</span>
+                    </div>
+
+                    <div className="space-y-2 border-t pt-3">
+                      <span className="text-gray-400 font-bold uppercase text-[9px] block mb-1">Cost Summary:</span>
+                      <div className="flex justify-between text-[11px]">
+                        <span>Material Total:</span>
+                        <span className="font-mono font-bold">₹{(selectedInvoice.subTotal || 0).toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="flex justify-between text-[11px]">
+                        <span>Freight Charges:</span>
+                        <span className="font-mono font-bold">₹{(selectedInvoice.freight || 0).toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="flex justify-between text-[11px]">
+                        <span>Crane Charges:</span>
+                        <span className="font-mono font-bold">₹{(selectedInvoice.craneCharges || 0).toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="flex justify-between text-[11px]">
+                        <span>Other Charges:</span>
+                        <span className="font-mono font-bold">₹{(selectedInvoice.otherCharges || 0).toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between font-black border-t pt-3.5 text-gray-950">
+                      <span className="text-gray-400 uppercase text-[10px]">Grand Total:</span>
+                      <span className="text-blue-600 font-mono text-base">₹{(selectedInvoice.grandTotal || 0).toLocaleString('en-IN')}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-150 pt-4 bg-gray-50/30 rounded-xl p-3 text-[10px] font-bold text-gray-400 flex items-center gap-1.5">
+                  <HelpCircle className="w-4 h-4 text-gray-400 shrink-0" />
+                  <span>We record only reels and KGs. Reel numbers are not entered.</span>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* ── SUB-PAGE 3: MAIN LIST VIEW ──────────────────────────────────────── */
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+            <div>
+              <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+                <Coins className="w-5 h-5 text-blue-600" />
+                Purchase Batches
+              </h1>
+              <p className="text-xs text-gray-500 mt-0.5 font-medium">All purchase batches (each batch may contain multiple materials/lot lines)</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={handleExportExcel}
+                className="flex items-center gap-1.5 px-4 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 bg-white rounded-xl text-xs font-semibold shadow-sm transition-all"
+              >
+                <Download className="w-3.5 h-3.5" /> Import from Excel
+              </button>
+              <button
+                onClick={() => {
+                  setIsEditing(false);
+                  setEditingInvoiceId(null);
+                  setInvoiceForm({
+                    invoiceNumber: '',
+                    vendorId: '',
+                    taxAmount: '0',
+                    freight: '0',
+                    craneCharges: '0',
+                    loadingUnloading: '0',
+                    otherCharges: '0',
+                    dueDate: new Date().toISOString().split('T')[0],
+                    items: [{ skuId: '', brand: '', gsm: '', width: '', reelsCount: '', quantity: '', purchasePrice: '', lotNumber: '' }]
+                  });
+                  setAddError('');
+                  setActiveSubPage('new');
+                }}
+                className="flex items-center gap-1.5 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black shadow-md transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" /> + New Purchase
+              </button>
+            </div>
+          </div>
 
-              {/* View GRN / Receipt button */}
-              <div className="flex justify-center border-t pt-4">
+          {/* Statistics row */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
+              <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
+                <FileText className="w-6 h-6 animate-pulse-slow" />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Batches</span>
+                <span className="text-xl font-black text-gray-900 block font-mono mt-0.5">{dashboardTotalBatches}</span>
+                <span className="text-[9px] text-gray-500 block font-bold uppercase mt-0.5">This Month</span>
+              </div>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
+              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
+                <Layers className="w-6 h-6" />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Quantity</span>
+                <span className="text-xl font-black text-emerald-700 block font-mono mt-0.5">{dashboardTotalWeight.toLocaleString('en-IN')} KG</span>
+                <span className="text-[9px] text-gray-500 block font-bold uppercase mt-0.5">This Month</span>
+              </div>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
+              <div className="p-3 bg-orange-50 text-orange-600 rounded-2xl">
+                <Coins className="w-6 h-6" />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Value</span>
+                <span className="text-xl font-black text-orange-700 block font-mono mt-0.5">₹{dashboardTotalValue.toLocaleString('en-IN')}</span>
+                <span className="text-[9px] text-gray-500 block font-bold uppercase mt-0.5">This Month</span>
+              </div>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
+              <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl">
+                <Calendar className="w-6 h-6" />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Pending Receipts</span>
+                <span className="text-xl font-black text-purple-700 block font-mono mt-0.5">{dashboardPendingReceipts}</span>
+                <span className="text-[9px] text-gray-500 block font-bold uppercase mt-0.5">This Month</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Table section */}
+          <div className="space-y-4">
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+              <form onSubmit={handleSearchSubmit} className="flex-1 w-full relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search by Batch No, Supplier, Material..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50/50 focus:bg-white transition-all text-gray-950 font-medium"
+                />
+              </form>
+              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                <select
+                  value={vendorFilter}
+                  onChange={e => { setVendorFilter(e.target.value); setPage(1); }}
+                  className="w-full sm:w-40 px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-700 font-bold"
+                >
+                  <option value="">All Suppliers</option>
+                  {vendors.map(v => (
+                    <option key={v._id} value={v._id}>{v.firmName || v.ownerName}</option>
+                  ))}
+                </select>
+
+                <div className="flex items-center gap-1.5 border border-gray-200 rounded-xl p-1 bg-white font-mono font-bold">
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={e => setStartDate(e.target.value)}
+                    className="text-xs border-0 bg-transparent focus:ring-0 p-1 text-gray-700 w-28 font-mono font-bold"
+                  />
+                  <span className="text-gray-400 font-bold text-xs">-</span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={e => setEndDate(e.target.value)}
+                    className="text-xs border-0 bg-transparent focus:ring-0 p-1 text-gray-700 w-28 font-mono font-bold"
+                  />
+                </div>
+
                 <button
                   onClick={() => {
-                    showToast('Opening Goods Receipt Note (GRN)...', 'info');
+                    setSearch('');
+                    setVendorFilter('');
+                    setStatusFilter('');
+                    setStartDate('2024-06-01');
+                    setEndDate('2024-06-30');
+                    setPage(1);
                   }}
-                  className="flex items-center gap-1.5 px-6 py-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 font-extrabold text-xs shadow-3xs border border-blue-200 transition-colors"
+                  className="p-2 text-gray-400 hover:text-blue-600 bg-gray-50 hover:bg-gray-200 rounded-xl transition-all"
+                  title="Reset Filters"
                 >
-                  <FileText className="w-4 h-4" /> View GRN / Receipt
+                  <RefreshCw className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 text-right">
-              <button
-                onClick={() => setSelectedInvoice(null)}
-                className="px-5 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 font-semibold text-xs shadow-3xs"
-              >
-                Close Drawer
-              </button>
+            <InvoiceTable
+              invoices={invoices}
+              loading={loading}
+              onViewDetails={(inv) => {
+                setSelectedInvoice(inv);
+                setDetailsTab('lots');
+                setActiveSubPage('details');
+              }}
+              onEditInvoice={handleEditInvoice}
+              onDeleteInvoice={handleDeleteInvoice}
+            />
+
+            {/* Pagination Footer */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between bg-white px-4 py-3 rounded-xl border border-gray-200 shadow-sm text-xs font-semibold text-gray-500">
+                <span>
+                  Showing Page <span className="text-gray-900">{page}</span> of <span className="text-gray-900">{totalPages}</span>
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+                    disabled={page === 1}
+                    className="p-1.5 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 disabled:opacity-40 transition-colors shadow-3xs flex items-center"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={page === totalPages}
+                    className="p-1.5 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 disabled:opacity-40 transition-colors shadow-3xs flex items-center"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-blue-50/50 p-4 border border-blue-150 rounded-2xl space-y-2 text-xs">
+            <h4 className="font-black text-blue-900 flex items-center gap-1.5">
+              <HelpCircle className="w-4.5 h-4.5 text-blue-600 shrink-0" />
+              About Purchase Batches
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5 font-semibold text-blue-700 text-[11px]">
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                Each purchase batch can contain multiple materials (different brand, GSM, width, etc.)
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                Location allocation happens after inward.
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                We record only: Reels and KGs (no reel numbers).
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                Stock is tracked lot-wise for accuracy.
+              </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* ── LOCATION ALLOCATION MODAL DIALOG ──────────────────────────────────── */}
+      {showAllocateModal && selectedInvoice && (() => {
+        // Find default location
+        const defaultLocationId = selectedInvoice.items?.[0] 
+          ? (typeof selectedInvoice.items[0].locationId === 'object' && selectedInvoice.items[0].locationId !== null 
+             ? (selectedInvoice.items[0].locationId as any)._id 
+             : selectedInvoice.items[0].locationId)
+          : '';
+
+        const lotItem = selectedInvoice.items[allocateForm.itemIndex];
+        const selectedSkuId = lotItem ? (typeof lotItem.skuId === 'object' && lotItem.skuId !== null ? (lotItem.skuId as any)._id : lotItem.skuId) : '';
+        
+        // Find remaining unallocated quantity at default location
+        const unallocatedBal = inventoryBalances.find(
+          b => (b.location?._id || b.locationId) === defaultLocationId && 
+               b.batchNumber === selectedInvoice.invoiceNumber && 
+               (b.sku?._id || b.skuId) === selectedSkuId
+        );
+        const maxAllocatable = unallocatedBal ? unallocatedBal.onHand : 0;
+
+        const physicalLocations = locations.filter(loc => loc.level === 'Storage Location' && loc._id !== defaultLocationId);
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/45 backdrop-blur-3xs" onClick={() => !allocateSubmitting && setShowAllocateModal(false)} />
+
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-xl max-w-md w-full relative z-10 animate-in zoom-in-95 duration-150 overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                  <MapPinIcon className="w-4 h-4 text-blue-600 animate-pulse" />
+                  Allocate Location
+                </h2>
+                <button
+                  disabled={allocateSubmitting}
+                  onClick={() => setShowAllocateModal(false)}
+                  className="p-1.5 hover:bg-gray-150 rounded-lg transition-colors text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleAllocateSubmit} className="p-6 space-y-4 text-left text-xs">
+                {allocateError && (
+                  <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-xs font-bold text-red-700 flex items-center gap-1.5">
+                    <HelpCircle className="w-4 h-4 shrink-0" />
+                    <span>{allocateError}</span>
+                  </div>
+                )}
+
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5 space-y-2 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400 font-bold uppercase">Batch Number:</span>
+                    <span className="font-bold text-blue-600 font-mono">{selectedInvoice.invoiceNumber}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400 font-bold uppercase">Available Unallocated:</span>
+                    <span className="font-black text-gray-900 font-mono">
+                      {maxAllocatable.toLocaleString('en-IN')} KG
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-3.5">
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase tracking-wider">Select Material Lot *</label>
+                    <select
+                      value={allocateForm.itemIndex}
+                      onChange={e => setAllocateForm({ ...allocateForm, itemIndex: Number(e.target.value), quantity: '' })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                      required
+                      disabled={allocateSubmitting}
+                    >
+                      {selectedInvoice.items?.map((item, idx) => {
+                        const name = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any).name : 'Raw Material';
+                        const lotNo = item.lotNumber || `${selectedInvoice.invoiceNumber}-L0${idx + 1}`;
+                        return (
+                          <option key={idx} value={idx}>
+                            {name} ({lotNo})
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase tracking-wider">Destination Storage Location *</label>
+                    <select
+                      value={allocateForm.toLocationId}
+                      onChange={e => setAllocateForm({ ...allocateForm, toLocationId: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                      required
+                      disabled={allocateSubmitting}
+                    >
+                      <option value="">-- Choose Storage Bin --</option>
+                      {physicalLocations.map(loc => {
+                        return (
+                          <option key={loc._id} value={loc._id}>
+                            {loc.name} ({loc.level})
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase tracking-wider">Quantity to Allocate (KG) *</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step="any"
+                        min="0.001"
+                        max={maxAllocatable}
+                        placeholder={`Max ${maxAllocatable.toLocaleString()} KG`}
+                        value={allocateForm.quantity}
+                        onChange={e => setAllocateForm({ ...allocateForm, quantity: e.target.value })}
+                        className="w-full pl-3 pr-12 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 font-mono font-bold text-gray-900"
+                        required
+                        disabled={allocateSubmitting || maxAllocatable <= 0}
+                      />
+                      <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-[10px] font-black text-gray-400 uppercase font-mono">
+                        KG
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-gray-150 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    disabled={allocateSubmitting}
+                    onClick={() => setShowAllocateModal(false)}
+                    className="px-4 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-50 bg-white disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={allocateSubmitting || maxAllocatable <= 0}
+                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                  >
+                    {allocateSubmitting ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Allocating...
+                      </>
+                    ) : (
+                      <>
+                        <ArrowRight className="w-3.5 h-3.5" /> Allocate Stock
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };
+
+// Local icons
+const AlertCircleIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+  </svg>
+);
+
+const MapPinIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" />
+  </svg>
+);
 
 export default PurchaseInvoicePage;
