@@ -133,7 +133,7 @@ const PurchaseInvoicePage: React.FC = () => {
         getSkusV2(selectedCompany?._id || ''),
         getWarehouseHierarchyV2(selectedCompany?._id || '')
       ]);
-      const vendorList = vendorRes && (vendorRes as any).parties ? (vendorRes as any).parties : (Array.isArray(vendorRes) ? vendorRes : []);
+      const vendorList = vendorRes?.data?.parties || (Array.isArray(vendorRes?.data) ? vendorRes.data : []);
       setVendors(vendorList);
       setSkus(skuRes);
       setLocations(locRes);
