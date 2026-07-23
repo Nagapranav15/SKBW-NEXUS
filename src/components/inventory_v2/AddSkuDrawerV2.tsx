@@ -152,27 +152,30 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ companyId, editSku, onC
   // Compile Sku Name dynamically from other inputs
   useEffect(() => {
     if (!isNameManuallyEdited && !editSku) {
-      if (form.category === 'Finished Goods') {
+      if (form.category === 'Raw Material') {
+        if (!form.brand && !form.gsm && !form.width && !form.length) {
+          setForm(prev => ({ ...prev, name: '' }));
+          return;
+        }
         const parts = [];
-        if (form.pages) {
-          parts.push(`${form.pages}P`);
-        }
-        if (form.brand) {
-          parts.push(form.brand);
-        }
-        if (form.ruleType) {
-          parts.push(`(${form.ruleType})`);
-        }
-        setForm(prev => ({ ...prev, name: parts.join(' ') }));
-      } else {
-        const parts = [];
-        if (form.category) parts.push(form.category);
-        if (form.paperType && form.paperType !== 'None') parts.push(form.paperType);
-        if (form.ruleType) parts.push(form.ruleType);
+        if (form.brand) parts.push(form.brand);
+        const formatType = form.paperType === 'Reels' ? 'Reel' : form.paperType === 'Sheets' ? 'Sheet' : '';
+        if (formatType) parts.push(formatType);
         if (form.gsm) parts.push(`${form.gsm}GSM`);
         if (form.width && form.length) parts.push(`${form.width}x${form.length}CM`);
-        if (form.unit) parts.push(`(${form.unit})`);
         setForm(prev => ({ ...prev, name: parts.join(' ') }));
+      } else if (form.category === 'Finished Goods') {
+        if (!form.pages && !form.brand && !form.ruleType) {
+          setForm(prev => ({ ...prev, name: '' }));
+          return;
+        }
+        const parts = [];
+        if (form.pages) parts.push(`${form.pages}P`);
+        if (form.brand) parts.push(form.brand);
+        if (form.ruleType) parts.push(`(${form.ruleType})`);
+        setForm(prev => ({ ...prev, name: parts.join(' ') }));
+      } else {
+        setForm(prev => ({ ...prev, name: '' }));
       }
     }
   }, [form.category, form.paperType, form.ruleType, form.gsm, form.width, form.length, form.unit, form.pages, form.brand, isNameManuallyEdited, editSku]);
@@ -281,10 +284,16 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ companyId, editSku, onC
                 <select
                   value={form.category}
                   onChange={e => {
-                    if (e.target.value === '__ADD_NEW__') {
+                    const val = e.target.value;
+                    if (val === '__ADD_NEW__') {
                       handleAddNewOption('categories');
                     } else {
-                      setForm({ ...form, category: e.target.value });
+                      setForm(prev => ({
+                        ...prev,
+                        category: val,
+                        paperType: val === 'Raw Material' ? 'Reels' : 'None',
+                        ruleType: val === 'Raw Material' ? '' : prev.ruleType
+                      }));
                     }
                   }}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
@@ -296,45 +305,36 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ companyId, editSku, onC
                 </select>
               </div>
 
-              {/* Reels vs Sheets Radio Selector */}
-              <div className="col-span-2 bg-gray-50/50 p-3 rounded-xl border border-gray-100 flex items-center justify-between">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Format Category</span>
-                <div className="flex items-center gap-4">
-                  <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
-                    <input
-                      type="radio"
-                      name="paperType"
-                      value="None"
-                      checked={form.paperType === 'None'}
-                      onChange={() => setForm({ ...form, paperType: 'None' })}
-                      className="text-blue-600 focus:ring-blue-500"
-                    />
-                    None
-                  </label>
-                  <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
-                    <input
-                      type="radio"
-                      name="paperType"
-                      value="Reels"
-                      checked={form.paperType === 'Reels'}
-                      onChange={() => setForm({ ...form, paperType: 'Reels' })}
-                      className="text-blue-600 focus:ring-blue-500"
-                    />
-                    Reels
-                  </label>
-                  <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
-                    <input
-                      type="radio"
-                      name="paperType"
-                      value="Sheets"
-                      checked={form.paperType === 'Sheets'}
-                      onChange={() => setForm({ ...form, paperType: 'Sheets' })}
-                      className="text-blue-600 focus:ring-blue-500"
-                    />
-                    Sheets
-                  </label>
+              {/* Reels vs Sheets Radio Selector (Only for Raw Materials) */}
+              {form.category === 'Raw Material' && (
+                <div className="col-span-2 bg-gray-50/50 p-3 rounded-xl border border-gray-100 flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Format Category</span>
+                  <div className="flex items-center gap-4">
+                    <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
+                      <input
+                        type="radio"
+                        name="paperType"
+                        value="Reels"
+                        checked={form.paperType === 'Reels'}
+                        onChange={() => setForm({ ...form, paperType: 'Reels' })}
+                        className="text-blue-600 focus:ring-blue-500"
+                      />
+                      Reels
+                    </label>
+                    <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
+                      <input
+                        type="radio"
+                        name="paperType"
+                        value="Sheets"
+                        checked={form.paperType === 'Sheets'}
+                        onChange={() => setForm({ ...form, paperType: 'Sheets' })}
+                        className="text-blue-600 focus:ring-blue-500"
+                      />
+                      Sheets
+                    </label>
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="col-span-2">
                 <div className="flex items-center justify-between mb-1">
@@ -438,25 +438,27 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ companyId, editSku, onC
                   <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
                 </select>
               </div>
-              <div>
-                <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Rule Type</label>
-                <select
-                  value={form.ruleType}
-                  onChange={e => {
-                    if (e.target.value === '__ADD_NEW__') {
-                      handleAddNewOption('ruleTypes');
-                    } else {
-                      setForm({ ...form, ruleType: e.target.value });
-                    }
-                  }}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
-                >
-                  {ruleTypesList.map(rule => (
-                    <option key={rule} value={rule}>{rule}</option>
-                  ))}
-                  <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
-                </select>
-              </div>
+              {form.category !== 'Raw Material' && (
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Rule Type</label>
+                  <select
+                    value={form.ruleType}
+                    onChange={e => {
+                      if (e.target.value === '__ADD_NEW__') {
+                        handleAddNewOption('ruleTypes');
+                      } else {
+                        setForm({ ...form, ruleType: e.target.value });
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                  >
+                    {ruleTypesList.map(rule => (
+                      <option key={rule} value={rule}>{rule}</option>
+                    ))}
+                    <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
+                  </select>
+                </div>
+              )}
               {form.category === 'Finished Goods' && (
                 <>
                   <div>
