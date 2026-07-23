@@ -71,7 +71,8 @@ const PurchaseInvoicePage: React.FC = () => {
         reelsCount: '',
         quantity: '', 
         purchasePrice: '', 
-        lotNumber: ''
+        lotNumber: '',
+        reels: [] as any[]
       }
     ]
   });
@@ -215,7 +216,7 @@ const PurchaseInvoicePage: React.FC = () => {
       ...invoiceForm,
       items: [
         ...invoiceForm.items,
-        { skuId: '', brand: '', gsm: '', width: '', reelsCount: '', quantity: '', purchasePrice: '', lotNumber: '' }
+        { skuId: '', brand: '', gsm: '', width: '', reelsCount: '', quantity: '', purchasePrice: '', lotNumber: '', reels: [] as any[] }
       ]
     });
   };
@@ -241,9 +242,44 @@ const PurchaseInvoicePage: React.FC = () => {
         item.width = String(selectedSku.width || '');
       }
     }
+
+    if (field === 'reelsCount') {
+      const count = Number(value) || 0;
+      const currentReels = item.reels || [];
+      const newReels = [...currentReels];
+      if (newReels.length < count) {
+        while (newReels.length < count) {
+          newReels.push({ weight: 0 });
+        }
+      } else if (newReels.length > count) {
+        newReels.length = count;
+      }
+      item.reels = newReels;
+
+      // Auto-compute total quantity if there are reel weights set
+      const sum = newReels.reduce((sum, r) => sum + (r.weight || 0), 0);
+      if (sum > 0) {
+        item.quantity = String(sum);
+      }
+    }
     
     updated[idx] = item;
     setInvoiceForm({ ...invoiceForm, items: updated });
+  };
+
+  const handleReelWeightChange = (itemIdx: number, reelIdx: number, weightVal: string) => {
+    const updatedItems = [...invoiceForm.items];
+    const item = { ...updatedItems[itemIdx] };
+    const reels = [...(item.reels || [])];
+    
+    reels[reelIdx] = { ...reels[reelIdx], weight: Number(weightVal) || 0 };
+    item.reels = reels;
+
+    const sum = reels.reduce((acc, r) => acc + (r.weight || 0), 0);
+    item.quantity = String(sum);
+
+    updatedItems[itemIdx] = item;
+    setInvoiceForm({ ...invoiceForm, items: updatedItems });
   };
 
   // Submit Invoice Creation
@@ -284,13 +320,17 @@ const PurchaseInvoicePage: React.FC = () => {
 
       // Generate reels log array dynamically based on count
       const reelsArray = [];
-      const weightPerReel = reelsCount > 0 ? Number((qty / reelsCount).toFixed(2)) : 0;
+      const itemReels = item.reels || [];
       for (let r = 0; r < reelsCount; r++) {
+        const reelWeight = (itemReels[r] && itemReels[r].weight > 0)
+          ? itemReels[r].weight
+          : (reelsCount > 0 ? Number((qty / reelsCount).toFixed(2)) : 0);
+
         reelsArray.push({
           reelNumber: `${finalInvoiceNumber}-R${r + 1}`,
           gsm: Number(item.gsm) || 0,
           width: Number(item.width) || 0,
-          weight: weightPerReel
+          weight: reelWeight
         });
       }
 
@@ -606,89 +646,117 @@ const PurchaseInvoicePage: React.FC = () => {
                     </thead>
                     <tbody className="divide-y divide-gray-50 text-gray-800 font-semibold">
                       {invoiceForm.items.map((item, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50/20">
-                          <td className="py-2 px-2 text-gray-400 font-mono text-[10px]">{idx + 1}</td>
-                          <td className="py-2 px-2">
-                            <select
-                              value={item.skuId}
-                              onChange={e => handleItemRowChange(idx, 'skuId', e.target.value)}
-                              className="w-full px-2 py-1 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 text-xs font-semibold"
-                              required
-                            >
-                              <option value="">Select SKU</option>
-                              {skus.map(s => (
-                                <option key={s._id} value={s._id}>{s.name}</option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="py-2 px-2">
-                            <input
-                              type="text"
-                              value={item.brand}
-                              onChange={e => handleItemRowChange(idx, 'brand', e.target.value)}
-                              className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs"
-                            />
-                          </td>
-                          <td className="py-2 px-2">
-                            <input
-                              type="number"
-                              value={item.gsm}
-                              onChange={e => handleItemRowChange(idx, 'gsm', e.target.value)}
-                              className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-center"
-                            />
-                          </td>
-                          <td className="py-2 px-2">
-                            <input
-                              type="number"
-                              value={item.width}
-                              onChange={e => handleItemRowChange(idx, 'width', e.target.value)}
-                              className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-center"
-                            />
-                          </td>
-                          <td className="py-2 px-2">
-                            <input
-                              type="number"
-                              value={item.reelsCount}
-                              onChange={e => handleItemRowChange(idx, 'reelsCount', e.target.value)}
-                              className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-center"
-                              placeholder="0"
-                            />
-                          </td>
-                          <td className="py-2 px-2">
-                            <input
-                              type="number"
-                              value={item.quantity}
-                              onChange={e => handleItemRowChange(idx, 'quantity', e.target.value)}
-                              className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-right font-black"
-                              placeholder="0"
-                              required
-                            />
-                          </td>
-                          <td className="py-2 px-2">
-                            <input
-                              type="number"
-                              value={item.purchasePrice}
-                              onChange={e => handleItemRowChange(idx, 'purchasePrice', e.target.value)}
-                              className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-right"
-                              placeholder="0.00"
-                              required
-                            />
-                          </td>
-                          <td className="py-2 px-2 text-right font-mono font-black text-gray-900 text-xs">
-                            ₹{((Number(item.quantity) || 0) * (Number(item.purchasePrice) || 0)).toLocaleString('en-IN')}
-                          </td>
-                          <td className="py-2 px-2 text-center">
-                            {invoiceForm.items.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveItemRow(idx)}
-                                className="text-red-500 hover:text-red-700 p-1 border rounded bg-white hover:bg-red-50"
+                        <React.Fragment key={idx}>
+                          <tr className="hover:bg-gray-50/20">
+                            <td className="py-2 px-2 text-gray-400 font-mono text-[10px]">{idx + 1}</td>
+                            <td className="py-2 px-2">
+                              <select
+                                value={item.skuId}
+                                onChange={e => handleItemRowChange(idx, 'skuId', e.target.value)}
+                                className="w-full px-2 py-1 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 text-xs font-semibold"
+                                required
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </td>
-                        </tr>
+                                <option value="">Select SKU</option>
+                                {skus.map(s => (
+                                  <option key={s._id} value={s._id}>{s.name}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="py-2 px-2">
+                              <input
+                                type="text"
+                                value={item.brand}
+                                onChange={e => handleItemRowChange(idx, 'brand', e.target.value)}
+                                className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs"
+                              />
+                            </td>
+                            <td className="py-2 px-2">
+                              <input
+                                type="number"
+                                value={item.gsm}
+                                onChange={e => handleItemRowChange(idx, 'gsm', e.target.value)}
+                                className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-center"
+                              />
+                            </td>
+                            <td className="py-2 px-2">
+                              <input
+                                type="number"
+                                value={item.width}
+                                onChange={e => handleItemRowChange(idx, 'width', e.target.value)}
+                                className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-center"
+                              />
+                            </td>
+                            <td className="py-2 px-2">
+                              <input
+                                type="number"
+                                value={item.reelsCount}
+                                onChange={e => handleItemRowChange(idx, 'reelsCount', e.target.value)}
+                                className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-center"
+                                placeholder="0"
+                              />
+                            </td>
+                            <td className="py-2 px-2">
+                              <input
+                                type="number"
+                                value={item.quantity}
+                                onChange={e => handleItemRowChange(idx, 'quantity', e.target.value)}
+                                className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-right font-black"
+                                placeholder="0"
+                                required
+                              />
+                            </td>
+                            <td className="py-2 px-2">
+                              <input
+                                type="number"
+                                value={item.purchasePrice}
+                                onChange={e => handleItemRowChange(idx, 'purchasePrice', e.target.value)}
+                                className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-right"
+                                placeholder="0.00"
+                                required
+                              />
+                            </td>
+                            <td className="py-2 px-2 text-right font-mono font-black text-gray-900 text-xs">
+                              ₹{((Number(item.quantity) || 0) * (Number(item.purchasePrice) || 0)).toLocaleString('en-IN')}
+                            </td>
+                            <td className="py-2 px-2 text-center">
+                              {invoiceForm.items.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveItemRow(idx)}
+                                  className="text-red-500 hover:text-red-700 p-1 border rounded bg-white hover:bg-red-50"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                          
+                          {Number(item.reelsCount) > 0 && (
+                            <tr className="bg-blue-50/5 hover:bg-blue-50/10">
+                              <td />
+                              <td colSpan={9} className="px-3 py-2.5 border-t border-b border-blue-50/30">
+                                <div className="flex flex-wrap items-center gap-3">
+                                  <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Reel Weights (KG):</span>
+                                  {Array.from({ length: Number(item.reelsCount) }).map((_, rIdx) => {
+                                    const reel = (item.reels || [])[rIdx] || { weight: 0 };
+                                    return (
+                                      <div key={rIdx} className="flex items-center gap-1.5 bg-white px-2 py-1 border border-gray-100 rounded-lg shadow-3xs">
+                                        <span className="text-[9px] text-gray-400 font-mono font-bold">R{rIdx + 1}:</span>
+                                        <input
+                                          type="number"
+                                          value={reel.weight || ''}
+                                          onChange={e => handleReelWeightChange(idx, rIdx, e.target.value)}
+                                          placeholder="0"
+                                          className="w-14 px-1.5 py-0.5 border border-gray-200 rounded text-center text-xs font-mono font-semibold text-gray-800 focus:ring-1 focus:ring-blue-500 bg-white"
+                                        />
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
                       ))}
                     </tbody>
                   </table>
