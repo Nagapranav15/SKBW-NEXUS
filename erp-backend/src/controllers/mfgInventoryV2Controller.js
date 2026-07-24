@@ -48,7 +48,7 @@ exports.getSkus = async (req, res, next) => {
 
 exports.createSku = async (req, res, next) => {
   try {
-    const { skuCode, name, category, unit, altUnit, altUnitConversion, paperType, gsm, width, length, brand, ruleType, pages, booksGbl, status, company } = req.body;
+    const { skuCode, name, category, unit, altUnit, altUnitConversion, paperType, gsm, width, length, brand, title, ruleType, pages, booksGbl, status, company } = req.body;
     if (!company) {
       return res.status(400).json({ msg: "company is required" });
     }
@@ -70,6 +70,7 @@ exports.createSku = async (req, res, next) => {
       width: width ? Number(width) : undefined,
       length: length ? Number(length) : undefined,
       brand,
+      title: title || "",
       ruleType,
       pages: pages ? Number(pages) : undefined,
       booksGbl: booksGbl ? Number(booksGbl) : undefined,
@@ -88,7 +89,7 @@ exports.createSku = async (req, res, next) => {
 exports.updateSku = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { skuCode, name, category, unit, altUnit, altUnitConversion, paperType, gsm, width, length, brand, ruleType, pages, booksGbl, status, company } = req.body;
+    const { skuCode, name, category, unit, altUnit, altUnitConversion, paperType, gsm, width, length, brand, title, ruleType, pages, booksGbl, status, company } = req.body;
     
     if (!company) {
       return res.status(400).json({ msg: "company is required" });
@@ -119,6 +120,7 @@ exports.updateSku = async (req, res, next) => {
     sku.width = width ? Number(width) : undefined;
     sku.length = length ? Number(length) : undefined;
     sku.brand = brand || "";
+    sku.title = title || "";
     sku.ruleType = ruleType;
     sku.pages = pages ? Number(pages) : undefined;
     sku.booksGbl = booksGbl ? Number(booksGbl) : undefined;
@@ -1166,7 +1168,7 @@ exports.getMetadata = async (req, res, next) => {
 
 exports.updateMetadata = async (req, res, next) => {
   try {
-    const { companyId, units, categories, ruleTypes } = req.body;
+    const { companyId, units, categories, ruleTypes, categoryFields } = req.body;
     if (!companyId) {
       return res.status(400).json({ msg: "companyId is required" });
     }
@@ -1178,6 +1180,7 @@ exports.updateMetadata = async (req, res, next) => {
     if (units) doc.units = units;
     if (categories) doc.categories = categories;
     if (ruleTypes) doc.ruleTypes = ruleTypes;
+    if (categoryFields) doc.categoryFields = categoryFields;
     await doc.save();
     res.json(doc);
   } catch (err) {

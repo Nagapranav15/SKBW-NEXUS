@@ -23,6 +23,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
     width: '',
     length: '',
     brand: '',
+    title: '',
     ruleType: 'Plain',
     pages: '',
     booksGbl: '',
@@ -37,20 +38,30 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Brand searchable dropdown states
+  // Brand searchable dropdown lists (separated for Finished Goods vs Raw Materials)
   const [existingBrands, setExistingBrands] = useState<string[]>([]);
+  const [fgBrandsList, setFgBrandsList] = useState<string[]>([]);
   const [brandSearch, setBrandSearch] = useState('');
   const [showBrandDropdown, setShowBrandDropdown] = useState(false);
 
-  // Custom Options Modal Popup state (Replacing browser prompt dialogs)
+  // Category specific field visibility mapping
+  const [categoryFieldsMap, setCategoryFieldsMap] = useState<Record<string, string[]>>({
+    "Raw Material": ["gsm", "brand", "title", "dimensions", "paperType"],
+    "Semi Finished": ["gsm", "brand", "dimensions", "ruleType", "altUnit"],
+    "Finished Goods": ["gsm", "brand", "dimensions", "ruleType", "pages", "booksGbl", "altUnit"]
+  });
+
+  // Custom Options Modal Popup state
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
     type: 'categories' | 'units' | 'ruleTypes' | null;
     nameValue: string;
+    selectedFields: string[];
   }>({
     isOpen: false,
     type: null,
-    nameValue: ''
+    nameValue: '',
+    selectedFields: ['brand', 'gsm', 'dimensions']
   });
 
   // Load custom metadata lists & brands from database
@@ -68,6 +79,10 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
         if (data.categories?.length) setCategoriesList(data.categories);
         if (data.units?.length) setUnitsList(data.units);
         if (data.ruleTypes?.length) setRuleTypesList(data.ruleTypes);
+        if (data.categoryFields) {
+          // If returned as Map structure or nested record
+          setCategoryFieldsMap(data.categoryFields);
+        }
       }
     } catch (e) {
       console.error('Failed to load dynamic options metadata', e);
@@ -77,12 +92,20 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
   const loadExistingBrands = async () => {
     try {
       const skus = await getSkusV2(companyId);
-      const brands = Array.from(new Set(
-        skus
-          .map(s => s.brand)
-          .filter((b): b is string => !!b && typeof b === 'string' && b.trim() !== '')
-      ));
-      setExistingBrands(brands);
+      
+      // Filter brands based on category
+      const fgBrands = skus
+        .filter(s => s.category === 'Finished Goods')
+        .map(s => s.brand)
+        .filter((b): b is string => !!b && typeof b === 'string' && b.trim() !== '');
+        
+      const rawBrands = skus
+        .filter(s => s.category === 'Raw Material')
+        .map(s => s.brand)
+        .filter((b): b is string => !!b && typeof b === 'string' && b.trim() !== '');
+
+      setFgBrandsList(Array.from(new Set(fgBrands)));
+      setExistingBrands(Array.from(new Set(rawBrands)));
     } catch (e) {
       console.error('Failed to load existing brands', e);
     }
@@ -92,7 +115,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
     setModalConfig({
       isOpen: true,
       type: field,
-      nameValue: ''
+      nameValue: '',
+      selectedFields: field === 'categories' ? ['brand', 'gsm', 'dimensions'] : []
     });
   };
 
@@ -105,12 +129,15 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
       let updatedCategories = [...categoriesList];
       let updatedUnits = [...unitsList];
       let updatedRuleTypes = [...ruleTypesList];
+      let updatedFieldsMap = { ...categoryFieldsMap };
 
       if (field === 'categories') {
         if (!updatedCategories.includes(cleanVal)) {
           updatedCategories.push(cleanVal);
           setCategoriesList(updatedCategories);
         }
+        updatedFieldsMap[cleanVal] = modalConfig.selectedFields;
+        setCategoryFieldsMap(updatedFieldsMap);
         setForm(prev => ({ ...prev, category: cleanVal }));
       } else if (field === 'units') {
         if (!updatedUnits.includes(cleanVal)) {
@@ -130,10 +157,11 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
         companyId,
         categories: updatedCategories,
         units: updatedUnits,
-        ruleTypes: updatedRuleTypes
+        ruleTypes: updatedRuleTypes,
+        categoryFields: updatedFieldsMap
       });
 
-      setModalConfig({ isOpen: false, type: null, nameValue: '' });
+      setModalConfig({ isOpen: false, type: null, nameValue: '', selectedFields: [] });
     } catch (e) {
       console.error(e);
       alert('Failed to save dynamic option to settings database.');
@@ -154,12 +182,13 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
         category: editSku.category || 'Raw Material',
         paperType: editSku.paperType || 'None',
         unit: editSku.unit || 'kg',
-        altUnit: (editSku as any).altUnit || '',
-        altUnitConversion: (editSku as any).altUnitConversion !== undefined ? String((editSku as any).altUnitConversion) : '',
+        altUnit: editSku.altUnit || '',
+        altUnitConversion: editSku.altUnitConversion !== undefined ? String(editSku.altUnitConversion) : '',
         gsm: editSku.gsm !== undefined ? String(editSku.gsm) : '',
         width: editSku.width !== undefined ? String(editSku.width) : '',
         length: editSku.length !== undefined ? String(editSku.length) : '',
         brand: editSku.brand || '',
+        title: editSku.title || '',
         ruleType: editSku.ruleType || 'Plain',
         pages: (editSku as any).pages !== undefined ? String((editSku as any).pages) : '',
         booksGbl: (editSku as any).booksGbl !== undefined ? String((editSku as any).booksGbl) : '',
@@ -179,6 +208,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
         width: '',
         length: '',
         brand: '',
+        title: '',
         ruleType: 'Plain',
         pages: '',
         booksGbl: '',
@@ -188,346 +218,441 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
     }
   }, [editSku, isOpen]);
 
+  // Load custom metadata lists & brands from database
+  useEffect(() => {
+    if (companyId) {
+      loadMetadata();
+      loadExistingBrands();
+    }
+  }, [companyId]);
+
+  const activeFields = categoryFieldsMap[form.category] || ['brand', 'gsm', 'dimensions'];
+
   // Auto-generate SKU Code
   useEffect(() => {
-    if (!editSku && !form.skuCode) {
-      regenerateSkuCode();
-    }
-  }, [form.category, editSku]);
-
-  const regenerateSkuCode = () => {
-    const prefix = form.category === 'Raw Material' ? 'RM' : form.category === 'Semi Finished' ? 'SF' : 'FG';
-    const rand = Math.floor(10000 + Math.random() * 90000);
-    setForm(prev => ({ ...prev, skuCode: `${prefix}-${rand}` }));
-  };
-
-  // Compile Sku Name dynamically from other inputs
-  useEffect(() => {
-    if (!isNameManuallyEdited && !editSku) {
-      if (form.category === 'Raw Material') {
-        if (!form.brand && !form.gsm && !form.width && !form.length) {
-          setForm(prev => ({ ...prev, name: '' }));
-          return;
-        }
-        const parts = [];
-        if (form.brand) parts.push(form.brand);
-        const formatType = form.paperType === 'Reels' ? 'Reel' : form.paperType === 'Sheets' ? 'Sheet' : '';
-        if (formatType) parts.push(formatType);
-        if (form.gsm) parts.push(`${form.gsm}GSM`);
-        if (form.width && form.length) parts.push(`${form.width}x${form.length}CM`);
-        setForm(prev => ({ ...prev, name: parts.join(' ') }));
-      } else if (form.category === 'Finished Goods') {
-        if (!form.pages && !form.brand && !form.ruleType) {
-          setForm(prev => ({ ...prev, name: '' }));
-          return;
-        }
-        const parts = [];
-        if (form.pages) parts.push(`${form.pages}P`);
-        if (form.brand) parts.push(form.brand);
-        if (form.ruleType) parts.push(`(${form.ruleType})`);
-        setForm(prev => ({ ...prev, name: parts.join(' ') }));
-      } else {
-        setForm(prev => ({ ...prev, name: '' }));
+      if (!editSku && !form.skuCode) {
+        regenerateSkuCode();
       }
-    }
-  }, [form.category, form.paperType, form.ruleType, form.gsm, form.width, form.length, form.unit, form.pages, form.brand, isNameManuallyEdited, editSku]);
+    }, [form.category, editSku]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.skuCode.trim() || !form.name.trim()) {
-      setErrorMsg('SKU Code and SKU Name are required');
-      return;
-    }
-    setErrorMsg('');
-    setIsSaving(true);
-    try {
-      const isSemiOrFinished = form.category === 'Semi Finished' || form.category === 'Finished Goods';
-      const payload = {
-        ...form,
-        pages: form.pages ? Number(form.pages) : undefined,
-        booksGbl: form.booksGbl ? Number(form.booksGbl) : undefined,
-        altUnit: isSemiOrFinished ? (form.altUnit || undefined) : undefined,
-        altUnitConversion: (isSemiOrFinished && form.altUnit) ? (form.altUnitConversion ? Number(form.altUnitConversion) : undefined) : undefined,
-        company: companyId
-      };
+    const regenerateSkuCode = () => {
+      const prefix = form.category === 'Raw Material' ? 'RM' : form.category === 'Semi Finished' ? 'SF' : 'FG';
+      const rand = Math.floor(10000 + Math.random() * 90000);
+      setForm(prev => ({ ...prev, skuCode: `${prefix}-${rand}` }));
+    };
 
-      let saved;
-      if (editSku?._id) {
-        saved = await updateSkuV2(editSku._id, payload);
-      } else {
-        saved = await createSkuV2(payload);
+    // Compile Sku Name dynamically from other inputs
+    useEffect(() => {
+      if (!isNameManuallyEdited && !editSku) {
+        if (form.category === 'Raw Material') {
+          if (!form.brand && !form.title && !form.gsm && !form.width && !form.length) {
+            setForm(prev => ({ ...prev, name: '' }));
+            return;
+          }
+          const parts = [];
+          if (form.brand) parts.push(form.brand);
+          if (form.title) parts.push(form.title);
+          const formatType = form.paperType === 'Reels' ? 'Reel' : form.paperType === 'Sheets' ? 'Sheet' : '';
+          if (formatType) parts.push(formatType);
+          if (form.gsm) parts.push(`${form.gsm}GSM`);
+          if (form.width && form.length) parts.push(`${form.width}x${form.length}CM`);
+          setForm(prev => ({ ...prev, name: parts.join(' ') }));
+        } else if (form.category === 'Finished Goods') {
+          if (!form.pages && !form.brand && !form.ruleType) {
+            setForm(prev => ({ ...prev, name: '' }));
+            return;
+          }
+          const parts = [];
+          if (form.pages) parts.push(`${form.pages}P`);
+          if (form.brand) parts.push(form.brand);
+          if (form.ruleType) parts.push(`(${form.ruleType})`);
+          setForm(prev => ({ ...prev, name: parts.join(' ') }));
+        } else {
+          const active = categoryFieldsMap[form.category] || [];
+          const parts = [];
+          if (active.includes('brand') && form.brand) parts.push(form.brand);
+          if (active.includes('title') && form.title) parts.push(form.title);
+          if (active.includes('gsm') && form.gsm) parts.push(`${form.gsm}GSM`);
+          if (active.includes('dimensions') && form.width && form.length) parts.push(`${form.width}x${form.length}CM`);
+          if (parts.length > 0) {
+            setForm(prev => ({ ...prev, name: parts.join(' ') }));
+          } else {
+            setForm(prev => ({ ...prev, name: '' }));
+          }
+        }
       }
-      onSaveSuccess(saved);
-    } catch (err: any) {
-      console.error(err);
-      setErrorMsg(err.response?.data?.msg || 'Failed to save SKU');
-    } finally {
-      setIsSaving(false);
-    }
-  };
+    }, [form.category, form.paperType, form.ruleType, form.gsm, form.width, form.length, form.unit, form.pages, form.brand, form.title, isNameManuallyEdited, editSku, categoryFieldsMap]);
 
-  if (!isOpen) return null;
+    const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!form.skuCode.trim() || !form.name.trim()) {
+        setErrorMsg('SKU Code and SKU Name are required');
+        return;
+      }
+      setErrorMsg('');
+      setIsSaving(true);
+      try {
+        const isSemiOrFinished = form.category === 'Semi Finished' || form.category === 'Finished Goods';
+        const payload = {
+          ...form,
+          pages: form.pages ? Number(form.pages) : undefined,
+          booksGbl: form.booksGbl ? Number(form.booksGbl) : undefined,
+          altUnit: isSemiOrFinished ? (form.altUnit || undefined) : undefined,
+          altUnitConversion: (isSemiOrFinished && form.altUnit) ? (form.altUnitConversion ? Number(form.altUnitConversion) : undefined) : undefined,
+          company: companyId
+        };
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
-      {/* Background Overlay */}
-      <div 
-        className="fixed inset-0 bg-black/40 backdrop-blur-3xs transition-opacity animate-in fade-in duration-200"
-        onClick={onClose}
-      />
+        let saved;
+        if (editSku?._id) {
+          saved = await updateSkuV2(editSku._id, payload);
+        } else {
+          saved = await createSkuV2(payload);
+        }
+        onSaveSuccess(saved);
+      } catch (err: any) {
+        console.error(err);
+        setErrorMsg(err.response?.data?.msg || 'Failed to save SKU');
+      } finally {
+        setIsSaving(false);
+      }
+    };
 
-      {/* Drawer Container */}
-      <div className="relative w-full max-w-lg bg-white shadow-2xl h-full flex flex-col z-10 animate-in slide-in-from-right duration-250 font-sans text-xs">
-        {/* Header */}
-        <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-bold text-gray-900">
-              {editSku ? 'Edit SKU Item' : 'Add New SKU Item'}
-            </h2>
-            <p className="text-[10px] text-gray-500 mt-0.5">
-              {editSku ? 'Modify SKU specifications and values' : 'Register a new manufacturing inventory SKU item'}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+    if (!isOpen) return null;
 
-        {/* Scrollable Form Body */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-6">
-          {errorMsg && (
-            <div className="p-3 bg-red-50 border border-red-150 rounded-xl text-xs font-semibold text-red-700">
-              {errorMsg}
+    return (
+      <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
+        {/* Background Overlay */}
+        <div 
+          className="fixed inset-0 bg-black/40 backdrop-blur-3xs transition-opacity animate-in fade-in duration-200"
+          onClick={onClose}
+        />
+
+        {/* Drawer Container */}
+        <div className="relative w-full max-w-lg bg-white shadow-2xl h-full flex flex-col z-10 animate-in slide-in-from-right duration-250 font-sans text-xs">
+          {/* Header */}
+          <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-gray-900">
+                {editSku ? 'Edit SKU Item' : 'Add New SKU Item'}
+              </h2>
+              <p className="text-[10px] text-gray-500 mt-0.5">
+                {editSku ? 'Modify SKU specifications and values' : 'Register a new manufacturing inventory SKU item'}
+              </p>
             </div>
-          )}
-
-          {/* Group 1: General Information */}
-          <div className="space-y-4">
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1.5">
-              General Information
-            </h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2 sm:col-span-1">
-                <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">SKU Code *</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="e.g. RM-REEL-01"
-                    value={form.skuCode}
-                    onChange={e => setForm({ ...form, skuCode: e.target.value.toUpperCase() })}
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
-                    required
-                  />
-                  {!editSku && (
-                    <button
-                      type="button"
-                      onClick={regenerateSkuCode}
-                      className="px-2.5 py-2 text-xs border border-gray-200 rounded-lg font-semibold bg-gray-50 hover:bg-gray-100 text-gray-700 transition-colors"
-                      title="Re-generate SKU Code"
-                    >
-                      Regen
-                    </button>
-                  )}
-                </div>
-              </div>
-              <div className="col-span-2 sm:col-span-1">
-                <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Category *</label>
-                <select
-                  value={form.category}
-                  onChange={e => {
-                    const val = e.target.value;
-                    if (val === '__ADD_NEW__') {
-                      handleAddNewOption('categories');
-                    } else {
-                      setForm(prev => ({
-                        ...prev,
-                        category: val,
-                        paperType: val === 'Raw Material' ? 'Reels' : 'None',
-                        ruleType: val === 'Raw Material' ? '' : prev.ruleType
-                      }));
-                    }
-                  }}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
-                >
-                  {categoriesList.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                  <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
-                </select>
-              </div>
-
-              {/* Reels vs Sheets Radio Selector (Only for Raw Materials) */}
-              {form.category === 'Raw Material' && (
-                <div className="col-span-2 bg-gray-50/50 p-3 rounded-xl border border-gray-100 flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Format Category</span>
-                  <div className="flex items-center gap-4">
-                    <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
-                      <input
-                        type="radio"
-                        name="paperType"
-                        value="Reels"
-                        checked={form.paperType === 'Reels'}
-                        onChange={() => setForm({ ...form, paperType: 'Reels' })}
-                        className="text-blue-600 focus:ring-blue-500"
-                      />
-                      Reels
-                    </label>
-                    <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
-                      <input
-                        type="radio"
-                        name="paperType"
-                        value="Sheets"
-                        checked={form.paperType === 'Sheets'}
-                        onChange={() => setForm({ ...form, paperType: 'Sheets' })}
-                        className="text-blue-600 focus:ring-blue-500"
-                      />
-                      Sheets
-                    </label>
-                  </div>
-                </div>
-              )}
-
-              <div className="col-span-2">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[10px] font-bold text-gray-600 uppercase">SKU Name *</label>
-                  {!editSku && isNameManuallyEdited && (
-                    <button
-                      type="button"
-                      onClick={() => setIsNameManuallyEdited(false)}
-                      className="text-[10px] text-blue-600 font-bold hover:underline"
-                    >
-                      Re-sync auto name
-                    </button>
-                  )}
-                </div>
-                <input
-                  type="text"
-                  placeholder="e.g. Maplitho Paper Reel 70 GSM"
-                  value={form.name}
-                  onChange={e => {
-                    setForm({ ...form, name: e.target.value });
-                    setIsNameManuallyEdited(true);
-                  }}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
-                  required
-                />
-              </div>
-            </div>
+            <button
+              onClick={onClose}
+              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
-          {/* Group 2: Specifications */}
-          <div className="space-y-4">
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1.5">
-              Specifications
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">GSM</label>
-                <input
-                  type="number"
-                  placeholder="e.g. 70"
-                  value={form.gsm}
-                  onChange={e => setForm({ ...form, gsm: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
-                />
+          {/* Scrollable Form Body */}
+          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-6">
+            {errorMsg && (
+              <div className="p-3 bg-red-50 border border-red-150 rounded-xl text-xs font-semibold text-red-700">
+                {errorMsg}
               </div>
-              <div>
-                <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Brand</label>
-                {form.category === 'Finished Goods' ? (
-                  <div className="relative">
+            )}
+
+            {/* Group 1: General Information */}
+            <div className="space-y-4">
+              <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1.5">
+                General Information
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">SKU Code *</label>
+                  <div className="flex gap-2">
                     <input
                       type="text"
-                      placeholder="Search or type brand..."
-                      value={brandSearch}
-                      onChange={e => {
-                        setBrandSearch(e.target.value);
-                        setForm(prev => ({ ...prev, brand: e.target.value }));
-                      }}
-                      onFocus={() => setShowBrandDropdown(true)}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                      placeholder="e.g. RM-REEL-01"
+                      value={form.skuCode}
+                      onChange={e => setForm({ ...form, skuCode: e.target.value.toUpperCase() })}
+                      className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                      required
                     />
-                    {showBrandDropdown && (
-                      <>
-                        <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-20 divide-y divide-gray-50">
-                          {existingBrands
-                            .filter(b => b.toLowerCase().includes(brandSearch.toLowerCase()))
-                            .map(b => (
-                              <button
-                                key={b}
-                                type="button"
-                                onClick={() => {
-                                  setForm(prev => ({ ...prev, brand: b }));
-                                  setBrandSearch(b);
-                                  setShowBrandDropdown(false);
-                                }}
-                                className="w-full px-3 py-2 text-left text-xs hover:bg-blue-50 hover:text-blue-600 transition-colors font-semibold text-gray-700 block"
-                              >
-                                {b}
-                              </button>
-                            ))
-                          }
-                          {brandSearch.trim() && !existingBrands.some(b => b.toLowerCase() === brandSearch.toLowerCase()) && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newBrand = brandSearch.trim();
-                                if (!existingBrands.includes(newBrand)) {
-                                  setExistingBrands(prev => [...prev, newBrand]);
-                                }
-                                setForm(prev => ({ ...prev, brand: newBrand }));
-                                setShowBrandDropdown(false);
-                              }}
-                              className="w-full px-3 py-2 text-left text-xs hover:bg-green-50 text-green-600 font-bold transition-colors block"
-                            >
-                              + Add Brand "{brandSearch.trim()}"
-                            </button>
-                          )}
-                          {existingBrands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase())).length === 0 && !brandSearch.trim() && (
-                            <div className="px-3 py-2 text-xs text-gray-400 italic">No brands found</div>
-                          )}
-                        </div>
-                        <div 
-                          className="fixed inset-0 z-10" 
-                          onClick={() => setShowBrandDropdown(false)} 
-                        />
-                      </>
+                    {!editSku && (
+                      <button
+                        type="button"
+                        onClick={regenerateSkuCode}
+                        className="px-2.5 py-2 text-xs border border-gray-200 rounded-lg font-semibold bg-gray-50 hover:bg-gray-100 text-gray-700 transition-colors"
+                        title="Re-generate SKU Code"
+                      >
+                        Regen
+                      </button>
                     )}
                   </div>
-                ) : (
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Category *</label>
+                  <select
+                    value={form.category}
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (val === '__ADD_NEW__') {
+                        handleAddNewOption('categories');
+                      } else {
+                        setForm(prev => ({
+                          ...prev,
+                          category: val,
+                          paperType: val === 'Raw Material' ? 'Reels' : 'None',
+                          ruleType: val === 'Raw Material' ? '' : prev.ruleType
+                        }));
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                  >
+                    {categoriesList.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                    <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
+                  </select>
+                </div>
+
+                {/* Reels vs Sheets Radio Selector */}
+                {activeFields.includes('paperType') && (
+                  <div className="col-span-2 bg-gray-50/50 p-3 rounded-xl border border-gray-100 flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Format Category</span>
+                    <div className="flex items-center gap-4">
+                      <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
+                        <input
+                          type="radio"
+                          name="paperType"
+                          value="Reels"
+                          checked={form.paperType === 'Reels'}
+                          onChange={() => setForm({ ...form, paperType: 'Reels' })}
+                          className="text-blue-600 focus:ring-blue-500"
+                        />
+                        Reels
+                      </label>
+                      <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
+                        <input
+                          type="radio"
+                          name="paperType"
+                          value="Sheets"
+                          checked={form.paperType === 'Sheets'}
+                          onChange={() => setForm({ ...form, paperType: 'Sheets' })}
+                          className="text-blue-600 focus:ring-blue-500"
+                        />
+                        Sheets
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                <div className="col-span-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[10px] font-bold text-gray-600 uppercase">SKU Name *</label>
+                    {!editSku && isNameManuallyEdited && (
+                      <button
+                        type="button"
+                        onClick={() => setIsNameManuallyEdited(false)}
+                        className="text-[10px] text-blue-600 font-bold hover:underline"
+                      >
+                        Re-sync auto name
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="text"
-                    placeholder="e.g. Century / BILT"
-                    value={form.brand}
-                    onChange={e => setForm({ ...form, brand: e.target.value })}
+                    placeholder="e.g. Maplitho Paper Reel 70 GSM"
+                    value={form.name}
+                    onChange={e => {
+                      setForm({ ...form, name: e.target.value });
+                      setIsNameManuallyEdited(true);
+                    }}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                    required
                   />
-                )}
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Width (CM)</label>
-                <input
-                  type="number"
-                  placeholder="e.g. 32"
-                  value={form.width}
-                  onChange={e => setForm({ ...form, width: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Length (CM)</label>
-                <input
-                  type="number"
-                  placeholder="e.g. 44"
-                  value={form.length}
-                  onChange={e => setForm({ ...form, length: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
-                />
+                </div>
               </div>
             </div>
-          </div>
+
+          {/* Group 2: Specifications */}
+          {(activeFields.includes('gsm') || activeFields.includes('brand') || activeFields.includes('title') || activeFields.includes('dimensions')) && (
+            <div className="space-y-4">
+              <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1.5">
+                Specifications
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                {activeFields.includes('gsm') && (
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">GSM</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 70"
+                      value={form.gsm}
+                      onChange={e => setForm({ ...form, gsm: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                    />
+                  </div>
+                )}
+                {activeFields.includes('brand') && (
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Brand</label>
+                    {form.category === 'Finished Goods' ? (
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="Search or type brand..."
+                          value={brandSearch}
+                          onChange={e => {
+                            setBrandSearch(e.target.value);
+                            setForm(prev => ({ ...prev, brand: e.target.value }));
+                          }}
+                          onFocus={() => setShowBrandDropdown(true)}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                        />
+                        {showBrandDropdown && (
+                          <>
+                            <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-20 divide-y divide-gray-50">
+                              {fgBrandsList
+                                .filter(b => b.toLowerCase().includes(brandSearch.toLowerCase()))
+                                .map(b => (
+                                  <button
+                                    key={b}
+                                    type="button"
+                                    onClick={() => {
+                                      setForm(prev => ({ ...prev, brand: b }));
+                                      setBrandSearch(b);
+                                      setShowBrandDropdown(false);
+                                    }}
+                                    className="w-full px-3 py-2 text-left text-xs hover:bg-blue-50 hover:text-blue-600 transition-colors font-semibold text-gray-700 block"
+                                  >
+                                    {b}
+                                  </button>
+                                ))
+                              }
+                              {brandSearch.trim() && !fgBrandsList.some(b => b.toLowerCase() === brandSearch.toLowerCase()) && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newBrand = brandSearch.trim();
+                                    if (!fgBrandsList.includes(newBrand)) {
+                                      setFgBrandsList(prev => [...prev, newBrand]);
+                                    }
+                                    setForm(prev => ({ ...prev, brand: newBrand }));
+                                    setShowBrandDropdown(false);
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-xs hover:bg-green-50 text-green-600 font-bold transition-colors block"
+                                >
+                                  + Add Brand "{brandSearch.trim()}"
+                                </button>
+                              )}
+                              {fgBrandsList.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase())).length === 0 && !brandSearch.trim() && (
+                                <div className="px-3 py-2 text-xs text-gray-400 italic">No brands found</div>
+                              )}
+                            </div>
+                            <div 
+                              className="fixed inset-0 z-10" 
+                              onClick={() => setShowBrandDropdown(false)} 
+                            />
+                          </>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="Search or type brand..."
+                          value={brandSearch}
+                          onChange={e => {
+                            setBrandSearch(e.target.value);
+                            setForm(prev => ({ ...prev, brand: e.target.value }));
+                          }}
+                          onFocus={() => setShowBrandDropdown(true)}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                        />
+                        {showBrandDropdown && (
+                          <>
+                            <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-20 divide-y divide-gray-50">
+                              {existingBrands
+                                .filter(b => b.toLowerCase().includes(brandSearch.toLowerCase()))
+                                .map(b => (
+                                  <button
+                                    key={b}
+                                    type="button"
+                                    onClick={() => {
+                                      setForm(prev => ({ ...prev, brand: b }));
+                                      setBrandSearch(b);
+                                      setShowBrandDropdown(false);
+                                    }}
+                                    className="w-full px-3 py-2 text-left text-xs hover:bg-blue-50 hover:text-blue-600 transition-colors font-semibold text-gray-700 block"
+                                  >
+                                    {b}
+                                  </button>
+                                ))
+                              }
+                              {brandSearch.trim() && !existingBrands.some(b => b.toLowerCase() === brandSearch.toLowerCase()) && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newBrand = brandSearch.trim();
+                                    if (!existingBrands.includes(newBrand)) {
+                                      setExistingBrands(prev => [...prev, newBrand]);
+                                    }
+                                    setForm(prev => ({ ...prev, brand: newBrand }));
+                                    setShowBrandDropdown(false);
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-xs hover:bg-green-50 text-green-600 font-bold transition-colors block"
+                                >
+                                  + Add Brand "{brandSearch.trim()}"
+                                </button>
+                              )}
+                              {existingBrands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase())).length === 0 && !brandSearch.trim() && (
+                                <div className="px-3 py-2 text-xs text-gray-400 italic">No brands found</div>
+                              )}
+                            </div>
+                            <div 
+                              className="fixed inset-0 z-10" 
+                              onClick={() => setShowBrandDropdown(false)} 
+                            />
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {activeFields.includes('title') && (
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Title (Description)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Maplitho / Azure"
+                      value={form.title}
+                      onChange={e => setForm({ ...form, title: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                    />
+                  </div>
+                )}
+                {activeFields.includes('dimensions') && (
+                  <>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Width (CM)</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 32"
+                        value={form.width}
+                        onChange={e => setForm({ ...form, width: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Length (CM)</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 44"
+                        value={form.length}
+                        onChange={e => setForm({ ...form, length: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Group 3: Additional Attributes */}
           <div className="space-y-4">
@@ -554,7 +679,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                   <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
                 </select>
               </div>
-              {(form.category === 'Semi Finished' || form.category === 'Finished Goods') && (
+              {activeFields.includes('altUnit') && (
                 <>
                   <div>
                     <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Alternative Unit</label>
@@ -592,7 +717,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                   )}
                 </>
               )}
-              {form.category !== 'Raw Material' && (
+              {activeFields.includes('ruleType') && (
                 <div>
                   <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Rule Type</label>
                   <select
@@ -613,29 +738,29 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                   </select>
                 </div>
               )}
-              {form.category === 'Finished Goods' && (
-                <>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Pages</label>
-                    <input
-                      type="number"
-                      placeholder="e.g. 112 / 132"
-                      value={form.pages}
-                      onChange={e => setForm({ ...form, pages: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Books / GBL</label>
-                    <input
-                      type="number"
-                      placeholder="e.g. 200 / 240"
-                      value={form.booksGbl}
-                      onChange={e => setForm({ ...form, booksGbl: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
-                    />
-                  </div>
-                </>
+              {activeFields.includes('pages') && (
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Pages</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 112 / 132"
+                    value={form.pages}
+                    onChange={e => setForm({ ...form, pages: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                  />
+                </div>
+              )}
+              {activeFields.includes('booksGbl') && (
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Books / GBL</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 200 / 240"
+                    value={form.booksGbl}
+                    onChange={e => setForm({ ...form, booksGbl: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                  />
+                </div>
               )}
               <div>
                 <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Status</label>
@@ -694,7 +819,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
               </span>
               <button 
                 type="button"
-                onClick={() => setModalConfig({ isOpen: false, type: null, nameValue: '' })}
+                onClick={() => setModalConfig({ isOpen: false, type: null, nameValue: '', selectedFields: [] })}
                 className="text-gray-400 hover:text-gray-600 rounded p-1 hover:bg-gray-100"
               >
                 <X className="w-3.5 h-3.5" />
@@ -719,13 +844,50 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                   autoFocus
                 />
               </div>
+
+              {/* Checklist of fields for new Category */}
+              {modalConfig.type === 'categories' && (
+                <div className="space-y-2 border-t pt-3">
+                  <span className="block text-[9px] font-black text-gray-500 uppercase tracking-wider mb-1">
+                    Select Required Fields
+                  </span>
+                  <div className="grid grid-cols-2 gap-2 bg-gray-50 p-3 rounded-xl border border-gray-100 max-h-40 overflow-y-auto">
+                    {[
+                      { id: 'brand', label: 'Brand' },
+                      { id: 'title', label: 'Title (Description)' },
+                      { id: 'gsm', label: 'GSM' },
+                      { id: 'dimensions', label: 'Dimensions (Size)' },
+                      { id: 'paperType', label: 'Format Reels/Sheets' },
+                      { id: 'ruleType', label: 'Rule Type' },
+                      { id: 'pages', label: 'Pages' },
+                      { id: 'booksGbl', label: 'Books / GBL' },
+                      { id: 'altUnit', label: 'Alternative Unit' }
+                    ].map(f => (
+                      <label key={f.id} className="flex items-center gap-1.5 cursor-pointer hover:text-blue-600 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={modalConfig.selectedFields.includes(f.id)}
+                          onChange={e => {
+                            const newFields = e.target.checked
+                              ? [...modalConfig.selectedFields, f.id]
+                              : modalConfig.selectedFields.filter(x => x !== f.id);
+                            setModalConfig(prev => ({ ...prev, selectedFields: newFields }));
+                          }}
+                          className="rounded border-gray-305 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                        />
+                        <span className="text-[10px] font-semibold text-gray-700">{f.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Actions */}
             <div className="px-5 py-3.5 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setModalConfig({ isOpen: false, type: null, nameValue: '' })}
+                onClick={() => setModalConfig({ isOpen: false, type: null, nameValue: '', selectedFields: [] })}
                 className="px-3 py-1.5 border border-gray-200 rounded-lg font-bold hover:bg-gray-100 text-gray-600 transition-colors"
               >
                 Cancel

@@ -20,6 +20,7 @@ const skuV2Schema = new mongoose.Schema({
   width: { type: Number, required: false },
   length: { type: Number, required: false },
   brand: { type: String, default: "" },
+  title: { type: String, default: "" },
   ruleType: { 
     type: String, 
     required: false
