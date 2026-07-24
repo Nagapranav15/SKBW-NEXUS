@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, RefreshCw } from 'lucide-react';
-import { createSkuV2, updateSkuV2, SkuV2, getMetadataV2, updateMetadataV2 } from '../../api/mfgApiV2';
+import { createSkuV2, updateSkuV2, SkuV2, getMetadataV2, updateMetadataV2, getSkusV2 } from '../../api/mfgApiV2';
 
 interface AddSkuDrawerV2Props {
   companyId: string;
@@ -16,6 +16,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ companyId, editSku, onC
     category: 'Raw Material',
     paperType: 'None' as 'Reels' | 'Sheets' | 'None',
     unit: 'kg',
+    altUnit: '',
+    altUnitConversion: '',
     gsm: '',
     width: '',
     length: '',
@@ -34,10 +36,27 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ companyId, editSku, onC
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Load custom metadata lists from database
+  // Brand searchable dropdown states
+  const [existingBrands, setExistingBrands] = useState<string[]>([]);
+  const [brandSearch, setBrandSearch] = useState('');
+  const [showBrandDropdown, setShowBrandDropdown] = useState(false);
+
+  // Custom Options Modal Popup state (Replacing browser prompt dialogs)
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    type: 'categories' | 'units' | 'ruleTypes' | null;
+    nameValue: string;
+  }>({
+    isOpen: false,
+    type: null,
+    nameValue: ''
+  });
+
+  // Load custom metadata lists & brands from database
   useEffect(() => {
     if (companyId) {
       loadMetadata();
+      loadExistingBrands();
     }
   }, [companyId]);
 
@@ -54,11 +73,32 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ companyId, editSku, onC
     }
   };
 
-  const handleAddNewOption = async (field: 'categories' | 'units' | 'ruleTypes') => {
-    const label = field === 'categories' ? 'Category' : field === 'units' ? 'Unit' : 'Rule Type';
-    const newVal = prompt(`Enter new custom ${label}:`);
-    if (!newVal || !newVal.trim()) return;
-    const cleanVal = newVal.trim();
+  const loadExistingBrands = async () => {
+    try {
+      const skus = await getSkusV2(companyId);
+      const brands = Array.from(new Set(
+        skus
+          .map(s => s.brand)
+          .filter((b): b is string => !!b && typeof b === 'string' && b.trim() !== '')
+      ));
+      setExistingBrands(brands);
+    } catch (e) {
+      console.error('Failed to load existing brands', e);
+    }
+  };
+
+  const handleAddNewOption = (field: 'categories' | 'units' | 'ruleTypes') => {
+    setModalConfig({
+      isOpen: true,
+      type: field,
+      nameValue: ''
+    });
+  };
+
+  const handleSaveCustomOption = async () => {
+    const field = modalConfig.type;
+    const cleanVal = modalConfig.nameValue.trim();
+    if (!field || !cleanVal) return;
 
     try {
       let updatedCategories = [...categoriesList];
@@ -91,11 +131,18 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ companyId, editSku, onC
         units: updatedUnits,
         ruleTypes: updatedRuleTypes
       });
+
+      setModalConfig({ isOpen: false, type: null, nameValue: '' });
     } catch (e) {
       console.error(e);
       alert('Failed to save dynamic option to settings database.');
     }
   };
+
+  // Sync brandSearch with form.brand
+  useEffect(() => {
+    setBrandSearch(form.brand);
+  }, [form.brand]);
 
   // Update form state if editSku is provided or changes
   useEffect(() => {
@@ -106,6 +153,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ companyId, editSku, onC
         category: editSku.category || 'Raw Material',
         paperType: editSku.paperType || 'None',
         unit: editSku.unit || 'kg',
+        altUnit: (editSku as any).altUnit || '',
+        altUnitConversion: (editSku as any).altUnitConversion !== undefined ? String((editSku as any).altUnitConversion) : '',
         gsm: editSku.gsm !== undefined ? String(editSku.gsm) : '',
         width: editSku.width !== undefined ? String(editSku.width) : '',
         length: editSku.length !== undefined ? String(editSku.length) : '',
@@ -123,6 +172,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ companyId, editSku, onC
         category: 'Raw Material',
         paperType: 'None',
         unit: 'kg',
+        altUnit: '',
+        altUnitConversion: '',
         gsm: '',
         width: '',
         length: '',
@@ -134,7 +185,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ companyId, editSku, onC
       });
       setIsNameManuallyEdited(false);
     }
-  }, [editSku]);
+  }, [editSku, isOpen]);
 
   // Auto-generate SKU Code
   useEffect(() => {
@@ -189,21 +240,21 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ companyId, editSku, onC
     setErrorMsg('');
     setIsSaving(true);
     try {
+      const isSemiOrFinished = form.category === 'Semi Finished' || form.category === 'Finished Goods';
+      const payload = {
+        ...form,
+        pages: form.pages ? Number(form.pages) : undefined,
+        booksGbl: form.booksGbl ? Number(form.booksGbl) : undefined,
+        altUnit: isSemiOrFinished ? (form.altUnit || undefined) : undefined,
+        altUnitConversion: (isSemiOrFinished && form.altUnit) ? (form.altUnitConversion ? Number(form.altUnitConversion) : undefined) : undefined,
+        company: companyId
+      };
+
       let saved;
       if (editSku?._id) {
-        saved = await updateSkuV2(editSku._id, {
-          ...form,
-          pages: form.pages ? Number(form.pages) : undefined,
-          booksGbl: form.booksGbl ? Number(form.booksGbl) : undefined,
-          company: companyId
-        });
+        saved = await updateSkuV2(editSku._id, payload);
       } else {
-        saved = await createSkuV2({
-          ...form,
-          pages: form.pages ? Number(form.pages) : undefined,
-          booksGbl: form.booksGbl ? Number(form.booksGbl) : undefined,
-          company: companyId
-        });
+        saved = await createSkuV2(payload);
       }
       onSaveSuccess(saved);
     } catch (err: any) {
@@ -382,13 +433,75 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ companyId, editSku, onC
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Brand</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Century / BILT"
-                  value={form.brand}
-                  onChange={e => setForm({ ...form, brand: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
-                />
+                {form.category === 'Finished Goods' ? (
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search or type brand..."
+                      value={brandSearch}
+                      onChange={e => {
+                        setBrandSearch(e.target.value);
+                        setForm(prev => ({ ...prev, brand: e.target.value }));
+                      }}
+                      onFocus={() => setShowBrandDropdown(true)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                    />
+                    {showBrandDropdown && (
+                      <>
+                        <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-20 divide-y divide-gray-50">
+                          {existingBrands
+                            .filter(b => b.toLowerCase().includes(brandSearch.toLowerCase()))
+                            .map(b => (
+                              <button
+                                key={b}
+                                type="button"
+                                onClick={() => {
+                                  setForm(prev => ({ ...prev, brand: b }));
+                                  setBrandSearch(b);
+                                  setShowBrandDropdown(false);
+                                }}
+                                className="w-full px-3 py-2 text-left text-xs hover:bg-blue-50 hover:text-blue-600 transition-colors font-semibold text-gray-700 block"
+                              >
+                                {b}
+                              </button>
+                            ))
+                          }
+                          {brandSearch.trim() && !existingBrands.some(b => b.toLowerCase() === brandSearch.toLowerCase()) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newBrand = brandSearch.trim();
+                                if (!existingBrands.includes(newBrand)) {
+                                  setExistingBrands(prev => [...prev, newBrand]);
+                                }
+                                setForm(prev => ({ ...prev, brand: newBrand }));
+                                setShowBrandDropdown(false);
+                              }}
+                              className="w-full px-3 py-2 text-left text-xs hover:bg-green-50 text-green-600 font-bold transition-colors block"
+                            >
+                              + Add Brand "{brandSearch.trim()}"
+                            </button>
+                          )}
+                          {existingBrands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase())).length === 0 && !brandSearch.trim() && (
+                            <div className="px-3 py-2 text-xs text-gray-400 italic">No brands found</div>
+                          )}
+                        </div>
+                        <div 
+                          className="fixed inset-0 z-10" 
+                          onClick={() => setShowBrandDropdown(false)} 
+                        />
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    placeholder="e.g. Century / BILT"
+                    value={form.brand}
+                    onChange={e => setForm({ ...form, brand: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                  />
+                )}
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Width (CM)</label>
@@ -438,6 +551,44 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ companyId, editSku, onC
                   <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
                 </select>
               </div>
+              {(form.category === 'Semi Finished' || form.category === 'Finished Goods') && (
+                <>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Alternative Unit</label>
+                    <select
+                      value={form.altUnit}
+                      onChange={e => {
+                        if (e.target.value === '__ADD_NEW__') {
+                          handleAddNewOption('units');
+                        } else {
+                          setForm({ ...form, altUnit: e.target.value });
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                    >
+                      <option value="">None</option>
+                      {unitsList.map(unit => (
+                        <option key={unit} value={unit}>{unit}</option>
+                      ))}
+                      <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
+                    </select>
+                  </div>
+                  {form.altUnit && (
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">
+                        Conversion Rate (1 {form.altUnit} = ? {form.unit})
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 100"
+                        value={form.altUnitConversion}
+                        onChange={e => setForm({ ...form, altUnitConversion: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800 font-mono"
+                      />
+                    </div>
+                  )}
+                </>
+              )}
               {form.category !== 'Raw Material' && (
                 <div>
                   <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Rule Type</label>
@@ -528,6 +679,65 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ companyId, editSku, onC
           </button>
         </div>
       </div>
+
+      {/* Dynamic Option Custom Modal Popup */}
+      {modalConfig.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-xs font-sans text-xs">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full border border-gray-150 overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+              <span className="font-bold text-gray-800 text-xs">
+                Add Custom {modalConfig.type === 'categories' ? 'Category' : modalConfig.type === 'units' ? 'Unit' : 'Rule Type'}
+              </span>
+              <button 
+                type="button"
+                onClick={() => setModalConfig({ isOpen: false, type: null, nameValue: '' })}
+                className="text-gray-400 hover:text-gray-600 rounded p-1 hover:bg-gray-100"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            
+            {/* Form Fields */}
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-[9px] font-bold text-gray-500 mb-1 uppercase">
+                  {modalConfig.type === 'categories' ? 'Category Name' : modalConfig.type === 'units' ? 'Unit Symbol' : 'Rule Name'} *
+                </label>
+                <input
+                  type="text"
+                  placeholder={
+                    modalConfig.type === 'categories' ? 'e.g. Packing Material' :
+                    modalConfig.type === 'units' ? 'e.g. gross' : 'e.g. Single Line'
+                  }
+                  value={modalConfig.nameValue}
+                  onChange={e => setModalConfig(prev => ({ ...prev, nameValue: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 font-semibold text-gray-800 bg-white"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="px-5 py-3.5 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setModalConfig({ isOpen: false, type: null, nameValue: '' })}
+                className="px-3 py-1.5 border border-gray-200 rounded-lg font-bold hover:bg-gray-100 text-gray-600 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveCustomOption}
+                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-sm transition-colors"
+              >
+                Save Option
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -12,6 +12,8 @@ export interface SkuV2 {
   length?: number;
   brand?: string;
   ruleType?: string;
+  altUnit?: string;
+  altUnitConversion?: number;
   status: 'Active' | 'Inactive';
   createdAt?: string;
 }

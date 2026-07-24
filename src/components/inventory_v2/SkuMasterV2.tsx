@@ -373,7 +373,14 @@ const SkuMasterV2: React.FC = () => {
                           {s.category}
                         </span>
                       </td>
-                      <td className="px-5 py-3 font-bold text-gray-500 uppercase font-mono">{s.unit}</td>
+                      <td className="px-5 py-3 font-bold text-gray-500 uppercase font-mono">
+                        {s.unit}
+                        {(s as any).altUnit && (
+                          <span className="text-[10px] text-gray-400 font-medium block normal-case">
+                            Alt: {(s as any).altUnit} (x{(s as any).altUnitConversion || 1})
+                          </span>
+                        )}
+                      </td>
                       <td className="px-5 py-3 font-medium text-gray-600">{s.brand || '—'}</td>
                       <td className="px-5 py-3 text-center font-semibold text-gray-600">{s.gsm || '—'}</td>
                       <td className="px-5 py-3 text-center font-medium text-gray-600">{formatSize(s)}</td>
@@ -605,6 +612,20 @@ const SkuMasterV2: React.FC = () => {
                     <span className="block text-[10px] text-gray-400 font-medium uppercase">Default Unit</span>
                     <span className="font-semibold font-mono">{selectedSkuDetails.unit}</span>
                   </div>
+                  {(selectedSkuDetails as any).altUnit && (
+                    <>
+                      <div>
+                        <span className="block text-[10px] text-gray-400 font-medium uppercase">Alternative Unit</span>
+                        <span className="font-semibold font-mono">{(selectedSkuDetails as any).altUnit}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] text-gray-400 font-medium uppercase">Conversion Factor</span>
+                        <span className="font-semibold font-mono">
+                          1 {(selectedSkuDetails as any).altUnit} = {(selectedSkuDetails as any).altUnitConversion || 1} {selectedSkuDetails.unit}
+                        </span>
+                      </div>
+                    </>
+                  )}
                   <div>
                     <span className="block text-[10px] text-gray-400 font-medium uppercase">Status</span>
                     <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-extrabold uppercase ${

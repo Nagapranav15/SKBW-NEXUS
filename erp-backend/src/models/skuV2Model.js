@@ -14,6 +14,8 @@ const skuV2Schema = new mongoose.Schema({
     default: "None"
   },
   unit: { type: String, required: true },
+  altUnit: { type: String, required: false },
+  altUnitConversion: { type: Number, required: false },
   gsm: { type: Number, required: false },
   width: { type: Number, required: false },
   length: { type: Number, required: false },
