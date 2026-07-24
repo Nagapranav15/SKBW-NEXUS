@@ -48,7 +48,7 @@ exports.getSkus = async (req, res, next) => {
 
 exports.createSku = async (req, res, next) => {
   try {
-    const { skuCode, name, category, unit, gsm, width, length, brand, ruleType, pages, booksGbl, status, company } = req.body;
+    const { skuCode, name, category, unit, altUnit, altUnitConversion, paperType, gsm, width, length, brand, ruleType, pages, booksGbl, status, company } = req.body;
     if (!company) {
       return res.status(400).json({ msg: "company is required" });
     }
@@ -63,6 +63,9 @@ exports.createSku = async (req, res, next) => {
       name,
       category,
       unit,
+      altUnit,
+      altUnitConversion: altUnitConversion ? Number(altUnitConversion) : undefined,
+      paperType: paperType || "None",
       gsm: gsm ? Number(gsm) : undefined,
       width: width ? Number(width) : undefined,
       length: length ? Number(length) : undefined,
@@ -85,7 +88,7 @@ exports.createSku = async (req, res, next) => {
 exports.updateSku = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { skuCode, name, category, unit, gsm, width, length, brand, ruleType, pages, booksGbl, status, company } = req.body;
+    const { skuCode, name, category, unit, altUnit, altUnitConversion, paperType, gsm, width, length, brand, ruleType, pages, booksGbl, status, company } = req.body;
     
     if (!company) {
       return res.status(400).json({ msg: "company is required" });
@@ -109,6 +112,9 @@ exports.updateSku = async (req, res, next) => {
     sku.name = name;
     sku.category = category;
     sku.unit = unit;
+    sku.altUnit = altUnit;
+    sku.altUnitConversion = altUnitConversion ? Number(altUnitConversion) : undefined;
+    sku.paperType = paperType || "None";
     sku.gsm = gsm ? Number(gsm) : undefined;
     sku.width = width ? Number(width) : undefined;
     sku.length = length ? Number(length) : undefined;
