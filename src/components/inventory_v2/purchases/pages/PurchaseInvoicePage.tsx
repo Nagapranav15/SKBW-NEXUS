@@ -733,26 +733,35 @@ const PurchaseInvoicePage: React.FC = () => {
                           </tr>
                           
                           {Number(item.reelsCount) > 0 && (
-                            <tr className="bg-blue-50/5 hover:bg-blue-50/10">
+                            <tr className="bg-gray-50/30">
                               <td />
-                              <td colSpan={9} className="px-3 py-2.5 border-t border-b border-blue-50/30">
-                                <div className="flex flex-wrap items-center gap-3">
-                                  <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Reel Weights (KG):</span>
-                                  {Array.from({ length: Number(item.reelsCount) }).map((_, rIdx) => {
-                                    const reel = (item.reels || [])[rIdx] || { weight: 0 };
-                                    return (
-                                      <div key={rIdx} className="flex items-center gap-1.5 bg-white px-2 py-1 border border-gray-100 rounded-lg shadow-3xs">
-                                        <span className="text-[9px] text-gray-400 font-mono font-bold">R{rIdx + 1}:</span>
-                                        <input
-                                          type="number"
-                                          value={reel.weight || ''}
-                                          onChange={e => handleReelWeightChange(idx, rIdx, e.target.value)}
-                                          placeholder="0"
-                                          className="w-14 px-1.5 py-0.5 border border-gray-200 rounded text-center text-xs font-mono font-semibold text-gray-800 focus:ring-1 focus:ring-blue-500 bg-white"
-                                        />
-                                      </div>
-                                    );
-                                  })}
+                              <td colSpan={9} className="px-5 py-3 border-t border-b border-gray-100">
+                                <div className="bg-gray-50/60 rounded-xl p-3 border border-gray-100 space-y-2">
+                                  <div className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                                    <span>Reel Weights Log</span>
+                                    <span className="text-[9px] text-gray-400 font-bold lowercase">({item.reelsCount} reels total)</span>
+                                  </div>
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+                                    {Array.from({ length: Number(item.reelsCount) }).map((_, rIdx) => {
+                                      const reel = (item.reels || [])[rIdx] || { weight: 0 };
+                                      return (
+                                        <div 
+                                          key={rIdx} 
+                                          className="flex items-center justify-between gap-1.5 bg-white px-2 py-1 border border-gray-200 rounded-lg shadow-3xs focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all"
+                                        >
+                                          <span className="text-[9px] text-gray-400 font-mono font-black">R{rIdx + 1}</span>
+                                          <input
+                                            type="number"
+                                            value={reel.weight || ''}
+                                            onChange={e => handleReelWeightChange(idx, rIdx, e.target.value)}
+                                            placeholder="0"
+                                            className="w-full text-right text-xs font-mono font-bold text-gray-800 bg-transparent border-none p-0 outline-none focus:ring-0"
+                                          />
+                                          <span className="text-[9px] text-gray-400 font-bold lowercase">kg</span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
