@@ -439,6 +439,7 @@ const SkuMasterV2: React.FC = () => {
       {/* Add/Edit SKU Slide-Over */}
       {showAddDrawer && (
         <AddSkuDrawerV2
+          isOpen={showAddDrawer}
           companyId={selectedCompany?._id || ''}
           editSku={editSku}
           onClose={() => {
