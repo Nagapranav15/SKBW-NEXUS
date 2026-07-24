@@ -71,8 +71,7 @@ const PurchaseInvoicePage: React.FC = () => {
         reelsCount: '',
         quantity: '', 
         purchasePrice: '', 
-        lotNumber: '',
-        reels: [] as any[]
+        lotNumber: ''
       }
     ]
   });
@@ -81,7 +80,6 @@ const PurchaseInvoicePage: React.FC = () => {
   const [addError, setAddError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
-  const [activeReelModalIdx, setActiveReelModalIdx] = useState<number | null>(null);
 
   // Date range filters
   const [startDate, setStartDate] = useState('2024-06-01');
@@ -217,7 +215,7 @@ const PurchaseInvoicePage: React.FC = () => {
       ...invoiceForm,
       items: [
         ...invoiceForm.items,
-        { skuId: '', brand: '', gsm: '', width: '', reelsCount: '', quantity: '', purchasePrice: '', lotNumber: '', reels: [] as any[] }
+        { skuId: '', brand: '', gsm: '', width: '', reelsCount: '', quantity: '', purchasePrice: '', lotNumber: '' }
       ]
     });
   };
@@ -243,44 +241,9 @@ const PurchaseInvoicePage: React.FC = () => {
         item.width = String(selectedSku.width || '');
       }
     }
-
-    if (field === 'reelsCount') {
-      const count = Number(value) || 0;
-      const currentReels = item.reels || [];
-      const newReels = [...currentReels];
-      if (newReels.length < count) {
-        while (newReels.length < count) {
-          newReels.push({ weight: 0 });
-        }
-      } else if (newReels.length > count) {
-        newReels.length = count;
-      }
-      item.reels = newReels;
-
-      // Auto-compute total quantity if there are reel weights set
-      const sum = newReels.reduce((sum, r) => sum + (r.weight || 0), 0);
-      if (sum > 0) {
-        item.quantity = String(sum);
-      }
-    }
     
     updated[idx] = item;
     setInvoiceForm({ ...invoiceForm, items: updated });
-  };
-
-  const handleReelWeightChange = (itemIdx: number, reelIdx: number, weightVal: string) => {
-    const updatedItems = [...invoiceForm.items];
-    const item = { ...updatedItems[itemIdx] };
-    const reels = [...(item.reels || [])];
-    
-    reels[reelIdx] = { ...reels[reelIdx], weight: Number(weightVal) || 0 };
-    item.reels = reels;
-
-    const sum = reels.reduce((acc, r) => acc + (r.weight || 0), 0);
-    item.quantity = String(sum);
-
-    updatedItems[itemIdx] = item;
-    setInvoiceForm({ ...invoiceForm, items: updatedItems });
   };
 
   // Submit Invoice Creation
@@ -321,17 +284,13 @@ const PurchaseInvoicePage: React.FC = () => {
 
       // Generate reels log array dynamically based on count
       const reelsArray = [];
-      const itemReels = item.reels || [];
+      const weightPerReel = reelsCount > 0 ? Number((qty / reelsCount).toFixed(2)) : 0;
       for (let r = 0; r < reelsCount; r++) {
-        const reelWeight = (itemReels[r] && itemReels[r].weight > 0)
-          ? itemReels[r].weight
-          : (reelsCount > 0 ? Number((qty / reelsCount).toFixed(2)) : 0);
-
         reelsArray.push({
           reelNumber: `${finalInvoiceNumber}-R${r + 1}`,
           gsm: Number(item.gsm) || 0,
           width: Number(item.width) || 0,
-          weight: reelWeight
+          weight: weightPerReel
         });
       }
 
@@ -410,8 +369,7 @@ const PurchaseInvoicePage: React.FC = () => {
         reelsCount: String(item.reels?.length || ''),
         quantity: String(item.quantity),
         purchasePrice: String(item.purchasePrice),
-        lotNumber: item.lotNumber || '',
-        reels: item.reels || []
+        lotNumber: item.lotNumber || ''
       }))
     });
     setAddError('');
@@ -648,100 +606,89 @@ const PurchaseInvoicePage: React.FC = () => {
                     </thead>
                     <tbody className="divide-y divide-gray-50 text-gray-800 font-semibold">
                       {invoiceForm.items.map((item, idx) => (
-                        <React.Fragment key={idx}>
-                          <tr className="hover:bg-gray-50/20">
-                            <td className="py-2 px-2 text-gray-400 font-mono text-[10px]">{idx + 1}</td>
-                            <td className="py-2 px-2">
-                              <select
-                                value={item.skuId}
-                                onChange={e => handleItemRowChange(idx, 'skuId', e.target.value)}
-                                className="w-full px-2 py-1 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 text-xs font-semibold"
-                                required
+                        <tr key={idx} className="hover:bg-gray-50/20">
+                          <td className="py-2 px-2 text-gray-400 font-mono text-[10px]">{idx + 1}</td>
+                          <td className="py-2 px-2">
+                            <select
+                              value={item.skuId}
+                              onChange={e => handleItemRowChange(idx, 'skuId', e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 text-xs font-semibold"
+                              required
+                            >
+                              <option value="">Select SKU</option>
+                              {skus.map(s => (
+                                <option key={s._id} value={s._id}>{s.name}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="py-2 px-2">
+                            <input
+                              type="text"
+                              value={item.brand}
+                              onChange={e => handleItemRowChange(idx, 'brand', e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs"
+                            />
+                          </td>
+                          <td className="py-2 px-2">
+                            <input
+                              type="number"
+                              value={item.gsm}
+                              onChange={e => handleItemRowChange(idx, 'gsm', e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-center"
+                            />
+                          </td>
+                          <td className="py-2 px-2">
+                            <input
+                              type="number"
+                              value={item.width}
+                              onChange={e => handleItemRowChange(idx, 'width', e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-center"
+                            />
+                          </td>
+                          <td className="py-2 px-2">
+                            <input
+                              type="number"
+                              value={item.reelsCount}
+                              onChange={e => handleItemRowChange(idx, 'reelsCount', e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-center"
+                              placeholder="0"
+                            />
+                          </td>
+                          <td className="py-2 px-2">
+                            <input
+                              type="number"
+                              value={item.quantity}
+                              onChange={e => handleItemRowChange(idx, 'quantity', e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-right font-black"
+                              placeholder="0"
+                              required
+                            />
+                          </td>
+                          <td className="py-2 px-2">
+                            <input
+                              type="number"
+                              value={item.purchasePrice}
+                              onChange={e => handleItemRowChange(idx, 'purchasePrice', e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-right"
+                              placeholder="0.00"
+                              required
+                            />
+                          </td>
+                          <td className="py-2 px-2 text-right font-mono font-black text-gray-900 text-xs">
+                            ₹{((Number(item.quantity) || 0) * (Number(item.purchasePrice) || 0)).toLocaleString('en-IN')}
+                          </td>
+                          <td className="py-2 px-2 text-center">
+                            {invoiceForm.items.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveItemRow(idx)}
+                                className="text-red-500 hover:text-red-700 p-1 border rounded bg-white hover:bg-red-50"
                               >
-                                <option value="">Select SKU</option>
-                                {skus.map(s => (
-                                  <option key={s._id} value={s._id}>{s.name}</option>
-                                ))}
-                              </select>
-                            </td>
-                            <td className="py-2 px-2">
-                              <input
-                                type="text"
-                                value={item.brand}
-                                onChange={e => handleItemRowChange(idx, 'brand', e.target.value)}
-                                className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs"
-                              />
-                            </td>
-                            <td className="py-2 px-2">
-                              <input
-                                type="number"
-                                value={item.gsm}
-                                onChange={e => handleItemRowChange(idx, 'gsm', e.target.value)}
-                                className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-center"
-                              />
-                            </td>
-                            <td className="py-2 px-2">
-                              <input
-                                type="number"
-                                value={item.width}
-                                onChange={e => handleItemRowChange(idx, 'width', e.target.value)}
-                                className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-center"
-                              />
-                            </td>
-                            <td className="py-2 px-2">
-                               <input
-                                 type="number"
-                                 value={item.reelsCount}
-                                 onChange={e => handleItemRowChange(idx, 'reelsCount', e.target.value)}
-                                 className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-center"
-                                 placeholder="0"
-                               />
-                               {Number(item.reelsCount) > 0 && (
-                                 <button
-                                   type="button"
-                                   onClick={() => setActiveReelModalIdx(idx)}
-                                   className="mt-1 w-full px-1 py-0.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-600 rounded text-[9px] font-black transition-colors block text-center uppercase tracking-wider"
-                                 >
-                                   {item.reels?.filter(r => r.weight > 0).length || 0}/{item.reelsCount} Set
-                                 </button>
-                               )}
-                            </td>
-                            <td className="py-2 px-2">
-                              <input
-                                type="number"
-                                value={item.quantity}
-                                onChange={e => handleItemRowChange(idx, 'quantity', e.target.value)}
-                                className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-right font-black"
-                                placeholder="0"
-                                required
-                              />
-                            </td>
-                            <td className="py-2 px-2">
-                              <input
-                                type="number"
-                                value={item.purchasePrice}
-                                onChange={e => handleItemRowChange(idx, 'purchasePrice', e.target.value)}
-                                className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-right"
-                                placeholder="0.00"
-                                required
-                              />
-                            </td>
-                            <td className="py-2 px-2 text-right font-mono font-black text-gray-900 text-xs">
-                              ₹{((Number(item.quantity) || 0) * (Number(item.purchasePrice) || 0)).toLocaleString('en-IN')}
-                            </td>
-                            <td className="py-2 px-2 text-center">
-                              {invoiceForm.items.length > 1 && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveItemRow(idx)}
-                                  className="text-red-500 hover:text-red-700 p-1 border rounded bg-white hover:bg-red-50"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        </React.Fragment>
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
                       ))}
                     </tbody>
                   </table>
@@ -1269,7 +1216,7 @@ const PurchaseInvoicePage: React.FC = () => {
                     loadingUnloading: '0',
                     otherCharges: '0',
                     dueDate: new Date().toISOString().split('T')[0],
-                    items: [{ skuId: '', brand: '', gsm: '', width: '', reelsCount: '', quantity: '', purchasePrice: '', lotNumber: '', reels: [] as any[] }]
+                    items: [{ skuId: '', brand: '', gsm: '', width: '', reelsCount: '', quantity: '', purchasePrice: '', lotNumber: '' }]
                   });
                   setAddError('');
                   setActiveSubPage('new');
@@ -1600,83 +1547,6 @@ const PurchaseInvoicePage: React.FC = () => {
                   </button>
                 </div>
               </form>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Dynamic Reel Weights Modal Popup */}
-      {activeReelModalIdx !== null && (() => {
-        const item = invoiceForm.items[activeReelModalIdx];
-        if (!item) return null;
-        
-        // Find selected SKU name for display
-        const skuObj = skus.find(s => s._id === item.skuId);
-        const skuName = skuObj ? skuObj.name : 'Unknown SKU';
-        const reelsCount = Number(item.reelsCount) || 0;
-
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-xs font-sans text-xs">
-            <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full border border-gray-150 overflow-hidden animate-in zoom-in-95 duration-150">
-              {/* Header */}
-              <div className="px-5 py-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-                <div>
-                  <span className="font-bold text-gray-800 text-xs block">Reel Weights Configuration</span>
-                  <span className="text-[10px] text-blue-600 font-extrabold uppercase mt-0.5">{skuName}</span>
-                </div>
-                <button 
-                  type="button"
-                  onClick={() => setActiveReelModalIdx(null)}
-                  className="text-gray-400 hover:text-gray-600 rounded p-1 hover:bg-gray-100"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-              
-              {/* Grid of inputs */}
-              <div className="p-5 space-y-4">
-                <div className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">
-                  Enter individual weights for {reelsCount} reels:
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[300px] overflow-y-auto p-1 bg-gray-50 rounded-xl border border-gray-100">
-                  {Array.from({ length: reelsCount }).map((_, rIdx) => {
-                    const reel = (item.reels || [])[rIdx] || { weight: 0 };
-                    return (
-                      <div 
-                        key={rIdx} 
-                        className="flex items-center justify-between gap-1.5 bg-white px-2.5 py-1.5 border border-gray-200 rounded-lg shadow-3xs focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all"
-                      >
-                        <span className="text-[9px] text-gray-400 font-mono font-black">Reel {rIdx + 1}</span>
-                        <input
-                          type="number"
-                          value={reel.weight || ''}
-                          onChange={e => handleReelWeightChange(activeReelModalIdx, rIdx, e.target.value)}
-                          placeholder="0"
-                          className="w-full text-right text-xs font-mono font-bold text-gray-800 bg-transparent border-none p-0 outline-none focus:ring-0"
-                        />
-                        <span className="text-[9px] text-gray-400 font-bold lowercase">kg</span>
-                      </div>
-                    );
-                  })}
-                </div>
-                
-                {/* Total sum indicator */}
-                <div className="pt-3 border-t flex justify-between items-center text-xs font-bold text-gray-700">
-                  <span>Total Accumulated Weight:</span>
-                  <span className="text-sm font-black text-blue-600 font-mono">{item.quantity || 0} kg</span>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="px-5 py-3.5 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveReelModalIdx(null)}
-                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-sm transition-colors"
-                >
-                  Apply & Done
-                </button>
-              </div>
             </div>
           </div>
         );
