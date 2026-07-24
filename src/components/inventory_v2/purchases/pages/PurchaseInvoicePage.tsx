@@ -409,7 +409,8 @@ const PurchaseInvoicePage: React.FC = () => {
         reelsCount: String(item.reels?.length || ''),
         quantity: String(item.quantity),
         purchasePrice: String(item.purchasePrice),
-        lotNumber: item.lotNumber || ''
+        lotNumber: item.lotNumber || '',
+        reels: item.reels || []
       }))
     });
     setAddError('');
@@ -1284,7 +1285,7 @@ const PurchaseInvoicePage: React.FC = () => {
                     loadingUnloading: '0',
                     otherCharges: '0',
                     dueDate: new Date().toISOString().split('T')[0],
-                    items: [{ skuId: '', brand: '', gsm: '', width: '', reelsCount: '', quantity: '', purchasePrice: '', lotNumber: '' }]
+                    items: [{ skuId: '', brand: '', gsm: '', width: '', reelsCount: '', quantity: '', purchasePrice: '', lotNumber: '', reels: [] as any[] }]
                   });
                   setAddError('');
                   setActiveSubPage('new');
