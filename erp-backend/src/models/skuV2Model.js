@@ -21,6 +21,7 @@ const skuV2Schema = new mongoose.Schema({
   length: { type: Number, required: false },
   brand: { type: String, default: "" },
   title: { type: String, default: "" },
+  group: { type: String, default: "" },
   ruleType: { 
     type: String, 
     required: false

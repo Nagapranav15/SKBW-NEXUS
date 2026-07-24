@@ -24,6 +24,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
     length: '',
     brand: '',
     title: '',
+    group: '',
     ruleType: 'Plain',
     pages: '',
     booksGbl: '',
@@ -33,6 +34,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
   const [categoriesList, setCategoriesList] = useState<string[]>(["Raw Material", "Semi Finished", "Finished Goods"]);
   const [unitsList, setUnitsList] = useState<string[]>(["kg", "pcs", "Sheets", "Reels", "mtr"]);
   const [ruleTypesList, setRuleTypesList] = useState<string[]>(["Plain", "Single Line", "Double Line", "Square Ruled", "Four Line", "Unruled"]);
+  const [groupsList, setGroupsList] = useState<string[]>(["132P Happy days (UR)", "220P Happy days (SR)"]);
   
   const [isNameManuallyEdited, setIsNameManuallyEdited] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -47,14 +49,14 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
   // Category specific field visibility mapping
   const [categoryFieldsMap, setCategoryFieldsMap] = useState<Record<string, string[]>>({
     "Raw Material": ["gsm", "brand", "title", "dimensions", "paperType"],
-    "Semi Finished": ["gsm", "brand", "dimensions", "ruleType", "altUnit"],
-    "Finished Goods": ["gsm", "brand", "dimensions", "ruleType", "pages", "booksGbl", "altUnit"]
+    "Semi Finished": ["gsm", "brand", "dimensions", "ruleType", "altUnit", "group"],
+    "Finished Goods": ["gsm", "brand", "dimensions", "ruleType", "pages", "booksGbl", "altUnit", "group"]
   });
 
   // Custom Options Modal Popup state
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
-    type: 'categories' | 'units' | 'ruleTypes' | null;
+    type: 'categories' | 'units' | 'ruleTypes' | 'groups' | null;
     nameValue: string;
     selectedFields: string[];
   }>({
@@ -79,6 +81,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
         if (data.categories?.length) setCategoriesList(data.categories);
         if (data.units?.length) setUnitsList(data.units);
         if (data.ruleTypes?.length) setRuleTypesList(data.ruleTypes);
+        if (data.groups?.length) setGroupsList(data.groups);
         if (data.categoryFields) {
           // If returned as Map structure or nested record
           setCategoryFieldsMap(data.categoryFields);
@@ -111,7 +114,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
     }
   };
 
-  const handleAddNewOption = (field: 'categories' | 'units' | 'ruleTypes') => {
+  const handleAddNewOption = (field: 'categories' | 'units' | 'ruleTypes' | 'groups') => {
     setModalConfig({
       isOpen: true,
       type: field,
@@ -129,6 +132,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
       let updatedCategories = [...categoriesList];
       let updatedUnits = [...unitsList];
       let updatedRuleTypes = [...ruleTypesList];
+      let updatedGroups = [...groupsList];
       let updatedFieldsMap = { ...categoryFieldsMap };
 
       if (field === 'categories') {
@@ -145,6 +149,12 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
           setUnitsList(updatedUnits);
         }
         setForm(prev => ({ ...prev, unit: cleanVal }));
+      } else if (field === 'groups') {
+        if (!updatedGroups.includes(cleanVal)) {
+          updatedGroups.push(cleanVal);
+          setGroupsList(updatedGroups);
+        }
+        setForm(prev => ({ ...prev, group: cleanVal }));
       } else {
         if (!updatedRuleTypes.includes(cleanVal)) {
           updatedRuleTypes.push(cleanVal);
@@ -158,6 +168,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
         categories: updatedCategories,
         units: updatedUnits,
         ruleTypes: updatedRuleTypes,
+        groups: updatedGroups,
         categoryFields: updatedFieldsMap
       });
 
@@ -189,6 +200,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
         length: editSku.length !== undefined ? String(editSku.length) : '',
         brand: editSku.brand || '',
         title: editSku.title || '',
+        group: editSku.group || '',
         ruleType: editSku.ruleType || 'Plain',
         pages: (editSku as any).pages !== undefined ? String((editSku as any).pages) : '',
         booksGbl: (editSku as any).booksGbl !== undefined ? String((editSku as any).booksGbl) : '',
@@ -209,6 +221,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
         length: '',
         brand: '',
         title: '',
+        group: '',
         ruleType: 'Plain',
         pages: '',
         booksGbl: '',
@@ -262,11 +275,19 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
             setForm(prev => ({ ...prev, name: '' }));
             return;
           }
-          const parts = [];
-          if (form.pages) parts.push(`${form.pages}P`);
-          if (form.brand) parts.push(form.brand);
-          if (form.ruleType) parts.push(`(${form.ruleType})`);
-          setForm(prev => ({ ...prev, name: parts.join(' ') }));
+          if (form.group) {
+            setForm(prev => ({ ...prev, name: form.group }));
+          } else {
+            if (!form.pages && !form.brand && !form.ruleType) {
+              setForm(prev => ({ ...prev, name: '' }));
+              return;
+            }
+            const parts = [];
+            if (form.pages) parts.push(`${form.pages}P`);
+            if (form.brand) parts.push(form.brand);
+            if (form.ruleType) parts.push(`(${form.ruleType})`);
+            setForm(prev => ({ ...prev, name: parts.join(' ') }));
+          }
         } else {
           const active = categoryFieldsMap[form.category] || [];
           const parts = [];
@@ -281,7 +302,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
           }
         }
       }
-    }, [form.category, form.paperType, form.ruleType, form.gsm, form.width, form.length, form.unit, form.pages, form.brand, form.title, isNameManuallyEdited, editSku, categoryFieldsMap]);
+    }, [form.category, form.paperType, form.ruleType, form.gsm, form.width, form.length, form.unit, form.pages, form.brand, form.title, form.group, isNameManuallyEdited, editSku, categoryFieldsMap]);
 
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -717,6 +738,28 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                   )}
                 </>
               )}
+              {activeFields.includes('group') && (
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Group</label>
+                  <select
+                    value={form.group}
+                    onChange={e => {
+                      if (e.target.value === '__ADD_NEW__') {
+                        handleAddNewOption('groups');
+                      } else {
+                        setForm({ ...form, group: e.target.value });
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                  >
+                    <option value="">None</option>
+                    {groupsList.map(g => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                    <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
+                  </select>
+                </div>
+              )}
               {activeFields.includes('ruleType') && (
                 <div>
                   <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Rule Type</label>
@@ -815,7 +858,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
             {/* Header */}
             <div className="px-5 py-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
               <span className="font-bold text-gray-800 text-xs">
-                Add Custom {modalConfig.type === 'categories' ? 'Category' : modalConfig.type === 'units' ? 'Unit' : 'Rule Type'}
+                Add Custom {modalConfig.type === 'categories' ? 'Category' : modalConfig.type === 'units' ? 'Unit' : modalConfig.type === 'groups' ? 'Group' : 'Rule Type'}
               </span>
               <button 
                 type="button"
@@ -830,13 +873,14 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
             <div className="p-5 space-y-4">
               <div>
                 <label className="block text-[9px] font-bold text-gray-500 mb-1 uppercase">
-                  {modalConfig.type === 'categories' ? 'Category Name' : modalConfig.type === 'units' ? 'Unit Symbol' : 'Rule Name'} *
+                  {modalConfig.type === 'categories' ? 'Category Name' : modalConfig.type === 'units' ? 'Unit Symbol' : modalConfig.type === 'groups' ? 'Group Name' : 'Rule Name'} *
                 </label>
                 <input
                   type="text"
                   placeholder={
                     modalConfig.type === 'categories' ? 'e.g. Packing Material' :
-                    modalConfig.type === 'units' ? 'e.g. gross' : 'e.g. Single Line'
+                    modalConfig.type === 'units' ? 'e.g. gross' :
+                    modalConfig.type === 'groups' ? 'e.g. 132P Happy days (UR)' : 'e.g. Single Line'
                   }
                   value={modalConfig.nameValue}
                   onChange={e => setModalConfig(prev => ({ ...prev, nameValue: e.target.value }))}
@@ -855,6 +899,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                     {[
                       { id: 'brand', label: 'Brand' },
                       { id: 'title', label: 'Title (Description)' },
+                      { id: 'group', label: 'Group' },
                       { id: 'gsm', label: 'GSM' },
                       { id: 'dimensions', label: 'Dimensions (Size)' },
                       { id: 'paperType', label: 'Format Reels/Sheets' },

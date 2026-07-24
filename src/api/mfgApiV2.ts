@@ -12,6 +12,7 @@ export interface SkuV2 {
   length?: number;
   brand?: string;
   title?: string;
+  group?: string;
   ruleType?: string;
   altUnit?: string;
   altUnitConversion?: number;

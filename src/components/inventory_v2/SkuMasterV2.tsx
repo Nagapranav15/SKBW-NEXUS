@@ -345,6 +345,7 @@ const SkuMasterV2: React.FC = () => {
                     <th className="px-5 py-3">Item Code</th>
                     <th className="px-5 py-3">Item Name</th>
                     <th className="px-5 py-3">Category</th>
+                    <th className="px-5 py-3">Group</th>
                     <th className="px-5 py-3">Unit</th>
                     <th className="px-5 py-3">Brand</th>
                     <th className="px-5 py-3 text-center">GSM</th>
@@ -373,6 +374,7 @@ const SkuMasterV2: React.FC = () => {
                           {s.category}
                         </span>
                       </td>
+                      <td className="px-5 py-3 font-semibold text-gray-600">{(s as any).group || '—'}</td>
                       <td className="px-5 py-3 font-bold text-gray-500 uppercase font-mono">
                         {s.unit}
                         {(s as any).altUnit && (
@@ -608,6 +610,10 @@ const SkuMasterV2: React.FC = () => {
                   <div>
                     <span className="block text-[10px] text-gray-400 font-medium uppercase">Brand</span>
                     <span className="font-semibold">{selectedSkuDetails.brand || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-gray-400 font-medium uppercase">Group</span>
+                    <span className="font-semibold">{(selectedSkuDetails as any).group || '—'}</span>
                   </div>
                   <div>
                     <span className="block text-[10px] text-gray-400 font-medium uppercase">Default Unit</span>
