@@ -3,13 +3,14 @@ import { X, Save, RefreshCw } from 'lucide-react';
 import { createSkuV2, updateSkuV2, SkuV2, getMetadataV2, updateMetadataV2, getSkusV2 } from '../../api/mfgApiV2';
 
 interface AddSkuDrawerV2Props {
+  isOpen: boolean;
   companyId: string;
   editSku?: SkuV2 | null;
   onClose: () => void;
   onSaveSuccess: (savedSku: SkuV2) => void;
 }
 
-const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ companyId, editSku, onClose, onSaveSuccess }) => {
+const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, editSku, onClose, onSaveSuccess }) => {
   const [form, setForm] = useState({
     skuCode: '',
     name: '',
@@ -264,6 +265,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ companyId, editSku, onC
       setIsSaving(false);
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
