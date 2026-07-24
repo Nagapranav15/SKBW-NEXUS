@@ -781,6 +781,11 @@ exports.getBalances = async (req, res, next) => {
             $sum: {
               $cond: [{ $eq: ["$direction", "OUT"] }, "$quantity", 0]
             }
+          },
+          reelsList: {
+            $push: {
+              $cond: [{ $eq: ["$direction", "IN"] }, "$reels", []]
+            }
           }
         }
       },
@@ -789,7 +794,14 @@ exports.getBalances = async (req, res, next) => {
           skuId: "$_id.skuId",
           locationId: "$_id.locationId",
           batchNumber: isGroupBatch ? "$_id.batchNumber" : null,
-          onHand: { $subtract: ["$qtyInTotal", "$qtyOutTotal"] }
+          onHand: { $subtract: ["$qtyInTotal", "$qtyOutTotal"] },
+          reels: {
+            $reduce: {
+              input: "$reelsList",
+              initialValue: [],
+              in: { $concatArrays: ["$$value", "$$this"] }
+            }
+          }
         }
       },
       { $match: { onHand: { $gt: 0 } } },

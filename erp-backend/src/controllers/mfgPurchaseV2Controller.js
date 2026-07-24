@@ -172,6 +172,7 @@ exports.createPurchaseInvoice = async (req, res, next) => {
         zoneId: valItem.zoneId,
         locationId: valItem.locationId,
         remarks: `Lot: ${valItem.lotNumber}. Inwarded via invoice ${finalInvoiceNo}`,
+        reels: valItem.reels || [],
         createdBy: toObjectId(req.user.id),
         company: companyObjId,
         status: "Posted"
@@ -460,6 +461,7 @@ exports.editPurchaseInvoice = async (req, res, next) => {
         zoneId: valItem.zoneId,
         locationId: valItem.locationId,
         remarks: `Lot: ${valItem.lotNumber}. Inwarded via invoice ${invoice.invoiceNumber}`,
+        reels: valItem.reels || [],
         createdBy: toObjectId(req.user.id),
         company: companyObjId,
         status: "Posted"
