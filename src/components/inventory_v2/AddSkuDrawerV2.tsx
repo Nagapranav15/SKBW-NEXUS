@@ -45,6 +45,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
   const [fgBrandsList, setFgBrandsList] = useState<string[]>([]);
   const [brandSearch, setBrandSearch] = useState('');
   const [showBrandDropdown, setShowBrandDropdown] = useState(false);
+  const [groupSearch, setGroupSearch] = useState('');
+  const [showGroupDropdown, setShowGroupDropdown] = useState(false);
 
   // Category specific field visibility mapping
   const [categoryFieldsMap, setCategoryFieldsMap] = useState<Record<string, string[]>>({
@@ -184,6 +186,11 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
     setBrandSearch(form.brand);
   }, [form.brand]);
 
+  // Sync groupSearch with form.group
+  useEffect(() => {
+    setGroupSearch(form.group);
+  }, [form.group]);
+
   // Update form state if editSku is provided or changes
   useEffect(() => {
     if (editSku) {
@@ -322,6 +329,24 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
           altUnitConversion: (isSemiOrFinished && form.altUnit) ? (form.altUnitConversion ? Number(form.altUnitConversion) : undefined) : undefined,
           company: companyId
         };
+
+        // Auto-save typed Group if not in groupsList
+        if (form.group.trim() && !groupsList.includes(form.group.trim())) {
+          const updatedGroupsList = [...groupsList, form.group.trim()];
+          setGroupsList(updatedGroupsList);
+          try {
+            await updateMetadataV2({
+              companyId,
+              categories: categoriesList,
+              units: unitsList,
+              ruleTypes: ruleTypesList,
+              groups: updatedGroupsList,
+              categoryFields: categoryFieldsMap
+            });
+          } catch (e) {
+            console.error("Failed to auto-save new group to metadata", e);
+          }
+        }
 
         let saved;
         if (editSku?._id) {
@@ -741,23 +766,65 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
               {activeFields.includes('group') && (
                 <div>
                   <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Group</label>
-                  <select
-                    value={form.group}
-                    onChange={e => {
-                      if (e.target.value === '__ADD_NEW__') {
-                        handleAddNewOption('groups');
-                      } else {
-                        setForm({ ...form, group: e.target.value });
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
-                  >
-                    <option value="">None</option>
-                    {groupsList.map(g => (
-                      <option key={g} value={g}>{g}</option>
-                    ))}
-                    <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
-                  </select>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search or type group..."
+                      value={groupSearch}
+                      onChange={e => {
+                        setGroupSearch(e.target.value);
+                        setForm(prev => ({ ...prev, group: e.target.value }));
+                      }}
+                      onFocus={() => setShowGroupDropdown(true)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                    />
+                    {showGroupDropdown && (
+                      <>
+                        <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-20 divide-y divide-gray-50">
+                          {groupsList
+                            .filter(g => g.toLowerCase().includes(groupSearch.toLowerCase()))
+                            .map(g => (
+                              <button
+                                key={g}
+                                type="button"
+                                onClick={() => {
+                                  setForm(prev => ({ ...prev, group: g }));
+                                  setGroupSearch(g);
+                                  setShowGroupDropdown(false);
+                                }}
+                                className="w-full px-3 py-2 text-left text-xs hover:bg-blue-50 hover:text-blue-600 transition-colors font-semibold text-gray-700 block"
+                              >
+                                {g}
+                              </button>
+                            ))
+                          }
+                          {groupSearch.trim() && !groupsList.some(g => g.toLowerCase() === groupSearch.toLowerCase()) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newGrp = groupSearch.trim();
+                                if (!groupsList.includes(newGrp)) {
+                                  setGroupsList(prev => [...prev, newGrp]);
+                                }
+                                setForm(prev => ({ ...prev, group: newGrp }));
+                                setShowGroupDropdown(false);
+                              }}
+                              className="w-full px-3 py-2 text-left text-xs hover:bg-green-50 text-green-600 font-bold transition-colors block"
+                            >
+                              + Add Group "{groupSearch.trim()}"
+                            </button>
+                          )}
+                          {groupsList.filter(g => g.toLowerCase().includes(groupSearch.toLowerCase())).length === 0 && !groupSearch.trim() && (
+                            <div className="px-3 py-2 text-xs text-gray-400 italic">No groups found</div>
+                          )}
+                        </div>
+                        <div 
+                          className="fixed inset-0 z-10" 
+                          onClick={() => setShowGroupDropdown(false)} 
+                        />
+                      </>
+                    )}
+                  </div>
                 </div>
               )}
               {activeFields.includes('ruleType') && (
