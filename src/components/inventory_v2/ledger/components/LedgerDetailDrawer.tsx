@@ -1,6 +1,7 @@
-import React from 'react';
-import { X, ShieldAlert, Layers, MapPin, ArrowRightLeft, FileText, User } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { X, ShieldAlert, Layers, MapPin, ArrowRightLeft, FileText, User, Box, ListTodo, HelpCircle, History } from 'lucide-react';
 import { LedgerEntryV2 } from '../types';
+import { getBalancesV2 } from '../../../../api/mfgApiV2';
 
 interface LedgerDetailDrawerProps {
   entry: LedgerEntryV2 | null;
@@ -8,7 +9,31 @@ interface LedgerDetailDrawerProps {
 }
 
 const LedgerDetailDrawer: React.FC<LedgerDetailDrawerProps> = ({ entry, onClose }) => {
+  const [batchBalances, setBatchBalances] = useState<any[]>([]);
+  const [loadingBalances, setLoadingBalances] = useState(false);
+
+  useEffect(() => {
+    if (entry?.skuId?._id && entry?.batchNumber) {
+      setLoadingBalances(true);
+      // Fetch dynamic location placement balances for this specific SKU and Batch
+      getBalancesV2(entry.skuId.company || '', undefined, true, entry.skuId._id, entry.batchNumber)
+        .then(res => {
+          setBatchBalances(res || []);
+        })
+        .catch(err => {
+          console.error("Failed to load current location placement for ledger entry", err);
+        })
+        .finally(() => {
+          setLoadingBalances(false);
+        });
+    } else {
+      setBatchBalances([]);
+    }
+  }, [entry?.skuId?._id, entry?.batchNumber]);
+
   if (!entry) return null;
+
+  const hasReels = entry.reels && entry.reels.length > 0;
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
@@ -71,10 +96,8 @@ const LedgerDetailDrawer: React.FC<LedgerDetailDrawerProps> = ({ entry, onClose 
                 <span className="font-bold text-gray-800 block mt-0.5">{entry.transactionType}</span>
               </div>
               <div>
-                <span className="block text-[10px] text-gray-400 font-semibold uppercase">Status</span>
-                <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-extrabold uppercase bg-green-50 border border-green-200 text-green-700 mt-0.5">
-                  {entry.status}
-                </span>
+                <span className="block text-[10px] text-gray-400 font-semibold uppercase">Batch Number</span>
+                <span className="font-mono font-bold text-blue-600 block mt-0.5">{entry.batchNumber || '—'}</span>
               </div>
               <div>
                 <span className="block text-[10px] text-gray-400 font-semibold uppercase">Posted Date</span>
@@ -123,10 +146,100 @@ const LedgerDetailDrawer: React.FC<LedgerDetailDrawerProps> = ({ entry, onClose 
             </div>
           </div>
 
-          {/* Location Trail */}
+          {/* Reels / Sheets Specification Inside This Transaction */}
+          {hasReels && (
+            <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
+                <Box className="w-3.5 h-3.5 text-blue-600" /> Reels Specifications in this Flow ({entry.reels?.length} Reels)
+              </h3>
+              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden max-h-48 overflow-y-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50 text-gray-400 font-bold border-b border-gray-200 text-[10px] uppercase">
+                      <th className="px-3 py-2">Reel Number</th>
+                      <th className="px-3 py-2 text-right">GSM / Width</th>
+                      <th className="px-3 py-2 text-right">Weight (KG)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50 text-gray-700 font-semibold">
+                    {entry.reels?.map((r, i) => (
+                      <tr key={i} className="hover:bg-gray-50/20">
+                        <td className="px-3 py-2 font-mono text-gray-900">{r.reelNumber}</td>
+                        <td className="px-3 py-2 text-right text-gray-500">{r.gsm}g • {r.width}cm</td>
+                        <td className="px-3 py-2 text-right font-mono font-bold text-gray-900">{r.weight} KG</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Current Placement / Distributed Locations */}
           <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-blue-600" /> Physical Location Hierarchy
+              <MapPin className="w-3.5 h-3.5 text-emerald-600" /> Current Placement (Physical Location Hierarchy)
+            </h3>
+            
+            {loadingBalances ? (
+              <div className="py-6 flex items-center justify-center gap-2 text-gray-400 text-xs font-semibold">
+                <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
+                <span>Locating active stock placement...</span>
+              </div>
+            ) : batchBalances.length > 0 ? (
+              <div className="space-y-3.5">
+                {batchBalances.map((bal, idx) => {
+                  // Resolve parents hierarchy representation
+                  const pathHierarchy = [];
+                  if (bal.location?.parentId) {
+                    // We can display parents if populated, otherwise show location levels
+                    pathHierarchy.push(bal.location.level || 'Bin');
+                  }
+                  
+                  return (
+                    <div key={idx} className="bg-white border border-gray-200 rounded-xl p-3.5 space-y-2 shadow-3xs">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-emerald-50 text-emerald-700 border border-emerald-100">
+                            {bal.location?.level || 'Storage'}
+                          </span>
+                          <span className="font-bold text-gray-900 text-xs">{bal.location?.name || '—'}</span>
+                        </div>
+                        <span className="font-mono font-black text-xs text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-lg">
+                          {bal.onHand?.toLocaleString()} {entry.skuId?.unit || entry.unit}
+                        </span>
+                      </div>
+
+                      {/* Display reels physically stored here */}
+                      {bal.reels && bal.reels.length > 0 && (
+                        <div className="pt-2 border-t border-gray-100 space-y-1.5">
+                          <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">
+                            Stored Reels ({bal.reels.length}):
+                          </span>
+                          <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                            {bal.reels.map((r: any, rIdx: number) => (
+                              <span key={rIdx} className="px-2 py-1 rounded bg-gray-50 border border-gray-200 text-[10px] font-mono font-bold text-gray-700" title={`${r.gsm}g • ${r.width}cm • ${r.weight}kg`}>
+                                {r.reelNumber} ({r.weight}kg)
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-gray-400 italic text-[11px] bg-white border border-gray-100 rounded-xl">
+                ⚠️ Stock has been fully consumed or moved from this batch.
+              </div>
+            )}
+          </div>
+
+          {/* Source Transaction Placement Hierarchy */}
+          <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
+              <History className="w-3.5 h-3.5 text-blue-600" /> Transaction Initial Location Trail
             </h3>
             <div className="space-y-2 text-xs">
               <div className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-100">
@@ -142,13 +255,13 @@ const LedgerDetailDrawer: React.FC<LedgerDetailDrawerProps> = ({ entry, onClose 
                 <span className="font-bold text-gray-900">{entry.zoneId?.name || '—'}</span>
               </div>
               <div className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-200">
-                <span className="text-emerald-700 uppercase font-semibold text-[10px]">Storage Location</span>
+                <span className="text-emerald-700 uppercase font-semibold text-[10px]">Initial Location Node</span>
                 <span className="font-bold text-emerald-800">{entry.locationId?.name || '—'}</span>
               </div>
             </div>
           </div>
 
-          {/* Reference Document */}
+          {/* Reference Info */}
           <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
               <FileText className="w-3.5 h-3.5 text-blue-600" /> Reference documents

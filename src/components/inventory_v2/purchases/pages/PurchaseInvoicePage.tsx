@@ -40,7 +40,7 @@ const PurchaseInvoicePage: React.FC = () => {
   const [selectedInvoice, setSelectedInvoice] = useState<PurchaseInvoiceV2 | null>(null);
   
   // Details tabs
-  const [detailsTab, setDetailsTab] = useState<'lots' | 'allocation' | 'docs' | 'history'>('lots');
+  const [detailsTab, setDetailsTab] = useState<'lots' | 'allocation' | 'history'>('lots');
 
   // Allocation Modal state
   const [showAllocateModal, setShowAllocateModal] = useState(false);
@@ -49,6 +49,7 @@ const PurchaseInvoicePage: React.FC = () => {
     toLocationId: '',
     quantity: ''
   });
+  const [selectedReelsForAllocation, setSelectedReelsForAllocation] = useState<any[]>([]);
   const [allocateSubmitting, setAllocateSubmitting] = useState(false);
   const [allocateError, setAllocateError] = useState('');
 
@@ -468,12 +469,14 @@ const PurchaseInvoicePage: React.FC = () => {
         quantity: qty,
         remarks: `Location Allocation: ${selectedInvoice.invoiceNumber}`,
         company: selectedCompany?._id || '',
-        batchNumber: selectedInvoice.invoiceNumber
+        batchNumber: selectedInvoice.invoiceNumber,
+        reels: selectedReelsForAllocation
       });
 
       showToast('Stock allocated successfully!', 'success');
       setShowAllocateModal(false);
       setAllocateForm({ itemIndex: 0, toLocationId: '', quantity: '' });
+      setSelectedReelsForAllocation([]);
       loadBalances();
     } catch (err: any) {
       console.error(err);
@@ -978,16 +981,7 @@ const PurchaseInvoicePage: React.FC = () => {
                 >
                   <MapPinIcon className="w-3.5 h-3.5" /> Location Allocation
                 </button>
-                <button
-                  onClick={() => setDetailsTab('docs')}
-                  className={`px-4 py-2 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
-                    detailsTab === 'docs' 
-                      ? 'border-blue-600 text-blue-600' 
-                      : 'border-transparent text-gray-400 hover:text-gray-700'
-                  }`}
-                >
-                  <Calendar className="w-3.5 h-3.5" /> Documents
-                </button>
+
                 <button
                   onClick={() => setDetailsTab('history')}
                   className={`px-4 py-2 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
@@ -1140,28 +1134,7 @@ const PurchaseInvoicePage: React.FC = () => {
                 );
               })()}
 
-              {/* DOCUMENTS TAB */}
-              {detailsTab === 'docs' && (
-                <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4 shadow-sm">
-                  <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider border-b pb-2">
-                    Purchase Documents
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="flex items-center justify-between p-3.5 border border-gray-200 rounded-xl hover:bg-gray-50/20 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-red-50 text-red-500 rounded-lg">
-                          <FileText className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-gray-800">InvoiceCopy_{selectedInvoice.invoiceNumber}.pdf</p>
-                          <p className="text-[10px] text-gray-400 mt-0.5 font-bold uppercase font-mono">1.8 MB • PDF Document</p>
-                        </div>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-gray-300" />
-                    </div>
-                  </div>
-                </div>
-              )}
+
 
               {/* TIMELINE TAB */}
               {detailsTab === 'history' && (
@@ -1480,17 +1453,30 @@ const PurchaseInvoicePage: React.FC = () => {
         );
         const maxAllocatable = unallocatedBal ? unallocatedBal.onHand : 0;
 
-        const physicalLocations = locations.filter(loc => loc.level === 'Storage Location' && loc._id !== defaultLocationId);
+        const physicalLocations = locations.filter(loc => loc._id !== defaultLocationId);
+        const hasReels = unallocatedBal && unallocatedBal.reels && unallocatedBal.reels.length > 0;
+
+        const handleReelToggle = (reel: any) => {
+          let newSelected = [...selectedReelsForAllocation];
+          if (newSelected.some(r => r.reelNumber === reel.reelNumber)) {
+            newSelected = newSelected.filter(r => r.reelNumber !== reel.reelNumber);
+          } else {
+            newSelected.push(reel);
+          }
+          setSelectedReelsForAllocation(newSelected);
+          const sumWeight = newSelected.reduce((sum, r) => sum + r.weight, 0);
+          setAllocateForm(prev => ({ ...prev, quantity: sumWeight > 0 ? String(sumWeight) : '' }));
+        };
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-black/45 backdrop-blur-3xs" onClick={() => !allocateSubmitting && setShowAllocateModal(false)} />
 
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-xl max-w-md w-full relative z-10 animate-in zoom-in-95 duration-150 overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-xl max-w-lg w-full relative z-10 animate-in zoom-in-95 duration-150 overflow-hidden flex flex-col max-h-[85vh]">
+              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
                 <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
                   <MapPinIcon className="w-4 h-4 text-blue-600 animate-pulse" />
-                  Allocate Location
+                  Allocate Location & Reels
                 </h2>
                 <button
                   disabled={allocateSubmitting}
@@ -1501,7 +1487,7 @@ const PurchaseInvoicePage: React.FC = () => {
                 </button>
               </div>
 
-              <form onSubmit={handleAllocateSubmit} className="p-6 space-y-4 text-left text-xs">
+              <form onSubmit={handleAllocateSubmit} className="p-6 space-y-4 text-left text-xs overflow-y-auto flex-1">
                 {allocateError && (
                   <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-xs font-bold text-red-700 flex items-center gap-1.5">
                     <HelpCircle className="w-4 h-4 shrink-0" />
@@ -1522,12 +1508,15 @@ const PurchaseInvoicePage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="space-y-3.5">
+                <div className="space-y-4">
                   <div>
                     <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase tracking-wider">Select Material Lot *</label>
                     <select
                       value={allocateForm.itemIndex}
-                      onChange={e => setAllocateForm({ ...allocateForm, itemIndex: Number(e.target.value), quantity: '' })}
+                      onChange={e => {
+                        setAllocateForm({ ...allocateForm, itemIndex: Number(e.target.value), quantity: '' });
+                        setSelectedReelsForAllocation([]);
+                      }}
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
                       required
                       disabled={allocateSubmitting}
@@ -1545,7 +1534,7 @@ const PurchaseInvoicePage: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase tracking-wider">Destination Storage Location *</label>
+                    <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase tracking-wider">Destination Storage Location (Warehouse/Floor/Zone/Bin) *</label>
                     <select
                       value={allocateForm.toLocationId}
                       onChange={e => setAllocateForm({ ...allocateForm, toLocationId: e.target.value })}
@@ -1553,16 +1542,50 @@ const PurchaseInvoicePage: React.FC = () => {
                       required
                       disabled={allocateSubmitting}
                     >
-                      <option value="">-- Choose Storage Bin --</option>
+                      <option value="">-- Choose Storage Area --</option>
                       {physicalLocations.map(loc => {
+                        const paths = resolveLocationPath(loc._id);
+                        const hierarchy = [paths.factory, paths.floor, paths.zone].filter(p => p && p !== '—').join(' > ');
                         return (
                           <option key={loc._id} value={loc._id}>
-                            {loc.name} ({loc.level})
+                            {hierarchy ? `${hierarchy} > ` : ''}{loc.name} ({loc.level})
                           </option>
                         );
                       })}
                     </select>
                   </div>
+
+                  {hasReels && (
+                    <div className="space-y-2">
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                        Select Reels to Allocate ({selectedReelsForAllocation.length} of {unallocatedBal.reels.length} selected)
+                      </label>
+                      <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 max-h-48 overflow-y-auto space-y-1.5">
+                        {unallocatedBal.reels.map((r: any) => {
+                          const isChecked = selectedReelsForAllocation.some(sr => sr.reelNumber === r.reelNumber);
+                          return (
+                            <label key={r.reelNumber} className="flex items-center justify-between p-2 hover:bg-white rounded-lg border border-transparent hover:border-gray-200 transition-all cursor-pointer font-semibold text-gray-700">
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => handleReelToggle(r)}
+                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                                />
+                                <span className="font-mono text-xs text-gray-900">{r.reelNumber}</span>
+                              </div>
+                              <span className="font-mono text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-black">
+                                {r.weight} KG
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <p className="text-[10px] text-gray-400 italic">
+                        💡 Sum weight of selected reels will automatically calculate the allocation weight.
+                      </p>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase tracking-wider">Quantity to Allocate (KG) *</label>
@@ -1572,12 +1595,12 @@ const PurchaseInvoicePage: React.FC = () => {
                         step="any"
                         min="0.001"
                         max={maxAllocatable}
-                        placeholder={`Max ${maxAllocatable.toLocaleString()} KG`}
+                        placeholder={hasReels ? "Auto-calculated from selected reels" : `Max ${maxAllocatable.toLocaleString()} KG`}
                         value={allocateForm.quantity}
                         onChange={e => setAllocateForm({ ...allocateForm, quantity: e.target.value })}
-                        className="w-full pl-3 pr-12 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 font-mono font-bold text-gray-900"
+                        className="w-full pl-3 pr-12 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 font-mono font-bold text-gray-900 bg-white"
                         required
-                        disabled={allocateSubmitting || maxAllocatable <= 0}
+                        disabled={allocateSubmitting || maxAllocatable <= 0 || hasReels}
                       />
                       <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-[10px] font-black text-gray-400 uppercase font-mono">
                         KG
@@ -1586,7 +1609,7 @@ const PurchaseInvoicePage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-gray-150 flex justify-end gap-3">
+                <div className="pt-4 border-t border-gray-150 flex justify-end gap-3 flex-shrink-0">
                   <button
                     type="button"
                     disabled={allocateSubmitting}
@@ -1597,7 +1620,7 @@ const PurchaseInvoicePage: React.FC = () => {
                   </button>
                   <button
                     type="submit"
-                    disabled={allocateSubmitting || maxAllocatable <= 0}
+                    disabled={allocateSubmitting || maxAllocatable <= 0 || (hasReels && selectedReelsForAllocation.length === 0)}
                     className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 transition-colors disabled:opacity-50"
                   >
                     {allocateSubmitting ? (

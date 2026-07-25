@@ -141,6 +141,7 @@ export const recordTransferV2 = async (transferData: {
   remarks?: string;
   company: string;
   batchNumber?: string;
+  reels?: any[];
 }): Promise<any> => {
   const response = await api.post('/v2/ledger/transfer', transferData);
   return response.data;
@@ -148,9 +149,15 @@ export const recordTransferV2 = async (transferData: {
 
 // ── BALANCES API ─────────────────────────────────────────────────────────────
 
-export const getBalancesV2 = async (companyId: string, category?: string, groupByBatch?: boolean): Promise<any[]> => {
+export const getBalancesV2 = async (
+  companyId: string,
+  category?: string,
+  groupByBatch?: boolean,
+  skuId?: string,
+  batchNumber?: string
+): Promise<any[]> => {
   const response = await api.get('/v2/balances', {
-    params: { companyId, category, groupByBatch }
+    params: { companyId, category, groupByBatch, skuId, batchNumber }
   });
   return response.data;
 };

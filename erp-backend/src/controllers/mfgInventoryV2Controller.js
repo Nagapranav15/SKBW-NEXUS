@@ -531,7 +531,7 @@ exports.recordTransfer = async (req, res, next) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
-    const { skuId, fromLocationId, toLocationId, quantity, remarks, company, batchNumber } = req.body;
+    const { skuId, fromLocationId, toLocationId, quantity, remarks, company, batchNumber, reels } = req.body;
     if (!company) {
       return res.status(400).json({ msg: "company is required" });
     }
@@ -602,12 +602,6 @@ exports.recordTransfer = async (req, res, next) => {
       session.endSession();
       return res.status(400).json({ msg: "Destination location not found" });
     }
-    if (destLocation.level !== "Storage Location") {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({ msg: "Destination location must be a Storage Location node" });
-    }
-
     // Check capacity constraint on destination location
     if (destLocation.capacity && destLocation.capacity > 0) {
       const totalOccupiedAgg = await InventoryLedger.aggregate([
@@ -685,6 +679,7 @@ exports.recordTransfer = async (req, res, next) => {
       floorId: fromFloor?._id || fromLocObjId,
       zoneId: fromZone?._id || fromLocObjId,
       locationId: fromLocObjId,
+      reels: reels || [],
       remarks: remarks || `Transfer to ${destLocation.name}`,
       createdBy: toObjectId(req.user.id),
       company: companyObjId,
@@ -707,6 +702,7 @@ exports.recordTransfer = async (req, res, next) => {
       floorId: toFloor?._id || toLocObjId,
       zoneId: toZone?._id || toLocObjId,
       locationId: toLocObjId,
+      reels: reels || [],
       remarks: remarks || `Transfer from ${fromLocation.name}`,
       createdBy: toObjectId(req.user.id),
       company: companyObjId,
@@ -757,7 +753,7 @@ exports.recordTransfer = async (req, res, next) => {
 
 exports.getBalances = async (req, res, next) => {
   try {
-    const { companyId, category, groupByBatch } = req.query;
+    const { companyId, category, groupByBatch, skuId, batchNumber } = req.query;
     if (!companyId) {
       return res.status(400).json({ msg: "companyId query parameter is required" });
     }
@@ -767,8 +763,12 @@ exports.getBalances = async (req, res, next) => {
       ? { skuId: "$skuId", locationId: "$locationId", batchNumber: "$batchNumber" }
       : { skuId: "$skuId", locationId: "$locationId" };
 
+    const matchObj = { company: toObjectId(companyId) };
+    if (skuId) matchObj.skuId = toObjectId(skuId);
+    if (batchNumber) matchObj.batchNumber = batchNumber;
+
     const pipeline = [
-      { $match: { company: toObjectId(companyId) } },
+      { $match: matchObj },
       {
         $group: {
           _id: groupFields,
@@ -782,9 +782,14 @@ exports.getBalances = async (req, res, next) => {
               $cond: [{ $eq: ["$direction", "OUT"] }, "$quantity", 0]
             }
           },
-          reelsList: {
+          reelsIn: {
             $push: {
               $cond: [{ $eq: ["$direction", "IN"] }, "$reels", []]
+            }
+          },
+          reelsOut: {
+            $push: {
+              $cond: [{ $eq: ["$direction", "OUT"] }, "$reels", []]
             }
           }
         }
@@ -796,10 +801,29 @@ exports.getBalances = async (req, res, next) => {
           batchNumber: isGroupBatch ? "$_id.batchNumber" : null,
           onHand: { $subtract: ["$qtyInTotal", "$qtyOutTotal"] },
           reels: {
-            $reduce: {
-              input: "$reelsList",
-              initialValue: [],
-              in: { $concatArrays: ["$$value", "$$this"] }
+            $filter: {
+              input: {
+                $reduce: {
+                  input: "$reelsIn",
+                  initialValue: [],
+                  in: { $concatArrays: ["$$value", "$$this"] }
+                }
+              },
+              as: "r",
+              cond: {
+                $not: {
+                  $in: [
+                    "$$r.reelNumber",
+                    {
+                      $reduce: {
+                        input: "$reelsOut",
+                        initialValue: [],
+                        in: { $concatArrays: ["$$value", "$$this"] }
+                      }
+                    }
+                  ]
+                }
+              }
             }
           }
         }

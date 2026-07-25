@@ -21,6 +21,12 @@ export interface LedgerEntryV2 {
     email: string;
   };
   status: 'Posted' | 'Pending' | 'Cancelled';
+  reels?: {
+    reelNumber: string;
+    gsm: number;
+    width: number;
+    weight: number;
+  }[];
   createdAt: string;
   updatedAt: string;
 }
