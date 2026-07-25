@@ -198,7 +198,13 @@ const Layout: React.FC = () => {
     navigate('/login');
   };
 
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (path: string) => {
+    if (path.includes('?')) {
+      const [pathName, searchPart] = path.split('?');
+      return location.pathname === pathName && location.search.includes(searchPart);
+    }
+    return location.pathname === path;
+  };
 
   // Masters
   const mastersItems = [
@@ -217,21 +223,21 @@ const Layout: React.FC = () => {
   const purchaseItems = [
     { label: 'Purchase Batches', path: '/inventory-v2/purchases', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
     { label: 'Suppliers', path: '/party/vendors', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
-    { label: 'Purchase Ledger', path: '/inventory-v2/ledger', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
+    { label: 'Purchase Ledger', path: '/inventory-v2/ledger?mode=purchase', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
   ];
   const visiblePurchaseItems = purchaseItems.filter(item => hasPermission(item.permission));
   const hasPurchaseAccess = visiblePurchaseItems.length > 0;
-  const isPurchaseActive = () => ['/inventory-v2/purchases', '/party/vendors'].includes(location.pathname) || (location.pathname === '/inventory-v2/ledger' && document.referrer.includes('purchase'));
+  const isPurchaseActive = () => ['/inventory-v2/purchases', '/party/vendors'].includes(location.pathname) || (location.pathname === '/inventory-v2/ledger' && location.search.includes('mode=purchase'));
 
   // Inventory
   const inventoryV2Items = [
     { label: 'Batch Stock / Lots', path: '/inventory-v2/batch-stock', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
-    { label: 'Stock Ledger', path: '/inventory-v2/ledger', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
+    { label: 'Stock Ledger', path: '/inventory-v2/ledger?mode=stock', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
     { label: 'Warehouse Setup', path: '/inventory-v2/warehouse', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
   ];
   const visibleInventoryV2Items = inventoryV2Items.filter(item => hasPermission(item.permission));
   const hasInventoryV2Access = visibleInventoryV2Items.length > 0;
-  const isInventoryV2Active = () => ['/inventory-v2/batch-stock', '/inventory-v2/warehouse'].includes(location.pathname) || (location.pathname === '/inventory-v2/ledger' && !document.referrer.includes('purchase'));
+  const isInventoryV2Active = () => ['/inventory-v2/batch-stock', '/inventory-v2/warehouse'].includes(location.pathname) || (location.pathname === '/inventory-v2/ledger' && location.search.includes('mode=stock'));
 
   // Conversions
   const conversionsItems = [

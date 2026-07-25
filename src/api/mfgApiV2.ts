@@ -125,6 +125,7 @@ export const getLedgerV2 = async (params: {
   skuId?: string;
   locationId?: string;
   transactionType?: string;
+  excludeType?: string;
   batchNumber?: string;
   startDate?: string;
   endDate?: string;

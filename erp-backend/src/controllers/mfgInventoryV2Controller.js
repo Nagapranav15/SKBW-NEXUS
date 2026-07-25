@@ -498,7 +498,7 @@ exports.getLocationDetails = async (req, res, next) => {
 
 exports.getLedger = async (req, res, next) => {
   try {
-    const { companyId, skuId, locationId, transactionType, batchNumber, startDate, endDate } = req.query;
+    const { companyId, skuId, locationId, transactionType, batchNumber, startDate, endDate, excludeType } = req.query;
     if (!companyId) {
       return res.status(400).json({ msg: "companyId query parameter is required" });
     }
@@ -507,6 +507,7 @@ exports.getLedger = async (req, res, next) => {
     if (skuId) query.skuId = toObjectId(skuId);
     if (locationId) query.locationId = toObjectId(locationId);
     if (transactionType) query.transactionType = transactionType;
+    if (excludeType) query.transactionType = { $ne: excludeType };
     if (batchNumber) query.batchNumber = batchNumber;
 
     if (startDate || endDate) {
@@ -974,7 +975,7 @@ exports.getDashboardStats = async (req, res, next) => {
 
 exports.getInventoryLedger = async (req, res, next) => {
   try {
-    const { companyId, skuId, locationId, transactionType, direction, startDate, endDate, referenceId, search, page = 1, limit = 20 } = req.query;
+    const { companyId, skuId, locationId, transactionType, direction, startDate, endDate, referenceId, search, excludeType, page = 1, limit = 20 } = req.query;
     if (!companyId) {
       return res.status(400).json({ msg: "companyId query parameter is required" });
     }
@@ -983,6 +984,7 @@ exports.getInventoryLedger = async (req, res, next) => {
     if (skuId) query.skuId = toObjectId(skuId);
     if (locationId) query.locationId = toObjectId(locationId);
     if (transactionType) query.transactionType = transactionType;
+    if (excludeType) query.transactionType = { $ne: excludeType };
     if (direction) query.direction = direction;
     if (referenceId) query.referenceId = { $regex: referenceId, $options: "i" };
 

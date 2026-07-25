@@ -36,6 +36,7 @@ export interface LedgerFetchParams {
   skuId?: string;
   locationId?: string;
   transactionType?: string;
+  excludeType?: string;
   direction?: string;
   startDate?: string;
   endDate?: string;

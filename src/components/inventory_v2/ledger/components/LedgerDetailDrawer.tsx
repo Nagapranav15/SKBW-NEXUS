@@ -1,22 +1,23 @@
 import React, { useEffect, useState } from 'react';
-import { X, ShieldAlert, Layers, MapPin, ArrowRightLeft, FileText, User, Box, ListTodo, HelpCircle, History } from 'lucide-react';
+import { X, ShieldAlert, Layers, MapPin, ArrowRightLeft, FileText, User, Box, ListTodo, HelpCircle, History, RefreshCw } from 'lucide-react';
 import { LedgerEntryV2 } from '../types';
 import { getBalancesV2 } from '../../../../api/mfgApiV2';
 
 interface LedgerDetailDrawerProps {
   entry: LedgerEntryV2 | null;
+  companyId: string;
   onClose: () => void;
 }
 
-const LedgerDetailDrawer: React.FC<LedgerDetailDrawerProps> = ({ entry, onClose }) => {
+const LedgerDetailDrawer: React.FC<LedgerDetailDrawerProps> = ({ entry, companyId, onClose }) => {
   const [batchBalances, setBatchBalances] = useState<any[]>([]);
   const [loadingBalances, setLoadingBalances] = useState(false);
 
   useEffect(() => {
     if (entry?.skuId?._id && entry?.batchNumber) {
       setLoadingBalances(true);
-      // Fetch dynamic location placement balances for this specific SKU and Batch
-      getBalancesV2(entry.skuId.company || '', undefined, true, entry.skuId._id, entry.batchNumber)
+      // Fetch dynamic location placement balances for this specific SKU and Batch using direct companyId
+      getBalancesV2(companyId || '', undefined, true, entry.skuId._id, entry.batchNumber)
         .then(res => {
           setBatchBalances(res || []);
         })
@@ -29,7 +30,7 @@ const LedgerDetailDrawer: React.FC<LedgerDetailDrawerProps> = ({ entry, onClose 
     } else {
       setBatchBalances([]);
     }
-  }, [entry?.skuId?._id, entry?.batchNumber]);
+  }, [entry?.skuId?._id, entry?.batchNumber, companyId]);
 
   if (!entry) return null;
 

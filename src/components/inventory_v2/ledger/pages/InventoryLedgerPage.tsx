@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ArrowRightLeft, Search, Calendar, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../../../context/AuthContext';
 import { getSkusV2, getWarehouseHierarchyV2, SkuV2, WarehouseLocationV2 } from '../../../../api/mfgApiV2';
@@ -9,6 +10,9 @@ import LedgerDetailDrawer from '../components/LedgerDetailDrawer';
 
 const InventoryLedgerPage: React.FC = () => {
   const { selectedCompany } = useAuth();
+  const [searchParams] = useSearchParams();
+  const ledgerMode = searchParams.get('mode') || 'stock'; // 'purchase' or 'stock'
+
   const [entries, setEntries] = useState<LedgerEntryV2[]>([]);
   const [skus, setSkus] = useState<SkuV2[]>([]);
   const [locations, setLocations] = useState<WarehouseLocationV2[]>([]);
@@ -37,6 +41,18 @@ const InventoryLedgerPage: React.FC = () => {
     }
   }, [selectedCompany?._id]);
 
+  // Reset filters when the ledger mode changes
+  useEffect(() => {
+    setPage(1);
+    setSearch('');
+    setSkuFilter('');
+    setLocFilter('');
+    setTypeFilter('');
+    setDirectionFilter('');
+    setStartDate('');
+    setEndDate('');
+  }, [ledgerMode]);
+
   useEffect(() => {
     if (!selectedCompany?._id) return;
     loadLedger(true);
@@ -46,7 +62,7 @@ const InventoryLedgerPage: React.FC = () => {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [selectedCompany?._id, page, skuFilter, locFilter, typeFilter, directionFilter, startDate, endDate]);
+  }, [selectedCompany?._id, page, skuFilter, locFilter, typeFilter, directionFilter, startDate, endDate, ledgerMode]);
 
   const loadFilterData = async () => {
     try {
@@ -66,18 +82,29 @@ const InventoryLedgerPage: React.FC = () => {
       setLoading(true);
     }
     try {
-      const res = await fetchInventoryLedger({
+      const queryParams: any = {
         companyId: selectedCompany?._id || '',
         skuId: skuFilter || undefined,
         locationId: locFilter || undefined,
-        transactionType: typeFilter || undefined,
         direction: directionFilter || undefined,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
         search: search || undefined,
         page,
         limit
-      });
+      };
+
+      if (ledgerMode === 'purchase') {
+        queryParams.transactionType = 'Purchase';
+      } else {
+        if (typeFilter) {
+          queryParams.transactionType = typeFilter;
+        } else {
+          queryParams.excludeType = 'Purchase';
+        }
+      }
+
+      const res = await fetchInventoryLedger(queryParams);
       setEntries(res.entries);
       setTotal(res.total);
       
@@ -122,12 +149,16 @@ const InventoryLedgerPage: React.FC = () => {
         <div>
           <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
             <ArrowRightLeft className="w-5 h-5 text-blue-600 animate-pulse-slow" />
-            Inventory Ledger (Engine V2)
+            {ledgerMode === 'purchase' ? 'Purchase Ledger' : 'Stock Ledger'}
           </h1>
-          <p className="text-xs text-gray-500 mt-0.5">Immutable historical transaction movements (Single Source of Truth)</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {ledgerMode === 'purchase'
+              ? 'Immutable historical purchase and inward transaction logs'
+              : 'Immutable historical stock transfer, adjustment, and movement logs'}
+          </p>
         </div>
         <button
-          onClick={loadLedger}
+          onClick={() => loadLedger(true)}
           className="p-2 text-gray-600 hover:bg-gray-50 hover:text-blue-600 border border-gray-200 rounded-xl transition-colors bg-white shadow-sm flex items-center gap-1.5 text-xs font-semibold"
           title="Reload Ledger Log"
         >
@@ -138,7 +169,7 @@ const InventoryLedgerPage: React.FC = () => {
 
       {/* Filters Toolbar */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-3xs p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 items-end">
-        <div className="col-span-1 sm:col-span-2">
+        <div className={ledgerMode === 'purchase' ? "col-span-1 sm:col-span-2 md:col-span-3" : "col-span-1 sm:col-span-2"}>
           <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Search Logs</label>
           <form onSubmit={handleSearchSubmit} className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-3.5 h-3.5" />
@@ -177,23 +208,24 @@ const InventoryLedgerPage: React.FC = () => {
             ))}
           </select>
         </div>
-        <div>
-          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Type</label>
-          <select
-            value={typeFilter}
-            onChange={e => { setTypeFilter(e.target.value); setPage(1); }}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white"
-          >
-            <option value="">All Types</option>
-            <option value="Purchase">Purchase</option>
-            <option value="Processing">Processing</option>
-            <option value="Production">Production</option>
-            <option value="Transfer">Transfer</option>
-            <option value="Adjustment">Adjustment</option>
-            <option value="Sale">Sale</option>
-            <option value="Opening Balance">Opening Balance</option>
-          </select>
-        </div>
+        {ledgerMode !== 'purchase' && (
+          <div>
+            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Type</label>
+            <select
+              value={typeFilter}
+              onChange={e => { setTypeFilter(e.target.value); setPage(1); }}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white"
+            >
+              <option value="">All Stock Types</option>
+              <option value="Processing">Processing</option>
+              <option value="Production">Production</option>
+              <option value="Transfer">Transfer</option>
+              <option value="Adjustment">Adjustment</option>
+              <option value="Sale">Sale</option>
+              <option value="Opening Balance">Opening Balance</option>
+            </select>
+          </div>
+        )}
         <div>
           <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Direction</label>
           <select
@@ -281,6 +313,7 @@ const InventoryLedgerPage: React.FC = () => {
       {selectedEntry && (
         <LedgerDetailDrawer
           entry={selectedEntry}
+          companyId={selectedCompany?._id || ''}
           onClose={() => setSelectedEntry(null)}
         />
       )}
