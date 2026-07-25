@@ -1178,10 +1178,9 @@ const PurchaseInvoicePage: React.FC = () => {
                      : selectedInvoice.items[0].locationId)
                   : '';
 
-                // Filter balances to display only physical allocations
+                // Filter balances to display allocations for this batch
                 const physicalBalances = inventoryBalances.filter(
-                  b => b.batchNumber === selectedInvoice.invoiceNumber && 
-                       (b.location?._id || b.locationId) !== defaultLocationId
+                  b => b.batchNumber === selectedInvoice.invoiceNumber
                 );
 
                 const totalAllocated = physicalBalances.reduce((sum, b) => sum + (b.onHand || 0), 0);
