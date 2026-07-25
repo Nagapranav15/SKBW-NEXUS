@@ -68,28 +68,32 @@ exports.createPurchaseInvoice = async (req, res, next) => {
         return res.status(400).json({ msg: `Only Raw Materials or Consumables can be purchased (SKU: ${sku.skuCode})` });
       }
 
-      // Resolve Location Hierarchy
+      // Resolve Location Hierarchy dynamically
       const location = await WarehouseLocationV2.findOne({ _id: toObjectId(locationId), company: companyObjId });
       if (!location) {
         return res.status(400).json({ msg: `Storage Location '${locationId}' not found` });
       }
-      if (location.level !== "Storage Location") {
-        return res.status(400).json({ msg: `Location '${location.name}' is not a Storage Location node` });
-      }
 
-      const zone = await WarehouseLocationV2.findOne({ _id: location.parentId, company: companyObjId });
-      if (!zone || zone.level !== "Zone") {
-        return res.status(400).json({ msg: `Hierarchy error for location '${location.name}': parent must be a Zone` });
-      }
+      let zoneId = location._id;
+      let floorId = location._id;
+      let warehouseId = location._id;
 
-      const floor = await WarehouseLocationV2.findOne({ _id: zone.parentId, company: companyObjId });
-      if (!floor || floor.level !== "Floor") {
-        return res.status(400).json({ msg: `Hierarchy error for zone '${zone.name}': parent must be a Floor` });
-      }
-
-      const warehouse = await WarehouseLocationV2.findOne({ _id: floor.parentId, company: companyObjId });
-      if (!warehouse || warehouse.level !== "Factory") {
-        return res.status(400).json({ msg: `Hierarchy error for floor '${floor.name}': parent must be a Factory` });
+      const parent1 = location.parentId ? await WarehouseLocationV2.findOne({ _id: location.parentId, company: companyObjId }) : null;
+      if (parent1) {
+        zoneId = parent1._id;
+        const parent2 = parent1.parentId ? await WarehouseLocationV2.findOne({ _id: parent1.parentId, company: companyObjId }) : null;
+        if (parent2) {
+          floorId = parent2._id;
+          const parent3 = parent2.parentId ? await WarehouseLocationV2.findOne({ _id: parent2.parentId, company: companyObjId }) : null;
+          if (parent3) {
+            warehouseId = parent3._id;
+          } else {
+            warehouseId = parent2._id;
+          }
+        } else {
+          floorId = parent1._id;
+          warehouseId = parent1._id;
+        }
       }
 
       const itemTotal = qty * price;
@@ -379,16 +383,30 @@ exports.editPurchaseInvoice = async (req, res, next) => {
       }
 
       const location = await WarehouseLocationV2.findOne({ _id: toObjectId(locationId), company: companyObjId });
-      if (!location || location.level !== "Storage Location") {
-        return res.status(400).json({ msg: `Location '${locationId}' is not a valid Storage Location` });
+      if (!location) {
+        return res.status(400).json({ msg: `Location '${locationId}' not found` });
       }
 
-      const zone = await WarehouseLocationV2.findOne({ _id: location.parentId, company: companyObjId });
-      const floor = await WarehouseLocationV2.findOne({ _id: zone?.parentId, company: companyObjId });
-      const warehouse = await WarehouseLocationV2.findOne({ _id: floor?.parentId, company: companyObjId });
+      let zoneId = location._id;
+      let floorId = location._id;
+      let warehouseId = location._id;
 
-      if (!zone || !floor || !warehouse) {
-        return res.status(400).json({ msg: `Hierarchy resolution error for location ${location.name}` });
+      const parent1 = location.parentId ? await WarehouseLocationV2.findOne({ _id: location.parentId, company: companyObjId }) : null;
+      if (parent1) {
+        zoneId = parent1._id;
+        const parent2 = parent1.parentId ? await WarehouseLocationV2.findOne({ _id: parent1.parentId, company: companyObjId }) : null;
+        if (parent2) {
+          floorId = parent2._id;
+          const parent3 = parent2.parentId ? await WarehouseLocationV2.findOne({ _id: parent2.parentId, company: companyObjId }) : null;
+          if (parent3) {
+            warehouseId = parent3._id;
+          } else {
+            warehouseId = parent2._id;
+          }
+        } else {
+          floorId = parent1._id;
+          warehouseId = parent1._id;
+        }
       }
 
       const itemTotal = qty * price;

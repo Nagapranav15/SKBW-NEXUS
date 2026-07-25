@@ -602,30 +602,7 @@ exports.recordTransfer = async (req, res, next) => {
       session.endSession();
       return res.status(400).json({ msg: "Destination location not found" });
     }
-    // Check capacity constraint on destination location
-    if (destLocation.capacity && destLocation.capacity > 0) {
-      const totalOccupiedAgg = await InventoryLedger.aggregate([
-        { $match: { locationId: toLocObjId, company: companyObjId } },
-        {
-          $group: {
-            _id: null,
-            totalQty: {
-              $sum: {
-                $cond: [{ $eq: ["$direction", "IN"] }, "$quantity", { $subtract: [0, "$quantity"] }]
-              }
-            }
-          }
-        }
-      ]);
-      const totalOccupied = totalOccupiedAgg.length > 0 ? totalOccupiedAgg[0].totalQty : 0;
-      if (totalOccupied + transferQty > destLocation.capacity) {
-        await session.abortTransaction();
-        session.endSession();
-        return res.status(400).json({ 
-          msg: `Transfer rejected. Destination storage has insufficient space. Capacity: ${destLocation.capacity} ${destLocation.unit || 'kg'}, Currently Occupied: ${totalOccupied} ${destLocation.unit || 'kg'}, Space Available: ${destLocation.capacity - totalOccupied} ${destLocation.unit || 'kg'}` 
-        });
-      }
-    }
+    // Bypassed destination capacity limit constraint verification per user request
 
     const toZone = await WarehouseLocationV2.findOne({ _id: destLocation.parentId, company: companyObjId });
     const toFloor = toZone ? await WarehouseLocationV2.findOne({ _id: toZone.parentId, company: companyObjId }) : null;

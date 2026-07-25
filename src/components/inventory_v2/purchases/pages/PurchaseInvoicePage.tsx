@@ -273,15 +273,15 @@ const PurchaseInvoicePage: React.FC = () => {
     setInvoiceForm({ ...invoiceForm, items: updated });
   };
 
-  const handleReelWeightChange = (itemIdx: number, reelIdx: number, weightVal: string) => {
+  const handleReelChange = (itemIdx: number, reelIdx: number, field: string, value: any) => {
     const updatedItems = [...invoiceForm.items];
     const item = { ...updatedItems[itemIdx] };
     const reels = [...(item.reels || [])];
     
-    reels[reelIdx] = { ...reels[reelIdx], weight: Number(weightVal) || 0 };
+    reels[reelIdx] = { ...reels[reelIdx], [field]: field === 'weight' || field === 'width' ? (Number(value) || 0) : value };
     item.reels = reels;
 
-    const sum = reels.reduce((acc, r) => acc + (r.weight || 0), 0);
+    const sum = reels.reduce((acc, r) => acc + (Number(r.weight) || 0), 0);
     item.quantity = String(sum);
 
     updatedItems[itemIdx] = item;
@@ -324,32 +324,61 @@ const PurchaseInvoicePage: React.FC = () => {
         return;
       }
 
-      // Generate reels log array dynamically based on count
-      const reelsArray = [];
-      const itemReels = item.reels || [];
-      for (let r = 0; r < reelsCount; r++) {
-        const reelWeight = (itemReels[r] && itemReels[r].weight > 0)
-          ? itemReels[r].weight
-          : (reelsCount > 0 ? Number((qty / reelsCount).toFixed(2)) : 0);
+      // Generate reels array and group by locationId if reels exist
+      if (reelsCount > 0) {
+        const reelsByLoc: Record<string, any[]> = {};
+        const itemReels = item.reels || [];
 
-        reelsArray.push({
-          reelNumber: `${finalInvoiceNumber}-R${r + 1}`,
-          gsm: Number(item.gsm) || 0,
-          width: Number(item.width) || 0,
-          weight: reelWeight
+        for (let r = 0; r < reelsCount; r++) {
+          const reelObj = itemReels[r] || {};
+          const reelWeight = Number(reelObj.weight) || 0;
+          const reelWidth = Number(reelObj.width) || Number(item.width) || 0;
+          const reelLocId = reelObj.locationId || item.locationId || firstStorage._id || '';
+
+          if (!reelsByLoc[reelLocId]) {
+            reelsByLoc[reelLocId] = [];
+          }
+
+          reelsByLoc[reelLocId].push({
+            reelNumber: reelObj.reelNumber || `${finalInvoiceNumber}-L${i + 1}-R${String(r + 1).padStart(2, '0')}`,
+            gsm: Number(item.gsm) || 0,
+            width: reelWidth,
+            weight: reelWeight
+          });
+        }
+
+        // Push a validated item for each unique location
+        const uniqueLocations = Object.keys(reelsByLoc);
+        for (let lIdx = 0; lIdx < uniqueLocations.length; lIdx++) {
+          const locId = uniqueLocations[lIdx];
+          const reelsGroup = reelsByLoc[locId];
+          const totalGroupWeight = reelsGroup.reduce((sum, r) => sum + r.weight, 0);
+
+          validatedItems.push({
+            skuId: item.skuId,
+            quantity: totalGroupWeight,
+            unit: 'kg',
+            purchasePrice: price,
+            totalPrice: totalGroupWeight * price,
+            lotNumber: item.lotNumber || `${finalInvoiceNumber}-L0${i + 1}`,
+            locationId: locId,
+            reels: reelsGroup
+          });
+        }
+      } else {
+        // Non-reels lot
+        const destLocId = item.locationId || firstStorage._id || '';
+        validatedItems.push({
+          skuId: item.skuId,
+          quantity: qty,
+          unit: 'kg',
+          purchasePrice: price,
+          totalPrice: qty * price,
+          lotNumber: item.lotNumber || `${finalInvoiceNumber}-L0${i + 1}`,
+          locationId: destLocId,
+          reels: []
         });
       }
-
-      validatedItems.push({
-        skuId: item.skuId,
-        quantity: qty,
-        unit: 'kg', // Default raw material unit
-        purchasePrice: price,
-        totalPrice: qty * price,
-        lotNumber: `${finalInvoiceNumber}-L0${i + 1}`,
-        locationId: firstStorage._id || '', // Default allocation to virtual storage location
-        reels: reelsArray
-      });
     }
 
     const matTotal = validatedItems.reduce((sum, item) => sum + item.totalPrice, 0);
@@ -623,143 +652,233 @@ const PurchaseInvoicePage: React.FC = () => {
               </div>
 
               {/* Section 2: Material Lots */}
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
-                <div className="flex justify-between items-center border-b pb-2">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
                   <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider">
-                    2. Material Lots <span className="text-[10px] text-gray-400 font-semibold">(Different materials in this purchase batch)</span>
+                    Material Lots
                   </h3>
                   <button
                     type="button"
                     onClick={handleAddItemRow}
-                    className="px-3 py-1 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-600 rounded-lg text-xs font-bold transition-all"
+                    className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-black transition-all shadow-sm"
                   >
                     + Add Material Lot
                   </button>
                 </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-gray-50/50 text-gray-400 font-bold uppercase text-[9px] border-b border-gray-150">
-                        <th className="py-2.5 px-2">#</th>
-                        <th className="py-2.5 px-2 w-52">Item *</th>
-                        <th className="py-2.5 px-2">Brand</th>
-                        <th className="py-2.5 px-2 w-16">GSM</th>
-                        <th className="py-2.5 px-2 w-20">Width (cm)</th>
-                        <th className="py-2.5 px-2 w-16 text-center">Reels</th>
-                        <th className="py-2.5 px-2 w-24 text-right">Total KG</th>
-                        <th className="py-2.5 px-2 w-24 text-right">Rate / KG (₹)</th>
-                        <th className="py-2.5 px-2 w-28 text-right">Amount (₹)</th>
-                        <th className="py-2.5 px-2 text-center"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50 text-gray-800 font-semibold">
-                      {invoiceForm.items.map((item, idx) => (
-                        <React.Fragment key={idx}>
-                          <tr className="hover:bg-gray-50/20">
-                            <td className="py-2 px-2 text-gray-400 font-mono text-[10px]">{idx + 1}</td>
-                            <td className="py-2 px-2">
+                <div className="space-y-4">
+                  {invoiceForm.items.map((item, idx) => {
+                    const reelsCount = Number(item.reelsCount) || 0;
+                    return (
+                      <div key={idx} className="bg-white rounded-xl border border-gray-200 shadow-xs p-5 space-y-4 text-left">
+                        <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                          <span className="text-xs font-black text-gray-900 uppercase font-mono bg-gray-100 px-2 py-0.5 rounded">
+                            LOT - {idx + 1}
+                          </span>
+                          {invoiceForm.items.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveItemRow(idx)}
+                              className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded transition-colors text-xs font-bold flex items-center gap-1"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> Remove Lot
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Lot Form Grid */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3.5 text-xs text-gray-900">
+                          <div className="col-span-2">
+                            <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Item SKU *</label>
+                            <select
+                              value={item.skuId}
+                              onChange={e => handleItemRowChange(idx, 'skuId', e.target.value)}
+                              className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg bg-white font-semibold text-gray-800 text-xs"
+                              required
+                            >
+                              <option value="">Select SKU</option>
+                              {skus.map(s => (
+                                <option key={s._id} value={s._id}>{s.name}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Brand</label>
+                            <input
+                              type="text"
+                              value={item.brand}
+                              onChange={e => handleItemRowChange(idx, 'brand', e.target.value)}
+                              className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">GSM</label>
+                            <input
+                              type="number"
+                              value={item.gsm}
+                              onChange={e => handleItemRowChange(idx, 'gsm', e.target.value)}
+                              className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-center font-bold"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Width (cm)</label>
+                            <input
+                              type="number"
+                              value={item.width}
+                              onChange={e => handleItemRowChange(idx, 'width', e.target.value)}
+                              className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-center font-bold"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Reels Count</label>
+                            <input
+                              type="number"
+                              value={item.reelsCount}
+                              onChange={e => handleItemRowChange(idx, 'reelsCount', e.target.value)}
+                              className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-center font-bold"
+                              placeholder="0"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Total KG</label>
+                            <input
+                              type="number"
+                              value={item.quantity}
+                              onChange={e => handleItemRowChange(idx, 'quantity', e.target.value)}
+                              className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-right font-black"
+                              placeholder="0"
+                              disabled={reelsCount > 0}
+                              required
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Rate / KG (₹)</label>
+                            <input
+                              type="number"
+                              value={item.purchasePrice}
+                              onChange={e => handleItemRowChange(idx, 'purchasePrice', e.target.value)}
+                              className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-right font-bold"
+                              placeholder="0.00"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        {/* Layout details: amount and storage (only for non-reels items) */}
+                        <div className="flex flex-wrap items-center justify-between gap-4 bg-gray-50/50 p-3 rounded-lg border border-gray-100 text-xs">
+                          <div className="flex gap-4">
+                            <span className="font-semibold text-gray-500">
+                              Lot Subtotal: <span className="font-black text-gray-800 text-sm">₹{((Number(item.quantity) || 0) * (Number(item.purchasePrice) || 0)).toLocaleString('en-IN')}</span>
+                            </span>
+                          </div>
+
+                          {reelsCount === 0 && (
+                            <div className="flex items-center gap-2">
+                              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Lot Storage Location:</label>
                               <select
-                                value={item.skuId}
-                                onChange={e => handleItemRowChange(idx, 'skuId', e.target.value)}
-                                className="w-full px-2 py-1 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 text-xs font-semibold"
+                                value={item.locationId || ''}
+                                onChange={e => handleItemRowChange(idx, 'locationId', e.target.value)}
+                                className="px-2 py-1 border border-gray-200 rounded-lg bg-white text-[11px] font-bold text-gray-800"
                                 required
                               >
-                                <option value="">Select SKU</option>
-                                {skus.map(s => (
-                                  <option key={s._id} value={s._id}>{s.name}</option>
-                                ))}
+                                <option value="">-- Select Destination Storage --</option>
+                                {locations.map(loc => {
+                                  const paths = resolveLocationPath(loc._id);
+                                  const hierarchy = [paths.factory, paths.floor, paths.zone].filter(p => p && p !== '—').join(' > ');
+                                  return (
+                                    <option key={loc._id} value={loc._id}>
+                                      {hierarchy ? `${hierarchy} > ` : ''}{loc.name} ({loc.level})
+                                    </option>
+                                  );
+                                })}
                               </select>
-                            </td>
-                            <td className="py-2 px-2">
-                              <input
-                                type="text"
-                                value={item.brand}
-                                onChange={e => handleItemRowChange(idx, 'brand', e.target.value)}
-                                className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs"
-                              />
-                            </td>
-                            <td className="py-2 px-2">
-                              <input
-                                type="number"
-                                value={item.gsm}
-                                onChange={e => handleItemRowChange(idx, 'gsm', e.target.value)}
-                                className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-center"
-                              />
-                            </td>
-                            <td className="py-2 px-2">
-                              <input
-                                type="number"
-                                value={item.width}
-                                onChange={e => handleItemRowChange(idx, 'width', e.target.value)}
-                                className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-center"
-                              />
-                            </td>
-                            <td className="py-2 px-2">
-                               <input
-                                 type="number"
-                                 value={item.reelsCount}
-                                 onChange={e => handleItemRowChange(idx, 'reelsCount', e.target.value)}
-                                 className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-center"
-                                 placeholder="0"
-                               />
-                               {Number(item.reelsCount) > 0 && (() => {
-                                 const weightsCount = item.reels?.filter(r => (r.weight || 0) > 0).length || 0;
-                                 const isComplete = weightsCount === Number(item.reelsCount);
-                                 return (
-                                   <button
-                                     type="button"
-                                     onClick={() => setActiveReelModalIdx(idx)}
-                                     className={`mt-1.5 w-full px-1 py-1 rounded text-[9px] font-black transition-all block text-center uppercase tracking-wider border shadow-3xs ${
-                                       isComplete
-                                         ? 'bg-emerald-50 hover:bg-emerald-100 border-emerald-300 text-emerald-800'
-                                         : 'bg-amber-50 hover:bg-amber-100 border-amber-300 text-amber-800 animate-pulse'
-                                     }`}
-                                   >
-                                     {isComplete ? '✅ Weights Set' : '⚠️ Enter Weights'}
-                                   </button>
-                                 );
-                               })()}
-                            </td>
-                            <td className="py-2 px-2">
-                              <input
-                                type="number"
-                                value={item.quantity}
-                                onChange={e => handleItemRowChange(idx, 'quantity', e.target.value)}
-                                className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-right font-black"
-                                placeholder="0"
-                                required
-                              />
-                            </td>
-                            <td className="py-2 px-2">
-                              <input
-                                type="number"
-                                value={item.purchasePrice}
-                                onChange={e => handleItemRowChange(idx, 'purchasePrice', e.target.value)}
-                                className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono text-right"
-                                placeholder="0.00"
-                                required
-                              />
-                            </td>
-                            <td className="py-2 px-2 text-right font-mono font-black text-gray-900 text-xs">
-                              ₹{((Number(item.quantity) || 0) * (Number(item.purchasePrice) || 0)).toLocaleString('en-IN')}
-                            </td>
-                            <td className="py-2 px-2 text-center">
-                              {invoiceForm.items.length > 1 && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveItemRow(idx)}
-                                  className="text-red-500 hover:text-red-700 p-1 border rounded bg-white hover:bg-red-50"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        </React.Fragment>
-                      ))}
-                    </tbody>
-                  </table>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Inline Reels List inside card (matches handwritten sketch) */}
+                        {reelsCount > 0 && (
+                          <div className="pt-3 border-t border-gray-100 space-y-2">
+                            <span className="block text-[10px] font-black text-gray-400 uppercase tracking-wider">
+                              Reel Specifications & Storage Placement:
+                            </span>
+
+                            <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                              <table className="w-full text-left text-xs border-collapse">
+                                <thead>
+                                  <tr className="bg-gray-50 text-gray-400 font-bold uppercase text-[9px] border-b border-gray-150">
+                                    <th className="py-2 px-3 w-16">Reel</th>
+                                    <th className="py-2 px-3 w-32">Weight (KG) *</th>
+                                    <th className="py-2 px-3 w-32">Width (cm) *</th>
+                                    <th className="py-2 px-3">Storage Allocation *</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100 font-semibold text-gray-700">
+                                  {Array.from({ length: reelsCount }).map((_, rIdx) => {
+                                    const reelObj = item.reels?.[rIdx] || {};
+                                    const reelWeightVal = reelObj.weight !== undefined && reelObj.weight !== null ? reelObj.weight : '';
+                                    const reelWidthVal = reelObj.width !== undefined && reelObj.width !== null ? reelObj.width : item.width;
+                                    const reelLocId = reelObj.locationId || '';
+
+                                    return (
+                                      <tr key={rIdx} className="hover:bg-gray-50/20">
+                                        <td className="py-1.5 px-3 font-mono text-gray-500 font-bold">R-{rIdx + 1}</td>
+                                        <td className="py-1.5 px-3">
+                                          <input
+                                            type="number"
+                                            value={reelWeightVal}
+                                            onChange={e => handleReelChange(idx, rIdx, 'weight', e.target.value)}
+                                            placeholder="0.0"
+                                            className="w-full px-2 py-1 border border-gray-200 rounded-md text-xs font-mono font-bold text-gray-900"
+                                            required
+                                          />
+                                        </td>
+                                        <td className="py-1.5 px-3">
+                                          <input
+                                            type="number"
+                                            value={reelWidthVal}
+                                            onChange={e => handleReelChange(idx, rIdx, 'width', e.target.value)}
+                                            placeholder="Width"
+                                            className="w-full px-2 py-1 border border-gray-200 rounded-md text-xs font-mono"
+                                            required
+                                          />
+                                        </td>
+                                        <td className="py-1.5 px-3">
+                                          <select
+                                            value={reelLocId}
+                                            onChange={e => handleReelChange(idx, rIdx, 'locationId', e.target.value)}
+                                            className="w-full px-2 py-1 border border-gray-200 rounded-md bg-white text-xs font-bold text-gray-800"
+                                            required
+                                          >
+                                            <option value="">-- Choose Storage Area --</option>
+                                            {locations.map(loc => {
+                                              const paths = resolveLocationPath(loc._id);
+                                              const hierarchy = [paths.factory, paths.floor, paths.zone].filter(p => p && p !== '—').join(' > ');
+                                              return (
+                                                <option key={loc._id} value={loc._id}>
+                                                  {hierarchy ? `${hierarchy} > ` : ''}{loc.name} ({loc.level})
+                                                </option>
+                                              );
+                                            })}
+                                          </select>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1635,121 +1754,6 @@ const PurchaseInvoicePage: React.FC = () => {
                   </button>
                 </div>
               </form>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Dynamic Reel Weights Modal Popup */}
-      {activeReelModalIdx !== null && (() => {
-        const item = invoiceForm.items[activeReelModalIdx];
-        if (!item) return null;
-        
-        // Find selected SKU name for display
-        const skuObj = skus.find(s => s._id === item.skuId);
-        const skuName = skuObj ? skuObj.name : 'Unknown SKU';
-        const reelsCount = Number(item.reelsCount) || 0;
-
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-xs font-sans text-xs">
-            <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full border border-gray-150 overflow-hidden animate-in zoom-in-95 duration-150">
-              {/* Header */}
-              <div className="px-5 py-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-                <div>
-                  <span className="font-bold text-gray-800 text-xs block">Reel Weights Configuration</span>
-                  <span className="text-[10px] text-blue-600 font-extrabold uppercase mt-0.5">{skuName}</span>
-                </div>
-                <button 
-                  type="button"
-                  onClick={() => setActiveReelModalIdx(null)}
-                  className="text-gray-400 hover:text-gray-600 rounded p-1 hover:bg-gray-100"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-              
-              {/* Grid of inputs */}
-              <div className="p-5 space-y-4">
-                {/* Auto Split helper */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-blue-50/70 p-3.5 rounded-xl border border-blue-100 text-xs text-blue-800">
-                  <div className="space-y-0.5">
-                    <span className="font-bold block">⚡ Auto-Split Quantity</span>
-                    <span className="text-[10px] text-blue-600 block">Split total weight equally among {reelsCount} reels:</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      placeholder="Total KG..."
-                      value={item.quantity || ''}
-                      onChange={e => {
-                        const updatedItems = [...invoiceForm.items];
-                        updatedItems[activeReelModalIdx] = { ...item, quantity: e.target.value };
-                        setInvoiceForm({ ...invoiceForm, items: updatedItems });
-                      }}
-                      className="w-24 px-2 py-1 border border-blue-200 rounded-lg text-xs font-mono font-bold text-right text-gray-800 bg-white focus:ring-1 focus:ring-blue-500 outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const totalQty = Number(item.quantity) || 0;
-                        if (totalQty > 0) {
-                          const splitVal = Number((totalQty / reelsCount).toFixed(2));
-                          const newReels = Array.from({ length: reelsCount }).map(() => ({ weight: splitVal }));
-                          const updatedItems = [...invoiceForm.items];
-                          updatedItems[activeReelModalIdx] = { ...item, reels: newReels };
-                          setInvoiceForm({ ...invoiceForm, items: updatedItems });
-                        }
-                      }}
-                      className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-3xs hover:scale-102 active:scale-98 transition-all shrink-0"
-                    >
-                      Split
-                    </button>
-                  </div>
-                </div>
-
-                <div className="text-[10px] font-black text-gray-400 uppercase tracking-wider">
-                  Or enter/adjust each reel weight manually:
-                </div>
-                
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[220px] overflow-y-auto p-1 bg-gray-50 rounded-xl border border-gray-100">
-                  {Array.from({ length: reelsCount }).map((_, rIdx) => {
-                    const reel = (item.reels || [])[rIdx] || { weight: 0 };
-                    return (
-                      <div 
-                        key={rIdx} 
-                        className="flex items-center justify-between gap-1.5 bg-white px-2.5 py-1.5 border border-gray-200 rounded-lg shadow-3xs focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all"
-                      >
-                        <span className="text-[9px] text-gray-400 font-mono font-black">Reel {rIdx + 1}</span>
-                        <input
-                          type="number"
-                          value={reel.weight || ''}
-                          onChange={e => handleReelWeightChange(activeReelModalIdx, rIdx, e.target.value)}
-                          placeholder="0"
-                          className="w-full text-right text-xs font-mono font-bold text-gray-800 bg-transparent border-none p-0 outline-none focus:ring-0"
-                        />
-                        <span className="text-[9px] text-gray-400 font-bold lowercase">kg</span>
-                      </div>
-                    );
-                  })}
-                </div>
-                
-                {/* Total sum indicator */}
-                <div className="pt-3 border-t flex justify-between items-center text-xs font-bold text-gray-700">
-                  <span>Total Accumulated Weight:</span>
-                  <span className="text-sm font-black text-blue-600 font-mono">{item.quantity || 0} kg</span>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="px-5 py-3.5 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveReelModalIdx(null)}
-                  className="px-5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-sm transition-colors uppercase tracking-wider text-[10px]"
-                >
-                  Save & Apply
-                </button>
-              </div>
             </div>
           </div>
         );
