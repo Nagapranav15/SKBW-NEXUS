@@ -186,6 +186,7 @@ export interface MetadataV2 {
   categories: string[];
   ruleTypes: string[];
   groups?: string[];
+  brands?: string[];
   categoryFields?: Record<string, string[]>;
 }
 
@@ -202,6 +203,7 @@ export const updateMetadataV2 = async (metadataData: {
   categories?: string[];
   ruleTypes?: string[];
   groups?: string[];
+  brands?: string[];
   categoryFields?: Record<string, string[]>;
 }): Promise<MetadataV2> => {
   const response = await api.post('/v2/metadata', metadataData);

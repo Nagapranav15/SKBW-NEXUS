@@ -1179,6 +1179,11 @@ exports.getMetadata = async (req, res, next) => {
         doc.groups = ["132P Happy days (UR)", "220P Happy days (SR)"];
         docUpdated = true;
       }
+      if (!doc.brands || doc.brands.length === 0) {
+        doc.brands = ["Happy Days", "Classmate", "Navneet"];
+        doc.markModified("brands");
+        docUpdated = true;
+      }
       if (doc.categoryFields) {
         const sf = doc.categoryFields.get ? doc.categoryFields.get("Semi Finished") : (doc.categoryFields["Semi Finished"] || []);
         if (sf && !sf.includes("group")) {
@@ -1215,7 +1220,7 @@ exports.getMetadata = async (req, res, next) => {
 
 exports.updateMetadata = async (req, res, next) => {
   try {
-    const { companyId, units, categories, ruleTypes, groups, categoryFields } = req.body;
+    const { companyId, units, categories, ruleTypes, groups, brands, categoryFields } = req.body;
     if (!companyId) {
       return res.status(400).json({ msg: "companyId is required" });
     }
@@ -1228,6 +1233,7 @@ exports.updateMetadata = async (req, res, next) => {
     if (categories) doc.categories = categories;
     if (ruleTypes) doc.ruleTypes = ruleTypes;
     if (groups) doc.groups = groups;
+    if (brands) doc.brands = brands;
     if (categoryFields) doc.categoryFields = categoryFields;
     await doc.save();
     res.json(doc);

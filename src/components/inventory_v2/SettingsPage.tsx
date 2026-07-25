@@ -13,6 +13,7 @@ const SettingsPage: React.FC = () => {
   const [units, setUnits] = useState<string[]>([]);
   const [ruleTypes, setRuleTypes] = useState<string[]>([]);
   const [groups, setGroups] = useState<string[]>([]);
+  const [brands, setBrands] = useState<string[]>([]);
   const [categoryFields, setCategoryFields] = useState<Record<string, string[]>>({});
 
   // Input states for adding new ones
@@ -20,6 +21,7 @@ const SettingsPage: React.FC = () => {
   const [newUnit, setNewUnit] = useState('');
   const [newRuleType, setNewRuleType] = useState('');
   const [newGroup, setNewGroup] = useState('');
+  const [newBrand, setNewBrand] = useState('');
 
   // Selected category for configuring custom fields modal
   const [selectedCatForFields, setSelectedCatForFields] = useState<string | null>(null);
@@ -39,8 +41,9 @@ const SettingsPage: React.FC = () => {
         setCategories(data.categories || []);
         setUnits(data.units || []);
         setRuleTypes(data.ruleTypes || []);
-        setGroups((data as any).groups || []);
-        setCategoryFields((data as any).categoryFields || {});
+        setGroups(data.groups || []);
+        setBrands(data.brands || []);
+        setCategoryFields(data.categoryFields || {});
       }
     } catch (e) {
       console.error(e);
@@ -55,6 +58,7 @@ const SettingsPage: React.FC = () => {
     updatedUnits: string[],
     updatedRules: string[],
     updatedGroups: string[],
+    updatedBrands: string[],
     updatedFields: Record<string, string[]>
   ) => {
     setSaving(true);
@@ -65,6 +69,7 @@ const SettingsPage: React.FC = () => {
         units: updatedUnits,
         ruleTypes: updatedRules,
         groups: updatedGroups,
+        brands: updatedBrands,
         categoryFields: updatedFields
       });
       showToast('Settings saved successfully', 'success');
@@ -76,7 +81,7 @@ const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleAddItem = (type: 'category' | 'unit' | 'ruleType' | 'group') => {
+  const handleAddItem = (type: 'category' | 'unit' | 'ruleType' | 'group' | 'brand') => {
     if (type === 'category') {
       if (!newCategory.trim()) return;
       if (categories.includes(newCategory.trim())) {
@@ -93,7 +98,7 @@ const SettingsPage: React.FC = () => {
         [newCategory.trim()]: ['brand', 'gsm', 'dimensions']
       };
       setCategoryFields(updatedFields);
-      handleSave(updated, units, ruleTypes, groups, updatedFields);
+      handleSave(updated, units, ruleTypes, groups, brands, updatedFields);
     } else if (type === 'unit') {
       if (!newUnit.trim()) return;
       if (units.includes(newUnit.trim())) {
@@ -103,7 +108,7 @@ const SettingsPage: React.FC = () => {
       const updated = [...units, newUnit.trim()];
       setUnits(updated);
       setNewUnit('');
-      handleSave(categories, updated, ruleTypes, groups, categoryFields);
+      handleSave(categories, updated, ruleTypes, groups, brands, categoryFields);
     } else if (type === 'group') {
       if (!newGroup.trim()) return;
       if (groups.includes(newGroup.trim())) {
@@ -113,7 +118,17 @@ const SettingsPage: React.FC = () => {
       const updated = [...groups, newGroup.trim()];
       setGroups(updated);
       setNewGroup('');
-      handleSave(categories, units, ruleTypes, updated, categoryFields);
+      handleSave(categories, units, ruleTypes, updated, brands, categoryFields);
+    } else if (type === 'brand') {
+      if (!newBrand.trim()) return;
+      if (brands.includes(newBrand.trim())) {
+        showToast('Brand already exists', 'error');
+        return;
+      }
+      const updated = [...brands, newBrand.trim()];
+      setBrands(updated);
+      setNewBrand('');
+      handleSave(categories, units, ruleTypes, groups, updated, categoryFields);
     } else {
       if (!newRuleType.trim()) return;
       if (ruleTypes.includes(newRuleType.trim())) {
@@ -123,30 +138,34 @@ const SettingsPage: React.FC = () => {
       const updated = [...ruleTypes, newRuleType.trim()];
       setRuleTypes(updated);
       setNewRuleType('');
-      handleSave(categories, units, ruleTypes, groups, categoryFields);
+      handleSave(categories, units, ruleTypes, groups, brands, categoryFields);
     }
   };
 
-  const handleDeleteItem = (type: 'category' | 'unit' | 'ruleType' | 'group', item: string) => {
+  const handleDeleteItem = (type: 'category' | 'unit' | 'ruleType' | 'group' | 'brand', item: string) => {
     if (type === 'category') {
       const updated = categories.filter(c => c !== item);
       setCategories(updated);
       const updatedFields = { ...categoryFields };
       delete updatedFields[item];
       setCategoryFields(updatedFields);
-      handleSave(updated, units, ruleTypes, groups, updatedFields);
+      handleSave(updated, units, ruleTypes, groups, brands, updatedFields);
     } else if (type === 'unit') {
       const updated = units.filter(u => u !== item);
       setUnits(updated);
-      handleSave(categories, updated, ruleTypes, groups, categoryFields);
+      handleSave(categories, updated, ruleTypes, groups, brands, categoryFields);
     } else if (type === 'group') {
       const updated = groups.filter(g => g !== item);
       setGroups(updated);
-      handleSave(categories, units, ruleTypes, updated, categoryFields);
+      handleSave(categories, units, ruleTypes, updated, brands, categoryFields);
+    } else if (type === 'brand') {
+      const updated = brands.filter(b => b !== item);
+      setBrands(updated);
+      handleSave(categories, units, ruleTypes, groups, updated, categoryFields);
     } else {
       const updated = ruleTypes.filter(r => r !== item);
       setRuleTypes(updated);
-      handleSave(categories, units, updated, groups, categoryFields);
+      handleSave(categories, units, updated, groups, brands, categoryFields);
     }
   };
 
@@ -163,7 +182,7 @@ const SettingsPage: React.FC = () => {
     };
     setCategoryFields(updatedFields);
     setSelectedCatForFields(null);
-    handleSave(categories, units, ruleTypes, groups, updatedFields);
+    handleSave(categories, units, ruleTypes, groups, brands, updatedFields);
   };
 
   const toggleField = (fieldId: string) => {
@@ -205,7 +224,7 @@ const SettingsPage: React.FC = () => {
             <span>ERP Custom Fields & Options Settings</span>
           </h1>
           <p className="text-xs text-gray-500 mt-1">
-            Manage custom Categories, Stock Groups, Default Units, and Rule Types used across the Sku Item Master.
+            Manage custom Categories, Stock Groups, Brands, Default Units, and Rule Types used across the Sku Item Master.
           </p>
         </div>
         <button
@@ -217,12 +236,12 @@ const SettingsPage: React.FC = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {/* Categories Column */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-[500px]">
           <div className="p-4 border-b border-gray-150 bg-gray-50/50">
             <h2 className="text-xs font-bold text-gray-800 uppercase tracking-wider">SKU Categories</h2>
-            <p className="text-[10px] text-gray-400 mt-0.5">Click gear icon to manage whitelisted fields per category.</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">Click gear icon to manage fields list.</p>
           </div>
           
           {/* Add input */}
@@ -276,7 +295,7 @@ const SettingsPage: React.FC = () => {
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-[500px]">
           <div className="p-4 border-b border-gray-150 bg-gray-50/50">
             <h2 className="text-xs font-bold text-gray-800 uppercase tracking-wider">Stock Groups</h2>
-            <p className="text-[10px] text-gray-400 mt-0.5">Categorize finished brands (e.g. Happy Days 132P).</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">Categorize finished goods brands.</p>
           </div>
           
           {/* Add input */}
@@ -317,11 +336,56 @@ const SettingsPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Brands Column */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-[500px]">
+          <div className="p-4 border-b border-gray-150 bg-gray-50/50">
+            <h2 className="text-xs font-bold text-gray-800 uppercase tracking-wider">Brands</h2>
+            <p className="text-[10px] text-gray-400 mt-0.5">Manage brand choices whitelist.</p>
+          </div>
+          
+          {/* Add input */}
+          <div className="p-3 border-b border-gray-100 flex gap-2">
+            <input
+              type="text"
+              placeholder="Add brand..."
+              value={newBrand}
+              onChange={e => setNewBrand(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAddItem('brand')}
+              className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-blue-500 bg-white text-gray-800 font-semibold"
+            />
+            <button
+              onClick={() => handleAddItem('brand')}
+              className="p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* List */}
+          <div className="flex-1 overflow-y-auto p-3 divide-y divide-gray-50">
+            {brands.map(b => (
+              <div key={b} className="py-2 flex items-center justify-between text-xs font-semibold text-gray-700 group">
+                <span className="truncate pr-2">{b}</span>
+                <button
+                  onClick={() => handleDeleteItem('brand', b)}
+                  className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                  title="Delete brand"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+            {brands.length === 0 && (
+              <div className="text-center py-12 text-gray-400 text-[11px]">No brands yet</div>
+            )}
+          </div>
+        </div>
+
         {/* Units Column */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-[500px]">
           <div className="p-4 border-b border-gray-150 bg-gray-50/50">
             <h2 className="text-xs font-bold text-gray-800 uppercase tracking-wider">Default Units</h2>
-            <p className="text-[10px] text-gray-400 mt-0.5">Specify stocking units like kg, pcs, Sheets, Reels, bags, etc.</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">Specify stocking units (kg, pcs, Sheets, Reels, bags).</p>
           </div>
           
           {/* Add input */}
@@ -366,7 +430,7 @@ const SettingsPage: React.FC = () => {
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-[500px]">
           <div className="p-4 border-b border-gray-150 bg-gray-50/50">
             <h2 className="text-xs font-bold text-gray-800 uppercase tracking-wider">Rule Types</h2>
-            <p className="text-[10px] text-gray-400 mt-0.5">Specify ruling categories like Plain, Single Line, Square, etc.</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">Specify ruling categories (Plain, Single, Square).</p>
           </div>
           
           {/* Add input */}

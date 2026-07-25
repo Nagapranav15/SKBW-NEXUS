@@ -35,6 +35,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
   const [unitsList, setUnitsList] = useState<string[]>(["kg", "pcs", "Sheets", "Reels", "mtr"]);
   const [ruleTypesList, setRuleTypesList] = useState<string[]>(["Plain", "Single Line", "Double Line", "Square Ruled", "Four Line", "Unruled"]);
   const [groupsList, setGroupsList] = useState<string[]>(["132P Happy days (UR)", "220P Happy days (SR)"]);
+  const [brandsList, setBrandsList] = useState<string[]>(["Happy Days", "Classmate", "Navneet"]);
   
   const [isNameManuallyEdited, setIsNameManuallyEdited] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -52,7 +53,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
   const [categoryFieldsMap, setCategoryFieldsMap] = useState<Record<string, string[]>>({
     "Raw Material": ["gsm", "brand", "title", "dimensions", "paperType"],
     "Semi Finished": ["gsm", "brand", "dimensions", "ruleType", "altUnit", "group"],
-    "Finished Goods": ["gsm", "brand", "dimensions", "ruleType", "pages", "booksGbl", "altUnit", "group"]
+    "Finished Goods": ["gsm", "brand", "dimensions", "ruleType", "pages", "altUnit", "group"]
   });
 
   // Custom Options Modal Popup state
@@ -84,6 +85,10 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
         if (data.units?.length) setUnitsList(data.units);
         if (data.ruleTypes?.length) setRuleTypesList(data.ruleTypes);
         if (data.groups?.length) setGroupsList(data.groups);
+        if (data.brands?.length) {
+          setBrandsList(data.brands);
+          setExistingBrands(data.brands);
+        }
         if (data.categoryFields) {
           // If returned as Map structure or nested record
           setCategoryFieldsMap(data.categoryFields);
@@ -110,7 +115,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
         .filter((b): b is string => !!b && typeof b === 'string' && b.trim() !== '');
 
       setFgBrandsList(Array.from(new Set(fgBrands)));
-      setExistingBrands(Array.from(new Set(rawBrands)));
+      setExistingBrands(prev => Array.from(new Set([...prev, ...rawBrands])));
     } catch (e) {
       console.error('Failed to load existing brands', e);
     }
@@ -275,7 +280,13 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
           const formatType = form.paperType === 'Reels' ? 'Reel' : form.paperType === 'Sheets' ? 'Sheet' : '';
           if (formatType) parts.push(formatType);
           if (form.gsm) parts.push(`${form.gsm}GSM`);
-          if (form.width && form.length) parts.push(`${form.width}x${form.length}CM`);
+          let sizeStr = '';
+          if (form.width && form.length) {
+            sizeStr = `${form.width}x${form.length}CM`;
+          } else if (form.width) {
+            sizeStr = `${form.width}CM`;
+          }
+          if (sizeStr) parts.push(sizeStr);
           setForm(prev => ({ ...prev, name: parts.join(' ') }));
         } else if (form.category === 'Finished Goods') {
           if (!form.pages && !form.brand && !form.ruleType) {
@@ -301,7 +312,17 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
           if (active.includes('brand') && form.brand) parts.push(form.brand);
           if (active.includes('title') && form.title) parts.push(form.title);
           if (active.includes('gsm') && form.gsm) parts.push(`${form.gsm}GSM`);
-          if (active.includes('dimensions') && form.width && form.length) parts.push(`${form.width}x${form.length}CM`);
+          
+          let sizeStr = '';
+          if (active.includes('dimensions')) {
+            if (form.width && form.length) {
+              sizeStr = `${form.width}x${form.length}CM`;
+            } else if (form.width) {
+              sizeStr = `${form.width}CM`;
+            }
+          }
+          if (sizeStr) parts.push(sizeStr);
+          
           if (parts.length > 0) {
             setForm(prev => ({ ...prev, name: parts.join(' ') }));
           } else {
@@ -330,21 +351,37 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
           company: companyId
         };
 
-        // Auto-save typed Group if not in groupsList
+        // Auto-save brand/group to metadata on submission if not already present
+        let metadataUpdated = false;
+        let updatedGroups = [...groupsList];
+        let updatedBrands = [...brandsList];
+
         if (form.group.trim() && !groupsList.includes(form.group.trim())) {
-          const updatedGroupsList = [...groupsList, form.group.trim()];
-          setGroupsList(updatedGroupsList);
+          updatedGroups.push(form.group.trim());
+          setGroupsList(updatedGroups);
+          metadataUpdated = true;
+        }
+
+        if (form.brand.trim() && !brandsList.includes(form.brand.trim())) {
+          updatedBrands.push(form.brand.trim());
+          setBrandsList(updatedBrands);
+          setExistingBrands(prev => Array.from(new Set([...prev, form.brand.trim()])));
+          metadataUpdated = true;
+        }
+
+        if (metadataUpdated) {
           try {
             await updateMetadataV2({
               companyId,
               categories: categoriesList,
               units: unitsList,
               ruleTypes: ruleTypesList,
-              groups: updatedGroupsList,
+              groups: updatedGroups,
+              brands: updatedBrands,
               categoryFields: categoryFieldsMap
             });
           } catch (e) {
-            console.error("Failed to auto-save new group to metadata", e);
+            console.error("Failed to auto-save new options to metadata", e);
           }
         }
 
@@ -554,7 +591,10 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                           <>
                             <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-20 divide-y divide-gray-50">
                               {fgBrandsList
-                                .filter(b => b.toLowerCase().includes(brandSearch.toLowerCase()))
+                                .filter(b => {
+                                  if (brandSearch === form.brand) return true;
+                                  return b.toLowerCase().includes(brandSearch.toLowerCase());
+                                })
                                 .map(b => (
                                   <button
                                     key={b}
@@ -614,7 +654,10 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                           <>
                             <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-20 divide-y divide-gray-50">
                               {existingBrands
-                                .filter(b => b.toLowerCase().includes(brandSearch.toLowerCase()))
+                                .filter(b => {
+                                  if (brandSearch === form.brand) return true;
+                                  return b.toLowerCase().includes(brandSearch.toLowerCase());
+                                })
                                 .map(b => (
                                   <button
                                     key={b}
@@ -782,7 +825,10 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                       <>
                         <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-20 divide-y divide-gray-50">
                           {groupsList
-                            .filter(g => g.toLowerCase().includes(groupSearch.toLowerCase()))
+                            .filter(g => {
+                              if (groupSearch === form.group) return true;
+                              return g.toLowerCase().includes(groupSearch.toLowerCase());
+                            })
                             .map(g => (
                               <button
                                 key={g}
