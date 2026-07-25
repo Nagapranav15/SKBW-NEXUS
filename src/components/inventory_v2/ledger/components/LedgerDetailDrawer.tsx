@@ -6,10 +6,11 @@ import { getBalancesV2 } from '../../../../api/mfgApiV2';
 interface LedgerDetailDrawerProps {
   entry: LedgerEntryV2 | null;
   companyId: string;
+  locations: any[];
   onClose: () => void;
 }
 
-const LedgerDetailDrawer: React.FC<LedgerDetailDrawerProps> = ({ entry, companyId, onClose }) => {
+const LedgerDetailDrawer: React.FC<LedgerDetailDrawerProps> = ({ entry, companyId, locations, onClose }) => {
   const [batchBalances, setBatchBalances] = useState<any[]>([]);
   const [loadingBalances, setLoadingBalances] = useState(false);
 
@@ -31,6 +32,23 @@ const LedgerDetailDrawer: React.FC<LedgerDetailDrawerProps> = ({ entry, companyI
       setBatchBalances([]);
     }
   }, [entry?.skuId?._id, entry?.batchNumber, companyId]);
+
+  // Helper: Traverse parent chain in memory
+  const resolveLocationPath = (locId: string) => {
+    const bin = locations.find(l => l._id === locId);
+    if (!bin) return { factory: '—', floor: '—', zone: '—', bin: '—' };
+    
+    const zone = locations.find(l => l._id === bin.parentId);
+    const floor = zone ? locations.find(l => l._id === zone.parentId) : null;
+    const factory = floor ? locations.find(l => l._id === floor.parentId) : null;
+    
+    return {
+      factory: factory?.name || '—',
+      floor: floor?.name || '—',
+      zone: zone?.name || '—',
+      bin: bin.name || '—'
+    };
+  };
 
   if (!entry) return null;
 
@@ -191,11 +209,8 @@ const LedgerDetailDrawer: React.FC<LedgerDetailDrawerProps> = ({ entry, companyI
               <div className="space-y-3.5">
                 {batchBalances.map((bal, idx) => {
                   // Resolve parents hierarchy representation
-                  const pathHierarchy = [];
-                  if (bal.location?.parentId) {
-                    // We can display parents if populated, otherwise show location levels
-                    pathHierarchy.push(bal.location.level || 'Bin');
-                  }
+                  const paths = resolveLocationPath(bal.location?._id || bal.locationId);
+                  const hierarchyPath = [paths.factory, paths.floor, paths.zone, paths.bin].filter(p => p && p !== '—').join(' > ');
                   
                   return (
                     <div key={idx} className="bg-white border border-gray-200 rounded-xl p-3.5 space-y-2 shadow-3xs">
@@ -204,7 +219,7 @@ const LedgerDetailDrawer: React.FC<LedgerDetailDrawerProps> = ({ entry, companyI
                           <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-emerald-50 text-emerald-700 border border-emerald-100">
                             {bal.location?.level || 'Storage'}
                           </span>
-                          <span className="font-bold text-gray-900 text-xs">{bal.location?.name || '—'}</span>
+                          <span className="font-bold text-gray-900 text-xs">{hierarchyPath || bal.location?.name || '—'}</span>
                         </div>
                         <span className="font-mono font-black text-xs text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-lg">
                           {bal.onHand?.toLocaleString()} {entry.skuId?.unit || entry.unit}

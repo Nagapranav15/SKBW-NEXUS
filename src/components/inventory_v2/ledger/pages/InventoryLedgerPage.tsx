@@ -16,6 +16,7 @@ const InventoryLedgerPage: React.FC = () => {
   const [entries, setEntries] = useState<LedgerEntryV2[]>([]);
   const [skus, setSkus] = useState<SkuV2[]>([]);
   const [locations, setLocations] = useState<WarehouseLocationV2[]>([]);
+  const [allLocations, setAllLocations] = useState<WarehouseLocationV2[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Group purchase entries by referenceId (Invoice/Batch Number)
@@ -100,6 +101,7 @@ const InventoryLedgerPage: React.FC = () => {
         getWarehouseHierarchyV2(selectedCompany?._id || '')
       ]);
       setSkus(sData);
+      setAllLocations(lData);
       setLocations(lData.filter(loc => loc.level === 'Storage Location'));
     } catch (e) {
       console.error(e);
@@ -445,6 +447,7 @@ const InventoryLedgerPage: React.FC = () => {
         <LedgerDetailDrawer
           entry={selectedEntry}
           companyId={selectedCompany?._id || ''}
+          locations={allLocations}
           onClose={() => setSelectedEntry(null)}
         />
       )}
