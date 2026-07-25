@@ -109,9 +109,9 @@ exports.createPurchaseInvoice = async (req, res, next) => {
         locationId: location._id,
         reels: reels || [],
         // Cached hierarchies for ledger creation
-        warehouseId: warehouse._id,
-        floorId: floor._id,
-        zoneId: zone._id
+        warehouseId,
+        floorId,
+        zoneId
       });
     }
 
@@ -421,9 +421,9 @@ exports.editPurchaseInvoice = async (req, res, next) => {
         lotNumber,
         locationId: location._id,
         reels: reels || [],
-        warehouseId: warehouse._id,
-        floorId: floor._id,
-        zoneId: zone._id
+        warehouseId,
+        floorId,
+        zoneId
       });
     }
 
