@@ -788,12 +788,12 @@ const PurchaseInvoicePage: React.FC = () => {
                                 required
                               >
                                 <option value="">-- Select Destination Storage --</option>
-                                {locations.map(loc => {
+                                {locations.filter(loc => loc.level === 'Storage Location').map(loc => {
                                   const paths = resolveLocationPath(loc._id);
                                   const hierarchy = [paths.factory, paths.floor, paths.zone].filter(p => p && p !== '—').join(' > ');
                                   return (
                                     <option key={loc._id} value={loc._id}>
-                                      {hierarchy ? `${hierarchy} > ` : ''}{loc.name} ({loc.level})
+                                      {hierarchy ? `${hierarchy} > ` : ''}{loc.name}
                                     </option>
                                   );
                                 })}
@@ -857,12 +857,12 @@ const PurchaseInvoicePage: React.FC = () => {
                                             required
                                           >
                                             <option value="">-- Choose Storage Area --</option>
-                                            {locations.map(loc => {
+                                            {locations.filter(loc => loc.level === 'Storage Location').map(loc => {
                                               const paths = resolveLocationPath(loc._id);
                                               const hierarchy = [paths.factory, paths.floor, paths.zone].filter(p => p && p !== '—').join(' > ');
                                               return (
                                                 <option key={loc._id} value={loc._id}>
-                                                  {hierarchy ? `${hierarchy} > ` : ''}{loc.name} ({loc.level})
+                                                  {hierarchy ? `${hierarchy} > ` : ''}{loc.name}
                                                 </option>
                                               );
                                             })}
@@ -1572,7 +1572,7 @@ const PurchaseInvoicePage: React.FC = () => {
         );
         const maxAllocatable = unallocatedBal ? unallocatedBal.onHand : 0;
 
-        const physicalLocations = locations.filter(loc => loc._id !== defaultLocationId);
+        const physicalLocations = locations.filter(loc => loc.level === 'Storage Location' && loc._id !== defaultLocationId);
         const hasReels = unallocatedBal && unallocatedBal.reels && unallocatedBal.reels.length > 0;
 
         const handleReelToggle = (reel: any) => {
