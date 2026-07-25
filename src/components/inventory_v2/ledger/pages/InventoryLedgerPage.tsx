@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ArrowRightLeft, Search, Calendar, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowRightLeft, Search, Calendar, RefreshCw, ChevronLeft, ChevronRight, Eye, User } from 'lucide-react';
 import { useAuth } from '../../../../context/AuthContext';
 import { getSkusV2, getWarehouseHierarchyV2, SkuV2, WarehouseLocationV2 } from '../../../../api/mfgApiV2';
 import { fetchInventoryLedger } from '../services/ledgerService';
@@ -17,6 +17,35 @@ const InventoryLedgerPage: React.FC = () => {
   const [skus, setSkus] = useState<SkuV2[]>([]);
   const [locations, setLocations] = useState<WarehouseLocationV2[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Group purchase entries by referenceId (Invoice/Batch Number)
+  const groupedPurchaseBatches = useMemo(() => {
+    if (ledgerMode !== 'purchase') return [];
+
+    const groups: Record<string, {
+      referenceId: string;
+      createdAt: string;
+      createdBy: any;
+      status: string;
+      items: LedgerEntryV2[];
+    }> = {};
+
+    entries.forEach(entry => {
+      const refId = entry.referenceId || 'Unknown Batch';
+      if (!groups[refId]) {
+        groups[refId] = {
+          referenceId: refId,
+          createdAt: entry.createdAt,
+          createdBy: entry.createdBy,
+          status: entry.status,
+          items: []
+        };
+      }
+      groups[refId].items.push(entry);
+    });
+
+    return Object.values(groups);
+  }, [entries, ledgerMode]);
 
   // Pagination
   const [page, setPage] = useState(1);
@@ -277,12 +306,114 @@ const InventoryLedgerPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Table Component */}
-      <LedgerTable
-        entries={entries}
-        loading={loading}
-        onViewDetails={setSelectedEntry}
-      />
+      {/* Table / Cards View */}
+      {loading ? (
+        <div className="flex items-center justify-center bg-white rounded-xl border border-gray-200 h-64">
+          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : ledgerMode === 'purchase' ? (
+        <div className="space-y-4">
+          {groupedPurchaseBatches.length > 0 ? (
+            groupedPurchaseBatches.map((batch, bIdx) => {
+              const totalQty = batch.items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+              return (
+                <div key={bIdx} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden text-left">
+                  {/* Header */}
+                  <div className="bg-gray-50/75 border-b border-gray-150 px-5 py-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-black text-sm text-gray-900 bg-gray-200 px-2 py-0.5 rounded">
+                        {batch.referenceId}
+                      </span>
+                      <span className="text-gray-400 font-medium">
+                        {new Date(batch.createdAt).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center gap-4 text-gray-600 font-semibold">
+                      <div className="flex items-center gap-1">
+                        <User className="w-3.5 h-3.5 text-gray-400" />
+                        <span>{batch.createdBy?.fullName || 'System'}</span>
+                      </div>
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-extrabold uppercase ${
+                        batch.status === 'Posted' ? 'bg-green-50 text-green-700' : 
+                        batch.status === 'Pending' ? 'bg-amber-50 text-amber-700' : 'bg-gray-200 text-gray-500'
+                      }`}>
+                        {batch.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Body / Lots list */}
+                  <div className="p-4 space-y-3">
+                    <div className="flex items-center justify-between text-xs font-bold text-gray-505 border-b border-gray-100 pb-2">
+                      <span>ITEMS IN BATCH: {batch.items.length}</span>
+                      <span>TOTAL INWARDED: <span className="font-black text-green-600">{totalQty.toLocaleString()} kg</span></span>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-lg border border-gray-100 bg-white">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-gray-50/50 text-gray-400 font-bold uppercase text-[9px] border-b border-gray-100 whitespace-nowrap">
+                            <th className="py-2.5 px-3">#</th>
+                            <th className="py-2.5 px-3">SKU / Material</th>
+                            <th className="py-2.5 px-3">Transaction No</th>
+                            <th className="py-2.5 px-3 text-right">Quantity</th>
+                            <th className="py-2.5 px-3">Allocated Location</th>
+                            <th className="py-2.5 px-3 text-center">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50 font-semibold text-gray-700">
+                          {batch.items.map((item, iIdx) => (
+                            <tr key={iIdx} className="hover:bg-gray-50/20">
+                              <td className="py-2 px-3 font-mono text-gray-400">{iIdx + 1}</td>
+                              <td className="py-2 px-3">
+                                <p className="font-bold text-gray-900">{item.skuId?.name || 'Unknown'}</p>
+                                <p className="text-[9px] font-mono text-gray-400 mt-0.5">{item.skuId?.skuCode || '—'}</p>
+                              </td>
+                              <td className="py-2 px-3 font-mono font-bold text-gray-505">{item.transactionNumber}</td>
+                              <td className="py-2 px-3 text-right font-black text-green-600">
+                                +{item.quantity} <span className="text-[10px] text-gray-400 font-bold">{item.skuId?.unit || item.unit}</span>
+                              </td>
+                              <td className="py-2 px-3">
+                                <p className="font-bold text-gray-800">{item.locationId?.name || '—'}</p>
+                                <p className="text-[9px] text-gray-400 uppercase font-medium">{item.locationId?.level || '—'}</p>
+                              </td>
+                              <td className="py-2 px-3 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedEntry(item)}
+                                  className="p-1 text-blue-600 hover:bg-blue-50 border border-blue-150 rounded transition-all"
+                                  title="View Reel Details & Hierarchy Trail"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="text-center py-16 text-gray-400 bg-white rounded-xl border border-gray-200">
+              <ArrowRightLeft className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+              <p className="text-sm font-semibold">No purchase batches found</p>
+              <p className="text-xs text-gray-505 mt-1">Inward purchase ledger records will populate here automatically.</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-3xs overflow-hidden">
+          <LedgerTable
+            entries={entries}
+            loading={loading}
+            onViewDetails={setSelectedEntry}
+          />
+        </div>
+      )}
 
       {/* Pagination Footer */}
       {totalPages > 1 && (
