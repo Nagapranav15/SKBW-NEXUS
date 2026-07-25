@@ -218,7 +218,7 @@ const InventoryLedgerPage: React.FC = () => {
           <select
             value={skuFilter}
             onChange={e => { setSkuFilter(e.target.value); setPage(1); }}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white"
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-800 font-semibold cursor-pointer transition-colors hover:border-gray-300"
           >
             <option value="">All SKUs</option>
             {skus.map(s => (
@@ -231,7 +231,7 @@ const InventoryLedgerPage: React.FC = () => {
           <select
             value={locFilter}
             onChange={e => { setLocFilter(e.target.value); setPage(1); }}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white"
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-800 font-semibold cursor-pointer transition-colors hover:border-gray-300"
           >
             <option value="">All Locations</option>
             {locations.map(l => (
@@ -245,7 +245,7 @@ const InventoryLedgerPage: React.FC = () => {
             <select
               value={typeFilter}
               onChange={e => { setTypeFilter(e.target.value); setPage(1); }}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-800 font-semibold cursor-pointer transition-colors hover:border-gray-300"
             >
               <option value="">All Stock Types</option>
               <option value="Processing">Processing</option>
@@ -262,7 +262,7 @@ const InventoryLedgerPage: React.FC = () => {
           <select
             value={directionFilter}
             onChange={e => { setDirectionFilter(e.target.value); setPage(1); }}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white"
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-800 font-semibold cursor-pointer transition-colors hover:border-gray-300"
           >
             <option value="">All Directions</option>
             <option value="IN">IN</option>
