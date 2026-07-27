@@ -645,11 +645,12 @@ exports.recordTransfer = async (req, res, next) => {
 
     // Generate transaction references
     const referenceId = `TXF-${Date.now()}`;
-    const transactionNumber = await Sequence.getNextSequence("IL", session);
+    const transactionNumberOut = await Sequence.getNextSequence("IL", session);
+    const transactionNumberIn = await Sequence.getNextSequence("IL", session);
 
     // 1. OUT entry at source in primary ledger
     const primOut = new InventoryLedger({
-      transactionNumber,
+      transactionNumber: transactionNumberOut,
       transactionType: "Transfer",
       skuId: skuObjId,
       quantity: transferQty,
@@ -672,7 +673,7 @@ exports.recordTransfer = async (req, res, next) => {
 
     // 2. IN entry at destination in primary ledger
     const primIn = new InventoryLedger({
-      transactionNumber,
+      transactionNumber: transactionNumberIn,
       transactionType: "Transfer",
       skuId: skuObjId,
       quantity: transferQty,
