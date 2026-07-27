@@ -338,19 +338,37 @@ const SkuMasterV2: React.FC = () => {
   const filteredSkus = skus.filter(s => {
     if (unitFilter && s.unit !== unitFilter) return false;
     if (search) {
-      const q = search.toLowerCase();
+      const q = search.trim().toLowerCase();
       const matchText = (s.skuCode || '').toLowerCase().includes(q) ||
                         (s.name || '').toLowerCase().includes(q) ||
                         (s.brand || '').toLowerCase().includes(q) ||
                         (s.category || '').toLowerCase().includes(q) ||
                         (s.group || '').toLowerCase().includes(q) ||
                         (s.ruleType || '').toLowerCase().includes(q) ||
-                        (s.paperType || '').toLowerCase().includes(q);
+                        (s.paperType || '').toLowerCase().includes(q) ||
+                        (s.unit || '').toLowerCase().includes(q) ||
+                        (s.altUnit || '').toLowerCase().includes(q);
+
+      if (matchText) return true;
+
+      // Try parsing dimension format like "54 x 78" or "54x78" or "54 * 78"
+      const dimensionMatch = q.match(/^(\d+(?:\.\d+)?)\s*[xx\*]\s*(\d+(?:\.\d+)?)$/);
+      if (dimensionMatch) {
+        const w = Number(dimensionMatch[1]);
+        const l = Number(dimensionMatch[2]);
+        return s.width === w && s.length === l;
+      }
+
+      // Try parsing single number
       const parsedNum = Number(q);
-      const matchNum = !isNaN(parsedNum) && (
-        s.gsm === parsedNum || s.pages === parsedNum
-      );
-      return matchText || matchNum;
+      if (!isNaN(parsedNum)) {
+        return s.gsm === parsedNum || 
+               s.pages === parsedNum || 
+               s.width === parsedNum || 
+               s.length === parsedNum;
+      }
+
+      return false;
     }
     return true;
   });

@@ -32,7 +32,8 @@ exports.getSkus = async (req, res, next) => {
       query.status = status;
     }
     if (search) {
-      const regexSearch = { $regex: search, $options: "i" };
+      const q = search.trim();
+      const regexSearch = { $regex: q, $options: "i" };
       query.$or = [
         { skuCode: regexSearch },
         { name: regexSearch },
@@ -40,12 +41,28 @@ exports.getSkus = async (req, res, next) => {
         { category: regexSearch },
         { group: regexSearch },
         { ruleType: regexSearch },
-        { paperType: regexSearch }
+        { paperType: regexSearch },
+        { unit: regexSearch },
+        { altUnit: regexSearch }
       ];
-      const parsedNum = Number(search);
-      if (!isNaN(parsedNum)) {
-        query.$or.push({ gsm: parsedNum });
-        query.$or.push({ pages: parsedNum });
+
+      // Try parsing dimension format like "54 x 78" or "54x78" or "54 * 78"
+      const dimensionMatch = q.match(/^(\d+(?:\.\d+)?)\s*[xX\*]\s*(\d+(?:\.\d+)?)$/);
+      if (dimensionMatch) {
+        const w = Number(dimensionMatch[1]);
+        const l = Number(dimensionMatch[2]);
+        if (!isNaN(w) && !isNaN(l)) {
+          query.$or.push({ $and: [{ width: w }, { length: l }] });
+        }
+      } else {
+        // Try parsing single number
+        const parsedNum = Number(q);
+        if (!isNaN(parsedNum)) {
+          query.$or.push({ gsm: parsedNum });
+          query.$or.push({ pages: parsedNum });
+          query.$or.push({ width: parsedNum });
+          query.$or.push({ length: parsedNum });
+        }
       }
     }
 
