@@ -1553,8 +1553,8 @@ const PurchaseInvoicePage: React.FC = () => {
                                 b => b.batchNumber === selectedInvoice.invoiceNumber && 
                                      b.reels?.some(r => r.reelNumber === reel.reelNumber)
                               );
-                              const locationName = balance && typeof balance.locationId === 'object' && balance.locationId !== null
-                                ? (balance.locationId as any).name 
+                              const locationName = balance && balance.location
+                                ? balance.location.name 
                                 : 'Not Allocated';
                               return (
                                 <div key={rIdx} className="bg-white p-2 border border-gray-100 rounded-lg flex items-center justify-between text-[11px]">
