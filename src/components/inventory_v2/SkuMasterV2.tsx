@@ -188,7 +188,7 @@ const SkuMasterV2: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 ">
+    <div className={`space-y-6 transition-all duration-300 ${showAddDrawer || selectedSkuDetails || showImportDrawer ? 'lg:mr-[520px]' : ''}`}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
         <div>
@@ -493,9 +493,7 @@ const SkuMasterV2: React.FC = () => {
 
       {/* Bulk Import Slide-Over Drawer */}
       {showImportDrawer && (
-        <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-3xs" onClick={() => setShowImportDrawer(false)} />
-          <div className="relative w-full max-w-lg bg-white shadow-2xl h-full flex flex-col z-10 animate-in slide-in-from-right duration-250">
+        <div className="fixed top-0 right-0 h-full w-full sm:w-[520px] bg-white shadow-2xl border-l border-gray-200 z-50 flex flex-col animate-in slide-in-from-right duration-250">
             <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
               <div>
                 <h2 className="text-base font-bold text-gray-900">Bulk Import SKUs (JSON Array)</h2>
@@ -549,14 +547,11 @@ const SkuMasterV2: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* SKU Details Side-Over Drawer */}
       {selectedSkuDetails && (
-        <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-3xs" onClick={() => setSelectedSkuDetails(null)} />
-          <div className="relative w-full max-w-lg bg-white shadow-2xl h-full flex flex-col z-10 animate-in slide-in-from-right duration-250">
+        <div className="fixed top-0 right-0 h-full w-full sm:w-[520px] bg-white shadow-2xl border-l border-gray-200 z-50 flex flex-col animate-in slide-in-from-right duration-250">
             <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
               <div>
                 <h2 className="text-base font-bold text-gray-900">SKU Detailed Information</h2>
@@ -653,8 +648,7 @@ const SkuMasterV2: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
     </div>
   );
 };

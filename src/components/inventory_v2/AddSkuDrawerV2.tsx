@@ -403,15 +403,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
     if (!isOpen) return null;
 
     return (
-      <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
-        {/* Background Overlay */}
-        <div 
-          className="fixed inset-0 bg-black/40 backdrop-blur-3xs transition-opacity animate-in fade-in duration-200"
-          onClick={onClose}
-        />
-
-        {/* Drawer Container */}
-        <div className="relative w-full max-w-lg bg-white shadow-2xl h-full flex flex-col z-10 animate-in slide-in-from-right duration-250 font-sans text-xs">
+      <div className="fixed top-0 right-0 h-full w-full sm:w-[520px] bg-white shadow-2xl border-l border-gray-200 z-50 flex flex-col animate-in slide-in-from-right duration-250 font-sans text-xs">
           {/* Header */}
           <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
             <div>
@@ -962,7 +954,6 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
             )}
           </button>
         </div>
-      </div>
 
       {/* Dynamic Option Custom Modal Popup */}
       {modalConfig.isOpen && (
