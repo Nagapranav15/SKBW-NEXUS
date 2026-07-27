@@ -1551,7 +1551,6 @@ const PurchaseInvoicePage: React.FC = () => {
                             {item.reels?.map((reel, rIdx) => {
                               const balance = inventoryBalances.find(
                                 b => b.batchNumber === selectedInvoice.invoiceNumber && 
-                                     b.lotNumber === lotNo && 
                                      b.reels?.some(r => r.reelNumber === reel.reelNumber)
                               );
                               const locationName = balance && typeof balance.locationId === 'object' && balance.locationId !== null
