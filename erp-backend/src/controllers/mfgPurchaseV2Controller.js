@@ -120,12 +120,7 @@ exports.createPurchaseInvoice = async (req, res, next) => {
     // 3. Generate sequential invoice number if not manually specified
     let finalInvoiceNo = invoiceNumber;
     if (!finalInvoiceNo) {
-      const seqDoc = await Sequence.findOneAndUpdate(
-        { prefix: "PB" },
-        { $inc: { sequence: 1 } },
-        { new: true, upsert: true }
-      );
-      finalInvoiceNo = `PB-${String(seqDoc.sequence).padStart(6, '0')}`;
+      finalInvoiceNo = await Sequence.getNextSequence("PB");
     } else {
       const exists = await PurchaseInvoiceV2.findOne({ invoiceNumber: finalInvoiceNo, company: companyObjId });
       if (exists) {
@@ -154,12 +149,7 @@ exports.createPurchaseInvoice = async (req, res, next) => {
 
     // 5. Inward stock using V2 Ledger Engine for each item
     for (const valItem of validatedItems) {
-      const seqDoc = await Sequence.findOneAndUpdate(
-        { prefix: "IL" },
-        { $inc: { sequence: 1 } },
-        { new: true, upsert: true }
-      );
-      const transactionNumber = `IL-${String(seqDoc.sequence).padStart(8, '0')}`;
+      const transactionNumber = await Sequence.getNextSequence("IL");
 
       const newLedgerEntry = new InventoryLedger({
         transactionNumber,
@@ -457,12 +447,7 @@ exports.editPurchaseInvoice = async (req, res, next) => {
     await InventoryLedger.deleteMany({ referenceType: "PurchaseInvoice", referenceId: invoice.invoiceNumber, company: companyObjId });
 
     for (const valItem of validatedItems) {
-      const seqDoc = await Sequence.findOneAndUpdate(
-        { prefix: "IL" },
-        { $inc: { sequence: 1 } },
-        { new: true, upsert: true }
-      );
-      const transactionNumber = `IL-${String(seqDoc.sequence).padStart(8, '0')}`;
+      const transactionNumber = await Sequence.getNextSequence("IL");
 
       const newLedgerEntry = new InventoryLedger({
         transactionNumber,

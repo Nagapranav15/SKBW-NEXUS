@@ -645,12 +645,7 @@ exports.recordTransfer = async (req, res, next) => {
 
     // Generate transaction references
     const referenceId = `TXF-${Date.now()}`;
-    const seqDoc = await Sequence.findOneAndUpdate(
-      { prefix: "IL" },
-      { $inc: { sequence: 1 } },
-      { new: true, upsert: true, session }
-    );
-    const transactionNumber = `IL-${String(seqDoc.sequence).padStart(8, '0')}`;
+    const transactionNumber = await Sequence.getNextSequence("IL", session);
 
     // 1. OUT entry at source in primary ledger
     const primOut = new InventoryLedger({
@@ -1141,12 +1136,7 @@ exports.createInventoryLedgerEntry = async (req, res, next) => {
       }
     }
 
-    const seqDoc = await Sequence.findOneAndUpdate(
-      { prefix: "IL" },
-      { $inc: { sequence: 1 } },
-      { new: true, upsert: true }
-    );
-    const transactionNumber = `IL-${String(seqDoc.sequence).padStart(8, '0')}`;
+    const transactionNumber = await Sequence.getNextSequence("IL");
 
     const newEntry = new InventoryLedger({
       transactionNumber,
