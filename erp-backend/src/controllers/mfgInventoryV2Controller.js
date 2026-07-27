@@ -1176,44 +1176,6 @@ exports.getMetadata = async (req, res, next) => {
     if (!doc) {
       doc = new Metadata({ company: companyObjId });
       await doc.save();
-    } else {
-      let docUpdated = false;
-      if (!doc.groups || doc.groups.length === 0) {
-        doc.groups = ["132P Happy days (UR)", "220P Happy days (SR)"];
-        docUpdated = true;
-      }
-      if (!doc.brands || doc.brands.length === 0) {
-        doc.brands = ["Happy Days", "Classmate", "Navneet"];
-        doc.markModified("brands");
-        docUpdated = true;
-      }
-      if (doc.categoryFields) {
-        const sf = doc.categoryFields.get ? doc.categoryFields.get("Semi Finished") : (doc.categoryFields["Semi Finished"] || []);
-        if (sf && !sf.includes("group")) {
-          sf.push("group");
-          if (doc.categoryFields.set) {
-            doc.categoryFields.set("Semi Finished", sf);
-          } else {
-            doc.categoryFields["Semi Finished"] = sf;
-          }
-          docUpdated = true;
-        }
-        const fg = doc.categoryFields.get ? doc.categoryFields.get("Finished Goods") : (doc.categoryFields["Finished Goods"] || []);
-        if (fg && !fg.includes("group")) {
-          fg.push("group");
-          if (doc.categoryFields.set) {
-            doc.categoryFields.set("Finished Goods", fg);
-          } else {
-            doc.categoryFields["Finished Goods"] = fg;
-          }
-          docUpdated = true;
-        }
-      }
-      if (docUpdated) {
-        doc.markModified("groups");
-        doc.markModified("categoryFields");
-        await doc.save();
-      }
     }
     res.json(doc);
   } catch (err) {

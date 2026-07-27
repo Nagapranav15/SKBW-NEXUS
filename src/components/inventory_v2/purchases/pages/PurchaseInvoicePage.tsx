@@ -567,17 +567,28 @@ const PurchaseInvoicePage: React.FC = () => {
       loadingUnloading: '0',
       otherCharges: String(invoice.otherCharges || 0),
       dueDate: invoice.dueDate ? new Date(invoice.dueDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-      items: (invoice.items || []).map(item => ({
-        skuId: typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any)._id : item.skuId,
-        brand: '',
-        gsm: '',
-        width: '',
-        reelsCount: String(item.reels?.length || 0),
-        quantity: String(item.quantity),
-        purchasePrice: String(item.purchasePrice),
-        lotNumber: item.lotNumber,
-        reels: item.reels || []
-      }))
+      items: (invoice.items || []).map(item => {
+        const skuIdVal = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any)._id : item.skuId;
+        const selectedSku = skus.find(s => s._id === skuIdVal);
+        const locIdVal = typeof item.locationId === 'object' && item.locationId !== null ? (item.locationId as any)._id : item.locationId;
+        const mappedReels = (item.reels || []).map(r => ({
+          ...r,
+          locationId: locIdVal
+        }));
+
+        return {
+          skuId: skuIdVal,
+          brand: selectedSku?.brand || '',
+          gsm: selectedSku?.gsm ? String(selectedSku.gsm) : '',
+          width: selectedSku?.width ? String(selectedSku.width) : '',
+          reelsCount: String(item.reels?.length || 0),
+          quantity: String(item.quantity),
+          purchasePrice: String(item.purchasePrice),
+          lotNumber: item.lotNumber,
+          locationId: locIdVal,
+          reels: mappedReels
+        };
+      })
     });
     setAddError('');
     setActiveSubPage('new');
@@ -1158,9 +1169,11 @@ const PurchaseInvoicePage: React.FC = () => {
                           </span>
                         </div>
 
-                        {reelsCount === 0 && (
+                        {true && (
                           <div className="flex items-center gap-2">
-                            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Lot Storage Location:</label>
+                            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                              {reelsCount > 0 ? 'Default Lot Storage:' : 'Lot Storage Location:'}
+                            </label>
                             <select
                               value={item.locationId || ''}
                               onChange={e => handleItemRowChange(idx, 'locationId', e.target.value)}
@@ -1204,7 +1217,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                   const reelObj = item.reels?.[rIdx] || {};
                                   const reelWeightVal = reelObj.weight !== undefined && reelObj.weight !== null ? reelObj.weight : '';
                                   const reelWidthVal = reelObj.width !== undefined && reelObj.width !== null ? reelObj.width : item.width;
-                                  const reelLocId = reelObj.locationId || '';
+                                  const reelLocId = reelObj.locationId || item.locationId || '';
 
                                   return (
                                     <tr key={rIdx} className="hover:bg-gray-50/20">

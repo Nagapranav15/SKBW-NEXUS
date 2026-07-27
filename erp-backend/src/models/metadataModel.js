@@ -13,7 +13,7 @@ const metadataSchema = new mongoose.Schema({
     default: {
       "Raw Material": ["gsm", "brand", "title", "dimensions", "paperType"],
       "Semi Finished": ["gsm", "brand", "dimensions", "ruleType", "altUnit", "group"],
-      "Finished Goods": ["gsm", "brand", "dimensions", "ruleType", "pages", "altUnit", "group"]
+      "Finished Goods": ["gsm", "brand", "dimensions", "ruleType", "pages", "altUnit"]
     }
   }
 }, { timestamps: true });

@@ -48,12 +48,14 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
   const [showBrandDropdown, setShowBrandDropdown] = useState(false);
   const [groupSearch, setGroupSearch] = useState('');
   const [showGroupDropdown, setShowGroupDropdown] = useState(false);
+  const [brandAtFocus, setBrandAtFocus] = useState<string | null>(null);
+  const [groupAtFocus, setGroupAtFocus] = useState<string | null>(null);
 
   // Category specific field visibility mapping
   const [categoryFieldsMap, setCategoryFieldsMap] = useState<Record<string, string[]>>({
     "Raw Material": ["gsm", "brand", "title", "dimensions", "paperType"],
     "Semi Finished": ["gsm", "brand", "dimensions", "ruleType", "altUnit", "group"],
-    "Finished Goods": ["gsm", "brand", "dimensions", "ruleType", "pages", "altUnit", "group"]
+    "Finished Goods": ["gsm", "brand", "dimensions", "ruleType", "pages", "altUnit"]
   });
 
   // Custom Options Modal Popup state
@@ -303,7 +305,11 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
             const parts = [];
             if (form.pages) parts.push(`${form.pages}P`);
             if (form.brand) parts.push(form.brand);
-            if (form.ruleType) parts.push(`(${form.ruleType})`);
+            if (form.ruleType) {
+              const clean = form.ruleType.trim();
+              const wrapped = (clean.startsWith('(') && clean.endsWith(')')) ? clean : `(${clean})`;
+              parts.push(wrapped);
+            }
             setForm(prev => ({ ...prev, name: parts.join(' ') }));
           }
         } else {
@@ -576,7 +582,10 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                             setBrandSearch(e.target.value);
                             setForm(prev => ({ ...prev, brand: e.target.value }));
                           }}
-                          onFocus={() => setShowBrandDropdown(true)}
+                          onFocus={() => {
+                            setShowBrandDropdown(true);
+                            setBrandAtFocus(form.brand);
+                          }}
                           className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
                         />
                         {showBrandDropdown && (
@@ -584,7 +593,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                             <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-20 divide-y divide-gray-50">
                               {fgBrandsList
                                 .filter(b => {
-                                  if (brandSearch === form.brand) return true;
+                                  if (brandSearch === brandAtFocus) return true;
                                   return b.toLowerCase().includes(brandSearch.toLowerCase());
                                 })
                                 .map(b => (
@@ -600,8 +609,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                                   >
                                     {b}
                                   </button>
-                                ))
-                              }
+                                  ))
+                                }
                               {brandSearch.trim() && !fgBrandsList.some(b => b.toLowerCase() === brandSearch.toLowerCase()) && (
                                 <button
                                   type="button"
@@ -639,7 +648,10 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                             setBrandSearch(e.target.value);
                             setForm(prev => ({ ...prev, brand: e.target.value }));
                           }}
-                          onFocus={() => setShowBrandDropdown(true)}
+                          onFocus={() => {
+                            setShowBrandDropdown(true);
+                            setBrandAtFocus(form.brand);
+                          }}
                           className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
                         />
                         {showBrandDropdown && (
@@ -647,7 +659,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                             <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-20 divide-y divide-gray-50">
                               {existingBrands
                                 .filter(b => {
-                                  if (brandSearch === form.brand) return true;
+                                  if (brandSearch === brandAtFocus) return true;
                                   return b.toLowerCase().includes(brandSearch.toLowerCase());
                                 })
                                 .map(b => (
@@ -663,8 +675,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                                   >
                                     {b}
                                   </button>
-                                ))
-                              }
+                                  ))
+                                }
                               {brandSearch.trim() && !existingBrands.some(b => b.toLowerCase() === brandSearch.toLowerCase()) && (
                                 <button
                                   type="button"
@@ -810,7 +822,10 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                         setGroupSearch(e.target.value);
                         setForm(prev => ({ ...prev, group: e.target.value }));
                       }}
-                      onFocus={() => setShowGroupDropdown(true)}
+                      onFocus={() => {
+                        setShowGroupDropdown(true);
+                        setGroupAtFocus(form.group);
+                      }}
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
                     />
                     {showGroupDropdown && (
@@ -818,7 +833,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                         <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-20 divide-y divide-gray-50">
                           {groupsList
                             .filter(g => {
-                              if (groupSearch === form.group) return true;
+                              if (groupSearch === groupAtFocus) return true;
                               return g.toLowerCase().includes(groupSearch.toLowerCase());
                             })
                             .map(g => (
@@ -834,8 +849,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                               >
                                 {g}
                               </button>
-                            ))
-                          }
+                              ))
+                            }
                           {groupSearch.trim() && !groupsList.some(g => g.toLowerCase() === groupSearch.toLowerCase()) && (
                             <button
                               type="button"
