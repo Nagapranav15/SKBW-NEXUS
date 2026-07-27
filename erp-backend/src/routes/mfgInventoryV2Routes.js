@@ -40,6 +40,7 @@ router.get("/balances", auth, rbac(view), ctrl.getBalances);
 router.get("/dashboard", auth, rbac(view), ctrl.getDashboardStats);
 
 // Purchase V2 routes
+router.get("/purchases/next-number", auth, rbac(view), purchaseCtrl.getNextInvoiceNumber);
 router.get("/purchases/invoices", auth, rbac(view), purchaseCtrl.getPurchaseInvoices);
 router.post("/purchases/invoices", auth, rbac(manage), purchaseCtrl.createPurchaseInvoice);
 router.put("/purchases/invoices/:id", auth, rbac(manage), purchaseCtrl.editPurchaseInvoice);

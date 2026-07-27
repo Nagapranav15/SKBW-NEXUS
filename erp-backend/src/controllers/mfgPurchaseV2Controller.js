@@ -545,3 +545,30 @@ exports.deletePurchaseInvoice = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.getNextInvoiceNumber = async (req, res, next) => {
+  try {
+    const { companyId } = req.query;
+    if (!companyId) {
+      return res.status(400).json({ msg: "companyId is required" });
+    }
+    const companyObjId = toObjectId(companyId);
+
+    const seqDoc = await Sequence.findOne({ prefix: "PB" });
+    const currentSeq = seqDoc ? seqDoc.sequence : 0;
+
+    let nextSeq = currentSeq + 1;
+    let code = `PB-${String(nextSeq).padStart(6, '0')}`;
+    let exists = await PurchaseInvoiceV2.exists({ invoiceNumber: code, company: companyObjId });
+
+    while (exists) {
+      nextSeq++;
+      code = `PB-${String(nextSeq).padStart(6, '0')}`;
+      exists = await PurchaseInvoiceV2.exists({ invoiceNumber: code, company: companyObjId });
+    }
+
+    res.json({ nextInvoiceNumber: code });
+  } catch (err) {
+    next(err);
+  }
+};

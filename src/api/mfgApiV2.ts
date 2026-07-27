@@ -217,3 +217,10 @@ export const updateMetadataV2 = async (metadataData: {
   const response = await api.post('/v2/metadata', metadataData);
   return response.data;
 };
+
+export const getNextInvoiceNumberV2 = async (companyId: string): Promise<string> => {
+  const response = await api.get('/v2/purchases/next-number', {
+    params: { companyId }
+  });
+  return response.data.nextInvoiceNumber;
+};

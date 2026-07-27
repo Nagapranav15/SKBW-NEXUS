@@ -3,7 +3,7 @@ import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, X, Fil
 import { useAuth } from '../../../../context/AuthContext';
 import { getActivityLogs, createActivityLog } from '../../../../api/activityLogApi';
 import { getParties } from '../../../../api/partyApi';
-import { getSkusV2, getWarehouseHierarchyV2, recordTransferV2, SkuV2, WarehouseLocationV2, getBalancesV2 } from '../../../../api/mfgApiV2';
+import { getSkusV2, getWarehouseHierarchyV2, recordTransferV2, SkuV2, WarehouseLocationV2, getBalancesV2, getNextInvoiceNumberV2 } from '../../../../api/mfgApiV2';
 import { 
   getPurchaseInvoicesV2, 
   createPurchaseInvoiceV2, 
@@ -594,6 +594,34 @@ const PurchaseInvoicePage: React.FC = () => {
     setActiveSubPage('new');
   };
 
+  const handleNewPurchaseClick = async () => {
+    setIsEditing(false);
+    setEditingInvoiceId(null);
+    setInvoiceForm({
+      invoiceNumber: '',
+      vendorId: '',
+      taxAmount: '0',
+      freight: '0',
+      craneCharges: '0',
+      loadingUnloading: '0',
+      otherCharges: '0',
+      dueDate: new Date().toISOString().split('T')[0],
+      items: [{ skuId: '', brand: '', gsm: '', width: '', reelsCount: '', quantity: '', purchasePrice: '', lotNumber: '', reels: [] as any[] }]
+    });
+    setAddError('');
+    setActiveSubPage('new');
+
+    try {
+      const nextNo = await getNextInvoiceNumberV2(selectedCompany?._id || '');
+      setInvoiceForm(prev => ({
+        ...prev,
+        invoiceNumber: nextNo
+      }));
+    } catch (e) {
+      console.error("Failed to load next purchase invoice number:", e);
+    }
+  };
+
   const handleDeleteInvoice = async (invoice: PurchaseInvoiceV2) => {
     if (!window.confirm(`Are you sure you want to delete purchase invoice ${invoice.invoiceNumber}? This will reverse the stock entries and adjust the vendor's outstanding balance.`)) {
       return;
@@ -766,23 +794,7 @@ const PurchaseInvoicePage: React.FC = () => {
               </div>
 
               <button
-                onClick={() => {
-                  setIsEditing(false);
-                  setEditingInvoiceId(null);
-                  setInvoiceForm({
-                    invoiceNumber: '',
-                    vendorId: '',
-                    taxAmount: '0',
-                    freight: '0',
-                    craneCharges: '0',
-                    loadingUnloading: '0',
-                    otherCharges: '0',
-                    dueDate: new Date().toISOString().split('T')[0],
-                    items: [{ skuId: '', brand: '', gsm: '', width: '', reelsCount: '', quantity: '', purchasePrice: '', lotNumber: '', reels: [] as any[] }]
-                  });
-                  setAddError('');
-                  setActiveSubPage('new');
-                }}
+                onClick={handleNewPurchaseClick}
                 className="flex items-center gap-1.5 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black shadow-md transition-all"
               >
                 <Plus className="w-3.5 h-3.5" /> + New Purchase
