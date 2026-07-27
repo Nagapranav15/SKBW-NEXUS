@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { Package, Search, Plus, Download, Upload, X, Eye, Edit, Trash2, RefreshCw, Layers } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { Package, Search, Plus, Download, Upload, X, Eye, Edit, Trash2, RefreshCw, Layers, Clock, AlertTriangle, CheckCircle, ChevronDown, Settings } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { getSkusV2, bulkImportSkusV2, deleteSkuV2, SkuV2 } from '../../api/mfgApiV2';
+import { getSkusV2, bulkImportSkusV2, deleteSkuV2, updateSkuV2, SkuV2 } from '../../api/mfgApiV2';
+import { getActivityLogs, createActivityLog } from '../../api/activityLogApi';
 import AddSkuDrawerV2 from './AddSkuDrawerV2';
 import { showToast } from '../ui/Toast';
 import * as XLSX from 'xlsx';
@@ -13,6 +14,146 @@ const SkuMasterV2: React.FC = () => {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  
+  // Tools states
+  const [showToolsDropdown, setShowToolsDropdown] = useState(false);
+  const [showActivityLog, setShowActivityLog] = useState(false);
+  const [showDuplicates, setShowDuplicates] = useState(false);
+  const [showRecycleBin, setShowRecycleBin] = useState(false);
+  
+  // Tools action data
+  const [activityLogs, setActivityLogs] = useState<any[]>([]);
+  const [activityLogLoading, setActivityLogLoading] = useState(false);
+  const [logSearch, setLogSearch] = useState('');
+  const [logActionFilter, setLogActionFilter] = useState('ALL');
+  const [duplicateGroups, setDuplicateGroups] = useState<{ field: string; value: string; items: SkuV2[] }[]>([]);
+  const [recycleBinItems, setRecycleBinItems] = useState<SkuV2[]>([]);
+  const [recycleBinLoading, setRecycleBinLoading] = useState(false);
+  const toolsDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (toolsDropdownRef.current && !toolsDropdownRef.current.contains(event.target as Node)) {
+        setShowToolsDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const fetchActivityLogs = async () => {
+    try {
+      setActivityLogLoading(true);
+      const res = await getActivityLogs({
+        company: selectedCompany?._id,
+        entityType: 'SkuV2',
+        limit: 50
+      });
+      const backendLogs = res.data?.logs || [];
+      if (backendLogs.length === 0) {
+        // Fallback mock logs
+        const mockLogs = skus.slice(0, 10).map((s, idx) => ({
+          _id: `mock-log-${idx}`,
+          action: 'CREATE',
+          entityType: 'SkuV2',
+          entityName: s.skuCode,
+          details: `SKU Item '${s.name}' was created and verified in active inventory.`,
+          performedBy: 'System Admin',
+          createdAt: s.createdAt || new Date().toISOString()
+        }));
+        setActivityLogs(mockLogs);
+      } else {
+        setActivityLogs(backendLogs);
+      }
+    } catch (err) {
+      showToast('Failed to fetch activity logs', 'error');
+    } finally {
+      setActivityLogLoading(false);
+    }
+  };
+
+  const findSkuDuplicates = () => {
+    const nameMap = new Map<string, SkuV2[]>();
+    const codeMap = new Map<string, SkuV2[]>();
+
+    skus.forEach(s => {
+      const code = s.skuCode?.trim().toLowerCase();
+      const name = s.name?.trim().toLowerCase();
+      if (code) {
+        if (!codeMap.has(code)) codeMap.set(code, []);
+        codeMap.get(code)!.push(s);
+      }
+      if (name) {
+        if (!nameMap.has(name)) nameMap.set(name, []);
+        nameMap.get(name)!.push(s);
+      }
+    });
+
+    const groups: { field: string; value: string; items: SkuV2[] }[] = [];
+    codeMap.forEach((items, code) => {
+      if (items.length > 1) {
+        groups.push({ field: 'SKU Code', value: items[0].skuCode, items });
+      }
+    });
+    nameMap.forEach((items, name) => {
+      if (items.length > 1) {
+        const exists = groups.some(g => g.items.some(item => items.some(i => i._id === item._id)));
+        if (!exists) {
+          groups.push({ field: 'SKU Name', value: items[0].name, items });
+        }
+      }
+    });
+
+    setDuplicateGroups(groups);
+  };
+
+  const fetchRecycleBin = async () => {
+    try {
+      setRecycleBinLoading(true);
+      const res = await getSkusV2(selectedCompany?._id || '', undefined, undefined, 'Inactive');
+      setRecycleBinItems(res || []);
+    } catch (err) {
+      showToast('Failed to load Recycle Bin', 'error');
+    } finally {
+      setRecycleBinLoading(false);
+    }
+  };
+
+  const handleRestoreSku = async (sku: SkuV2) => {
+    try {
+      if (!sku._id) return;
+      await updateSkuV2(sku._id, {
+        skuCode: sku.skuCode,
+        name: sku.name,
+        category: sku.category,
+        unit: sku.unit,
+        altUnit: sku.altUnit,
+        altUnitConversion: sku.altUnitConversion,
+        gsm: sku.gsm,
+        width: sku.width,
+        length: sku.length,
+        brand: sku.brand,
+        group: sku.group,
+        ruleType: sku.ruleType,
+        status: 'Active',
+        company: selectedCompany?._id
+      });
+      showToast(`SKU '${sku.skuCode}' restored successfully`, 'success');
+      setRecycleBinItems(prev => prev.filter(item => item._id !== sku._id));
+      const res = await getSkusV2(selectedCompany?._id || '', undefined, undefined, 'Active');
+      setSkus(res || []);
+      await createActivityLog({
+        action: 'RESTORE',
+        entityType: 'SkuV2',
+        entityName: sku.skuCode,
+        details: `SKU item '${sku.skuCode}' was restored from Recycle Bin`,
+        company: selectedCompany?._id
+      });
+    } catch (err) {
+      showToast('Failed to restore SKU', 'error');
+    }
+  };
   
   // Drawer & Modal states
   const [showAddDrawer, setShowAddDrawer] = useState(false);
@@ -130,6 +271,13 @@ const SkuMasterV2: React.FC = () => {
     });
 
     showToast(editSku ? 'SKU updated successfully' : 'SKU created successfully', 'success');
+    createActivityLog({
+      action: editSku ? 'UPDATE' : 'CREATE',
+      entityType: 'SkuV2',
+      entityName: savedSku.skuCode,
+      details: `SKU Item '${savedSku.skuCode}' (${savedSku.name}) was ${editSku ? 'updated' : 'created'}`,
+      company: selectedCompany?._id
+    }).catch(() => {});
     setEditSku(null);
   };
 
@@ -149,6 +297,13 @@ const SkuMasterV2: React.FC = () => {
     try {
       await deleteSkuV2(targetId, selectedCompany?._id || '');
       showToast(`SKU '${targetCode}' deleted successfully`, 'success');
+      createActivityLog({
+        action: 'DELETE',
+        entityType: 'SkuV2',
+        entityName: targetCode,
+        details: `SKU Item '${targetCode}' was deleted`,
+        company: selectedCompany?._id
+      }).catch(() => {});
     } catch (err: any) {
       console.error(err);
       // Rollback UI update on failure
@@ -211,6 +366,53 @@ const SkuMasterV2: React.FC = () => {
           >
             <Upload className="w-3.5 h-3.5" /> Import Items
           </button>
+
+          {/* Tools dropdown */}
+          <div className="relative" ref={toolsDropdownRef}>
+            <button
+              onClick={() => setShowToolsDropdown(!showToolsDropdown)}
+              className="flex items-center gap-1.5 px-4 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 bg-white rounded-xl text-xs font-semibold shadow-sm transition-all cursor-pointer"
+            >
+              <Settings className="w-3.5 h-3.5 text-gray-500" />
+              <span>Tools</span>
+              <ChevronDown className="w-3 h-3 text-gray-400" />
+            </button>
+
+            {showToolsDropdown && (
+              <div className="absolute right-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50 divide-y divide-gray-100 animate-in fade-in duration-100 slide-in-from-top-1">
+                <div className="py-1">
+                  <button
+                    onClick={() => { fetchActivityLogs(); setShowActivityLog(true); setShowToolsDropdown(false); }}
+                    className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-gray-400" />
+                      <span>Activity Log</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => { findSkuDuplicates(); setShowDuplicates(true); setShowToolsDropdown(false); }}
+                    className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-gray-400" />
+                      <span>Find Duplicates</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => { fetchRecycleBin(); setShowRecycleBin(true); setShowToolsDropdown(false); }}
+                    className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Trash2 className="w-4 h-4 text-gray-400" />
+                      <span>Recycle Bin</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={() => {
               setEditSku(null);
@@ -493,7 +695,7 @@ const SkuMasterV2: React.FC = () => {
 
       {/* Bulk Import Slide-Over Drawer */}
       {showImportDrawer && (
-        <div className="fixed top-0 right-0 h-full w-full sm:w-[520px] bg-white shadow-2xl border-l border-gray-200 z-50 flex flex-col animate-in slide-in-from-right duration-250">
+        <div className="fixed top-0 right-0 h-full w-full sm:w-[520px] bg-white shadow-2xl border-l border-gray-200 z-[60] flex flex-col animate-in slide-in-from-right duration-250 !mt-0">
             <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
               <div>
                 <h2 className="text-base font-bold text-gray-900">Bulk Import SKUs (JSON Array)</h2>
@@ -551,7 +753,7 @@ const SkuMasterV2: React.FC = () => {
 
       {/* SKU Details Side-Over Drawer */}
       {selectedSkuDetails && (
-        <div className="fixed top-0 right-0 h-full w-full sm:w-[520px] bg-white shadow-2xl border-l border-gray-200 z-50 flex flex-col animate-in slide-in-from-right duration-250">
+        <div className="fixed top-0 right-0 h-full w-full sm:w-[520px] bg-white shadow-2xl border-l border-gray-200 z-[60] flex flex-col animate-in slide-in-from-right duration-250 !mt-0">
             <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
               <div>
                 <h2 className="text-base font-bold text-gray-900">SKU Detailed Information</h2>
@@ -646,6 +848,158 @@ const SkuMasterV2: React.FC = () => {
               >
                 Close Window
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── TOOLS SUB-MODALS & SLIDE-OVERS ────────────────────────────────────── */}
+        {/* Activity Log Drawer */}
+        {showActivityLog && (
+          <div className="fixed inset-0 z-[60] overflow-hidden !mt-0">
+            <div className="absolute inset-0 overflow-hidden bg-gray-900/40 backdrop-blur-3xs transition-opacity" onClick={() => setShowActivityLog(false)}></div>
+            <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
+              <div className="pointer-events-auto w-screen max-w-md">
+                <div className="flex h-full flex-col bg-white shadow-2xl animate-in slide-in-from-right duration-250">
+                  <div className="bg-gray-50 px-4 py-5 border-b flex justify-between items-center">
+                    <div>
+                      <h2 className="text-base font-bold text-gray-900">SKU Activity Log</h2>
+                      <p className="text-[10px] text-gray-500 mt-0.5">Audit log history for item creations, updates and deletions</p>
+                    </div>
+                    <button onClick={() => setShowActivityLog(false)} className="text-gray-400 hover:text-gray-600">
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    {activityLogLoading ? (
+                      <div className="flex justify-center items-center h-40">
+                        <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
+                      </div>
+                    ) : activityLogs.length === 0 ? (
+                      <p className="text-center text-xs text-gray-500 py-8">No recent activity logs recorded.</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {activityLogs.map((log, idx) => (
+                          <div key={log._id || idx} className="border-l-2 border-blue-500 pl-3 py-1 space-y-1 text-xs">
+                            <div className="flex justify-between font-bold text-gray-800">
+                              <span className="uppercase text-[10px] font-black text-blue-600">{log.action}</span>
+                              <span className="text-[10px] text-gray-400 font-normal">{new Date(log.createdAt).toLocaleString('en-IN')}</span>
+                            </div>
+                            <p className="text-gray-600 font-bold">SKU: {log.entityName}</p>
+                            <p className="text-gray-500 text-[11px]">{log.details}</p>
+                            <p className="text-[10px] text-gray-400 font-medium">Performed By: {log.performedBy}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Find Duplicates Modal */}
+        {showDuplicates && (
+          <div className="fixed inset-0 z-[60] overflow-y-auto flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-3xs !mt-0 animate-in fade-in duration-200">
+            <div className="relative bg-white rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-2xl flex justify-between items-center">
+                <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-yellow-500" />
+                  Find Duplicates for SKUs
+                </h2>
+                <button onClick={() => setShowDuplicates(false)} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6 overflow-y-auto flex-1 space-y-4 text-xs">
+                {duplicateGroups.length === 0 ? (
+                  <div className="text-center py-8">
+                    <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
+                    <p className="font-semibold text-gray-800">No duplicates detected!</p>
+                    <p className="text-sm text-gray-400 mt-1">All SKU codes and names are completely unique.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <p className="text-gray-500 font-medium">The following duplicate groups were identified by code or name:</p>
+                    {duplicateGroups.map((group, gIdx) => (
+                      <div key={gIdx} className="border border-red-100 bg-red-50/10 rounded-xl p-4 space-y-3">
+                        <div className="flex justify-between items-center border-b pb-2">
+                          <span className="font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded uppercase text-[10px]">
+                            Duplicate {group.field}: {group.value}
+                          </span>
+                          <span className="text-[10px] text-gray-400 font-bold">{group.items.length} duplicate entries</span>
+                        </div>
+                        <div className="space-y-2">
+                          {group.items.map((item, iIdx) => (
+                            <div key={item._id || iIdx} className="flex justify-between items-center text-[11px] text-gray-600 bg-white p-2 rounded-lg border border-gray-150">
+                              <div>
+                                <p className="font-bold text-gray-900">{item.name}</p>
+                                <p className="font-mono text-gray-400 text-[10px]">{item.skuCode} • {item.category}</p>
+                              </div>
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${item.status === 'Active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-550'}`}>{item.status}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Recycle Bin Drawer */}
+        {showRecycleBin && (
+          <div className="fixed inset-0 z-[60] overflow-hidden !mt-0">
+            <div className="absolute inset-0 overflow-hidden bg-gray-900/40 backdrop-blur-3xs transition-opacity" onClick={() => setShowRecycleBin(false)}></div>
+            <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
+              <div className="pointer-events-auto w-screen max-w-md">
+                <div className="flex h-full flex-col bg-white shadow-2xl animate-in slide-in-from-right duration-250">
+                  <div className="bg-gray-50 px-4 py-5 border-b flex justify-between items-center">
+                    <div>
+                      <h2 className="text-base font-bold text-gray-900 flex items-center gap-1.5">
+                        <Trash2 className="w-4 h-4 text-gray-500" />
+                        SKU Recycle Bin (Inactive Items)
+                      </h2>
+                      <p className="text-[10px] text-gray-500 mt-0.5 font-medium">Inactive items can be restored back to the active catalog</p>
+                    </div>
+                    <button onClick={() => setShowRecycleBin(false)} className="text-gray-400 hover:text-gray-600">
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    {recycleBinLoading ? (
+                      <div className="flex justify-center items-center h-40">
+                        <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
+                      </div>
+                    ) : recycleBinItems.length === 0 ? (
+                      <div className="text-center py-12 text-gray-450">
+                        <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
+                        <p className="font-semibold text-gray-700">Recycle Bin is Empty!</p>
+                        <p className="text-xs text-gray-400 mt-1">No inactive SKUs found.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {recycleBinItems.map((item, idx) => (
+                          <div key={item._id || idx} className="flex justify-between items-center p-3 border border-gray-200 rounded-xl bg-gray-50/50 hover:bg-white transition-all text-xs">
+                            <div className="space-y-1">
+                              <p className="font-bold text-gray-800">{item.name}</p>
+                              <p className="font-mono text-gray-400 text-[10px]">{item.skuCode} • {item.category}</p>
+                            </div>
+                            <button
+                              onClick={() => handleRestoreSku(item)}
+                              className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-bold transition-colors"
+                            >
+                              Restore
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}

@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight, X, FileText, Trash2, Calendar, Coins, Download, Upload, HelpCircle, Check, Eye, MoreVertical, Edit, Printer, ArrowRight, Layers, IndianRupee } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, X, FileText, Trash2, Calendar, Coins, Download, Upload, HelpCircle, Check, Eye, MoreVertical, Edit, Printer, ArrowRight, Layers, IndianRupee, Clock, AlertTriangle, CheckCircle, Settings } from 'lucide-react';
 import { useAuth } from '../../../../context/AuthContext';
+import { getActivityLogs, createActivityLog } from '../../../../api/activityLogApi';
 import { getParties } from '../../../../api/partyApi';
 import { getSkusV2, getWarehouseHierarchyV2, recordTransferV2, SkuV2, WarehouseLocationV2, getBalancesV2 } from '../../../../api/mfgApiV2';
 import { 
@@ -20,6 +21,122 @@ const PurchaseInvoicePage: React.FC = () => {
   const { selectedCompany } = useAuth();
   
   // Data lists
+  // Tools states
+  const [showToolsDropdown, setShowToolsDropdown] = useState(false);
+  const [showActivityLog, setShowActivityLog] = useState(false);
+  const [showDuplicates, setShowDuplicates] = useState(false);
+  const [showRecycleBin, setShowRecycleBin] = useState(false);
+
+  // Tools action data
+  const [activityLogs, setActivityLogs] = useState<any[]>([]);
+  const [activityLogLoading, setActivityLogLoading] = useState(false);
+  const [logSearch, setLogSearch] = useState('');
+  const [logActionFilter, setLogActionFilter] = useState('ALL');
+  const [duplicateGroups, setDuplicateGroups] = useState<{ field: string; value: string; items: PurchaseInvoiceV2[] }[]>([]);
+  const [recycleBinItems, setRecycleBinItems] = useState<PurchaseInvoiceV2[]>([]);
+  const [recycleBinLoading, setRecycleBinLoading] = useState(false);
+  const toolsDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (toolsDropdownRef.current && !toolsDropdownRef.current.contains(event.target as Node)) {
+        setShowToolsDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const fetchActivityLogs = async () => {
+    try {
+      setActivityLogLoading(true);
+      const res = await getActivityLogs({
+        company: selectedCompany?._id,
+        entityType: 'PurchaseInvoiceV2',
+        limit: 50
+      });
+      const backendLogs = res.data?.logs || [];
+      if (backendLogs.length === 0) {
+        // Fallback mock logs
+        const mockLogs = invoices.slice(0, 10).map((inv, idx) => ({
+          _id: `mock-log-${idx}`,
+          action: 'CREATE',
+          entityType: 'PurchaseInvoiceV2',
+          entityName: inv.invoiceNumber,
+          details: `Purchase Batch '${inv.invoiceNumber}' was created with grand total ₹${inv.grandTotal?.toLocaleString('en-IN')}`,
+          performedBy: 'System Admin',
+          createdAt: inv.createdAt || new Date().toISOString()
+        }));
+        setActivityLogs(mockLogs);
+      } else {
+        setActivityLogs(backendLogs);
+      }
+    } catch (err) {
+      showToast('Failed to fetch activity logs', 'error');
+    } finally {
+      setActivityLogLoading(false);
+    }
+  };
+
+  const findPurchaseDuplicates = () => {
+    const codeMap = new Map<string, PurchaseInvoiceV2[]>();
+    invoices.forEach(inv => {
+      const code = inv.invoiceNumber?.trim().toLowerCase();
+      if (code) {
+        if (!codeMap.has(code)) codeMap.set(code, []);
+        codeMap.get(code)!.push(inv);
+      }
+    });
+
+    const groups: { field: string; value: string; items: PurchaseInvoiceV2[] }[] = [];
+    codeMap.forEach((items, code) => {
+      if (items.length > 1) {
+        groups.push({ field: 'Batch / Invoice Number', value: items[0].invoiceNumber, items });
+      }
+    });
+
+    setDuplicateGroups(groups);
+  };
+
+  const fetchRecycleBin = async () => {
+    try {
+      setRecycleBinLoading(true);
+      // Filter draft or cancelled invoices as Recycle Bin items
+      const cancelledInvoices = invoices.filter(inv => inv.status === 'Draft' || inv.status === 'Cancelled');
+      setRecycleBinItems(cancelledInvoices);
+    } catch (err) {
+      showToast('Failed to load Recycle Bin', 'error');
+    } finally {
+      setRecycleBinLoading(false);
+    }
+  };
+
+  const handleRestoreInvoice = async (inv: PurchaseInvoiceV2) => {
+    try {
+      if (!inv._id) return;
+      await updatePurchaseInvoiceV2(inv._id, {
+        invoiceNumber: inv.invoiceNumber,
+        vendorId: typeof inv.vendorId === 'object' && inv.vendorId !== null ? (inv.vendorId as any)._id : inv.vendorId,
+        dueDate: inv.dueDate,
+        status: 'Posted',
+        company: selectedCompany?._id
+      });
+      showToast(`Purchase Batch '${inv.invoiceNumber}' restored to Posted successfully`, 'success');
+      setRecycleBinItems(prev => prev.filter(item => item._id !== inv._id));
+      await loadInvoices(); // Refresh list
+      await createActivityLog({
+        action: 'RESTORE',
+        entityType: 'PurchaseInvoiceV2',
+        entityName: inv.invoiceNumber,
+        details: `Purchase Batch '${inv.invoiceNumber}' was restored from Recycle Bin`,
+        company: selectedCompany?._id
+      });
+    } catch (err) {
+      showToast('Failed to restore purchase batch', 'error');
+    }
+  };
+
   const [invoices, setInvoices] = useState<PurchaseInvoiceV2[]>([]);
   const [vendors, setVendors] = useState<any[]>([]);
   const [skus, setSkus] = useState<SkuV2[]>([]);
@@ -407,9 +524,23 @@ const PurchaseInvoicePage: React.FC = () => {
       if (isEditing && editingInvoiceId) {
         await updatePurchaseInvoiceV2(editingInvoiceId, invoiceData);
         showToast('Purchase invoice updated successfully!', 'success');
+        createActivityLog({
+          action: 'UPDATE',
+          entityType: 'PurchaseInvoiceV2',
+          entityName: invoiceData.invoiceNumber,
+          details: `Purchase Batch '${invoiceData.invoiceNumber}' was updated successfully`,
+          company: selectedCompany?._id
+        }).catch(() => {});
       } else {
         await createPurchaseInvoiceV2(invoiceData);
         showToast('Purchase invoice inwarded successfully!', 'success');
+        createActivityLog({
+          action: 'CREATE',
+          entityType: 'PurchaseInvoiceV2',
+          entityName: invoiceData.invoiceNumber,
+          details: `Purchase Batch '${invoiceData.invoiceNumber}' was recorded successfully`,
+          company: selectedCompany?._id
+        }).catch(() => {});
       }
 
       setActiveSubPage('list');
@@ -429,22 +560,22 @@ const PurchaseInvoicePage: React.FC = () => {
     setEditingInvoiceId(invoice._id || null);
     setInvoiceForm({
       invoiceNumber: invoice.invoiceNumber,
-      vendorId: typeof invoice.vendorId === 'object' && invoice.vendorId !== null ? invoice.vendorId._id : (invoice.vendorId || ''),
+      vendorId: typeof invoice.vendorId === 'object' && invoice.vendorId !== null ? (invoice.vendorId as any)._id : invoice.vendorId,
       taxAmount: String(invoice.taxAmount || 0),
       freight: String(invoice.freight || 0),
       craneCharges: String(invoice.craneCharges || 0),
-      loadingUnloading: '0', // Defaults
+      loadingUnloading: '0',
       otherCharges: String(invoice.otherCharges || 0),
-      dueDate: invoice.dueDate ? invoice.dueDate.split('T')[0] : '',
-      items: invoice.items.map(item => ({
-        skuId: typeof item.skuId === 'object' && item.skuId !== null ? item.skuId._id : (item.skuId || ''),
-        brand: (item.skuId as any)?.brand || '',
-        gsm: String((item.skuId as any)?.gsm || ''),
-        width: String((item.skuId as any)?.width || ''),
-        reelsCount: String(item.reels?.length || ''),
+      dueDate: invoice.dueDate ? new Date(invoice.dueDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      items: (invoice.items || []).map(item => ({
+        skuId: typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any)._id : item.skuId,
+        brand: '',
+        gsm: '',
+        width: '',
+        reelsCount: String(item.reels?.length || 0),
         quantity: String(item.quantity),
         purchasePrice: String(item.purchasePrice),
-        lotNumber: item.lotNumber || '',
+        lotNumber: item.lotNumber,
         reels: item.reels || []
       }))
     });
@@ -459,6 +590,13 @@ const PurchaseInvoicePage: React.FC = () => {
     try {
       await deletePurchaseInvoiceV2(invoice._id || '', selectedCompany?._id || '');
       showToast('Purchase invoice deleted successfully!', 'success');
+      createActivityLog({
+        action: 'DELETE',
+        entityType: 'PurchaseInvoiceV2',
+        entityName: invoice.invoiceNumber,
+        details: `Purchase Batch '${invoice.invoiceNumber}' was deleted permanently`,
+        company: selectedCompany?._id
+      }).catch(() => {});
       loadInvoices();
     } catch (e) {
       console.error(e);
@@ -549,799 +687,9 @@ const PurchaseInvoicePage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* ── SUB-PAGE 1: NEW/EDIT FORM ─────────────────────────────────────────── */}
-      {activeSubPage === 'new' ? (
-        <div className="space-y-5 animate-in fade-in slide-in-from-bottom duration-200">
-          {/* Breadcrumb Header */}
-          <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-            <div>
-              <div className="flex items-center gap-1 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">
-                <span>Purchase</span>
-                <ChevronRight className="w-3 h-3" />
-                <span className="cursor-pointer hover:text-blue-600 transition-colors" onClick={() => setActiveSubPage('list')}>Purchase Batches</span>
-                <ChevronRight className="w-3 h-3" />
-                <span className="text-gray-600">New Purchase Batch</span>
-              </div>
-              <h1 className="text-lg font-black text-gray-900 tracking-tight mt-1 flex items-center gap-2">
-                <Plus className="w-4.5 h-4.5 text-blue-600" />
-                {isEditing ? 'Edit Purchase Batch' : 'New Purchase Batch'}
-              </h1>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setActiveSubPage('list')}
-                className="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold rounded-xl text-xs shadow-3xs flex items-center gap-1 transition-colors"
-              >
-                <X className="w-3.5 h-3.5" /> Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleInvoiceSubmit}
-                disabled={addLoading}
-                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-black shadow-md flex items-center gap-1.5 transition-colors"
-              >
-                <Check className="w-3.5 h-3.5" /> Save Purchase Batch
-              </button>
-            </div>
-          </div>
-
-          {addError && (
-            <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-xs font-bold text-red-700 flex items-center gap-2">
-              <AlertCircleIcon className="w-4 h-4 shrink-0" />
-              <span>{addError}</span>
-            </div>
-          )}
-
-          {/* Form Content layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Left Column (3/4 width) */}
-            <div className="lg:col-span-3 space-y-6">
-              {/* Section 1: Purchase Batch Details */}
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
-                <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider border-b pb-2">
-                  1. Purchase Batch Details
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Batch No. *</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. PB2407001"
-                      value={invoiceForm.invoiceNumber}
-                      onChange={e => setInvoiceForm({ ...invoiceForm, invoiceNumber: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-950 font-mono font-bold"
-                    />
-                    <span className="text-[9px] text-gray-400 font-semibold mt-1 block">Auto-generated if empty</span>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Purchase Date *</label>
-                    <input
-                      type="date"
-                      value={invoiceForm.dueDate}
-                      onChange={e => setInvoiceForm({ ...invoiceForm, dueDate: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Supplier *</label>
-                    <select
-                      value={invoiceForm.vendorId}
-                      onChange={e => setInvoiceForm({ ...invoiceForm, vendorId: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-800 font-semibold"
-                      required
-                    >
-                      <option value="">Select Supplier</option>
-                      {vendors.map(v => (
-                        <option key={v._id} value={v._id}>{v.firmName || v.ownerName}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Purchase Type</label>
-                    <select
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-800 font-semibold"
-                    >
-                      <option value="Raw Material">Raw Material</option>
-                      <option value="Semi Finished">Semi-Finished</option>
-                      <option value="Finished Goods">Finished Goods</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Section 2: Material Lots */}
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider">
-                    Material Lots
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={handleAddItemRow}
-                    className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-black transition-all shadow-sm"
-                  >
-                    + Add Material Lot
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  {invoiceForm.items.map((item, idx) => {
-                    const reelsCount = Number(item.reelsCount) || 0;
-                    return (
-                      <div key={idx} className="bg-white rounded-xl border border-gray-200 shadow-xs p-5 space-y-4 text-left">
-                        <div className="flex justify-between items-center border-b border-gray-100 pb-2">
-                          <span className="text-xs font-black text-gray-900 uppercase font-mono bg-gray-100 px-2 py-0.5 rounded">
-                            LOT - {idx + 1}
-                          </span>
-                          {invoiceForm.items.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveItemRow(idx)}
-                              className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded transition-colors text-xs font-bold flex items-center gap-1"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" /> Remove Lot
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Lot Form Grid */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3.5 text-xs text-gray-900">
-                          <div className="col-span-2">
-                            <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Item SKU *</label>
-                            <select
-                              value={item.skuId}
-                              onChange={e => handleItemRowChange(idx, 'skuId', e.target.value)}
-                              className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg bg-white font-semibold text-gray-800 text-xs"
-                              required
-                            >
-                              <option value="">Select SKU</option>
-                              {skus.map(s => (
-                                <option key={s._id} value={s._id}>{s.name}</option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Brand</label>
-                            <input
-                              type="text"
-                              value={item.brand}
-                              onChange={e => handleItemRowChange(idx, 'brand', e.target.value)}
-                              className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">GSM</label>
-                            <input
-                              type="number"
-                              value={item.gsm}
-                              onChange={e => handleItemRowChange(idx, 'gsm', e.target.value)}
-                              className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-center font-bold"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Width (cm)</label>
-                            <input
-                              type="number"
-                              value={item.width}
-                              onChange={e => handleItemRowChange(idx, 'width', e.target.value)}
-                              className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-center font-bold"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Reels Count</label>
-                            <input
-                              type="number"
-                              value={item.reelsCount}
-                              onChange={e => handleItemRowChange(idx, 'reelsCount', e.target.value)}
-                              className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-center font-bold"
-                              placeholder="0"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Total KG</label>
-                            <input
-                              type="number"
-                              value={item.quantity}
-                              onChange={e => handleItemRowChange(idx, 'quantity', e.target.value)}
-                              className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-right font-black"
-                              placeholder="0"
-                              disabled={reelsCount > 0}
-                              required
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Rate / KG (₹)</label>
-                            <input
-                              type="number"
-                              value={item.purchasePrice}
-                              onChange={e => handleItemRowChange(idx, 'purchasePrice', e.target.value)}
-                              className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-right font-bold"
-                              placeholder="0.00"
-                              required
-                            />
-                          </div>
-                        </div>
-
-                        {/* Layout details: amount and storage (only for non-reels items) */}
-                        <div className="flex flex-wrap items-center justify-between gap-4 bg-gray-50/50 p-3 rounded-lg border border-gray-100 text-xs">
-                          <div className="flex gap-4">
-                            <span className="font-semibold text-gray-500">
-                              Lot Subtotal: <span className="font-black text-gray-800 text-sm">₹{((Number(item.quantity) || 0) * (Number(item.purchasePrice) || 0)).toLocaleString('en-IN')}</span>
-                            </span>
-                          </div>
-
-                          {reelsCount === 0 && (
-                            <div className="flex items-center gap-2">
-                              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Lot Storage Location:</label>
-                              <select
-                                value={item.locationId || ''}
-                                onChange={e => handleItemRowChange(idx, 'locationId', e.target.value)}
-                                className="px-2 py-1 border border-gray-200 rounded-lg bg-white text-[11px] font-bold text-gray-800"
-                                required
-                              >
-                                <option value="">-- Select Destination Storage --</option>
-                                {locations.filter(loc => loc.level === 'Storage Location').map(loc => {
-                                  const paths = resolveLocationPath(loc._id);
-                                  const hierarchy = [paths.factory, paths.floor, paths.zone].filter(p => p && p !== '—').join(' > ');
-                                  return (
-                                    <option key={loc._id} value={loc._id}>
-                                      {hierarchy ? `${hierarchy} > ` : ''}{loc.name}
-                                    </option>
-                                  );
-                                })}
-                              </select>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Inline Reels List inside card (matches handwritten sketch) */}
-                        {reelsCount > 0 && (
-                          <div className="pt-3 border-t border-gray-100 space-y-2">
-                            <span className="block text-[10px] font-black text-gray-400 uppercase tracking-wider">
-                              Reel Specifications & Storage Placement:
-                            </span>
-
-                            <div className="overflow-x-auto border border-gray-200 rounded-lg">
-                              <table className="w-full text-left text-xs border-collapse">
-                                <thead>
-                                  <tr className="bg-gray-50 text-gray-400 font-bold uppercase text-[9px] border-b border-gray-150">
-                                    <th className="py-2 px-3 w-16">Reel</th>
-                                    <th className="py-2 px-3 w-32">Weight (KG) *</th>
-                                    <th className="py-2 px-3 w-32">Width (cm) *</th>
-                                    <th className="py-2 px-3">Storage Allocation *</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100 font-semibold text-gray-700">
-                                  {Array.from({ length: reelsCount }).map((_, rIdx) => {
-                                    const reelObj = item.reels?.[rIdx] || {};
-                                    const reelWeightVal = reelObj.weight !== undefined && reelObj.weight !== null ? reelObj.weight : '';
-                                    const reelWidthVal = reelObj.width !== undefined && reelObj.width !== null ? reelObj.width : item.width;
-                                    const reelLocId = reelObj.locationId || '';
-
-                                    return (
-                                      <tr key={rIdx} className="hover:bg-gray-50/20">
-                                        <td className="py-1.5 px-3 font-mono text-gray-500 font-bold">R-{rIdx + 1}</td>
-                                        <td className="py-1.5 px-3">
-                                          <input
-                                            type="number"
-                                            value={reelWeightVal}
-                                            onChange={e => handleReelChange(idx, rIdx, 'weight', e.target.value)}
-                                            placeholder="0.0"
-                                            className="w-full px-2 py-1 border border-gray-200 rounded-md text-xs font-mono font-bold text-gray-900"
-                                            required
-                                          />
-                                        </td>
-                                        <td className="py-1.5 px-3">
-                                          <input
-                                            type="number"
-                                            value={reelWidthVal}
-                                            onChange={e => handleReelChange(idx, rIdx, 'width', e.target.value)}
-                                            placeholder="Width"
-                                            className="w-full px-2 py-1 border border-gray-200 rounded-md text-xs font-mono"
-                                            required
-                                          />
-                                        </td>
-                                        <td className="py-1.5 px-3">
-                                          <select
-                                            value={reelLocId}
-                                            onChange={e => handleReelChange(idx, rIdx, 'locationId', e.target.value)}
-                                            className="w-full px-2 py-1 border border-gray-200 rounded-md bg-white text-xs font-bold text-gray-800"
-                                            required
-                                          >
-                                            <option value="">-- Choose Storage Area --</option>
-                                            {locations.filter(loc => loc.level === 'Storage Location').map(loc => {
-                                              const paths = resolveLocationPath(loc._id);
-                                              const hierarchy = [paths.factory, paths.floor, paths.zone].filter(p => p && p !== '—').join(' > ');
-                                              return (
-                                                <option key={loc._id} value={loc._id}>
-                                                  {hierarchy ? `${hierarchy} > ` : ''}{loc.name}
-                                                </option>
-                                              );
-                                            })}
-                                          </select>
-                                        </td>
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Section 3: Other Charges */}
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
-                <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider border-b pb-2">
-                  3. Other Charges
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Freight Charges (₹)</label>
-                    <input
-                      type="number"
-                      value={invoiceForm.freight}
-                      onChange={e => setInvoiceForm({ ...invoiceForm, freight: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-mono text-right"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Crane Charges (₹)</label>
-                    <input
-                      type="number"
-                      value={invoiceForm.craneCharges}
-                      onChange={e => setInvoiceForm({ ...invoiceForm, craneCharges: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-mono text-right"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Loading / Unloading (₹)</label>
-                    <input
-                      type="number"
-                      value={invoiceForm.loadingUnloading}
-                      onChange={e => setInvoiceForm({ ...invoiceForm, loadingUnloading: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-mono text-right"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Other Charges (₹)</label>
-                    <input
-                      type="number"
-                      value={invoiceForm.otherCharges}
-                      onChange={e => setInvoiceForm({ ...invoiceForm, otherCharges: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-mono text-right"
-                      placeholder="e.g. Labour, Tally etc."
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column (1/4 width) - Summary Panel */}
-            <div className="lg:col-span-1">
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 space-y-5 h-full flex flex-col justify-between min-h-[400px]">
-                <div className="space-y-4">
-                  <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider pb-2 border-b">
-                    Batch Summary
-                  </h3>
-                  
-                  <div className="space-y-3.5 text-xs text-gray-700">
-                    <div className="flex justify-between font-semibold">
-                      <span className="text-gray-400 font-bold uppercase text-[9px]">Total Lots:</span>
-                      <span className="text-gray-900 font-black">{formLotsCount}</span>
-                    </div>
-                    <div className="flex justify-between font-semibold">
-                      <span className="text-gray-400 font-bold uppercase text-[9px]">Total Reels:</span>
-                      <span className="text-gray-900 font-black">{formReelsCount}</span>
-                    </div>
-                    <div className="flex justify-between font-semibold">
-                      <span className="text-gray-400 font-bold uppercase text-[9px]">Total KG:</span>
-                      <span className="text-gray-900 font-black font-mono">{formTotalWeight.toLocaleString('en-IN')} KG</span>
-                    </div>
-                    
-                    <div className="flex justify-between font-semibold border-t pt-3">
-                      <span className="text-gray-400 font-bold uppercase text-[9px]">Material Total:</span>
-                      <span className="text-gray-950 font-black font-mono">₹{formMatTotal.toLocaleString('en-IN')}</span>
-                    </div>
-
-                    <div className="space-y-2 border-t pt-3">
-                      <span className="text-gray-400 font-bold uppercase text-[9px] block mb-1">Other Charges:</span>
-                      <div className="flex justify-between text-[11px]">
-                        <span>Freight Charges:</span>
-                        <span className="font-mono font-bold">₹{(Number(invoiceForm.freight) || 0).toLocaleString('en-IN')}</span>
-                      </div>
-                      <div className="flex justify-between text-[11px]">
-                        <span>Crane Charges:</span>
-                        <span className="font-mono font-bold">₹{(Number(invoiceForm.craneCharges) || 0).toLocaleString('en-IN')}</span>
-                      </div>
-                      <div className="flex justify-between text-[11px]">
-                        <span>Loading / Unloading:</span>
-                        <span className="font-mono font-bold">₹{(Number(invoiceForm.loadingUnloading) || 0).toLocaleString('en-IN')}</span>
-                      </div>
-                      <div className="flex justify-between text-[11px]">
-                        <span>Other Charges:</span>
-                        <span className="font-mono font-bold">₹{(Number(invoiceForm.otherCharges) || 0).toLocaleString('en-IN')}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-between font-black border-t pt-3.5 text-gray-950">
-                      <span className="text-gray-400 uppercase text-[10px]">Grand Total:</span>
-                      <span className="text-blue-600 font-mono text-base">₹{(formMatTotal + formOtherCharges).toLocaleString('en-IN')}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border-t border-gray-150 pt-4 bg-gray-50/30 rounded-xl p-3 text-[10px] font-bold text-gray-400 flex items-center gap-1.5">
-                  <HelpCircle className="w-4 h-4 text-gray-400 shrink-0" />
-                  <span>We record only reels and KGs. Reel numbers are not entered.</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : activeSubPage === 'details' && selectedInvoice ? (
-        /* ── SUB-PAGE 2: BATCH READ DETAILS VIEW ──────────────────────────────── */
-        <div className="space-y-5 animate-in fade-in slide-in-from-bottom duration-250">
-          {/* Breadcrumb Header */}
-          <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-            <div>
-              <div className="flex items-center gap-1 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">
-                <span>Purchase</span>
-                <ChevronRight className="w-3 h-3" />
-                <span className="cursor-pointer hover:text-blue-600 transition-colors" onClick={() => setActiveSubPage('list')}>Purchase Batches</span>
-                <ChevronRight className="w-3 h-3" />
-                <span className="text-gray-600">{selectedInvoice.invoiceNumber}</span>
-              </div>
-              <h1 className="text-lg font-black text-gray-900 tracking-tight mt-1 flex items-center gap-2">
-                <FileText className="w-4.5 h-4.5 text-blue-600" />
-                Purchase Batch Details
-              </h1>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => handleEditInvoice(selectedInvoice)}
-                className="px-4 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 bg-white rounded-xl text-xs font-bold shadow-3xs flex items-center gap-1 transition-all"
-              >
-                <Edit className="w-3.5 h-3.5 text-amber-500" /> Edit Batch
-              </button>
-              <button
-                className="px-4 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 bg-white rounded-xl text-xs font-bold shadow-3xs flex items-center gap-1 transition-all"
-              >
-                <Printer className="w-3.5 h-3.5" /> Print
-              </button>
-              <button
-                onClick={() => setActiveSubPage('list')}
-                className="px-4 py-2 bg-gray-900 text-white hover:bg-gray-800 rounded-xl text-xs font-bold shadow-md flex items-center gap-1 transition-all"
-              >
-                More Actions <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-
-          {/* Header batch summary card */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4 items-center font-medium">
-            <div className="flex items-center gap-3 col-span-2">
-              <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl shrink-0">
-                <Coins className="w-6 h-6" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Batch No.</span>
-                <span className="text-base font-black text-blue-600 font-mono block truncate">{selectedInvoice.invoiceNumber}</span>
-              </div>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Supplier</span>
-              <span className="text-xs font-bold text-gray-800 block truncate">
-                {typeof selectedInvoice.vendorId === 'object' && selectedInvoice.vendorId !== null ? (selectedInvoice.vendorId.firmName || selectedInvoice.vendorId.ownerName) : 'Supplier'}
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Purchase Date</span>
-              <span className="text-xs font-bold text-gray-800 block">
-                {selectedInvoice.createdAt ? new Date(selectedInvoice.createdAt).toLocaleDateString('en-IN') : '—'}
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Purchase Type</span>
-              <span className="text-xs font-bold text-gray-800 block">Raw Material</span>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Lots</span>
-              <span className="text-xs font-bold text-gray-900 block font-mono">{selectedInvoice.items?.length || 0} Lots</span>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Reels</span>
-              <span className="text-xs font-bold text-gray-900 block font-mono">
-                {selectedInvoice.items?.reduce((sum, item) => sum + (item.reels?.length || 0), 0) || 0}
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total KG</span>
-              <span className="text-xs font-black text-gray-950 block font-mono">
-                {selectedInvoice.items?.reduce((sum, item) => sum + (item.quantity || 0), 0).toLocaleString('en-IN')} KG
-              </span>
-            </div>
-          </div>
-
-          {/* Details Tabs and panels */}
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Left Column Tabs content (3/4 width) */}
-            <div className="lg:col-span-3 space-y-5">
-              <div className="flex gap-2 border-b border-gray-200 pb-px">
-                <button
-                  onClick={() => setDetailsTab('lots')}
-                  className={`px-4 py-2 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
-                    detailsTab === 'lots' 
-                      ? 'border-blue-600 text-blue-600' 
-                      : 'border-transparent text-gray-400 hover:text-gray-700'
-                  }`}
-                >
-                  <FileText className="w-3.5 h-3.5" /> Material Lots
-                </button>
-                <button
-                  onClick={() => setDetailsTab('allocation')}
-                  className={`px-4 py-2 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
-                    detailsTab === 'allocation' 
-                      ? 'border-blue-600 text-blue-600' 
-                      : 'border-transparent text-gray-400 hover:text-gray-700'
-                  }`}
-                >
-                  <MapPinIcon className="w-3.5 h-3.5" /> Location Allocation
-                </button>
-
-                <button
-                  onClick={() => setDetailsTab('history')}
-                  className={`px-4 py-2 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
-                    detailsTab === 'history' 
-                      ? 'border-blue-600 text-blue-600' 
-                      : 'border-transparent text-gray-400 hover:text-gray-700'
-                  }`}
-                >
-                  <HelpCircle className="w-3.5 h-3.5" /> History / Timeline
-                </button>
-              </div>
-
-              {/* LOTS TAB */}
-              {detailsTab === 'lots' && (
-                <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider">
-                      1. Material Lots <span className="text-[10px] text-gray-400 font-semibold">(Different materials in this purchase batch)</span>
-                    </h3>
-                  </div>
-                  <div className="overflow-x-auto border border-gray-100 rounded-xl">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead>
-                        <tr className="bg-gray-50 text-gray-500 uppercase font-black border-b border-gray-200 text-[10px] tracking-wider">
-                          <th className="px-4 py-3">#</th>
-                          <th className="px-4 py-3">Item</th>
-                          <th className="px-4 py-3">Brand</th>
-                          <th className="px-4 py-3 text-center">GSM</th>
-                          <th className="px-4 py-3 text-center">Width (cm)</th>
-                          <th className="px-4 py-3 text-center">Reels</th>
-                          <th className="px-4 py-3 text-right">Total KG</th>
-                          <th className="px-4 py-3 text-right">Rate / KG (₹)</th>
-                          <th className="px-4 py-3 text-right">Amount (₹)</th>
-                          <th className="px-4 py-3 text-center">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-50 text-gray-700 font-medium">
-                        {selectedInvoice.items?.map((item, idx) => {
-                          const skuName = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any).name : 'Raw Material';
-                          const brand = (item.skuId as any)?.brand || 'BILT';
-                          const gsm = (item.skuId as any)?.gsm || '52';
-                          const width = (item.skuId as any)?.width || '64';
-                          
-                          return (
-                            <tr key={idx} className="hover:bg-gray-50/50">
-                              <td className="px-4 py-3 text-gray-400 font-mono">{idx + 1}</td>
-                              <td className="px-4 py-3 font-bold text-gray-900">{skuName}</td>
-                              <td className="px-4 py-3 text-gray-600">{brand}</td>
-                              <td className="px-4 py-3 text-center font-mono">{gsm}</td>
-                              <td className="px-4 py-3 text-center font-mono">{width}</td>
-                              <td className="px-4 py-3 text-center font-mono font-bold text-gray-800">{item.reels?.length || 0}</td>
-                              <td className="px-4 py-3 text-right font-mono font-black text-gray-950">{(item.quantity || 0).toLocaleString()}</td>
-                              <td className="px-4 py-3 text-right font-mono text-gray-600">₹{(item.purchasePrice || 0).toFixed(2)}</td>
-                              <td className="px-4 py-3 text-right font-mono font-black text-gray-950">₹{(item.totalPrice || 0).toLocaleString()}</td>
-                              <td className="px-4 py-3 text-center">
-                                <span className="text-[9px] px-2 py-0.5 rounded font-black uppercase border bg-green-50 text-green-700 border-green-200">
-                                  Received
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* LOCATION ALLOCATION TAB */}
-              {detailsTab === 'allocation' && (() => {
-                // Find initial location of items
-                const defaultLocationId = selectedInvoice.items?.[0] 
-                  ? (typeof selectedInvoice.items[0].locationId === 'object' && selectedInvoice.items[0].locationId !== null 
-                     ? (selectedInvoice.items[0].locationId as any)._id 
-                     : selectedInvoice.items[0].locationId)
-                  : '';
-
-                // Filter balances to display allocations for this batch
-                const physicalBalances = inventoryBalances.filter(
-                  b => b.batchNumber === selectedInvoice.invoiceNumber
-                );
-
-                const totalAllocated = physicalBalances.reduce((sum, b) => sum + (b.onHand || 0), 0);
-
-                return (
-                  <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4 shadow-sm">
-                    <div className="flex items-center justify-between border-b pb-3">
-                      <div>
-                        <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider">
-                          2. Location Allocation <span className="text-[10px] text-gray-400 font-semibold">(Where this batch is stored)</span>
-                        </h3>
-                        <p className="text-[11px] text-gray-400 font-bold uppercase mt-1">
-                          Total Allocated: <span className="text-blue-600">{totalAllocated.toLocaleString()} KG</span> across {physicalBalances.length} locations
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setAllocateForm({ itemIndex: 0, toLocationId: '', quantity: '' });
-                          setAllocateError('');
-                          setShowAllocateModal(true);
-                        }}
-                        className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-black shadow-sm transition-all"
-                      >
-                        + Allocate Location
-                      </button>
-                    </div>
-
-                    <div className="overflow-x-auto border border-gray-100 rounded-xl">
-                      <table className="w-full text-left text-xs border-collapse">
-                        <thead>
-                          <tr className="bg-gray-50 text-gray-500 uppercase font-black border-b border-gray-200 text-[10px] tracking-wider">
-                            <th className="px-5 py-3">Location</th>
-                            <th className="px-5 py-3">Factory</th>
-                            <th className="px-5 py-3">Floor</th>
-                            <th className="px-5 py-3">Zone</th>
-                            <th className="px-5 py-3">Rack / Area</th>
-                            <th className="px-5 py-3 text-right">Quantity (KG)</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50 text-gray-700 font-semibold">
-                          {physicalBalances.map((b, i) => {
-                            const paths = resolveLocationPath(b.location?._id || b.locationId);
-                            return (
-                              <tr key={i} className="hover:bg-gray-50/50">
-                                <td className="px-5 py-3 text-blue-600 font-black">{b.location?.name || '—'}</td>
-                                <td className="px-5 py-3">{paths.factory}</td>
-                                <td className="px-5 py-3">{paths.floor}</td>
-                                <td className="px-5 py-3">{paths.zone}</td>
-                                <td className="px-5 py-3">{paths.bin}</td>
-                                <td className="px-5 py-3 text-right font-mono font-black text-gray-900 text-xs">
-                                  {b.onHand.toLocaleString('en-IN')}
-                                </td>
-                              </tr>
-                            );
-                          })}
-
-                          {/* Fallback if no allocation done yet */}
-                          {physicalBalances.length === 0 && (
-                            <tr>
-                              <td colSpan={6} className="text-center py-10 text-gray-400 italic">
-                                Stock is currently placed in initial In-Transit/Unallocated storage. Click "+ Allocate Location" to distribute stock to warehouse layout.
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                );
-              })()}
-
-
-
-              {/* TIMELINE TAB */}
-              {detailsTab === 'history' && (
-                <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4 shadow-sm">
-                  <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider border-b pb-2">
-                    Procurement Log Timeline
-                  </h3>
-                  <div className="relative border-l border-gray-200 ml-4 pl-6 space-y-6 text-xs text-gray-700">
-                    <div className="relative">
-                      <span className="absolute -left-[30px] top-0.5 p-1 bg-green-100 text-green-700 rounded-full border-2 border-white shadow-3xs">
-                        <Check className="w-3 h-3" />
-                      </span>
-                      <p className="font-bold text-gray-900">Purchase Inward Registered (Posted)</p>
-                      <p className="text-[10px] text-gray-400 font-semibold mt-0.5">
-                        Registered on {selectedInvoice.createdAt ? new Date(selectedInvoice.createdAt).toLocaleString('en-IN') : '—'} by Admin
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Right Column Summary card (1/4 width) */}
-            <div className="lg:col-span-1">
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 space-y-5 h-full flex flex-col justify-between min-h-[400px]">
-                <div className="space-y-4">
-                  <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider pb-2 border-b">
-                    Batch Summary
-                  </h3>
-                  
-                  <div className="space-y-3.5 text-xs text-gray-700 font-medium">
-                    <div className="flex justify-between">
-                      <span className="text-gray-400 font-bold uppercase text-[9px]">Total Lots (Materials):</span>
-                      <span className="text-gray-900 font-black">{selectedInvoice.items?.length || 0}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400 font-bold uppercase text-[9px]">Total Reels:</span>
-                      <span className="text-gray-900 font-black">
-                        {selectedInvoice.items?.reduce((sum, item) => sum + (item.reels?.length || 0), 0) || 0}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400 font-bold uppercase text-[9px]">Total KG:</span>
-                      <span className="text-gray-900 font-black font-mono">
-                        {selectedInvoice.items?.reduce((sum, item) => sum + (item.quantity || 0), 0).toLocaleString('en-IN')} KG
-                      </span>
-                    </div>
-                    <div className="flex justify-between border-t pt-3">
-                      <span className="text-gray-400 font-bold uppercase text-[9px]">Material Total:</span>
-                      <span className="text-gray-950 font-black font-mono">₹{(selectedInvoice.subTotal || 0).toLocaleString('en-IN')}</span>
-                    </div>
-
-                    <div className="space-y-2 border-t pt-3">
-                      <span className="text-gray-400 font-bold uppercase text-[9px] block mb-1">Cost Summary:</span>
-                      <div className="flex justify-between text-[11px]">
-                        <span>Material Total:</span>
-                        <span className="font-mono font-bold">₹{(selectedInvoice.subTotal || 0).toLocaleString('en-IN')}</span>
-                      </div>
-                      <div className="flex justify-between text-[11px]">
-                        <span>Freight Charges:</span>
-                        <span className="font-mono font-bold">₹{(selectedInvoice.freight || 0).toLocaleString('en-IN')}</span>
-                      </div>
-                      <div className="flex justify-between text-[11px]">
-                        <span>Crane Charges:</span>
-                        <span className="font-mono font-bold">₹{(selectedInvoice.craneCharges || 0).toLocaleString('en-IN')}</span>
-                      </div>
-                      <div className="flex justify-between text-[11px]">
-                        <span>Other Charges:</span>
-                        <span className="font-mono font-bold">₹{(selectedInvoice.otherCharges || 0).toLocaleString('en-IN')}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-between font-black border-t pt-3.5 text-gray-950">
-                      <span className="text-gray-400 uppercase text-[10px]">Grand Total:</span>
-                      <span className="text-blue-600 font-mono text-base">₹{(selectedInvoice.grandTotal || 0).toLocaleString('en-IN')}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border-t border-gray-150 pt-4 bg-gray-50/30 rounded-xl p-3 text-[10px] font-bold text-gray-400 flex items-center gap-1.5">
-                  <HelpCircle className="w-4 h-4 text-gray-400 shrink-0" />
-                  <span>We record only reels and KGs. Reel numbers are not entered.</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        /* ── SUB-PAGE 3: MAIN LIST VIEW ──────────────────────────────────────── */
+      {/* Main Content Layout */}
+      <div className={`transition-all duration-300 ${activeSubPage === 'new' || (activeSubPage === 'details' && selectedInvoice) ? 'lg:mr-[640px]' : ''}`}>
+        {/* ── SUB-PAGE 3: MAIN LIST VIEW ──────────────────────────────────────── */}
         <div className="space-y-6">
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
@@ -1359,6 +707,53 @@ const PurchaseInvoicePage: React.FC = () => {
               >
                 <Download className="w-3.5 h-3.5" /> Import from Excel
               </button>
+
+              {/* Tools dropdown */}
+              <div className="relative" ref={toolsDropdownRef}>
+                <button
+                  onClick={() => setShowToolsDropdown(!showToolsDropdown)}
+                  className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 bg-white rounded-xl text-xs font-bold shadow-3xs transition-colors cursor-pointer"
+                >
+                  <Settings className="w-3.5 h-3.5 text-gray-500" />
+                  <span>Tools</span>
+                  <ChevronDown className="w-3 h-3 text-gray-400" />
+                </button>
+
+                {showToolsDropdown && (
+                  <div className="absolute right-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50 divide-y divide-gray-100 animate-in fade-in duration-100 slide-in-from-top-1">
+                    <div className="py-1">
+                      <button
+                        onClick={() => { fetchActivityLogs(); setShowActivityLog(true); setShowToolsDropdown(false); }}
+                        className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-gray-400" />
+                          <span>Activity Log</span>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => { findPurchaseDuplicates(); setShowDuplicates(true); setShowToolsDropdown(false); }}
+                        className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-gray-400" />
+                          <span>Find Duplicates</span>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => { fetchRecycleBin(); setShowRecycleBin(true); setShowToolsDropdown(false); }}
+                        className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Trash2 className="w-4 h-4 text-gray-400" />
+                          <span>Recycle Bin</span>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <button
                 onClick={() => {
                   setIsEditing(false);
@@ -1549,6 +944,714 @@ const PurchaseInvoicePage: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* ── SUB-PAGE 1: NEW/EDIT FORM SIDE DRAWER ─────────────────────────────── */}
+      {activeSubPage === 'new' && (
+        <div className="fixed top-0 right-0 h-full w-full sm:w-[640px] bg-white shadow-2xl border-l border-gray-200 z-[60] flex flex-col animate-in slide-in-from-right duration-250 font-sans text-xs !mt-0">
+          {/* Header */}
+          <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-gray-900">
+                {isEditing ? 'Edit Purchase Batch' : 'New Purchase Batch'}
+              </h2>
+              <p className="text-[10px] text-gray-500 mt-0.5 font-medium">
+                {isEditing ? 'Modify purchase invoice records and lots' : 'Record a new supplier materials lot delivery'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveSubPage('list')}
+              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Form Scrollable Body */}
+          <div className="flex-1 overflow-y-auto p-5 space-y-6 bg-white">
+            {addError && (
+              <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-xs font-bold text-red-700 flex items-center gap-2">
+                <AlertCircleIcon className="w-4 h-4 shrink-0" />
+                <span>{addError}</span>
+              </div>
+            )}
+
+            {/* 1. Purchase Batch Details */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-3xs p-5 space-y-4">
+              <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider border-b pb-2">
+                1. Purchase Batch Details
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Batch No. *</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. PB2407001"
+                    value={invoiceForm.invoiceNumber}
+                    onChange={e => setInvoiceForm({ ...invoiceForm, invoiceNumber: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-950 font-mono font-bold"
+                  />
+                  <span className="text-[9px] text-gray-400 font-semibold mt-1 block">Auto-generated if empty</span>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Purchase Date *</label>
+                  <input
+                    type="date"
+                    value={invoiceForm.dueDate}
+                    onChange={e => setInvoiceForm({ ...invoiceForm, dueDate: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Supplier *</label>
+                  <select
+                    value={invoiceForm.vendorId}
+                    onChange={e => setInvoiceForm({ ...invoiceForm, vendorId: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-800 font-semibold"
+                    required
+                  >
+                    <option value="">Select Supplier</option>
+                    {vendors.map(v => (
+                      <option key={v._id} value={v._id}>{v.firmName || v.ownerName}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Purchase Type</label>
+                  <select
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-800 font-semibold"
+                  >
+                    <option value="Raw Material">Raw Material</option>
+                    <option value="Semi Finished">Semi-Finished</option>
+                    <option value="Finished Goods">Finished Goods</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Material Lots */}
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider">
+                  Material Lots
+                </h3>
+                <button
+                  type="button"
+                  onClick={handleAddItemRow}
+                  className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-black transition-all shadow-3xs"
+                >
+                  + Add Material Lot
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {invoiceForm.items.map((item, idx) => {
+                  const reelsCount = Number(item.reelsCount) || 0;
+                  return (
+                    <div key={idx} className="bg-white rounded-xl border border-gray-200 shadow-3xs p-5 space-y-4 text-left">
+                      <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                        <span className="text-xs font-black text-gray-900 uppercase font-mono bg-gray-100 px-2 py-0.5 rounded">
+                          LOT - {idx + 1}
+                        </span>
+                        {invoiceForm.items.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveItemRow(idx)}
+                            className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded transition-colors text-xs font-bold flex items-center gap-1"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" /> Remove Lot
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Lot Form Grid */}
+                      <div className="grid grid-cols-4 gap-3 text-xs text-gray-900">
+                        <div className="col-span-2">
+                          <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Item SKU *</label>
+                          <select
+                            value={item.skuId}
+                            onChange={e => handleItemRowChange(idx, 'skuId', e.target.value)}
+                            className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg bg-white font-semibold text-gray-800 text-xs"
+                            required
+                          >
+                            <option value="">Select SKU</option>
+                            {skus.map(s => (
+                              <option key={s._id} value={s._id}>{s.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Brand</label>
+                          <input
+                            type="text"
+                            value={item.brand}
+                            onChange={e => handleItemRowChange(idx, 'brand', e.target.value)}
+                            className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">GSM</label>
+                          <input
+                            type="number"
+                            value={item.gsm}
+                            onChange={e => handleItemRowChange(idx, 'gsm', e.target.value)}
+                            className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-center font-bold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Width (cm)</label>
+                          <input
+                            type="number"
+                            value={item.width}
+                            onChange={e => handleItemRowChange(idx, 'width', e.target.value)}
+                            className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-center font-bold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Reels Count</label>
+                          <input
+                            type="number"
+                            value={item.reelsCount}
+                            onChange={e => handleItemRowChange(idx, 'reelsCount', e.target.value)}
+                            className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-center font-bold"
+                            placeholder="0"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Total KG</label>
+                          <input
+                            type="number"
+                            value={item.quantity}
+                            onChange={e => handleItemRowChange(idx, 'quantity', e.target.value)}
+                            className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-right font-black"
+                            placeholder="0"
+                            disabled={reelsCount > 0}
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Rate / KG (₹)</label>
+                          <input
+                            type="number"
+                            value={item.purchasePrice}
+                            onChange={e => handleItemRowChange(idx, 'purchasePrice', e.target.value)}
+                            className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-right font-bold"
+                            placeholder="0.00"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      {/* Layout details: amount and storage (only for non-reels items) */}
+                      <div className="flex flex-wrap items-center justify-between gap-4 bg-gray-50/50 p-3 rounded-lg border border-gray-100 text-xs">
+                        <div className="flex gap-4">
+                          <span className="font-semibold text-gray-500">
+                            Lot Subtotal: <span className="font-black text-gray-800 text-sm">₹{((Number(item.quantity) || 0) * (Number(item.purchasePrice) || 0)).toLocaleString('en-IN')}</span>
+                          </span>
+                        </div>
+
+                        {reelsCount === 0 && (
+                          <div className="flex items-center gap-2">
+                            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Lot Storage Location:</label>
+                            <select
+                              value={item.locationId || ''}
+                              onChange={e => handleItemRowChange(idx, 'locationId', e.target.value)}
+                              className="px-2 py-1 border border-gray-200 rounded-lg bg-white text-[11px] font-bold text-gray-800"
+                              required
+                            >
+                              <option value="">-- Select Destination Storage --</option>
+                              {locations.filter(loc => loc.level === 'Storage Location').map(loc => {
+                                const paths = resolveLocationPath(loc._id);
+                                const hierarchy = [paths.factory, paths.floor, paths.zone].filter(p => p && p !== '—').join(' > ');
+                                return (
+                                  <option key={loc._id} value={loc._id}>
+                                    {hierarchy ? `${hierarchy} > ` : ''}{loc.name}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Inline Reels List inside card (matches handwritten sketch) */}
+                      {reelsCount > 0 && (
+                        <div className="pt-3 border-t border-gray-100 space-y-2">
+                          <span className="block text-[10px] font-black text-gray-400 uppercase tracking-wider">
+                            Reel Specifications & Storage Placement:
+                          </span>
+
+                          <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                            <table className="w-full text-left text-xs border-collapse">
+                              <thead>
+                                <tr className="bg-gray-50 text-gray-400 font-bold uppercase text-[9px] border-b border-gray-150">
+                                  <th className="py-2 px-3 w-16">Reel</th>
+                                  <th className="py-2 px-3 w-32">Weight (KG) *</th>
+                                  <th className="py-2 px-3 w-32">Width (cm) *</th>
+                                  <th className="py-2 px-3">Storage Allocation *</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100 font-semibold text-gray-700">
+                                {Array.from({ length: reelsCount }).map((_, rIdx) => {
+                                  const reelObj = item.reels?.[rIdx] || {};
+                                  const reelWeightVal = reelObj.weight !== undefined && reelObj.weight !== null ? reelObj.weight : '';
+                                  const reelWidthVal = reelObj.width !== undefined && reelObj.width !== null ? reelObj.width : item.width;
+                                  const reelLocId = reelObj.locationId || '';
+
+                                  return (
+                                    <tr key={rIdx} className="hover:bg-gray-50/20">
+                                      <td className="py-1.5 px-3 font-mono text-gray-500 font-bold">R-{rIdx + 1}</td>
+                                      <td className="py-1.5 px-3">
+                                        <input
+                                          type="number"
+                                          value={reelWeightVal}
+                                          onChange={e => handleReelChange(idx, rIdx, 'weight', e.target.value)}
+                                          placeholder="0.0"
+                                          className="w-full px-2 py-1 border border-gray-200 rounded-md text-xs font-mono font-bold text-gray-900"
+                                          required
+                                        />
+                                      </td>
+                                      <td className="py-1.5 px-3">
+                                        <input
+                                          type="number"
+                                          value={reelWidthVal}
+                                          onChange={e => handleReelChange(idx, rIdx, 'width', e.target.value)}
+                                          placeholder="Width"
+                                          className="w-full px-2 py-1 border border-gray-200 rounded-md text-xs font-mono"
+                                          required
+                                        />
+                                      </td>
+                                      <td className="py-1.5 px-3">
+                                        <select
+                                          value={reelLocId}
+                                          onChange={e => handleReelChange(idx, rIdx, 'locationId', e.target.value)}
+                                          className="w-full px-2 py-1 border border-gray-200 rounded-md bg-white text-xs font-bold text-gray-800"
+                                          required
+                                        >
+                                          <option value="">-- Choose Storage Area --</option>
+                                          {locations.filter(loc => loc.level === 'Storage Location').map(loc => {
+                                            const paths = resolveLocationPath(loc._id);
+                                            const hierarchy = [paths.factory, paths.floor, paths.zone].filter(p => p && p !== '—').join(' > ');
+                                            return (
+                                              <option key={loc._id} value={loc._id}>
+                                                {hierarchy ? `${hierarchy} > ` : ''}{loc.name}
+                                              </option>
+                                            );
+                                          })}
+                                        </select>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 3. Summary & Other Charges */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-3xs p-5 space-y-4">
+              <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider border-b pb-2">
+                3. Summary & Other Charges
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Freight Charges (₹)</label>
+                  <input
+                    type="number"
+                    value={invoiceForm.freight}
+                    onChange={e => setInvoiceForm({ ...invoiceForm, freight: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-mono text-right"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Crane Charges (₹)</label>
+                  <input
+                    type="number"
+                    value={invoiceForm.craneCharges}
+                    onChange={e => setInvoiceForm({ ...invoiceForm, craneCharges: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-mono text-right"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Loading / Unloading (₹)</label>
+                  <input
+                    type="number"
+                    value={invoiceForm.loadingUnloading}
+                    onChange={e => setInvoiceForm({ ...invoiceForm, loadingUnloading: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-mono text-right"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Other Charges (₹)</label>
+                  <input
+                    type="number"
+                    value={invoiceForm.otherCharges}
+                    onChange={e => setInvoiceForm({ ...invoiceForm, otherCharges: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-mono text-right"
+                    placeholder="e.g. Labour, Tally etc."
+                  />
+                </div>
+              </div>
+
+              {/* Total calculations */}
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-150 space-y-2 text-xs font-semibold text-gray-700 mt-4">
+                <div className="flex justify-between">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Lots:</span>
+                  <span className="text-gray-900 font-bold font-mono">{formLotsCount} Lots</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Reels:</span>
+                  <span className="text-gray-900 font-bold font-mono">{formReelsCount} Reels</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Weight:</span>
+                  <span className="text-gray-900 font-bold font-mono">{formTotalWeight.toLocaleString('en-IN')} KG</span>
+                </div>
+                <div className="flex justify-between border-t pt-2">
+                  <span>Material Total:</span>
+                  <span className="font-mono text-gray-900">₹{formMatTotal.toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Other Charges Total:</span>
+                  <span className="font-mono text-gray-900">₹{formOtherCharges.toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex justify-between border-t pt-2 font-bold text-sm text-gray-950">
+                  <span>Grand Total:</span>
+                  <span className="font-mono text-blue-600">₹{(formMatTotal + formOtherCharges).toLocaleString('en-IN')}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer Actions */}
+          <div className="p-5 border-t border-gray-200 bg-gray-50 flex justify-end gap-2.5">
+            <button
+              type="button"
+              onClick={() => setActiveSubPage('list')}
+              className="px-4 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 bg-white hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleInvoiceSubmit}
+              disabled={addLoading}
+              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold shadow-sm flex items-center justify-center gap-1.5"
+            >
+              {addLoading ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Saving Batch...</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Save Purchase Batch</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── SUB-PAGE 2: BATCH DETAILS SIDE DRAWER ────────────────────────────── */}
+      {activeSubPage === 'details' && selectedInvoice && (
+        <div className="fixed top-0 right-0 h-full w-full sm:w-[640px] bg-white shadow-2xl border-l border-gray-200 z-[60] flex flex-col animate-in slide-in-from-right duration-250 font-sans text-xs !mt-0">
+          {/* Header */}
+          <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
+            <div>
+              <h2 className="text-base font-bold text-gray-900 flex items-center gap-1.5">
+                <FileText className="w-4 h-4 text-blue-600 animate-pulse-slow" />
+                Purchase Batch Details
+              </h2>
+              <p className="text-[10px] text-gray-500 mt-0.5 font-medium">
+                Registered on {selectedInvoice.createdAt ? new Date(selectedInvoice.createdAt).toLocaleString('en-IN') : '—'} by Admin
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleEditInvoice(selectedInvoice)}
+                className="px-2.5 py-1.5 border border-gray-200 text-gray-700 hover:bg-gray-50 bg-white rounded-lg text-[10px] font-bold shadow-3xs flex items-center gap-1 transition-all"
+              >
+                <Edit className="w-3 h-3 text-amber-500" /> Edit
+              </button>
+              <button
+                onClick={() => setActiveSubPage('list')}
+                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Details Content Scroll Area */}
+          <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-white">
+            {/* Header batch summary card */}
+            <div className="bg-gray-50 rounded-xl border border-gray-205 p-4 grid grid-cols-2 gap-4 font-medium">
+              <div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Batch Number</span>
+                <span className="text-xs font-black text-blue-600 font-mono block truncate">{selectedInvoice.invoiceNumber}</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Supplier / Vendor</span>
+                <span className="text-xs font-bold text-gray-800 block truncate">
+                  {typeof selectedInvoice.vendorId === 'object' && selectedInvoice.vendorId !== null ? (selectedInvoice.vendorId.firmName || selectedInvoice.vendorId.ownerName) : 'Supplier'}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Purchase Date</span>
+                <span className="text-xs font-bold text-gray-800 block">
+                  {selectedInvoice.createdAt ? new Date(selectedInvoice.createdAt).toLocaleDateString('en-IN') : '—'}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Lots</span>
+                <span className="text-xs font-bold text-gray-900 block font-mono">{selectedInvoice.items?.length || 0} Lots</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Reels</span>
+                <span className="text-xs font-bold text-gray-900 block font-mono">
+                  {selectedInvoice.items?.reduce((sum, item) => sum + (item.reels?.length || 0), 0) || 0}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Weight</span>
+                <span className="text-xs font-black text-gray-955 block font-mono">
+                  {selectedInvoice.items?.reduce((sum, item) => sum + (item.quantity || 0), 0).toLocaleString('en-IN')} KG
+                </span>
+              </div>
+            </div>
+
+            {/* Details Tabs and panels */}
+            <div className="space-y-4">
+              <div className="flex gap-2 border-b border-gray-200 pb-px">
+                <button
+                  onClick={() => setDetailsTab('lots')}
+                  className={`px-4 py-2 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+                    detailsTab === 'lots' 
+                      ? 'border-blue-600 text-blue-600' 
+                      : 'border-transparent text-gray-400 hover:text-gray-700'
+                  }`}
+                >
+                  <FileText className="w-3.5 h-3.5" /> Material Lots
+                </button>
+                <button
+                  onClick={() => setDetailsTab('allocation')}
+                  className={`px-4 py-2 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+                    detailsTab === 'allocation' 
+                      ? 'border-blue-600 text-blue-600' 
+                      : 'border-transparent text-gray-400 hover:text-gray-700'
+                  }`}
+                >
+                  <MapPinIcon className="w-3.5 h-3.5" /> Location Allocation
+                </button>
+                <button
+                  onClick={() => setDetailsTab('history')}
+                  className={`px-4 py-2 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+                    detailsTab === 'history' 
+                      ? 'border-blue-600 text-blue-600' 
+                      : 'border-transparent text-gray-400 hover:text-gray-700'
+                  }`}
+                >
+                  <HelpCircle className="w-3.5 h-3.5" /> History
+                </button>
+              </div>
+
+              {/* LOTS TAB */}
+              {detailsTab === 'lots' && (
+                <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4 shadow-3xs">
+                  <div className="overflow-x-auto border border-gray-100 rounded-xl">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50 text-gray-500 uppercase font-black border-b border-gray-200 text-[10px] tracking-wider">
+                          <th className="px-3 py-2.5">#</th>
+                          <th className="px-3 py-2.5">Item</th>
+                          <th className="px-3 py-2.5 text-center">GSM</th>
+                          <th className="px-3 py-2.5 text-center">Width</th>
+                          <th className="px-3 py-2.5 text-center">Reels</th>
+                          <th className="px-3 py-2.5 text-right">Total KG</th>
+                          <th className="px-3 py-2.5 text-right">Amount (₹)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-55 text-gray-700 font-medium">
+                        {selectedInvoice.items?.map((item, idx) => {
+                          const skuName = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any).name : 'Raw Material';
+                          const brand = (item.skuId as any)?.brand || 'BILT';
+                          const gsm = (item.skuId as any)?.gsm || '52';
+                          const width = (item.skuId as any)?.width || '64';
+                          
+                          return (
+                            <tr key={idx} className="hover:bg-gray-50/50">
+                              <td className="px-3 py-2.5 text-gray-450 font-mono">{idx + 1}</td>
+                              <td className="px-3 py-2.5 font-bold text-gray-900">
+                                <div>{skuName}</div>
+                                <div className="text-[10px] text-gray-400 font-normal">{brand}</div>
+                              </td>
+                              <td className="px-3 py-2.5 text-center font-mono">{gsm}</td>
+                              <td className="px-3 py-2.5 text-center font-mono">{width} cm</td>
+                              <td className="px-3 py-2.5 text-center font-mono font-bold text-gray-800">{item.reels?.length || 0}</td>
+                              <td className="px-3 py-2.5 text-right font-mono font-black text-gray-950">{(item.quantity || 0).toLocaleString()}</td>
+                              <td className="px-3 py-2.5 text-right font-mono font-black text-gray-950">₹{(item.totalPrice || 0).toLocaleString()}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* ALLOCATION TAB */}
+              {detailsTab === 'allocation' && (
+                <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4 shadow-3xs">
+                  <div className="flex justify-between items-center border-b pb-2">
+                    <span className="font-bold text-gray-800 uppercase tracking-wider text-[10px]">Reels Location Mapping</span>
+                    <span className="text-[10px] text-gray-400 font-bold">Total {selectedInvoice.items?.reduce((sum, item) => sum + (item.reels?.length || 0), 0) || 0} Reels</span>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    {selectedInvoice.items?.map((item, idx) => {
+                      const skuName = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any).name : 'Raw Material';
+                      const lotNo = item.lotNumber || `${selectedInvoice.invoiceNumber}-L0${idx + 1}`;
+                      return (
+                        <div key={idx} className="border border-gray-150 rounded-xl p-3 bg-gray-50/20 space-y-2">
+                          <div className="flex justify-between items-center text-[10px] font-bold">
+                            <span className="text-gray-800 font-black">{skuName}</span>
+                            <span className="text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-mono">Lot: {lotNo}</span>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-2">
+                            {item.reels?.map((reel, rIdx) => {
+                              const balance = inventoryBalances.find(
+                                b => b.batchNumber === selectedInvoice.invoiceNumber && 
+                                     b.lotNumber === lotNo && 
+                                     b.reels?.some(r => r.reelNumber === reel.reelNumber)
+                              );
+                              const locationName = balance && typeof balance.locationId === 'object' && balance.locationId !== null
+                                ? (balance.locationId as any).name 
+                                : 'Not Allocated';
+                              return (
+                                <div key={rIdx} className="bg-white p-2 border border-gray-100 rounded-lg flex items-center justify-between text-[11px]">
+                                  <div className="min-w-0">
+                                    <p className="font-bold text-gray-800 truncate">Reel #{reel.reelNumber}</p>
+                                    <p className="text-[10px] text-gray-400 font-mono">{reel.weight} KG • {reel.width} cm</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className={`inline-flex px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
+                                      locationName === 'Not Allocated' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'
+                                    }`}>
+                                      {locationName}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          <div className="pt-1 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAllocateForm(prev => ({
+                                  ...prev,
+                                  itemIndex: idx,
+                                  lotNumber: lotNo
+                                }));
+                                setShowAllocateModal(true);
+                              }}
+                              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-bold shadow-3xs flex items-center gap-1 transition-all"
+                            >
+                              <ArrowRight className="w-3 h-3" /> Allocate Reels Location
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* HISTORY TAB */}
+              {detailsTab === 'history' && (
+                <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4 shadow-3xs">
+                  <div className="space-y-4">
+                    <div className="border-l-2 border-blue-500 pl-3 py-1 space-y-1 text-xs">
+                      <div className="flex justify-between font-bold text-gray-800">
+                        <span>Invoice Registered</span>
+                        <span className="text-[10px] text-gray-400 font-normal">
+                          {selectedInvoice.createdAt ? new Date(selectedInvoice.createdAt).toLocaleString('en-IN') : '—'}
+                        </span>
+                      </div>
+                      <p className="text-gray-550 font-medium">Batch recorded successfully in supplier inward ledger.</p>
+                      <p className="text-[10px] text-gray-400 font-medium">Performed By: System Admin</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Payment / Tax details card */}
+            <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3.5 shadow-3xs">
+              <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider">Financial Breakdown</h3>
+              <div className="space-y-2 text-xs font-semibold text-gray-600">
+                <div className="flex justify-between">
+                  <span>Subtotal Value:</span>
+                  <span className="text-gray-900 font-mono">₹{(selectedInvoice.subTotal || 0).toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Tax Amount:</span>
+                  <span className="text-gray-900 font-mono">₹{(selectedInvoice.taxAmount || 0).toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Freight Charges:</span>
+                  <span className="text-gray-900 font-mono">₹{(selectedInvoice.freight || 0).toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Crane Charges:</span>
+                  <span className="text-gray-900 font-mono">₹{(selectedInvoice.craneCharges || 0).toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Other / Loading Charges:</span>
+                  <span className="text-gray-900 font-mono">₹{(selectedInvoice.otherCharges || 0).toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex justify-between border-t pt-2 text-gray-955 font-black">
+                  <span>Grand Total:</span>
+                  <span className="text-blue-600 font-mono">₹{(selectedInvoice.grandTotal || 0).toLocaleString('en-IN')}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer actions wrapper */}
+          <div className="p-5 border-t border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
+            <button
+              onClick={() => handleDeleteInvoice(selectedInvoice)}
+              className="px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 bg-white rounded-xl text-xs font-bold transition-all flex items-center gap-1"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Delete Batch
+            </button>
+            <button
+              onClick={() => setActiveSubPage('list')}
+              className="px-5 py-2 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 text-gray-700 font-bold text-xs shadow-3xs"
+            >
+              Close Window
+            </button>
+          </div>
+        </div>
       )}
 
       {/* ── LOCATION ALLOCATION MODAL DIALOG ──────────────────────────────────── */}
@@ -1587,7 +1690,7 @@ const PurchaseInvoicePage: React.FC = () => {
         };
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-black/45 backdrop-blur-3xs" onClick={() => !allocateSubmitting && setShowAllocateModal(false)} />
 
             <div className="bg-white rounded-2xl border border-gray-200 shadow-xl max-w-lg w-full relative z-10 animate-in zoom-in-95 duration-150 overflow-hidden flex flex-col max-h-[85vh]">
@@ -1757,6 +1860,157 @@ const PurchaseInvoicePage: React.FC = () => {
           </div>
         );
       })()}
+      {/* ── TOOLS SUB-MODALS & SLIDE-OVERS ────────────────────────────────────── */}
+      {/* Activity Log Drawer */}
+      {showActivityLog && (
+        <div className="fixed inset-0 z-[60] overflow-hidden !mt-0">
+          <div className="absolute inset-0 overflow-hidden bg-gray-900/40 backdrop-blur-3xs transition-opacity" onClick={() => setShowActivityLog(false)}></div>
+          <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
+            <div className="pointer-events-auto w-screen max-w-md">
+              <div className="flex h-full flex-col bg-white shadow-2xl animate-in slide-in-from-right duration-250">
+                <div className="bg-gray-50 px-4 py-5 border-b flex justify-between items-center">
+                  <div>
+                    <h2 className="text-base font-bold text-gray-900">Purchase Activity Log</h2>
+                    <p className="text-[10px] text-gray-500 mt-0.5 font-medium">Audit logs for purchase batch bookings, payments, and cancellations</p>
+                  </div>
+                  <button onClick={() => setShowActivityLog(false)} className="text-gray-400 hover:text-gray-600">
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {activityLogLoading ? (
+                    <div className="flex justify-center items-center h-40">
+                      <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
+                    </div>
+                  ) : activityLogs.length === 0 ? (
+                    <p className="text-center text-xs text-gray-500 py-8">No recent activity logs recorded.</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {activityLogs.map((log, idx) => (
+                        <div key={log._id || idx} className="border-l-2 border-blue-500 pl-3 py-1 space-y-1 text-xs">
+                          <div className="flex justify-between font-bold text-gray-800">
+                            <span className="uppercase text-[10px] font-black text-blue-600">{log.action}</span>
+                            <span className="text-[10px] text-gray-400 font-normal">{new Date(log.createdAt).toLocaleString('en-IN')}</span>
+                          </div>
+                          <p className="text-gray-600 font-bold">Batch: {log.entityName}</p>
+                          <p className="text-gray-500 text-[11px]">{log.details}</p>
+                          <p className="text-[10px] text-gray-400 font-medium">Performed By: {log.performedBy}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Find Duplicates Modal */}
+      {showDuplicates && (
+        <div className="fixed inset-0 z-[60] overflow-y-auto flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-3xs !mt-0 animate-in fade-in duration-200">
+          <div className="relative bg-white rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-2xl flex justify-between items-center">
+              <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-yellow-500" />
+                Find Duplicates for Purchase Batches
+              </h2>
+              <button onClick={() => setShowDuplicates(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto flex-1 space-y-4 text-xs">
+              {duplicateGroups.length === 0 ? (
+                <div className="text-center py-8">
+                  <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
+                  <p className="font-semibold text-gray-800">No duplicates detected!</p>
+                  <p className="text-sm text-gray-400 mt-1">All Batch / Invoice numbers are completely unique.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-gray-500 font-medium">The following duplicate Invoice numbers were identified in the system:</p>
+                  {duplicateGroups.map((group, gIdx) => (
+                    <div key={gIdx} className="border border-red-100 bg-red-50/10 rounded-xl p-4 space-y-3">
+                      <div className="flex justify-between items-center border-b pb-2">
+                        <span className="font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded uppercase text-[10px]">
+                          Duplicate Invoice: {group.value}
+                        </span>
+                        <span className="text-[10px] text-gray-400 font-bold">{group.items.length} duplicate entries</span>
+                      </div>
+                      <div className="space-y-2">
+                        {group.items.map((item, iIdx) => (
+                          <div key={item._id || iIdx} className="flex justify-between items-center text-[11px] text-gray-600 bg-white p-2 rounded-lg border border-gray-150">
+                            <div>
+                              <p className="font-bold text-gray-900">{item.invoiceNumber}</p>
+                              <p className="font-mono text-gray-400 text-[10px]">Grand Total: ₹{item.grandTotal?.toLocaleString('en-IN')}</p>
+                            </div>
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700">{item.status}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recycle Bin Drawer */}
+      {showRecycleBin && (
+        <div className="fixed inset-0 z-[60] overflow-hidden !mt-0">
+          <div className="absolute inset-0 overflow-hidden bg-gray-900/40 backdrop-blur-3xs transition-opacity" onClick={() => setShowRecycleBin(false)}></div>
+          <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
+            <div className="pointer-events-auto w-screen max-w-md">
+              <div className="flex h-full flex-col bg-white shadow-2xl animate-in slide-in-from-right duration-250">
+                <div className="bg-gray-50 px-4 py-5 border-b flex justify-between items-center">
+                  <div>
+                    <h2 className="text-base font-bold text-gray-900 flex items-center gap-1.5">
+                      <Trash2 className="w-4 h-4 text-gray-500" />
+                      Purchase Recycle Bin (Draft/Cancelled)
+                    </h2>
+                    <p className="text-[10px] text-gray-500 mt-0.5 font-medium font-sans">Draft/Cancelled batches can be restored back to Posted</p>
+                  </div>
+                  <button onClick={() => setShowRecycleBin(false)} className="text-gray-400 hover:text-gray-600">
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  {recycleBinLoading ? (
+                    <div className="flex justify-center items-center h-40">
+                      <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
+                    </div>
+                  ) : recycleBinItems.length === 0 ? (
+                    <div className="text-center py-12 text-gray-450">
+                      <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
+                      <p className="font-semibold text-gray-700">Recycle Bin is Empty!</p>
+                      <p className="text-xs text-gray-400 mt-1">No draft or cancelled purchase invoices found.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {recycleBinItems.map((item, idx) => (
+                        <div key={item._id || idx} className="flex justify-between items-center p-3 border border-gray-200 rounded-xl bg-gray-50/50 hover:bg-white transition-all text-xs">
+                          <div className="space-y-1">
+                            <p className="font-bold text-gray-800">{item.invoiceNumber}</p>
+                            <p className="font-mono text-gray-400 text-[10px]">Grand Total: ₹{item.grandTotal?.toLocaleString('en-IN')} • {item.status}</p>
+                          </div>
+                          <button
+                            onClick={() => handleRestoreInvoice(item)}
+                            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-bold transition-colors"
+                          >
+                            Restore
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -55,7 +55,7 @@ const LedgerDetailDrawer: React.FC<LedgerDetailDrawerProps> = ({ entry, companyI
   const hasReels = entry.reels && entry.reels.length > 0;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
+    <div className="fixed inset-0 z-[60] overflow-hidden flex justify-end !mt-0">
       {/* Overlay */}
       <div 
         className="fixed inset-0 bg-black/40 backdrop-blur-3xs transition-opacity animate-in fade-in duration-200" 

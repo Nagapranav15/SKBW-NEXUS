@@ -403,7 +403,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
     if (!isOpen) return null;
 
     return (
-      <div className="fixed top-0 right-0 h-full w-full sm:w-[520px] bg-white shadow-2xl border-l border-gray-200 z-50 flex flex-col animate-in slide-in-from-right duration-250 font-sans text-xs">
+      <div className="fixed top-0 right-0 h-full w-full sm:w-[520px] bg-white shadow-2xl border-l border-gray-200 z-[60] flex flex-col animate-in slide-in-from-right duration-250 font-sans text-xs !mt-0">
           {/* Header */}
           <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
             <div>

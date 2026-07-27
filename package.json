@@ -11,6 +11,7 @@
     "seed": "npm run seed --prefix erp-backend"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "axios": "^1.14.0",
     "chart.js": "^4.5.1",
     "lucide-react": "^0.344.0",

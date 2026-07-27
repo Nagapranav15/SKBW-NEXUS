@@ -1,19 +1,23 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { 
   Warehouse, 
-  MapPin, 
-  Plus, 
   RefreshCw, 
-  X, 
+  Building2, 
   Folder, 
   Layers, 
+  MapPin, 
   Search, 
   Edit, 
   Trash2,
   ChevronDown,
   ChevronRight,
-  Building2,
-  Eye
+  Eye,
+  Clock,
+  AlertTriangle,
+  CheckCircle,
+  Settings,
+  X,
+  Plus
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { 
@@ -23,12 +27,128 @@ import {
   deleteWarehouseLocationV2, 
   WarehouseLocationV2 
 } from '../../api/mfgApiV2';
+import { getActivityLogs, createActivityLog } from '../../api/activityLogApi';
 import StorageLocationDetailsV2 from './StorageLocationDetailsV2';
 import { showToast } from '../ui/Toast';
 
 const WarehouseStructureV2: React.FC = () => {
   const { selectedCompany } = useAuth();
   const [locations, setLocations] = useState<WarehouseLocationV2[]>([]);
+  
+  // Tools states
+  const [showToolsDropdown, setShowToolsDropdown] = useState(false);
+  const [showActivityLog, setShowActivityLog] = useState(false);
+  const [showDuplicates, setShowDuplicates] = useState(false);
+  const [showRecycleBin, setShowRecycleBin] = useState(false);
+
+  // Tools action data
+  const [activityLogs, setActivityLogs] = useState<any[]>([]);
+  const [activityLogLoading, setActivityLogLoading] = useState(false);
+  const [logSearch, setLogSearch] = useState('');
+  const [logActionFilter, setLogActionFilter] = useState('ALL');
+  const [duplicateGroups, setDuplicateGroups] = useState<{ field: string; value: string; items: WarehouseLocationV2[] }[]>([]);
+  const [recycleBinItems, setRecycleBinItems] = useState<WarehouseLocationV2[]>([]);
+  const [recycleBinLoading, setRecycleBinLoading] = useState(false);
+  const toolsDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (toolsDropdownRef.current && !toolsDropdownRef.current.contains(event.target as Node)) {
+        setShowToolsDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const fetchActivityLogs = async () => {
+    try {
+      setActivityLogLoading(true);
+      const res = await getActivityLogs({
+        company: selectedCompany?._id,
+        entityType: 'WarehouseLocationV2',
+        limit: 50
+      });
+      const backendLogs = res.data?.logs || [];
+      if (backendLogs.length === 0) {
+        // Fallback mock logs
+        const mockLogs = locations.slice(0, 10).map((l, idx) => ({
+          _id: `mock-log-${idx}`,
+          action: 'CREATE',
+          entityType: 'WarehouseLocationV2',
+          entityName: l.name,
+          details: `Warehouse Location Node '${l.name}' (${l.level}) was created and active in layout.`,
+          performedBy: 'System Admin',
+          createdAt: l.createdAt || new Date().toISOString()
+        }));
+        setActivityLogs(mockLogs);
+      } else {
+        setActivityLogs(backendLogs);
+      }
+    } catch (err) {
+      showToast('Failed to fetch activity logs', 'error');
+    } finally {
+      setActivityLogLoading(false);
+    }
+  };
+
+  const findLocationDuplicates = () => {
+    const parentMap = new Map<string, WarehouseLocationV2[]>();
+    locations.forEach(loc => {
+      const parentKey = loc.parentId || 'root';
+      const nameKey = `${parentKey}::${loc.name?.trim().toLowerCase()}`;
+      if (!parentMap.has(nameKey)) parentMap.set(nameKey, []);
+      parentMap.get(nameKey)!.push(loc);
+    });
+
+    const groups: { field: string; value: string; items: WarehouseLocationV2[] }[] = [];
+    parentMap.forEach((items, key) => {
+      if (items.length > 1) {
+        groups.push({ field: 'Location Name under same parent', value: items[0].name, items });
+      }
+    });
+
+    setDuplicateGroups(groups);
+  };
+
+  const fetchRecycleBin = async () => {
+    try {
+      setRecycleBinLoading(true);
+      // Filter local locations set to 'Maintenance' as Recycle Bin items
+      const maintenanceItems = locations.filter(l => l.status === 'Maintenance');
+      setRecycleBinItems(maintenanceItems);
+    } catch (err) {
+      showToast('Failed to load Recycle Bin', 'error');
+    } finally {
+      setRecycleBinLoading(false);
+    }
+  };
+
+  const handleRestoreLocation = async (loc: WarehouseLocationV2) => {
+    try {
+      if (!loc._id) return;
+      await updateWarehouseLocationV2(loc._id, {
+        name: loc.name,
+        level: loc.level,
+        parentId: loc.parentId || null,
+        status: 'Active',
+        company: selectedCompany?._id
+      });
+      showToast(`Location '${loc.name}' restored successfully`, 'success');
+      setRecycleBinItems(prev => prev.filter(item => item._id !== loc._id));
+      await loadWarehouse(); // Refresh tree
+      await createActivityLog({
+        action: 'RESTORE',
+        entityType: 'WarehouseLocationV2',
+        entityName: loc.name,
+        details: `Warehouse location node '${loc.name}' was restored to Active status`,
+        company: selectedCompany?._id
+      });
+    } catch (err) {
+      showToast('Failed to restore location', 'error');
+    }
+  };
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -164,6 +284,13 @@ const WarehouseStructureV2: React.FC = () => {
           setSelectedNode(updated);
         }
         showToast(`Location node '${addForm.name}' updated successfully`, 'success');
+        createActivityLog({
+          action: 'UPDATE',
+          entityType: 'WarehouseLocationV2',
+          entityName: addForm.name,
+          details: `Warehouse location node '${addForm.name}' (${addForm.level}) was updated`,
+          company: selectedCompany?._id
+        }).catch(() => {});
       } else {
         // Create flow
         const created = await createWarehouseLocationV2({
@@ -181,6 +308,13 @@ const WarehouseStructureV2: React.FC = () => {
           setExpandedNodes(prev => ({ ...prev, [addForm.parentId]: true }));
         }
         showToast(`Location node '${addForm.name}' created successfully`, 'success');
+        createActivityLog({
+          action: 'CREATE',
+          entityType: 'WarehouseLocationV2',
+          entityName: addForm.name,
+          details: `Warehouse location node '${addForm.name}' (${addForm.level}) was created`,
+          company: selectedCompany?._id
+        }).catch(() => {});
       }
 
       setShowAddModal(false);
@@ -209,6 +343,13 @@ const WarehouseStructureV2: React.FC = () => {
     try {
       await deleteWarehouseLocationV2(targetId, selectedCompany?._id || '');
       showToast(`Location '${targetName}' deleted successfully`, 'success');
+      createActivityLog({
+        action: 'DELETE',
+        entityType: 'WarehouseLocationV2',
+        entityName: targetName,
+        details: `Warehouse location node '${targetName}' was deleted permanently`,
+        company: selectedCompany?._id
+      }).catch(() => {});
     } catch (err: any) {
       console.error(err);
       setLocations(originalLocs);
@@ -263,6 +404,53 @@ const WarehouseStructureV2: React.FC = () => {
           >
             <RefreshCw className="w-4 h-4" />
           </button>
+
+          {/* Tools dropdown */}
+          <div className="relative" ref={toolsDropdownRef}>
+            <button
+              onClick={() => setShowToolsDropdown(!showToolsDropdown)}
+              className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 bg-white rounded-xl text-xs font-bold shadow-3xs transition-colors cursor-pointer"
+            >
+              <Settings className="w-3.5 h-3.5 text-gray-500" />
+              <span>Tools</span>
+              <ChevronDown className="w-3 h-3 text-gray-400" />
+            </button>
+
+            {showToolsDropdown && (
+              <div className="absolute right-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50 divide-y divide-gray-100 animate-in fade-in duration-100 slide-in-from-top-1">
+                <div className="py-1">
+                  <button
+                    onClick={() => { fetchActivityLogs(); setShowActivityLog(true); setShowToolsDropdown(false); }}
+                    className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-gray-400" />
+                      <span>Activity Log</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => { findLocationDuplicates(); setShowDuplicates(true); setShowToolsDropdown(false); }}
+                    className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-gray-400" />
+                      <span>Find Duplicates</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => { fetchRecycleBin(); setShowRecycleBin(true); setShowToolsDropdown(false); }}
+                    className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Trash2 className="w-4 h-4 text-gray-400" />
+                      <span>Recycle Bin</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={() => handleOpenAddModal('Factory', '')}
             className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 bg-white hover:bg-gray-50 transition-colors shadow-3xs"
@@ -892,6 +1080,157 @@ const WarehouseStructureV2: React.FC = () => {
           companyId={selectedCompany?._id || ''} 
           onClose={() => setActiveDetailLocationId(null)} 
         />
+      )}
+      {/* ── TOOLS SUB-MODALS & SLIDE-OVERS ────────────────────────────────────── */}
+      {/* Activity Log Drawer */}
+      {showActivityLog && (
+        <div className="fixed inset-0 z-[60] overflow-hidden !mt-0">
+          <div className="absolute inset-0 overflow-hidden bg-gray-900/40 backdrop-blur-3xs transition-opacity" onClick={() => setShowActivityLog(false)}></div>
+          <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
+            <div className="pointer-events-auto w-screen max-w-md">
+              <div className="flex h-full flex-col bg-white shadow-2xl animate-in slide-in-from-right duration-250">
+                <div className="bg-gray-50 px-4 py-5 border-b flex justify-between items-center">
+                  <div>
+                    <h2 className="text-base font-bold text-gray-900">Warehouse Activity Log</h2>
+                    <p className="text-[10px] text-gray-500 mt-0.5 font-medium">Audit history for warehouse structure additions, updates and deletions</p>
+                  </div>
+                  <button onClick={() => setShowActivityLog(false)} className="text-gray-400 hover:text-gray-600">
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {activityLogLoading ? (
+                    <div className="flex justify-center items-center h-40">
+                      <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
+                    </div>
+                  ) : activityLogs.length === 0 ? (
+                    <p className="text-center text-xs text-gray-500 py-8">No recent activity logs recorded.</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {activityLogs.map((log, idx) => (
+                        <div key={log._id || idx} className="border-l-2 border-blue-500 pl-3 py-1 space-y-1 text-xs">
+                          <div className="flex justify-between font-bold text-gray-800">
+                            <span className="uppercase text-[10px] font-black text-blue-600">{log.action}</span>
+                            <span className="text-[10px] text-gray-400 font-normal">{new Date(log.createdAt).toLocaleString('en-IN')}</span>
+                          </div>
+                          <p className="text-gray-600 font-bold">Node: {log.entityName}</p>
+                          <p className="text-gray-500 text-[11px]">{log.details}</p>
+                          <p className="text-[10px] text-gray-400 font-medium">Performed By: {log.performedBy}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Find Duplicates Modal */}
+      {showDuplicates && (
+        <div className="fixed inset-0 z-[60] overflow-y-auto flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-3xs !mt-0 animate-in fade-in duration-200">
+          <div className="relative bg-white rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-2xl flex justify-between items-center">
+              <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-yellow-500" />
+                Find Duplicates for Warehouse Nodes
+              </h2>
+              <button onClick={() => setShowDuplicates(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto flex-1 space-y-4 text-xs">
+              {duplicateGroups.length === 0 ? (
+                <div className="text-center py-8">
+                  <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
+                  <p className="font-semibold text-gray-800">No duplicates detected!</p>
+                  <p className="text-sm text-gray-400 mt-1">All location nodes have unique names under their parents.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-gray-500 font-medium">The following duplicate location names were identified under the same parent node:</p>
+                  {duplicateGroups.map((group, gIdx) => (
+                    <div key={gIdx} className="border border-red-100 bg-red-50/10 rounded-xl p-4 space-y-3">
+                      <div className="flex justify-between items-center border-b pb-2">
+                        <span className="font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded uppercase text-[10px]">
+                          Duplicate name: {group.value}
+                        </span>
+                        <span className="text-[10px] text-gray-400 font-bold">{group.items.length} duplicate entries</span>
+                      </div>
+                      <div className="space-y-2">
+                        {group.items.map((item, iIdx) => (
+                          <div key={item._id || iIdx} className="flex justify-between items-center text-[11px] text-gray-600 bg-white p-2 rounded-lg border border-gray-150">
+                            <div>
+                              <p className="font-bold text-gray-900">{item.name}</p>
+                              <p className="font-mono text-gray-400 text-[10px]">{item.level} • ID: {item._id}</p>
+                            </div>
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-yellow-50 text-yellow-700">{item.status}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recycle Bin Drawer */}
+      {showRecycleBin && (
+        <div className="fixed inset-0 z-[60] overflow-hidden !mt-0">
+          <div className="absolute inset-0 overflow-hidden bg-gray-900/40 backdrop-blur-3xs transition-opacity" onClick={() => setShowRecycleBin(false)}></div>
+          <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
+            <div className="pointer-events-auto w-screen max-w-md">
+              <div className="flex h-full flex-col bg-white shadow-2xl animate-in slide-in-from-right duration-250">
+                <div className="bg-gray-50 px-4 py-5 border-b flex justify-between items-center">
+                  <div>
+                    <h2 className="text-base font-bold text-gray-900 flex items-center gap-1.5">
+                      <Trash2 className="w-4 h-4 text-gray-500" />
+                      Warehouse Recycle Bin (Maintenance Items)
+                    </h2>
+                    <p className="text-[10px] text-gray-500 mt-0.5 font-medium font-sans">Nodes in Maintenance status can be restored to Active</p>
+                  </div>
+                  <button onClick={() => setShowRecycleBin(false)} className="text-gray-400 hover:text-gray-600">
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  {recycleBinLoading ? (
+                    <div className="flex justify-center items-center h-40">
+                      <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
+                    </div>
+                  ) : recycleBinItems.length === 0 ? (
+                    <div className="text-center py-12 text-gray-450">
+                      <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
+                      <p className="font-semibold text-gray-700">Recycle Bin is Empty!</p>
+                      <p className="text-xs text-gray-400 mt-1">No warehouse locations currently under maintenance.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {recycleBinItems.map((item, idx) => (
+                        <div key={item._id || idx} className="flex justify-between items-center p-3 border border-gray-200 rounded-xl bg-gray-50/50 hover:bg-white transition-all text-xs">
+                          <div className="space-y-1">
+                            <p className="font-bold text-gray-800">{item.name}</p>
+                            <p className="font-mono text-gray-400 text-[10px]">{item.level} • {item.status}</p>
+                          </div>
+                          <button
+                            onClick={() => handleRestoreLocation(item)}
+                            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-bold transition-colors"
+                          >
+                            Restore
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

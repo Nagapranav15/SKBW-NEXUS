@@ -48,7 +48,7 @@ const StorageLocationDetailsV2: React.FC<StorageLocationDetailsV2Props> = ({
       );
     }
     return (
-      <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
+      <div className="fixed inset-0 z-[60] overflow-hidden flex justify-end !mt-0">
         <div className="fixed inset-0 bg-black/40 backdrop-blur-3xs" onClick={onClose} />
         <div className="relative w-full max-w-lg bg-white shadow-2xl h-full flex items-center justify-center z-10">
           <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -185,7 +185,7 @@ const StorageLocationDetailsV2: React.FC<StorageLocationDetailsV2Props> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
+    <div className="fixed inset-0 z-[60] overflow-hidden flex justify-end !mt-0">
       {/* Overlay */}
       <div className="fixed inset-0 bg-black/40 backdrop-blur-3xs" onClick={onClose} />
 
