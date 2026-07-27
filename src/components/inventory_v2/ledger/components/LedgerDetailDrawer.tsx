@@ -280,7 +280,7 @@ const LedgerDetailDrawer: React.FC<LedgerDetailDrawerProps> = ({ entry, companyI
           {/* Reference Info */}
           <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
-              <FileText className="w-3.5 h-3.5 text-blue-600" /> Reference documents
+              <FileText className="w-3.5 h-3.5 text-blue-600" /> Reference Information
             </h3>
             <div className="grid grid-cols-2 gap-y-3.5 gap-x-4 text-xs text-gray-900">
               <div>

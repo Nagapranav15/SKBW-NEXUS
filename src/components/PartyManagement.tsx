@@ -319,25 +319,32 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
   className = ""
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState(value);
+  const [search, setSearch] = useState(() => {
+    const opt = options.find(o => o.value === value);
+    return opt ? opt.label : value;
+  });
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setSearch(value);
-  }, [value]);
+    const opt = options.find(o => o.value === value);
+    setSearch(opt ? opt.label : value);
+  }, [value, options]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
-        if (search !== value) {
-          onChange(search);
+        const trimmed = search.trim();
+        const match = options.find(o => o.label.toLowerCase() === trimmed.toLowerCase());
+        const finalVal = match ? match.value : trimmed;
+        if (finalVal !== value) {
+          onChange(finalVal);
         }
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [search, value, onChange]);
+  }, [search, value, onChange, options]);
 
   const filteredOptions = options.filter(opt =>
     (opt.label || "").toLowerCase().includes(search.toLowerCase())
@@ -351,7 +358,6 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
-            onChange(e.target.value);
             setIsOpen(true);
           }}
           onFocus={() => setIsOpen(true)}
@@ -377,7 +383,8 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
           onClick={() => {
             setIsOpen(!isOpen);
             if (!isOpen) {
-              setSearch(value);
+              const opt = options.find(o => o.value === value);
+              setSearch(opt ? opt.label : value);
             }
           }}
           className="absolute right-2 text-gray-400 cursor-pointer focus:outline-none flex items-center justify-center p-1 hover:text-gray-650"

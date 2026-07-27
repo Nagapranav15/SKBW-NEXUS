@@ -108,12 +108,6 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
                           <Eye className="w-3.5 h-3.5" />
                         </button>
                         <button
-                          className="p-1.5 text-gray-500 hover:bg-gray-50 rounded-lg transition-colors border border-gray-200 shadow-3xs"
-                          title="View Invoice Document"
-                        >
-                          <FileText className="w-3.5 h-3.5" />
-                        </button>
-                        <button
                           onClick={() => onDeleteInvoice(inv)}
                           className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-100/50 shadow-3xs"
                           title="Delete Purchase Batch"

@@ -277,7 +277,7 @@ const SettingsPage: React.FC = () => {
                   </button>
                   <button
                     onClick={() => handleDeleteItem('category', cat)}
-                    className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                    className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                     title="Delete category"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -323,7 +323,7 @@ const SettingsPage: React.FC = () => {
                 <span className="truncate pr-2">{g}</span>
                 <button
                   onClick={() => handleDeleteItem('group', g)}
-                  className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                  className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                   title="Delete stock group"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -368,7 +368,7 @@ const SettingsPage: React.FC = () => {
                 <span className="truncate pr-2">{b}</span>
                 <button
                   onClick={() => handleDeleteItem('brand', b)}
-                  className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                  className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                   title="Delete brand"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -413,7 +413,7 @@ const SettingsPage: React.FC = () => {
                 <span>{unit}</span>
                 <button
                   onClick={() => handleDeleteItem('unit', unit)}
-                  className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                  className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                   title="Delete unit"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -458,7 +458,7 @@ const SettingsPage: React.FC = () => {
                 <span>{rule}</span>
                 <button
                   onClick={() => handleDeleteItem('ruleType', rule)}
-                  className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                  className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                   title="Delete rule type"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
