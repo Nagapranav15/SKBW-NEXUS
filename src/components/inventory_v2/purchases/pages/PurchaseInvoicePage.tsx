@@ -1669,14 +1669,13 @@ const PurchaseInvoicePage: React.FC = () => {
 
       {/* ── LOCATION ALLOCATION MODAL DIALOG ──────────────────────────────────── */}
       {showAllocateModal && selectedInvoice && (() => {
-        // Find default location
-        const defaultLocationId = selectedInvoice.items?.[0] 
-          ? (typeof selectedInvoice.items[0].locationId === 'object' && selectedInvoice.items[0].locationId !== null 
-             ? (selectedInvoice.items[0].locationId as any)._id 
-             : selectedInvoice.items[0].locationId)
+        const lotItem = selectedInvoice.items[allocateForm.itemIndex];
+        const defaultLocationId = lotItem 
+          ? (typeof lotItem.locationId === 'object' && lotItem.locationId !== null 
+             ? (lotItem.locationId as any)._id 
+             : lotItem.locationId)
           : '';
 
-        const lotItem = selectedInvoice.items[allocateForm.itemIndex];
         const selectedSkuId = lotItem ? (typeof lotItem.skuId === 'object' && lotItem.skuId !== null ? (lotItem.skuId as any)._id : lotItem.skuId) : '';
         
         // Find remaining unallocated quantity at default location

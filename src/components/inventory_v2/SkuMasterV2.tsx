@@ -14,6 +14,7 @@ const SkuMasterV2: React.FC = () => {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
   
   // Tools states
   const [showToolsDropdown, setShowToolsDropdown] = useState(false);
@@ -167,32 +168,48 @@ const SkuMasterV2: React.FC = () => {
   const [importSuccessMsg, setImportSuccessMsg] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Debounce search input
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [search]);
+
+  // Load when company or filters change (with loader spinner)
   useEffect(() => {
     if (selectedCompany?._id) {
-      loadSkus();
+      loadSkus(true);
     }
   }, [selectedCompany?._id, categoryFilter, statusFilter]);
 
-  const loadSkus = async () => {
-    setLoading(true);
+  // Load when search changes (without spinner for smooth typing)
+  useEffect(() => {
+    if (selectedCompany?._id) {
+      loadSkus(false);
+    }
+  }, [debouncedSearch]);
+
+  const loadSkus = async (showSpinner = true) => {
+    if (showSpinner) setLoading(true);
     try {
       const data = await getSkusV2(
         selectedCompany?._id || '', 
         categoryFilter || undefined, 
-        search || undefined,
+        debouncedSearch || undefined,
         statusFilter || undefined
       );
       setSkus(data);
     } catch (e) {
       console.error(e);
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    loadSkus();
+    loadSkus(true);
   };
 
   const handleExport = () => {
@@ -317,9 +334,24 @@ const SkuMasterV2: React.FC = () => {
   // Local unit filter
   const [unitFilter, setUnitFilter] = useState('');
 
-  // Local filtering
+  // Local filtering (instant client-side search)
   const filteredSkus = skus.filter(s => {
     if (unitFilter && s.unit !== unitFilter) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      const matchText = (s.skuCode || '').toLowerCase().includes(q) ||
+                        (s.name || '').toLowerCase().includes(q) ||
+                        (s.brand || '').toLowerCase().includes(q) ||
+                        (s.category || '').toLowerCase().includes(q) ||
+                        (s.group || '').toLowerCase().includes(q) ||
+                        (s.ruleType || '').toLowerCase().includes(q) ||
+                        (s.paperType || '').toLowerCase().includes(q);
+      const parsedNum = Number(q);
+      const matchNum = !isNaN(parsedNum) && (
+        s.gsm === parsedNum || s.pages === parsedNum
+      );
+      return matchText || matchNum;
+    }
     return true;
   });
 

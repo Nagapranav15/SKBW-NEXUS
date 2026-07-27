@@ -32,11 +32,21 @@ exports.getSkus = async (req, res, next) => {
       query.status = status;
     }
     if (search) {
+      const regexSearch = { $regex: search, $options: "i" };
       query.$or = [
-        { skuCode: { $regex: search, $options: "i" } },
-        { name: { $regex: search, $options: "i" } },
-        { brand: { $regex: search, $options: "i" } }
+        { skuCode: regexSearch },
+        { name: regexSearch },
+        { brand: regexSearch },
+        { category: regexSearch },
+        { group: regexSearch },
+        { ruleType: regexSearch },
+        { paperType: regexSearch }
       ];
+      const parsedNum = Number(search);
+      if (!isNaN(parsedNum)) {
+        query.$or.push({ gsm: parsedNum });
+        query.$or.push({ pages: parsedNum });
+      }
     }
 
     const skus = await SkuV2.find(query).sort({ createdAt: -1 });
