@@ -87,33 +87,16 @@ const StorageLocationDetailsV2: React.FC<StorageLocationDetailsV2Props> = ({
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-white text-gray-950">
-        {/* Radial / Progress Capacity Widget */}
+        {/* Occupied Stock Summary Widget */}
         <div className="bg-gray-50/50 p-4 border border-gray-200 rounded-xl">
-          <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1">
+          <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1">
             <BarChart2 className="w-3.5 h-3.5 text-blue-600" />
-            Location Capacity Usage
+            Stock Occupancy Summary
           </h3>
-          <div className="flex items-center gap-6">
-            {/* Radial Progress Graphic */}
-            <div className="relative flex items-center justify-center shrink-0">
-              <svg className="w-20 h-20 transform -rotate-90">
-                <circle cx="40" cy="40" r="32" stroke="#E5E7EB" strokeWidth="6" fill="transparent" />
-                <circle cx="40" cy="40" r="32" stroke="#10B981" strokeWidth="6" fill="transparent"
-                  strokeDasharray={2 * Math.PI * 32}
-                  strokeDashoffset={2 * Math.PI * 32 * (1 - occupiedPercent / 100)}
-                  strokeLinecap="round"
-                  className="transition-all duration-500"
-                />
-              </svg>
-              <span className="absolute text-sm font-black text-emerald-700">{occupiedPercent}%</span>
-            </div>
-            <div className="space-y-1.5 text-xs text-gray-700">
-              <p className="text-gray-500">Current Occupied: <span className="font-bold text-gray-900">{totalQty.toLocaleString()} {location.unit || 'kg'}</span></p>
-              <p className="text-gray-500">Total Capacity: <span className="font-bold text-gray-900">{location.capacity || 'Unlimited'} {location.unit || 'kg'}</span></p>
-              <p className="text-gray-500">Available Space: <span className="font-bold text-gray-900">
-                {location.capacity ? `${(location.capacity - totalQty).toLocaleString()} ${location.unit}` : 'Unlimited'}
-              </span></p>
-            </div>
+          <div className="text-xs text-gray-700">
+            <p className="text-gray-550 font-semibold">
+              Current Stored Quantity: <span className="font-black text-gray-950 text-sm ml-1">{totalQty.toLocaleString()} {location.unit || 'kg'}</span>
+            </p>
           </div>
         </div>
 

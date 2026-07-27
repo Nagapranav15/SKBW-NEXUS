@@ -645,7 +645,6 @@ const WarehouseStructureV2: React.FC = () => {
                       <thead>
                         <tr className="bg-gray-50 text-gray-500 font-bold border-b border-gray-200 text-[9px] uppercase">
                           <th className="px-4 py-2.5">Name</th>
-                          {selectedNode.level === 'Zone' && <th className="px-4 py-2.5 text-right">Max Capacity</th>}
                           {selectedNode.level === 'Zone' && <th className="px-4 py-2.5 text-center">Status</th>}
                           <th className="px-4 py-2.5 text-center">Actions</th>
                         </tr>
@@ -661,11 +660,6 @@ const WarehouseStructureV2: React.FC = () => {
                                 <span>{child.name}</span>
                               </div>
                             </td>
-                            {selectedNode.level === 'Zone' && (
-                              <td className="px-4 py-3 text-right font-semibold text-gray-700 font-mono">
-                                {child.capacity ? `${child.capacity.toLocaleString()} ${child.unit || 'kg'}` : 'Unlimited'}
-                              </td>
-                            )}
                             {selectedNode.level === 'Zone' && (
                               <td className="px-4 py-3 text-center">
                                 <span className={`text-[9px] px-1.5 py-0.5 rounded font-extrabold uppercase ${
@@ -865,30 +859,6 @@ const WarehouseStructureV2: React.FC = () => {
                 )}
               </div>
 
-              {addForm.level === 'Storage Location' && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-600 mb-1.5 uppercase">Max Capacity</label>
-                    <input
-                      type="number"
-                      placeholder="e.g. 5000"
-                      value={addForm.capacity}
-                      onChange={e => setAddForm({ ...addForm, capacity: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-600 mb-1.5 uppercase">Capacity Unit</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. kg / Pcs / Sheets"
-                      value={addForm.unit}
-                      onChange={e => setAddForm({ ...addForm, unit: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 font-semibold"
-                    />
-                  </div>
-                </div>
-              )}
 
               <div className="pt-4 border-t border-gray-100 flex justify-end gap-2.5 text-xs">
                 <button
