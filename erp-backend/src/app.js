@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const compression = require("compression");
 const errorMiddleware = require("./middlewares/errorMiddleware");
 
 const authRoutes = require("./routes/authRoutes");
@@ -22,6 +23,8 @@ const activityLogRoutes = require("./routes/activityLogRoutes");
 const dataManagerRoutes = require("./routes/dataManagerRoutes");
 
 const app = express();
+
+app.use(compression());
 
 // Allowed origins: custom domain + Vercel previews + local dev
 const allowedOrigins = [
