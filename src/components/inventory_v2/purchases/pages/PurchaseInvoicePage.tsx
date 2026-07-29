@@ -733,13 +733,13 @@ const PurchaseInvoicePage: React.FC = () => {
         {/* ── SUB-PAGE 3: MAIN LIST VIEW ──────────────────────────────────────── */}
         <div className="space-y-6">
           <div className="mb-4">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
                   <Coins className="w-6 h-6 text-blue-600" />
                   Purchase Batches
                 </h1>
-                <p className="text-sm text-gray-505 mt-1">All purchase batches (each batch may contain multiple materials/lot lines)</p>
+                <p className="text-sm text-gray-500 mt-1">All purchase batches (each batch may contain multiple materials/lot lines)</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -847,7 +847,7 @@ const PurchaseInvoicePage: React.FC = () => {
 
           {/* Table section */}
           <div className="space-y-4">
-            <div className="bg-white rounded-xl border border-gray-100 shadow-xs p-3 flex flex-col md:flex-row items-center justify-between gap-3">
+            <div className="bg-white rounded-xl border border-gray-100 shadow-xs p-3 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
               <form onSubmit={handleSearchSubmit} className="flex-1 w-full relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
@@ -1558,7 +1558,7 @@ const PurchaseInvoicePage: React.FC = () => {
                           <th className="px-3 py-2.5 text-right">Amount (₹)</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-55 text-gray-700 font-medium">
+                      <tbody className="divide-y divide-gray-100 text-gray-700 font-medium">
                         {selectedInvoice.items?.map((item, idx) => {
                           const skuName = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any).name : 'Raw Material';
                           const brand = (item.skuId as any)?.brand || 'BILT';
@@ -1666,7 +1666,7 @@ const PurchaseInvoicePage: React.FC = () => {
                           {selectedInvoice.createdAt ? new Date(selectedInvoice.createdAt).toLocaleString('en-IN') : '—'}
                         </span>
                       </div>
-                      <p className="text-gray-550 font-medium">Batch recorded successfully in supplier inward ledger.</p>
+                      <p className="text-gray-500 font-medium">Batch recorded successfully in supplier inward ledger.</p>
                       <p className="text-[10px] text-gray-400 font-medium">Performed By: System Admin</p>
                     </div>
                   </div>
