@@ -3432,7 +3432,7 @@ const PartyManagement: React.FC = () => {
                               <td key={col} className="px-3.5 py-2 whitespace-nowrap text-[13.5px] font-medium text-gray-700">
                                 {col === 'firmName' ? (
                                   <div className="flex flex-col">
-                                    <span className="font-semibold text-gray-955">{item.firmName || '-'}</span>
+                                    <span className="font-bold text-gray-955">{item.firmName || '-'}</span>
                                     {(currentType === 'customer' || currentType === 'vendor') && item.ownerName && (
                                       <span className="text-xs text-gray-455 font-normal mt-0.5">{item.ownerName}</span>
                                     )}

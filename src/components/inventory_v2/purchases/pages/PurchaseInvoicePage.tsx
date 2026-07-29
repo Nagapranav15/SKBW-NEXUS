@@ -730,127 +730,123 @@ const PurchaseInvoicePage: React.FC = () => {
     <div className="space-y-6">
       {/* Main Content Layout */}
       <div className={`transition-all duration-300 ${activeSubPage === 'new' || (activeSubPage === 'details' && selectedInvoice) ? 'lg:mr-[640px]' : ''}`}>
-        {/* ── SUB-PAGE 3: MAIN LIST VIEW ──────────────────────────────────────── */}
-        <div className="space-y-6">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
-            <div>
-              <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
-                <Coins className="w-5 h-5 text-blue-600" />
-                Purchase Batches
-              </h1>
-              <p className="text-xs text-gray-500 mt-0.5 font-medium">All purchase batches (each batch may contain multiple materials/lot lines)</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={handleExportExcel}
-                className="flex items-center gap-1.5 px-4 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 bg-white rounded-xl text-xs font-semibold shadow-sm transition-all"
-              >
-                <Download className="w-3.5 h-3.5" /> Import from Excel
-              </button>
-
-              {/* Tools dropdown */}
-              <div className="relative" ref={toolsDropdownRef}>
+        {/* ── SUB-PAGE 3: MAIN LIST VIEW ───────────────────          {/* Header */}
+          <div className="mb-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+                  <Coins className="w-6 h-6 text-blue-600" />
+                  Purchase Batches
+                </h1>
+                <p className="text-sm text-gray-505 mt-1">All purchase batches (each batch may contain multiple materials/lot lines)</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
                 <button
-                  onClick={() => setShowToolsDropdown(!showToolsDropdown)}
-                  className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 bg-white rounded-xl text-xs font-bold shadow-3xs transition-colors cursor-pointer"
+                  onClick={handleExportExcel}
+                  className="flex items-center space-x-2 px-4 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium text-sm shadow-xs cursor-pointer animate-fade-in"
                 >
-                  <Settings className="w-3.5 h-3.5 text-gray-500" />
-                  <span>Tools</span>
-                  <ChevronDown className="w-3 h-3 text-gray-400" />
+                  <Download className="w-4 h-4" /> <span>Import from Excel</span>
                 </button>
 
-                {showToolsDropdown && (
-                  <div className="absolute right-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50 divide-y divide-gray-100 animate-in fade-in duration-100 slide-in-from-top-1">
-                    <div className="py-1">
-                      <button
-                        onClick={() => { fetchActivityLogs(); setShowActivityLog(true); setShowToolsDropdown(false); }}
-                        className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-xs text-gray-700 hover:bg-gray-50 transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-gray-400" />
-                          <span>Activity Log</span>
-                        </div>
-                      </button>
-                      <button
-                        onClick={() => { findPurchaseDuplicates(); setShowDuplicates(true); setShowToolsDropdown(false); }}
-                        className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-xs text-gray-700 hover:bg-gray-50 transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          <AlertTriangle className="w-4 h-4 text-gray-400" />
-                          <span>Find Duplicates</span>
-                        </div>
-                      </button>
-                      <button
-                        onClick={() => { fetchRecycleBin(); setShowRecycleBin(true); setShowToolsDropdown(false); }}
-                        className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-xs text-gray-700 hover:bg-gray-50 transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Trash2 className="w-4 h-4 text-gray-400" />
-                          <span>Recycle Bin</span>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+                {/* Tools dropdown */}
+                <div className="relative" ref={toolsDropdownRef}>
+                  <button
+                    onClick={() => setShowToolsDropdown(!showToolsDropdown)}
+                    className="flex items-center space-x-2 px-4 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium text-sm shadow-xs cursor-pointer"
+                  >
+                    <Settings className="w-4 h-4 text-gray-500" />
+                    <span>Tools</span>
+                    <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                  </button>
 
-              <button
-                onClick={handleNewPurchaseClick}
-                className="flex items-center gap-1.5 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black shadow-md transition-all"
-              >
-                <Plus className="w-3.5 h-3.5" /> + New Purchase
-              </button>
+                  {showToolsDropdown && (
+                    <div className="absolute right-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50 divide-y divide-gray-100 animate-in fade-in duration-100 slide-in-from-top-1">
+                      <div className="py-1">
+                        <button
+                          onClick={() => { fetchActivityLogs(); setShowActivityLog(true); setShowToolsDropdown(false); }}
+                          className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-gray-400" />
+                            <span>Activity Log</span>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => { findPurchaseDuplicates(); setShowDuplicates(true); setShowToolsDropdown(false); }}
+                          className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4 text-gray-400" />
+                            <span>Find Duplicates</span>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => { fetchRecycleBin(); setShowRecycleBin(true); setShowToolsDropdown(false); }}
+                          className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Trash2 className="w-4 h-4 text-gray-400" />
+                            <span>Recycle Bin</span>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={handleNewPurchaseClick}
+                  className="flex items-center space-x-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-semibold text-sm shadow-xs"
+                >
+                  <Plus className="w-4 h-4" /> <span>+ New Purchase</span>
+                </button>
+              </div>
             </div>
           </div>
 
           {/* Statistics row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
-              <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
-                <FileText className="w-6 h-6 animate-pulse-slow" />
+            <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-xs border-l-4 border-l-blue-500 hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center gap-4">
+              <div className="p-2.5 bg-blue-50 text-blue-600 rounded-lg">
+                <FileText className="w-5 h-5" />
               </div>
               <div>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Batches</span>
-                <span className="text-xl font-black text-gray-900 block font-mono mt-0.5">{dashboardTotalBatches}</span>
-                <span className="text-[9px] text-gray-500 block font-bold uppercase mt-0.5">This Month</span>
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Total Batches</span>
+                <span className="text-2xl font-bold text-gray-900 block mt-0.5 font-mono">{dashboardTotalBatches}</span>
               </div>
             </div>
-            <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
-              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
-                <Layers className="w-6 h-6" />
+            <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-xs border-l-4 border-l-emerald-500 hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center gap-4">
+              <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg">
+                <Layers className="w-5 h-5" />
               </div>
               <div>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Quantity</span>
-                <span className="text-xl font-black text-emerald-700 block font-mono mt-0.5">{dashboardTotalWeight.toLocaleString('en-IN')} KG</span>
-                <span className="text-[9px] text-gray-500 block font-bold uppercase mt-0.5">This Month</span>
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Total Quantity</span>
+                <span className="text-2xl font-bold text-gray-900 block mt-0.5 font-mono">{dashboardTotalWeight.toLocaleString('en-IN')} KG</span>
               </div>
             </div>
-            <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
-              <div className="p-3 bg-orange-50 text-orange-600 rounded-2xl">
-                <IndianRupee className="w-6 h-6" />
+            <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-xs border-l-4 border-l-orange-500 hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center gap-4">
+              <div className="p-2.5 bg-orange-50 text-orange-600 rounded-lg">
+                <IndianRupee className="w-5 h-5" />
               </div>
               <div>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Value</span>
-                <span className="text-xl font-black text-orange-700 block font-mono mt-0.5">₹{dashboardTotalValue.toLocaleString('en-IN')}</span>
-                <span className="text-[9px] text-gray-500 block font-bold uppercase mt-0.5">This Month</span>
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Total Value</span>
+                <span className="text-2xl font-bold text-gray-900 block mt-0.5 font-mono">₹{dashboardTotalValue.toLocaleString('en-IN')}</span>
               </div>
             </div>
-            <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
-              <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl">
-                <Calendar className="w-6 h-6" />
+            <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-xs border-l-4 border-l-purple-500 hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center gap-4">
+              <div className="p-2.5 bg-purple-50 text-purple-600 rounded-lg">
+                <Calendar className="w-5 h-5" />
               </div>
               <div>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Pending Receipts</span>
-                <span className="text-xl font-black text-purple-700 block font-mono mt-0.5">{dashboardPendingReceipts}</span>
-                <span className="text-[9px] text-gray-500 block font-bold uppercase mt-0.5">This Month</span>
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Pending Receipts</span>
+                <span className="text-2xl font-bold text-gray-900 block mt-0.5 font-mono">{dashboardPendingReceipts}</span>
               </div>
             </div>
           </div>
 
           {/* Table section */}
           <div className="space-y-4">
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="bg-white rounded-xl border border-gray-100 shadow-xs p-3 flex flex-col md:flex-row items-center justify-between gap-3">
               <form onSubmit={handleSearchSubmit} className="flex-1 w-full relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
@@ -858,14 +854,14 @@ const PurchaseInvoicePage: React.FC = () => {
                   placeholder="Search by Batch No, Supplier, Material..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50/50 focus:bg-white transition-all text-gray-950 font-medium"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 focus:bg-white transition-colors text-gray-950 font-medium"
                 />
               </form>
               <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                 <select
                   value={vendorFilter}
                   onChange={e => { setVendorFilter(e.target.value); setPage(1); }}
-                  className="w-full sm:w-40 px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-700 font-bold"
+                  className="w-full sm:w-44 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white text-gray-700 font-semibold cursor-pointer"
                 >
                   <option value="">All Suppliers</option>
                   {vendors.map(v => (
@@ -873,19 +869,19 @@ const PurchaseInvoicePage: React.FC = () => {
                   ))}
                 </select>
 
-                <div className="flex items-center gap-1.5 border border-gray-200 rounded-xl p-1 bg-white font-mono font-bold">
+                <div className="flex items-center gap-1.5 border border-gray-200 rounded-lg p-1.5 bg-white text-sm font-semibold">
                   <input
                     type="date"
                     value={startDate}
                     onChange={e => setStartDate(e.target.value)}
-                    className="text-xs border-0 bg-transparent focus:ring-0 p-1 text-gray-700 w-28 font-mono font-bold"
+                    className="text-xs border-0 bg-transparent focus:ring-0 p-0 text-gray-700 w-24 font-mono font-bold"
                   />
                   <span className="text-gray-400 font-bold text-xs">-</span>
                   <input
                     type="date"
                     value={endDate}
                     onChange={e => setEndDate(e.target.value)}
-                    className="text-xs border-0 bg-transparent focus:ring-0 p-1 text-gray-700 w-28 font-mono font-bold"
+                    className="text-xs border-0 bg-transparent focus:ring-0 p-0 text-gray-700 w-24 font-mono font-bold"
                   />
                 </div>
 

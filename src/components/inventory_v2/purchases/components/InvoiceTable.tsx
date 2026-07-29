@@ -19,28 +19,28 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
 }) => {
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64 bg-white rounded-2xl border border-gray-200 shadow-sm">
+      <div className="flex items-center justify-center h-64 bg-white rounded-xl border border-gray-100 shadow-xs">
         <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-xl border border-gray-100 shadow-xs overflow-hidden">
       {invoices.length > 0 ? (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-gray-50/50 text-gray-400 uppercase font-black border-b border-gray-150 text-[10px] tracking-wider">
-                <th className="px-6 py-4">Batch No.</th>
-                <th className="px-6 py-4">Date</th>
-                <th className="px-6 py-4">Supplier</th>
-                <th className="px-6 py-4">Material Lots</th>
-                <th className="px-6 py-4">Total Reels</th>
-                <th className="px-6 py-4">Total KG</th>
-                <th className="px-6 py-4">Total Value</th>
-                <th className="px-6 py-4 text-center">Status</th>
-                <th className="px-6 py-4 text-center">Actions</th>
+              <tr className="bg-gray-55/70 text-gray-400 uppercase font-bold border-b border-gray-100 text-[11px] tracking-wider select-none">
+                <th className="px-4 py-2.5">Batch No.</th>
+                <th className="px-4 py-2.5">Date</th>
+                <th className="px-4 py-2.5">Supplier</th>
+                <th className="px-4 py-2.5">Material Lots</th>
+                <th className="px-4 py-2.5 text-center">Total Reels</th>
+                <th className="px-4 py-2.5">Total KG</th>
+                <th className="px-4 py-2.5">Total Value</th>
+                <th className="px-4 py-2.5 text-center">Status</th>
+                <th className="px-4 py-2.5 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-gray-700 font-medium">
@@ -72,33 +72,33 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
                 return (
                   <tr 
                     key={inv._id} 
-                    className="hover:bg-gray-50/40 transition-colors cursor-pointer border-b border-gray-100" 
+                    className="hover:bg-gray-50 border-b border-gray-100/60 transition-colors cursor-pointer text-gray-700" 
                     onClick={() => onViewDetails(inv)}
                   >
-                    <td className="px-6 py-4 font-black font-mono text-blue-600 text-xs">{inv.invoiceNumber}</td>
-                    <td className="px-6 py-4 text-gray-500 font-semibold">
+                    <td className="px-4 py-2.5 font-bold font-mono text-blue-600 text-[13px]">{inv.invoiceNumber}</td>
+                    <td className="px-4 py-2.5 text-gray-500 font-semibold text-[13.5px]">
                       {inv.createdAt ? new Date(inv.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                     </td>
-                    <td className="px-6 py-4 font-bold text-gray-800">{supplierName}</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-100">
+                    <td className="px-4 py-2.5 font-bold text-gray-900 text-[13.5px]">{supplierName}</td>
+                    <td className="px-4 py-2.5">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">
                         {lotsLabel}
                       </span>
                     </td>
-                    <td className="px-6 py-4 font-mono font-bold text-gray-900 text-center">{totalReels || '—'}</td>
-                    <td className="px-6 py-4 font-mono font-black text-gray-900">
+                    <td className="px-4 py-2.5 font-mono font-semibold text-gray-900 text-[13px] text-center">{totalReels || '—'}</td>
+                    <td className="px-4 py-2.5 font-mono font-bold text-gray-900 text-[13px]">
                       {totalQty.toLocaleString('en-IN')}{' '}
-                      <span className="text-[9px] text-gray-400 font-bold uppercase">{unit}</span>
+                      <span className="text-[10px] text-gray-400 font-semibold uppercase">{unit}</span>
                     </td>
-                    <td className="px-6 py-4 font-mono font-black text-gray-900">
+                    <td className="px-4 py-2.5 font-mono font-bold text-gray-900 text-[13px]">
                       ₹{(inv.subTotal || 0).toLocaleString('en-IN')}
                     </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className={`text-[9px] px-2 py-0.5 rounded font-black uppercase border ${statusColor}`}>
+                    <td className="px-4 py-2.5 text-center">
+                      <span className={`text-[9px] px-2 py-0.5 rounded font-bold uppercase border ${statusColor}`}>
                         {inv.status === 'Posted' ? 'Received' : inv.status === 'Draft' ? 'Draft' : 'Cancelled'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-4 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-center gap-2">
                         <button
                           onClick={() => onViewDetails(inv)}
@@ -123,7 +123,7 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
           </table>
         </div>
       ) : (
-        <div className="text-center py-16 text-gray-400">
+        <div className="text-center py-16 text-gray-450 bg-white">
           <FileText className="w-12 h-12 text-gray-200 mx-auto mb-3" />
           <p className="text-sm font-semibold">No purchase batches registered yet</p>
           <p className="text-xs text-gray-500 mt-1">Click the "+ New Purchase" button to procure materials.</p>
