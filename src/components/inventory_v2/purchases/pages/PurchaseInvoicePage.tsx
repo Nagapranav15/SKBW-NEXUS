@@ -727,7 +727,7 @@ const PurchaseInvoicePage: React.FC = () => {
   const dashboardPendingReceipts = invoices.filter(inv => inv.status === 'Draft').length;
 
   return (
-    <div className="space-y-6">
+    <div className="p-4 space-y-6">
       {/* Main Content Layout */}
       <div className={`transition-all duration-300 ${activeSubPage === 'new' || (activeSubPage === 'details' && selectedInvoice) ? 'lg:mr-[640px]' : ''}`}>
         {/* ── SUB-PAGE 3: MAIN LIST VIEW ──────────────────────────────────────── */}
