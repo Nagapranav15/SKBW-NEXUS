@@ -337,7 +337,7 @@ const PurchaseInvoicePage: React.FC = () => {
       ...invoiceForm,
       items: [
         ...invoiceForm.items,
-        { skuId: '', brand: '', gsm: '', width: '', reelsCount: '', quantity: '', purchasePrice: '', lotNumber: '', reels: [] as any[] }
+        { skuId: '', brand: '', gsm: '', width: '', length: '', reelsCount: '', quantity: '', purchasePrice: '', lotNumber: '', reels: [] as any[] }
       ]
     });
   };
@@ -361,6 +361,13 @@ const PurchaseInvoicePage: React.FC = () => {
         item.brand = selectedSku.brand || '';
         item.gsm = String(selectedSku.gsm || '');
         item.width = String(selectedSku.width || '');
+        item.length = String(selectedSku.length || '');
+        
+        // Reset Reels if not Reels format
+        if (selectedSku.paperType !== 'Reels') {
+          item.reelsCount = '';
+          item.reels = [];
+        }
       }
     }
 
@@ -486,11 +493,12 @@ const PurchaseInvoicePage: React.FC = () => {
         }
       } else {
         // Non-reels lot
+        const selectedSku = skus.find(s => s._id === item.skuId);
         const destLocId = item.locationId || firstStorage._id || '';
         validatedItems.push({
           skuId: item.skuId,
           quantity: qty,
-          unit: 'kg',
+          unit: selectedSku?.unit || 'kg',
           purchasePrice: price,
           totalPrice: qty * price,
           lotNumber: item.lotNumber || `${finalInvoiceNumber}-L0${i + 1}`,
@@ -583,6 +591,7 @@ const PurchaseInvoicePage: React.FC = () => {
           brand: selectedSku?.brand || '',
           gsm: selectedSku?.gsm ? String(selectedSku.gsm) : '',
           width: selectedSku?.width ? String(selectedSku.width) : '',
+          length: selectedSku?.length ? String(selectedSku.length) : '',
           reelsCount: String(item.reels?.length || 0),
           quantity: String(item.quantity),
           purchasePrice: String(item.purchasePrice),
@@ -608,7 +617,7 @@ const PurchaseInvoicePage: React.FC = () => {
       loadingUnloading: '0',
       otherCharges: '0',
       dueDate: new Date().toISOString().split('T')[0],
-      items: [{ skuId: '', brand: '', gsm: '', width: '', reelsCount: '', quantity: '', purchasePrice: '', lotNumber: '', reels: [] as any[] }]
+      items: [{ skuId: '', brand: '', gsm: '', width: '', length: '', reelsCount: '', quantity: '', purchasePrice: '', lotNumber: '', reels: [] as any[] }]
     });
     setAddError('');
     setActiveSubPage('new');
@@ -1075,6 +1084,9 @@ const PurchaseInvoicePage: React.FC = () => {
               <div className="space-y-4">
                 {invoiceForm.items.map((item, idx) => {
                   const reelsCount = Number(item.reelsCount) || 0;
+                  const selectedSku = skus.find(s => s._id === item.skuId);
+                  const paperType = selectedSku?.paperType || 'None';
+                  const unitLabel = selectedSku?.unit || 'KG';
                   return (
                     <div key={idx} className="bg-white rounded-xl border border-gray-200 shadow-3xs p-5 space-y-4 text-left">
                       <div className="flex justify-between items-center border-b border-gray-100 pb-2">
@@ -1176,51 +1188,131 @@ const PurchaseInvoicePage: React.FC = () => {
                           />
                         </div>
 
-                        <div>
-                          <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Width (cm)</label>
-                          <input
-                            type="number"
-                            value={item.width}
-                            onChange={e => handleItemRowChange(idx, 'width', e.target.value)}
-                            className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-center font-bold"
-                          />
-                        </div>
+                        {paperType === 'Reels' && (
+                          <>
+                            <div>
+                              <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Width (cm)</label>
+                              <input
+                                type="number"
+                                value={item.width}
+                                onChange={e => handleItemRowChange(idx, 'width', e.target.value)}
+                                className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-center font-bold"
+                              />
+                            </div>
 
-                        <div>
-                          <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Reels Count</label>
-                          <input
-                            type="number"
-                            value={item.reelsCount}
-                            onChange={e => handleItemRowChange(idx, 'reelsCount', e.target.value)}
-                            className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-center font-bold"
-                            placeholder="0"
-                          />
-                        </div>
+                            <div>
+                              <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Reels Count</label>
+                              <input
+                                type="number"
+                                value={item.reelsCount}
+                                onChange={e => handleItemRowChange(idx, 'reelsCount', e.target.value)}
+                                className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-center font-bold"
+                                placeholder="0"
+                              />
+                            </div>
 
-                        <div>
-                          <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Total KG</label>
-                          <input
-                            type="number"
-                            value={item.quantity}
-                            onChange={e => handleItemRowChange(idx, 'quantity', e.target.value)}
-                            className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-right font-black"
-                            placeholder="0"
-                            disabled={reelsCount > 0}
-                            required
-                          />
-                        </div>
+                            <div>
+                              <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Total {unitLabel}</label>
+                              <input
+                                type="number"
+                                value={item.quantity}
+                                onChange={e => handleItemRowChange(idx, 'quantity', e.target.value)}
+                                className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-right font-black"
+                                placeholder="0"
+                                disabled={reelsCount > 0}
+                                required
+                              />
+                            </div>
 
-                        <div>
-                          <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Rate / KG (₹)</label>
-                          <input
-                            type="number"
-                            value={item.purchasePrice}
-                            onChange={e => handleItemRowChange(idx, 'purchasePrice', e.target.value)}
-                            className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-right font-bold"
-                            placeholder="0.00"
-                            required
-                          />
-                        </div>
+                            <div>
+                              <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Rate / {unitLabel} (₹)</label>
+                              <input
+                                type="number"
+                                value={item.purchasePrice}
+                                onChange={e => handleItemRowChange(idx, 'purchasePrice', e.target.value)}
+                                className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-right font-bold"
+                                placeholder="0.00"
+                                required
+                              />
+                            </div>
+                          </>
+                        )}
+
+                        {paperType === 'Sheets' && (
+                          <>
+                            <div>
+                              <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Width (cm)</label>
+                              <input
+                                type="number"
+                                value={item.width}
+                                onChange={e => handleItemRowChange(idx, 'width', e.target.value)}
+                                className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-center font-bold"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Length (cm)</label>
+                              <input
+                                type="number"
+                                value={item.length || ''}
+                                onChange={e => handleItemRowChange(idx, 'length', e.target.value)}
+                                className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-center font-bold"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Total {unitLabel}</label>
+                              <input
+                                type="number"
+                                value={item.quantity}
+                                onChange={e => handleItemRowChange(idx, 'quantity', e.target.value)}
+                                className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-right font-black"
+                                placeholder="0"
+                                required
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Rate / {unitLabel} (₹)</label>
+                              <input
+                                type="number"
+                                value={item.purchasePrice}
+                                onChange={e => handleItemRowChange(idx, 'purchasePrice', e.target.value)}
+                                className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-right font-bold"
+                                placeholder="0.00"
+                                required
+                              />
+                            </div>
+                          </>
+                        )}
+
+                        {paperType === 'None' && (
+                          <>
+                            <div className="col-span-2">
+                              <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Total {unitLabel}</label>
+                              <input
+                                type="number"
+                                value={item.quantity}
+                                onChange={e => handleItemRowChange(idx, 'quantity', e.target.value)}
+                                className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-right font-black"
+                                placeholder="0"
+                                required
+                              />
+                            </div>
+
+                            <div className="col-span-2">
+                              <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Rate / {unitLabel} (₹)</label>
+                              <input
+                                type="number"
+                                value={item.purchasePrice}
+                                onChange={e => handleItemRowChange(idx, 'purchasePrice', e.target.value)}
+                                className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono text-right font-bold"
+                                placeholder="0.00"
+                                required
+                              />
+                            </div>
+                          </>
+                        )}
                       </div>
 
                       {/* Layout details: amount and storage (only for non-reels items) */}
