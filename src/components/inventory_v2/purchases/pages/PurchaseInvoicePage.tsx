@@ -730,7 +730,8 @@ const PurchaseInvoicePage: React.FC = () => {
     <div className="space-y-6">
       {/* Main Content Layout */}
       <div className={`transition-all duration-300 ${activeSubPage === 'new' || (activeSubPage === 'details' && selectedInvoice) ? 'lg:mr-[640px]' : ''}`}>
-        {/* ── SUB-PAGE 3: MAIN LIST VIEW ───────────────────          {/* Header */}
+        {/* ── SUB-PAGE 3: MAIN LIST VIEW ──────────────────────────────────────── */}
+        <div className="space-y-6">
           <div className="mb-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
