@@ -169,6 +169,8 @@ const PurchaseInvoicePage: React.FC = () => {
   const [selectedReelsForAllocation, setSelectedReelsForAllocation] = useState<any[]>([]);
   const [allocateSubmitting, setAllocateSubmitting] = useState(false);
   const [allocateError, setAllocateError] = useState('');
+  const [focusedRowIdx, setFocusedRowIdx] = useState<number | null>(null);
+  const [skuSearchText, setSkuSearchText] = useState<string>('');
 
   // Form states: Add Invoice
   const [invoiceForm, setInvoiceForm] = useState({
@@ -1093,17 +1095,64 @@ const PurchaseInvoicePage: React.FC = () => {
                       <div className="grid grid-cols-4 gap-3 text-xs text-gray-900">
                         <div className="col-span-2">
                           <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Item SKU *</label>
-                          <select
-                            value={item.skuId}
-                            onChange={e => handleItemRowChange(idx, 'skuId', e.target.value)}
-                            className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg bg-white font-semibold text-gray-800 text-xs"
-                            required
-                          >
-                            <option value="">Select SKU</option>
-                            {skus.map(s => (
-                              <option key={s._id} value={s._id}>{s.name}</option>
-                            ))}
-                          </select>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              placeholder="Search or select SKU..."
+                              value={focusedRowIdx === idx ? skuSearchText : (skus.find(s => s._id === item.skuId)?.name || '')}
+                              onChange={e => setSkuSearchText(e.target.value)}
+                              onFocus={() => {
+                                setFocusedRowIdx(idx);
+                                setSkuSearchText(skus.find(s => s._id === item.skuId)?.name || '');
+                              }}
+                              className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg bg-white font-semibold text-gray-800 text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              required
+                            />
+                            {focusedRowIdx === idx && (
+                              <>
+                                <div className="absolute left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-30 divide-y divide-gray-50">
+                                  {skus
+                                    .filter(s => {
+                                      if (!skuSearchText.trim()) return true;
+                                      const term = skuSearchText.toLowerCase();
+                                      return s.name.toLowerCase().includes(term) || 
+                                             s.skuCode.toLowerCase().includes(term);
+                                    })
+                                    .map(s => (
+                                      <button
+                                        key={s._id}
+                                        type="button"
+                                        onClick={() => {
+                                          handleItemRowChange(idx, 'skuId', s._id);
+                                          setFocusedRowIdx(null);
+                                          setSkuSearchText('');
+                                        }}
+                                        className="w-full px-3 py-2 text-left hover:bg-blue-50 hover:text-blue-600 transition-colors block text-[11px]"
+                                      >
+                                        <div className="font-bold text-gray-900">{s.name}</div>
+                                        <div className="text-[10px] text-gray-400 font-mono">{s.skuCode} • {s.category}</div>
+                                      </button>
+                                    ))
+                                  }
+                                  {skus.filter(s => {
+                                    if (!skuSearchText.trim()) return true;
+                                    const term = skuSearchText.toLowerCase();
+                                    return s.name.toLowerCase().includes(term) || 
+                                           s.skuCode.toLowerCase().includes(term);
+                                  }).length === 0 && (
+                                    <div className="px-3 py-2 text-xs text-gray-400 italic text-center">No SKUs found</div>
+                                  )}
+                                </div>
+                                <div 
+                                  className="fixed inset-0 z-20" 
+                                  onClick={() => {
+                                    setFocusedRowIdx(null);
+                                    setSkuSearchText('');
+                                  }}
+                                />
+                              </>
+                            )}
+                          </div>
                         </div>
 
                         <div>

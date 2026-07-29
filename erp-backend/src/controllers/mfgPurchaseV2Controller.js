@@ -64,8 +64,8 @@ exports.createPurchaseInvoice = async (req, res, next) => {
       if (!sku) {
         return res.status(400).json({ msg: `SKU '${skuId}' not found` });
       }
-      if (sku.category !== "Raw Material" && sku.category !== "Consumables") {
-        return res.status(400).json({ msg: `Only Raw Materials or Consumables can be purchased (SKU: ${sku.skuCode})` });
+      if (sku.category !== "Raw Material" && sku.category !== "Consumables" && sku.category !== "Semi Finished") {
+        return res.status(400).json({ msg: `Only Raw Materials, Consumables, or Semi Finished goods can be purchased (SKU: ${sku.skuCode})` });
       }
 
       // Resolve Location Hierarchy dynamically

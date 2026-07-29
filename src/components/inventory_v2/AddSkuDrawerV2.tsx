@@ -257,10 +257,10 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
 
   // Auto-generate SKU Code
   useEffect(() => {
-      if (!editSku && !form.skuCode) {
-        regenerateSkuCode();
-      }
-    }, [form.category, editSku]);
+    if (!editSku) {
+      regenerateSkuCode();
+    }
+  }, [form.category, editSku]);
 
     const regenerateSkuCode = () => {
       const prefix = form.category === 'Raw Material' ? 'RM' : form.category === 'Semi Finished' ? 'SF' : 'FG';
@@ -444,26 +444,14 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2 sm:col-span-1">
                   <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">SKU Code *</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="e.g. RM-REEL-01"
-                      value={form.skuCode}
-                      onChange={e => setForm({ ...form, skuCode: e.target.value.toUpperCase() })}
-                      className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
-                      required
-                    />
-                    {!editSku && (
-                      <button
-                        type="button"
-                        onClick={regenerateSkuCode}
-                        className="px-2.5 py-2 text-xs border border-gray-200 rounded-lg font-semibold bg-gray-50 hover:bg-gray-100 text-gray-700 transition-colors"
-                        title="Re-generate SKU Code"
-                      >
-                        Regen
-                      </button>
-                    )}
-                  </div>
+                  <input
+                    type="text"
+                    placeholder="e.g. RM-REEL-01"
+                    value={form.skuCode}
+                    onChange={e => setForm({ ...form, skuCode: e.target.value.toUpperCase() })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                    required
+                  />
                 </div>
                 <div className="col-span-2 sm:col-span-1">
                   <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Category *</label>
@@ -502,7 +490,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                           name="paperType"
                           value="Reels"
                           checked={form.paperType === 'Reels'}
-                          onChange={() => setForm({ ...form, paperType: 'Reels' })}
+                          onChange={() => setForm({ ...form, paperType: 'Reels', length: '' })}
                           className="text-blue-600 focus:ring-blue-500"
                         />
                         Reels
@@ -731,16 +719,18 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                         className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
                       />
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Length (CM)</label>
-                      <input
-                        type="number"
-                        placeholder="e.g. 44"
-                        value={form.length}
-                        onChange={e => setForm({ ...form, length: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
-                      />
-                    </div>
+                    {form.paperType !== 'Reels' && (
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Length (CM)</label>
+                        <input
+                          type="number"
+                          placeholder="e.g. 44"
+                          value={form.length}
+                          onChange={e => setForm({ ...form, length: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                        />
+                      </div>
+                    )}
                   </>
                 )}
               </div>
