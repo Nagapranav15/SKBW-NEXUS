@@ -806,7 +806,11 @@ const PurchaseInvoicePage: React.FC = () => {
           </div>
 
           {/* Statistics row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className={`grid gap-4 ${
+            activeSubPage === 'new' || (activeSubPage === 'details' && selectedInvoice)
+              ? 'grid-cols-1 sm:grid-cols-2'
+              : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
+          }`}>
             <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-xs border-l-4 border-l-blue-500 hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center gap-4">
               <div className="p-2.5 bg-blue-50 text-blue-600 rounded-lg">
                 <FileText className="w-5 h-5" />
