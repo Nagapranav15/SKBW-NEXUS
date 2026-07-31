@@ -30,12 +30,12 @@ const CompanySelection: React.FC = () => {
   });
   const navigate = useNavigate();
   const { setSelectedCompany, hasPermission, logout } = useAuth();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const canManage = hasPermission('MANAGE_COMPANIES');
 
   const handleLogout = () => {
-    logout();
-    navigate('/login');
+    setShowLogoutConfirm(true);
   };
 
   useEffect(() => {
@@ -309,6 +309,41 @@ const CompanySelection: React.FC = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Logout Confirmation Modal */}
+        {showLogoutConfirm && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-[100] animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl border border-gray-150 animate-in zoom-in-95 duration-200">
+              <div className="flex items-center gap-3.5 mb-4">
+                <div className="p-3 bg-red-50 text-red-600 rounded-xl">
+                  <LogOut className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900">Confirm Logout</h3>
+                  <p className="text-[11px] text-gray-500 mt-0.5">Are you sure you want to log out of your session?</p>
+                </div>
+              </div>
+              <div className="flex gap-2.5 mt-5">
+                <button
+                  onClick={() => setShowLogoutConfirm(false)}
+                  className="flex-1 px-4 py-2 border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setShowLogoutConfirm(false);
+                    logout();
+                    navigate('/login');
+                  }}
+                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-md shadow-red-200 cursor-pointer"
+                >
+                  Logout
+                </button>
+              </div>
             </div>
           </div>
         )}
