@@ -2374,8 +2374,13 @@ const PartyManagement: React.FC = () => {
     const wb = XLSX.utils.book_new();
     let exportData: any[] = [];
 
+    // Filter by selectedIds if there are selected items, otherwise export all loaded parties
+    const targetData = selectedIds.length > 0
+      ? parties.filter(p => selectedIds.includes(p._id))
+      : parties;
+
     if (currentType === 'route') {
-      exportData = parties.map(p => ({
+      exportData = targetData.map(p => ({
         'Region Name': p.name,
         'Region Code': p.code,
         'Assigned Agent': p.assignedAgent || '-',
@@ -2385,7 +2390,7 @@ const PartyManagement: React.FC = () => {
         'Status': p.status
       }));
     } else if (currentType === 'agent') {
-      exportData = parties.map(p => {
+      exportData = targetData.map(p => {
         const routesStr = allRoutes
           .filter(r => r.assignedAgent === (p.firmName || p.contactName))
           .map(r => r.name)
@@ -2400,7 +2405,7 @@ const PartyManagement: React.FC = () => {
         };
       });
     } else if (currentType === 'market') {
-      exportData = parties.map(p => ({
+      exportData = targetData.map(p => ({
         'City': p.firmName,
         'District': p.district || '-',
         'State': p.state || '-',
@@ -2412,7 +2417,7 @@ const PartyManagement: React.FC = () => {
         'Status': p.status || 'active'
       }));
     } else if (currentType === 'transporter') {
-      exportData = parties.map(p => {
+      exportData = targetData.map(p => {
         const contactPersonsStr = Array.isArray(p.contactPersons)
           ? p.contactPersons.map((cp: any) => `${cp.name || 'Unnamed'}: ${cp.phone || 'No Phone'}`).join(' | ')
           : p.contactName ? `${p.contactName}: ${p.phone || 'No Phone'}` : '-';
@@ -2437,7 +2442,7 @@ const PartyManagement: React.FC = () => {
         };
       });
     } else if (currentType === 'customer') {
-      exportData = parties.map(p => ({
+      exportData = targetData.map(p => ({
         'Firm Name': p.firmName || '-',
         'Owner Name': p.ownerName || '-',
         'Contact Name': p.contactName || '-',
@@ -2473,7 +2478,7 @@ const PartyManagement: React.FC = () => {
       }));
     } else {
       // Vendor
-      exportData = parties.map(p => ({
+      exportData = targetData.map(p => ({
         'Firm Name': p.firmName || '-',
         'Owner Name': p.ownerName || '-',
         'Contact Name': p.contactName || '-',
