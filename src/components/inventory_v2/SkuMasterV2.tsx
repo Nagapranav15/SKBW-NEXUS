@@ -872,8 +872,9 @@ const SkuMasterV2: React.FC = () => {
                               onClick={() => {
                                 setEditSku(s);
                                 setShowAddDrawer(true);
+                                setSelectedSkuDetails(null);
                               }}
-                              className="p-1.5 text-amber-605 hover:bg-amber-50 rounded-lg transition-all"
+                              className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
                               title="Edit SKU"
                             >
                               <Edit className="w-4 h-4" />
