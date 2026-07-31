@@ -55,9 +55,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
 
   // Category specific field visibility mapping
   const [categoryFieldsMap, setCategoryFieldsMap] = useState<Record<string, string[]>>({
-    "Raw Material": ["gsm", "title", "dimensions", "paperType"],
-    "Semi Finished": ["gsm", "dimensions", "ruleType", "altUnit", "group"],
-    "Finished Goods": ["gsm", "dimensions", "ruleType", "pages", "altUnit"]
+    "Raw Material": ["gsm", "title", "width", "length", "paperType"],
+    "Semi Finished": ["gsm", "width", "length", "ruleType", "altUnit", "group"],
+    "Finished Goods": ["gsm", "width", "length", "ruleType", "pages", "altUnit"]
   });
 
   // Custom Options Modal Popup state
@@ -70,7 +70,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
     isOpen: false,
     type: null,
     nameValue: '',
-    selectedFields: ['gsm', 'dimensions']
+    selectedFields: ['gsm', 'width', 'length']
   });
 
   // Load custom metadata lists & brands from database
@@ -130,7 +130,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
       isOpen: true,
       type: field,
       nameValue: '',
-      selectedFields: field === 'categories' ? ['brand', 'gsm', 'dimensions'] : []
+      selectedFields: field === 'categories' ? ['gsm', 'width', 'length'] : []
     });
   };
 
@@ -257,7 +257,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
     }
   }, [companyId]);
 
-  const activeFields = categoryFieldsMap[form.category] || ['brand', 'gsm', 'dimensions'];
+  const activeFields = categoryFieldsMap[form.category] || ['gsm', 'width', 'length'];
 
   // Auto-generate SKU Code
   useEffect(() => {
@@ -324,12 +324,14 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
           if (active.includes('gsm') && form.gsm) parts.push(`${form.gsm}GSM`);
           
           let sizeStr = '';
-          if (active.includes('dimensions')) {
-            if (form.width && form.length) {
-              sizeStr = `${form.width}x${form.length}CM`;
-            } else if (form.width) {
-              sizeStr = `${form.width}CM`;
-            }
+          const hasWidth = active.includes('width');
+          const hasLength = active.includes('length');
+          if (hasWidth && hasLength && form.width && form.length) {
+            sizeStr = `${form.width}x${form.length}CM`;
+          } else if (hasWidth && form.width) {
+            sizeStr = `${form.width}CM`;
+          } else if (hasLength && form.length) {
+            sizeStr = `${form.length}CM`;
           }
           if (sizeStr) parts.push(sizeStr);
 
@@ -551,7 +553,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
             </div>
 
           {/* Group 2: Specifications */}
-          {(activeFields.includes('gsm') || activeFields.includes('brand') || activeFields.includes('title') || activeFields.includes('dimensions')) && (
+          {(activeFields.includes('gsm') || activeFields.includes('brand') || activeFields.includes('title') || activeFields.includes('width') || activeFields.includes('length')) && (
             <div className="space-y-4">
               <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1.5">
                 Specifications
@@ -719,31 +721,29 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                     />
                   </div>
                 )}
-                {activeFields.includes('dimensions') && (
-                  <>
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Width (CM)</label>
-                      <input
-                        type="number"
-                        placeholder="e.g. 32"
-                        value={form.width}
-                        onChange={e => setForm({ ...form, width: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
-                      />
-                    </div>
-                    {form.paperType !== 'Reels' && (
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Length (CM)</label>
-                        <input
-                          type="number"
-                          placeholder="e.g. 44"
-                          value={form.length}
-                          onChange={e => setForm({ ...form, length: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
-                        />
-                      </div>
-                    )}
-                  </>
+                {activeFields.includes('width') && (
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Width (CM)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 32"
+                      value={form.width}
+                      onChange={e => setForm({ ...form, width: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                    />
+                  </div>
+                )}
+                {activeFields.includes('length') && form.paperType !== 'Reels' && (
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Length (CM)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 44"
+                      value={form.length}
+                      onChange={e => setForm({ ...form, length: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                    />
+                  </div>
                 )}
               </div>
             </div>
@@ -1053,7 +1053,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                       { id: 'title', label: 'Title (Description)' },
                       { id: 'group', label: 'Group' },
                       { id: 'gsm', label: 'GSM' },
-                      { id: 'dimensions', label: 'Dimensions (Size)' },
+                      { id: 'width', label: 'Width (cm)' },
+                      { id: 'length', label: 'Length (cm)' },
                       { id: 'paperType', label: 'Format Reels/Sheets' },
                       { id: 'ruleType', label: 'Rule Type' },
                       { id: 'pages', label: 'Pages' },

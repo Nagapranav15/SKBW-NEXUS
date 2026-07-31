@@ -95,7 +95,7 @@ const SettingsPage: React.FC = () => {
       // Default fields for new category
       const updatedFields = {
         ...categoryFields,
-        [newCategory.trim()]: ['brand', 'gsm', 'dimensions']
+        [newCategory.trim()]: ['gsm', 'width', 'length']
       };
       setCategoryFields(updatedFields);
       handleSave(updated, units, ruleTypes, groups, brands, updatedFields);
@@ -198,7 +198,8 @@ const SettingsPage: React.FC = () => {
     { id: 'title', label: 'Title (Description)' },
     { id: 'group', label: 'Group' },
     { id: 'gsm', label: 'GSM' },
-    { id: 'dimensions', label: 'Dimensions (Size)' },
+    { id: 'width', label: 'Width (cm)' },
+    { id: 'length', label: 'Length (cm)' },
     { id: 'paperType', label: 'Format Reels/Sheets' },
     { id: 'ruleType', label: 'Rule Type' },
     { id: 'pages', label: 'Pages' },
