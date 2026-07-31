@@ -94,8 +94,22 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
           setExistingBrands(data.brands);
         }
         if (data.categoryFields) {
-          // If returned as Map structure or nested record
-          setCategoryFieldsMap(data.categoryFields);
+          // Migrate old database 'dimensions' schema to separate 'width' and 'length' fields dynamically on load
+          const migratedFields: Record<string, string[]> = {};
+          Object.entries(data.categoryFields).forEach(([cat, fields]) => {
+            if (Array.isArray(fields)) {
+              let updated = [...fields];
+              if (updated.includes('dimensions')) {
+                updated = updated.filter(f => f !== 'dimensions');
+                if (!updated.includes('width')) updated.push('width');
+                if (!updated.includes('length')) updated.push('length');
+              }
+              migratedFields[cat] = updated;
+            } else {
+              migratedFields[cat] = fields as string[];
+            }
+          });
+          setCategoryFieldsMap(migratedFields);
         }
       }
     } catch (e) {

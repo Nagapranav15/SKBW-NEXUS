@@ -43,7 +43,25 @@ const SettingsPage: React.FC = () => {
         setRuleTypes(data.ruleTypes || []);
         setGroups(data.groups || []);
         setBrands(data.brands || []);
-        setCategoryFields(data.categoryFields || {});
+        if (data.categoryFields) {
+          const migratedFields: Record<string, string[]> = {};
+          Object.entries(data.categoryFields).forEach(([cat, fields]) => {
+            if (Array.isArray(fields)) {
+              let updated = [...fields];
+              if (updated.includes('dimensions')) {
+                updated = updated.filter(f => f !== 'dimensions');
+                if (!updated.includes('width')) updated.push('width');
+                if (!updated.includes('length')) updated.push('length');
+              }
+              migratedFields[cat] = updated;
+            } else {
+              migratedFields[cat] = fields as string[];
+            }
+          });
+          setCategoryFields(migratedFields);
+        } else {
+          setCategoryFields({});
+        }
       }
     } catch (e) {
       console.error(e);
