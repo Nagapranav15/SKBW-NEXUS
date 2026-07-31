@@ -699,46 +699,33 @@ const BatchStockV2: React.FC = () => {
             </div>
           </div>
 
-          {/* Stats Banner row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
-              <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
-                <Layers className="w-6 h-6" />
-              </div>
+          {/* Stats Banner row (matching customer stats card style exactly) */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            <div className="w-full text-left rounded-xl shadow-xs border p-3 border-l-4 border-l-blue-500 bg-white border-gray-100 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default select-none group">
               <div>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Lots</span>
-                <span className="text-xl font-black text-gray-900 block font-mono mt-0.5">{statTotalLots}</span>
-                <span className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Across all locations</span>
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 group-hover:text-blue-500 transition-colors">Total Lots</p>
+                <p className="text-2xl font-bold text-gray-900 mt-0.5">{statTotalLots}</p>
               </div>
             </div>
-            <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
-              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
-                <Coins className="w-6 h-6" />
-              </div>
+
+            <div className="w-full text-left rounded-xl shadow-xs border p-3 border-l-4 border-l-green-500 bg-white border-gray-100 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default select-none group">
               <div>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Available</span>
-                <span className="text-xl font-black text-emerald-700 block font-mono mt-0.5">{statTotalAvailable.toLocaleString('en-IN')} KG</span>
-                <span className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">All Material Lots</span>
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 group-hover:text-green-500 transition-colors">Total Available</p>
+                <p className="text-2xl font-bold text-green-600 mt-0.5">{statTotalAvailable.toLocaleString('en-IN')} KG</p>
               </div>
             </div>
-            <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
-              <div className="p-3 bg-orange-50 text-orange-600 rounded-2xl">
-                <Package className="w-6 h-6 animate-pulse-slow" />
-              </div>
+
+            <div className="w-full text-left rounded-xl shadow-xs border p-3 border-l-4 border-l-orange-500 bg-white border-gray-100 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default select-none group">
               <div>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Reel Count</span>
-                <span className="text-xl font-black text-orange-700 block font-mono mt-0.5">{statTotalReels}</span>
-                <span className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Reels in Stock</span>
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 group-hover:text-orange-500 transition-colors">Total Reel Count</p>
+                <p className="text-2xl font-bold text-orange-600 mt-0.5">{statTotalReels}</p>
               </div>
             </div>
-            <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
-              <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl">
-                <MapPin className="w-6 h-6" />
-              </div>
+
+            <div className="w-full text-left rounded-xl shadow-xs border p-3 border-l-4 border-l-purple-500 bg-white border-gray-100 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default select-none group">
               <div>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Locations</span>
-                <span className="text-xl font-black text-purple-700 block font-mono mt-0.5">{statTotalLocations}</span>
-                <span className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Active Locations</span>
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 group-hover:text-purple-500 transition-colors">Total Locations</p>
+                <p className="text-2xl font-bold text-purple-600 mt-0.5">{statTotalLocations}</p>
               </div>
             </div>
           </div>

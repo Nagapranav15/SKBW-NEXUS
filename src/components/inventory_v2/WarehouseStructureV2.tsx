@@ -472,42 +472,33 @@ const WarehouseStructureV2: React.FC = () => {
         </div>
       </div>
 
-      {/* Top Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between">
+      {/* Top Stat Cards (matching customer stats card style exactly) */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+        <div className="w-full text-left rounded-xl shadow-xs border p-3 border-l-4 border-l-blue-500 bg-white border-gray-100 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default select-none group">
           <div>
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Factories</span>
-            <span className="text-xl font-black text-gray-900">{getFactories().length}</span>
-          </div>
-          <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
-            <Building2 className="w-4 h-4" />
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 group-hover:text-blue-500 transition-colors">Factories</p>
+            <p className="text-2xl font-bold text-gray-900 mt-0.5">{getFactories().length}</p>
           </div>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between">
+
+        <div className="w-full text-left rounded-xl shadow-xs border p-3 border-l-4 border-l-orange-500 bg-white border-gray-100 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default select-none group">
           <div>
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Floors</span>
-            <span className="text-xl font-black text-gray-900">{getFloors().length}</span>
-          </div>
-          <div className="p-2.5 bg-orange-50 text-orange-600 rounded-xl">
-            <Folder className="w-4 h-4" />
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 group-hover:text-orange-500 transition-colors">Floors</p>
+            <p className="text-2xl font-bold text-orange-600 mt-0.5">{getFloors().length}</p>
           </div>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between">
+
+        <div className="w-full text-left rounded-xl shadow-xs border p-3 border-l-4 border-l-purple-500 bg-white border-gray-100 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default select-none group">
           <div>
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Zones</span>
-            <span className="text-xl font-black text-gray-900">{getZones().length}</span>
-          </div>
-          <div className="p-2.5 bg-purple-50 text-purple-600 rounded-xl">
-            <Layers className="w-4 h-4" />
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 group-hover:text-purple-500 transition-colors">Zones</p>
+            <p className="text-2xl font-bold text-purple-600 mt-0.5">{getZones().length}</p>
           </div>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between">
+
+        <div className="w-full text-left rounded-xl shadow-xs border p-3 border-l-4 border-l-green-500 bg-white border-gray-100 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default select-none group">
           <div>
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Storage Bins</span>
-            <span className="text-xl font-black text-gray-900">{getStorageLocations().length}</span>
-          </div>
-          <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
-            <MapPin className="w-4 h-4" />
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 group-hover:text-green-500 transition-colors">Storage Bins</p>
+            <p className="text-2xl font-bold text-green-600 mt-0.5">{getStorageLocations().length}</p>
           </div>
         </div>
       </div>

@@ -600,79 +600,63 @@ const SkuMasterV2: React.FC = () => {
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div 
+        {/* Stats Cards (matching customer stats card style exactly) */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 animate-none">
+          <button
             onClick={() => setCategoryFilter('')}
-            className={`p-5 rounded-2xl border flex items-center gap-4 cursor-pointer select-none transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md ${
+            className={`w-full text-left rounded-xl shadow-xs border p-3 border-l-4 border-l-blue-500 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] group ${
               categoryFilter === '' 
-                ? 'bg-blue-50/20 border-blue-500 shadow-sm ring-2 ring-blue-500/20' 
-                : 'bg-white border-gray-200 shadow-sm'
+                ? 'bg-blue-50/40 border-blue-400 ring-2 ring-blue-100 shadow-sm' 
+                : 'bg-white border-gray-100 hover:shadow-md hover:-translate-y-0.5'
             }`}
           >
-            <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
-              <Package className="w-6 h-6" />
-            </div>
             <div>
-              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Total Items</span>
-              <span className="text-2xl font-black text-gray-900">{totalItems}</span>
-              <span className="text-[10px] text-gray-500 mt-0.5 block font-bold text-blue-600">All Items</span>
+              <p className={`text-xs font-semibold uppercase tracking-wider transition-colors ${categoryFilter === '' ? 'text-blue-600' : 'text-gray-400 group-hover:text-blue-500'}`}>Total Items</p>
+              <p className="text-2xl font-bold text-gray-900 mt-0.5">{totalItems}</p>
             </div>
-          </div>
+          </button>
 
-          <div 
+          <button
             onClick={() => setCategoryFilter('Raw Material')}
-            className={`p-5 rounded-2xl border flex items-center gap-4 cursor-pointer select-none transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md ${
+            className={`w-full text-left rounded-xl shadow-xs border p-3 border-l-4 border-l-amber-500 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] group ${
               categoryFilter === 'Raw Material' 
-                ? 'bg-amber-50/20 border-amber-500 shadow-sm ring-2 ring-amber-500/20' 
-                : 'bg-white border-gray-200 shadow-sm'
+                ? 'bg-amber-50/40 border-amber-400 ring-2 ring-amber-100 shadow-sm' 
+                : 'bg-white border-gray-100 hover:shadow-md hover:-translate-y-0.5'
             }`}
           >
-            <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl">
-              <RefreshCw className="w-6 h-6 animate-spin-slow" />
-            </div>
             <div>
-              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Raw Materials</span>
-              <span className="text-2xl font-black text-gray-900">{rawMaterialsCount}</span>
-              <span className="text-[10px] text-gray-500 mt-0.5 block font-bold text-amber-600">Filter Active</span>
+              <p className={`text-xs font-semibold uppercase tracking-wider transition-colors ${categoryFilter === 'Raw Material' ? 'text-amber-600' : 'text-gray-400 group-hover:text-amber-500'}`}>Raw Materials</p>
+              <p className="text-2xl font-bold text-amber-600 mt-0.5">{rawMaterialsCount}</p>
             </div>
-          </div>
+          </button>
 
-          <div 
+          <button
             onClick={() => setCategoryFilter('Semi Finished')}
-            className={`p-5 rounded-2xl border flex items-center gap-4 cursor-pointer select-none transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md ${
+            className={`w-full text-left rounded-xl shadow-xs border p-3 border-l-4 border-l-purple-500 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] group ${
               categoryFilter === 'Semi Finished' 
-                ? 'bg-purple-50/20 border-purple-500 shadow-sm ring-2 ring-purple-500/20' 
-                : 'bg-white border-gray-200 shadow-sm'
+                ? 'bg-purple-50/40 border-purple-400 ring-2 ring-purple-100 shadow-sm' 
+                : 'bg-white border-gray-100 hover:shadow-md hover:-translate-y-0.5'
             }`}
           >
-            <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl">
-              <Layers className="w-6 h-6 animate-pulse" />
-            </div>
             <div>
-              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Semi-Finished</span>
-              <span className="text-2xl font-black text-gray-900">{semiFinishedCount}</span>
-              <span className="text-[10px] text-gray-500 mt-0.5 block font-bold text-purple-600">Filter Active</span>
+              <p className={`text-xs font-semibold uppercase tracking-wider transition-colors ${categoryFilter === 'Semi Finished' ? 'text-purple-600' : 'text-gray-400 group-hover:text-purple-500'}`}>Semi-Finished</p>
+              <p className="text-2xl font-bold text-purple-600 mt-0.5">{semiFinishedCount}</p>
             </div>
-          </div>
+          </button>
 
-          <div 
+          <button
             onClick={() => setCategoryFilter('Finished Goods')}
-            className={`p-5 rounded-2xl border flex items-center gap-4 cursor-pointer select-none transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md ${
+            className={`w-full text-left rounded-xl shadow-xs border p-3 border-l-4 border-l-emerald-500 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] group ${
               categoryFilter === 'Finished Goods' 
-                ? 'bg-emerald-50/20 border-emerald-500 shadow-sm ring-2 ring-emerald-500/20' 
-                : 'bg-white border-gray-200 shadow-sm'
+                ? 'bg-emerald-50/40 border-emerald-400 ring-2 ring-emerald-100 shadow-sm' 
+                : 'bg-white border-gray-100 hover:shadow-md hover:-translate-y-0.5'
             }`}
           >
-            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
-              <Package className="w-6 h-6" />
-            </div>
             <div>
-              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Finished Goods</span>
-              <span className="text-2xl font-black text-gray-900">{finishedGoodsCount}</span>
-              <span className="text-[10px] text-gray-500 mt-0.5 block font-bold text-emerald-600">Filter Active</span>
+              <p className={`text-xs font-semibold uppercase tracking-wider transition-colors ${categoryFilter === 'Finished Goods' ? 'text-emerald-600' : 'text-gray-400 group-hover:text-emerald-500'}`}>Finished Goods</p>
+              <p className="text-2xl font-bold text-emerald-600 mt-0.5">{finishedGoodsCount}</p>
             </div>
-          </div>
+          </button>
         </div>
 
         {/* Filters & Bulk Selection */}

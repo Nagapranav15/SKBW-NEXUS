@@ -111,22 +111,41 @@ const Dashboard: React.FC = () => {
       {/* At a Glance Grid */}
       <div className="mb-8">
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">At a Glance</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat, index) => (
-            <div 
-              key={index} 
-              onClick={() => stat.path && navigate(stat.path)}
-              className="bg-white rounded-xl shadow-sm p-5 border border-gray-100 hover:shadow-md hover:border-blue-100 transition-all cursor-pointer flex items-center space-x-4"
-            >
-              <div className={`${stat.color} p-3 rounded-xl`}>
-                <stat.icon className="w-6 h-6" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {stats.map((stat, index) => {
+            const borderColors = [
+              'border-l-blue-500',
+              'border-l-green-500',
+              'border-l-indigo-500',
+              'border-l-orange-500',
+              'border-l-teal-500',
+              'border-l-red-500',
+              'border-l-purple-500',
+              'border-l-pink-500'
+            ];
+            const textHoverColors = [
+              'group-hover:text-blue-500',
+              'group-hover:text-green-500',
+              'group-hover:text-indigo-500',
+              'group-hover:text-orange-500',
+              'group-hover:text-teal-500',
+              'group-hover:text-red-500',
+              'group-hover:text-purple-500',
+              'group-hover:text-pink-500'
+            ];
+            return (
+              <div 
+                key={index} 
+                onClick={() => stat.path && navigate(stat.path)}
+                className={`w-full text-left rounded-xl shadow-xs border p-3 border-l-4 ${borderColors[index]} bg-white border-gray-100 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer select-none group`}
+              >
+                <div>
+                  <p className={`text-xs font-semibold uppercase tracking-wider text-gray-400 ${textHoverColors[index]} transition-colors`}>{stat.title}</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-0.5">{stat.value}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-                <p className="text-sm text-gray-500 font-medium">{stat.title}</p>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
