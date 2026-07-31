@@ -1026,8 +1026,8 @@ const SkuMasterV2: React.FC = () => {
         <div className="fixed top-0 right-0 h-full w-full sm:w-[520px] bg-white shadow-2xl border-l border-gray-200 z-[60] flex flex-col animate-in slide-in-from-right duration-250 !mt-0">
           <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-black text-gray-905">SKU Item Specifications</h2>
-              <p className="text-[11px] text-gray-500 mt-0.5">Attributes & parameters associated with this item</p>
+              <h2 className="text-sm font-bold text-gray-900">SKU Item Specifications</h2>
+              <p className="text-[11px] text-gray-505 mt-0.5">Attributes & parameters associated with this item</p>
             </div>
             <button
               onClick={() => setSelectedSkuDetails(null)}
@@ -1041,10 +1041,10 @@ const SkuMasterV2: React.FC = () => {
               <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b pb-1.5 flex items-center gap-1.5">
                 <Layers className="w-4 h-4 text-blue-600" /> General Specifications
               </h3>
-              <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs text-gray-905">
+              <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs text-gray-900">
                 <div>
                   <span className="block text-[10px] text-gray-400 font-medium uppercase">SKU Code</span>
-                  <span className="font-bold font-mono text-sm">{selectedSkuDetails.skuCode}</span>
+                  <span className="font-bold text-sm text-gray-900">{selectedSkuDetails.skuCode}</span>
                 </div>
                 <div>
                   <span className="block text-[10px] text-gray-400 font-medium uppercase">Category</span>
@@ -1052,7 +1052,7 @@ const SkuMasterV2: React.FC = () => {
                 </div>
                 <div className="col-span-2">
                   <span className="block text-[10px] text-gray-400 font-medium uppercase">SKU Name</span>
-                  <span className="font-bold text-gray-800">{selectedSkuDetails.name}</span>
+                  <span className="font-semibold text-gray-800">{selectedSkuDetails.name}</span>
                 </div>
                 <div>
                   <span className="block text-[10px] text-gray-400 font-medium uppercase">GSM</span>
@@ -1077,34 +1077,33 @@ const SkuMasterV2: React.FC = () => {
                 
                 {/* Beautified Conversion Info inside detail panel */}
                 <div className="col-span-2 bg-blue-50/30 p-4 rounded-xl border border-blue-100/60 mt-2 space-y-2">
-                  <span className="block text-[10px] font-black text-blue-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="block text-[10px] font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1.5">
                     <Layers className="w-3.5 h-3.5 text-blue-550" />
                     Unit Configuration Details
                   </span>
                   <div className="flex items-center justify-between text-xs pt-1">
                     <span className="text-gray-500 font-semibold">Primary Unit:</span>
-                    <span className="font-black text-slate-800 uppercase font-mono">{selectedSkuDetails.unit}</span>
+                    <span className="font-bold text-slate-800 uppercase">{selectedSkuDetails.unit}</span>
                   </div>
                   {(selectedSkuDetails as any).altUnit && (
                     <>
                       <div className="flex items-center justify-between text-xs border-t border-blue-100/40 pt-2 mt-1">
                         <span className="text-gray-500 font-semibold">Alternative Unit:</span>
-                        <span className="font-bold text-slate-850 uppercase font-mono">{(selectedSkuDetails as any).altUnit}</span>
+                        <span className="font-bold text-slate-850 uppercase">{(selectedSkuDetails as any).altUnit}</span>
                       </div>
                       <div className="flex items-center justify-between text-xs bg-white p-2.5 rounded-lg border border-blue-100/30 mt-2">
                         <span className="text-gray-500 font-semibold">Conversion Rate:</span>
-                        <span className="font-black text-blue-700 font-mono">
+                        <span className="font-bold text-blue-700">
                           1 {(selectedSkuDetails as any).altUnit} = {(selectedSkuDetails as any).altUnitConversion || 1} {selectedSkuDetails.unit}
                         </span>
                       </div>
                     </>
                   )}
                 </div>
-
                 <div>
                   <span className="block text-[10px] text-gray-400 font-medium uppercase">Status</span>
-                  <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
-                    selectedSkuDetails.status === 'Active' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-gray-200 text-gray-500'
+                  <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                    selectedSkuDetails.status === 'Active' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-gray-205 text-gray-500'
                   }`}>
                     {selectedSkuDetails.status}
                   </span>
