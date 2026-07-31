@@ -246,6 +246,23 @@ const SkuMasterV2: React.FC = () => {
     }
   }, [debouncedSearch]);
 
+  // Background poller to refresh SKU data silently every 5 seconds
+  useEffect(() => {
+    if (!selectedCompany?._id) return;
+
+    const interval = setInterval(() => {
+      // Reload table list silently
+      loadSkus(false);
+      
+      // Reload stats cards silently
+      getSkusV2(selectedCompany._id)
+        .then(data => setAllSkus(data))
+        .catch(() => {});
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [selectedCompany?._id, categoryFilter, statusFilter, debouncedSearch]);
+
   const loadSkus = async (showSpinner = true) => {
     if (showSpinner) setLoading(true);
     try {

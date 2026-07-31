@@ -1603,11 +1603,11 @@ const PartyManagement: React.FC = () => {
   };
 
   // Fetch Main Data List
-  const fetchMainData = useCallback(async () => {
+  const fetchMainData = useCallback(async (showSpinner = true) => {
     if (!selectedCompany) return;
     const currentFetchId = ++fetchIdRef.current;
     try {
-      setLoading(true);
+      if (showSpinner) setLoading(true);
       if (currentType === 'route') {
         const res = await getRoutes(selectedCompany._id);
         if (currentFetchId !== fetchIdRef.current) return;
@@ -1701,7 +1701,7 @@ const PartyManagement: React.FC = () => {
     } catch (err) {
       console.error('Error loading data list:', err);
     } finally {
-      if (currentFetchId === fetchIdRef.current) {
+      if (currentFetchId === fetchIdRef.current && showSpinner) {
         setLoading(false);
       }
     }
@@ -1742,10 +1742,17 @@ const PartyManagement: React.FC = () => {
     fetchDropdownOptions();
   }, [fetchDropdownOptions]);
 
-  // Load main list and stats when filters/type/pagination changes
+  // Load main list and stats when filters/type/pagination changes (with 5-second background poller)
   useEffect(() => {
-    fetchMainData();
+    fetchMainData(true);
     fetchStatsCounts();
+
+    const interval = setInterval(() => {
+      fetchMainData(false);
+      fetchStatsCounts();
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, [fetchMainData, fetchStatsCounts]);
 
   // Load Activity Logs
