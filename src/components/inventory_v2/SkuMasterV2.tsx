@@ -830,15 +830,17 @@ const SkuMasterV2: React.FC = () => {
                           <td className="px-5 py-3.5 font-semibold text-gray-600 whitespace-nowrap">{(s as any).group || '—'}</td>
                         )}
                         {visibleColumns.unit && (
-                          <td className="px-5 py-3.5 font-bold text-gray-500 uppercase font-mono whitespace-nowrap">
-                            <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[10.5px]">
-                              {s.unit}
-                            </span>
-                            {(s as any).altUnit && (
-                              <span className="text-[10px] text-blue-650 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded font-medium ml-1.5 inline-block normal-case font-sans">
-                                Alt: {(s as any).altUnit} (x{(s as any).altUnitConversion || 1})
+                          <td className="px-5 py-3.5 whitespace-nowrap">
+                            <div className="flex flex-col gap-1 items-start">
+                              <span className="bg-slate-100 text-slate-800 border border-slate-200 px-2 py-0.5 rounded font-bold font-mono text-[10px] uppercase">
+                                {s.unit}
                               </span>
-                            )}
+                              {(s as any).altUnit && (
+                                <span className="text-[9.5px] font-black text-blue-650 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded font-mono uppercase tracking-wider">
+                                  1 {(s as any).altUnit} = {(s as any).altUnitConversion || 1} {s.unit}
+                                </span>
+                              )}
+                            </div>
                           </td>
                         )}
                         {visibleColumns.gsm && (

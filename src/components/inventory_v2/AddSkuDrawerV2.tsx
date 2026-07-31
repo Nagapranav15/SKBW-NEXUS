@@ -806,30 +806,47 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                 </div>
 
                 {activeFields.includes('altUnit') && form.altUnit && (
-                  <div className="bg-white p-3 rounded-lg border border-slate-100 space-y-2 animate-in fade-in duration-200">
-                    <div className="flex items-center justify-between">
-                      <label className="block text-[10px] font-bold text-slate-600 uppercase">
-                        Conversion Rate
-                      </label>
-                      <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-mono">
-                        1 {form.altUnit} = {form.altUnitConversion || '?'} {form.unit || 'units'}
-                      </span>
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        placeholder="Enter conversion multiplier"
-                        value={form.altUnitConversion}
-                        onChange={e => setForm({ ...form, altUnitConversion: e.target.value })}
-                        className="w-full pl-3 pr-20 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800 font-mono"
-                      />
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400 uppercase font-mono select-none">
-                        {form.unit || 'units'}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-205 space-y-3 animate-in fade-in duration-200">
+                    <span className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                      Unit Conversion Rule
+                    </span>
+                    <div className="flex items-center gap-2.5 bg-white p-3 rounded-lg border border-slate-100 shadow-3xs">
+                      {/* Left: Alternative Unit Badge */}
+                      <div className="flex-1 text-center bg-blue-50/50 border border-blue-100 rounded-lg py-2.5 px-3">
+                        <span className="block text-[9px] font-black text-blue-500 uppercase tracking-wider mb-0.5">Alternative Unit</span>
+                        <span className="text-xs font-black text-blue-900 uppercase font-mono">{form.altUnit || '—'}</span>
+                      </div>
+
+                      {/* Middle Symbol */}
+                      <div className="text-gray-400 font-bold text-lg select-none">=</div>
+
+                      {/* Middle: Conversion Input */}
+                      <div className="w-24 relative">
+                        <input
+                          type="number"
+                          placeholder="Rate"
+                          value={form.altUnitConversion}
+                          onChange={e => setForm({ ...form, altUnitConversion: e.target.value })}
+                          className="w-full px-2 py-2 border border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-lg text-xs font-bold text-center text-blue-900 font-mono shadow-3xs"
+                        />
+                      </div>
+
+                      {/* Middle Symbol */}
+                      <div className="text-gray-400 font-bold text-sm select-none">×</div>
+
+                      {/* Right: Primary Unit Badge */}
+                      <div className="flex-1 text-center bg-slate-50 border border-slate-150 rounded-lg py-2.5 px-3">
+                        <span className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-0.5">Primary Unit</span>
+                        <span className="text-xs font-black text-gray-800 uppercase font-mono">{form.unit || '—'}</span>
                       </div>
                     </div>
-                    <p className="text-[10px] text-gray-400 italic leading-relaxed">
-                      * Define how many primary units make up one alternative unit.
-                    </p>
+                    
+                    {/* Live Sentence Feedback */}
+                    <div className="text-center bg-blue-50/20 border border-blue-50/50 rounded-lg py-2 px-3">
+                      <span className="text-[11px] font-medium text-slate-600">
+                        Formula: <span className="font-bold text-slate-900">1 {form.altUnit}</span> = <span className="font-black text-blue-600 font-mono text-xs">{form.altUnitConversion || '0'}</span> × <span className="font-bold text-slate-900">{form.unit}</span>.
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>
