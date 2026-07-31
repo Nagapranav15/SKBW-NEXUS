@@ -41,6 +41,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
+  const [hasAltUnit, setHasAltUnit] = useState(false);
+
   // Brand searchable dropdown lists (separated for Finished Goods vs Raw Materials)
   const [existingBrands, setExistingBrands] = useState<string[]>([]);
   const [fgBrandsList, setFgBrandsList] = useState<string[]>([]);
@@ -220,6 +222,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
         booksGbl: (editSku as any).booksGbl !== undefined ? String((editSku as any).booksGbl) : '',
         status: editSku.status || 'Active'
       });
+      setHasAltUnit(!!editSku.altUnit);
       setIsNameManuallyEdited(true); // Edit SKU should keep its loaded name
     } else {
       setForm({
@@ -241,6 +244,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
         booksGbl: '',
         status: 'Active'
       });
+      setHasAltUnit(false);
       setIsNameManuallyEdited(false);
     }
   }, [editSku, isOpen]);
@@ -751,105 +755,94 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
               Inventory & Additional Attributes
             </h3>
             <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2 bg-slate-50/50 p-4 rounded-xl border border-dashed border-slate-200 space-y-3.5 mt-2">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                  <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                    <Layers className="w-3.5 h-3.5 text-blue-500" />
-                    Unit Configuration
-                  </span>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Primary Unit *</label>
+                <select
+                  value={form.unit}
+                  onChange={e => {
+                    if (e.target.value === '__ADD_NEW__') {
+                      handleAddNewOption('units');
+                    } else {
+                      setForm({ ...form, unit: e.target.value });
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                >
+                  <option value="">Select Unit</option>
+                  {unitsList.map(unit => (
+                    <option key={unit} value={unit}>{unit}</option>
+                  ))}
+                  <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
+                </select>
+              </div>
+
+              {activeFields.includes('altUnit') && (
+                <div className="flex items-end h-full">
+                  <label className="flex items-center space-x-2.5 bg-gray-50 border border-gray-200 hover:border-blue-300 hover:bg-blue-50/10 rounded-xl px-3.5 py-2 w-full cursor-pointer select-none transition-all">
+                    <input
+                      type="checkbox"
+                      checked={hasAltUnit}
+                      onChange={e => {
+                        const checked = e.target.checked;
+                        setHasAltUnit(checked);
+                        if (!checked) {
+                          setForm(prev => ({ ...prev, altUnit: '', altUnitConversion: '' }));
+                        }
+                      }}
+                      className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 border-gray-300 cursor-pointer"
+                    />
+                    <div className="text-left">
+                      <span className="block text-[11px] font-bold text-gray-700">Enable Alternate Unit</span>
+                      <span className="block text-[9px] text-gray-400 font-medium leading-tight">Define bulk or packaging conversions</span>
+                    </div>
+                  </label>
                 </div>
-                
-                <div className="grid grid-cols-2 gap-3.5">
+              )}
+
+              {activeFields.includes('altUnit') && hasAltUnit && (
+                <div className="col-span-2 grid grid-cols-2 gap-3 bg-blue-50/20 p-3.5 rounded-xl border border-blue-100/50 animate-in fade-in duration-200">
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Primary Unit *</label>
+                    <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Alternative Unit</label>
                     <select
-                      value={form.unit}
+                      value={form.altUnit}
                       onChange={e => {
                         if (e.target.value === '__ADD_NEW__') {
                           handleAddNewOption('units');
                         } else {
-                          setForm({ ...form, unit: e.target.value });
+                          setForm({ ...form, altUnit: e.target.value });
                         }
                       }}
-                      className="w-full px-3 py-2 border border-gray-250 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
                     >
-                      <option value="">Select Unit</option>
+                      <option value="">Select Alternative</option>
                       {unitsList.map(unit => (
                         <option key={unit} value={unit}>{unit}</option>
                       ))}
                       <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
                     </select>
                   </div>
-
-                  {activeFields.includes('altUnit') && (
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Alternative Unit</label>
-                      <select
-                        value={form.altUnit}
-                        onChange={e => {
-                          if (e.target.value === '__ADD_NEW__') {
-                            handleAddNewOption('units');
-                          } else {
-                            setForm({ ...form, altUnit: e.target.value });
-                          }
-                        }}
-                        className="w-full px-3 py-2 border border-gray-250 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
-                      >
-                        <option value="">None</option>
-                        {unitsList.map(unit => (
-                          <option key={unit} value={unit}>{unit}</option>
-                        ))}
-                        <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
-                      </select>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Conversion Rate</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        placeholder="Multiplier rate"
+                        value={form.altUnitConversion}
+                        onChange={e => setForm({ ...form, altUnitConversion: e.target.value })}
+                        className="w-full pl-3 pr-14 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800 font-mono"
+                      />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400 uppercase font-mono select-none">
+                        {form.unit || 'units'}
+                      </div>
+                    </div>
+                  </div>
+                  {form.altUnit && form.altUnitConversion && (
+                    <div className="col-span-2 text-center bg-white py-1.5 px-3 rounded-lg border border-slate-100 text-[10.5px] font-medium text-slate-500">
+                      Formula: <span className="font-bold text-slate-800">1 {form.altUnit}</span> = <span className="font-extrabold text-blue-600 font-mono text-xs">{form.altUnitConversion}</span> × <span className="font-bold text-slate-800">{form.unit}</span>
                     </div>
                   )}
                 </div>
-
-                {activeFields.includes('altUnit') && form.altUnit && (
-                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-205 space-y-3 animate-in fade-in duration-200">
-                    <span className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                      Unit Conversion Rule
-                    </span>
-                    <div className="flex items-center gap-2.5 bg-white p-3 rounded-lg border border-slate-100 shadow-3xs">
-                      {/* Left: Alternative Unit Badge */}
-                      <div className="flex-1 text-center bg-blue-50/50 border border-blue-100 rounded-lg py-2.5 px-3">
-                        <span className="block text-[9px] font-black text-blue-500 uppercase tracking-wider mb-0.5">Alternative Unit</span>
-                        <span className="text-xs font-black text-blue-900 uppercase font-mono">{form.altUnit || '—'}</span>
-                      </div>
-
-                      {/* Middle Symbol */}
-                      <div className="text-gray-400 font-bold text-lg select-none">=</div>
-
-                      {/* Middle: Conversion Input */}
-                      <div className="w-24 relative">
-                        <input
-                          type="number"
-                          placeholder="Rate"
-                          value={form.altUnitConversion}
-                          onChange={e => setForm({ ...form, altUnitConversion: e.target.value })}
-                          className="w-full px-2 py-2 border border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-lg text-xs font-bold text-center text-blue-900 font-mono shadow-3xs"
-                        />
-                      </div>
-
-                      {/* Middle Symbol */}
-                      <div className="text-gray-400 font-bold text-sm select-none">×</div>
-
-                      {/* Right: Primary Unit Badge */}
-                      <div className="flex-1 text-center bg-slate-50 border border-slate-150 rounded-lg py-2.5 px-3">
-                        <span className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-0.5">Primary Unit</span>
-                        <span className="text-xs font-black text-gray-800 uppercase font-mono">{form.unit || '—'}</span>
-                      </div>
-                    </div>
-                    
-                    {/* Live Sentence Feedback */}
-                    <div className="text-center bg-blue-50/20 border border-blue-50/50 rounded-lg py-2 px-3">
-                      <span className="text-[11px] font-medium text-slate-600">
-                        Formula: <span className="font-bold text-slate-900">1 {form.altUnit}</span> = <span className="font-black text-blue-600 font-mono text-xs">{form.altUnitConversion || '0'}</span> × <span className="font-bold text-slate-900">{form.unit}</span>.
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
+              )}
               {activeFields.includes('group') && (
                 <div>
                   <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Group</label>
