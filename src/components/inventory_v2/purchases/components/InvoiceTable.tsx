@@ -75,7 +75,7 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
                     className="hover:bg-gray-50 border-b border-gray-100/60 transition-colors cursor-pointer text-gray-700" 
                     onClick={() => onViewDetails(inv)}
                   >
-                    <td className="px-4 py-2.5 font-bold font-mono text-blue-600 text-[13px]">{inv.invoiceNumber}</td>
+                    <td className="px-4 py-2.5 font-bold text-blue-600 text-[13.5px]">{inv.invoiceNumber}</td>
                     <td className="px-4 py-2.5 text-gray-500 font-semibold text-[13.5px]">
                       {inv.createdAt ? new Date(inv.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                     </td>
@@ -85,12 +85,12 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
                         {lotsLabel}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 font-mono font-semibold text-gray-900 text-[13px] text-center">{totalReels || '—'}</td>
-                    <td className="px-4 py-2.5 font-mono font-bold text-gray-900 text-[13px]">
+                    <td className="px-4 py-2.5 font-semibold text-gray-900 text-[13.5px] text-center">{totalReels || '—'}</td>
+                    <td className="px-4 py-2.5 font-bold text-gray-900 text-[13.5px]">
                       {totalQty.toLocaleString('en-IN')}{' '}
                       <span className="text-[10px] text-gray-400 font-semibold uppercase">{unit}</span>
                     </td>
-                    <td className="px-4 py-2.5 font-mono font-bold text-gray-900 text-[13px]">
+                    <td className="px-4 py-2.5 font-bold text-gray-900 text-[13.5px]">
                       ₹{(inv.subTotal || 0).toLocaleString('en-IN')}
                     </td>
                     <td className="px-4 py-2.5 text-center">

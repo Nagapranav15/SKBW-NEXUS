@@ -380,7 +380,7 @@ const BatchStockV2: React.FC = () => {
                   <Package className="w-6 h-6" />
                 </div>
                 <div className="min-w-0">
-                  <h2 className="text-base font-black text-gray-900 truncate">{selectedDetailLot.sku?.name}</h2>
+                  <h2 className="text-base font-bold text-gray-900 truncate">{selectedDetailLot.sku?.name}</h2>
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-0.5 block">
                     Brand: {selectedDetailLot.sku?.brand || 'BILT'} | GSM: {selectedDetailLot.sku?.gsm || 52} | Width: {selectedDetailLot.sku?.width || 64} cm
                   </span>
@@ -388,23 +388,23 @@ const BatchStockV2: React.FC = () => {
               </div>
               <div>
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Reels</span>
-                <span className="text-sm font-bold text-gray-900 block font-mono">{originalReels}</span>
+                <span className="text-sm font-bold text-gray-900 block">{originalReels}</span>
               </div>
               <div>
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total KG</span>
-                <span className="text-sm font-bold text-gray-900 block font-mono">{originalQty.toLocaleString()} KG</span>
+                <span className="text-sm font-bold text-gray-900 block">{originalQty.toLocaleString()} KG</span>
               </div>
               <div>
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Available KG</span>
-                <span className="text-sm font-black text-green-600 block font-mono">{totalLotAvailable.toLocaleString()} KG</span>
+                <span className="text-sm font-semibold text-green-600 block">{totalLotAvailable.toLocaleString()} KG</span>
               </div>
               <div>
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Rate / KG</span>
-                <span className="text-sm font-bold text-gray-950 block font-mono">₹{(selectedDetailLot.sku?.price || 68.00).toFixed(2)}</span>
+                <span className="text-sm font-bold text-gray-950 block">₹{(selectedDetailLot.sku?.price || 68.00).toFixed(2)}</span>
               </div>
               <div>
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Lot Value (Available)</span>
-                <span className="text-sm font-black text-green-700 block font-mono">₹{(totalLotAvailable * (selectedDetailLot.sku?.price || 68.00)).toLocaleString()}</span>
+                <span className="text-sm font-semibold text-green-700 block">₹{(totalLotAvailable * (selectedDetailLot.sku?.price || 68.00)).toLocaleString()}</span>
               </div>
             </div>
 
@@ -414,13 +414,13 @@ const BatchStockV2: React.FC = () => {
               <div className="lg:col-span-2 space-y-6">
                 {/* Lot Information */}
                 <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4 text-xs font-semibold text-gray-700">
-                  <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider border-b pb-2">
+                  <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider border-b pb-2">
                     Lot Information
                   </h3>
                   <div className="grid grid-cols-2 gap-y-3.5 gap-x-4">
                     <div className="flex justify-between border-b border-gray-50 pb-1.5">
                       <span className="text-gray-400 font-bold uppercase text-[9px]">Source Batch:</span>
-                      <span className="text-gray-950 font-bold font-mono">{selectedDetailLot.batchNumber}</span>
+                      <span className="text-gray-950 font-bold">{selectedDetailLot.batchNumber}</span>
                     </div>
                     <div className="flex justify-between border-b border-gray-50 pb-1.5">
                       <span className="text-gray-400 font-bold uppercase text-[9px]">Supplier:</span>
@@ -475,28 +475,27 @@ const BatchStockV2: React.FC = () => {
                           </tr>
                         ) : ledgerHistory.length > 0 ? (
                           ledgerHistory.map((h, idx) => {
-                            const isIncoming = h.qtyIn && h.qtyIn > 0;
                             const typeColor = h.transactionType === 'Purchase' ? 'bg-green-50 text-green-700 border-green-200' :
                                               h.transactionType === 'Transfer' ? 'bg-blue-50 text-blue-700 border-blue-200' :
                                               'bg-purple-50 text-purple-700 border-purple-200';
-                            
-                            return (
-                              <tr key={idx} className="hover:bg-gray-50/50">
-                                <td className="px-4 py-3 text-gray-500 font-mono">
+                             
+                             return (
+                               <tr key={idx} className="hover:bg-gray-50/50">
+                                <td className="px-4 py-3 text-gray-500">
                                   {h.createdAt ? new Date(h.createdAt).toLocaleDateString('en-IN') : '01/07/2024'}
                                 </td>
                                 <td className="px-4 py-3 text-center">
-                                  <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded border ${typeColor}`}>
+                                  <span className={`text-[8px] font-bold uppercase px-2 py-0.5 rounded border ${typeColor}`}>
                                     {h.transactionType}
                                   </span>
                                 </td>
                                 <td className="px-4 py-3 truncate max-w-xs">{h.remarks || h.referenceId}</td>
-                                <td className="px-4 py-3 text-center font-mono">{h.reels?.length || '—'}</td>
-                                <td className="px-4 py-3 text-right font-mono font-bold text-green-600">{h.qtyIn ? h.qtyIn.toLocaleString() : '—'}</td>
-                                <td className="px-4 py-3 text-right font-mono font-bold text-red-600">{h.qtyOut ? h.qtyOut.toLocaleString() : '—'}</td>
-                                <td className="px-4 py-3 text-right font-mono font-black text-gray-900">{h.balanceAfter ? h.balanceAfter.toLocaleString() : '—'}</td>
-                                <td className="px-4 py-3 text-blue-600 font-black">{h.locationId?.name || 'Storage'}</td>
-                                <td className="px-4 py-3 text-gray-500 font-mono">Admin</td>
+                                <td className="px-4 py-3 text-center">{h.reels?.length || '—'}</td>
+                                <td className="px-4 py-3 text-right font-semibold text-green-600">{h.qtyIn ? h.qtyIn.toLocaleString() : '—'}</td>
+                                <td className="px-4 py-3 text-right font-semibold text-red-600">{h.qtyOut ? h.qtyOut.toLocaleString() : '—'}</td>
+                                <td className="px-4 py-3 text-right font-bold text-gray-900">{h.balanceAfter ? h.balanceAfter.toLocaleString() : '—'}</td>
+                                <td className="px-4 py-3 text-blue-600 font-bold">{h.locationId?.name || 'Storage'}</td>
+                                <td className="px-4 py-3 text-gray-500">Admin</td>
                               </tr>
                             );
                           })
@@ -504,48 +503,48 @@ const BatchStockV2: React.FC = () => {
                           <>
                             {/* Dummy records mimicking Screenshot 5 */}
                             <tr className="hover:bg-gray-50/50">
-                              <td className="px-4 py-3 text-gray-500 font-mono">01/07/2024 10:15 AM</td>
+                              <td className="px-4 py-3 text-gray-500">01/07/2024 10:15 AM</td>
                               <td className="px-4 py-3 text-center">
-                                <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded border bg-green-50 text-green-700 border-green-200">
+                                <span className="text-[8px] font-bold uppercase px-2 py-0.5 rounded border bg-green-50 text-green-700 border-green-200">
                                   INWARD
                                 </span>
                               </td>
                               <td className="px-4 py-3">Purchase Inward ({selectedDetailLot.batchNumber})</td>
-                              <td className="px-4 py-3 text-center font-mono">8</td>
-                              <td className="px-4 py-3 text-right font-mono font-bold text-green-600">2,350</td>
-                              <td className="px-4 py-3 text-right font-mono text-gray-400">—</td>
-                              <td className="px-4 py-3 text-right font-mono font-black text-gray-900">2,350</td>
-                              <td className="px-4 py-3 text-blue-600 font-black">Outdoor A - A1</td>
+                              <td className="px-4 py-3 text-center">8</td>
+                              <td className="px-4 py-3 text-right font-semibold text-green-600">2,350</td>
+                              <td className="px-4 py-3 text-right text-gray-400">—</td>
+                              <td className="px-4 py-3 text-right font-bold text-gray-900">2,350</td>
+                              <td className="px-4 py-3 text-blue-600 font-bold">Outdoor A - A1</td>
                               <td className="px-4 py-3 text-gray-500">Admin</td>
                             </tr>
                             <tr className="hover:bg-gray-50/50">
-                              <td className="px-4 py-3 text-gray-500 font-mono">02/07/2024 09:30 AM</td>
+                              <td className="px-4 py-3 text-gray-500">02/07/2024 09:30 AM</td>
                               <td className="px-4 py-3 text-center">
-                                <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
+                                <span className="text-[8px] font-bold uppercase px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
                                   MOVE
                                 </span>
                               </td>
                               <td className="px-4 py-3">Move to A2</td>
-                              <td className="px-4 py-3 text-center font-mono">—</td>
-                              <td className="px-4 py-3 text-right font-mono text-gray-400">—</td>
-                              <td className="px-4 py-3 text-right font-mono font-bold text-red-600">950</td>
-                              <td className="px-4 py-3 text-right font-mono font-black text-gray-900">1,400</td>
-                              <td className="px-4 py-3 text-blue-600 font-black">Outdoor A - A1</td>
+                              <td className="px-4 py-3 text-center">—</td>
+                              <td className="px-4 py-3 text-right text-gray-400">—</td>
+                              <td className="px-4 py-3 text-right font-semibold text-red-600">950</td>
+                              <td className="px-4 py-3 text-right font-bold text-gray-900">1,400</td>
+                              <td className="px-4 py-3 text-blue-600 font-bold">Outdoor A - A1</td>
                               <td className="px-4 py-3 text-gray-500">Warehouse</td>
                             </tr>
                             <tr className="hover:bg-gray-50/50">
-                              <td className="px-4 py-3 text-gray-500 font-mono">02/07/2024 09:35 AM</td>
+                              <td className="px-4 py-3 text-gray-500">02/07/2024 09:35 AM</td>
                               <td className="px-4 py-3 text-center">
-                                <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
+                                <span className="text-[8px] font-bold uppercase px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
                                   MOVE
                                 </span>
                               </td>
                               <td className="px-4 py-3">Move from A1 to A2</td>
-                              <td className="px-4 py-3 text-center font-mono">—</td>
-                              <td className="px-4 py-3 text-right font-mono font-bold text-green-600">950</td>
-                              <td className="px-4 py-3 text-right font-mono text-gray-400">—</td>
-                              <td className="px-4 py-3 text-right font-mono font-black text-gray-900 font-mono">950</td>
-                              <td className="px-4 py-3 text-blue-600 font-black">Outdoor A - A2</td>
+                              <td className="px-4 py-3 text-center">—</td>
+                              <td className="px-4 py-3 text-right font-semibold text-green-600">950</td>
+                              <td className="px-4 py-3 text-right text-gray-400">—</td>
+                              <td className="px-4 py-3 text-right font-bold text-gray-900">950</td>
+                              <td className="px-4 py-3 text-blue-600 font-bold">Outdoor A - A2</td>
                               <td className="px-4 py-3 text-gray-500">Warehouse</td>
                             </tr>
                           </>
@@ -584,10 +583,10 @@ const BatchStockV2: React.FC = () => {
                       <tbody className="divide-y divide-gray-50 text-gray-700 font-semibold">
                         {lotLocations.map((b, idx) => (
                           <tr key={idx} className="hover:bg-gray-50/50">
-                            <td className="px-4 py-2.5 text-blue-600 font-black">{b.location?.name || '—'}</td>
-                            <td className="px-4 py-2.5 text-center font-mono">{b.reels?.length || '—'}</td>
-                            <td className="px-4 py-2.5 text-right font-mono">{(b.onHand || 0).toLocaleString()} KG</td>
-                            <td className="px-4 py-2.5 text-right font-mono font-black text-green-600">{(b.onHand || 0).toLocaleString()} KG</td>
+                            <td className="px-4 py-2.5 text-blue-600 font-bold">{b.location?.name || '—'}</td>
+                            <td className="px-4 py-2.5 text-center">{b.reels?.length || '—'}</td>
+                            <td className="px-4 py-2.5 text-right">{(b.onHand || 0).toLocaleString()} KG</td>
+                            <td className="px-4 py-2.5 text-right font-bold text-green-600">{(b.onHand || 0).toLocaleString()} KG</td>
                           </tr>
                         ))}
                       </tbody>
@@ -622,7 +621,7 @@ const BatchStockV2: React.FC = () => {
                       />
                     </svg>
                     <div className="absolute flex flex-col items-center">
-                      <span className="text-base font-black text-gray-900 font-mono">{totalLotAvailable.toLocaleString()}</span>
+                      <span className="text-base font-bold text-gray-900">{totalLotAvailable.toLocaleString()}</span>
                       <span className="text-[9px] font-bold text-gray-400 uppercase">Available KG</span>
                     </div>
                   </div>
@@ -827,20 +826,20 @@ const BatchStockV2: React.FC = () => {
                           }`}
                           onClick={() => setSelectedLot(b)}
                         >
-                          <td className="px-5 py-4 font-black font-mono text-blue-600 text-xs">
+                          <td className="px-5 py-4 font-bold text-blue-600 text-[13px]">
                             {displayLot}
                             <span className="text-[9px] text-gray-400 font-medium block mt-0.5">From {b.batchNumber || '—'}</span>
                           </td>
                           <td className="px-5 py-4 font-bold text-gray-900 truncate max-w-xs">{b.sku?.name || 'Raw Material'}</td>
                           <td className="px-5 py-4 text-gray-500">{b.sku?.brand || 'BILT'}</td>
-                          <td className="px-5 py-4 text-center font-mono font-bold">{b.sku?.gsm || '52'}</td>
-                          <td className="px-5 py-4 text-center font-mono font-bold">{b.sku?.width || '64'}</td>
-                          <td className="px-5 py-4 text-center font-mono font-bold text-gray-800">{reelsCount || '—'}</td>
-                          <td className="px-5 py-4 text-right font-mono font-black text-green-600">{(b.onHand || 0).toLocaleString()} KG</td>
-                          <td className="px-5 py-4 text-right font-mono text-gray-600">₹{(b.sku?.price || 68).toFixed(2)}</td>
+                          <td className="px-5 py-4 text-center font-semibold text-gray-700">{b.sku?.gsm || '52'}</td>
+                          <td className="px-5 py-4 text-center font-semibold text-gray-700">{b.sku?.width || '64'}</td>
+                          <td className="px-5 py-4 text-center font-semibold text-gray-800">{reelsCount || '—'}</td>
+                          <td className="px-5 py-4 text-right font-bold text-green-600">{(b.onHand || 0).toLocaleString()} KG</td>
+                          <td className="px-5 py-4 text-right text-gray-600">₹{(b.sku?.price || 68).toFixed(2)}</td>
                           <td className="px-5 py-4 text-blue-600 font-bold">{b.location?.name || 'Bin'}</td>
                           <td className="px-5 py-4 text-center">
-                            <span className="text-[9px] px-2 py-0.5 rounded font-black uppercase border bg-green-50 text-green-700 border-green-200">
+                            <span className="text-[9px] px-2 py-0.5 rounded font-bold uppercase border bg-green-50 text-green-700 border-green-200">
                               Available
                             </span>
                           </td>
@@ -909,14 +908,14 @@ const BatchStockV2: React.FC = () => {
               {/* SELECTED LOT SUMMARY */}
               {selectedLot && (
                 <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
-                  <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider pb-2 border-b">
+                  <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider pb-2 border-b">
                     Selected Lot Summary
                   </h3>
 
                   <div className="space-y-3.5 text-xs text-gray-700 font-semibold font-medium">
                     <div className="flex justify-between">
                       <span className="text-gray-400 font-bold uppercase text-[9px]">Lot No.</span>
-                      <span className="text-blue-600 font-mono font-black">{getDisplayLotNo(selectedLot)}</span>
+                      <span className="text-blue-600 font-bold">{getDisplayLotNo(selectedLot)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-400 font-bold uppercase text-[9px]">Item</span>
@@ -928,33 +927,33 @@ const BatchStockV2: React.FC = () => {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-400 font-bold uppercase text-[9px]">GSM</span>
-                      <span className="text-gray-950 font-bold font-mono">{selectedLot.sku?.gsm || 52}</span>
+                      <span className="text-gray-950 font-bold">{selectedLot.sku?.gsm || 52}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-400 font-bold uppercase text-[9px]">Width</span>
-                      <span className="text-gray-950 font-bold font-mono">{selectedLot.sku?.width || 64} cm</span>
+                      <span className="text-gray-950 font-bold">{selectedLot.sku?.width || 64} cm</span>
                     </div>
                     
                     <div className="border-t pt-3.5 space-y-3">
                       <div className="flex justify-between">
                         <span className="text-gray-400 font-bold uppercase text-[9px]">Total Reels</span>
-                        <span className="text-gray-950 font-bold font-mono">{lotTotalReels}</span>
+                        <span className="text-gray-950 font-bold">{lotTotalReels}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-400 font-bold uppercase text-[9px]">Available Reels (Est.)</span>
-                        <span className="text-gray-950 font-bold font-mono">{lotTotalReels ? `${lotTotalReels}.0` : '—'}</span>
+                        <span className="text-gray-950 font-bold">{lotTotalReels ? `${lotTotalReels}.0` : '—'}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-400 font-bold uppercase text-[9px]">Available KG</span>
-                        <span className="text-green-600 font-black font-mono">{selectedLot.onHand.toLocaleString()} KG</span>
+                        <span className="text-green-600 font-bold">{selectedLot.onHand.toLocaleString()} KG</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-400 font-bold uppercase text-[9px]">Rate / KG</span>
-                        <span className="text-gray-950 font-bold font-mono">₹{(selectedLot.sku?.price || 68.00).toFixed(2)}</span>
+                        <span className="text-gray-950 font-bold">₹{(selectedLot.sku?.price || 68.00).toFixed(2)}</span>
                       </div>
-                      <div className="flex justify-between border-t pt-3 font-black text-gray-950">
+                      <div className="flex justify-between border-t pt-3 font-bold text-gray-955">
                         <span className="text-gray-400 uppercase text-[10px]">Lot Value</span>
-                        <span className="text-blue-600 font-mono text-xs">₹{lotValue.toLocaleString()}</span>
+                        <span className="text-blue-600 font-bold text-xs">₹{lotValue.toLocaleString()}</span>
                       </div>
                     </div>
                   </div>
