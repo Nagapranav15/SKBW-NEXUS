@@ -507,9 +507,11 @@ const SkuMasterV2: React.FC = () => {
   // Helper to format Size
   const formatSize = (s: SkuV2) => {
     if (s.width && s.length) {
-      return `${s.width} x ${s.length} cm`;
+      return `${s.width} × ${s.length} cm`;
     } else if (s.width) {
-      return `${s.width} cm`;
+      return `${s.width} cm (W)`;
+    } else if (s.length) {
+      return `${s.length} cm (L)`;
     }
     return '—';
   };
@@ -869,33 +871,59 @@ const SkuMasterV2: React.FC = () => {
                           />
                         </td>
                         {visibleColumns.skuCode && (
-                          <td className="px-5 py-3.5 font-bold font-mono text-blue-600 whitespace-nowrap">{s.skuCode}</td>
+                          <td className="px-5 py-3.5 whitespace-nowrap">
+                            <span className="px-2 py-1 bg-gray-50 border border-gray-200 rounded-lg text-[11px] font-extrabold font-mono text-gray-750 tracking-wider">
+                              {s.skuCode}
+                            </span>
+                          </td>
                         )}
                         {visibleColumns.name && (
-                          <td className="px-5 py-3.5 font-semibold text-gray-800 whitespace-nowrap max-w-xs truncate">{s.name}</td>
+                          <td className="px-5 py-3.5 whitespace-nowrap">
+                            <div className="text-xs font-black text-gray-900 max-w-xs truncate" title={s.name}>
+                              {s.name}
+                            </div>
+                          </td>
                         )}
                         {visibleColumns.category && (
                           <td className="px-5 py-3.5 whitespace-nowrap">
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-black tracking-wider uppercase inline-block ${
-                              s.category === 'Raw Material' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
-                              s.category === 'Semi Finished' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
-                              'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-black tracking-wider uppercase inline-block border ${
+                              s.category === 'Raw Material' ? 'bg-amber-50/70 text-amber-700 border-amber-200' :
+                              s.category === 'Semi Finished' ? 'bg-purple-50/70 text-purple-700 border-purple-200' :
+                              'bg-emerald-50/70 text-emerald-700 border-emerald-200'
                             }`}>
                               {s.category}
                             </span>
                           </td>
                         )}
                         {visibleColumns.group && (
-                          <td className="px-5 py-3.5 font-semibold text-gray-600 whitespace-nowrap">{(s as any).group || '—'}</td>
+                          <td className="px-5 py-3.5 whitespace-nowrap">
+                            {(s as any).group ? (
+                              <span className="px-2 py-0.5 bg-blue-50/50 text-blue-700 border border-blue-100 rounded text-[10px] font-extrabold uppercase tracking-wide">
+                                {(s as any).group}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 text-xs">—</span>
+                            )}
+                          </td>
                         )}
                         {visibleColumns.unit && (
                           <td className="px-5 py-3.5 whitespace-nowrap">
-                            <div className="flex flex-col gap-1 items-start">
-                              <span className="bg-slate-100 text-slate-800 border border-slate-200 px-2 py-0.5 rounded font-bold font-mono text-[10px] uppercase">
-                                {s.unit}
-                              </span>
+                            <div className="flex flex-col gap-1.5 items-start">
+                              <div className="flex items-center gap-1.5">
+                                <span className="bg-slate-100 text-slate-800 border border-slate-200 px-2 py-0.5 rounded text-[10px] font-black font-mono uppercase">
+                                  {s.unit}
+                                </span>
+                                {(s as any).altUnit && (
+                                  <span className="text-gray-400 text-[10px] font-semibold">➔</span>
+                                )}
+                                {(s as any).altUnit && (
+                                  <span className="bg-blue-50 text-blue-800 border border-blue-100 px-2 py-0.5 rounded text-[10px] font-black font-mono uppercase">
+                                    {(s as any).altUnit}
+                                  </span>
+                                )}
+                              </div>
                               {(s as any).altUnit && (
-                                <span className="text-[9.5px] font-black text-blue-650 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded font-mono uppercase tracking-wider">
+                                <span className="text-[9.5px] font-black text-blue-650 bg-blue-50/40 border border-blue-100/60 px-2 py-0.5 rounded-md font-mono tracking-wider">
                                   1 {(s as any).altUnit} = {(s as any).altUnitConversion || 1} {s.unit}
                                 </span>
                               )}
@@ -903,18 +931,36 @@ const SkuMasterV2: React.FC = () => {
                           </td>
                         )}
                         {visibleColumns.gsm && (
-                          <td className="px-5 py-3.5 text-center font-bold text-gray-600 whitespace-nowrap font-mono">{s.gsm || '—'}</td>
+                          <td className="px-5 py-3.5 text-center whitespace-nowrap">
+                            {s.gsm ? (
+                              <span className="text-gray-800 font-bold font-mono text-xs">
+                                {s.gsm} <span className="text-[9px] text-gray-405 font-black">GSM</span>
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 text-xs">—</span>
+                            )}
+                          </td>
                         )}
                         {visibleColumns.dimensions && (
-                          <td className="px-5 py-3.5 text-center font-semibold text-gray-600 whitespace-nowrap font-mono">{formatSize(s)}</td>
+                          <td className="px-5 py-3.5 text-center font-bold text-gray-700 whitespace-nowrap font-mono text-xs">
+                            {formatSize(s)}
+                          </td>
                         )}
                         {visibleColumns.pages && (
-                          <td className="px-5 py-3.5 text-center font-bold text-gray-700 whitespace-nowrap font-mono">{(s as any).pages || '—'}</td>
+                          <td className="px-5 py-3.5 text-center whitespace-nowrap">
+                            {(s as any).pages ? (
+                              <span className="px-1.5 py-0.5 bg-slate-50 border border-slate-200 rounded text-gray-750 font-black font-mono text-[10.5px]">
+                                {(s as any).pages} <span className="text-[8.5px] text-gray-400 uppercase font-black">Pages</span>
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 text-xs">—</span>
+                            )}
+                          </td>
                         )}
                         {visibleColumns.status && (
                           <td className="px-5 py-3.5 text-center whitespace-nowrap">
-                            <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-extrabold uppercase inline-block ${
-                              s.status === 'Active' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-gray-105 text-gray-500'
+                            <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-black uppercase inline-block border ${
+                              s.status === 'Active' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-100 text-gray-500 border-gray-200'
                             }`}>
                               {s.status}
                             </span>
