@@ -1,6 +1,6 @@
 import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthProvider';
+import { AuthProvider } from './context/AuthContext';
 import { ToastContainer } from './components/ui/Toast';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -20,22 +20,13 @@ const SalesReports = lazy(() => import('./components/sales/SalesReports'));
 const TransactionTools = lazy(() => import('./components/TransactionTools'));
 const AnalyzerDashboard = lazy(() => import('./components/AnalyzerDashboard'));
 
-// Inventory sub-pages
-const MfgDashboard = lazy(() => import('./components/inventory/MfgDashboard'));
-const MfgZones = lazy(() => import('./components/inventory/MfgZones'));
-const MfgSkus = lazy(() => import('./components/inventory/MfgSkus'));
-const MfgMovements = lazy(() => import('./components/inventory/MfgMovements'));
-const MfgBom = lazy(() => import('./components/inventory/MfgBom'));
-const MfgAnalytics = lazy(() => import('./components/inventory/MfgAnalytics'));
-const MfgReports = lazy(() => import('./components/inventory/MfgReports'));
-
 // Inventory V2 (Beta) sub-pages
 const DashboardV2 = lazy(() => import('./components/inventory_v2/DashboardV2'));
 const SkuMasterV2 = lazy(() => import('./components/inventory_v2/SkuMasterV2'));
-const InventoryLedgerPage = lazy(() => import('./components/inventory_v2/ledger/pages/InventoryLedgerPage'));
+const InventoryLedgerPage = lazy(() => import('./components/inventory_v2/ledger/InventoryLedgerPage'));
 const WarehouseStructureV2 = lazy(() => import('./components/inventory_v2/WarehouseStructureV2'));
 const TestingTransactionsV2 = lazy(() => import('./components/inventory_v2/TestingTransactionsV2'));
-const PurchaseInvoicePage = lazy(() => import('./components/inventory_v2/purchases/pages/PurchaseInvoicePage'));
+const PurchaseInvoicePage = lazy(() => import('./components/inventory_v2/purchases/PurchaseInvoicePage'));
 const InventoryBalanceV2 = lazy(() => import('./components/inventory_v2/InventoryBalanceV2'));
 const BatchStockV2 = lazy(() => import('./components/inventory_v2/BatchStockV2'));
 const SettingsPage = lazy(() => import('./components/inventory_v2/SettingsPage'));
@@ -92,15 +83,6 @@ function App() {
                 <Route path="sales/reports" element={<SalesReports />} />
                 <Route path="transactions" element={<TransactionTools />} />
                 <Route path="analyzer" element={<AnalyzerDashboard />} />
-                {/* Inventory sub-routes */}
-                <Route path="inventory" element={<Navigate to="/inventory/dashboard" replace />} />
-                <Route path="inventory/dashboard" element={<MfgDashboard />} />
-                <Route path="inventory/zones" element={<MfgZones />} />
-                <Route path="inventory/skus" element={<MfgSkus />} />
-                <Route path="inventory/movements" element={<MfgMovements />} />
-                <Route path="inventory/bom" element={<MfgBom />} />
-                <Route path="inventory/analytics" element={<MfgAnalytics />} />
-                <Route path="inventory/reports" element={<MfgReports />} />
 
                 {/* Manufacturing Inventory (Beta) sub-routes */}
                 <Route path="inventory-v2" element={<Navigate to="/inventory-v2/dashboard" replace />} />

@@ -6,6 +6,8 @@ import { getActivityLogs, createActivityLog } from '../../api/activityLogApi';
 import AddSkuDrawerV2 from './AddSkuDrawerV2';
 import { showToast } from '../ui/Toast';
 import * as XLSX from 'xlsx';
+import Modal from '../ui/Modal';
+import Drawer from '../ui/Drawer';
 
 const SkuMasterV2: React.FC = () => {
   const { selectedCompany } = useAuth();
@@ -1133,30 +1135,24 @@ const SkuMasterV2: React.FC = () => {
       )}
 
       {/* Modal: Single Delete Confirmation */}
-      {deleteConfirmSku && (
-        <div className="fixed inset-0 z-50 overflow-hidden flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-in fade-in duration-100">
-          <div className="relative bg-white rounded-2xl max-w-sm w-full shadow-2xl flex flex-col border border-gray-200 animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 bg-gray-50 rounded-t-2xl flex justify-between items-center">
-              <h2 className="text-sm font-bold text-gray-900">Confirm Deletion</h2>
+      <Modal
+        isOpen={!!deleteConfirmSku}
+        onClose={() => setDeleteConfirmSku(null)}
+        size="max-w-sm"
+        title="Confirm Deletion"
+      >
+        {deleteConfirmSku && (
+          <div className="space-y-3 text-left">
+            <p className="text-xs font-semibold leading-relaxed">
+              Are you sure you want to delete SKU <span className="font-bold font-mono text-red-600">{deleteConfirmSku.skuCode}</span>?
+            </p>
+            <p className="text-[11px] text-gray-400">
+              This action is non-reversible. Deletion will be rejected if the SKU contains active ledger transactions.
+            </p>
+            <div className="flex justify-end gap-2 mt-4">
               <button
                 onClick={() => setDeleteConfirmSku(null)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="w-4.5 h-4.5" />
-              </button>
-            </div>
-            <div className="p-5 text-gray-800 space-y-3">
-              <p className="text-xs font-semibold leading-relaxed">
-                Are you sure you want to delete SKU <span className="font-bold font-mono text-red-600">{deleteConfirmSku.skuCode}</span>?
-              </p>
-              <p className="text-[11px] text-gray-400">
-                This action is non-reversible. Deletion will be rejected if the SKU contains active ledger transactions.
-              </p>
-            </div>
-            <div className="px-5 py-3 border-t border-gray-100 bg-gray-50 flex justify-end gap-2">
-              <button
-                onClick={() => setDeleteConfirmSku(null)}
-                className="px-3.5 py-1.5 border border-gray-250 rounded-lg text-xs font-bold text-gray-600 bg-white hover:bg-gray-50"
+                className="px-3.5 py-1.5 border border-gray-255 rounded-lg text-xs font-bold text-gray-600 bg-white hover:bg-gray-50"
               >
                 Cancel
               </button>
@@ -1168,270 +1164,230 @@ const SkuMasterV2: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* Modal: Bulk Delete Confirmation */}
-      {showBulkDeleteConfirm && (
-        <div className="fixed inset-0 z-50 overflow-hidden flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-in fade-in duration-100">
-          <div className="relative bg-white rounded-2xl max-w-sm w-full shadow-2xl flex flex-col border border-gray-200 animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 bg-gray-50 rounded-t-2xl flex justify-between items-center">
-              <h2 className="text-sm font-bold text-gray-900">Confirm Bulk Deletion</h2>
-              <button
-                onClick={() => setShowBulkDeleteConfirm(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="w-4.5 h-4.5" />
-              </button>
-            </div>
-            <div className="p-5 text-gray-800 space-y-3">
-              <p className="text-xs font-semibold leading-relaxed">
-                Are you sure you want to delete <span className="font-black text-red-600">{selectedIds.length} selected SKUs</span>?
-              </p>
-              <p className="text-[11px] text-gray-400">
-                This action is non-reversible. Items with active transaction records will fail deletion automatically.
-              </p>
-            </div>
-            <div className="px-5 py-3 border-t border-gray-100 bg-gray-50 flex justify-end gap-2">
-              <button
-                onClick={() => setShowBulkDeleteConfirm(false)}
-                className="px-3.5 py-1.5 border border-gray-250 rounded-lg text-xs font-bold text-gray-600 bg-white hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleBulkDelete}
-                className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow-3xs"
-              >
-                Delete All Selected
-              </button>
-            </div>
+      <Modal
+        isOpen={showBulkDeleteConfirm}
+        onClose={() => setShowBulkDeleteConfirm(false)}
+        size="max-w-sm"
+        title="Confirm Bulk Deletion"
+      >
+        <div className="space-y-3 text-left">
+          <p className="text-xs font-semibold leading-relaxed">
+            Are you sure you want to delete <span className="font-black text-red-600">{selectedIds.length} selected SKUs</span>?
+          </p>
+          <p className="text-[11px] text-gray-400">
+            This action is non-reversible. Items with active transaction records will fail deletion automatically.
+          </p>
+          <div className="flex justify-end gap-2 mt-4">
+            <button
+              onClick={() => setShowBulkDeleteConfirm(false)}
+              className="px-3.5 py-1.5 border border-gray-255 rounded-lg text-xs font-bold text-gray-600 bg-white hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow-3xs"
+            >
+              Delete All Selected
+            </button>
           </div>
         </div>
-      )}
+      </Modal>
 
       {/* Bulk Import Slide-Over Drawer */}
-      {showImportDrawer && (
-        <div className="fixed top-0 right-0 h-full w-full sm:w-[520px] bg-white shadow-2xl border-l border-gray-200 z-[60] flex flex-col animate-in slide-in-from-right duration-250 !mt-0">
-          <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-black text-gray-900">Bulk Import SKU Items</h2>
-              <p className="text-[10px] text-gray-500 mt-0.5">Paste a JSON array matching the required schema</p>
+      <Drawer
+        isOpen={showImportDrawer}
+        onClose={() => {
+          setShowImportDrawer(false);
+          setImportError('');
+          setImportSuccessMsg('');
+        }}
+        size="max-w-xl"
+        title="Bulk Import SKU Items"
+      >
+        <form onSubmit={handleBulkImport} className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 p-5 overflow-y-auto space-y-4">
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-gray-600 uppercase">JSON Data Array</label>
+              <textarea
+                value={importText}
+                onChange={e => setImportText(e.target.value)}
+                className="w-full h-[250px] p-3 border border-gray-250 rounded-xl font-mono text-xs focus:ring-2 focus:ring-blue-500"
+                placeholder={`[\n  {\n    "skuCode": "RM-REEL-70GSM",\n    "name": "Century Maplitho Reel 70 GSM",\n    "category": "Raw Material",\n    "unit": "kg",\n    "gsm": 70\n  }\n]`}
+              />
             </div>
+
+            {importError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex gap-2 text-xs text-red-750">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <div>
+                  <span className="font-bold">Import failed:</span> {importError}
+                </div>
+              </div>
+            )}
+
+            {importSuccessMsg && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-xl flex gap-2 text-xs text-green-700">
+                <CheckCircle className="w-4 h-4 shrink-0" />
+                <div>{importSuccessMsg}</div>
+              </div>
+            )}
+          </div>
+          <div className="px-5 py-3.5 border-t bg-gray-50 flex justify-end gap-2 shrink-0">
             <button
+              type="button"
               onClick={() => {
                 setShowImportDrawer(false);
                 setImportError('');
                 setImportSuccessMsg('');
               }}
-              className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg cursor-pointer"
+              className="px-3.5 py-1.5 border border-gray-250 rounded-lg text-xs font-bold text-gray-600 bg-white hover:bg-gray-55"
             >
-              <X className="w-5 h-5" />
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={importLoading}
+              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold shadow-3xs"
+            >
+              {importLoading ? 'Importing...' : 'Start Import'}
             </button>
           </div>
-          <form onSubmit={handleBulkImport} className="flex-1 flex flex-col overflow-hidden">
-            <div className="flex-1 p-5 overflow-y-auto space-y-4">
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold text-gray-600 uppercase">JSON Data Array</label>
-                <textarea
-                  value={importText}
-                  onChange={e => setImportText(e.target.value)}
-                  className="w-full h-[250px] p-3 border border-gray-250 rounded-xl font-mono text-xs focus:ring-2 focus:ring-blue-500"
-                  placeholder={`[\n  {\n    "skuCode": "RM-REEL-70GSM",\n    "name": "Century Maplitho Reel 70 GSM",\n    "category": "Raw Material",\n    "unit": "kg",\n    "gsm": 70\n  }\n]`}
-                />
-              </div>
-
-              {importError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex gap-2 text-xs text-red-750">
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
-                  <div>
-                    <span className="font-bold">Import failed:</span> {importError}
-                  </div>
-                </div>
-              )}
-
-              {importSuccessMsg && (
-                <div className="p-3 bg-green-50 border border-green-200 rounded-xl flex gap-2 text-xs text-green-700">
-                  <CheckCircle className="w-4 h-4 shrink-0" />
-                  <div>{importSuccessMsg}</div>
-                </div>
-              )}
-            </div>
-            <div className="px-5 py-3.5 border-t bg-gray-50 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowImportDrawer(false);
-                  setImportError('');
-                  setImportSuccessMsg('');
-                }}
-                className="px-3.5 py-1.5 border border-gray-250 rounded-lg text-xs font-bold text-gray-600 bg-white hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={importLoading}
-                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold shadow-3xs"
-              >
-                {importLoading ? 'Importing...' : 'Start Import'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+        </form>
+      </Drawer>
 
       {/* Tools sub-drawers (Activity Log, Duplicates, Recycle Bin) */}
       {/* Activity Log Drawer */}
-      {showActivityLog && (
-        <div className="fixed inset-0 z-[60] overflow-hidden !mt-0">
-          <div className="absolute inset-0 overflow-hidden bg-gray-900/40 backdrop-blur-3xs transition-opacity" onClick={() => setShowActivityLog(false)}></div>
-          <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
-            <div className="pointer-events-auto w-screen max-w-md">
-              <div className="flex h-full flex-col bg-white shadow-2xl animate-in slide-in-from-right duration-250">
-                <div className="bg-gray-50 px-4 py-5 border-b flex justify-between items-center">
-                  <div>
-                    <h2 className="text-base font-bold text-gray-900">SKU Activity Log</h2>
-                    <p className="text-[10px] text-gray-500 mt-0.5">Audit log history for item creations, updates and deletions</p>
-                  </div>
-                  <button onClick={() => setShowActivityLog(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                  {activityLogLoading ? (
-                    <div className="flex justify-center items-center h-40">
-                      <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
-                    </div>
-                  ) : activityLogs.length === 0 ? (
-                    <p className="text-center text-xs text-gray-500 py-8">No recent activity logs recorded.</p>
-                  ) : (
-                    <div className="space-y-4">
-                      {activityLogs.map((log, idx) => (
-                        <div key={log._id || idx} className="border-l-2 border-blue-500 pl-3 py-1 space-y-1 text-xs">
-                          <div className="flex justify-between font-bold text-gray-800">
-                            <span className="uppercase text-[10px] font-black text-blue-600">{log.action}</span>
-                            <span className="text-[10px] text-gray-400 font-normal">{new Date(log.createdAt).toLocaleString('en-IN')}</span>
-                          </div>
-                          <p className="text-gray-600 font-bold">SKU: {log.entityName}</p>
-                          <p className="text-gray-505 text-[11px]">{log.details}</p>
-                          <p className="text-[10px] text-gray-400 font-medium">Performed By: {log.performedBy}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+      <Drawer
+        isOpen={showActivityLog}
+        onClose={() => setShowActivityLog(false)}
+        size="max-w-md"
+        title="SKU Activity Log"
+      >
+        <div className="flex h-full flex-col overflow-hidden bg-white">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {activityLogLoading ? (
+              <div className="flex justify-center items-center h-40">
+                <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
               </div>
-            </div>
+            ) : activityLogs.length === 0 ? (
+              <p className="text-center text-xs text-gray-550 py-8">No recent activity logs recorded.</p>
+            ) : (
+              <div className="space-y-4">
+                {activityLogs.map((log, idx) => (
+                  <div key={log._id || idx} className="border-l-2 border-blue-500 pl-3 py-1 space-y-1 text-xs">
+                    <div className="flex justify-between font-bold text-gray-800">
+                      <span className="uppercase text-[10px] font-black text-blue-600">{log.action}</span>
+                      <span className="text-[10px] text-gray-400 font-normal">{new Date(log.createdAt).toLocaleString('en-IN')}</span>
+                    </div>
+                    <p className="text-gray-600 font-bold">SKU: {log.entityName}</p>
+                    <p className="text-gray-505 text-[11px]">{log.details}</p>
+                    <p className="text-[10px] text-gray-400 font-medium">Performed By: {log.performedBy}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
-      )}
+      </Drawer>
 
       {/* Find Duplicates Modal */}
-      {showDuplicates && (
-        <div className="fixed inset-0 z-[60] overflow-y-auto flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-3xs !mt-0 animate-in fade-in duration-200">
-          <div className="relative bg-white rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-2xl flex justify-between items-center">
-              <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-yellow-500" />
-                Find Duplicates for SKUs
-              </h2>
-              <button onClick={() => setShowDuplicates(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-6 overflow-y-auto flex-1 space-y-4 text-xs">
-              {duplicateGroups.length === 0 ? (
-                <div className="text-center py-8">
-                  <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
-                  <p className="font-semibold text-gray-800">No duplicates detected!</p>
-                  <p className="text-sm text-gray-400 mt-1">All SKU codes and names are completely unique.</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <p className="text-gray-500 font-medium">The following duplicate groups were identified by code or name:</p>
-                  {duplicateGroups.map((group, gIdx) => (
-                    <div key={gIdx} className="border border-red-100 bg-red-50/10 rounded-xl p-4 space-y-3">
-                      <div className="flex justify-between items-center border-b pb-2">
-                        <span className="font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded uppercase text-[10px]">
-                          Duplicate {group.field}: {group.value}
-                        </span>
-                        <span className="text-[10px] text-gray-400 font-bold">{group.items.length} duplicate entries</span>
-                      </div>
-                      <div className="space-y-2">
-                        {group.items.map((item, iIdx) => (
-                          <div key={item._id || iIdx} className="flex justify-between items-center text-[11px] text-gray-600 bg-white p-2 rounded-lg border border-gray-150">
-                            <div>
-                              <p className="font-bold text-gray-900">{item.name}</p>
-                              <p className="font-mono text-gray-400 text-[10px]">{item.skuCode} • {item.category}</p>
-                            </div>
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${item.status === 'Active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{item.status}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+      <Modal
+        isOpen={showDuplicates}
+        onClose={() => setShowDuplicates(false)}
+        size="max-w-2xl"
+        title={
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-yellow-500" />
+            <span>Find Duplicates for SKUs</span>
           </div>
+        }
+      >
+        <div className="p-2 space-y-4 text-xs">
+          {duplicateGroups.length === 0 ? (
+            <div className="text-center py-8">
+              <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
+              <p className="font-semibold text-gray-800">No duplicates detected!</p>
+              <p className="text-sm text-gray-400 mt-1">All SKU codes and names are completely unique.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-gray-500 font-medium">The following duplicate groups were identified by code or name:</p>
+              {duplicateGroups.map((group, gIdx) => (
+                <div key={gIdx} className="border border-red-100 bg-red-50/10 rounded-xl p-4 space-y-3">
+                  <div className="flex justify-between items-center border-b pb-2">
+                    <span className="font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded uppercase text-[10px]">
+                      Duplicate {group.field}: {group.value}
+                    </span>
+                    <span className="text-[10px] text-gray-400 font-bold">{group.items.length} duplicate entries</span>
+                  </div>
+                  <div className="space-y-2">
+                    {group.items.map((item, iIdx) => (
+                      <div key={item._id || iIdx} className="flex justify-between items-center text-[11px] text-gray-600 bg-white p-2 rounded-lg border border-gray-150">
+                        <div>
+                          <p className="font-bold text-gray-900">{item.name}</p>
+                          <p className="font-mono text-gray-400 text-[10px]">{item.skuCode} • {item.category}</p>
+                        </div>
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${item.status === 'Active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{item.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      </Modal>
 
       {/* Recycle Bin Drawer */}
-      {showRecycleBin && (
-        <div className="fixed inset-0 z-[60] overflow-hidden !mt-0">
-          <div className="absolute inset-0 overflow-hidden bg-gray-900/40 backdrop-blur-3xs transition-opacity" onClick={() => setShowRecycleBin(false)}></div>
-          <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
-            <div className="pointer-events-auto w-screen max-w-md">
-              <div className="flex h-full flex-col bg-white shadow-2xl animate-in slide-in-from-right duration-250">
-                <div className="bg-gray-50 px-4 py-5 border-b flex justify-between items-center">
-                  <div>
-                    <h2 className="text-base font-bold text-gray-900 flex items-center gap-1.5">
-                      <Trash2 className="w-4 h-4 text-gray-500" />
-                      SKU Recycle Bin (Inactive Items)
-                    </h2>
-                    <p className="text-[10px] text-gray-500 mt-0.5 font-medium">Inactive items can be restored back to the active catalog</p>
-                  </div>
-                  <button onClick={() => setShowRecycleBin(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                  {recycleBinLoading ? (
-                    <div className="flex justify-center items-center h-40">
-                      <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
-                    </div>
-                  ) : recycleBinItems.length === 0 ? (
-                    <div className="text-center py-12 text-gray-450">
-                      <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
-                      <p className="font-semibold text-gray-700">Recycle Bin is Empty!</p>
-                      <p className="text-xs text-gray-400 mt-1">No inactive SKUs found.</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {recycleBinItems.map((item, idx) => (
-                        <div key={item._id || idx} className="flex justify-between items-center p-3 border border-gray-200 rounded-xl bg-gray-50/50 hover:bg-white transition-all text-xs">
-                          <div className="space-y-1">
-                            <p className="font-bold text-gray-800">{item.name}</p>
-                            <p className="font-mono text-gray-400 text-[10px]">{item.skuCode} • {item.category}</p>
-                          </div>
-                          <button
-                            onClick={() => handleRestoreSku(item)}
-                            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-bold transition-colors cursor-pointer"
-                          >
-                            Restore
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+      <Drawer
+        isOpen={showRecycleBin}
+        onClose={() => setShowRecycleBin(false)}
+        size="max-w-md"
+        title={
+          <div className="flex items-center gap-1.5">
+            <Trash2 className="w-4 h-4 text-gray-500" />
+            <span>SKU Recycle Bin (Inactive Items)</span>
+          </div>
+        }
+      >
+        <div className="flex h-full flex-col overflow-hidden bg-white">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {recycleBinLoading ? (
+              <div className="flex justify-center items-center h-40">
+                <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
               </div>
-            </div>
+            ) : recycleBinItems.length === 0 ? (
+              <div className="text-center py-12 text-gray-450">
+                <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
+                <p className="font-semibold text-gray-700">Recycle Bin is Empty!</p>
+                <p className="text-xs text-gray-400 mt-1">No inactive SKUs found.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {recycleBinItems.map((item, idx) => (
+                  <div key={item._id || idx} className="flex justify-between items-center p-3 border border-gray-200 rounded-xl bg-gray-50/50 hover:bg-white transition-all text-xs text-left">
+                    <div className="space-y-1">
+                      <p className="font-bold text-gray-800">{item.name}</p>
+                      <p className="font-mono text-gray-400 text-[10px]">{item.skuCode} • {item.category}</p>
+                    </div>
+                    <button
+                      onClick={() => handleRestoreSku(item)}
+                      className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      Restore
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
-      )}
+      </Drawer>
     </div>
   );
 };

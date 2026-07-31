@@ -1,5 +1,5 @@
-import api from '../../../../api/axios';
-import { SkuV2, WarehouseLocationV2 } from '../../../../api/mfgApiV2';
+import api from '../../../api/axios';
+import { SkuV2, WarehouseLocationV2 } from '../../../api/mfgApiV2';
 
 export interface PurchaseInvoiceItemV2 {
   skuId: SkuV2 | string;

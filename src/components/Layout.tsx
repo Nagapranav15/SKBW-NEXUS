@@ -42,16 +42,13 @@ const Layout: React.FC = () => {
     ['/inventory-v2/batch-stock', '/inventory-v2/warehouse'].includes(window.location.pathname) || (window.location.pathname === '/inventory-v2/ledger' && !document.referrer.includes('purchase'))
   );
   const [conversionsOpen, setConversionsOpen] = useState(() => 
-    ['/inventory/bom', '/inventory/movements', '/inventory-v2/testing-transactions'].includes(window.location.pathname)
-  );
-  const [productionOpen, setProductionOpen] = useState(() => 
-    ['/inventory/dashboard', '/inventory/analytics'].includes(window.location.pathname)
+    ['/inventory-v2/testing-transactions'].includes(window.location.pathname)
   );
   const [salesOpen, setSalesOpen] = useState(() => 
     window.location.pathname.startsWith('/sales') && window.location.pathname !== '/sales/reports'
   );
   const [reportsOpen, setReportsOpen] = useState(() => 
-    ['/sales/reports', '/inventory/reports', '/analyzer', '/transactions'].includes(window.location.pathname)
+    ['/sales/reports', '/analyzer', '/transactions'].includes(window.location.pathname)
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showDataManager, setShowDataManager] = useState(false);
@@ -114,34 +111,6 @@ const Layout: React.FC = () => {
           case 't':
             e.preventDefault();
             handleNavigate('/party/transporters');
-            break;
-          case 'h':
-            e.preventDefault();
-            handleNavigate('/inventory/dashboard');
-            break;
-          case 'k':
-            e.preventDefault();
-            handleNavigate('/inventory/skus');
-            break;
-          case 'b':
-            e.preventDefault();
-            handleNavigate('/inventory/bom');
-            break;
-          case 'z':
-            e.preventDefault();
-            handleNavigate('/inventory/zones');
-            break;
-          case 'm':
-            e.preventDefault();
-            handleNavigate('/inventory/movements');
-            break;
-          case 'n':
-            e.preventDefault();
-            handleNavigate('/inventory/analytics');
-            break;
-          case 'p':
-            e.preventDefault();
-            handleNavigate('/inventory/reports');
             break;
           case 'g':
             e.preventDefault();
@@ -241,22 +210,11 @@ const Layout: React.FC = () => {
 
   // Conversions
   const conversionsItems = [
-    { label: 'BOM & Assembly', path: '/inventory/bom', permission: ['MANAGE_INVENTORY', 'MANAGE_ITEMS'] },
-    { label: 'Movements', path: '/inventory/movements', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
     { label: 'Transactions (Test)', path: '/inventory-v2/testing-transactions', permission: ['MANAGE_INVENTORY', 'MANAGE_ITEMS'] },
   ];
   const visibleConversionsItems = conversionsItems.filter(item => hasPermission(item.permission));
   const hasConversionsAccess = visibleConversionsItems.length > 0;
-  const isConversionsActive = () => ['/inventory/bom', '/inventory/movements', '/inventory-v2/testing-transactions'].includes(location.pathname);
-
-  // Production
-  const productionItems = [
-    { label: 'Mfg Dashboard', path: '/inventory/dashboard', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
-    { label: 'Mfg Analytics', path: '/inventory/analytics', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
-  ];
-  const visibleProductionItems = productionItems.filter(item => hasPermission(item.permission));
-  const hasProductionAccess = visibleProductionItems.length > 0;
-  const isProductionActive = () => ['/inventory/dashboard', '/inventory/analytics'].includes(location.pathname);
+  const isConversionsActive = () => ['/inventory-v2/testing-transactions'].includes(location.pathname);
 
   // Sales
   const salesItems = [
@@ -273,13 +231,12 @@ const Layout: React.FC = () => {
   // Reports
   const reportsItems = [
     { label: 'Sales Reports', path: '/sales/reports', permission: ['MANAGE_REPORTS', 'VIEW_REPORTS'] },
-    { label: 'Mfg Reports', path: '/inventory/reports', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
     { label: 'Analyzer', path: '/analyzer', permission: ['MANAGE_REPORTS', 'VIEW_REPORTS'] },
     { label: 'Transactions', path: '/transactions', permission: ['MANAGE_REPORTS', 'VIEW_REPORTS', 'VIEW_TRANSACTIONS'] },
   ];
   const visibleReportsItems = reportsItems.filter(item => hasPermission(item.permission));
   const hasReportsAccess = visibleReportsItems.length > 0;
-  const isReportsActive = () => ['/sales/reports', '/inventory/reports', '/analyzer', '/transactions'].includes(location.pathname);
+  const isReportsActive = () => ['/sales/reports', '/analyzer', '/transactions'].includes(location.pathname);
 
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
@@ -496,37 +453,6 @@ const Layout: React.FC = () => {
             </div>
           )}
 
-          {/* Production Dropdown */}
-          {hasProductionAccess && (
-            <div>
-              <button
-                onClick={() => setProductionOpen(!productionOpen)}
-                className={getDropdownPrimaryClass(isProductionActive() || productionOpen)}
-              >
-                <div className="flex items-center space-x-3">
-                  <BarChart3 className={`w-5 h-5 ${(isProductionActive() || productionOpen) ? 'text-blue-600' : 'text-gray-500'}`} />
-                  {sidebarOpen && <span className={(isProductionActive() || productionOpen) ? 'text-blue-700 font-bold' : 'text-gray-700'}>Production</span>}
-                </div>
-                {sidebarOpen && (
-                  <ChevronDown className={`w-4 h-4 transition-transform ${productionOpen ? 'rotate-180 text-blue-600' : 'text-gray-400'}`} />
-                )}
-              </button>
-              
-              {productionOpen && sidebarOpen && (
-                <div className="mt-1 ml-4 pl-2 border-l border-gray-150 space-y-0.5 animate-in fade-in duration-100">
-                  {visibleProductionItems.map((item) => (
-                    <button
-                      key={item.path}
-                      onClick={() => handleNavigate(item.path)}
-                      className={getSubItemClass(item.path)}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Sales Dropdown */}
           {hasSalesAccess && (

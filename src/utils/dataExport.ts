@@ -112,46 +112,22 @@ export const importDataFromJSON = (file: File): Promise<boolean> => {
           throw new Error('Invalid data format');
         }
 
-        // Import companies
-        for (const company of importedData.companies) {
-          const { _id, __v, createdAt, updatedAt, ...companyData } = company;
-          await api.post('/companies', companyData).catch(() => {});
-        }
+        const importConfigs = [
+          { key: 'companies', endpoint: '/companies' },
+          { key: 'parties', endpoint: '/parties' },
+          { key: 'items', endpoint: '/items' },
+          { key: 'quotes', endpoint: '/quotes' },
+          { key: 'salesOrders', endpoint: '/sales-orders' },
+          { key: 'deliveryChallans', endpoint: '/delivery-challans' },
+          { key: 'dispatchCards', endpoint: '/dispatch-cards' },
+        ] as const;
 
-        // Import parties
-        for (const party of importedData.parties) {
-          const { _id, __v, createdAt, updatedAt, ...partyData } = party;
-          await api.post('/parties', partyData).catch(() => {});
-        }
-
-        // Import items
-        for (const item of importedData.items) {
-          const { _id, __v, createdAt, updatedAt, ...itemData } = item;
-          await api.post('/items', itemData).catch(() => {});
-        }
-
-        // Import quotes
-        for (const quote of (importedData.quotes || [])) {
-          const { _id, __v, createdAt, updatedAt, ...quoteData } = quote;
-          await api.post('/quotes', quoteData).catch(() => {});
-        }
-
-        // Import sales orders
-        for (const order of (importedData.salesOrders || [])) {
-          const { _id, __v, createdAt, updatedAt, ...orderData } = order;
-          await api.post('/sales-orders', orderData).catch(() => {});
-        }
-
-        // Import delivery challans
-        for (const dc of (importedData.deliveryChallans || [])) {
-          const { _id, __v, createdAt, updatedAt, ...dcData } = dc;
-          await api.post('/delivery-challans', dcData).catch(() => {});
-        }
-
-        // Import dispatch cards
-        for (const card of (importedData.dispatchCards || [])) {
-          const { _id, __v, createdAt, updatedAt, ...cardData } = card;
-          await api.post('/dispatch-cards', cardData).catch(() => {});
+        for (const config of importConfigs) {
+          const list = (importedData[config.key] || []) as any[];
+          for (const item of list) {
+            const { _id, __v, createdAt, updatedAt, ...itemData } = item;
+            await api.post(config.endpoint, itemData).catch(() => {});
+          }
         }
 
         resolve(true);

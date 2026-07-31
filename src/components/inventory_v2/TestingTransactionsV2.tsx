@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ArrowRightLeft, RefreshCw, Send, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getSkusV2, getWarehouseHierarchyV2, getBalancesV2, SkuV2, WarehouseLocationV2 } from '../../api/mfgApiV2';
-import { createInventoryLedgerEntry } from './ledger/services/ledgerService';
+import { createInventoryLedgerEntry } from './ledger/ledgerService';
 import { showToast } from '../ui/Toast';
 
 const TestingTransactionsV2: React.FC = () => {

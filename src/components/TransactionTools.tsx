@@ -3,6 +3,7 @@ import { Plus, Download, Upload, Search, Filter, Trash2, Edit, X, FileText, Chev
 import { useAuth } from '../context/AuthContext';
 import * as txnApi from '../api/transactionApi';
 import * as XLSX from 'xlsx';
+import Modal from './ui/Modal';
 
 const PAYMENT_METHODS = [
   { value: 'cash', label: 'Cash', color: 'bg-green-100 text-green-700' },
@@ -297,40 +298,37 @@ const TransactionTools: React.FC = () => {
       )}
 
       {/* ADD/EDIT MODAL */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">{editingTxn ? 'Edit Transaction' : 'Add Transaction'}</h3>
-              <button onClick={() => { setShowModal(false); setEditingTxn(null); }} className="p-1 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="block text-sm font-medium text-gray-700 mb-1">Date *</label><input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" /></div>
-                <div><label className="block text-sm font-medium text-gray-700 mb-1">Type *</label><select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"><option value="credit">Credit</option><option value="debit">Debit</option></select></div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="block text-sm font-medium text-gray-700 mb-1">Category</label><select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"><option value="">Select...</option>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-                <div><label className="block text-sm font-medium text-gray-700 mb-1">Amount *</label><input type="number" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" /></div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="block text-sm font-medium text-gray-700 mb-1">Payment Method *</label><select value={form.paymentMethod} onChange={e => setForm(f => ({ ...f, paymentMethod: e.target.value, referenceId: '' }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">{PAYMENT_METHODS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}</select></div>
-                <div><label className="block text-sm font-medium text-gray-700 mb-1">{getRefLabel(form.paymentMethod)}</label><input value={form.referenceId} onChange={e => setForm(f => ({ ...f, referenceId: e.target.value }))} placeholder={getRefLabel(form.paymentMethod)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" /></div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                {form.paymentMethod === 'custom' && <div><label className="block text-sm font-medium text-gray-700 mb-1">Custom Method</label><input value={form.customPaymentMethod} onChange={e => setForm(f => ({ ...f, customPaymentMethod: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" /></div>}
-                <div><label className="block text-sm font-medium text-gray-700 mb-1">Ledger/Account</label><input value={form.ledgerAccount} onChange={e => setForm(f => ({ ...f, ledgerAccount: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" /></div>
-              </div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Party Name</label><input value={form.partyName} onChange={e => setForm(f => ({ ...f, partyName: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" /></div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Description</label><textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" /></div>
-            </div>
-            <div className="flex justify-end space-x-3 mt-5">
-              <button onClick={() => { setShowModal(false); setEditingTxn(null); }} className="px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
-              <button onClick={handleSave} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">{editingTxn ? 'Update' : 'Create'}</button>
-            </div>
+      <Modal
+        isOpen={showModal}
+        onClose={() => { setShowModal(false); setEditingTxn(null); }}
+        size="max-w-lg"
+        title={editingTxn ? 'Edit Transaction' : 'Add Transaction'}
+      >
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="block text-sm font-medium text-gray-700 mb-1">Date *</label><input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" /></div>
+            <div><label className="block text-sm font-medium text-gray-700 mb-1">Type *</label><select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"><option value="credit">Credit</option><option value="debit">Debit</option></select></div>
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="block text-sm font-medium text-gray-700 mb-1">Category</label><select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"><option value="">Select...</option>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+            <div><label className="block text-sm font-medium text-gray-700 mb-1">Amount *</label><input type="number" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="block text-sm font-medium text-gray-700 mb-1">Payment Method *</label><select value={form.paymentMethod} onChange={e => setForm(f => ({ ...f, paymentMethod: e.target.value, referenceId: '' }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">{PAYMENT_METHODS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}</select></div>
+            <div><label className="block text-sm font-medium text-gray-700 mb-1">{getRefLabel(form.paymentMethod)}</label><input value={form.referenceId} onChange={e => setForm(f => ({ ...f, referenceId: e.target.value }))} placeholder={getRefLabel(form.paymentMethod)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {form.paymentMethod === 'custom' && <div><label className="block text-sm font-medium text-gray-700 mb-1">Custom Method</label><input value={form.customPaymentMethod} onChange={e => setForm(f => ({ ...f, customPaymentMethod: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" /></div>}
+            <div><label className="block text-sm font-medium text-gray-700 mb-1">Ledger/Account</label><input value={form.ledgerAccount} onChange={e => setForm(f => ({ ...f, ledgerAccount: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" /></div>
+          </div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1">Party Name</label><input value={form.partyName} onChange={e => setForm(f => ({ ...f, partyName: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" /></div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1">Description</label><textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" /></div>
         </div>
-      )}
+        <div className="flex justify-end space-x-3 mt-5">
+          <button onClick={() => { setShowModal(false); setEditingTxn(null); }} className="px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 font-semibold">Cancel</button>
+          <button onClick={handleSave} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 font-semibold">{editingTxn ? 'Update' : 'Create'}</button>
+        </div>
+      </Modal>
     </div>
   );
 };

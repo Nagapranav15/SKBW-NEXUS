@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, RefreshCw, Layers } from 'lucide-react';
 import { createSkuV2, updateSkuV2, SkuV2, getMetadataV2, updateMetadataV2, getSkusV2 } from '../../api/mfgApiV2';
+import Modal from '../ui/Modal';
+import Drawer from '../ui/Drawer';
 
 interface AddSkuDrawerV2Props {
   isOpen: boolean;
@@ -433,30 +435,24 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
       }
     };
 
-    if (!isOpen) return null;
-
     return (
-      <div className="fixed top-0 right-0 h-full w-full sm:w-[520px] bg-white shadow-2xl border-l border-gray-200 z-[70] flex flex-col animate-in slide-in-from-right duration-250 font-sans text-xs !mt-0">
-          {/* Header */}
-          <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-bold text-gray-900">
-                {editSku ? 'Edit SKU Item' : 'Add New SKU Item'}
-              </h2>
-              <p className="text-[10px] text-gray-500 mt-0.5">
-                {editSku ? 'Modify SKU specifications and values' : 'Register a new manufacturing inventory SKU item'}
-              </p>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
+      <>
+        <Drawer
+        isOpen={isOpen}
+        onClose={onClose}
+        size="sm:w-[520px]"
+        title={
+          <div>
+            <h2 className="text-sm font-bold text-gray-900">
+              {editSku ? 'Edit SKU Item' : 'Add New SKU Item'}
+            </h2>
+            <p className="text-[10px] text-gray-550 mt-0.5 normal-case font-medium">
+              {editSku ? 'Modify SKU specifications and values' : 'Register a new manufacturing inventory SKU item'}
+            </p>
           </div>
-
-          {/* Scrollable Form Body */}
-          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-6">
+        }
+      >
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-6">
             {errorMsg && (
               <div className="p-3 bg-red-50 border border-red-150 rounded-xl text-xs font-semibold text-red-700">
                 {errorMsg}
@@ -1015,106 +1011,91 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
             )}
           </button>
         </div>
-
+      </Drawer>
       {/* Dynamic Option Custom Modal Popup */}
-      {modalConfig.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-xs font-sans text-xs">
-          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full border border-gray-150 overflow-hidden animate-in zoom-in-95 duration-150">
-            {/* Header */}
-            <div className="px-5 py-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-              <span className="font-bold text-gray-800 text-xs">
-                Add Custom {modalConfig.type === 'categories' ? 'Category' : modalConfig.type === 'units' ? 'Unit' : modalConfig.type === 'groups' ? 'Group' : 'Rule Type'}
+      <Modal
+        isOpen={modalConfig.isOpen}
+        onClose={() => setModalConfig({ isOpen: false, type: null, nameValue: '', selectedFields: [] })}
+        size="max-w-sm"
+        title={`Add Custom ${modalConfig.type === 'categories' ? 'Category' : modalConfig.type === 'units' ? 'Unit' : modalConfig.type === 'groups' ? 'Group' : 'Rule Type'}`}
+      >
+        <div className="space-y-4 text-xs text-left">
+          <div>
+            <label className="block text-[9px] font-bold text-gray-500 mb-1 uppercase">
+              {modalConfig.type === 'categories' ? 'Category Name' : modalConfig.type === 'units' ? 'Unit Symbol' : modalConfig.type === 'groups' ? 'Group Name' : 'Rule Name'} *
+            </label>
+            <input
+              type="text"
+              placeholder={
+                modalConfig.type === 'categories' ? 'e.g. Packing Material' :
+                modalConfig.type === 'units' ? 'e.g. gross' :
+                modalConfig.type === 'groups' ? 'e.g. 132P Happy days (UR)' : 'e.g. Single Line'
+              }
+              value={modalConfig.nameValue}
+              onChange={e => setModalConfig(prev => ({ ...prev, nameValue: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 font-semibold text-gray-800 bg-white"
+              autoFocus
+            />
+          </div>
+
+          {/* Checklist of fields for new Category */}
+          {modalConfig.type === 'categories' && (
+            <div className="space-y-2 border-t pt-3">
+              <span className="block text-[9px] font-black text-gray-500 uppercase tracking-wider mb-1">
+                Select Required Fields
               </span>
-              <button 
-                type="button"
-                onClick={() => setModalConfig({ isOpen: false, type: null, nameValue: '', selectedFields: [] })}
-                className="text-gray-400 hover:text-gray-600 rounded p-1 hover:bg-gray-100"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            
-            {/* Form Fields */}
-            <div className="p-5 space-y-4">
-              <div>
-                <label className="block text-[9px] font-bold text-gray-500 mb-1 uppercase">
-                  {modalConfig.type === 'categories' ? 'Category Name' : modalConfig.type === 'units' ? 'Unit Symbol' : modalConfig.type === 'groups' ? 'Group Name' : 'Rule Name'} *
-                </label>
-                <input
-                  type="text"
-                  placeholder={
-                    modalConfig.type === 'categories' ? 'e.g. Packing Material' :
-                    modalConfig.type === 'units' ? 'e.g. gross' :
-                    modalConfig.type === 'groups' ? 'e.g. 132P Happy days (UR)' : 'e.g. Single Line'
-                  }
-                  value={modalConfig.nameValue}
-                  onChange={e => setModalConfig(prev => ({ ...prev, nameValue: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 font-semibold text-gray-800 bg-white"
-                  autoFocus
-                />
+              <div className="grid grid-cols-2 gap-2 bg-gray-50 p-3 rounded-xl border border-gray-100 max-h-40 overflow-y-auto">
+                {[
+                  { id: 'brand', label: 'Brand' },
+                  { id: 'title', label: 'Title (Description)' },
+                  { id: 'group', label: 'Group' },
+                  { id: 'gsm', label: 'GSM' },
+                  { id: 'width', label: 'Width (cm)' },
+                  { id: 'length', label: 'Length (cm)' },
+                  { id: 'paperType', label: 'Format Reels/Sheets' },
+                  { id: 'ruleType', label: 'Rule Type' },
+                  { id: 'pages', label: 'Pages' },
+                  { id: 'booksGbl', label: 'Books / GBL' },
+                  { id: 'altUnit', label: 'Alternative Unit' }
+                ].map(f => (
+                  <label key={f.id} className="flex items-center gap-1.5 cursor-pointer hover:text-blue-600 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={modalConfig.selectedFields.includes(f.id)}
+                      onChange={e => {
+                        const newFields = e.target.checked
+                          ? [...modalConfig.selectedFields, f.id]
+                          : modalConfig.selectedFields.filter(x => x !== f.id);
+                        setModalConfig(prev => ({ ...prev, selectedFields: newFields }));
+                      }}
+                      className="rounded border-gray-305 text-blue-605 focus:ring-blue-500 w-3.5 h-3.5"
+                    />
+                    <span className="text-[10px] font-semibold text-gray-700">{f.label}</span>
+                  </label>
+                ))}
               </div>
-
-              {/* Checklist of fields for new Category */}
-              {modalConfig.type === 'categories' && (
-                <div className="space-y-2 border-t pt-3">
-                  <span className="block text-[9px] font-black text-gray-500 uppercase tracking-wider mb-1">
-                    Select Required Fields
-                  </span>
-                  <div className="grid grid-cols-2 gap-2 bg-gray-50 p-3 rounded-xl border border-gray-100 max-h-40 overflow-y-auto">
-                    {[
-                      { id: 'brand', label: 'Brand' },
-                      { id: 'title', label: 'Title (Description)' },
-                      { id: 'group', label: 'Group' },
-                      { id: 'gsm', label: 'GSM' },
-                      { id: 'width', label: 'Width (cm)' },
-                      { id: 'length', label: 'Length (cm)' },
-                      { id: 'paperType', label: 'Format Reels/Sheets' },
-                      { id: 'ruleType', label: 'Rule Type' },
-                      { id: 'pages', label: 'Pages' },
-                      { id: 'booksGbl', label: 'Books / GBL' },
-                      { id: 'altUnit', label: 'Alternative Unit' }
-                    ].map(f => (
-                      <label key={f.id} className="flex items-center gap-1.5 cursor-pointer hover:text-blue-600 transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={modalConfig.selectedFields.includes(f.id)}
-                          onChange={e => {
-                            const newFields = e.target.checked
-                              ? [...modalConfig.selectedFields, f.id]
-                              : modalConfig.selectedFields.filter(x => x !== f.id);
-                            setModalConfig(prev => ({ ...prev, selectedFields: newFields }));
-                          }}
-                          className="rounded border-gray-305 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
-                        />
-                        <span className="text-[10px] font-semibold text-gray-700">{f.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
+          )}
 
-            {/* Actions */}
-            <div className="px-5 py-3.5 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setModalConfig({ isOpen: false, type: null, nameValue: '', selectedFields: [] })}
-                className="px-3 py-1.5 border border-gray-200 rounded-lg font-bold hover:bg-gray-100 text-gray-600 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveCustomOption}
-                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-sm transition-colors"
-              >
-                Save Option
-              </button>
-            </div>
+          <div className="flex items-center justify-end gap-2 pt-4 border-t">
+            <button
+              type="button"
+              onClick={() => setModalConfig({ isOpen: false, type: null, nameValue: '', selectedFields: [] })}
+              className="px-3 py-1.5 border border-gray-200 rounded-lg font-bold hover:bg-gray-100 text-gray-600 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveCustomOption}
+              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-sm transition-colors"
+            >
+              Save Option
+            </button>
           </div>
         </div>
-      )}
-    </div>
+      </Modal>
+    </>
   );
 };
 

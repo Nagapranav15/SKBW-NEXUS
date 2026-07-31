@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext';
+import Modal from './ui/Modal';
+import Drawer from './ui/Drawer';
 import {
   getParties, getPartyStats, createParty, updateParty, getPartyById,
   deleteParty as deletePartyApi, importParties as importPartiesApi,
@@ -4765,137 +4767,113 @@ const PartyManagement: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* Activity Log slide-out modal */}
-      {showActivityLog && (
-        <div className="fixed inset-0 z-50 overflow-hidden" aria-labelledby="slide-over-title" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 overflow-hidden bg-gray-900/40 backdrop-blur-sm transition-opacity" onClick={() => setShowActivityLog(false)}></div>
-          <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
-            <div className="pointer-events-auto w-screen max-w-md">
-              <div className="flex h-full flex-col overflow-y-scroll bg-white shadow-2xl">
-                
-                {/* Header */}
-                <div className="bg-gray-50 px-4 py-6 sm:px-6 border-b flex-shrink-0">
-                  <div className="flex items-start justify-between">
-                    <h2 className="text-lg font-bold text-gray-900" id="slide-over-title">
-                      {typeLabel} Activity Log
-                    </h2>
-                    <div className="ml-3 flex h-7 items-center space-x-2">
-                      <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold text-gray-500 bg-gray-100 rounded border border-gray-200 shadow-xs select-none pointer-events-none">Esc</kbd>
-                      <button onClick={() => setShowActivityLog(false)} className="rounded-md text-gray-400 hover:text-gray-500 focus:outline-none">
-                        <X className="h-6 w-6" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Filters */}
-                <div className="bg-gray-50/50 px-4 py-3 sm:px-6 border-b flex gap-2 flex-shrink-0">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Search logs..."
-                      value={logSearch}
-                      onChange={e => setLogSearch(e.target.value)}
-                      className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-                    />
-                    {logSearch && (
-                      <button onClick={() => setLogSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-450 hover:text-gray-700 text-xs">
-                        Clear
-                      </button>
-                    )}
-                  </div>
-                  <select
-                    value={logActionFilter}
-                    onChange={e => setLogActionFilter(e.target.value)}
-                    className="px-2 py-1.5 border border-gray-200 rounded-lg text-xs bg-white text-gray-755 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                  >
-                    <option value="ALL">All Actions</option>
-                    <option value="CREATE">Creates</option>
-                    <option value="UPDATE">Updates</option>
-                    <option value="DELETE">Deletes</option>
-                    <option value="RESTORE">Restores</option>
-                  </select>
-                </div>
-
-                {/* Timeline content */}
-                <div className="relative flex-1 py-6 px-4 sm:px-6">
-                  {activityLogLoading ? (
-                    <div className="flex justify-center items-center h-40">
-                      <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
-                    </div>
-                  ) : activityLogs.length === 0 ? (
-                    <p className="text-sm text-gray-500 text-center py-8">No recent activity logged for {typeLabelPlural.toLowerCase()}</p>
-                  ) : filteredLogs.length === 0 ? (
-                    <p className="text-sm text-gray-500 text-center py-8">No matching activity logs found.</p>
-                  ) : (
-                    <div className="flow-root">
-                      <ul role="list" className="-mb-8">
-                        {filteredLogs.map((log, logIdx) => (
-                          <li key={log._id}>
-                            <div className="relative pb-8">
-                              {logIdx !== activityLogs.length - 1 ? (
-                                <span className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
-                              ) : null}
-                              <div className="relative flex space-x-3">
-                                <div>
-                                  <span className={`h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white ${
-                                    log.action === 'CREATE' ? 'bg-green-500 text-white' :
-                                    log.action === 'UPDATE' ? 'bg-blue-500 text-white' :
-                                    log.action === 'DELETE' ? 'bg-red-500 text-white' :
-                                    'bg-purple-500 text-white'
-                                  }`}>
-                                    {log.action[0]}
-                                  </span>
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-semibold text-gray-900">{log.details}</p>
-                                  <div className="flex justify-between items-center mt-1 text-xs text-gray-500">
-                                    <span>By: {log.performedBy}</span>
-                                    <span>{new Date(log.createdAt).toLocaleString()}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-
-              </div>
+      <Drawer
+        isOpen={showActivityLog}
+        onClose={() => setShowActivityLog(false)}
+        size="max-w-md"
+        title={`${typeLabel} Activity Log`}
+      >
+        <div className="flex h-full flex-col overflow-hidden bg-white">
+          {/* Filters */}
+          <div className="bg-gray-50 px-4 py-3 sm:px-6 border-b flex gap-2 flex-shrink-0">
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search logs..."
+                value={logSearch}
+                onChange={e => setLogSearch(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+              />
+              {logSearch && (
+                <button onClick={() => setLogSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-450 hover:text-gray-700 text-xs">
+                  Clear
+                </button>
+              )}
             </div>
+            <select
+              value={logActionFilter}
+              onChange={e => setLogActionFilter(e.target.value)}
+              className="px-2 py-1.5 border border-gray-200 rounded-lg text-xs bg-white text-gray-755 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+            >
+              <option value="ALL">All Actions</option>
+              <option value="CREATE">Creates</option>
+              <option value="UPDATE">Updates</option>
+              <option value="DELETE">Deletes</option>
+              <option value="RESTORE">Restores</option>
+            </select>
+          </div>
+
+          {/* Timeline content */}
+          <div className="relative flex-1 py-6 px-4 sm:px-6 overflow-y-auto">
+            {activityLogLoading ? (
+              <div className="flex justify-center items-center h-40">
+                <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
+              </div>
+            ) : activityLogs.length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-8">No recent activity logged for {typeLabelPlural.toLowerCase()}</p>
+            ) : filteredLogs.length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-8">No matching activity logs found.</p>
+            ) : (
+              <div className="flow-root">
+                <ul role="list" className="-mb-8">
+                  {filteredLogs.map((log, logIdx) => (
+                    <li key={log._id}>
+                      <div className="relative pb-8">
+                        {logIdx !== activityLogs.length - 1 ? (
+                          <span className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
+                        ) : null}
+                        <div className="relative flex space-x-3">
+                          <div>
+                            <span className={`h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white ${
+                              log.action === 'CREATE' ? 'bg-green-500 text-white' :
+                              log.action === 'UPDATE' ? 'bg-blue-500 text-white' :
+                              log.action === 'DELETE' ? 'bg-red-500 text-white' :
+                              'bg-purple-500 text-white'
+                            }`}>
+                              {log.action[0]}
+                            </span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gray-900">{log.details}</p>
+                            <div className="flex justify-between items-center mt-1 text-xs text-gray-500">
+                              <span>By: {log.performedBy}</span>
+                              <span>{new Date(log.createdAt).toLocaleString()}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </div>
-      )}
+      </Drawer>
 
       {/* Find Duplicates Modal */}
-      {showDuplicates && (
-        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm">
-          <div className="relative bg-white rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
-            
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-2xl flex justify-between items-center">
-              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-yellow-500" />
-                Find Duplicates for {typeLabelPlural}
-              </h2>
-              <div className="flex items-center gap-3">
-                <span className="hidden sm:flex items-center gap-1.5 text-[10px] text-gray-400 font-mono select-none">
-                  <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-gray-500">↑↓</kbd> select &nbsp;
-                  <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-gray-500">V</kbd> view &nbsp;
-                  {currentType !== 'route' && <><kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-gray-500">M</kbd> merge &nbsp;</>}
-                  <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-gray-500">K</kbd> keep &nbsp;
-                  <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-gray-500">Esc</kbd> close
-                </span>
-                <button onClick={() => setShowDuplicates(false)} className="text-gray-400 hover:text-gray-600">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
+      <Modal
+        isOpen={showDuplicates}
+        onClose={() => setShowDuplicates(false)}
+        size="max-w-2xl"
+        title={
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-yellow-500" />
+            <span>Find Duplicates for {typeLabelPlural}</span>
+          </div>
+        }
+      >
+        <div className="flex justify-between items-center bg-gray-50 px-4 py-2 border border-gray-100 rounded-lg mb-4 text-[10px] text-gray-400 font-mono select-none">
+          <span>Keyboard Shortcuts:</span>
+          <span className="flex items-center gap-1.5">
+            <kbd className="px-1.5 py-0.5 bg-white border border-gray-200 rounded text-gray-500">↑↓</kbd> select &nbsp;
+            <kbd className="px-1.5 py-0.5 bg-white border border-gray-200 rounded text-gray-500">V</kbd> view &nbsp;
+            {currentType !== 'route' && <><kbd className="px-1.5 py-0.5 bg-white border border-gray-200 rounded text-gray-500">M</kbd> merge &nbsp;</>}
+            <kbd className="px-1.5 py-0.5 bg-white border border-gray-200 rounded text-gray-500">K</kbd> keep &nbsp;
+            <kbd className="px-1.5 py-0.5 bg-white border border-gray-200 rounded text-gray-500">Esc</kbd> close
+          </span>
+        </div>
             {/* List */}
             <div className="p-6 overflow-y-auto flex-1 space-y-6">
               {duplicateGroups.length === 0 ? (
@@ -5024,9 +5002,7 @@ const PartyManagement: React.FC = () => {
               </button>
             </div>
 
-          </div>
-        </div>
-      )}
+      </Modal>
 
       {/* Compare Duplicates Modal (View Both) */}
       {compareGroup && (

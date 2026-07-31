@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Layers, Search, RefreshCw, X, FileText, ChevronRight, ChevronDown, Warehouse, MapPin, Database, Calendar, Package, ArrowUpRight, ArrowDownLeft, AlertCircle, ArrowRightLeft, Eye, HelpCircle, Download, Plus, ArrowRight, Printer, Coins, MoreVertical } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getBalancesV2, getWarehouseHierarchyV2, getLedgerV2, recordTransferV2, SkuV2, WarehouseLocationV2, LedgerEntryV2 } from '../../api/mfgApiV2';
-import { getPurchaseInvoicesV2, PurchaseInvoiceV2 } from './purchases/services/purchaseService';
+import { getPurchaseInvoicesV2, PurchaseInvoiceV2 } from './purchases/purchaseService';
 import { showToast } from '../ui/Toast';
 
 const BatchStockV2: React.FC = () => {
