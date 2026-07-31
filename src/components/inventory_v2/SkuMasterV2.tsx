@@ -27,7 +27,9 @@ const SkuMasterV2: React.FC = () => {
     name: 'Item Name',
     category: 'Category',
     group: 'Group',
-    unit: 'Unit',
+    unit: 'Primary Unit',
+    altUnit: 'Alternate Unit',
+    altUnitConversion: 'Conversion Rate',
     gsm: 'GSM',
     dimensions: 'Size (W x L)',
     pages: 'Pages',
@@ -47,6 +49,8 @@ const SkuMasterV2: React.FC = () => {
       category: true,
       group: true,
       unit: true,
+      altUnit: true,
+      altUnitConversion: true,
       gsm: true,
       dimensions: true,
       pages: true,
@@ -810,11 +814,11 @@ const SkuMasterV2: React.FC = () => {
               </div>
             ) : filteredSkus.length > 0 ? (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
+                <table className="min-w-full divide-y divide-gray-200">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200 text-[10px] text-gray-450 uppercase font-black tracking-wider">
+                    <tr className="bg-gray-50">
                       {/* Checkbox column */}
-                      <th className="px-5 py-3.5 text-left w-10">
+                      <th className="px-3 py-2 text-left w-10">
                         <input
                           type="checkbox"
                           checked={isAllOnPageSelected}
@@ -825,16 +829,18 @@ const SkuMasterV2: React.FC = () => {
                           className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 border-gray-300 cursor-pointer"
                         />
                       </th>
-                      {visibleColumns.skuCode && <th className="px-5 py-3.5 whitespace-nowrap">Item Code</th>}
-                      {visibleColumns.name && <th className="px-5 py-3.5 whitespace-nowrap">Item Name</th>}
-                      {visibleColumns.category && <th className="px-5 py-3.5 whitespace-nowrap">Category</th>}
-                      {visibleColumns.group && <th className="px-5 py-3.5 whitespace-nowrap">Group</th>}
-                      {visibleColumns.unit && <th className="px-5 py-3.5 whitespace-nowrap">Unit</th>}
-                      {visibleColumns.gsm && <th className="px-5 py-3.5 text-center whitespace-nowrap">GSM</th>}
-                      {visibleColumns.dimensions && <th className="px-5 py-3.5 text-center whitespace-nowrap">Size</th>}
-                      {visibleColumns.pages && <th className="px-5 py-3.5 text-center whitespace-nowrap">Pages</th>}
-                      {visibleColumns.status && <th className="px-5 py-3.5 text-center whitespace-nowrap">Status</th>}
-                      <th className="px-5 py-3.5 text-center whitespace-nowrap">Actions</th>
+                      {visibleColumns.skuCode && <th className="px-3.5 py-2 text-left text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Item Code</th>}
+                      {visibleColumns.name && <th className="px-3.5 py-2 text-left text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Item Name</th>}
+                      {visibleColumns.category && <th className="px-3.5 py-2 text-left text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Category</th>}
+                      {visibleColumns.group && <th className="px-3.5 py-2 text-left text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Group</th>}
+                      {visibleColumns.unit && <th className="px-3.5 py-2 text-left text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Primary Unit</th>}
+                      {visibleColumns.altUnit && <th className="px-3.5 py-2 text-left text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Alternate Unit</th>}
+                      {visibleColumns.altUnitConversion && <th className="px-3.5 py-2 text-left text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Conversion Rate</th>}
+                      {visibleColumns.gsm && <th className="px-3.5 py-2 text-center text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">GSM</th>}
+                      {visibleColumns.dimensions && <th className="px-3.5 py-2 text-center text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Size</th>}
+                      {visibleColumns.pages && <th className="px-3.5 py-2 text-center text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Pages</th>}
+                      {visibleColumns.status && <th className="px-3.5 py-2 text-center text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Status</th>}
+                      <th className="px-3.5 py-2 text-center text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap w-24">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-150 text-gray-700">
@@ -842,11 +848,11 @@ const SkuMasterV2: React.FC = () => {
                       <tr 
                         key={s._id} 
                         onClick={() => setSelectedSkuDetails(s)}
-                        className={`hover:bg-blue-50/20 transition-colors cursor-pointer ${
-                          selectedIds.includes(s._id || '') ? 'bg-blue-50/10' : ''
+                        className={`transition-all cursor-pointer hover:bg-gray-50 border-l-2 ${
+                          selectedIds.includes(s._id || '') ? 'bg-blue-50/20 border-l-blue-600 text-blue-900' : 'border-l-transparent text-gray-700'
                         }`}
                       >
-                        <td className="px-5 py-3.5 text-left w-10" onClick={e => e.stopPropagation()}>
+                        <td className="px-3 py-1.5 whitespace-nowrap" onClick={e => e.stopPropagation()}>
                           <input
                             type="checkbox"
                             checked={selectedIds.includes(s._id || '')}
@@ -855,34 +861,30 @@ const SkuMasterV2: React.FC = () => {
                           />
                         </td>
                         {visibleColumns.skuCode && (
-                          <td className="px-5 py-3.5 whitespace-nowrap">
-                            <span className="px-2 py-1 bg-gray-50 border border-gray-200 rounded-lg text-[11px] font-extrabold font-mono text-gray-750 tracking-wider">
-                              {s.skuCode}
-                            </span>
+                          <td className="px-3.5 py-2.5 whitespace-nowrap text-[13.5px] font-bold text-gray-900">
+                            {s.skuCode}
                           </td>
                         )}
                         {visibleColumns.name && (
-                          <td className="px-5 py-3.5 whitespace-nowrap">
-                            <div className="text-xs font-black text-gray-900 max-w-xs truncate" title={s.name}>
-                              {s.name}
-                            </div>
+                          <td className="px-3.5 py-2.5 whitespace-nowrap text-[13.5px] font-semibold text-gray-800 uppercase">
+                            {s.name}
                           </td>
                         )}
                         {visibleColumns.category && (
-                          <td className="px-5 py-3.5 whitespace-nowrap">
-                            <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-black tracking-wider uppercase inline-block border ${
-                              s.category === 'Raw Material' ? 'bg-amber-50/70 text-amber-700 border-amber-200' :
-                              s.category === 'Semi Finished' ? 'bg-purple-50/70 text-purple-700 border-purple-200' :
-                              'bg-emerald-50/70 text-emerald-700 border-emerald-200'
+                          <td className="px-3.5 py-2.5 whitespace-nowrap">
+                            <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold tracking-wider uppercase inline-block border ${
+                              s.category === 'Raw Material' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                              s.category === 'Semi Finished' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                              'bg-emerald-50 text-emerald-700 border-emerald-200'
                             }`}>
                               {s.category}
                             </span>
                           </td>
                         )}
                         {visibleColumns.group && (
-                          <td className="px-5 py-3.5 whitespace-nowrap">
+                          <td className="px-3.5 py-2.5 whitespace-nowrap text-[13.5px] font-medium text-gray-700">
                             {(s as any).group ? (
-                              <span className="px-2 py-0.5 bg-blue-50/50 text-blue-700 border border-blue-100 rounded text-[10px] font-extrabold uppercase tracking-wide">
+                              <span className="px-2 py-0.5 bg-blue-50/50 text-blue-700 border border-blue-100 rounded text-[10px] font-bold uppercase tracking-wide">
                                 {(s as any).group}
                               </span>
                             ) : (
@@ -891,70 +893,63 @@ const SkuMasterV2: React.FC = () => {
                           </td>
                         )}
                         {visibleColumns.unit && (
-                          <td className="px-5 py-3.5 whitespace-nowrap">
-                            <div className="flex flex-col gap-1.5 items-start">
-                              <div className="flex items-center gap-1.5">
-                                <span className="bg-slate-100 text-slate-800 border border-slate-200 px-2 py-0.5 rounded text-[10px] font-black font-mono uppercase">
-                                  {s.unit}
-                                </span>
-                                {(s as any).altUnit && (
-                                  <span className="text-gray-400 text-[10px] font-semibold">➔</span>
-                                )}
-                                {(s as any).altUnit && (
-                                  <span className="bg-blue-50 text-blue-800 border border-blue-100 px-2 py-0.5 rounded text-[10px] font-black font-mono uppercase">
-                                    {(s as any).altUnit}
-                                  </span>
-                                )}
-                              </div>
-                              {(s as any).altUnit && (
-                                <span className="text-[9.5px] font-black text-blue-650 bg-blue-50/40 border border-blue-100/60 px-2 py-0.5 rounded-md font-mono tracking-wider">
-                                  1 {(s as any).altUnit} = {(s as any).altUnitConversion || 1} {s.unit}
-                                </span>
-                              )}
-                            </div>
+                          <td className="px-3.5 py-2.5 whitespace-nowrap">
+                            <span className="bg-slate-100 text-slate-800 border border-slate-200 px-2 py-0.5 rounded text-[10px] font-bold uppercase">
+                              {s.unit}
+                            </span>
                           </td>
                         )}
-                        {visibleColumns.gsm && (
-                          <td className="px-5 py-3.5 text-center whitespace-nowrap">
-                            {s.gsm ? (
-                              <span className="text-gray-800 font-bold font-mono text-xs">
-                                {s.gsm} <span className="text-[9px] text-gray-405 font-black">GSM</span>
+                        {visibleColumns.altUnit && (
+                          <td className="px-3.5 py-2.5 whitespace-nowrap">
+                            {s.altUnit ? (
+                              <span className="bg-blue-50 text-blue-800 border border-blue-100 px-2 py-0.5 rounded text-[10px] font-bold uppercase">
+                                {s.altUnit}
                               </span>
                             ) : (
                               <span className="text-gray-400 text-xs">—</span>
                             )}
                           </td>
                         )}
+                        {visibleColumns.altUnitConversion && (
+                          <td className="px-3.5 py-2.5 whitespace-nowrap text-[13.5px] font-medium text-gray-700">
+                            {s.altUnit && s.altUnitConversion ? (
+                              <span>
+                                1 {s.altUnit} = {s.altUnitConversion} {s.unit}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 text-xs">—</span>
+                            )}
+                          </td>
+                        )}
+                        {visibleColumns.gsm && (
+                          <td className="px-3.5 py-2.5 text-center whitespace-nowrap text-[13.5px] font-medium text-gray-700">
+                            {s.gsm ? `${s.gsm} GSM` : '—'}
+                          </td>
+                        )}
                         {visibleColumns.dimensions && (
-                          <td className="px-5 py-3.5 text-center font-bold text-gray-700 whitespace-nowrap font-mono text-xs">
+                          <td className="px-3.5 py-2.5 text-center whitespace-nowrap text-[13.5px] font-medium text-gray-750">
                             {formatSize(s)}
                           </td>
                         )}
                         {visibleColumns.pages && (
-                          <td className="px-5 py-3.5 text-center whitespace-nowrap">
-                            {(s as any).pages ? (
-                              <span className="px-1.5 py-0.5 bg-slate-50 border border-slate-200 rounded text-gray-750 font-black font-mono text-[10.5px]">
-                                {(s as any).pages} <span className="text-[8.5px] text-gray-400 uppercase font-black">Pages</span>
-                              </span>
-                            ) : (
-                              <span className="text-gray-400 text-xs">—</span>
-                            )}
+                          <td className="px-3.5 py-2.5 text-center whitespace-nowrap text-[13.5px] font-medium text-gray-700">
+                            {s.pages ? `${s.pages} Pages` : '—'}
                           </td>
                         )}
                         {visibleColumns.status && (
-                          <td className="px-5 py-3.5 text-center whitespace-nowrap">
-                            <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-black uppercase inline-block border ${
+                          <td className="px-3.5 py-2.5 text-center whitespace-nowrap">
+                            <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase inline-block border ${
                               s.status === 'Active' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-100 text-gray-500 border-gray-200'
                             }`}>
                               {s.status}
                             </span>
                           </td>
                         )}
-                        <td className="px-5 py-3.5 text-center whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                        <td className="px-3.5 py-2 whitespace-nowrap text-center" onClick={e => e.stopPropagation()}>
                           <div className="flex items-center justify-center gap-1.5">
                             <button
                               onClick={() => setSelectedSkuDetails(s)}
-                              className="p-1.5 text-blue-605 hover:bg-blue-50 rounded-lg transition-all"
+                              className="p-1.5 text-gray-500 hover:bg-gray-100 hover:text-blue-650 rounded-lg transition-all"
                               title="View Details"
                             >
                               <Eye className="w-4 h-4" />
@@ -965,14 +960,14 @@ const SkuMasterV2: React.FC = () => {
                                 setShowAddDrawer(true);
                                 setSelectedSkuDetails(null);
                               }}
-                              className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                              className="p-1.5 text-gray-500 hover:bg-gray-100 hover:text-amber-600 rounded-lg transition-all"
                               title="Edit SKU"
                             >
                               <Edit className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => setDeleteConfirmSku(s)}
-                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                              className="p-1.5 text-gray-500 hover:bg-gray-100 hover:text-red-600 rounded-lg transition-all"
                               title="Delete SKU"
                             >
                               <Trash2 className="w-4 h-4" />
