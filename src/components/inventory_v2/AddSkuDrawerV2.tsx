@@ -375,13 +375,12 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
       setErrorMsg('');
       setIsSaving(true);
       try {
-        const isSemiOrFinished = form.category === 'Semi Finished' || form.category === 'Finished Goods';
         const payload = {
           ...form,
           pages: form.pages ? Number(form.pages) : undefined,
           booksGbl: form.booksGbl ? Number(form.booksGbl) : undefined,
-          altUnit: isSemiOrFinished ? (form.altUnit || undefined) : undefined,
-          altUnitConversion: (isSemiOrFinished && form.altUnit) ? (form.altUnitConversion ? Number(form.altUnitConversion) : undefined) : undefined,
+          altUnit: form.altUnit || undefined,
+          altUnitConversion: form.altUnit ? (form.altUnitConversion ? Number(form.altUnitConversion) : undefined) : undefined,
           company: companyId
         };
 

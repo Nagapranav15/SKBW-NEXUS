@@ -10,6 +10,7 @@ import * as XLSX from 'xlsx';
 const SkuMasterV2: React.FC = () => {
   const { selectedCompany } = useAuth();
   const [skus, setSkus] = useState<SkuV2[]>([]);
+  const [allSkus, setAllSkus] = useState<SkuV2[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -185,6 +186,7 @@ const SkuMasterV2: React.FC = () => {
       setRecycleBinItems(prev => prev.filter(item => item._id !== sku._id));
       const res = await getSkusV2(selectedCompany?._id || '', undefined, undefined, 'Active');
       setSkus(res || []);
+      setAllSkus(res || []);
       await createActivityLog({
         action: 'RESTORE',
         entityType: 'SkuV2',
@@ -217,6 +219,15 @@ const SkuMasterV2: React.FC = () => {
     return () => clearTimeout(handler);
   }, [search]);
 
+  // Fetch full unfiltered SKUs once on company change to keep top stats counts accurate
+  useEffect(() => {
+    if (selectedCompany?._id) {
+      getSkusV2(selectedCompany._id)
+        .then(data => setAllSkus(data))
+        .catch(err => console.error('Failed to load total counts', err));
+    }
+  }, [selectedCompany?._id]);
+
   // Load when company or filters change (with loader spinner)
   useEffect(() => {
     if (selectedCompany?._id) {
@@ -241,6 +252,9 @@ const SkuMasterV2: React.FC = () => {
         statusFilter || undefined
       );
       setSkus(data);
+      if (!categoryFilter && !debouncedSearch && !statusFilter) {
+        setAllSkus(data);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -331,6 +345,17 @@ const SkuMasterV2: React.FC = () => {
       }
     });
 
+    setAllSkus(prev => {
+      const idx = prev.findIndex(item => item._id === savedSku._id);
+      if (idx > -1) {
+        const updated = [...prev];
+        updated[idx] = savedSku;
+        return updated;
+      } else {
+        return [savedSku, ...prev];
+      }
+    });
+
     showToast(editSku ? 'SKU updated successfully' : 'SKU created successfully', 'success');
     createActivityLog({
       action: editSku ? 'UPDATE' : 'CREATE',
@@ -349,9 +374,11 @@ const SkuMasterV2: React.FC = () => {
     const targetId = deleteConfirmSku._id;
     const targetCode = deleteConfirmSku.skuCode;
     const originalSkus = [...skus];
+    const originalAllSkus = [...allSkus];
 
     // Optimistic UI Update: Immediately remove SKU from the local list
     setSkus(prev => prev.filter(s => s._id !== targetId));
+    setAllSkus(prev => prev.filter(s => s._id !== targetId));
     setSelectedIds(prev => prev.filter(id => id !== targetId));
     setDeleteConfirmSku(null);
     setIsDeleting(true);
@@ -370,6 +397,7 @@ const SkuMasterV2: React.FC = () => {
       console.error(err);
       // Rollback UI update on failure
       setSkus(originalSkus);
+      setAllSkus(originalAllSkus);
       showToast(err.response?.data?.msg || `Failed to delete SKU '${targetCode}'`, 'error');
     } finally {
       setIsDeleting(false);
@@ -380,9 +408,11 @@ const SkuMasterV2: React.FC = () => {
   const handleBulkDelete = async () => {
     const targetIds = [...selectedIds];
     const originalSkus = [...skus];
+    const originalAllSkus = [...allSkus];
 
     // Optimistic UI update
     setSkus(prev => prev.filter(s => !targetIds.includes(s._id || '')));
+    setAllSkus(prev => prev.filter(s => !targetIds.includes(s._id || '')));
     setSelectedIds([]);
     setShowBulkDeleteConfirm(false);
 
@@ -399,6 +429,7 @@ const SkuMasterV2: React.FC = () => {
     } catch (err: any) {
       console.error(err);
       setSkus(originalSkus);
+      setAllSkus(originalAllSkus);
       showToast(err.response?.data?.msg || 'Failed to delete some selected items', 'error');
     }
   };
@@ -464,14 +495,14 @@ const SkuMasterV2: React.FC = () => {
     );
   };
 
-  // Calculate dynamic stats
-  const totalItems = skus.length;
-  const rawMaterialsCount = skus.filter(s => s.category === 'Raw Material').length;
-  const semiFinishedCount = skus.filter(s => s.category === 'Semi Finished').length;
-  const finishedGoodsCount = skus.filter(s => s.category === 'Finished Goods').length;
+  // Calculate dynamic stats from unfiltered items list
+  const totalItems = allSkus.length;
+  const rawMaterialsCount = allSkus.filter(s => s.category === 'Raw Material').length;
+  const semiFinishedCount = allSkus.filter(s => s.category === 'Semi Finished').length;
+  const finishedGoodsCount = allSkus.filter(s => s.category === 'Finished Goods').length;
 
-  // Extract unique units for unit filter dropdown
-  const uniqueUnits = Array.from(new Set(skus.map(s => s.unit)));
+  // Extract unique units for unit filter dropdown from allSkus
+  const uniqueUnits = Array.from(new Set(allSkus.map(s => s.unit)));
 
   // Helper to format Size
   const formatSize = (s: SkuV2) => {
