@@ -13,3 +13,5 @@ dist-ssr
 .env
 .env.local
 *.local
+github-actions
+github-actions.pub
