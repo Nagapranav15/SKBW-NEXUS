@@ -328,6 +328,14 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
             }
           }
           if (sizeStr) parts.push(sizeStr);
+
+          if (active.includes('ruleType') && form.ruleType) {
+            const clean = form.ruleType.trim();
+            if (clean) {
+              const wrapped = (clean.startsWith('(') && clean.endsWith(')')) ? clean : `(${clean})`;
+              parts.push(wrapped);
+            }
+          }
           
           if (parts.length > 0) {
             setForm(prev => ({ ...prev, name: parts.join(' ') }));
