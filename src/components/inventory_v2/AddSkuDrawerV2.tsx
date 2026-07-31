@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, RefreshCw } from 'lucide-react';
+import { X, Save, RefreshCw, Layers } from 'lucide-react';
 import { createSkuV2, updateSkuV2, SkuV2, getMetadataV2, updateMetadataV2, getSkusV2 } from '../../api/mfgApiV2';
 
 interface AddSkuDrawerV2Props {
