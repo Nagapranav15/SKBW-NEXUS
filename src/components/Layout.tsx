@@ -89,7 +89,7 @@ const Layout: React.FC = () => {
             break;
           case 'i':
             e.preventDefault();
-            handleNavigate('/items');
+            handleNavigate('/inventory-v2/skus');
             break;
           case 'c':
             e.preventDefault();

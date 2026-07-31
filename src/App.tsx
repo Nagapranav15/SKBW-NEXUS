@@ -11,7 +11,6 @@ const Login = lazy(() => import('./components/Login'));
 const CompanySelection = lazy(() => import('./components/CompanySelection'));
 const Dashboard = lazy(() => import('./components/Dashboard'));
 const PartyManagement = lazy(() => import('./components/PartyManagement'));
-const ItemManagement = lazy(() => import('./components/ItemManagement'));
 const SalesQuotes = lazy(() => import('./components/sales/SalesQuotes'));
 const SalesOrders = lazy(() => import('./components/sales/SalesOrders'));
 const PendingOrders = lazy(() => import('./components/sales/PendingOrders'));
@@ -80,7 +79,7 @@ function App() {
                 <Route path="party/routes" element={<PartyManagement />} />
                 <Route path="party/markets" element={<PartyManagement />} />
                 <Route path="party/transporters" element={<PartyManagement />} />
-                <Route path="items" element={<ItemManagement />} />
+                <Route path="items" element={<Navigate to="/inventory-v2/skus" replace />} />
                 <Route path="sales/quotes" element={<SalesQuotes />} />
                 <Route path="sales/orders" element={<SalesOrders />} />
                 <Route path="sales/pending" element={<PendingOrders />} />

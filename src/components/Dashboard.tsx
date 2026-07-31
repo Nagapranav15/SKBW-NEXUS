@@ -73,8 +73,7 @@ const Dashboard: React.FC = () => {
     { title: 'Regions', value: dashData?.stats?.routesCount || 0, icon: Compass, color: 'text-orange-600 bg-orange-50', path: '/party/routes' },
     { title: 'Markets', value: dashData?.stats?.marketsCount || 0, icon: MapPin, color: 'text-teal-600 bg-teal-50', path: '/party/markets' },
     { title: 'Transporters', value: dashData?.stats?.transportersCount || 0, icon: Truck, color: 'text-red-600 bg-red-50', path: '/party/transporters' },
-    { title: 'Items', value: dashData?.stats?.totalItems || 0, icon: Package, color: 'text-purple-600 bg-purple-50', path: '/items' },
-    { title: 'Brands', value: 4, icon: Tag, color: 'text-pink-600 bg-pink-50', path: '/items' }
+    { title: 'Items', value: dashData?.stats?.totalItems || 0, icon: Package, color: 'text-purple-600 bg-purple-50', path: '/inventory-v2/skus' }
   ];
 
   const getStatusColor = (status: string) => {
@@ -201,7 +200,7 @@ const Dashboard: React.FC = () => {
                 <p className="text-sm text-gray-600">Create a new sales order</p>
               </button>
               
-              <button onClick={() => navigate('/items')} className="p-4 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors text-left">
+              <button onClick={() => navigate('/inventory-v2/skus')} className="p-4 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors text-left">
                 <Package className="w-8 h-8 text-purple-600 mb-2" />
                 <h3 className="font-semibold text-gray-900 mb-1">Add Item</h3>
                 <p className="text-sm text-gray-600">Add new product/SKU</p>
