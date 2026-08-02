@@ -207,7 +207,7 @@ exports.createPurchaseInvoice = async (req, res, next) => {
 
 exports.getPurchaseInvoices = async (req, res, next) => {
   try {
-    const { companyId, vendorId, paymentStatus, search, page = 1, limit = 20 } = req.query;
+    const { companyId, vendorId, paymentStatus, status, search, page = 1, limit = 20 } = req.query;
     if (!companyId) {
       return res.status(400).json({ msg: "companyId query parameter is required" });
     }
@@ -215,6 +215,7 @@ exports.getPurchaseInvoices = async (req, res, next) => {
     const query = { company: toObjectId(companyId) };
     if (vendorId) query.vendorId = toObjectId(vendorId);
     if (paymentStatus) query.paymentStatus = paymentStatus;
+    if (status) query.status = status;
 
     if (search) {
       query.$or = [

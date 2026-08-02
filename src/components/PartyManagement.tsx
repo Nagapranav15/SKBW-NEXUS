@@ -1346,7 +1346,7 @@ const PartyManagement: React.FC = () => {
       const [agentsRes, routesRes, marketsRes, transportersRes] = await Promise.all([
         getParties({ type: 'agent', limit: 1000, company: selectedCompany._id, light: true }),
         getRoutes(selectedCompany._id, { status: 'active' }),
-        getParties({ type: 'market', limit: 1000, company: selectedCompany._id, light: true }),
+        getParties({ type: 'market', limit: 1000, company: selectedCompany._id }),
         getParties({ type: 'transporter', limit: 1000, company: selectedCompany._id, light: true })
       ]);
 
@@ -2379,147 +2379,217 @@ const PartyManagement: React.FC = () => {
   };
 
   // Import / Export Logic
-  const handleExport = () => {
-    const wb = XLSX.utils.book_new();
-    let exportData: any[] = [];
+  const handleExport = async () => {
+    if (!selectedCompany) return;
 
-    // Filter by selectedIds if there are selected items, otherwise export all loaded parties
-    const targetData = selectedIds.length > 0
-      ? parties.filter(p => selectedIds.includes(p._id))
-      : parties;
+    try {
+      let targetData: any[] = [];
 
-    if (currentType === 'route') {
-      exportData = targetData.map(p => ({
-        'Region Name': p.name,
-        'Region Code': p.code,
-        'Assigned Agent': p.assignedAgent || '-',
-        'Cities Count': p.citiesCount || 0,
-        'Customers Count': p.customersCount || 0,
-        'Outstanding Balance': p.outstandingBalance !== undefined ? p.outstandingBalance : (p.outstanding || 0),
-        'Status': p.status
-      }));
-    } else if (currentType === 'agent') {
-      exportData = targetData.map(p => {
-        const routesStr = allRoutes
-          .filter(r => r.assignedAgent === (p.firmName || p.contactName))
-          .map(r => r.name)
-          .join(', ');
-        return {
-          'Agent Name': p.firmName || p.contactName,
-          'Mobile': p.phone || '-',
-          'Alt Phone': p.altPhone || '-',
-          'Email': p.email || '-',
-          'Assigned Regions': routesStr || '-',
-          'Status': p.status || 'active'
+      if (currentType === 'route') {
+        const res = await getRoutes(selectedCompany._id);
+        let data = res.data || [];
+        
+        if (statusFilter !== 'all') {
+          data = data.filter((r: any) => r.status === statusFilter);
+        }
+        if (debouncedSearch) {
+          const searchRegex = new RegExp(debouncedSearch, 'i');
+          data = data.filter((r: any) => searchRegex.test(r.name) || searchRegex.test(r.assignedAgent || ''));
+        }
+        if (filterRules && filterRules.length > 0) {
+          filterRules.forEach((rule: any) => {
+            const val = rule.value?.trim().toLowerCase();
+            if (val === undefined || val === null || val === '') return;
+            data = data.filter((r: any) => {
+              const fieldVal = (r[rule.field] || '').toString().toLowerCase();
+              if (rule.condition === 'equal to') {
+                return fieldVal === val;
+              } else if (rule.condition === 'contains') {
+                return fieldVal.includes(val);
+              } else if (rule.condition === 'greater than') {
+                return Number(r[rule.field]) > Number(val);
+              } else if (rule.condition === 'less than') {
+                return Number(r[rule.field]) < Number(val);
+              } else if (rule.condition === 'starts with') {
+                return fieldVal.startsWith(val);
+              } else if (rule.condition === 'ends with') {
+                return fieldVal.endsWith(val);
+              }
+              return true;
+            });
+          });
+        }
+        
+        if (selectedIds.length > 0) {
+          targetData = data.filter(p => selectedIds.includes(p._id));
+        } else {
+          targetData = data;
+        }
+      } else {
+        // Fetch all matching data from server (ignoring pagination limits)
+        const params: any = { 
+          type: currentType, 
+          limit: 100000,
+          company: selectedCompany._id
         };
-      });
-    } else if (currentType === 'market') {
-      exportData = targetData.map(p => ({
-        'City': p.firmName,
-        'District': p.district || '-',
-        'State': p.state || '-',
-        'Pincode': p.pincode || '-',
-        'Region Code': p.route || '-',
-        'Agent': p.agentAssigned || '-',
-        'Customers': p.customerCount || 0,
-        'Outstanding': p.outstandingBalance !== undefined ? p.outstandingBalance : (p.outstanding || 0),
-        'Status': p.status || 'active'
-      }));
-    } else if (currentType === 'transporter') {
-      exportData = targetData.map(p => {
-        const contactPersonsStr = Array.isArray(p.contactPersons)
-          ? p.contactPersons.map((cp: any) => `${cp.name || 'Unnamed'}: ${cp.phone || 'No Phone'}`).join(' | ')
-          : p.contactName ? `${p.contactName}: ${p.phone || 'No Phone'}` : '-';
-        return {
-          'Transporter Name': p.firmName || '-',
-          'Mobile': p.phone || '-',
+        if (statusFilter !== 'all') {
+          params.status = statusFilter;
+        }
+        if (debouncedSearch) params.search = debouncedSearch;
+        if (filterRules && filterRules.length > 0) {
+          params.filterRules = JSON.stringify(filterRules);
+        }
+        
+        const res = await getParties(params);
+        const allFetchedParties = res.data?.parties || [];
+        
+        if (selectedIds.length > 0) {
+          targetData = allFetchedParties.filter((p: any) => selectedIds.includes(p._id));
+        } else {
+          targetData = allFetchedParties;
+        }
+      }
+
+      const wb = XLSX.utils.book_new();
+      let exportData: any[] = [];
+
+      if (currentType === 'route') {
+        exportData = targetData.map(p => ({
+          'Region Name': p.name,
+          'Region Code': p.code,
+          'Assigned Agent': p.assignedAgent || '-',
+          'Cities Count': p.citiesCount || 0,
+          'Customers Count': p.customersCount || 0,
+          'Outstanding Balance': p.outstandingBalance !== undefined ? p.outstandingBalance : (p.outstanding || 0),
+          'Status': p.status
+        }));
+      } else if (currentType === 'agent') {
+        exportData = targetData.map(p => {
+          const routesStr = allRoutes
+            .filter(r => r.assignedAgent === (p.firmName || p.contactName))
+            .map(r => r.name)
+            .join(', ');
+          return {
+            'Agent Name': p.firmName || p.contactName,
+            'Mobile': p.phone || '-',
+            'Alt Phone': p.altPhone || '-',
+            'Email': p.email || '-',
+            'Assigned Regions': routesStr || '-',
+            'Status': p.status || 'active'
+          };
+        });
+      } else if (currentType === 'market') {
+        exportData = targetData.map(p => ({
+          'City': p.firmName,
+          'District': p.district || '-',
+          'State': p.state || '-',
+          'Pincode': p.pincode || '-',
+          'Region Code': p.route || '-',
+          'Agent': p.agentAssigned || '-',
+          'Customers': p.customerCount || 0,
+          'Outstanding': p.outstandingBalance !== undefined ? p.outstandingBalance : (p.outstanding || 0),
+          'Status': p.status || 'active'
+        }));
+      } else if (currentType === 'transporter') {
+        exportData = targetData.map(p => {
+          const contactPersonsStr = Array.isArray(p.contactPersons)
+            ? p.contactPersons.map((cp: any) => `${cp.name || 'Unnamed'}: ${cp.phone || 'No Phone'}`).join(' | ')
+            : p.contactName ? `${p.contactName}: ${p.phone || 'No Phone'}` : '-';
+          return {
+            'Transporter Name': p.firmName || '-',
+            'Mobile': p.phone || '-',
+            'Email': p.email || '-',
+            'Door No': p.doorNo || '-',
+            'Street Name': p.streetName || '-',
+            'Address Line 1': p.address1 || '-',
+            'Area': p.area || '-',
+            'Landmark': p.landmark || '-',
+            'City': p.city || '-',
+            'District': p.district || '-',
+            'State': p.state || '-',
+            'Pincode': p.pincode || '-',
+            'Customers Using': p.customerCount || 0,
+            'Contact Persons': contactPersonsStr,
+            'Remarks': p.remarks || '-',
+            'GST Number': p.gstNumber || '-',
+            'Status': p.status || 'active'
+          };
+        });
+      } else if (currentType === 'customer') {
+        exportData = targetData.map(p => ({
+          'Firm Name': p.firmName || '-',
+          'Owner Name': p.ownerName || '-',
+          'Contact Name': p.contactName || '-',
+          'Phone': p.phone || '-',
+          'Alt Phone': p.altPhone || '-',
+          'WhatsApp': p.whatsapp || '-',
           'Email': p.email || '-',
+          'GST Number': p.gstNumber || '-',
+          'Aadhar Number': p.aadharNumber || '-',
           'Door No': p.doorNo || '-',
           'Street Name': p.streetName || '-',
-          'Address Line 1': p.address1 || '-',
+          'Address Line': p.address1 || '-',
           'Area': p.area || '-',
           'Landmark': p.landmark || '-',
           'City': p.city || '-',
           'District': p.district || '-',
           'State': p.state || '-',
           'Pincode': p.pincode || '-',
-          'Customers Using': p.customerCount || 0,
-          'Contact Persons': contactPersonsStr,
+          'GPS Location': p.gpsLocation || '-',
+          'Region': p.route || '-',
+          'Agent Assigned': p.agentAssigned || (() => {
+            const routeDoc = allRoutes.find(r => r.name === p.route);
+            return routeDoc?.assignedAgent || '-';
+          })(),
+          'Preferred Transport': p.preferredTransport || '-',
+          'Credit Limit': p.creditLimit || 0,
+          'Credit Days': p.creditDays || 0,
+          'Opening Balance': p.openingBalance || 0,
+          'Outstanding Balance': p.outstandingBalance !== undefined ? p.outstandingBalance : (p.outstanding || 0),
+          'Tags': Array.isArray(p.tags) ? p.tags.join(', ') : '',
           'Remarks': p.remarks || '-',
-          'GST Number': p.gstNumber || '-',
           'Status': p.status || 'active'
-        };
-      });
-    } else if (currentType === 'customer') {
-      exportData = targetData.map(p => ({
-        'Firm Name': p.firmName || '-',
-        'Owner Name': p.ownerName || '-',
-        'Contact Name': p.contactName || '-',
-        'Phone': p.phone || '-',
-        'Alt Phone': p.altPhone || '-',
-        'WhatsApp': p.whatsapp || '-',
-        'Email': p.email || '-',
-        'GST Number': p.gstNumber || '-',
-        'Aadhar Number': p.aadharNumber || '-',
-        'Door No': p.doorNo || '-',
-        'Street Name': p.streetName || '-',
-        'Address Line': p.address1 || '-',
-        'Area': p.area || '-',
-        'Landmark': p.landmark || '-',
-        'City': p.city || '-',
-        'District': p.district || '-',
-        'State': p.state || '-',
-        'Pincode': p.pincode || '-',
-        'GPS Location': p.gpsLocation || '-',
-        'Region': p.route || '-',
-        'Agent Assigned': p.agentAssigned || (() => {
-          const routeDoc = allRoutes.find(r => r.name === p.route);
-          return routeDoc?.assignedAgent || '-';
-        })(),
-        'Preferred Transport': p.preferredTransport || '-',
-        'Credit Limit': p.creditLimit || 0,
-        'Credit Days': p.creditDays || 0,
-        'Opening Balance': p.openingBalance || 0,
-        'Outstanding Balance': p.outstandingBalance !== undefined ? p.outstandingBalance : (p.outstanding || 0),
-        'Tags': Array.isArray(p.tags) ? p.tags.join(', ') : '',
-        'Remarks': p.remarks || '-',
-        'Status': p.status || 'active'
-      }));
-    } else {
-      // Vendor
-      exportData = targetData.map(p => ({
-        'Firm Name': p.firmName || '-',
-        'Owner Name': p.ownerName || '-',
-        'Contact Name': p.contactName || '-',
-        'Phone': p.phone || '-',
-        'Alt Phone': p.altPhone || '-',
-        'WhatsApp': p.whatsapp || '-',
-        'Email': p.email || '-',
-        'GST Number': p.gstNumber || '-',
-        'Aadhar Number': p.aadharNumber || '-',
-        'Door No': p.doorNo || '-',
-        'Street Name': p.streetName || '-',
-        'Address Line': p.address1 || '-',
-        'Area': p.area || '-',
-        'Landmark': p.landmark || '-',
-        'City': p.city || '-',
-        'District': p.district || '-',
-        'State': p.state || '-',
-        'Pincode': p.pincode || '-',
-        'GPS Location': p.gpsLocation || '-',
-        'Vendor Type': p.vendorType || '-',
-        'Credit Limit': p.creditLimit || 0,
-        'Credit Days': p.creditDays || 0,
-        'Outstanding Balance': p.outstandingBalance !== undefined ? p.outstandingBalance : (p.outstanding || 0),
-        'Tags': Array.isArray(p.tags) ? p.tags.join(', ') : '',
-        'Remarks': p.remarks || '-',
-        'Status': p.status || 'active'
-      }));
-    }
+        }));
+      } else {
+        // Vendor
+        exportData = targetData.map(p => ({
+          'Firm Name': p.firmName || '-',
+          'Owner Name': p.ownerName || '-',
+          'Contact Name': p.contactName || '-',
+          'Phone': p.phone || '-',
+          'Alt Phone': p.altPhone || '-',
+          'WhatsApp': p.whatsapp || '-',
+          'Email': p.email || '-',
+          'GST Number': p.gstNumber || '-',
+          'Aadhar Number': p.aadharNumber || '-',
+          'Door No': p.doorNo || '-',
+          'Street Name': p.streetName || '-',
+          'Address Line': p.address1 || '-',
+          'Area': p.area || '-',
+          'Landmark': p.landmark || '-',
+          'City': p.city || '-',
+          'District': p.district || '-',
+          'State': p.state || '-',
+          'Pincode': p.pincode || '-',
+          'GPS Location': p.gpsLocation || '-',
+          'Vendor Type': p.vendorType || '-',
+          'Credit Limit': p.creditLimit || 0,
+          'Credit Days': p.creditDays || 0,
+          'Outstanding Balance': p.outstandingBalance !== undefined ? p.outstandingBalance : (p.outstanding || 0),
+          'Tags': Array.isArray(p.tags) ? p.tags.join(', ') : '',
+          'Remarks': p.remarks || '-',
+          'Status': p.status || 'active'
+        }));
+      }
 
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    XLSX.utils.book_append_sheet(wb, ws, typeLabelPlural);
-    XLSX.writeFile(wb, `${typeLabelPlural.toLowerCase()}_export.xlsx`);
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      XLSX.utils.book_append_sheet(wb, ws, typeLabelPlural);
+      XLSX.writeFile(wb, `${typeLabelPlural.toLowerCase()}_export.xlsx`);
+      setToast({ message: 'Export completed successfully!', type: 'success' });
+    } catch (err) {
+      console.error('Export failed', err);
+      setToast({ message: 'Export failed. Please try again.', type: 'error' });
+    }
   };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -6672,42 +6742,45 @@ const PartyManagement: React.FC = () => {
                       }
 
                       return (
-                        <div className="grid grid-cols-2 gap-2">
-                          {filteredCities.map((city) => (
-                            <div
-                              key={city._id}
-                              onClick={() => openCityCustomersPopup(city.firmName)}
-                              className="p-3 border border-gray-200 hover:border-blue-400 rounded-xl bg-white flex flex-col justify-between hover:shadow-xs hover:bg-blue-50/5 transition-all cursor-pointer group min-w-0"
-                              title={`Click to view customers in ${city.firmName}`}
-                            >
-                              <div className="mb-2 min-w-0">
-                                <span className="font-bold text-gray-955 text-sm block group-hover:text-blue-600 transition-colors truncate">
-                                  {city.firmName}
-                                </span>
-                                <div className="flex flex-col mt-1.5 gap-0.5 text-[11px] text-gray-500 font-medium">
-                                  <span>{city.customerCount || 0} {city.customerCount === 1 ? 'Customer' : 'Customers'}</span>
-                                  {(() => {
-                                    const bal = city.outstanding || city.outstandingBalance || 0;
-                                    const info = getOutstandingInfo('customer', bal);
-                                    return (
-                                      <span className={`${info.textClass} font-bold`}>
-                                        {info.formatted} Outstanding
-                                      </span>
-                                    );
-                                  })()}
+                        <div className="grid grid-cols-2 gap-2.5">
+                          {filteredCities.map((city) => {
+                            const bal = city.outstanding || city.outstandingBalance || 0;
+                            const info = getOutstandingInfo('customer', bal);
+                            return (
+                              <div
+                                key={city._id}
+                                onClick={() => openCityCustomersPopup(city.firmName)}
+                                className="p-3 border border-gray-150 hover:border-blue-400 rounded-xl bg-white hover:bg-blue-50/10 hover:shadow-xs transition-all duration-200 cursor-pointer group flex flex-col justify-between min-w-0"
+                                title={`Click to view customers in ${city.firmName}`}
+                              >
+                                <div className="min-w-0">
+                                  <div className="flex items-start justify-between gap-1 mb-2">
+                                    <span className="font-bold text-gray-905 text-sm block group-hover:text-blue-600 transition-colors truncate">
+                                      {city.firmName}
+                                    </span>
+                                    <span className={`inline-flex px-1.5 py-0.5 text-[8px] font-extrabold uppercase tracking-wide rounded shrink-0 ${
+                                      city.status === 'active'
+                                        ? 'bg-green-50 text-green-700 border border-green-100'
+                                        : 'bg-gray-100 text-gray-500'
+                                    }`}>
+                                      {city.status || 'active'}
+                                    </span>
+                                  </div>
+                                  
+                                  <div className="space-y-1">
+                                    <div className="flex items-center justify-between text-[11px] text-gray-500 font-semibold bg-gray-50 px-2 py-1 rounded-md">
+                                      <span>Customers</span>
+                                      <span className="text-gray-900 font-bold">{city.customerCount || 0}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-[11px] text-gray-500 font-semibold bg-gray-50 px-2 py-1 rounded-md">
+                                      <span>Outstanding</span>
+                                      <span className={`${info.textClass} font-bold`}>{info.formatted}</span>
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
-                              <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100 shrink-0">
-                                <span className={`inline-flex px-1.5 py-0.5 text-[9px] font-bold uppercase rounded ${
-                                  city.status === 'active'
-                                    ? 'bg-green-50 text-green-755 border border-green-150'
-                                    : 'bg-gray-100 text-gray-500'
-                                }`}>
-                                  {city.status || 'active'}
-                                </span>
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       );
                     })()}

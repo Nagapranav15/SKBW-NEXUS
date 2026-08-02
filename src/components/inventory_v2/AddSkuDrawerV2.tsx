@@ -27,8 +27,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
     brand: '',
     title: '',
     group: '',
-    ruleType: 'Plain',
     pages: '',
+    reamWeight: '',
     booksGbl: '',
     status: 'Active' as any
   });
@@ -57,7 +57,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
 
   // Category specific field visibility mapping
   const [categoryFieldsMap, setCategoryFieldsMap] = useState<Record<string, string[]>>({
-    "Raw Material": ["gsm", "title", "width", "length", "paperType"],
+    "Raw Material": ["gsm", "title", "width", "length", "paperType", "altUnit"],
     "Semi Finished": ["gsm", "width", "length", "ruleType", "altUnit", "group"],
     "Finished Goods": ["gsm", "width", "length", "ruleType", "pages", "altUnit"]
   });
@@ -99,17 +99,19 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
           // Migrate old database 'dimensions' schema to separate 'width' and 'length' fields dynamically on load
           const migratedFields: Record<string, string[]> = {};
           Object.entries(data.categoryFields).forEach(([cat, fields]) => {
-            if (Array.isArray(fields)) {
-              let updated = [...fields];
-              if (updated.includes('dimensions')) {
-                updated = updated.filter(f => f !== 'dimensions');
-                if (!updated.includes('width')) updated.push('width');
-                if (!updated.includes('length')) updated.push('length');
-              }
-              migratedFields[cat] = updated;
-            } else {
-              migratedFields[cat] = fields as string[];
+            let updated = Array.isArray(fields) ? [...fields] : (fields ? [fields as string] : []);
+            if (updated.includes('dimensions')) {
+              updated = updated.filter(f => f !== 'dimensions');
+              if (!updated.includes('width')) updated.push('width');
+              if (!updated.includes('length')) updated.push('length');
             }
+            // Guarantee altUnit field is present for standard categories
+            if (["Raw Material", "Semi Finished", "Finished Goods"].includes(cat)) {
+              if (!updated.includes('altUnit')) {
+                updated.push('altUnit');
+              }
+            }
+            migratedFields[cat] = updated;
           });
           setCategoryFieldsMap(migratedFields);
         }
@@ -233,8 +235,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
         brand: editSku.brand || '',
         title: editSku.title || '',
         group: editSku.group || '',
-        ruleType: editSku.ruleType || 'Plain',
         pages: (editSku as any).pages !== undefined ? String((editSku as any).pages) : '',
+        reamWeight: (editSku as any).reamWeight !== undefined ? String((editSku as any).reamWeight) : '',
         booksGbl: (editSku as any).booksGbl !== undefined ? String((editSku as any).booksGbl) : '',
         status: editSku.status || 'Active'
       });
@@ -255,8 +257,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
         brand: '',
         title: '',
         group: '',
-        ruleType: 'Plain',
         pages: '',
+        reamWeight: '',
         booksGbl: '',
         status: 'Active'
       });
@@ -273,7 +275,11 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
     }
   }, [companyId]);
 
-  const activeFields = categoryFieldsMap[form.category] || ['gsm', 'width', 'length'];
+  const activeFields = [...(categoryFieldsMap[form.category] || ['gsm', 'width', 'length'])];
+  if (form.paperType === 'Sheets' && !activeFields.includes('pages')) {
+    activeFields.push('pages');
+    activeFields.push('reamWeight');
+  }
 
   // Auto-generate SKU Code
   useEffect(() => {
@@ -378,8 +384,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
       setIsSaving(true);
       try {
         const payload = {
-          ...form,
           pages: form.pages ? Number(form.pages) : undefined,
+          reamWeight: form.reamWeight ? Number(form.reamWeight) : undefined,
           booksGbl: form.booksGbl ? Number(form.booksGbl) : undefined,
           altUnit: form.altUnit || undefined,
           altUnitConversion: form.altUnit ? (form.altUnitConversion ? Number(form.altUnitConversion) : undefined) : undefined,
@@ -841,13 +847,13 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                         className="w-full pl-3 pr-14 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800 font-mono"
                       />
                       <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400 uppercase font-mono select-none">
-                        {form.unit || 'units'}
+                        {form.altUnit || 'units'}
                       </div>
                     </div>
                   </div>
                   {form.altUnit && form.altUnitConversion && (
                     <div className="col-span-2 text-center bg-white py-1.5 px-3 rounded-lg border border-slate-100 text-[10.5px] font-medium text-slate-500">
-                      Formula: <span className="font-bold text-slate-800">1 {form.altUnit}</span> = <span className="font-extrabold text-blue-600 font-mono text-xs">{form.altUnitConversion}</span> × <span className="font-bold text-slate-800">{form.unit}</span>
+                      Formula: <span className="font-bold text-slate-800">1 {form.unit}</span> = <span className="font-extrabold text-blue-600 font-mono text-xs">{form.altUnitConversion}</span> × <span className="font-bold text-slate-800">{form.altUnit}</span>
                     </div>
                   )}
                 </div>
@@ -945,12 +951,27 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
               )}
               {activeFields.includes('pages') && (
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Pages</label>
+                  <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">
+                    {form.paperType === 'Sheets' ? 'Standard Sheets/Ream' : 'Pages'}
+                  </label>
                   <input
                     type="number"
-                    placeholder="e.g. 112 / 132"
+                    placeholder={form.paperType === 'Sheets' ? 'e.g. 500' : 'e.g. 112 / 132'}
                     value={form.pages}
                     onChange={e => setForm({ ...form, pages: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                  />
+                </div>
+              )}
+              {activeFields.includes('reamWeight') && (
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Ream Weight (kg)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="e.g. 10.37"
+                    value={form.reamWeight}
+                    onChange={e => setForm({ ...form, reamWeight: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
                   />
                 </div>

@@ -53,7 +53,7 @@ export const Modal: React.FC<ModalProps> = ({
   const maxWidthClass = sizeClasses[size] || size;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[70] overflow-y-auto flex items-center justify-center p-4 bg-gray-950/20">
       <div className={`relative bg-white rounded-xl shadow-2xl flex flex-col w-full ${maxWidthClass} max-h-[90vh] overflow-hidden ${className}`}>
         {title && (
           <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center shrink-0">

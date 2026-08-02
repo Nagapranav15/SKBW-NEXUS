@@ -6,4 +6,7 @@
   body {
     font-family: 'Inter', sans-serif;
   }
+  kbd, code, samp, pre, .font-mono {
+    font-family: 'Inter', sans-serif !important;
+  }
 }

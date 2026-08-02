@@ -27,6 +27,7 @@ const skuV2Schema = new mongoose.Schema({
     required: false
   },
   pages: { type: Number, required: false },
+  reamWeight: { type: Number, required: false },
   booksGbl: { type: Number, required: false },
   status: { type: String, required: true, enum: ["Active", "Inactive"], default: "Active" },
   company: { type: mongoose.Schema.Types.ObjectId, ref: "Company", required: true },

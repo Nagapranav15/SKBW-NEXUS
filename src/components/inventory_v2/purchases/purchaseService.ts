@@ -49,6 +49,7 @@ export const getPurchaseInvoicesV2 = async (params: {
   companyId: string;
   vendorId?: string;
   paymentStatus?: string;
+  status?: string;
   search?: string;
   page?: number;
   limit?: number;
