@@ -8,6 +8,8 @@ const purchaseInvoiceItemSchema = new mongoose.Schema({
   totalPrice: { type: Number, required: true },    
   lotNumber: { type: String, required: true },     
   locationId: { type: mongoose.Schema.Types.ObjectId, ref: 'WarehouseLocationV2', required: true },
+  reamWeight: { type: Number },
+  ratePerKg: { type: Number },
   reels: [{
     reelNumber: { type: String, required: true },
     gsm: { type: Number, required: true },

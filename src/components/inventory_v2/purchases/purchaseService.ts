@@ -9,6 +9,8 @@ export interface PurchaseInvoiceItemV2 {
   totalPrice: number;
   lotNumber: string;
   locationId: WarehouseLocationV2 | string;
+  reamWeight?: number;
+  ratePerKg?: number;
 }
 
 export interface PurchaseInvoiceV2 {

@@ -31,7 +31,8 @@ const skuV2Schema = new mongoose.Schema({
   booksGbl: { type: Number, required: false },
   status: { type: String, required: true, enum: ["Active", "Inactive"], default: "Active" },
   company: { type: mongoose.Schema.Types.ObjectId, ref: "Company", required: true },
-  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  isDeleted: { type: Boolean, default: false, index: true }
 }, { timestamps: true });
 
 skuV2Schema.index({ skuCode: 1, company: 1 }, { unique: true });

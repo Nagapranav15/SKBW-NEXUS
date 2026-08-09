@@ -179,7 +179,7 @@ const SkuMasterV2: React.FC = () => {
     const nameMap = new Map<string, SkuV2[]>();
     const codeMap = new Map<string, SkuV2[]>();
 
-    skus.forEach(s => {
+    allSkus.forEach(s => {
       const code = s.skuCode?.trim().toLowerCase();
       const name = s.name?.trim().toLowerCase();
       if (code) {
@@ -213,7 +213,7 @@ const SkuMasterV2: React.FC = () => {
   const fetchRecycleBin = async () => {
     try {
       setRecycleBinLoading(true);
-      const res = await getSkusV2(selectedCompany?._id || '', undefined, undefined, 'Inactive');
+      const res = await getSkusV2(selectedCompany?._id || '', undefined, undefined, undefined, true);
       setRecycleBinItems(res || []);
     } catch (err) {
       showToast('Failed to load Recycle Bin', 'error');
@@ -239,11 +239,12 @@ const SkuMasterV2: React.FC = () => {
         group: sku.group,
         ruleType: sku.ruleType,
         status: 'Active',
+        isDeleted: false,
         company: selectedCompany?._id
       });
       showToast(`SKU '${sku.skuCode}' restored successfully`, 'success');
       setRecycleBinItems(prev => prev.filter(item => item._id !== sku._id));
-      const res = await getSkusV2(selectedCompany?._id || '', undefined, undefined, 'Active');
+      const res = await getSkusV2(selectedCompany?._id || '', undefined, undefined, undefined, false);
       setSkus(res || []);
       setAllSkus(res || []);
       await createActivityLog({
@@ -257,7 +258,28 @@ const SkuMasterV2: React.FC = () => {
       showToast('Failed to restore SKU', 'error');
     }
   };
-  
+
+  const handlePermanentDeleteSku = async (sku: SkuV2) => {
+    try {
+      if (!sku._id) return;
+      if (!window.confirm(`Are you sure you want to permanently delete SKU '${sku.skuCode}'? This action cannot be undone.`)) {
+        return;
+      }
+      await deleteSkuV2(sku._id, selectedCompany?._id || '', true);
+      showToast(`SKU '${sku.skuCode}' permanently deleted`, 'success');
+      setRecycleBinItems(prev => prev.filter(item => item._id !== sku._id));
+      createActivityLog({
+        action: 'PERMANENT_DELETE',
+        entityType: 'SkuV2',
+        entityName: sku.skuCode,
+        details: `SKU item '${sku.skuCode}' was permanently deleted from system`,
+        company: selectedCompany?._id
+      }).catch(() => {});
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.response?.data?.msg || 'Failed to permanently delete SKU', 'error');
+    }
+  };
   // Drawer & Modal states
   const [showAddDrawer, setShowAddDrawer] = useState(false);
   const [editSku, setEditSku] = useState<SkuV2 | null>(null);
@@ -504,6 +526,161 @@ const SkuMasterV2: React.FC = () => {
   const paginatedSkus = React.useMemo(() => {
     return filteredAndSortedSkus.slice((page - 1) * limit, page * limit);
   }, [filteredAndSortedSkus, page, limit]);
+
+  const handleDownloadSampleCSV = () => {
+    const headers = [
+      'SKU Code', 'SKU Name', 'Category', 'Paper Type', 'Primary Unit', 'Alternate Unit', 'Conversion Rate',
+      'GSM', 'Width (cm)', 'Length (cm)', 'Pages / Std Sheets', 'Ream Weight (kg)', 'Rule Type', 'Brand',
+      'Title', 'Group', 'Books/GBL', 'Status'
+    ];
+    
+    const sampleRows = [
+      [
+        'RM-SHEET-52GSM',
+        'Vector Sheets 52GSM 57x70',
+        'Raw Material',
+        'Sheets',
+        'pcs',
+        'ream',
+        '500',
+        '52',
+        '57',
+        '70',
+        '500',
+        '10.37',
+        'Plain',
+        'Vector',
+        '',
+        'Raw Paper',
+        '',
+        'Active'
+      ],
+      [
+        'RM-REEL-70GSM',
+        'Century Maplitho Reel 70 GSM',
+        'Raw Material',
+        'Reels',
+        'kg',
+        '',
+        '',
+        '70',
+        '70',
+        '',
+        '',
+        '',
+        '',
+        'Century',
+        '',
+        'Raw Paper',
+        '',
+        'Active'
+      ],
+      [
+        'FG-NOTEBOOK-17x27-172P',
+        'Century Ruled Notebook 172P',
+        'Finished Goods',
+        'None',
+        'pcs',
+        '',
+        '',
+        '58',
+        '17',
+        '27',
+        '172',
+        '',
+        'Ruled',
+        'Century',
+        'Class Notebook',
+        'Single Line',
+        '6',
+        'Active'
+      ]
+    ];
+
+    const csvContent = [
+      headers.join(','),
+      ...sampleRows.map(row => row.map(val => {
+        const clean = String(val).replace(/"/g, '""');
+        return clean.includes(',') || clean.includes('\n') ? `"${clean}"` : clean;
+      }).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'sample_skus_template.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('Sample CSV template downloaded successfully.', 'success');
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rawData = XLSX.utils.sheet_to_json(ws) as any[];
+
+        if (rawData.length === 0) {
+          showToast('No data found in file.', 'error');
+          return;
+        }
+
+        // Normalize Excel headers to lowercase alphanumeric keys
+        const normalizedData = rawData.map(row => {
+          const norm: Record<string, any> = {};
+          Object.entries(row).forEach(([k, v]) => {
+            const normKey = k.trim().toLowerCase().replace(/[\s*_/-]/g, '');
+            norm[normKey] = v;
+          });
+          return norm;
+        });
+
+        const skusToImport = normalizedData.map(item => {
+          return {
+            skuCode: String(item['skucode'] || '').trim(),
+            name: String(item['skuname'] || item['name'] || item['itemname'] || '').trim(),
+            category: String(item['category'] || 'Raw Material').trim(),
+            paperType: String(item['papertype'] || 'None').trim(),
+            unit: String(item['primaryunit'] || item['unit'] || 'kg').trim(),
+            altUnit: item['alternateunit'] || item['altunit'] || undefined,
+            altUnitConversion: item['conversionrate'] || item['altunitconversion'] ? Number(item['conversionrate'] || item['altunitconversion']) : undefined,
+            gsm: item['gsm'] ? Number(item['gsm']) : undefined,
+            width: item['width'] || item['widthcm'] ? Number(item['width'] || item['widthcm']) : undefined,
+            length: item['length'] || item['lengthcm'] ? Number(item['length'] || item['lengthcm']) : undefined,
+            pages: item['pages'] || item['pagesstdsheets'] || item['stdsheets'] || item['sheetsream'] ? Number(item['pages'] || item['pagesstdsheets'] || item['stdsheets'] || item['sheetsream']) : undefined,
+            reamWeight: item['reamweight'] || item['reamweightkg'] ? Number(item['reamweight'] || item['reamweightkg']) : undefined,
+            ruleType: item['ruletype'] || undefined,
+            brand: String(item['brand'] || '').trim(),
+            title: String(item['title'] || '').trim(),
+            group: String(item['group'] || '').trim(),
+            booksGbl: item['books'] || item['booksgbl'] || item['gbl'] ? Number(item['books'] || item['booksgbl'] || item['gbl']) : undefined,
+            status: String(item['status'] || 'Active').trim()
+          };
+        }).filter(s => s.skuCode && s.name);
+
+        if (skusToImport.length === 0) {
+          showToast('No valid SKU items found. Please check SKU Code and SKU Name headers.', 'error');
+          return;
+        }
+
+        const res = await bulkImportSkusV2(skusToImport, selectedCompany?._id || '');
+        showToast(res.msg || `Successfully imported ${res.importedCount} items.`, 'success');
+        fetchSkus();
+      } catch (err: any) {
+        console.error('Import failed', err);
+        showToast(err.response?.data?.msg || 'Import failed. Please verify format.', 'error');
+      }
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = '';
+  };
 
   const handleExport = () => {
     const targetSkus = selectedIds.length > 0 
@@ -895,47 +1072,43 @@ const SkuMasterV2: React.FC = () => {
                   className="w-full pl-10 pr-4 py-2 border border-gray-205 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 focus:bg-white transition-colors text-gray-900"
                 />
               </div>
-              <button
-                onClick={() => setShowImportDrawer(true)}
-                className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-semibold text-sm shadow-xs cursor-pointer whitespace-nowrap"
-              >
-                <Upload className="w-4 h-4 text-gray-500" />
-                <span>Import Items</span>
-              </button>
             </div>
             
             <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto lg:ml-4">
-              <select
-                value={categoryFilter}
-                onChange={e => setCategoryFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white text-gray-700 cursor-pointer focus:ring-2 focus:ring-blue-500"
+              {/* Export Button */}
+              <button
+                onClick={handleExport}
+                className="flex items-center space-x-1.5 px-3.5 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-semibold text-sm shadow-xs cursor-pointer"
+                title="Export current list to Excel/CSV"
               >
-                <option value="">All Categories</option>
-                <option value="Raw Material">Raw Material</option>
-                <option value="Semi Finished">Semi-Finished</option>
-                <option value="Finished Goods">Finished Goods</option>
-              </select>
-              
-              <select
-                value={unitFilter}
-                onChange={e => setUnitFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white text-gray-700 cursor-pointer focus:ring-2 focus:ring-blue-500"
+                <Download className="w-4 h-4 text-blue-600" />
+                <span>Export</span>
+              </button>
+
+              {/* Sample CSV Button */}
+              <button
+                onClick={handleDownloadSampleCSV}
+                className="flex items-center space-x-1.5 px-3.5 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-semibold text-sm shadow-xs cursor-pointer"
+                title="Download Sample CSV Template"
               >
-                <option value="">All Units</option>
-                {uniqueUnits.map(u => (
-                  <option key={u} value={u}>{u.toUpperCase()}</option>
-                ))}
-              </select>
-              
-              <select
-                value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white text-gray-700 cursor-pointer focus:ring-2 focus:ring-blue-500"
+                <FileText className="w-4 h-4 text-amber-500" />
+                <span>Sample CSV</span>
+              </button>
+
+              {/* Import Button */}
+              <label
+                className="flex items-center space-x-1.5 px-3.5 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-semibold text-sm shadow-xs cursor-pointer"
+                title="Import items from CSV/Excel"
               >
-                <option value="">All Status</option>
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-              </select>
+                <Upload className="w-4 h-4 text-emerald-600" />
+                <span>Import</span>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleImport}
+                  className="hidden"
+                />
+              </label>
 
               {/* Filters Button */}
               <button
@@ -2093,7 +2266,30 @@ const SkuMasterV2: React.FC = () => {
                           <p className="font-bold text-gray-900">{item.name}</p>
                           <p className="font-mono text-gray-400 text-[10px]">{item.skuCode} • {item.category}</p>
                         </div>
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${item.status === 'Active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{item.status}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${item.status === 'Active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{item.status}</span>
+                          <button
+                            onClick={() => {
+                              setEditSku(item);
+                              setShowAddDrawer(true);
+                              setShowDuplicates(false);
+                            }}
+                            className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-600 rounded text-[10px] font-bold transition-colors cursor-pointer"
+                            title="Edit Duplicate Item"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => {
+                              setDeleteConfirmSku(item);
+                              setShowDuplicates(false);
+                            }}
+                            className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded text-[10px] font-bold transition-colors cursor-pointer"
+                            title="Delete Duplicate Item"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -2136,12 +2332,21 @@ const SkuMasterV2: React.FC = () => {
                       <p className="font-bold text-gray-800">{item.name}</p>
                       <p className="font-mono text-gray-400 text-[10px]">{item.skuCode} • {item.category}</p>
                     </div>
-                    <button
-                      onClick={() => handleRestoreSku(item)}
-                      className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-bold transition-colors cursor-pointer"
-                    >
-                      Restore
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => handleRestoreSku(item)}
+                        className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                      >
+                        Restore
+                      </button>
+                      <button
+                        onClick={() => handlePermanentDeleteSku(item)}
+                        className="p-1.5 text-gray-450 hover:bg-red-50 hover:text-red-650 rounded-lg transition-colors cursor-pointer"
+                        title="Delete Permanently"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

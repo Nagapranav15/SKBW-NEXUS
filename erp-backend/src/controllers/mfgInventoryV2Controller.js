@@ -25,6 +25,11 @@ exports.getSkus = async (req, res, next) => {
     }
 
     const query = { company: toObjectId(companyId) };
+    if (req.query.showDeleted === "true") {
+      query.isDeleted = true;
+    } else {
+      query.isDeleted = { $ne: true };
+    }
     if (category) {
       query.category = category;
     }
@@ -154,6 +159,11 @@ exports.updateSku = async (req, res, next) => {
     sku.pages = pages ? Number(pages) : undefined;
     sku.booksGbl = booksGbl ? Number(booksGbl) : undefined;
     sku.status = status || "Active";
+    if (req.body.isDeleted !== undefined) {
+      sku.isDeleted = req.body.isDeleted;
+    } else if (status === "Active") {
+      sku.isDeleted = false;
+    }
 
     await sku.save();
     res.json(sku);
@@ -165,7 +175,7 @@ exports.updateSku = async (req, res, next) => {
 exports.deleteSku = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { companyId } = req.query;
+    const { companyId, permanent } = req.query;
 
     if (!companyId) {
       return res.status(400).json({ msg: "companyId query parameter is required" });
@@ -179,15 +189,21 @@ exports.deleteSku = async (req, res, next) => {
       return res.status(404).json({ msg: "SKU not found" });
     }
 
-    const count = await InventoryLedgerV2.countDocuments({ skuId: skuObjId, company: companyObjId });
-    if (count > 0) {
-      return res.status(400).json({ 
-        msg: `Cannot delete SKU '${sku.skuCode}' because it has active inventory ledger history. Consider changing its status to Inactive.` 
-      });
+    if (permanent === "true") {
+      const count = await InventoryLedgerV2.countDocuments({ skuId: skuObjId, company: companyObjId });
+      if (count > 0) {
+        return res.status(400).json({ 
+          msg: `Cannot permanently delete SKU '${sku.skuCode}' because it has active inventory ledger history.` 
+        });
+      }
+      await SkuV2.deleteOne({ _id: skuObjId });
+      return res.json({ msg: "SKU permanently deleted successfully" });
     }
 
-    await SkuV2.deleteOne({ _id: skuObjId });
-    res.json({ msg: "SKU deleted successfully" });
+    sku.isDeleted = true;
+    sku.status = "Inactive";
+    await sku.save();
+    res.json({ msg: "SKU moved to recycle bin successfully" });
   } catch (err) {
     next(err);
   }
@@ -226,13 +242,17 @@ exports.bulkImportSkus = async (req, res, next) => {
         skuCode: item.skuCode,
         name: item.name,
         category: item.category,
+        paperType: item.paperType || "None",
         unit: item.unit,
+        altUnit: item.altUnit || undefined,
+        altUnitConversion: item.altUnitConversion ? Number(item.altUnitConversion) : undefined,
         gsm: item.gsm ? Number(item.gsm) : undefined,
         width: item.width ? Number(item.width) : undefined,
         length: item.length ? Number(item.length) : undefined,
         brand: item.brand || "",
         ruleType: item.ruleType,
         pages: item.pages ? Number(item.pages) : undefined,
+        reamWeight: item.reamWeight ? Number(item.reamWeight) : undefined,
         booksGbl: item.booksGbl ? Number(item.booksGbl) : undefined,
         status: item.status || "Active",
         company: companyObjId,

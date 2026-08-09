@@ -78,12 +78,15 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
                 let totalKgWeight = 0;
 
                 inv.items?.forEach((item) => {
-                  const skuIdVal = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any)._id : item.skuId;
-                  const selectedSku = skus.find(s => s._id === skuIdVal);
-                  if (selectedSku?.paperType === 'Sheets') {
-                    const stdSheets = selectedSku.pages || 500;
-                    totalReamsCount += (item.quantity || 0) / stdSheets;
+                  const resolvedSku = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null;
+                  const paperType = resolvedSku?.paperType;
+                  if (paperType === 'Sheets') {
+                    const stdSheets = resolvedSku?.pages || 500;
+                    const reamWeight = item.reamWeight || resolvedSku?.reamWeight || getFallbackReamWeight(resolvedSku) || 0;
+                    const itemReams = (item.quantity || 0) / stdSheets;
+                    totalReamsCount += itemReams;
                     totalSheetsCount += item.quantity || 0;
+                    totalKgWeight += itemReams * reamWeight;
                   } else {
                     totalReelsCount += item.reels?.length || 0;
                     totalKgWeight += item.quantity || 0;
@@ -117,12 +120,7 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
                       {totalReamsCount > 0 ? totalReamsCount.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '—'}
                     </td>
                     <td className="px-3.5 py-2 font-bold text-gray-900 text-[13px]">
-                      {(() => {
-                        const parts = [];
-                        if (totalKgWeight > 0) parts.push(`${totalKgWeight.toLocaleString('en-IN')} KG`);
-                        if (totalSheetsCount > 0) parts.push(`${totalSheetsCount.toLocaleString('en-IN')} Sheets`);
-                        return parts.length > 0 ? parts.join(' / ') : '—';
-                      })()}
+                      {totalKgWeight > 0 ? `${totalKgWeight.toLocaleString('en-IN', { maximumFractionDigits: 2 })} KG` : '—'}
                     </td>
                     <td className="px-3.5 py-2 font-bold text-gray-900 text-[13.5px]">
                       ₹{(inv.subTotal || 0).toLocaleString('en-IN')}
@@ -167,6 +165,28 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
   );
 };
 
+const getFallbackReamWeight = (sku: any): number => {
+  if (!sku) return 0;
+  const gsm = Number(sku.gsm) || 0;
+  let w = Number(sku.width) || 0;
+  let l = Number(sku.length) || 0;
+
+  // Fallback to name parsing if fields are zero
+  if ((w === 0 || l === 0) && sku.name) {
+    const match = sku.name.match(/(\d+(?:\.\d+)?)\s*[xX\*]\s*(\d+(?:\.\d+)?)/i);
+    if (match) {
+      if (w === 0) w = Number(match[1]) || 0;
+      if (l === 0) l = Number(match[2]) || 0;
+    }
+  }
+
+  const stdSheets = Number(sku.pages) || 500;
+  if (gsm > 0 && w > 0 && l > 0) {
+    return (w * l * gsm * stdSheets) / 10000000;
+  }
+  return 0;
+};
+
 const PurchaseInvoicePage: React.FC = () => {
   const { selectedCompany } = useAuth();
   const navigate = useNavigate();
@@ -206,6 +226,14 @@ const PurchaseInvoicePage: React.FC = () => {
   // Navigation states
   const [activeSubPage, setActiveSubPage] = useState<'list' | 'new' | 'details'>('list');
   const [selectedInvoice, setSelectedInvoice] = useState<PurchaseInvoiceV2 | null>(null);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [search]);
   
   // Details tabs
   const [detailsTab, setDetailsTab] = useState<'lots' | 'allocation' | 'history'>('lots');
@@ -433,7 +461,7 @@ const PurchaseInvoicePage: React.FC = () => {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [selectedCompany?._id, page, vendorFilter, statusFilter]);
+  }, [selectedCompany?._id, page, vendorFilter, statusFilter, debouncedSearch]);
 
   // Load balances when detailed invoice is selected
   useEffect(() => {
@@ -485,7 +513,7 @@ const PurchaseInvoicePage: React.FC = () => {
         companyId: selectedCompany?._id || '',
         vendorId: vendorFilter || undefined,
         status: statusFilter || undefined,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         page,
         limit
       });
@@ -493,10 +521,8 @@ const PurchaseInvoicePage: React.FC = () => {
       setTotal(res.total || 0);
 
       if (selectedInvoice) {
-        const updated = (res.invoices || []).find((inv: any) => inv._id === selectedInvoice._id);
-        if (updated) {
-          setSelectedInvoice(updated);
-        }
+        // Only load fresh balances; do not reset/overwrite the selected invoice reference to avoid reloading bugs
+        loadBalances(false);
       }
     } catch (e) {
       console.error(e);
@@ -734,7 +760,9 @@ const PurchaseInvoicePage: React.FC = () => {
             totalPrice: splitQty * price,
             lotNumber: item.lotNumber || `${finalInvoiceNumber}-L0${i + 1}`,
             locationId: split.locationId,
-            reels: []
+            reels: [],
+            reamWeight: (item as any).reamWeight ? Number((item as any).reamWeight) : undefined,
+            ratePerKg: (item as any).ratePerKg ? Number((item as any).ratePerKg) : undefined
           });
         }
       } else {
@@ -749,7 +777,9 @@ const PurchaseInvoicePage: React.FC = () => {
           totalPrice: qty * price,
           lotNumber: item.lotNumber || `${finalInvoiceNumber}-L0${i + 1}`,
           locationId: destLocId,
-          reels: []
+          reels: [],
+          reamWeight: (item as any).reamWeight ? Number((item as any).reamWeight) : undefined,
+          ratePerKg: (item as any).ratePerKg ? Number((item as any).ratePerKg) : undefined
         });
       }
     }
@@ -862,9 +892,9 @@ const PurchaseInvoicePage: React.FC = () => {
           reelsCount: String(item.reels?.length || 0),
           quantity: String(item.quantity),
           purchasePrice: String(item.purchasePrice),
-          reamWeight: (selectedSku as any)?.reamWeight ? String((selectedSku as any).reamWeight) : '',
-          ratePerKg: (() => {
-            const rw = (selectedSku as any)?.reamWeight || 0;
+          reamWeight: item.reamWeight ? String(item.reamWeight) : ((selectedSku as any)?.reamWeight ? String((selectedSku as any).reamWeight) : ''),
+          ratePerKg: item.ratePerKg ? String(item.ratePerKg) : (() => {
+            const rw = item.reamWeight || (selectedSku as any)?.reamWeight || 0;
             const stdSheets = selectedSku?.pages || 500;
             if (rw > 0) {
               return String((Number(item.purchasePrice) * stdSheets) / rw);
@@ -2189,9 +2219,8 @@ const PurchaseInvoicePage: React.FC = () => {
           {/* Details Content Scroll Area */}
           {(() => {
             const isSheetsInvoice = selectedInvoice.items?.some(item => {
-              const skuIdVal = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any)._id : item.skuId;
-              const selectedSku = skus.find(s => s._id === skuIdVal);
-              return selectedSku?.paperType === 'Sheets';
+              const resolvedSku = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null;
+              return resolvedSku?.paperType === 'Sheets';
             });
 
             let totalReelsCount = 0;
@@ -2200,12 +2229,14 @@ const PurchaseInvoicePage: React.FC = () => {
             let totalKgWeight = 0;
 
             selectedInvoice.items?.forEach(item => {
-              const skuIdVal = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any)._id : item.skuId;
-              const selectedSku = skus.find(s => s._id === skuIdVal);
-              if (selectedSku?.paperType === 'Sheets') {
-                const stdSheets = selectedSku.pages || 500;
+              const resolvedSku = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null;
+              if (resolvedSku?.paperType === 'Sheets') {
+                const stdSheets = resolvedSku?.pages || 500;
+                const reamWeight = item.reamWeight || resolvedSku?.reamWeight || getFallbackReamWeight(resolvedSku) || 0;
+                const itemReams = (item.quantity || 0) / stdSheets;
                 totalSheetsCount += item.quantity || 0;
-                totalReamsCount += (item.quantity || 0) / stdSheets;
+                totalReamsCount += itemReams;
+                totalKgWeight += itemReams * reamWeight;
               } else {
                 totalReelsCount += item.reels?.length || 0;
                 totalKgWeight += item.quantity || 0;
@@ -2272,14 +2303,7 @@ const PurchaseInvoicePage: React.FC = () => {
                     </span>
                   </div>
 
-                  {/* Card 8: Total Sheets */}
-                  <div className="bg-pink-50/40 border border-pink-100 rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-                    <span className="block text-[10px] text-pink-700 font-bold uppercase tracking-wider leading-tight">Total Sheets</span>
-                    <span className="block text-xl text-pink-900 font-extrabold mt-0.5">
-                      {totalSheetsCount.toLocaleString('en-IN')}
-                    </span>
                   </div>
-                </div>
 
             {/* Details Tabs and panels */}
             <div className="space-y-4">
@@ -2335,9 +2359,20 @@ const PurchaseInvoicePage: React.FC = () => {
                       <tbody className="divide-y divide-gray-100 text-gray-700 font-medium">
                         {selectedInvoice.items?.map((item, idx) => {
                           const skuName = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any).name : 'Raw Material';
-                          const brand = (item.skuId as any)?.brand || 'BILT';
-                          const gsm = (item.skuId as any)?.gsm || '52';
-                          const width = (item.skuId as any)?.width || '64';
+                          const resolvedSku = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null;
+                          const brand = resolvedSku?.brand || 'BILT';
+                          const gsm = resolvedSku?.gsm || '52';
+                          const width = resolvedSku?.width || '64';
+                          
+                          let displayQtyKg = item.quantity || 0;
+                          if (resolvedSku?.paperType === 'Sheets') {
+                            const stdSheets = resolvedSku.pages || 500;
+                            const reamWeight = item.reamWeight || resolvedSku?.reamWeight || getFallbackReamWeight(resolvedSku) || 0;
+                            if (reamWeight > 0) {
+                              const reams = (item.quantity || 0) / stdSheets;
+                              displayQtyKg = reams * reamWeight;
+                            }
+                          }
                           
                           return (
                             <tr key={idx} className="hover:bg-gray-50/50">
@@ -2349,7 +2384,9 @@ const PurchaseInvoicePage: React.FC = () => {
                               <td className="px-3 py-2.5 text-center font-bold text-gray-700">{gsm}</td>
                               <td className="px-3 py-2.5 text-center font-bold text-gray-700">{width} cm</td>
                               <td className="px-3 py-2.5 text-center font-bold text-gray-800">{item.reels?.length || 0}</td>
-                              <td className="px-3 py-2.5 text-right font-black text-gray-955">{(item.quantity || 0).toLocaleString()}</td>
+                              <td className="px-3 py-2.5 text-right font-black text-gray-955">
+                                {displayQtyKg.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                              </td>
                               <td className="px-3 py-2.5 text-right font-black text-gray-955">₹{(item.totalPrice || 0).toLocaleString()}</td>
                             </tr>
                           );
@@ -2727,7 +2764,7 @@ const PurchaseInvoicePage: React.FC = () => {
           : '';
 
         const selectedSkuId = lotItem ? (typeof lotItem.skuId === 'object' && lotItem.skuId !== null ? (lotItem.skuId as any)._id : lotItem.skuId) : '';
-        const selectedSku = skus.find(s => s._id === selectedSkuId);
+        const selectedSku = skus.find(s => s._id === selectedSkuId) || (lotItem && typeof lotItem.skuId === 'object' ? (lotItem.skuId as any) : null);
         const stdSheetsPerReam = selectedSku?.pages || 500;
         
         // Find remaining unallocated quantity at default location

@@ -108,6 +108,8 @@ exports.createPurchaseInvoice = async (req, res, next) => {
         lotNumber,
         locationId: location._id,
         reels: reels || [],
+        reamWeight: item.reamWeight ? Number(item.reamWeight) : undefined,
+        ratePerKg: item.ratePerKg ? Number(item.ratePerKg) : undefined,
         // Cached hierarchies for ledger creation
         warehouseId,
         floorId,
@@ -229,7 +231,7 @@ exports.getPurchaseInvoices = async (req, res, next) => {
     const [invoices, total] = await Promise.all([
       PurchaseInvoiceV2.find(query)
         .populate("vendorId", "firmName ownerName phone contactName email outstanding")
-        .populate("items.skuId", "skuCode name category unit gsm ruleType")
+        .populate("items.skuId", "skuCode name category unit paperType pages reamWeight gsm ruleType")
         .populate("items.locationId", "name level")
         .populate("createdBy", "fullName")
         .sort({ createdAt: -1 })

@@ -51,9 +51,9 @@ export interface LedgerEntryV2 {
 
 // ── SKU API ──────────────────────────────────────────────────────────────────
 
-export const getSkusV2 = async (companyId: string, category?: string, search?: string, status?: string): Promise<SkuV2[]> => {
+export const getSkusV2 = async (companyId: string, category?: string, search?: string, status?: string, showDeleted?: boolean): Promise<SkuV2[]> => {
   const response = await api.get('/v2/skus', {
-    params: { companyId, category, search, status }
+    params: { companyId, category, search, status, showDeleted }
   });
   return response.data;
 };
@@ -68,9 +68,9 @@ export const updateSkuV2 = async (id: string, skuData: any): Promise<SkuV2> => {
   return response.data;
 };
 
-export const deleteSkuV2 = async (id: string, companyId: string): Promise<any> => {
+export const deleteSkuV2 = async (id: string, companyId: string, permanent?: boolean): Promise<any> => {
   const response = await api.delete(`/v2/skus/${id}`, {
-    params: { companyId }
+    params: { companyId, permanent }
   });
   return response.data;
 };

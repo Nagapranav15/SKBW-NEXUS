@@ -408,7 +408,7 @@ const LedgerDetailDrawer: React.FC<LedgerDetailDrawerProps> = ({ entry, companyI
 const InventoryLedgerPage: React.FC = () => {
   const { selectedCompany } = useAuth();
   const [searchParams] = useSearchParams();
-  const ledgerMode = searchParams.get('mode') || 'stock';
+  const ledgerMode = 'stock';
 
   const [entries, setEntries] = useState<LedgerEntryV2[]>([]);
   const [skus, setSkus] = useState<SkuV2[]>([]);

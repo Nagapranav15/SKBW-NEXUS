@@ -39,7 +39,7 @@ const Layout: React.FC = () => {
     ['/inventory-v2/purchases', '/party/vendors'].includes(window.location.pathname)
   );
   const [inventoryOpen, setInventoryOpen] = useState(() => 
-    ['/inventory-v2/batch-stock', '/inventory-v2/warehouse'].includes(window.location.pathname) || (window.location.pathname === '/inventory-v2/ledger' && !document.referrer.includes('purchase'))
+    ['/inventory-v2/batch-stock', '/inventory-v2/warehouse', '/inventory-v2/ledger'].includes(window.location.pathname)
   );
   const [conversionsOpen, setConversionsOpen] = useState(() => 
     ['/inventory-v2/testing-transactions'].includes(window.location.pathname)
@@ -192,11 +192,10 @@ const Layout: React.FC = () => {
   const purchaseItems = [
     { label: 'Purchase Batches', path: '/inventory-v2/purchases', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
     { label: 'Suppliers', path: '/party/vendors', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
-    { label: 'Purchase Ledger', path: '/inventory-v2/ledger?mode=purchase', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
   ];
   const visiblePurchaseItems = purchaseItems.filter(item => hasPermission(item.permission));
   const hasPurchaseAccess = visiblePurchaseItems.length > 0;
-  const isPurchaseActive = () => ['/inventory-v2/purchases', '/party/vendors'].includes(location.pathname) || (location.pathname === '/inventory-v2/ledger' && location.search.includes('mode=purchase'));
+  const isPurchaseActive = () => ['/inventory-v2/purchases', '/party/vendors'].includes(location.pathname);
 
   // Inventory
   const inventoryV2Items = [
@@ -294,8 +293,12 @@ const Layout: React.FC = () => {
           <div className="flex items-center justify-between">
             {sidebarOpen && (
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-600 shrink-0 shadow-sm border border-blue-500/20">
-                  <Building2 className="w-6 h-6" />
+                <div className="w-10 h-10 rounded-xl overflow-hidden bg-blue-500/10 flex items-center justify-center text-blue-600 shrink-0 shadow-sm border border-blue-500/20">
+                  {selectedCompany?.logo ? (
+                    <img src={selectedCompany.logo} alt={selectedCompany.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <Building2 className="w-6 h-6" />
+                  )}
                 </div>
                 <div>
                   <h2 className="font-bold text-gray-900 text-sm leading-tight">SKBW CORE</h2>

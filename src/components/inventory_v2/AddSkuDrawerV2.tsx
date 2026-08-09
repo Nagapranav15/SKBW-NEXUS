@@ -384,11 +384,24 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
       setIsSaving(true);
       try {
         const payload = {
+          skuCode: form.skuCode.trim(),
+          name: form.name.trim(),
+          category: form.category,
+          paperType: form.paperType,
+          unit: form.unit,
+          altUnit: form.altUnit || undefined,
+          altUnitConversion: form.altUnit ? (form.altUnitConversion ? Number(form.altUnitConversion) : undefined) : undefined,
+          gsm: form.gsm ? Number(form.gsm) : undefined,
+          width: form.width ? Number(form.width) : undefined,
+          length: form.length ? Number(form.length) : undefined,
+          brand: form.brand.trim() || undefined,
+          title: form.title.trim() || undefined,
+          group: form.group.trim() || undefined,
+          ruleType: form.ruleType || undefined,
           pages: form.pages ? Number(form.pages) : undefined,
           reamWeight: form.reamWeight ? Number(form.reamWeight) : undefined,
           booksGbl: form.booksGbl ? Number(form.booksGbl) : undefined,
-          altUnit: form.altUnit || undefined,
-          altUnitConversion: form.altUnit ? (form.altUnitConversion ? Number(form.altUnitConversion) : undefined) : undefined,
+          status: form.status || 'Active',
           company: companyId
         };
 
