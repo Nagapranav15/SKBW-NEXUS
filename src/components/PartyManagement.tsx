@@ -2294,8 +2294,24 @@ const PartyManagement: React.FC = () => {
           }
           await fetchMainData();
           await fetchStatsCounts();
-          // Refresh duplicate scan
-          await handleFindDuplicates();
+          
+          // Smoothly update local duplicate groups without screen flash
+          setDuplicateGroups(prev => {
+            return prev.map(group => {
+              const updatedItems = group.items.filter(item => item._id !== id);
+              return { ...group, items: updatedItems };
+            }).filter(group => group.items.length > 1);
+          });
+
+          if (compareGroup) {
+            setCompareGroup((prev: any) => {
+              if (!prev) return null;
+              const updatedItems = prev.items.filter((item: any) => item._id !== id);
+              if (updatedItems.length <= 1) return null;
+              return { ...prev, items: updatedItems };
+            });
+          }
+
           setToast({ message: `Duplicate record deleted successfully.`, type: 'success' });
         } catch (err) {
           console.error('Delete failed:', err);
@@ -3276,13 +3292,6 @@ const PartyManagement: React.FC = () => {
                 <span>Import</span>
                 <input type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} className="hidden" />
               </label>
-              <button
-                onClick={() => { fetchMainData(); fetchStatsCounts(); fetchDropdownOptions(); }}
-                className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200"
-                title="Refresh Page"
-              >
-                <RefreshCw className="w-4 h-4" />
-              </button>
             </div>
           </div>
 
@@ -5099,7 +5108,16 @@ const PartyManagement: React.FC = () => {
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider border-r border-gray-200 w-[180px]">Field</th>
                       {compareGroup.items.map((item: any, idx: number) => (
                         <th key={item._id} className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[200px] border-r last:border-r-0">
-                          Record #{idx + 1}
+                          <div className="flex justify-between items-center">
+                            <span>Record #{idx + 1}</span>
+                            <button
+                              onClick={() => deleteDuplicateItem(item._id)}
+                              className="text-red-500 hover:text-red-700 p-1 font-normal text-[10px] normal-case flex items-center gap-0.5 border border-red-200 bg-red-50 rounded"
+                              title="Delete Record"
+                            >
+                              <Trash2 className="w-3 h-3" /> Delete
+                            </button>
+                          </div>
                         </th>
                       ))}
                     </tr>

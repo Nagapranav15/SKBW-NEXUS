@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, Save, RefreshCw, Layers } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Save, RefreshCw, Layers, Plus, Trash2, CheckCircle } from 'lucide-react';
 import { createSkuV2, updateSkuV2, SkuV2, getMetadataV2, updateMetadataV2, getSkusV2 } from '../../api/mfgApiV2';
 import Modal from '../ui/Modal';
 import Drawer from '../ui/Drawer';
@@ -30,12 +30,13 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
     pages: '',
     reamWeight: '',
     booksGbl: '',
+    openingStock: '',
     status: 'Active' as any
   });
 
   const [categoriesList, setCategoriesList] = useState<string[]>(["Raw Material", "Semi Finished", "Finished Goods"]);
   const [unitsList, setUnitsList] = useState<string[]>(["kg", "pcs", "Sheets", "Reels", "mtr"]);
-  const [ruleTypesList, setRuleTypesList] = useState<string[]>(["Plain", "Single Line", "Double Line", "Square Ruled", "Four Line", "Unruled"]);
+  const [ruleTypesList, setRuleTypesList] = useState<string[]>(["Plain", "Single Line", "Double Line", "Square Ruled", "Four Line", "Unruled", "UR"]);
   const [groupsList, setGroupsList] = useState<string[]>(["132P Happy days (UR)", "220P Happy days (SR)"]);
   const [brandsList, setBrandsList] = useState<string[]>(["Happy Days", "Classmate", "Navneet"]);
   
@@ -54,6 +55,22 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
   const [showGroupDropdown, setShowGroupDropdown] = useState(false);
   const [brandAtFocus, setBrandAtFocus] = useState<string | null>(null);
   const [groupAtFocus, setGroupAtFocus] = useState<string | null>(null);
+
+  const brandContainerRef = useRef<HTMLDivElement>(null);
+  const groupContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (brandContainerRef.current && !brandContainerRef.current.contains(e.target as Node)) {
+        setShowBrandDropdown(false);
+      }
+      if (groupContainerRef.current && !groupContainerRef.current.contains(e.target as Node)) {
+        setShowGroupDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Category specific field visibility mapping
   const [categoryFieldsMap, setCategoryFieldsMap] = useState<Record<string, string[]>>({
@@ -238,6 +255,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
         pages: (editSku as any).pages !== undefined ? String((editSku as any).pages) : '',
         reamWeight: (editSku as any).reamWeight !== undefined ? String((editSku as any).reamWeight) : '',
         booksGbl: (editSku as any).booksGbl !== undefined ? String((editSku as any).booksGbl) : '',
+        openingStock: (editSku as any).openingStock !== undefined ? String((editSku as any).openingStock) : '',
         status: editSku.status || 'Active'
       });
       setHasAltUnit(!!editSku.altUnit);
@@ -260,6 +278,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
         pages: '',
         reamWeight: '',
         booksGbl: '',
+        openingStock: '',
         status: 'Active'
       });
       setHasAltUnit(false);
@@ -310,7 +329,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
           if (form.gsm) parts.push(`${form.gsm}GSM`);
           let sizeStr = '';
           if (form.width && form.length) {
-            sizeStr = `${form.width}x${form.length}CM`;
+            sizeStr = `${form.width} * ${form.length}CM`;
           } else if (form.width) {
             sizeStr = `${form.width}CM`;
           }
@@ -349,7 +368,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
           const hasWidth = active.includes('width');
           const hasLength = active.includes('length');
           if (hasWidth && hasLength && form.width && form.length) {
-            sizeStr = `${form.width}x${form.length}CM`;
+            const sep = form.category === 'Semi Finished' ? ' * ' : 'x';
+            sizeStr = `${form.width}${sep}${form.length}CM`;
           } else if (hasWidth && form.width) {
             sizeStr = `${form.width}CM`;
           } else if (hasLength && form.length) {
@@ -401,6 +421,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
           pages: form.pages ? Number(form.pages) : undefined,
           reamWeight: form.reamWeight ? Number(form.reamWeight) : undefined,
           booksGbl: form.booksGbl ? Number(form.booksGbl) : undefined,
+          openingStock: form.openingStock ? Number(form.openingStock) : 0,
           status: form.status || 'Active',
           company: companyId
         };
@@ -508,7 +529,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                           ...prev,
                           category: val,
                           paperType: val === 'Raw Material' ? 'Reels' : 'None',
-                          ruleType: val === 'Raw Material' ? '' : prev.ruleType
+                          ruleType: val === 'Finished Goods' ? (prev.ruleType || 'UR') : (val === 'Raw Material' ? '' : prev.ruleType)
                         }));
                       }
                     }}
@@ -519,6 +540,18 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                     ))}
                     <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
                   </select>
+                </div>
+
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Opening Stock</label>
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="0"
+                    value={form.openingStock}
+                    onChange={e => setForm({ ...form, openingStock: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                  />
                 </div>
 
                 {/* Reels vs Sheets Radio Selector */}
@@ -603,7 +636,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                   <div>
                     <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Brand</label>
                     {form.category === 'Finished Goods' ? (
-                      <div className="relative">
+                      <div className="relative" ref={brandContainerRef}>
                         <input
                           type="text"
                           placeholder="Search or type brand..."
@@ -619,40 +652,39 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                           className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
                         />
                         {showBrandDropdown && (
-                          <>
-                            <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-20 divide-y divide-gray-50">
-                              {fgBrandsList
-                                .filter(b => {
-                                  if (brandSearch === brandAtFocus) return true;
-                                  return b.toLowerCase().includes(brandSearch.toLowerCase());
-                                })
-                                .map(b => (
-                                  <button
-                                    key={b}
-                                    type="button"
-                                    onClick={() => {
-                                      setForm(prev => ({ ...prev, brand: b }));
-                                      setBrandSearch(b);
-                                      setShowBrandDropdown(false);
-                                    }}
-                                    className="w-full px-3 py-2 text-left text-xs hover:bg-blue-50 hover:text-blue-600 transition-colors font-semibold text-gray-700 block"
-                                  >
-                                    {b}
-                                  </button>
-                                  ))
-                                }
-                              {brandSearch.trim() && !fgBrandsList.some(b => b.toLowerCase() === brandSearch.toLowerCase()) && (
+                          <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-20 divide-y divide-gray-50">
+                            {fgBrandsList
+                              .filter(b => {
+                                if (brandSearch === brandAtFocus) return true;
+                                return b.toLowerCase().includes(brandSearch.toLowerCase());
+                              })
+                              .map(b => (
                                 <button
+                                  key={b}
                                   type="button"
                                   onClick={() => {
-                                    const newBrand = brandSearch.trim();
-                                    if (!fgBrandsList.includes(newBrand)) {
-                                      setFgBrandsList(prev => [...prev, newBrand]);
-                                    }
-                                    setForm(prev => ({ ...prev, brand: newBrand }));
+                                    setForm(prev => ({ ...prev, brand: b }));
+                                    setBrandSearch(b);
                                     setShowBrandDropdown(false);
                                   }}
-                                  className="w-full px-3 py-2 text-left text-xs hover:bg-green-50 text-green-600 font-bold transition-colors block"
+                                  className="w-full px-3 py-2 text-left text-xs hover:bg-blue-50 hover:text-blue-600 transition-colors font-semibold text-gray-700 block"
+                                >
+                                  {b}
+                                </button>
+                              ))
+                            }
+                            {brandSearch.trim() && !fgBrandsList.some(b => b.toLowerCase() === brandSearch.toLowerCase()) && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newBrand = brandSearch.trim();
+                                  if (!fgBrandsList.includes(newBrand)) {
+                                    setFgBrandsList(prev => [...prev, newBrand]);
+                                  }
+                                  setForm(prev => ({ ...prev, brand: newBrand }));
+                                  setShowBrandDropdown(false);
+                                }}
+                                className="w-full px-3 py-2 text-left text-xs hover:bg-green-50 text-green-600 font-bold transition-colors block"
                                 >
                                   + Add Brand "{brandSearch.trim()}"
                                 </button>
@@ -661,31 +693,25 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                                 <div className="px-3 py-2 text-xs text-gray-400 italic">No brands found</div>
                               )}
                             </div>
-                            <div 
-                              className="fixed inset-0 z-10" 
-                              onClick={() => setShowBrandDropdown(false)} 
-                            />
-                          </>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="relative">
-                        <input
-                          type="text"
-                          placeholder="Search or type brand..."
-                          value={brandSearch}
-                          onChange={e => {
-                            setBrandSearch(e.target.value);
-                            setForm(prev => ({ ...prev, brand: e.target.value }));
-                          }}
-                          onFocus={() => {
-                            setShowBrandDropdown(true);
-                            setBrandAtFocus(form.brand);
-                          }}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
-                        />
-                        {showBrandDropdown && (
-                          <>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="relative" ref={brandContainerRef}>
+                          <input
+                            type="text"
+                            placeholder="Search or type brand..."
+                            value={brandSearch}
+                            onChange={e => {
+                              setBrandSearch(e.target.value);
+                              setForm(prev => ({ ...prev, brand: e.target.value }));
+                            }}
+                            onFocus={() => {
+                              setShowBrandDropdown(true);
+                              setBrandAtFocus(form.brand);
+                            }}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                          />
+                          {showBrandDropdown && (
                             <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-20 divide-y divide-gray-50">
                               {existingBrands
                                 .filter(b => {
@@ -705,8 +731,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                                   >
                                     {b}
                                   </button>
-                                  ))
-                                }
+                                ))
+                              }
                               {brandSearch.trim() && !existingBrands.some(b => b.toLowerCase() === brandSearch.toLowerCase()) && (
                                 <button
                                   type="button"
@@ -727,13 +753,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                                 <div className="px-3 py-2 text-xs text-gray-400 italic">No brands found</div>
                               )}
                             </div>
-                            <div 
-                              className="fixed inset-0 z-10" 
-                              onClick={() => setShowBrandDropdown(false)} 
-                            />
-                          </>
-                        )}
-                      </div>
+                          )}
+                        </div>
                     )}
                   </div>
                 )}
@@ -874,7 +895,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
               {activeFields.includes('group') && (
                 <div>
                   <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Group</label>
-                  <div className="relative">
+                  <div className="relative" ref={groupContainerRef}>
                     <input
                       type="text"
                       placeholder="Search or type group..."
@@ -890,53 +911,47 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
                     />
                     {showGroupDropdown && (
-                      <>
-                        <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-20 divide-y divide-gray-50">
-                          {groupsList
-                            .filter(g => {
-                              if (groupSearch === groupAtFocus) return true;
-                              return g.toLowerCase().includes(groupSearch.toLowerCase());
-                            })
-                            .map(g => (
-                              <button
-                                key={g}
-                                type="button"
-                                onClick={() => {
-                                  setForm(prev => ({ ...prev, group: g }));
-                                  setGroupSearch(g);
-                                  setShowGroupDropdown(false);
-                                }}
-                                className="w-full px-3 py-2 text-left text-xs hover:bg-blue-50 hover:text-blue-600 transition-colors font-semibold text-gray-700 block"
-                              >
-                                {g}
-                              </button>
-                              ))
-                            }
-                          {groupSearch.trim() && !groupsList.some(g => g.toLowerCase() === groupSearch.toLowerCase()) && (
+                      <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-20 divide-y divide-gray-50">
+                        {groupsList
+                          .filter(g => {
+                            if (groupSearch === groupAtFocus) return true;
+                            return g.toLowerCase().includes(groupSearch.toLowerCase());
+                          })
+                          .map(g => (
                             <button
+                              key={g}
                               type="button"
                               onClick={() => {
-                                const newGrp = groupSearch.trim();
-                                if (!groupsList.includes(newGrp)) {
-                                  setGroupsList(prev => [...prev, newGrp]);
-                                }
-                                setForm(prev => ({ ...prev, group: newGrp }));
+                                setForm(prev => ({ ...prev, group: g }));
+                                setGroupSearch(g);
                                 setShowGroupDropdown(false);
                               }}
-                              className="w-full px-3 py-2 text-left text-xs hover:bg-green-50 text-green-600 font-bold transition-colors block"
+                              className="w-full px-3 py-2 text-left text-xs hover:bg-blue-50 hover:text-blue-600 transition-colors font-semibold text-gray-700 block"
                             >
-                              + Add Group "{groupSearch.trim()}"
+                              {g}
                             </button>
-                          )}
-                          {groupsList.filter(g => g.toLowerCase().includes(groupSearch.toLowerCase())).length === 0 && !groupSearch.trim() && (
-                            <div className="px-3 py-2 text-xs text-gray-400 italic">No groups found</div>
-                          )}
-                        </div>
-                        <div 
-                          className="fixed inset-0 z-10" 
-                          onClick={() => setShowGroupDropdown(false)} 
-                        />
-                      </>
+                          ))
+                        }
+                        {groupSearch.trim() && !groupsList.some(g => g.toLowerCase() === groupSearch.toLowerCase()) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newGrp = groupSearch.trim();
+                              if (!groupsList.includes(newGrp)) {
+                                setGroupsList(prev => [...prev, newGrp]);
+                              }
+                              setForm(prev => ({ ...prev, group: newGrp }));
+                              setShowGroupDropdown(false);
+                            }}
+                            className="w-full px-3 py-2 text-left text-xs hover:bg-green-50 text-green-600 font-bold transition-colors block"
+                          >
+                            + Add Group "{groupSearch.trim()}"
+                          </button>
+                        )}
+                        {groupsList.filter(g => g.toLowerCase().includes(groupSearch.toLowerCase())).length === 0 && !groupSearch.trim() && (
+                          <div className="px-3 py-2 text-xs text-gray-400 italic">No groups found</div>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>

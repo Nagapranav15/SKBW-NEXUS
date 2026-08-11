@@ -86,6 +86,7 @@ const SkuMasterV2: React.FC = () => {
     gsm: 'GSM',
     dimensions: 'Size (W x L)',
     pages: 'Pages / Std Sheets',
+    openingStock: 'Opening Stock',
     status: 'Status'
   };
 
@@ -100,6 +101,7 @@ const SkuMasterV2: React.FC = () => {
     gsm: true,
     dimensions: true,
     pages: true,
+    openingStock: true,
     status: true
   };
 
@@ -123,6 +125,8 @@ const SkuMasterV2: React.FC = () => {
   const [showRecycleBin, setShowRecycleBin] = useState(false);
   
   // Tools action data
+  const [logSearch, setLogSearch] = useState('');
+  const [logActionFilter, setLogActionFilter] = useState('ALL');
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [activityLogLoading, setActivityLogLoading] = useState(false);
   const [duplicateGroups, setDuplicateGroups] = useState<{ field: string; value: string; items: SkuV2[] }[]>([]);
@@ -531,7 +535,7 @@ const SkuMasterV2: React.FC = () => {
     const headers = [
       'SKU Code', 'SKU Name', 'Category', 'Paper Type', 'Primary Unit', 'Alternate Unit', 'Conversion Rate',
       'GSM', 'Width (cm)', 'Length (cm)', 'Pages / Std Sheets', 'Ream Weight (kg)', 'Rule Type', 'Brand',
-      'Title', 'Group', 'Books/GBL', 'Status'
+      'Title', 'Group', 'Opening Stock', 'Books/GBL', 'Status'
     ];
     
     const sampleRows = [
@@ -622,8 +626,8 @@ const SkuMasterV2: React.FC = () => {
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
+        const data = evt.target?.result;
+        const wb = XLSX.read(data, { type: 'array' });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rawData = XLSX.utils.sheet_to_json(ws) as any[];
 
@@ -632,11 +636,11 @@ const SkuMasterV2: React.FC = () => {
           return;
         }
 
-        // Normalize Excel headers to lowercase alphanumeric keys
+        // Normalize Excel headers to lowercase alphanumeric keys only
         const normalizedData = rawData.map(row => {
           const norm: Record<string, any> = {};
           Object.entries(row).forEach(([k, v]) => {
-            const normKey = k.trim().toLowerCase().replace(/[\s*_/-]/g, '');
+            const normKey = k.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
             norm[normKey] = v;
           });
           return norm;
@@ -644,8 +648,8 @@ const SkuMasterV2: React.FC = () => {
 
         const skusToImport = normalizedData.map(item => {
           return {
-            skuCode: String(item['skucode'] || '').trim(),
-            name: String(item['skuname'] || item['name'] || item['itemname'] || '').trim(),
+            skuCode: String(item['skucode'] || item['code'] || item['itemcode'] || '').trim(),
+            name: String(item['skuname'] || item['name'] || item['itemname'] || item['title'] || '').trim(),
             category: String(item['category'] || 'Raw Material').trim(),
             paperType: String(item['papertype'] || 'None').trim(),
             unit: String(item['primaryunit'] || item['unit'] || 'kg').trim(),
@@ -660,6 +664,7 @@ const SkuMasterV2: React.FC = () => {
             brand: String(item['brand'] || '').trim(),
             title: String(item['title'] || '').trim(),
             group: String(item['group'] || '').trim(),
+            openingStock: item['openingstock'] || item['stock'] || item['initialstock'] ? Number(item['openingstock'] || item['stock'] || item['initialstock']) : 0,
             booksGbl: item['books'] || item['booksgbl'] || item['gbl'] ? Number(item['books'] || item['booksgbl'] || item['gbl']) : undefined,
             status: String(item['status'] || 'Active').trim()
           };
@@ -678,7 +683,7 @@ const SkuMasterV2: React.FC = () => {
         showToast(err.response?.data?.msg || 'Import failed. Please verify format.', 'error');
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
     e.target.value = '';
   };
 
@@ -692,6 +697,7 @@ const SkuMasterV2: React.FC = () => {
       'SKU Name': s.name,
       'Category': s.category,
       'Unit': s.unit,
+      'Opening Stock': s.openingStock || 0,
       'GSM': s.gsm || 'N/A',
       'Width': s.width || 'N/A',
       'Length': s.length || 'N/A',
@@ -1075,41 +1081,6 @@ const SkuMasterV2: React.FC = () => {
             </div>
             
             <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto lg:ml-4">
-              {/* Export Button */}
-              <button
-                onClick={handleExport}
-                className="flex items-center space-x-1.5 px-3.5 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-semibold text-sm shadow-xs cursor-pointer"
-                title="Export current list to Excel/CSV"
-              >
-                <Download className="w-4 h-4 text-blue-600" />
-                <span>Export</span>
-              </button>
-
-              {/* Sample CSV Button */}
-              <button
-                onClick={handleDownloadSampleCSV}
-                className="flex items-center space-x-1.5 px-3.5 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-semibold text-sm shadow-xs cursor-pointer"
-                title="Download Sample CSV Template"
-              >
-                <FileText className="w-4 h-4 text-amber-500" />
-                <span>Sample CSV</span>
-              </button>
-
-              {/* Import Button */}
-              <label
-                className="flex items-center space-x-1.5 px-3.5 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-semibold text-sm shadow-xs cursor-pointer"
-                title="Import items from CSV/Excel"
-              >
-                <Upload className="w-4 h-4 text-emerald-600" />
-                <span>Import</span>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  onChange={handleImport}
-                  className="hidden"
-                />
-              </label>
-
               {/* Filters Button */}
               <button
                 onClick={() => setShowFilterPanel(!showFilterPanel)}
@@ -1260,6 +1231,7 @@ const SkuMasterV2: React.FC = () => {
                               gsm: true,
                               dimensions: true,
                               pages: true,
+                              openingStock: true,
                               status: true
                             };
                             setVisibleColumns(reset);
@@ -1298,31 +1270,40 @@ const SkuMasterV2: React.FC = () => {
                 )}
               </div>
 
+              {/* Export Button */}
               <button
                 onClick={handleExport}
-                className="flex items-center space-x-1.5 px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm font-medium transition-colors cursor-pointer"
+                className="flex items-center space-x-1.5 px-3.5 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-semibold text-sm shadow-xs cursor-pointer"
+                title="Export current list to Excel/CSV"
               >
-                <Download className="w-4 h-4" />
+                <Download className="w-4 h-4 text-blue-600" />
                 <span>Export</span>
               </button>
 
+              {/* Sample CSV Button */}
               <button
-                onClick={() => {
-                  setSearch('');
-                  setCategoryFilter('');
-                  setUnitFilter('');
-                  setStatusFilter('');
-                  setFilterRules([]);
-                  setSortRules([]);
-                  localStorage.removeItem('skbw_erp_filter_rules_skus');
-                  localStorage.removeItem('skbw_erp_sort_rules_skus');
-                  loadSkus(true);
-                }}
-                className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-gray-250 cursor-pointer"
-                title="Refresh Page"
+                onClick={handleDownloadSampleCSV}
+                className="flex items-center space-x-1.5 px-3.5 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-semibold text-sm shadow-xs cursor-pointer"
+                title="Download Sample CSV Template"
               >
-                <RefreshCw className="w-4 h-4" />
+                <FileText className="w-4 h-4 text-amber-500" />
+                <span>Sample CSV</span>
               </button>
+
+              {/* Import Button */}
+              <label
+                className="flex items-center space-x-1.5 px-3.5 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-semibold text-sm shadow-xs cursor-pointer"
+                title="Import items from CSV/Excel"
+              >
+                <Upload className="w-4 h-4 text-emerald-600" />
+                <span>Import</span>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleImport}
+                  className="hidden"
+                />
+              </label>
             </div>
           </div>
         </div>
@@ -1651,6 +1632,23 @@ const SkuMasterV2: React.FC = () => {
                           </div>
                         </th>
                       )}
+                      {visibleColumns.openingStock && (
+                        <th 
+                          onClick={() => handleSort('openingStock')}
+                          className="px-3.5 py-2 text-center text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap cursor-pointer hover:bg-gray-100/50 transition-colors select-none"
+                        >
+                          <div className="flex items-center justify-center space-x-1">
+                            <span>Opening Stock</span>
+                            <span className="text-gray-400">
+                              {sortRules[0]?.field === 'openingStock' ? (
+                                sortRules[0].order === 'asc' ? <ChevronUp className="w-3.5 h-3.5 inline ml-0.5 text-blue-600" /> : <ChevronDown className="w-3.5 h-3.5 inline ml-0.5 text-blue-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3.5 h-3.5 inline ml-0.5 text-gray-300 opacity-40 hover:opacity-100 transition-opacity" />
+                              )}
+                            </span>
+                          </div>
+                        </th>
+                      )}
                       {visibleColumns.status && (
                         <th 
                           onClick={() => handleSort('status')}
@@ -1762,6 +1760,11 @@ const SkuMasterV2: React.FC = () => {
                         {visibleColumns.pages && (
                           <td className="px-3.5 py-2.5 text-center whitespace-nowrap text-[13.5px] font-medium text-gray-700">
                             {s.pages ? (s.paperType === 'Sheets' ? `${s.pages} Sheets/Ream` : `${s.pages} Pages`) : '—'}
+                          </td>
+                        )}
+                        {visibleColumns.openingStock && (
+                          <td className="px-3.5 py-2.5 text-center whitespace-nowrap text-[13.5px] font-bold text-blue-700 font-mono">
+                            {s.openingStock !== undefined && s.openingStock !== null ? `${s.openingStock} ${s.unit}` : '0'}
                           </td>
                         )}
                         {visibleColumns.status && (
@@ -2020,6 +2023,10 @@ const SkuMasterV2: React.FC = () => {
                   <span className="block text-[10px] text-gray-400 font-medium uppercase">Group</span>
                   <span className="font-semibold">{(selectedSkuDetails as any).group || '—'}</span>
                 </div>
+                <div>
+                  <span className="block text-[10px] text-gray-400 font-medium uppercase">Opening Stock</span>
+                  <span className="font-bold text-blue-700 font-mono">{(selectedSkuDetails as any).openingStock !== undefined && (selectedSkuDetails as any).openingStock !== null ? `${(selectedSkuDetails as any).openingStock} ${selectedSkuDetails.unit}` : '0'}</span>
+                </div>
                 
                 {/* Beautified Conversion Info inside detail panel */}
                 <div className="col-span-2 bg-blue-50/30 p-4 rounded-xl border border-blue-100/60 mt-2 space-y-2">
@@ -2203,28 +2210,92 @@ const SkuMasterV2: React.FC = () => {
         title="SKU Activity Log"
       >
         <div className="flex h-full flex-col overflow-hidden bg-white">
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* Filters */}
+          <div className="bg-gray-50 px-4 py-3 sm:px-6 border-b flex gap-2 flex-shrink-0">
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search logs..."
+                value={logSearch}
+                onChange={e => setLogSearch(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+              />
+              {logSearch && (
+                <button onClick={() => setLogSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-450 hover:text-gray-700 text-xs">
+                  Clear
+                </button>
+              )}
+            </div>
+            <select
+              value={logActionFilter}
+              onChange={e => setLogActionFilter(e.target.value)}
+              className="px-2 py-1.5 border border-gray-200 rounded-lg text-xs bg-white text-gray-755 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+            >
+              <option value="ALL">All Actions</option>
+              <option value="CREATE">Creates</option>
+              <option value="UPDATE">Updates</option>
+              <option value="DELETE">Deletes</option>
+              <option value="RESTORE">Restores</option>
+            </select>
+          </div>
+
+          <div className="relative flex-1 py-6 px-4 sm:px-6 overflow-y-auto">
             {activityLogLoading ? (
               <div className="flex justify-center items-center h-40">
-                <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
+                <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
               </div>
             ) : activityLogs.length === 0 ? (
-              <p className="text-center text-xs text-gray-550 py-8">No recent activity logs recorded.</p>
-            ) : (
-              <div className="space-y-4">
-                {activityLogs.map((log, idx) => (
-                  <div key={log._id || idx} className="border-l-2 border-blue-500 pl-3 py-1 space-y-1 text-xs">
-                    <div className="flex justify-between font-bold text-gray-800">
-                      <span className="uppercase text-[10px] font-black text-blue-600">{log.action}</span>
-                      <span className="text-[10px] text-gray-400 font-normal">{new Date(log.createdAt).toLocaleString('en-IN')}</span>
-                    </div>
-                    <p className="text-gray-600 font-bold">SKU: {log.entityName}</p>
-                    <p className="text-gray-505 text-[11px]">{log.details}</p>
-                    <p className="text-[10px] text-gray-400 font-medium">Performed By: {log.performedBy}</p>
-                  </div>
-                ))}
-              </div>
-            )}
+              <p className="text-sm text-gray-500 text-center py-8">No recent activity logs recorded.</p>
+            ) : (() => {
+              const filtered = activityLogs.filter(log => {
+                if (logActionFilter !== 'ALL' && log.action !== logActionFilter) return false;
+                if (logSearch) {
+                  const q = logSearch.toLowerCase();
+                  const text = `${log.entityName || ''} ${log.details || ''} ${log.performedBy || ''}`.toLowerCase();
+                  return text.includes(q);
+                }
+                return true;
+              });
+              if (filtered.length === 0) {
+                return <p className="text-sm text-gray-500 text-center py-8">No matching activity logs found.</p>;
+              }
+              return (
+                <div className="flow-root">
+                  <ul role="list" className="-mb-8">
+                    {filtered.map((log, logIdx) => (
+                      <li key={log._id || logIdx}>
+                        <div className="relative pb-8">
+                          {logIdx !== filtered.length - 1 ? (
+                            <span className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
+                          ) : null}
+                          <div className="relative flex space-x-3">
+                            <div>
+                              <span className={`h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white ${
+                                log.action === 'CREATE' ? 'bg-green-500 text-white' :
+                                log.action === 'UPDATE' ? 'bg-blue-500 text-white' :
+                                log.action === 'DELETE' ? 'bg-red-500 text-white' :
+                                'bg-purple-500 text-white'
+                              }`}>
+                                {log.action ? log.action[0] : 'L'}
+                              </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-gray-900">{log.entityName ? `SKU: ${log.entityName}` : log.details}</p>
+                              <p className="text-xs text-gray-500 mt-0.5">{log.details}</p>
+                              <div className="flex justify-between items-center mt-1 text-xs text-gray-400">
+                                <span>By: {log.performedBy || 'System Admin'}</span>
+                                <span>{new Date(log.createdAt).toLocaleString('en-IN')}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </Drawer>

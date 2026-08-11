@@ -2050,6 +2050,22 @@ const PurchaseInvoicePage: React.FC = () => {
                               </tbody>
                             </table>
                           </div>
+                          {(() => {
+                            const enteredReels = item.reels || [];
+                            const validCount = enteredReels.filter((r: any) => r && (r.weight > 0 || r.reelNumber)).length;
+                            const totalWeight = enteredReels.reduce((sum: number, r: any) => sum + (Number(r.weight) || 0), 0);
+                            return (
+                              <div className="mt-2 bg-blue-50/70 border border-blue-200 rounded-lg px-3 py-2 flex items-center justify-between text-xs font-bold text-blue-900">
+                                <span className="flex items-center gap-1.5">
+                                  <Layers className="w-3.5 h-3.5 text-blue-600" />
+                                  Reconciliation:
+                                </span>
+                                <span className="font-mono text-blue-700">
+                                  {validCount || reelsCount} reels • {totalWeight.toLocaleString('en-IN', { maximumFractionDigits: 2 })} KG
+                                </span>
+                              </div>
+                            );
+                          })()}
                         </div>
                       )}
                     </div>
@@ -2353,16 +2369,17 @@ const PurchaseInvoicePage: React.FC = () => {
                           <th className="px-3 py-2.5 text-center">Width</th>
                           <th className="px-3 py-2.5 text-center">Reels</th>
                           <th className="px-3 py-2.5 text-right">Total KG</th>
-                          <th className="px-3 py-2.5 text-right">Amount (₹)</th>
+                          <th className="px-3 py-2.5 text-right">Mat Amount (₹)</th>
+                          <th className="px-3 py-2.5 text-right">Landed Rate/KG (₹)</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100 text-gray-700 font-medium">
                         {selectedInvoice.items?.map((item, idx) => {
                           const skuName = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any).name : 'Raw Material';
                           const resolvedSku = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null;
-                          const brand = resolvedSku?.brand || 'BILT';
-                          const gsm = resolvedSku?.gsm || '52';
-                          const width = resolvedSku?.width || '64';
+                          const brand = item.brand || resolvedSku?.brand || '—';
+                          const gsm = item.gsm || resolvedSku?.gsm || '—';
+                          const width = item.width || resolvedSku?.width || '—';
                           
                           let displayQtyKg = item.quantity || 0;
                           if (resolvedSku?.paperType === 'Sheets') {
@@ -2374,6 +2391,14 @@ const PurchaseInvoicePage: React.FC = () => {
                             }
                           }
                           
+                          // Calculate Landed Rate / KG (Total Lot Cost with freight / Total KGs)
+                          const totalMatSubtotal = selectedInvoice.subTotal || selectedInvoice.items.reduce((s, it) => s + (it.totalPrice || 0), 0) || 1;
+                          const totalFreightCharges = (selectedInvoice.freight || 0) + (selectedInvoice.craneCharges || 0) + (selectedInvoice.otherCharges || 0);
+                          const lotMatCost = item.totalPrice || 0;
+                          const lotFreightShare = totalMatSubtotal > 0 ? (lotMatCost / totalMatSubtotal) * totalFreightCharges : 0;
+                          const lotLandedTotal = lotMatCost + lotFreightShare;
+                          const landedRatePerKg = displayQtyKg > 0 ? lotLandedTotal / displayQtyKg : 0;
+
                           return (
                             <tr key={idx} className="hover:bg-gray-50/50">
                               <td className="px-3 py-2.5 text-gray-450 font-bold">{idx + 1}</td>
@@ -2387,7 +2412,10 @@ const PurchaseInvoicePage: React.FC = () => {
                               <td className="px-3 py-2.5 text-right font-black text-gray-955">
                                 {displayQtyKg.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                               </td>
-                              <td className="px-3 py-2.5 text-right font-black text-gray-955">₹{(item.totalPrice || 0).toLocaleString()}</td>
+                              <td className="px-3 py-2.5 text-right font-black text-gray-955">₹{(item.totalPrice || 0).toLocaleString('en-IN')}</td>
+                              <td className="px-3 py-2.5 text-right font-black text-blue-700 font-mono">
+                                ₹{landedRatePerKg.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </td>
                             </tr>
                           );
                         })}

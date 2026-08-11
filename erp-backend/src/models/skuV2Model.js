@@ -29,6 +29,7 @@ const skuV2Schema = new mongoose.Schema({
   pages: { type: Number, required: false },
   reamWeight: { type: Number, required: false },
   booksGbl: { type: Number, required: false },
+  openingStock: { type: Number, default: 0 },
   status: { type: String, required: true, enum: ["Active", "Inactive"], default: "Active" },
   company: { type: mongoose.Schema.Types.ObjectId, ref: "Company", required: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

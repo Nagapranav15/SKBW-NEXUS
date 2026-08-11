@@ -80,7 +80,7 @@ exports.getSkus = async (req, res, next) => {
 
 exports.createSku = async (req, res, next) => {
   try {
-    const { skuCode, name, category, unit, altUnit, altUnitConversion, paperType, gsm, width, length, brand, title, group, ruleType, pages, booksGbl, status, company } = req.body;
+    const { skuCode, name, category, unit, altUnit, altUnitConversion, paperType, gsm, width, length, brand, title, group, ruleType, pages, booksGbl, openingStock, status, company } = req.body;
     if (!company) {
       return res.status(400).json({ msg: "company is required" });
     }
@@ -107,6 +107,7 @@ exports.createSku = async (req, res, next) => {
       ruleType,
       pages: pages ? Number(pages) : undefined,
       booksGbl: booksGbl ? Number(booksGbl) : undefined,
+      openingStock: openingStock ? Number(openingStock) : 0,
       status: status || "Active",
       company: toObjectId(company),
       createdBy: req.user?.id ? toObjectId(req.user.id) : undefined
@@ -122,7 +123,7 @@ exports.createSku = async (req, res, next) => {
 exports.updateSku = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { skuCode, name, category, unit, altUnit, altUnitConversion, paperType, gsm, width, length, brand, title, group, ruleType, pages, booksGbl, status, company } = req.body;
+    const { skuCode, name, category, unit, altUnit, altUnitConversion, paperType, gsm, width, length, brand, title, group, ruleType, pages, booksGbl, openingStock, status, company } = req.body;
     
     if (!company) {
       return res.status(400).json({ msg: "company is required" });
@@ -158,6 +159,7 @@ exports.updateSku = async (req, res, next) => {
     sku.ruleType = ruleType;
     sku.pages = pages ? Number(pages) : undefined;
     sku.booksGbl = booksGbl ? Number(booksGbl) : undefined;
+    sku.openingStock = openingStock !== undefined ? Number(openingStock) : sku.openingStock;
     sku.status = status || "Active";
     if (req.body.isDeleted !== undefined) {
       sku.isDeleted = req.body.isDeleted;
@@ -254,6 +256,7 @@ exports.bulkImportSkus = async (req, res, next) => {
         pages: item.pages ? Number(item.pages) : undefined,
         reamWeight: item.reamWeight ? Number(item.reamWeight) : undefined,
         booksGbl: item.booksGbl ? Number(item.booksGbl) : undefined,
+        openingStock: item.openingStock ? Number(item.openingStock) : 0,
         status: item.status || "Active",
         company: companyObjId,
         createdBy: req.user?.id ? toObjectId(req.user.id) : undefined
