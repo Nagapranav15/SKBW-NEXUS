@@ -2518,27 +2518,34 @@ const PurchaseInvoicePage: React.FC = () => {
               <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider">Financial Breakdown</h3>
               <div className="space-y-2 text-xs font-semibold text-gray-600">
                 <div className="flex justify-between">
-                  <span>Subtotal Value:</span>
+                  <span>Material Amount (Subtotal):</span>
                   <span className="text-gray-900 font-bold">₹{(selectedInvoice.subTotal || 0).toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Tax Amount:</span>
                   <span className="text-gray-900 font-bold">₹{(selectedInvoice.taxAmount || 0).toLocaleString('en-IN')}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Freight Charges:</span>
-                  <span className="text-gray-900 font-bold">₹{(selectedInvoice.freight || 0).toLocaleString('en-IN')}</span>
+                <div className="flex justify-between border-t border-b py-2 text-green-700 font-black text-xs bg-green-50/50 px-2 rounded-lg my-1">
+                  <span>Total Due to Supplier:</span>
+                  <span className="font-mono text-sm">₹{((selectedInvoice.subTotal || 0) + (selectedInvoice.taxAmount || 0)).toLocaleString('en-IN')}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Crane Charges:</span>
-                  <span className="text-gray-900 font-bold">₹{(selectedInvoice.craneCharges || 0).toLocaleString('en-IN')}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Other / Loading Charges:</span>
-                  <span className="text-gray-900 font-bold">₹{(selectedInvoice.otherCharges || 0).toLocaleString('en-IN')}</span>
+                <div className="pt-1.5 space-y-1.5 text-[11px] text-gray-500">
+                  <span className="block font-bold text-[10px] text-gray-400 uppercase tracking-wider">Internal Costs (Paid by Us):</span>
+                  <div className="flex justify-between pl-2">
+                    <span>Freight Charges:</span>
+                    <span className="text-gray-800 font-semibold">₹{(selectedInvoice.freight || 0).toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex justify-between pl-2">
+                    <span>Crane Charges:</span>
+                    <span className="text-gray-800 font-semibold">₹{(selectedInvoice.craneCharges || 0).toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex justify-between pl-2">
+                    <span>Other / Loading Charges:</span>
+                    <span className="text-gray-800 font-semibold">₹{(selectedInvoice.otherCharges || 0).toLocaleString('en-IN')}</span>
+                  </div>
                 </div>
                 <div className="flex justify-between border-t pt-2 text-gray-955 font-black">
-                  <span>Grand Total:</span>
+                  <span>Total Landed Invoice Cost:</span>
                   <span className="text-blue-600 font-black">₹{(selectedInvoice.grandTotal || 0).toLocaleString('en-IN')}</span>
                 </div>
               </div>

@@ -626,13 +626,24 @@ const SkuMasterV2: React.FC = () => {
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
-        const data = evt.target?.result;
+        const arrayBuffer = evt.target?.result as ArrayBuffer;
+        if (!arrayBuffer) {
+          showToast('Failed to read file buffer.', 'error');
+          return;
+        }
+
+        const data = new Uint8Array(arrayBuffer);
         const wb = XLSX.read(data, { type: 'array' });
+        if (!wb.SheetNames || wb.SheetNames.length === 0) {
+          showToast('No sheets found in file.', 'error');
+          return;
+        }
+
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rawData = XLSX.utils.sheet_to_json(ws) as any[];
 
         if (rawData.length === 0) {
-          showToast('No data found in file.', 'error');
+          showToast('No data rows found in file.', 'error');
           return;
         }
 
@@ -646,12 +657,31 @@ const SkuMasterV2: React.FC = () => {
           return norm;
         });
 
-        const skusToImport = normalizedData.map(item => {
+        const skusToImport = normalizedData.map((item, index) => {
+          const rawName = String(item['skuname'] || item['name'] || item['itemname'] || item['title'] || '').trim();
+          let rawCode = String(item['skucode'] || item['code'] || item['itemcode'] || '').trim();
+          
+          let rawCat = String(item['category'] || 'Raw Material').trim();
+          const lowerCat = rawCat.toLowerCase();
+          if (lowerCat.includes('finished') && !lowerCat.includes('semi')) rawCat = 'Finished Goods';
+          else if (lowerCat.includes('semi')) rawCat = 'Semi Finished';
+          else if (lowerCat.includes('raw')) rawCat = 'Raw Material';
+
+          if (!rawCode && rawName) {
+            const prefix = rawCat === 'Finished Goods' ? 'FG' : rawCat === 'Semi Finished' ? 'SF' : 'RM';
+            const cleanName = rawName.toUpperCase().replace(/[^A-Z0-9]/g, '-').slice(0, 15);
+            rawCode = `${prefix}-${cleanName}-${Date.now().toString().slice(-4)}${index}`;
+          }
+
+          let rawPaper = String(item['papertype'] || 'None').trim();
+          if (rawPaper.toLowerCase().includes('sheet')) rawPaper = 'Sheets';
+          else if (rawPaper.toLowerCase().includes('reel')) rawPaper = 'Reels';
+
           return {
-            skuCode: String(item['skucode'] || item['code'] || item['itemcode'] || '').trim(),
-            name: String(item['skuname'] || item['name'] || item['itemname'] || item['title'] || '').trim(),
-            category: String(item['category'] || 'Raw Material').trim(),
-            paperType: String(item['papertype'] || 'None').trim(),
+            skuCode: rawCode,
+            name: rawName,
+            category: rawCat,
+            paperType: rawPaper,
             unit: String(item['primaryunit'] || item['unit'] || 'kg').trim(),
             altUnit: item['alternateunit'] || item['altunit'] || undefined,
             altUnitConversion: item['conversionrate'] || item['altunitconversion'] ? Number(item['conversionrate'] || item['altunitconversion']) : undefined,
@@ -676,11 +706,11 @@ const SkuMasterV2: React.FC = () => {
         }
 
         const res = await bulkImportSkusV2(skusToImport, selectedCompany?._id || '');
-        showToast(res.msg || `Successfully imported ${res.importedCount} items.`, 'success');
+        showToast(res.msg || `Successfully processed ${res.importedCount} items.`, 'success');
         fetchSkus();
       } catch (err: any) {
         console.error('Import failed', err);
-        showToast(err.response?.data?.msg || 'Import failed. Please verify format.', 'error');
+        showToast(err.response?.data?.msg || 'Import failed. Please verify CSV/Excel format.', 'error');
       }
     };
     reader.readAsArrayBuffer(file);

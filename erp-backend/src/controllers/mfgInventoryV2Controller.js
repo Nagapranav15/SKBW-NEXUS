@@ -222,11 +222,7 @@ exports.bulkImportSkus = async (req, res, next) => {
     }
 
     const companyObjId = toObjectId(company);
-    const existingSkuCodes = new Set(
-      (await SkuV2.find({ company: companyObjId }, "skuCode")).map(s => s.skuCode)
-    );
-
-    const toInsert = [];
+    const bulkOps = [];
     const skipped = [];
 
     for (const item of skus) {
@@ -235,12 +231,7 @@ exports.bulkImportSkus = async (req, res, next) => {
         continue;
       }
 
-      if (existingSkuCodes.has(item.skuCode)) {
-        skipped.push({ code: item.skuCode, reason: "SKU code already exists" });
-        continue;
-      }
-
-      toInsert.push({
+      const updateData = {
         skuCode: item.skuCode,
         name: item.name,
         category: item.category,
@@ -256,20 +247,35 @@ exports.bulkImportSkus = async (req, res, next) => {
         pages: item.pages ? Number(item.pages) : undefined,
         reamWeight: item.reamWeight ? Number(item.reamWeight) : undefined,
         booksGbl: item.booksGbl ? Number(item.booksGbl) : undefined,
-        openingStock: item.openingStock ? Number(item.openingStock) : 0,
+        openingStock: item.openingStock !== undefined ? Number(item.openingStock) : 0,
         status: item.status || "Active",
         company: companyObjId,
         createdBy: req.user?.id ? toObjectId(req.user.id) : undefined
+      };
+
+      bulkOps.push({
+        updateOne: {
+          filter: { skuCode: item.skuCode, company: companyObjId },
+          update: { $set: updateData },
+          upsert: true
+        }
       });
     }
 
-    if (toInsert.length > 0) {
-      await SkuV2.insertMany(toInsert);
+    let createdCount = 0;
+    let modifiedCount = 0;
+
+    if (bulkOps.length > 0) {
+      const result = await SkuV2.bulkWrite(bulkOps);
+      createdCount = result.upsertedCount || 0;
+      modifiedCount = result.modifiedCount || 0;
     }
 
+    const totalProcessed = createdCount + modifiedCount;
+
     res.json({
-      msg: `Bulk import completed: ${toInsert.length} imported, ${skipped.length} skipped`,
-      importedCount: toInsert.length,
+      msg: `Bulk import completed: ${createdCount} created, ${modifiedCount} updated.`,
+      importedCount: totalProcessed,
       skipped
     });
   } catch (err) {
