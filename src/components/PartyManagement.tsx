@@ -5085,7 +5085,7 @@ const PartyManagement: React.FC = () => {
 
       {/* Compare Duplicates Modal (View Both) */}
       {compareGroup && (
-        <div className="fixed inset-0 z-[60] overflow-y-auto flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-4 bg-gray-950/80 backdrop-blur-md animate-in fade-in duration-200">
           <div className="relative bg-white rounded-2xl max-w-4xl w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
             
             {/* Header */}
@@ -5199,7 +5199,7 @@ const PartyManagement: React.FC = () => {
       )}
               {/* Merge Selection Modal */}
       {mergeGroup && (
-        <div className="fixed inset-0 z-[60] overflow-y-auto flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-4 bg-gray-950/80 backdrop-blur-md animate-in fade-in duration-200">
           <div className="relative bg-white rounded-2xl max-w-lg w-full shadow-2xl flex flex-col border border-gray-100 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
             
             {/* Header */}

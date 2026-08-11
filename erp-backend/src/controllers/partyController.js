@@ -1130,8 +1130,38 @@ exports.getParties = async (req, res) => {
 
         return partyObj;
       });
+    } else if (req.query.type === 'vendor') {
+      const vendorIds = rawParties.map(p => p._id);
+      let statsMap = {};
+      try {
+        const PurchaseInvoiceV2 = require('../models/purchaseInvoiceV2Model');
+        const stats = await PurchaseInvoiceV2.aggregate([
+          { $match: { vendorId: { $in: vendorIds }, status: { $ne: 'Cancelled' } } },
+          {
+            $group: {
+              _id: '$vendorId',
+              totalMatSubTotal: { $sum: '$subTotal' },
+              totalPaid: { $sum: { $ifNull: ['$paidAmount', 0] } }
+            }
+          }
+        ]);
+        stats.forEach(s => {
+          statsMap[String(s._id)] = Math.max((s.totalMatSubTotal || 0) - (s.totalPaid || 0), 0);
+        });
+      } catch (e) {
+        console.error("Failed to compute vendor material outstanding stats:", e);
+      }
+
+      parties = rawParties.map(p => {
+        const partyObj = { ...p };
+        if (statsMap[String(p._id)] !== undefined) {
+          partyObj.outstandingBalance = statsMap[String(p._id)];
+          partyObj.outstanding = statsMap[String(p._id)];
+        }
+        return partyObj;
+      });
     } else {
-      // Fallback for customer, vendor, or others
+      // Fallback for customer or others
       // With lean() results, we can work directly with plain objects
       parties = rawParties.map(p => ({ ...p }));
     }

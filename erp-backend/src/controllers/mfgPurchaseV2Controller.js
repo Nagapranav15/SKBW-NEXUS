@@ -176,11 +176,12 @@ exports.createPurchaseInvoice = async (req, res, next) => {
       await newLedgerEntry.save();
     }
 
-    // 6. Automatically increase Vendor's outstanding liability
+    // 6. Automatically increase Vendor's outstanding liability (Material Cost Subtotal)
+    const supplierPayable = subTotal;
     const prevOutstanding = vendor.outstanding || 0;
     const prevOutstandingBal = vendor.outstandingBalance || 0;
-    vendor.outstanding = prevOutstanding + grandTotal;
-    vendor.outstandingBalance = prevOutstandingBal + grandTotal;
+    vendor.outstanding = prevOutstanding + supplierPayable;
+    vendor.outstandingBalance = prevOutstandingBal + supplierPayable;
     await vendor.save();
 
     // 7. Write to financial Transaction list (liability record)
@@ -190,7 +191,7 @@ exports.createPurchaseInvoice = async (req, res, next) => {
       type: "credit",
       category: "Purchase Invoice V2",
       subcategory: "Material Inward",
-      amount: grandTotal,
+      amount: supplierPayable,
       partyId: vendor._id,
       partyName: vendor.firmName || vendor.ownerName,
       description: `Inwarded materials under invoice ${finalInvoiceNo}`,
@@ -427,10 +428,11 @@ exports.editPurchaseInvoice = async (req, res, next) => {
       return res.status(400).json({ msg: `Cannot edit invoice to amount ₹${newGrandTotal} which is less than the already paid amount of ₹${invoice.paidAmount}` });
     }
 
-    const oldGrandTotal = invoice.grandTotal;
-    const diff = newGrandTotal - oldGrandTotal;
+    const newSupplierPayable = subTotal;
+    const oldSupplierPayable = invoice.subTotal || 0;
+    const diff = newSupplierPayable - oldSupplierPayable;
 
-    // Update Vendor Outstanding
+    // Update Vendor Outstanding (Material cost difference)
     vendor.outstanding = Math.max((vendor.outstanding || 0) + diff, 0);
     vendor.outstandingBalance = Math.max((vendor.outstandingBalance || 0) + diff, 0);
     await vendor.save();
@@ -443,7 +445,7 @@ exports.editPurchaseInvoice = async (req, res, next) => {
         source_type: "PURCHASE", 
         description: { $regex: invoice.invoiceNumber } 
       },
-      { $set: { amount: newGrandTotal } }
+      { $set: { amount: newSupplierPayable } }
     );
 
     // Delete old stock ledger entries and inward new ones
@@ -524,8 +526,9 @@ exports.deletePurchaseInvoice = async (req, res, next) => {
 
     const vendor = await Party.findOne({ _id: invoice.vendorId, company: companyObjId });
     if (vendor) {
-      vendor.outstanding = Math.max((vendor.outstanding || 0) - invoice.grandTotal, 0);
-      vendor.outstandingBalance = Math.max((vendor.outstandingBalance || 0) - invoice.grandTotal, 0);
+      const supplierPayable = invoice.subTotal || 0;
+      vendor.outstanding = Math.max((vendor.outstanding || 0) - supplierPayable, 0);
+      vendor.outstandingBalance = Math.max((vendor.outstandingBalance || 0) - supplierPayable, 0);
       await vendor.save();
     }
 

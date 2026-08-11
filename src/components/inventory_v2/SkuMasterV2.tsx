@@ -707,7 +707,7 @@ const SkuMasterV2: React.FC = () => {
 
         const res = await bulkImportSkusV2(skusToImport, selectedCompany?._id || '');
         showToast(res.msg || `Successfully processed ${res.importedCount} items.`, 'success');
-        fetchSkus();
+        loadSkus(true);
       } catch (err: any) {
         console.error('Import failed', err);
         showToast(err.response?.data?.msg || 'Import failed. Please verify CSV/Excel format.', 'error');

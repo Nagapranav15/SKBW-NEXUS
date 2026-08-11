@@ -2375,11 +2375,18 @@ const PurchaseInvoicePage: React.FC = () => {
                       </thead>
                       <tbody className="divide-y divide-gray-100 text-gray-700 font-medium">
                         {selectedInvoice.items?.map((item, idx) => {
-                          const skuName = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any).name : 'Raw Material';
-                          const resolvedSku = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null;
+                          const skuIdStr = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any)._id : item.skuId;
+                          const resolvedSku = skus.find(s => s._id === skuIdStr) || (typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null);
+                          const skuName = item.skuName || resolvedSku?.name || (typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any).name : 'Raw Material');
                           const brand = item.brand || resolvedSku?.brand || '—';
                           const gsm = item.gsm || resolvedSku?.gsm || '—';
-                          const width = item.width || resolvedSku?.width || '—';
+                          
+                          let parsedWidth = item.width || resolvedSku?.width;
+                          if (!parsedWidth && skuName) {
+                            const match = skuName.match(/(\d+)\s*CM/i) || skuName.match(/(\d+)\s*x\s*(\d+)/i);
+                            if (match) parsedWidth = match[1];
+                          }
+                          const widthDisplay = parsedWidth ? `${parsedWidth} cm` : '—';
                           
                           let displayQtyKg = item.quantity || 0;
                           if (resolvedSku?.paperType === 'Sheets') {
@@ -2407,7 +2414,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                 <div className="text-[10px] text-gray-400 font-normal">{brand}</div>
                               </td>
                               <td className="px-3 py-2.5 text-center font-bold text-gray-700">{gsm}</td>
-                              <td className="px-3 py-2.5 text-center font-bold text-gray-700">{width} cm</td>
+                              <td className="px-3 py-2.5 text-center font-bold text-gray-700">{widthDisplay}</td>
                               <td className="px-3 py-2.5 text-center font-bold text-gray-800">{item.reels?.length || 0}</td>
                               <td className="px-3 py-2.5 text-right font-black text-gray-955">
                                 {displayQtyKg.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
@@ -2518,34 +2525,27 @@ const PurchaseInvoicePage: React.FC = () => {
               <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider">Financial Breakdown</h3>
               <div className="space-y-2 text-xs font-semibold text-gray-600">
                 <div className="flex justify-between">
-                  <span>Material Amount (Subtotal):</span>
+                  <span>Subtotal Value:</span>
                   <span className="text-gray-900 font-bold">₹{(selectedInvoice.subTotal || 0).toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Tax Amount:</span>
                   <span className="text-gray-900 font-bold">₹{(selectedInvoice.taxAmount || 0).toLocaleString('en-IN')}</span>
                 </div>
-                <div className="flex justify-between border-t border-b py-2 text-green-700 font-black text-xs bg-green-50/50 px-2 rounded-lg my-1">
-                  <span>Total Due to Supplier:</span>
-                  <span className="font-mono text-sm">₹{((selectedInvoice.subTotal || 0) + (selectedInvoice.taxAmount || 0)).toLocaleString('en-IN')}</span>
+                <div className="flex justify-between">
+                  <span>Freight Charges:</span>
+                  <span className="text-gray-900 font-bold">₹{(selectedInvoice.freight || 0).toLocaleString('en-IN')}</span>
                 </div>
-                <div className="pt-1.5 space-y-1.5 text-[11px] text-gray-500">
-                  <span className="block font-bold text-[10px] text-gray-400 uppercase tracking-wider">Internal Costs (Paid by Us):</span>
-                  <div className="flex justify-between pl-2">
-                    <span>Freight Charges:</span>
-                    <span className="text-gray-800 font-semibold">₹{(selectedInvoice.freight || 0).toLocaleString('en-IN')}</span>
-                  </div>
-                  <div className="flex justify-between pl-2">
-                    <span>Crane Charges:</span>
-                    <span className="text-gray-800 font-semibold">₹{(selectedInvoice.craneCharges || 0).toLocaleString('en-IN')}</span>
-                  </div>
-                  <div className="flex justify-between pl-2">
-                    <span>Other / Loading Charges:</span>
-                    <span className="text-gray-800 font-semibold">₹{(selectedInvoice.otherCharges || 0).toLocaleString('en-IN')}</span>
-                  </div>
+                <div className="flex justify-between">
+                  <span>Crane Charges:</span>
+                  <span className="text-gray-900 font-bold">₹{(selectedInvoice.craneCharges || 0).toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Other / Loading Charges:</span>
+                  <span className="text-gray-900 font-bold">₹{(selectedInvoice.otherCharges || 0).toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex justify-between border-t pt-2 text-gray-955 font-black">
-                  <span>Total Landed Invoice Cost:</span>
+                  <span>Grand Total:</span>
                   <span className="text-blue-600 font-black">₹{(selectedInvoice.grandTotal || 0).toLocaleString('en-IN')}</span>
                 </div>
               </div>
