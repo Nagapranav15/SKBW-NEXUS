@@ -19,9 +19,10 @@ export default defineConfig({
             if (id.includes('lucide-react')) {
               return 'ui-icons';
             }
-            if (id.includes('xlsx') || id.includes('chart.js') || id.includes('react-chartjs-2')) {
-              return 'data-libs';
-            }
+            // Split, not bundled together: only the analyzer needs charts,
+            // only import/export pages need xlsx.
+            if (id.includes('xlsx')) return 'xlsx';
+            if (id.includes('chart.js') || id.includes('react-chartjs-2')) return 'charts';
             return 'vendor';
           }
         }

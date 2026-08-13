@@ -60,9 +60,6 @@ const StorageLocationDetailsV2: React.FC<StorageLocationDetailsV2Props> = ({
   if (!data) return null;
 
   const { location, storedSkus, recentMovements, totalQty } = data;
-  const occupiedPercent = location.capacity && location.capacity > 0 
-    ? Math.min(Math.round((totalQty / location.capacity) * 100), 100)
-    : 0;
 
   const renderContent = () => (
     <div className={`flex flex-col h-full ${isInline ? '' : 'animate-in slide-in-from-right duration-250'}`}>

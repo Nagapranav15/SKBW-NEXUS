@@ -40,8 +40,8 @@ const DataManager: React.FC<DataManagerProps> = ({ isOpen, onClose }) => {
   const { selectedCompany } = useAuth();
 
   const [formatting, setFormatting] = useState(false);
-  const [formatError, setFormatError] = useState('');
-  const [formatSuccess, setFormatSuccess] = useState(false);
+  const [, setFormatError] = useState('');
+  const [, setFormatSuccess] = useState(false);
 
   const handleFormatDatabase = async () => {
     const doubleConfirm = window.confirm(

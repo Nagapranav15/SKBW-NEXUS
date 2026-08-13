@@ -16,7 +16,7 @@ const BatchStockV2: React.FC = () => {
   const [balances, setBalances] = useState<any[]>([]);
   const [hierarchy, setHierarchy] = useState<WarehouseLocationV2[]>([]);
   const [invoices, setInvoices] = useState<PurchaseInvoiceV2[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   
   // Search & filter states
   const [search, setSearch] = useState('');
@@ -242,23 +242,6 @@ const BatchStockV2: React.FC = () => {
     }
   };
 
-  // Helper: Traverse parent chain in memory
-  const resolveLocationPath = (locId: string) => {
-    const bin = hierarchy.find(l => l._id === locId);
-    if (!bin) return { factory: '—', floor: '—', zone: '—', bin: '—' };
-    
-    const zone = hierarchy.find(l => l._id === bin.parentId);
-    const floor = zone ? hierarchy.find(l => l._id === zone.parentId) : null;
-    const factory = floor ? hierarchy.find(l => l._id === floor.parentId) : null;
-    
-    return {
-      factory: factory?.name || '—',
-      floor: floor?.name || '—',
-      zone: zone?.name || '—',
-      bin: bin.name || '—'
-    };
-  };
-
   // Helper to format Lot number
   const getDisplayLotNo = (b: any) => {
     if (!b) return '—';
@@ -283,7 +266,6 @@ const BatchStockV2: React.FC = () => {
     const displayLot = getDisplayLotNo(b).toLowerCase();
     const skuName = (b.sku?.name || '').toLowerCase();
     const brand = (b.sku?.brand || '').toLowerCase();
-    const category = (b.sku?.category || '').toLowerCase();
     const locationName = (b.location?.name || '').toLowerCase();
     
     const matchesSearch = displayLot.includes(search.toLowerCase()) || 
@@ -371,16 +353,6 @@ const BatchStockV2: React.FC = () => {
   const statFgGbl = fgBalances.reduce((sum, b) => sum + (b.sku?.booksGbl || 0), 0);
   const statFgPcs = fgBalances.reduce((sum, b) => sum + (b.onHand || 0), 0);
 
-  // Selected Lot Details (Tab info or calculations)
-  const lotTotalReels = selectedLot ? (selectedLot.reels?.length || (selectedLot.sku?.category === 'Raw Material' ? Math.round(selectedLot.onHand / 290) : 0) || 0) : 0;
-  const lotValue = selectedLot ? (selectedLot.onHand * (selectedLot.sku?.price || 68)) : 0;
-
-  // Invoice / Supplier lookup for Selected Lot Details
-  const matchedInvoice = selectedLot ? invoices.find(inv => inv.invoiceNumber === selectedLot.batchNumber) : null;
-  const supplierName = matchedInvoice && typeof matchedInvoice.vendorId === 'object' && matchedInvoice.vendorId !== null 
-    ? (matchedInvoice.vendorId.firmName || matchedInvoice.vendorId.ownerName) 
-    : 'Hreemkar Papers';
-
   return (
     <div className="p-4 sm:p-6 space-y-6 flex-1 w-full relative transition-all duration-300">
       <div className="flex-1 space-y-6 overflow-y-auto">
@@ -399,7 +371,6 @@ const BatchStockV2: React.FC = () => {
         // Calculate all locations storing this lot
         const lotLocations = balances.filter(b => b.batchNumber === selectedDetailLot.batchNumber && (b.sku?._id || b.skuId) === (selectedDetailLot.sku?._id || selectedDetailLot.skuId));
         const totalLotAvailable = lotLocations.reduce((sum, b) => sum + (b.onHand || 0), 0);
-        const totalLotReels = lotLocations.reduce((sum, b) => sum + (b.reels?.length || 0), 0);
 
         // Progress percentage for Donut
         const usedQty = Math.max(originalQty - totalLotAvailable, 0);
@@ -1367,7 +1338,7 @@ const BatchStockV2: React.FC = () => {
                             disabled={!hasSpace}
                             className={!hasSpace ? "text-gray-400 italic" : "text-gray-800 font-semibold"}
                           >
-                            {loc.name} {available !== null ? `(Available: ${available.toLocaleString()} / ${loc.capacity.toLocaleString()} ${loc.unit || 'kg'})` : '(Unlimited Capacity)'}
+                            {loc.name} {available !== null ? `(Available: ${available.toLocaleString()} / ${(loc.capacity ?? 0).toLocaleString()} ${loc.unit || 'kg'})` : '(Unlimited Capacity)'}
                           </option>
                         );
                       })}

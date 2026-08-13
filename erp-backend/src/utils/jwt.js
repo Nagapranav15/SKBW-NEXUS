@@ -1,13 +1,15 @@
 const jwt = require("jsonwebtoken");
 
 exports.generateToken = (user) => {
+  const secret = process.env.JWT_SECRET || "supersecret";
+  const roleId = user.role ? (typeof user.role === 'object' ? user.role._id : user.role) : null;
   return jwt.sign(
     {
       id: user._id,
-      role: user.role._id || user.role,
+      role: roleId,
       username: user.username
     },
-    process.env.JWT_SECRET,
+    secret,
     { expiresIn: "7d" }
   );
 };

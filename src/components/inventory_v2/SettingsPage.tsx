@@ -7,7 +7,7 @@ import { showToast } from '../ui/Toast';
 const SettingsPage: React.FC = () => {
   const { selectedCompany } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [, setSaving] = useState(false);
   
   const [categories, setCategories] = useState<string[]>([]);
   const [units, setUnits] = useState<string[]>([]);

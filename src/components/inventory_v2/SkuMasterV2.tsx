@@ -74,12 +74,12 @@ const SkuMasterV2: React.FC = () => {
   });
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [showColumnSelector, setShowColumnSelector] = useState(false);
-  const [unitFilter, setUnitFilter] = useState('');
+  const [unitFilter] = useState('');
   const [allSkus, setAllSkus] = useState<SkuV2[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState(search);
   
   // Selection
@@ -127,7 +127,7 @@ const SkuMasterV2: React.FC = () => {
     return defaults;
   });
 
-  const [showColumnDropdown, setShowColumnDropdown] = useState(false);
+  const [, setShowColumnDropdown] = useState(false);
   const columnDropdownRef = useRef<HTMLDivElement>(null);
 
   // Tools states
@@ -209,12 +209,12 @@ const SkuMasterV2: React.FC = () => {
     });
 
     const groups: { field: string; value: string; items: SkuV2[] }[] = [];
-    codeMap.forEach((items, code) => {
+    codeMap.forEach((items) => {
       if (items.length > 1) {
         groups.push({ field: 'SKU Code', value: items[0].skuCode, items });
       }
     });
-    nameMap.forEach((items, name) => {
+    nameMap.forEach((items) => {
       if (items.length > 1) {
         const exists = groups.some(g => g.items.some(item => items.some(i => i._id === item._id)));
         if (!exists) {
@@ -306,7 +306,7 @@ const SkuMasterV2: React.FC = () => {
   const [importLoading, setImportLoading] = useState(false);
   const [importError, setImportError] = useState('');
   const [importSuccessMsg, setImportSuccessMsg] = useState('');
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [, setIsDeleting] = useState(false);
 
   // Debounce search input
   useEffect(() => {
@@ -383,11 +383,6 @@ const SkuMasterV2: React.FC = () => {
   const handleStatsCardClick = (category: string) => {
     setCategoryFilter(prev => prev === category ? '' : category);
     setPage(1);
-  };
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    loadSkus(true);
   };
 
   const handleSort = (columnKey: string) => {
@@ -964,8 +959,6 @@ const SkuMasterV2: React.FC = () => {
   const semiFinishedCount = Array.isArray(allSkus) ? allSkus.filter(s => s.category === 'Semi Finished').length : 0;
   const finishedGoodsCount = Array.isArray(allSkus) ? allSkus.filter(s => s.category === 'Finished Goods').length : 0;
 
-  // Extract unique units for unit filter dropdown from allSkus
-  const uniqueUnits = Array.isArray(allSkus) ? Array.from(new Set(allSkus.map(s => s.unit))) : [];
 
 
 

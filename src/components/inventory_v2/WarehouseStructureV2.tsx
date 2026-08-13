@@ -101,7 +101,7 @@ const WarehouseStructureV2: React.FC = () => {
     });
 
     const groups: { field: string; value: string; items: WarehouseLocationV2[] }[] = [];
-    parentMap.forEach((items, key) => {
+    parentMap.forEach((items) => {
       if (items.length > 1) {
         groups.push({ field: 'Location Name under same parent', value: items[0].name, items });
       }

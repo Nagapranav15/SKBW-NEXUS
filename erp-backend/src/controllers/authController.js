@@ -28,13 +28,18 @@ exports.register = async (req, res) => {
     const populatedUser = await User.findById(user._id)
       .populate({ path: "role", populate: { path: "permissions" } });
 
+    const roleName = populatedUser.role && typeof populatedUser.role === 'object' ? (populatedUser.role.name || 'sales') : 'sales';
+    const permissions = (populatedUser.role && typeof populatedUser.role === 'object' && Array.isArray(populatedUser.role.permissions))
+      ? populatedUser.role.permissions.map(p => typeof p === 'object' ? (p.name || p) : p)
+      : [];
+
     res.status(201).json({
       _id: populatedUser._id,
       username: populatedUser.username,
       fullName: populatedUser.fullName,
       email: populatedUser.email,
-      role: populatedUser.role.name,
-      permissions: populatedUser.role.permissions.map(p => p.name),
+      role: roleName,
+      permissions: permissions,
       status: populatedUser.status
     });
   } catch (err) {
@@ -62,6 +67,11 @@ exports.login = async (req, res) => {
 
     const token = generateToken(user);
 
+    const roleName = user.role && typeof user.role === 'object' ? (user.role.name || 'sales') : 'sales';
+    const permissions = (user.role && typeof user.role === 'object' && Array.isArray(user.role.permissions))
+      ? user.role.permissions.map(p => typeof p === 'object' ? (p.name || p) : p)
+      : [];
+
     res.json({
       token,
       user: {
@@ -69,8 +79,8 @@ exports.login = async (req, res) => {
         username: user.username,
         fullName: user.fullName,
         email: user.email,
-        role: user.role.name,
-        permissions: user.role.permissions.map(p => p.name),
+        role: roleName,
+        permissions: permissions,
         status: user.status
       }
     });
@@ -86,13 +96,18 @@ exports.getMe = async (req, res) => {
 
     if (!user) return res.status(404).json({ msg: "User not found" });
 
+    const roleName = user.role && typeof user.role === 'object' ? (user.role.name || 'sales') : 'sales';
+    const permissions = (user.role && typeof user.role === 'object' && Array.isArray(user.role.permissions))
+      ? user.role.permissions.map(p => typeof p === 'object' ? (p.name || p) : p)
+      : [];
+
     res.json({
       _id: user._id,
       username: user.username,
       fullName: user.fullName,
       email: user.email,
-      role: user.role.name,
-      permissions: user.role.permissions.map(p => p.name),
+      role: roleName,
+      permissions: permissions,
       status: user.status
     });
   } catch (err) {

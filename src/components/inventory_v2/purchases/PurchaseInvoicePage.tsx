@@ -21,18 +21,14 @@ import Drawer from '../../ui/Drawer';
 interface InvoiceTableProps {
   invoices: PurchaseInvoiceV2[];
   loading: boolean;
-  skus: SkuV2[];
   onViewDetails: (invoice: PurchaseInvoiceV2) => void;
-  onEditInvoice: (invoice: PurchaseInvoiceV2) => void;
   onDeleteInvoice: (invoice: PurchaseInvoiceV2) => void;
 }
 
 const InvoiceTable: React.FC<InvoiceTableProps> = ({ 
   invoices, 
   loading, 
-  skus,
   onViewDetails,
-  onEditInvoice,
   onDeleteInvoice
 }) => {
   const [sortField, setSortField] = useState<string>('date');
@@ -370,7 +366,7 @@ const PurchaseInvoicePage: React.FC = () => {
   const [addError, setAddError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
-  const [activeReelModalIdx, setActiveReelModalIdx] = useState<number | null>(null);
+  const [, setActiveReelModalIdx] = useState<number | null>(null);
 
   // Date range filters
   const [startDate, setStartDate] = useState('2024-06-01');
@@ -478,7 +474,7 @@ const PurchaseInvoicePage: React.FC = () => {
     });
 
     const groups: { field: string; value: string; items: PurchaseInvoiceV2[] }[] = [];
-    codeMap.forEach((items, code) => {
+    codeMap.forEach((items) => {
       if (items.length > 1) {
         groups.push({ field: 'Batch / Invoice Number', value: items[0].invoiceNumber, items });
       }
@@ -1161,7 +1157,6 @@ const PurchaseInvoicePage: React.FC = () => {
 
   // Dashboard Stats (mocked or loaded)
   const dashboardTotalBatches = total;
-  const dashboardTotalWeight = invoices.reduce((sum, inv) => sum + (inv.items?.reduce((s, i) => s + (i.quantity || 0), 0) || 0), 0);
   const dashboardTotalValue = invoices.reduce((sum, inv) => sum + (inv.subTotal || 0), 0);
   const dashboardPendingReceipts = invoices.filter(inv => inv.status === 'Draft').length;
 
@@ -1372,13 +1367,11 @@ const PurchaseInvoicePage: React.FC = () => {
             <InvoiceTable
               invoices={invoices}
               loading={loading}
-              skus={skus}
               onViewDetails={(inv) => {
                 setSelectedInvoice(inv);
                 setDetailsTab('lots');
                 setActiveSubPage('details');
               }}
-              onEditInvoice={handleEditInvoice}
               onDeleteInvoice={handleDeleteInvoice}
             />
 
@@ -1644,7 +1637,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                         key={s._id}
                                         type="button"
                                         onClick={() => {
-                                          handleItemRowChange(idx, 'skuId', s._id);
+                                          handleItemRowChange(idx, 'skuId', s._id || '');
                                           setFocusedRowIdx(null);
                                           setSkuSearchText('');
                                         }}
@@ -2023,7 +2016,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                   >
                                     <option value="">-- Select Destination Storage --</option>
                                     {locations.filter(loc => loc.level === 'Storage Location').map(loc => {
-                                      const paths = resolveLocationPath(loc._id);
+                                      const paths = resolveLocationPath(loc._id || '');
                                       const hierarchy = [paths.factory, paths.floor, paths.zone].filter(p => p && p !== '—').join(' > ');
                                       return (
                                         <option key={loc._id} value={loc._id}>
@@ -2095,7 +2088,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                         >
                                           <option value="">-- Choose Storage Area --</option>
                                           {locations.filter(loc => loc.level === 'Storage Location').map(loc => {
-                                            const paths = resolveLocationPath(loc._id);
+                                            const paths = resolveLocationPath(loc._id || '');
                                             const hierarchy = [paths.factory, paths.floor, paths.zone].filter(p => p && p !== '—').join(' > ');
                                             return (
                                               <option key={loc._id} value={loc._id}>
@@ -2294,11 +2287,6 @@ const PurchaseInvoicePage: React.FC = () => {
           {/* Details Content Scroll Area */}
           {(() => {
             if (!selectedInvoice) return null;
-            const isSheetsInvoice = selectedInvoice.items?.some(item => {
-              const resolvedSku = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null;
-              return resolvedSku?.paperType === 'Sheets';
-            });
-
             let totalReelsCount = 0;
             let totalReamsCount = 0;
             let totalSheetsCount = 0;
@@ -2519,7 +2507,7 @@ const PurchaseInvoicePage: React.FC = () => {
                             {item.reels?.map((reel, rIdx) => {
                               const balance = inventoryBalances.find(
                                 b => b.batchNumber === selectedInvoice.invoiceNumber && 
-                                     b.reels?.some(r => r.reelNumber === reel.reelNumber)
+                                     b.reels?.some((r: any) => r.reelNumber === reel.reelNumber)
                               );
                               const locationName = balance && balance.location
                                 ? balance.location.name 
@@ -2621,7 +2609,7 @@ const PurchaseInvoicePage: React.FC = () => {
           {/* Footer actions wrapper */}
           <div className="p-5 border-t border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
             <button
-              onClick={() => handleDeleteInvoice(selectedInvoice)}
+              onClick={() => selectedInvoice && handleDeleteInvoice(selectedInvoice)}
               className="px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 bg-white rounded-xl text-xs font-bold transition-all flex items-center gap-1"
             >
               <Trash2 className="w-3.5 h-3.5" /> Delete Batch
@@ -2670,7 +2658,7 @@ const PurchaseInvoicePage: React.FC = () => {
                   >
                     <option value="">-- Choose Storage Location --</option>
                     {physicalLocations.map(loc => {
-                      const paths = resolveLocationPath(loc._id);
+                      const paths = resolveLocationPath(loc._id || '');
                       const hierarchy = [paths.factory, paths.floor, paths.zone].filter(p => p && p !== '—').join(' > ');
                       return (
                         <option key={loc._id} value={loc._id}>
@@ -2971,7 +2959,7 @@ const PurchaseInvoicePage: React.FC = () => {
                       >
                         <option value="">-- Choose Storage Area --</option>
                         {physicalLocations.map(loc => {
-                          const paths = resolveLocationPath(loc._id);
+                          const paths = resolveLocationPath(loc._id || '');
                           const hierarchy = [paths.factory, paths.floor, paths.zone].filter(p => p && p !== '—').join(' > ');
                           return (
                             <option key={loc._id} value={loc._id}>
@@ -2998,7 +2986,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                   setAllocateForm(prev => ({ ...prev, quantity: '' }));
                                 } else {
                                   setSelectedReelsForAllocation([...unallocatedBal.reels]);
-                                  const totalWeight = unallocatedBal.reels.reduce((sum, r) => sum + (r.weight || 0), 0);
+                                  const totalWeight = unallocatedBal.reels.reduce((sum: number, r: any) => sum + (r.weight || 0), 0);
                                   setAllocateForm(prev => ({ ...prev, quantity: String(totalWeight) }));
                                 }
                               }}
