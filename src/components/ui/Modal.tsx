@@ -6,7 +6,8 @@ interface ModalProps {
   onClose: () => void;
   title?: React.ReactNode;
   children: React.ReactNode;
-  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | 'max-w-md' | 'max-w-lg' | 'max-w-xl' | 'max-w-2xl' | 'max-w-4xl' | 'max-w-6xl' | 'max-w-7xl';
+  /** Tailwind width class, e.g. "max-w-2xl" */
+  size?: string;
   className?: string;
 }
 
@@ -32,29 +33,9 @@ export const Modal: React.FC<ModalProps> = ({
 
   if (!isOpen) return null;
 
-  const sizeClasses: Record<string, string> = {
-    sm: 'max-w-sm',
-    md: 'max-w-md',
-    lg: 'max-w-lg',
-    xl: 'max-w-xl',
-    '2xl': 'max-w-2xl',
-    '3xl': 'max-w-3xl',
-    '4xl': 'max-w-4xl',
-    '5xl': 'max-w-5xl',
-    'max-w-md': 'max-w-md',
-    'max-w-lg': 'max-w-lg',
-    'max-w-xl': 'max-w-xl',
-    'max-w-2xl': 'max-w-2xl',
-    'max-w-4xl': 'max-w-4xl',
-    'max-w-6xl': 'max-w-6xl',
-    'max-w-7xl': 'max-w-7xl',
-  };
-
-  const maxWidthClass = sizeClasses[size] || size;
-
   return (
     <div className="fixed inset-0 z-[70] overflow-y-auto flex items-center justify-center p-4 bg-gray-950/20">
-      <div className={`relative bg-white rounded-xl shadow-2xl flex flex-col w-full ${maxWidthClass} max-h-[90vh] overflow-hidden ${className}`}>
+      <div className={`relative bg-white rounded-xl shadow-2xl flex flex-col w-full ${size} max-h-[90vh] overflow-hidden ${className}`}>
         {title && (
           <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center shrink-0">
             <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">

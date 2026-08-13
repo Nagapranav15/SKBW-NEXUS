@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Download, Upload, Search, Filter, Trash2, Edit, X, FileText, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import { Plus, Download, Upload, Search, Filter, Trash2, Edit, FileText, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import * as txnApi from '../api/transactionApi';
 import * as XLSX from 'xlsx';

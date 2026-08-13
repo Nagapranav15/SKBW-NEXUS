@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layers, Search, RefreshCw, X, FileText, ChevronRight, ChevronDown, ChevronUp, ArrowUpDown, Warehouse, MapPin, Database, Calendar, Package, ArrowUpRight, ArrowDownLeft, AlertCircle, ArrowRightLeft, Eye, HelpCircle, Download, Plus, ArrowRight, Printer, Coins, MoreVertical, ChevronLeft, User } from 'lucide-react';
+import { Layers, Search, RefreshCw, X, FileText, ChevronRight, ChevronDown, ChevronUp, ArrowUpDown, Database, Package, AlertCircle, ArrowRightLeft, Eye, HelpCircle, Download, Plus, ArrowRight, Printer, MoreVertical, ChevronLeft, User } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { getBalancesV2, getWarehouseHierarchyV2, getLedgerV2, recordTransferV2, SkuV2, WarehouseLocationV2, LedgerEntryV2 } from '../../api/mfgApiV2';
+import { getBalancesV2, getWarehouseHierarchyV2, getLedgerV2, recordTransferV2, WarehouseLocationV2, LedgerEntryV2 } from '../../api/mfgApiV2';
 import { getPurchaseInvoicesV2, PurchaseInvoiceV2 } from './purchases/purchaseService';
 import { showToast } from '../ui/Toast';
 import { formatSkuName } from './SkuMasterV2';
@@ -765,7 +765,7 @@ const BatchStockV2: React.FC = () => {
             </div>
             <div className="flex flex-wrap items-center gap-2 md:gap-3">
               <button
-                onClick={loadData}
+                onClick={() => loadData()}
                 className="flex items-center space-x-2 px-4 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl transition-all font-medium text-xs shadow-xs cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5 text-gray-500" />

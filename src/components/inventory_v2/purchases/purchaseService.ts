@@ -1,5 +1,5 @@
 import api from '../../../api/axios';
-import { SkuV2, WarehouseLocationV2 } from '../../../api/mfgApiV2';
+import { SkuV2, WarehouseLocationV2, LedgerReelV2 } from '../../../api/mfgApiV2';
 
 export interface PurchaseInvoiceItemV2 {
   skuId: SkuV2 | string;
@@ -11,6 +11,12 @@ export interface PurchaseInvoiceItemV2 {
   locationId: WarehouseLocationV2 | string;
   reamWeight?: number;
   ratePerKg?: number;
+  reels?: LedgerReelV2[];
+  // denormalised by the API for display
+  skuName?: string;
+  brand?: string;
+  gsm?: number;
+  width?: number;
 }
 
 export interface PurchaseInvoiceV2 {
@@ -27,6 +33,9 @@ export interface PurchaseInvoiceV2 {
   items: PurchaseInvoiceItemV2[];
   subTotal: number;
   taxAmount: number;
+  freight?: number;
+  craneCharges?: number;
+  otherCharges?: number;
   grandTotal: number;
   paymentStatus: 'Unpaid' | 'Partially Paid' | 'Paid';
   paidAmount: number;

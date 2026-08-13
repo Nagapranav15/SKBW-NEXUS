@@ -11,10 +11,7 @@ node_modules
 dist
 dist-ssr
 .env
-.env*
-*.env
-*.env*
+.env.local
 *.local
-erp-backend/.env
 github-actions
 github-actions.pub

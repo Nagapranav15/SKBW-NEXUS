@@ -1,9 +1,10 @@
 import api from '../../../api/axios';
-import { SkuV2, WarehouseLocationV2 } from '../../../api/mfgApiV2';
+import { SkuV2, WarehouseLocationV2, LedgerReelV2 } from '../../../api/mfgApiV2';
 
 export interface LedgerEntryV2 {
   _id: string;
   transactionNumber: string;
+  batchNumber?: string;
   transactionType: 'Purchase' | 'Processing' | 'Production' | 'Transfer' | 'Adjustment' | 'Sale' | 'Opening Balance';
   skuId: SkuV2;
   quantity: number;
@@ -22,12 +23,7 @@ export interface LedgerEntryV2 {
     email: string;
   };
   status: 'Posted' | 'Pending' | 'Cancelled';
-  reels?: {
-    reelNumber: string;
-    gsm: number;
-    width: number;
-    weight: number;
-  }[];
+  reels?: LedgerReelV2[];
   createdAt: string;
   updatedAt: string;
 }

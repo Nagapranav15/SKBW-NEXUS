@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Download, Upload, Database, FileText, AlertCircle, CheckCircle, X, Trash2 } from 'lucide-react';
 import { exportDataAsJSON, exportDataAsExcel, importDataFromJSON, getDataSummary, saveExportTimestamp } from '../utils/dataExport';
 import { useAuth } from '../context/AuthContext';
+import api from '../api/axios';
 
 interface DataManagerProps {
   isOpen: boolean;

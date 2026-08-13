@@ -811,6 +811,8 @@ exports.recordTransfer = async (req, res, next) => {
       locationId: fromLocObjId,
       qtyOut: transferQty,
       balanceAfter: sourceBalance - transferQty,
+      batchNumber,
+      reels,
       company: companyObjId,
       remarks: remarks || `Transfer to ${destLocation.name}`,
       userId: toObjectId(req.user.id)
@@ -825,6 +827,8 @@ exports.recordTransfer = async (req, res, next) => {
       locationId: toLocObjId,
       qtyIn: transferQty,
       balanceAfter: destBalance + transferQty,
+      batchNumber,
+      reels,
       company: companyObjId,
       remarks: remarks || `Transfer from ${fromLocation.name}`,
       userId: toObjectId(req.user.id)

@@ -10,20 +10,8 @@ import {
   LogOut, 
   Building2,
   ChevronDown,
-  Database,
-  ArrowDownToLine,
-  BarChart3,
-  Warehouse,
   LayoutGrid,
-  Layers,
-  Store,
-  Briefcase,
-  Compass,
-  MapPin,
-  Truck,
-  ArrowRightLeft,
   FileText,
-  Coins,
   RefreshCw,
   Settings
 } from 'lucide-react';
@@ -236,15 +224,6 @@ const Layout: React.FC = () => {
   const visibleReportsItems = reportsItems.filter(item => hasPermission(item.permission));
   const hasReportsAccess = visibleReportsItems.length > 0;
   const isReportsActive = () => ['/sales/reports', '/analyzer', '/transactions'].includes(location.pathname);
-
-  const getRoleBadgeColor = (role: string) => {
-    switch (role) {
-      case 'admin': return 'bg-red-100 text-red-700';
-      case 'manager': return 'bg-blue-100 text-blue-700';
-      case 'sales': return 'bg-green-100 text-green-700';
-      default: return 'bg-gray-100 text-gray-700';
-    }
-  };
 
   const getPrimaryClass = (path: string) => {
     const active = isActive(path);

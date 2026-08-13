@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ArrowUpDown, X, FileText, Trash2, Calendar, Coins, Download, Upload, HelpCircle, Check, Eye, MoreVertical, Edit, Printer, ArrowRight, Layers, IndianRupee, Clock, AlertTriangle, CheckCircle, Settings, Trash, RefreshCcw, User, MapPin as MapPinIcon } from 'lucide-react';
+import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ArrowUpDown, X, FileText, Trash2, Download, HelpCircle, Check, Eye, Edit, ArrowRight, Layers, Clock, AlertTriangle, CheckCircle, Settings, User, MapPin as MapPinIcon } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { getActivityLogs, createActivityLog } from '../../../api/activityLogApi';
 import { getParties } from '../../../api/partyApi';
 import { getSkusV2, getWarehouseHierarchyV2, recordTransferV2, SkuV2, WarehouseLocationV2, getBalancesV2, getNextInvoiceNumberV2 } from '../../../api/mfgApiV2';
@@ -9,11 +9,9 @@ import { formatSkuName } from '../SkuMasterV2';
 import { 
   getPurchaseInvoicesV2, 
   createPurchaseInvoiceV2, 
-  recordPurchasePaymentV2, 
   updatePurchaseInvoiceV2,
   deletePurchaseInvoiceV2,
   PurchaseInvoiceV2, 
-  PurchaseInvoiceItemV2
 } from './purchaseService';
 import { showToast } from '../../ui/Toast';
 import * as XLSX from 'xlsx';
@@ -281,8 +279,6 @@ const PurchaseInvoicePage: React.FC = () => {
   // Tools action data
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [activityLogLoading, setActivityLogLoading] = useState(false);
-  const [logSearch, setLogSearch] = useState('');
-  const [logActionFilter, setLogActionFilter] = useState('ALL');
   const [duplicateGroups, setDuplicateGroups] = useState<{ field: string; value: string; items: PurchaseInvoiceV2[] }[]>([]);
   const [recycleBinItems, setRecycleBinItems] = useState<PurchaseInvoiceV2[]>([]);
   const [recycleBinLoading, setRecycleBinLoading] = useState(false);
@@ -336,6 +332,24 @@ const PurchaseInvoicePage: React.FC = () => {
   const [supplierSearchText, setSupplierSearchText] = useState<string>('');
   const [supplierFocused, setSupplierFocused] = useState<boolean>(false);
 
+  // One blank purchase line; used by the initial form, "add row" and reset.
+  const emptyLineItem = () => ({
+    skuId: '',
+    brand: '',
+    gsm: '',
+    width: '',
+    length: '',
+    reelsCount: '',
+    quantity: '',
+    purchasePrice: '',
+    reamWeight: '',
+    ratePerKg: '',
+    lotNumber: '',
+    locationId: '',
+    reels: [] as any[],
+    splits: [] as { locationId: string; quantity: string }[]
+  });
+
   // Form states: Add Invoice
   const [invoiceForm, setInvoiceForm] = useState({
     purchaseType: 'Raw Material',
@@ -348,20 +362,7 @@ const PurchaseInvoicePage: React.FC = () => {
     otherCharges: '0',
     dueDate: '',
     items: [
-      { 
-        skuId: '', 
-        brand: '',
-        gsm: '',
-        width: '',
-        length: '',
-        reelsCount: '',
-        quantity: '', 
-        purchasePrice: '', 
-        reamWeight: '',
-        ratePerKg: '',
-        lotNumber: '',
-        reels: [] as any[]
-      }
+      emptyLineItem()
     ]
   });
   
@@ -661,7 +662,7 @@ const PurchaseInvoicePage: React.FC = () => {
       ...invoiceForm,
       items: [
         ...invoiceForm.items,
-        { skuId: '', brand: '', gsm: '', width: '', length: '', reelsCount: '', quantity: '', purchasePrice: '', reamWeight: '', ratePerKg: '', lotNumber: '', reels: [] as any[] }
+        emptyLineItem()
       ]
     });
   };
@@ -983,7 +984,8 @@ const PurchaseInvoicePage: React.FC = () => {
           })(),
           lotNumber: item.lotNumber,
           locationId: locIdVal,
-          reels: mappedReels
+          reels: mappedReels,
+          splits: []
         };
       })
     });
@@ -1004,7 +1006,7 @@ const PurchaseInvoicePage: React.FC = () => {
       loadingUnloading: '0',
       otherCharges: '0',
       dueDate: new Date().toISOString().split('T')[0],
-      items: [{ skuId: '', brand: '', gsm: '', width: '', length: '', reelsCount: '', quantity: '', purchasePrice: '', reamWeight: '', ratePerKg: '', lotNumber: '', reels: [] as any[] }]
+      items: [emptyLineItem()]
     });
     setAddError('');
     setActiveSubPage('new');

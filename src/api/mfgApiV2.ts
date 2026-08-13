@@ -14,9 +14,14 @@ export interface SkuV2 {
   title?: string;
   group?: string;
   ruleType?: string;
+  pages?: number;
+  reamWeight?: number;
+  booksGbl?: number;
+  openingStock?: number;
   altUnit?: string;
   altUnitConversion?: number;
   status: 'Active' | 'Inactive';
+  isDeleted?: boolean;
   createdAt?: string;
 }
 
@@ -29,6 +34,14 @@ export interface WarehouseLocationV2 {
   unit?: string;
   occupiedPercent?: number;
   status: 'Active' | 'Maintenance' | 'Full';
+  createdAt?: string;
+}
+
+export interface LedgerReelV2 {
+  reelNumber: string;
+  gsm: number;
+  width: number;
+  weight: number;
 }
 
 export interface LedgerEntryV2 {
@@ -41,7 +54,10 @@ export interface LedgerEntryV2 {
   qtyIn: number;
   qtyOut: number;
   balanceAfter: number;
+  batchNumber?: string;
+  reels?: LedgerReelV2[];
   remarks: string;
+  createdAt?: string;
   userId: {
     _id: string;
     fullName: string;

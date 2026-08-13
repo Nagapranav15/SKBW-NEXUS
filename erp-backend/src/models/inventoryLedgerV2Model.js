@@ -23,6 +23,13 @@ const inventoryLedgerV2Schema = new mongoose.Schema({
   qtyIn: { type: Number, default: 0 },
   qtyOut: { type: Number, default: 0 },
   balanceAfter: { type: Number, required: true },
+  batchNumber: { type: String, index: true },
+  reels: [{
+    reelNumber: String,
+    gsm: Number,
+    width: Number,
+    weight: Number
+  }],
   company: { type: mongoose.Schema.Types.ObjectId, ref: "Company", required: true },
   remarks: { type: String, default: "" },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { X, MapPin, Layers, ArrowRightLeft, RefreshCw, BarChart2 } from 'lucide-react';
-import { getLocationDetailsV2, WarehouseLocationV2, SkuV2, LedgerEntryV2 } from '../../api/mfgApiV2';
+import { X, MapPin, Layers, ArrowRightLeft, BarChart2 } from 'lucide-react';
+import { getLocationDetailsV2, WarehouseLocationV2, SkuV2 } from '../../api/mfgApiV2';
 
 interface StorageLocationDetailsV2Props {
   locationId: string;

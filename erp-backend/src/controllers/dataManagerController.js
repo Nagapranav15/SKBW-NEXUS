@@ -10,10 +10,7 @@ const Sequence = require('../models/sequenceModel');
 const ActivityLog = require('../models/activityLogModel');
 const Inventory = require('../models/inventoryModel');
 const InventoryAuditLog = require('../models/inventoryAuditLogModel');
-const OpeningStockEntry = require('../models/openingStockEntryModel');
-const MfgMovement = require('../models/mfgMovementModel');
 const StockMovement = require('../models/stockMovementModel');
-const Bom = require('../models/bomModel');
 const MinimumStockLevel = require('../models/minimumStockLevelModel');
 
 exports.formatAllData = async (req, res) => {
@@ -34,10 +31,7 @@ exports.formatAllData = async (req, res) => {
       ActivityLog.deleteMany({}),
       Inventory.deleteMany({}),
       InventoryAuditLog.deleteMany({}),
-      OpeningStockEntry.deleteMany({}),
-      MfgMovement.deleteMany({}),
       StockMovement.deleteMany({}),
-      Bom.deleteMany({}),
       MinimumStockLevel.deleteMany({})
     ]);
 

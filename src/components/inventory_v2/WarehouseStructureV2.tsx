@@ -44,8 +44,6 @@ const WarehouseStructureV2: React.FC = () => {
   // Tools action data
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [activityLogLoading, setActivityLogLoading] = useState(false);
-  const [logSearch, setLogSearch] = useState('');
-  const [logActionFilter, setLogActionFilter] = useState('ALL');
   const [duplicateGroups, setDuplicateGroups] = useState<{ field: string; value: string; items: WarehouseLocationV2[] }[]>([]);
   const [recycleBinItems, setRecycleBinItems] = useState<WarehouseLocationV2[]>([]);
   const [recycleBinLoading, setRecycleBinLoading] = useState(false);

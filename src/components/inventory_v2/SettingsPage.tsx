@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Settings, Save, Trash2, Plus, RefreshCw, AlertCircle, X } from 'lucide-react';
+import { Settings, Trash2, Plus, RefreshCw, AlertCircle, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getMetadataV2, updateMetadataV2 } from '../../api/mfgApiV2';
 import { showToast } from '../ui/Toast';

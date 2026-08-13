@@ -5,7 +5,6 @@ import {
   Package, 
   ShoppingCart, 
   FileText, 
-  TrendingUp, 
   AlertCircle,
   CheckCircle,
   Clock,
@@ -14,7 +13,6 @@ import {
   Compass,
   MapPin,
   Truck,
-  Tag,
   RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -50,12 +48,6 @@ const Dashboard: React.FC = () => {
         setLoading(false);
       }
     }
-  };
-
-  const formatCurrency = (amount: number) => {
-    if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)}L`;
-    if (amount >= 1000) return `₹${(amount / 1000).toFixed(1)}K`;
-    return `₹${amount.toFixed(0)}`;
   };
 
   if (loading) {
@@ -98,7 +90,7 @@ const Dashboard: React.FC = () => {
           <p className="text-sm text-gray-500">Here's what's happening with {selectedCompany?.name || 'your business'} today.</p>
         </div>
         <button
-          onClick={fetchDashboard}
+          onClick={() => fetchDashboard()}
           className="p-2.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200 bg-white shadow-sm flex items-center gap-1.5 font-medium text-sm"
           title="Refresh Dashboard"
         >

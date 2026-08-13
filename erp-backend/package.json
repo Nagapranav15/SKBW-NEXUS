@@ -3,15 +3,11 @@
   "version": "1.0.0",
   "description": "",
   "main": "server.js",
-  "directories": {
-    "test": "tests"
-  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node -e \"require('./src/app')\" && echo ok",
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "seed": "node seed.js",
-    "search": "node test_agent_api.js"
+    "seed": "node seed.js"
   },
   "keywords": [],
   "author": "",
@@ -24,9 +20,7 @@
     "dotenv": "^17.4.1",
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
-    "jest": "^30.3.0",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.4.1",
-    "supertest": "^7.2.2"
+    "mongoose": "^9.4.1"
   }
 }

@@ -6,7 +6,8 @@ interface DrawerProps {
   onClose: () => void;
   title?: React.ReactNode;
   children: React.ReactNode;
-  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'max-w-md' | 'max-w-lg' | 'max-w-xl' | 'max-w-2xl' | 'max-w-3xl' | 'max-w-4xl' | 'max-w-5xl' | 'max-w-6xl' | 'max-w-7xl' | 'max-w-full';
+  /** Tailwind width class, e.g. "max-w-2xl" or "sm:w-[520px]" */
+  size?: string;
 }
 
 export const Drawer: React.FC<DrawerProps> = ({
@@ -30,30 +31,10 @@ export const Drawer: React.FC<DrawerProps> = ({
 
   if (!isOpen) return null;
 
-  const sizeClasses: Record<string, string> = {
-    sm: 'max-w-sm',
-    md: 'max-w-md',
-    lg: 'max-w-lg',
-    xl: 'max-w-xl',
-    full: 'max-w-full',
-    'max-w-md': 'max-w-md',
-    'max-w-lg': 'max-w-lg',
-    'max-w-xl': 'max-w-xl',
-    'max-w-2xl': 'max-w-2xl',
-    'max-w-3xl': 'max-w-3xl',
-    'max-w-4xl': 'max-w-4xl',
-    'max-w-5xl': 'max-w-5xl',
-    'max-w-6xl': 'max-w-6xl',
-    'max-w-7xl': 'max-w-7xl',
-    'max-w-full': 'max-w-full',
-  };
-
-  const maxWidthClass = sizeClasses[size] || size;
-
   return (
     <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden" role="dialog" aria-modal="true">
       <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
-        <div className={`pointer-events-auto w-screen ${maxWidthClass} animate-in slide-in-from-right duration-200`}>
+        <div className={`pointer-events-auto w-screen ${size} animate-in slide-in-from-right duration-200`}>
           <div className="flex h-full flex-col overflow-hidden bg-white shadow-2xl">
             {title && (
               <div className="bg-gray-50 px-4 py-6 sm:px-6 border-b flex-shrink-0">

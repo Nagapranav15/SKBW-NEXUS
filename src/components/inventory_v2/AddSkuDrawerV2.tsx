@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, RefreshCw, Layers, Plus, Trash2, CheckCircle } from 'lucide-react';
+import { Save, RefreshCw } from 'lucide-react';
 import { createSkuV2, updateSkuV2, SkuV2, getMetadataV2, updateMetadataV2, getSkusV2 } from '../../api/mfgApiV2';
 import Modal from '../ui/Modal';
 import Drawer from '../ui/Drawer';
@@ -27,11 +27,12 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
     brand: '',
     title: '',
     group: '',
+    ruleType: '',
     pages: '',
     reamWeight: '',
     booksGbl: '',
     openingStock: '',
-    status: 'Active' as any
+    status: 'Active' as 'Active' | 'Inactive'
   });
 
   const [categoriesList, setCategoriesList] = useState<string[]>(["Raw Material", "Semi Finished", "Finished Goods"]);
@@ -321,7 +322,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
             setForm(prev => ({ ...prev, name: '' }));
             return;
           }
-          const parts = [];
+          const parts: string[] = [];
           if (form.brand) parts.push(form.brand);
           if (form.title) parts.push(form.title);
           const formatType = form.paperType === 'Reels' ? 'Reel' : form.paperType === 'Sheets' ? 'Sheet' : '';
@@ -347,7 +348,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
               setForm(prev => ({ ...prev, name: '' }));
               return;
             }
-            const parts = [];
+            const parts: string[] = [];
             if (form.pages) parts.push(`${form.pages}P`);
             if (form.brand) parts.push(form.brand);
             if (form.ruleType) {
@@ -359,7 +360,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
           }
         } else {
           const active = categoryFieldsMap[form.category] || [];
-          const parts = [];
+          const parts: string[] = [];
           if (active.includes('brand') && form.brand) parts.push(form.brand);
           if (active.includes('title') && form.title) parts.push(form.title);
           if (active.includes('gsm') && form.gsm) parts.push(`${form.gsm}GSM`);

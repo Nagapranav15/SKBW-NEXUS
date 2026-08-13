@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Package, Layers, ArrowRightLeft, RefreshCw, AlertTriangle, Coins, TrendingUp } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getDashboardStatsV2 } from '../../api/mfgApiV2';
-import { LedgerEntryV2 } from './ledger/types';
+import { LedgerEntryV2 } from './ledger/ledgerService';
 
 const DashboardV2: React.FC = () => {
   const { selectedCompany } = useAuth();

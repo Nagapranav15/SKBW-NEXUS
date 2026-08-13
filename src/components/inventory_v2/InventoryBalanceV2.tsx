@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Package, Search, RefreshCw, Coins, ArrowRightLeft, Layers, CheckCircle, ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react';
+import { Search, RefreshCw, Coins, CheckCircle, ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getBalancesV2 } from '../../api/mfgApiV2';
 import { formatSkuName } from './SkuMasterV2';

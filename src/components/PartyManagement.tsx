@@ -3,8 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Plus, Search, Edit, Trash2, Download, Upload, X, Users, Building,
   Filter, Columns, MapPin, Camera, ChevronLeft, ChevronRight,
-  ChevronsLeft, ChevronsRight, ExternalLink, Phone, Mail, Clock,
-  AlertTriangle, RefreshCw, CheckCircle, XCircle, Pause,
+  ChevronsLeft, ChevronsRight, ExternalLink, Phone, Clock,
+  AlertTriangle, RefreshCw, CheckCircle, XCircle, 
   History, BookOpen, CreditCard, FileText, ShoppingCart, User, Tag,
   ArrowUpDown, ChevronUp, ChevronDown, Eye, Settings
 } from 'lucide-react';
@@ -510,8 +510,6 @@ const PartyManagement: React.FC = () => {
 
   // Dynamic Inline Adding states
   const [allCities, setAllCities] = useState<string[]>([]);
-  const [isAddingNewCity, setIsAddingNewCity] = useState(false);
-  const [newCityName, setNewCityName] = useState('');
   const [inlineModalType, setInlineModalType] = useState<'agent' | 'route' | 'market' | 'transporter' | null>(null);
   const [parentModalType, setParentModalType] = useState<'market' | 'route' | null>(null);
   const [isSavingInline, setIsSavingInline] = useState(false);
@@ -536,8 +534,6 @@ const PartyManagement: React.FC = () => {
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<any | null>(null);
   const [viewingCustomer, setViewingCustomer] = useState<any | null>(null);
-  const [docView, setDocView] = useState<'gst' | 'aadhar'>('gst');
-  const [expandedRouteId, setExpandedRouteId] = useState<string | null>(null);
   const [showColumnSelector, setShowColumnSelector] = useState(false);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [showSortSelector, setShowSortSelector] = useState(false);
@@ -552,12 +548,8 @@ const PartyManagement: React.FC = () => {
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
   // Filter input searches
-  const [filterCitySearch, setFilterCitySearch] = useState('');
-  const [filterRouteSearch, setFilterRouteSearch] = useState('');
-  const [filterAgentSearch, setFilterAgentSearch] = useState('');
 
   // Cities search under regions
-  const [citySearchText, setCitySearchText] = useState('');
   const [regionCitySearchText, setRegionCitySearchText] = useState('');
 
   // Custom Alert and Highlighting States
@@ -1213,8 +1205,6 @@ const PartyManagement: React.FC = () => {
     setSearchTerm('');
     setDebouncedSearch('');
     setViewingCustomer(null);
-    setExpandedRouteId(null);
-    setCitySearchText('');
     setRegionCitySearchText('');
     setSelectedCityName(null);
     setHighlightedRowIndex(-1);
@@ -1227,9 +1217,6 @@ const PartyManagement: React.FC = () => {
     setShowSortSelector(false);
     setShowColumnSelector(false);
     setShowFilterPanel(false);
-    setFilterCitySearch('');
-    setFilterRouteSearch('');
-    setFilterAgentSearch('');
 
     // Load sorting rules from localStorage
     const savedSort = localStorage.getItem(`skbw_erp_sort_rules_${currentType}`);
@@ -1311,12 +1298,6 @@ const PartyManagement: React.FC = () => {
   }, [highlightedRowIndex]);
 
   // Persist limit
-  const handleLimitChange = (newLimit: number) => {
-    setLimit(newLimit);
-    setPage(1);
-    localStorage.setItem(`skbw_erp_limit_${currentType}`, String(newLimit));
-  };
-
   // Persist filters
   useEffect(() => {
     if (currentType) {
@@ -1439,25 +1420,6 @@ const PartyManagement: React.FC = () => {
       route: cityObj?.route || ''
     });
     setShowForm(true);
-  };
-
-  const handleCardClick = (statusValue: string | null) => {
-    if (statusValue === null) {
-      const updated = filterRules.filter(r => r.field !== 'status');
-      setFilterRules(updated);
-      localStorage.setItem(`skbw_erp_filter_rules_${currentType}`, JSON.stringify(updated));
-    } else {
-      const existingIdx = filterRules.findIndex(r => r.field === 'status' && r.value === statusValue);
-      let updated: FilterRule[] = [];
-      if (existingIdx > -1) {
-        updated = filterRules.filter((_, idx) => idx !== existingIdx);
-      } else {
-        updated = [...filterRules, { join: 'and', field: 'status', condition: 'equal to', value: statusValue }];
-      }
-      setFilterRules(updated);
-      localStorage.setItem(`skbw_erp_filter_rules_${currentType}`, JSON.stringify(updated));
-    }
-    setPage(1);
   };
 
   const openInlineModal = (type: 'agent' | 'route' | 'market' | 'transporter', initialData?: any) => {
@@ -1985,8 +1947,6 @@ const PartyManagement: React.FC = () => {
       contactPersons: fullItem.contactPersons || [],
       outstandingBalance: fullItem.outstandingBalance !== undefined ? fullItem.outstandingBalance : (fullItem.outstanding || 0)
     });
-    setIsAddingNewCity(false);
-    setNewCityName('');
 
     if (currentType === 'agent') {
       const agentName = fullItem.firmName || fullItem.contactName;
@@ -2052,8 +2012,6 @@ const PartyManagement: React.FC = () => {
     setEditingItem(null);
     setShowForm(false);
     setAgentCheckedRoutes([]);
-    setIsAddingNewCity(false);
-    setNewCityName('');
   };
 
   // Selection Handlers
@@ -3688,84 +3646,6 @@ const PartyManagement: React.FC = () => {
                           </td>
                         </tr>
 
-                        {/* City list expansion for regions page */}
-                        {currentType === 'route' && expandedRouteId === item._id && (
-                          <tr className="bg-gray-50/50" onClick={(e) => e.stopPropagation()}>
-                            <td colSpan={Object.values(visibleColumns).filter(Boolean).length + 3} className="px-8 py-4 border-t border-b border-gray-100/60">
-                              <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm max-w-4xl mx-auto">
-                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 border-b pb-3">
-                                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center">
-                                    <MapPin className="w-3.5 h-3.5 text-blue-500 mr-1.5" />
-                                    Cities/Towns in {item.name} Line ({citiesUnderRoute.length})
-                                  </h4>
-                                  
-                                  <div className="flex items-center gap-3">
-                                    {/* Search input for cities inside the region */}
-                                    <div className="relative">
-                                      <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 w-3.5 h-3.5" />
-                                      <input
-                                        type="text"
-                                        placeholder="Search city..."
-                                        value={citySearchText}
-                                        onChange={(e) => setCitySearchText(e.target.value)}
-                                        className="pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 focus:bg-white transition-colors w-40"
-                                      />
-                                    </div>
-                                    <button
-                                      onClick={() => openInlineModal('market')}
-                                      className="text-xs text-blue-600 hover:text-blue-700 font-semibold flex items-center space-x-1 whitespace-nowrap bg-blue-50/50 hover:bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-100 transition-colors"
-                                    >
-                                      <Plus className="w-3 h-3" />
-                                      <span>Add New City</span>
-                                    </button>
-                                  </div>
-                                </div>
-                                
-                                {citiesUnderRoute.length === 0 ? (
-                                  <p className="text-xs text-gray-500 italic py-2">No cities mapped to this region yet.</p>
-                                ) : (() => {
-                                  const filtered = citiesUnderRoute.filter(c => 
-                                    c.firmName.toLowerCase().includes(citySearchText.toLowerCase())
-                                  );
-                                  
-                                  if (filtered.length === 0) {
-                                    return <p className="text-xs text-gray-500 italic py-2">No cities matching "{citySearchText}" found.</p>;
-                                  }
-
-                                  return (
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                      {filtered.map((city) => (
-                                        <div
-                                          key={city._id}
-                                          onClick={() => openCityCustomersPopup(city.firmName)}
-                                          className="p-3.5 border border-gray-100 rounded-lg bg-gray-50/30 flex items-center justify-between hover:border-blue-300 hover:bg-blue-50/10 hover:shadow-xs transition-all cursor-pointer group min-w-0"
-                                          title={`Click to view customers in ${city.firmName}`}
-                                        >
-                                          <div className="min-w-0 flex-1 mr-2">
-                                            <span className="font-semibold text-gray-950 text-sm block group-hover:text-blue-600 transition-colors truncate">{city.firmName}</span>
-                                            <span className="text-xs text-gray-400 mt-1 font-medium leading-normal block truncate">{city.district || '-'}, {city.state || '-'}</span>
-                                          </div>
-                                          <div className="text-right flex flex-col items-end">
-                                            <span className="inline-flex px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-50 text-blue-700 border border-blue-100 mb-1 group-hover:bg-blue-100 group-hover:text-blue-800 transition-colors">
-                                              {city.customerCount || 0} Custs
-                                            </span>
-                                            <span className={`inline-flex px-1.5 py-0.5 text-[9px] font-bold uppercase rounded ${
-                                              city.status === 'active'
-                                                ? 'bg-green-50 text-green-700 border border-green-100'
-                                                : 'bg-gray-100 text-gray-500'
-                                            }`}>
-                                              {city.status}
-                                            </span>
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  );
-                                })()}
-                              </div>
-                            </td>
-                          </tr>
-                        )}
                       </React.Fragment>
                     );
                   })
