@@ -23,23 +23,19 @@ const app = express();
 
 app.use(compression());
 
-// Robust CORS middleware ensuring valid headers across all environments
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-  } else {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-  }
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+// Open CORS configuration for all origins and preview domains
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow all incoming origins (https://www.skbw.in, https://skbw.in, *.vercel.app, etc.)
+    callback(null, true);
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"]
+}));
 
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
-  next();
-});
+// Enable pre-flight OPTIONS response for all routes (Express 5 compatible)
+app.options(/(.*)/, cors());
 app.use(express.json({ limit: "10mb" }));
 
 // Routes
