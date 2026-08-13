@@ -28,7 +28,7 @@ exports.register = async (req, res) => {
     const populatedUser = await User.findById(user._id)
       .populate({ path: "role", populate: { path: "permissions" } });
 
-    const roleName = populatedUser.role && typeof populatedUser.role === 'object' ? (populatedUser.role.name || 'sales') : 'sales';
+    const userRoleName = populatedUser.role && typeof populatedUser.role === 'object' ? (populatedUser.role.name || 'sales') : 'sales';
     const permissions = (populatedUser.role && typeof populatedUser.role === 'object' && Array.isArray(populatedUser.role.permissions))
       ? populatedUser.role.permissions.map(p => typeof p === 'object' ? (p.name || p) : p)
       : [];
@@ -38,7 +38,7 @@ exports.register = async (req, res) => {
       username: populatedUser.username,
       fullName: populatedUser.fullName,
       email: populatedUser.email,
-      role: roleName,
+      role: userRoleName,
       permissions: permissions,
       status: populatedUser.status
     });
