@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'erp-backend/**'
+      - '.github/workflows/**'
 
 jobs:
   deploy:
@@ -16,11 +19,14 @@ jobs:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.PORT || '22' }}
+          timeout: 60s
+          command_timeout: 15m
           script: |
             cd /var/www/SKBW-NEXUS
             git fetch origin
             git reset --hard origin/main
             cd erp-backend
             npm install
-            pm2 restart erp-backend --update-env
+            pm2 restart erp-backend --update-env || pm2 start server.js --name erp-backend
 
