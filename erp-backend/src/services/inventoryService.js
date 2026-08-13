@@ -2,6 +2,8 @@ const Item = require("../models/itemModel");
 const StockMovement = require("../models/stockMovementModel");
 const Inventory = require("../models/inventoryModel");
 const InventoryAuditLog = require("../models/inventoryAuditLogModel");
+// Registers the "Warehouse" model so .populate("warehouse") below can resolve it.
+require("../models/warehouseModel");
 
 /**
  * Shared Inventory Service — Ledger Architecture

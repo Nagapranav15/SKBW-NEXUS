@@ -2,6 +2,8 @@ const Inventory = require("../models/inventoryModel");
 const StockMovement = require("../models/stockMovementModel");
 const Item = require("../models/itemModel");
 const MinimumStockLevel = require("../models/minimumStockLevelModel");
+// Registers the "Warehouse" model so .populate("warehouse") below can resolve it.
+require("../models/warehouseModel");
 
 /**
  * Inventory Ledger Service — Optimized queries for dashboard and reports
