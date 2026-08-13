@@ -51,11 +51,14 @@ const Login: React.FC = () => {
 
           <form onSubmit={handleLogin} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
                 Username
               </label>
               <input
+                id="username"
+                name="username"
                 type="text"
+                autoComplete="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -65,11 +68,14 @@ const Login: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                 Password
               </label>
               <input
+                id="password"
+                name="password"
                 type="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
