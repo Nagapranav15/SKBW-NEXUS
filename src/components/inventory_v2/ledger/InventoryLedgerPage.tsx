@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ArrowRightLeft, Search, Calendar, RefreshCw, ChevronLeft, ChevronRight, Eye, User, ShieldAlert, Layers, MapPin, FileText, Box, History } from 'lucide-react';
+import { ArrowRightLeft, Search, Calendar, RefreshCw, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ArrowUpDown, Eye, User, ShieldAlert, Layers, MapPin, FileText, Box, History } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { getSkusV2, getWarehouseHierarchyV2, SkuV2, WarehouseLocationV2, getBalancesV2 } from '../../../api/mfgApiV2';
 import { fetchInventoryLedger, LedgerEntryV2 } from './ledgerService';
@@ -13,13 +13,66 @@ interface LedgerTableProps {
 }
 
 const LedgerTable: React.FC<LedgerTableProps> = ({ entries, loading, onViewDetails }) => {
+  const [sortField, setSortField] = useState<string>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center h-64 bg-white rounded-xl border border-gray-200 shadow-3xs">
         <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
+
+  const sortedEntries = [...entries].sort((a, b) => {
+    let valA: any = '';
+    let valB: any = '';
+
+    if (sortField === 'createdAt') {
+      valA = new Date(a.createdAt).getTime();
+      valB = new Date(b.createdAt).getTime();
+    } else if (sortField === 'transactionNumber') {
+      valA = a.transactionNumber || '';
+      valB = b.transactionNumber || '';
+    } else if (sortField === 'transactionType') {
+      valA = a.transactionType || '';
+      valB = b.transactionType || '';
+    } else if (sortField === 'batchNumber') {
+      valA = a.batchNumber || '';
+      valB = b.batchNumber || '';
+    } else if (sortField === 'sku') {
+      valA = a.skuId?.name || '';
+      valB = b.skuId?.name || '';
+    } else if (sortField === 'direction') {
+      valA = a.direction || '';
+      valB = b.direction || '';
+    } else if (sortField === 'quantity') {
+      valA = a.quantity || 0;
+      valB = b.quantity || 0;
+    } else if (sortField === 'location') {
+      valA = a.locationId?.name || '';
+      valB = b.locationId?.name || '';
+    } else if (sortField === 'status') {
+      valA = a.status || '';
+      valB = b.status || '';
+    }
+
+    if (typeof valA === 'number' && typeof valB === 'number') {
+      return sortOrder === 'asc' ? valA - valB : valB - valA;
+    }
+    valA = valA.toString().toLowerCase();
+    valB = valB.toString().toLowerCase();
+    return sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+  });
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-3xs overflow-hidden">
@@ -27,22 +80,39 @@ const LedgerTable: React.FC<LedgerTableProps> = ({ entries, loading, onViewDetai
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-gray-50 text-gray-500 uppercase font-bold border-b border-gray-100 whitespace-nowrap">
-                <th className="px-6 py-3">Date & Time</th>
-                <th className="px-6 py-3">Transaction No</th>
-                <th className="px-6 py-3">Transaction Type</th>
-                <th className="px-6 py-3">Reference</th>
-                <th className="px-6 py-3">SKU</th>
-                <th className="px-6 py-3 text-center">Direction</th>
-                <th className="px-6 py-3 text-right">Quantity</th>
-                <th className="px-6 py-3">Location</th>
-                <th className="px-6 py-3">Created By</th>
-                <th className="px-6 py-3 text-center">Status</th>
+              <tr className="bg-gray-50 text-gray-500 uppercase font-bold border-b border-gray-100 whitespace-nowrap select-none">
+                {[
+                  { label: 'Date & Time', key: 'createdAt', align: 'text-left' },
+                  { label: 'Transaction No', key: 'transactionNumber', align: 'text-left' },
+                  { label: 'Transaction Type', key: 'transactionType', align: 'text-left' },
+                  { label: 'Reference', key: 'batchNumber', align: 'text-left' },
+                  { label: 'SKU', key: 'sku', align: 'text-left' },
+                  { label: 'Direction', key: 'direction', align: 'text-center' },
+                  { label: 'Quantity', key: 'quantity', align: 'text-right' },
+                  { label: 'Location', key: 'location', align: 'text-left' },
+                  { label: 'Created By', key: 'createdBy', align: 'text-left' },
+                  { label: 'Status', key: 'status', align: 'text-center' }
+                ].map(col => (
+                  <th
+                    key={col.key}
+                    onClick={() => handleSort(col.key)}
+                    className={`px-6 py-3 ${col.align} cursor-pointer hover:bg-gray-100/50 transition-colors`}
+                  >
+                    <div className={`flex items-center space-x-1 ${col.align === 'text-center' ? 'justify-center' : col.align === 'text-right' ? 'justify-end' : ''}`}>
+                      <span>{col.label}</span>
+                      {sortField === col.key ? (
+                        sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5 inline text-blue-600" /> : <ChevronDown className="w-3.5 h-3.5 inline text-blue-600" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 inline text-gray-300 opacity-40 hover:opacity-100" />
+                      )}
+                    </div>
+                  </th>
+                ))}
                 <th className="px-6 py-3 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-gray-700">
-              {entries.map((tx) => (
+              {sortedEntries.map((tx) => (
                 <tr 
                   key={tx._id} 
                   onClick={() => onViewDetails(tx)}

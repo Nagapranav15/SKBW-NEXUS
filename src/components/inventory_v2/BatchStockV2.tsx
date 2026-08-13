@@ -1,11 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Layers, Search, RefreshCw, X, FileText, ChevronRight, ChevronDown, Warehouse, MapPin, Database, Calendar, Package, ArrowUpRight, ArrowDownLeft, AlertCircle, ArrowRightLeft, Eye, HelpCircle, Download, Plus, ArrowRight, Printer, Coins, MoreVertical } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Layers, Search, RefreshCw, X, FileText, ChevronRight, ChevronDown, ChevronUp, ArrowUpDown, Warehouse, MapPin, Database, Calendar, Package, ArrowUpRight, ArrowDownLeft, AlertCircle, ArrowRightLeft, Eye, HelpCircle, Download, Plus, ArrowRight, Printer, Coins, MoreVertical, ChevronLeft, User } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getBalancesV2, getWarehouseHierarchyV2, getLedgerV2, recordTransferV2, SkuV2, WarehouseLocationV2, LedgerEntryV2 } from '../../api/mfgApiV2';
 import { getPurchaseInvoicesV2, PurchaseInvoiceV2 } from './purchases/purchaseService';
 import { showToast } from '../ui/Toast';
+import { formatSkuName } from './SkuMasterV2';
+import Drawer from '../ui/Drawer';
 
 const BatchStockV2: React.FC = () => {
+  const navigate = useNavigate();
   const { selectedCompany } = useAuth();
   
   // Data state
@@ -16,11 +20,14 @@ const BatchStockV2: React.FC = () => {
   
   // Search & filter states
   const [search, setSearch] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
   const [filterItem, setFilterItem] = useState('');
   const [filterLocation, setFilterLocation] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   
-  // Selection details state
+  // Drawer & Selection details state
+  const [showLotDrawer, setShowLotDrawer] = useState(false);
+  const [drawerTab, setDrawerTab] = useState<'reels' | 'movements' | 'cost' | 'notes'>('reels');
   const [selectedLot, setSelectedLot] = useState<any | null>(null);
   const [activeSubPage, setActiveSubPage] = useState<'list' | 'details'>('list');
   const [selectedDetailLot, setSelectedDetailLot] = useState<any | null>(null);
@@ -284,23 +291,85 @@ const BatchStockV2: React.FC = () => {
                           brand.includes(search.toLowerCase()) ||
                           locationName.includes(search.toLowerCase());
 
+    const matchesCategory = !filterCategory || b.sku?.category === filterCategory;
     const matchesItem = !filterItem || (b.sku?._id || b.skuId) === filterItem;
     const matchesLocation = !filterLocation || (b.location?._id || b.locationId) === filterLocation;
+    const matchesStatus = !filterStatus || (filterStatus === 'AVAILABLE' ? (b.onHand || 0) > 0 : filterStatus === 'EXHAUSTED' ? (b.onHand || 0) <= 0 : true);
     
-    return matchesSearch && matchesItem && matchesLocation;
+    return matchesSearch && matchesCategory && matchesItem && matchesLocation && matchesStatus;
   });
 
-  const totalPages = Math.max(Math.ceil(filteredBalances.length / limit), 1);
-  const paginatedBalances = filteredBalances.slice((page - 1) * limit, page * limit);
+  const [sortField, setSortField] = useState<string>('lotNo');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
+
+  const sortedBalances = [...filteredBalances].sort((a, b) => {
+    let valA: any = '';
+    let valB: any = '';
+
+    if (sortField === 'lotNo') {
+      valA = getDisplayLotNo(a);
+      valB = getDisplayLotNo(b);
+    } else if (sortField === 'item') {
+      valA = a.sku?.name || '';
+      valB = b.sku?.name || '';
+    } else if (sortField === 'brand') {
+      valA = a.sku?.brand || '';
+      valB = b.sku?.brand || '';
+    } else if (sortField === 'gsm') {
+      valA = a.sku?.gsm || 0;
+      valB = b.sku?.gsm || 0;
+    } else if (sortField === 'width') {
+      valA = a.sku?.width || 0;
+      valB = b.sku?.width || 0;
+    } else if (sortField === 'reels') {
+      valA = a.reels?.length || 0;
+      valB = b.reels?.length || 0;
+    } else if (sortField === 'availableKg') {
+      valA = a.onHand || 0;
+      valB = b.onHand || 0;
+    } else if (sortField === 'rate') {
+      valA = a.sku?.costPrice || 0;
+      valB = b.sku?.costPrice || 0;
+    } else if (sortField === 'location') {
+      valA = a.location?.name || '';
+      valB = b.location?.name || '';
+    }
+
+    if (typeof valA === 'number' && typeof valB === 'number') {
+      return sortOrder === 'asc' ? valA - valB : valB - valA;
+    }
+    valA = valA.toString().toLowerCase();
+    valB = valB.toString().toLowerCase();
+    return sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+  });
+
+  const totalPages = Math.max(Math.ceil(sortedBalances.length / limit), 1);
+  const paginatedBalances = sortedBalances.slice((page - 1) * limit, page * limit);
 
   // Stats
   const statTotalLots = balances.length;
-  const statTotalAvailable = balances.reduce((sum, b) => sum + (b.onHand || 0), 0);
-  const statTotalReels = balances.reduce((sum, b) => {
-    // Return length of reels array or fallback to estimated reels (qty / weight)
-    return sum + (b.reels?.length || (b.sku?.category === 'Raw Material' ? Math.round(b.onHand / 290) : 0) || 0);
-  }, 0);
-  const statTotalLocations = new Set(balances.map(b => b.location?._id || b.locationId)).size;
+  
+  const rawMatBalances = balances.filter(b => b.sku?.category === 'Raw Material');
+  const statRawMatCount = rawMatBalances.length;
+  const statRawMatKg = rawMatBalances.reduce((sum, b) => sum + (b.onHand || 0), 0);
+
+  const semiBalances = balances.filter(b => b.sku?.category === 'Semi Finished');
+  const statSemiCount = semiBalances.length;
+  const statSemiSheets = semiBalances.reduce((sum, b) => sum + (b.onHand || 0), 0);
+
+  const fgBalances = balances.filter(b => b.sku?.category === 'Finished Goods');
+  const statFgCount = fgBalances.length;
+  const statFgGbl = fgBalances.reduce((sum, b) => sum + (b.sku?.booksGbl || 0), 0);
+  const statFgPcs = fgBalances.reduce((sum, b) => sum + (b.onHand || 0), 0);
 
   // Selected Lot Details (Tab info or calculations)
   const lotTotalReels = selectedLot ? (selectedLot.reels?.length || (selectedLot.sku?.category === 'Raw Material' ? Math.round(selectedLot.onHand / 290) : 0) || 0) : 0;
@@ -313,7 +382,8 @@ const BatchStockV2: React.FC = () => {
     : 'Hreemkar Papers';
 
   return (
-    <div className="space-y-6">
+    <div className="p-4 sm:p-6 space-y-6 flex-1 w-full relative transition-all duration-300">
+      <div className="flex-1 space-y-6 overflow-y-auto">
       {/* ── DETAILS SUB-PAGE (LOT VIEW) ──────────────────────────────────────── */}
       {activeSubPage === 'details' && selectedDetailLot ? (() => {
         const detailsInvoice = invoices.find(inv => inv.invoiceNumber === selectedDetailLot.batchNumber);
@@ -667,70 +737,122 @@ const BatchStockV2: React.FC = () => {
           </div>
         );
       })() : (
-        /* ── MAIN LIST VIEW (SPLIT SCREEN) ──────────────────────────────────── */
-        <div className="space-y-6 animate-in fade-in duration-200">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
-            <div>
-              <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
-                <Database className="w-5 h-5 text-blue-600" />
-                Batch Stock / Lot Inventory
-              </h1>
-              <p className="text-xs text-gray-500 mt-0.5 font-medium">Stock available by material lot and location</p>
+        /* ── MAIN LIST VIEW ──────────────────────────────────── */
+        <div className="space-y-4 animate-in fade-in duration-200">
+          {/* Top Bar with Navigation Back link and user profile pill */}
+          <div className="flex items-center justify-between">
+            <div 
+              className="flex items-center space-x-1.5 text-gray-500 hover:text-gray-900 cursor-pointer transition-colors" 
+              onClick={() => navigate(-1)}
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span className="text-sm font-semibold">Back</span>
             </div>
-            <div className="flex items-center gap-2">
+            
+            <div className="flex items-center space-x-2 text-gray-700 bg-gray-50 border border-gray-150 px-3.5 py-1.5 rounded-full text-xs font-semibold shadow-2xs">
+              <div className="w-5 h-5 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center">
+                <User className="w-3 h-3" />
+              </div>
+              <span>SKBW Admin</span>
+            </div>
+          </div>
+
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-1">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-905 tracking-tight">Stock</h1>
+              <p className="text-sm text-gray-500 mt-1">Live inventory by lot / batch and location</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 md:gap-3">
               <button
                 onClick={loadData}
-                className="px-4 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 bg-white rounded-xl text-xs font-semibold shadow-sm transition-all flex items-center gap-1.5"
+                className="flex items-center space-x-2 px-4 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl transition-all font-medium text-xs shadow-xs cursor-pointer"
               >
-                <RefreshCw className="w-3.5 h-3.5" /> Reload
+                <RefreshCw className="w-3.5 h-3.5 text-gray-500" />
+                <span>Reload</span>
               </button>
               <button
-                className="px-4 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 bg-white rounded-xl text-xs font-semibold shadow-sm transition-all flex items-center gap-1.5"
+                className="flex items-center space-x-2 px-4 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl transition-all font-medium text-xs shadow-xs cursor-pointer"
               >
-                <Download className="w-3.5 h-3.5" /> Export <ChevronDown className="w-3.5 h-3.5" />
+                <Download className="w-3.5 h-3.5 text-gray-500" />
+                <span>Export</span>
+                <ChevronDown className="w-3 h-3 text-gray-400" />
               </button>
               <button
-                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black shadow-md transition-all flex items-center gap-1.5"
+                className="flex items-center space-x-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all font-semibold text-xs shadow-xs cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5" /> + Add Stock Entry
+                <Plus className="w-4 h-4" />
+                <span>+ Add Stock Entry</span>
+                <kbd className="hidden md:inline-block ml-1.5 px-1.5 py-0.5 text-[10px] font-mono font-bold text-blue-100 bg-blue-800 rounded border border-blue-700 shadow-xs select-none pointer-events-none">Alt/Opt+C</kbd>
               </button>
             </div>
           </div>
 
-          {/* Stats Banner row (matching customer stats card style exactly) */}
+          {/* Top 4 Interactive Customer-Style Stat Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-            <div className="w-full text-left rounded-xl shadow-xs border p-3 border-l-4 border-l-blue-500 bg-white border-gray-100 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default select-none group">
+            <button
+              onClick={() => { setFilterCategory(''); setPage(1); }}
+              className={`w-full text-left rounded-xl border p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] group ${
+                filterCategory === '' 
+                  ? 'bg-blue-50/50 border-blue-200 ring-1 ring-blue-100 shadow-2xs' 
+                  : 'bg-white border-gray-200 border-l-4 border-l-blue-500 hover:shadow-xs'
+              }`}
+            >
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 group-hover:text-blue-500 transition-colors">Total Lots</p>
-                <p className="text-2xl font-bold text-gray-900 mt-0.5">{statTotalLots}</p>
+                <p className={`text-[11px] font-bold uppercase tracking-wider transition-colors ${filterCategory === '' ? 'text-blue-600' : 'text-gray-400 group-hover:text-blue-500'}`}>Total Lots</p>
+                <p className="text-2xl font-extrabold text-gray-900 mt-1">{statTotalLots}</p>
+                <p className="text-[10px] text-gray-400 font-medium mt-0.5">Across all categories</p>
               </div>
-            </div>
+            </button>
 
-            <div className="w-full text-left rounded-xl shadow-xs border p-3 border-l-4 border-l-green-500 bg-white border-gray-100 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default select-none group">
+            <button
+              onClick={() => { setFilterCategory('Raw Material'); setPage(1); }}
+              className={`w-full text-left rounded-xl border p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] group ${
+                filterCategory === 'Raw Material' 
+                  ? 'bg-amber-50/50 border-amber-200 ring-1 ring-amber-100 shadow-2xs' 
+                  : 'bg-white border-gray-200 border-l-4 border-l-amber-500 hover:shadow-xs'
+              }`}
+            >
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 group-hover:text-green-500 transition-colors">Total Available</p>
-                <p className="text-2xl font-bold text-green-600 mt-0.5">{statTotalAvailable.toLocaleString('en-IN')} KG</p>
+                <p className={`text-[11px] font-bold uppercase tracking-wider transition-colors ${filterCategory === 'Raw Material' ? 'text-amber-600' : 'text-gray-400 group-hover:text-amber-500'}`}>Raw Materials</p>
+                <p className="text-2xl font-extrabold text-amber-600 mt-1">{statRawMatCount}</p>
+                <p className="text-[10px] text-gray-400 font-medium mt-0.5">{statRawMatKg.toLocaleString('en-IN')} KG</p>
               </div>
-            </div>
+            </button>
 
-            <div className="w-full text-left rounded-xl shadow-xs border p-3 border-l-4 border-l-orange-500 bg-white border-gray-100 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default select-none group">
+            <button
+              onClick={() => { setFilterCategory('Semi Finished'); setPage(1); }}
+              className={`w-full text-left rounded-xl border p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] group ${
+                filterCategory === 'Semi Finished' 
+                  ? 'bg-purple-50/50 border-purple-200 ring-1 ring-purple-100 shadow-2xs' 
+                  : 'bg-white border-gray-200 border-l-4 border-l-purple-500 hover:shadow-xs'
+              }`}
+            >
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 group-hover:text-orange-500 transition-colors">Total Reel Count</p>
-                <p className="text-2xl font-bold text-orange-600 mt-0.5">{statTotalReels}</p>
+                <p className={`text-[11px] font-bold uppercase tracking-wider transition-colors ${filterCategory === 'Semi Finished' ? 'text-purple-600' : 'text-gray-400 group-hover:text-purple-500'}`}>Semi-Finished</p>
+                <p className="text-2xl font-extrabold text-purple-600 mt-1">{statSemiCount}</p>
+                <p className="text-[10px] text-gray-400 font-medium mt-0.5">{statSemiSheets.toLocaleString('en-IN')} Sheets</p>
               </div>
-            </div>
+            </button>
 
-            <div className="w-full text-left rounded-xl shadow-xs border p-3 border-l-4 border-l-purple-500 bg-white border-gray-100 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default select-none group">
+            <button
+              onClick={() => { setFilterCategory('Finished Goods'); setPage(1); }}
+              className={`w-full text-left rounded-xl border p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] group ${
+                filterCategory === 'Finished Goods' 
+                  ? 'bg-emerald-50/50 border-emerald-200 ring-1 ring-emerald-100 shadow-2xs' 
+                  : 'bg-white border-gray-200 border-l-4 border-l-emerald-500 hover:shadow-xs'
+              }`}
+            >
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 group-hover:text-purple-500 transition-colors">Total Locations</p>
-                <p className="text-2xl font-bold text-purple-600 mt-0.5">{statTotalLocations}</p>
+                <p className={`text-[11px] font-bold uppercase tracking-wider transition-colors ${filterCategory === 'Finished Goods' ? 'text-emerald-600' : 'text-gray-400 group-hover:text-emerald-500'}`}>Finished Goods</p>
+                <p className="text-2xl font-extrabold text-emerald-600 mt-1">{statFgCount}</p>
+                <p className="text-[10px] text-gray-400 font-medium mt-0.5">{statFgGbl > 0 ? `${statFgGbl} GBL / ` : ''}{statFgPcs.toLocaleString('en-IN')} PCS</p>
               </div>
-            </div>
+            </button>
           </div>
 
           {/* Filter / Search Bar */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="bg-white rounded-xl shadow-2xs border border-gray-150 p-3 mb-4 flex flex-col md:flex-row items-center justify-between gap-3">
             <div className="flex-1 w-full relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
@@ -738,14 +860,25 @@ const BatchStockV2: React.FC = () => {
                 placeholder="Search by Lot No, Item, Brand, GSM, Width..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50/50 focus:bg-white transition-all text-gray-950 font-medium"
+                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 focus:bg-white transition-colors text-gray-900"
               />
             </div>
-            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+              <select
+                value={filterCategory}
+                onChange={e => { setFilterCategory(e.target.value); setPage(1); }}
+                className="w-full sm:w-36 px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold bg-white text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
+              >
+                <option value="">All Categories</option>
+                <option value="Raw Material">Raw Material</option>
+                <option value="Semi Finished">Semi Finished</option>
+                <option value="Finished Goods">Finished Goods</option>
+              </select>
+
               <select
                 value={filterItem}
                 onChange={e => { setFilterItem(e.target.value); setPage(1); }}
-                className="w-full sm:w-40 px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-700 font-bold"
+                className="w-full sm:w-36 px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold bg-white text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
               >
                 <option value="">All Items</option>
                 {Array.from(new Set(balances.map(b => b.sku?._id || b.skuId))).map(id => {
@@ -757,7 +890,7 @@ const BatchStockV2: React.FC = () => {
               <select
                 value={filterLocation}
                 onChange={e => { setFilterLocation(e.target.value); setPage(1); }}
-                className="w-full sm:w-40 px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-700 font-bold"
+                className="w-full sm:w-36 px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold bg-white text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
               >
                 <option value="">All Locations</option>
                 {hierarchy.filter(h => h.level === 'Storage Location').map(loc => (
@@ -766,282 +899,394 @@ const BatchStockV2: React.FC = () => {
               </select>
 
               <select
-                className="w-full sm:w-32 px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-700 font-bold"
+                value={filterStatus}
+                onChange={e => { setFilterStatus(e.target.value); setPage(1); }}
+                className="w-full sm:w-32 px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold bg-white text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
               >
                 <option value="">All Status</option>
                 <option value="AVAILABLE">Available</option>
+                <option value="EXHAUSTED">Exhausted</option>
               </select>
 
               <button
-                className="px-4 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 bg-white rounded-xl text-xs font-semibold shadow-sm transition-all flex items-center gap-1.5"
+                className="px-3.5 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 bg-white rounded-lg text-xs font-semibold shadow-2xs flex items-center gap-1.5 cursor-pointer"
               >
-                <Layers className="w-3.5 h-3.5 text-gray-400" /> Filters
+                <Layers className="w-3.5 h-3.5 text-blue-600" /> Filters
               </button>
             </div>
           </div>
 
-          {/* Table & Side Panel grid split */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-            {/* Left table view (2/3 width) */}
-            <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider">
-                  Material Lots <span className="text-[10px] text-gray-400 font-bold uppercase">(Available Stock)</span>
-                </h3>
-              </div>
-              
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-gray-50/50 text-gray-400 uppercase font-black border-b border-gray-150 text-[10px]">
-                      <th className="px-5 py-3">Lot No.</th>
-                      <th className="px-5 py-3">Item</th>
-                      <th className="px-5 py-3">Brand</th>
-                      <th className="px-5 py-3 text-center">GSM</th>
-                      <th className="px-5 py-3 text-center">Width (cm)</th>
-                      <th className="px-5 py-3 text-center">Reels</th>
-                      <th className="px-5 py-3 text-right">Available KG</th>
-                      <th className="px-5 py-3 text-right">Rate / KG (₹)</th>
-                      <th className="px-5 py-3">Location</th>
-                      <th className="px-5 py-3 text-center">Status</th>
-                      <th className="px-5 py-3 text-center">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 text-gray-700 font-semibold text-xs">
-                    {paginatedBalances.map((b, idx) => {
-                      const displayLot = getDisplayLotNo(b);
-                      const isSelected = selectedLot && (
-                        selectedLot._id === b._id || 
-                        (selectedLot.batchNumber === b.batchNumber && 
-                         (selectedLot.sku?._id || selectedLot.skuId) === (b.sku?._id || b.skuId) && 
-                         (selectedLot.location?._id || selectedLot.locationId) === (b.location?._id || b.locationId))
-                      );
-                      const reelsCount = b.reels?.length || (b.sku?.category === 'Raw Material' ? Math.round(b.onHand / 290) : 0) || 0;
-                      
-                      return (
-                        <tr 
-                          key={`${b.sku?._id || b.skuId}-${b.location?._id || b.locationId}-${b.batchNumber}-${idx}`} 
-                          className={`hover:bg-gray-50/40 transition-colors cursor-pointer border-b border-gray-50 ${
-                            isSelected ? 'bg-blue-50/30' : ''
-                          }`}
-                          onClick={() => setSelectedLot(b)}
-                        >
-                          <td className="px-5 py-4 font-bold text-blue-600 text-[13px]">
-                            {displayLot}
-                            <span className="text-[9px] text-gray-400 font-medium block mt-0.5">From {b.batchNumber || '—'}</span>
-                          </td>
-                          <td className="px-5 py-4 font-bold text-gray-900 truncate max-w-xs">{b.sku?.name || 'Raw Material'}</td>
-                          <td className="px-5 py-4 text-gray-500">{b.sku?.brand || 'BILT'}</td>
-                          <td className="px-5 py-4 text-center font-semibold text-gray-700">{b.sku?.gsm || '52'}</td>
-                          <td className="px-5 py-4 text-center font-semibold text-gray-700">{b.sku?.width || '64'}</td>
-                          <td className="px-5 py-4 text-center font-semibold text-gray-800">{reelsCount || '—'}</td>
-                          <td className="px-5 py-4 text-right font-bold text-green-600">{(b.onHand || 0).toLocaleString()} KG</td>
-                          <td className="px-5 py-4 text-right text-gray-600">₹{(b.sku?.price || 68).toFixed(2)}</td>
-                          <td className="px-5 py-4 text-blue-600 font-bold">{b.location?.name || 'Bin'}</td>
-                          <td className="px-5 py-4 text-center">
-                            <span className="text-[9px] px-2 py-0.5 rounded font-bold uppercase border bg-green-50 text-green-700 border-green-200">
-                              Available
-                            </span>
-                          </td>
-                          <td className="px-5 py-4 text-center" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex items-center justify-center gap-1.5">
-                              <button
-                                onClick={() => {
-                                  setSelectedDetailLot(b);
-                                  setActiveSubPage('details');
-                                }}
-                                className="p-1 text-blue-600 hover:bg-blue-50 rounded border border-blue-100"
-                                title="View Lot details"
-                              >
-                                <Eye className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleOpenTransferModal(b)}
-                                className="p-1 text-gray-500 hover:bg-gray-50 rounded border border-gray-200"
-                                title="More actions"
-                              >
-                                <MoreVertical className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
+          {/* Full Width Table Container */}
+          <div className="bg-white rounded-xl border border-gray-150 shadow-2xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-gray-50/70 text-gray-500 uppercase font-bold border-b border-gray-200 text-[10px] select-none tracking-wider">
+                    {[
+                      { label: 'LOT NO.', key: 'lotNo', align: 'text-left', extraClass: 'pl-6 pr-4' },
+                      { label: 'ITEM', key: 'item', align: 'text-left', extraClass: 'px-4' },
+                      { label: 'BRAND', key: 'brand', align: 'text-left', extraClass: 'px-4' },
+                      { label: 'GSM', key: 'gsm', align: 'text-center', extraClass: 'px-4' },
+                      { label: 'SIZE / WIDTH', key: 'width', align: 'text-center', extraClass: 'px-4' },
+                      { label: 'UNIT', key: 'unit', align: 'text-center', extraClass: 'px-4' },
+                      { label: 'AVAILABLE', key: 'availableKg', align: 'text-right', extraClass: 'px-4' },
+                      { label: 'LOCATION', key: 'location', align: 'text-left', extraClass: 'px-4' }
+                    ].map(col => (
+                      <th
+                        key={col.key}
+                        onClick={() => handleSort(col.key)}
+                        className={`py-3.5 ${col.extraClass} ${col.align} cursor-pointer hover:bg-gray-100/60 transition-colors align-middle`}
+                      >
+                        <div className={`flex items-center space-x-1 ${col.align === 'text-center' ? 'justify-center' : col.align === 'text-right' ? 'justify-end' : ''}`}>
+                          <span>{col.label}</span>
+                          {sortField === col.key ? (
+                            sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5 inline text-blue-600" /> : <ChevronDown className="w-3.5 h-3.5 inline text-blue-600" />
+                          ) : (
+                            <ArrowUpDown className="w-3 h-3 inline text-gray-300 opacity-40 hover:opacity-100" />
+                          )}
+                        </div>
+                      </th>
+                    ))}
+                    <th className="px-4 py-3.5 text-center align-middle">STATUS</th>
+                    <th className="pl-4 pr-6 py-3.5 text-center align-middle">ACTIONS</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 text-gray-700 text-xs">
+                  {paginatedBalances.map((b, idx) => {
+                    const displayLot = getDisplayLotNo(b);
+                    const isSelected = selectedLot && (
+                      selectedLot._id === b._id || 
+                      (selectedLot.batchNumber === b.batchNumber && 
+                       (selectedLot.sku?._id || selectedLot.skuId) === (b.sku?._id || b.skuId) && 
+                       (selectedLot.location?._id || selectedLot.locationId) === (b.location?._id || b.locationId))
+                    );
+                    
+                    const isExhausted = (b.onHand || 0) <= 0;
+                    const isPartial = (b.onHand || 0) > 0 && (b.onHand || 0) < 100;
 
-                    {paginatedBalances.length === 0 && (
-                      <tr>
-                        <td colSpan={11} className="text-center py-16 text-gray-400 italic">
-                          No stock balances match your current filters.
+                    return (
+                      <tr 
+                        key={`${b.sku?._id || b.skuId}-${b.location?._id || b.locationId}-${b.batchNumber}-${idx}`} 
+                        className={`hover:bg-blue-50/20 transition-colors cursor-pointer border-b border-gray-100 ${
+                          isSelected ? 'bg-blue-50/50' : ''
+                        }`}
+                        onClick={() => {
+                          setSelectedLot(b);
+                          setSelectedDetailLot(b);
+                          setShowLotDrawer(true);
+                        }}
+                      >
+                        <td className="pl-6 pr-4 py-3.5 align-middle font-bold text-blue-600 text-xs whitespace-nowrap">
+                          {displayLot}
+                          <span className="text-[10px] text-gray-400 font-normal block mt-0.5">
+                            {b.createdAt ? new Date(b.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '10 Aug 2026'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 align-middle font-semibold text-gray-900 whitespace-nowrap">
+                          <p className="leading-tight">{formatSkuName(b.sku?.name || 'Raw Material')}</p>
+                          <p className="text-[10px] text-gray-400 font-normal mt-0.5">{b.sku?.category || 'Raw Material'}</p>
+                        </td>
+                        <td className="px-4 py-3.5 align-middle text-gray-700 font-medium">{b.sku?.brand || 'BILT'}</td>
+                        <td className="px-4 py-3.5 align-middle text-center font-medium text-gray-700">{b.sku?.gsm || '52'}</td>
+                        <td className="px-4 py-3.5 align-middle text-center font-medium text-gray-700">
+                          {b.sku?.width ? `${b.sku.width} cm` : '57 cm'}
+                        </td>
+                        <td className="px-4 py-3.5 align-middle text-center font-medium text-gray-700">
+                          {b.sku?.paperType === 'Sheets' ? 'Reams' : 'Reels'}
+                        </td>
+                        <td className="px-4 py-3.5 align-middle text-right font-bold">
+                          <span className={isExhausted ? 'text-red-600' : isPartial ? 'text-amber-600' : 'text-emerald-600'}>
+                            {(b.onHand || 0).toLocaleString('en-IN')} {b.sku?.unit || 'KG'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 align-middle text-left">
+                          <span className="font-semibold text-gray-800 text-xs block">{b.location?.name || 'Asha'} &gt;</span>
+                          <span className="text-[10px] text-gray-400 font-normal block mt-0.5">
+                            {b.location?.parentId ? 'Multiple Locations' : 'Rack 1'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 align-middle text-center">
+                          <span className={`inline-flex items-center justify-center text-[9.5px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider border leading-none ${
+                            isExhausted ? 'bg-red-50 text-red-700 border-red-200' :
+                            isPartial ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                            'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          }`}>
+                            {isExhausted ? 'EXHAUSTED' : isPartial ? 'PARTIAL' : 'AVAILABLE'}
+                          </span>
+                        </td>
+                        <td className="pl-4 pr-6 py-3.5 align-middle text-center" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              onClick={() => {
+                                setSelectedLot(b);
+                                setSelectedDetailLot(b);
+                                setShowLotDrawer(true);
+                              }}
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-100 transition-colors"
+                              title="View Lot details"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleOpenTransferModal(b)}
+                              className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors"
+                              title="More actions"
+                            >
+                              <MoreVertical className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                    );
+                  })}
 
-              {/* Pagination footer */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 text-xs font-bold text-gray-500">
-                  <span>Showing Page {page} of {totalPages}</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setPage(p => Math.max(p - 1, 1))}
-                      disabled={page === 1}
-                      className="p-1 border rounded bg-white hover:bg-gray-50 disabled:opacity-40"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => setPage(p => Math.min(p + 1, totalPages))}
-                      disabled={page === totalPages}
-                      className="p-1 border rounded bg-white hover:bg-gray-50 disabled:opacity-40"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              )}
+                  {paginatedBalances.length === 0 && (
+                    <tr>
+                      <td colSpan={10} className="text-center py-16 text-gray-400 italic font-medium">
+                        No stock balances match your current search/filters.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
+            <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-3.5 border-t border-gray-100 text-xs font-semibold text-gray-500 gap-3">
+              <span>Showing {paginatedBalances.length > 0 ? (page - 1) * limit + 1 : 0} to {Math.min(page * limit, sortedBalances.length)} of {sortedBalances.length} lots</span>
+              
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage(p => Math.max(p - 1, 1))}
+                  disabled={page === 1}
+                  className="px-2.5 py-1 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 disabled:opacity-40 font-bold text-gray-600 transition-colors"
+                >
+                  &lt;
+                </button>
+                
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                  <button
+                    key={p}
+                    onClick={() => setPage(p)}
+                    className={`px-3 py-1 rounded-lg font-bold text-xs transition-colors ${
+                      page === p 
+                        ? 'bg-blue-600 text-white shadow-3xs' 
+                        : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
 
-            {/* Right side summary cards (1/3 width) */}
-            <div className="lg:col-span-1 space-y-6">
-              {/* SELECTED LOT SUMMARY */}
-              {selectedLot && (
-                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
-                  <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider pb-2 border-b">
-                    Selected Lot Summary
-                  </h3>
+                <button
+                  onClick={() => setPage(p => Math.min(p + 1, totalPages))}
+                  disabled={page === totalPages}
+                  className="px-2.5 py-1 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 disabled:opacity-40 font-bold text-gray-600 transition-colors"
+                >
+                  &gt;
+                </button>
+              </div>
+            </div>
+          </div>
 
-                  <div className="space-y-3.5 text-xs text-gray-700 font-semibold font-medium">
-                    <div className="flex justify-between">
-                      <span className="text-gray-400 font-bold uppercase text-[9px]">Lot No.</span>
-                      <span className="text-blue-600 font-bold">{getDisplayLotNo(selectedLot)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400 font-bold uppercase text-[9px]">Item</span>
-                      <span className="text-gray-950 font-bold truncate max-w-[150px]">{selectedLot.sku?.name || '—'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400 font-bold uppercase text-[9px]">Brand</span>
-                      <span className="text-gray-950 font-bold">{selectedLot.sku?.brand || 'BILT'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400 font-bold uppercase text-[9px]">GSM</span>
-                      <span className="text-gray-950 font-bold">{selectedLot.sku?.gsm || 52}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400 font-bold uppercase text-[9px]">Width</span>
-                      <span className="text-gray-950 font-bold">{selectedLot.sku?.width || 64} cm</span>
-                    </div>
-                    
-                    <div className="border-t pt-3.5 space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-gray-400 font-bold uppercase text-[9px]">Total Reels</span>
-                        <span className="text-gray-950 font-bold">{lotTotalReels}</span>
+          {/* LOT DETAILS SIDE DRAWER */}
+          <Drawer
+            isOpen={showLotDrawer && !!selectedLot}
+            onClose={() => setShowLotDrawer(false)}
+            size="max-w-xl"
+            title={
+              <div>
+                <h2 className="text-base font-bold text-gray-900">Lot Details</h2>
+              </div>
+            }
+          >
+            {selectedLot && (() => {
+              const displayLot = getDisplayLotNo(selectedLot);
+              const isExhausted = (selectedLot.onHand || 0) <= 0;
+              const isPartial = (selectedLot.onHand || 0) > 0 && (selectedLot.onHand || 0) < 100;
+              const reelsCount = selectedLot.reels?.length || (selectedLot.sku?.category === 'Raw Material' ? Math.round(selectedLot.onHand / 290) : 0) || 3;
+              const originalWeight = selectedLot.onHand + 50;
+
+              return (
+                <div className="flex flex-col h-full overflow-hidden bg-white text-xs">
+                  <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                    {/* Top Lot Title Bar */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-lg font-black text-blue-600 font-mono tracking-tight">{displayLot}</span>
+                        <span className={`text-[10px] px-2.5 py-0.5 rounded-md font-black uppercase tracking-wider border ${
+                          isExhausted ? 'bg-red-50 text-red-700 border-red-200' :
+                          isPartial ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                          'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        }`}>
+                          {isExhausted ? 'EXHAUSTED' : isPartial ? 'PARTIAL' : 'AVAILABLE'}
+                        </span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400 font-bold uppercase text-[9px]">Available Reels (Est.)</span>
-                        <span className="text-gray-950 font-bold">{lotTotalReels ? `${lotTotalReels}.0` : '—'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400 font-bold uppercase text-[9px]">Available KG</span>
-                        <span className="text-green-600 font-bold">{selectedLot.onHand.toLocaleString()} KG</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400 font-bold uppercase text-[9px]">Rate / KG</span>
-                        <span className="text-gray-950 font-bold">₹{(selectedLot.sku?.price || 68.00).toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between border-t pt-3 font-bold text-gray-955">
-                        <span className="text-gray-400 uppercase text-[10px]">Lot Value</span>
-                        <span className="text-blue-600 font-bold text-xs">₹{lotValue.toLocaleString()}</span>
+                      <div className="flex items-center justify-between text-xs font-bold text-gray-800">
+                        <span>{formatSkuName(selectedLot.sku?.name || 'Maplitho Reel 52 GSM 57 cm')}</span>
+                        <span className="text-gray-400 uppercase text-[11px]">{selectedLot.sku?.brand || 'BILT'}</span>
                       </div>
                     </div>
+
+                    {/* 6-Grid Summary Specs Box */}
+                    <div className="bg-gray-50/70 border border-gray-200/80 rounded-2xl p-4 grid grid-cols-3 gap-y-3 gap-x-4">
+                      <div>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase block">Purchased On</span>
+                        <span className="text-xs font-bold text-gray-900 mt-0.5 block">
+                          {selectedLot.createdAt ? new Date(selectedLot.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '10 Aug 2026'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase block">Total Reels</span>
+                        <span className="text-xs font-bold text-gray-900 mt-0.5 block">{reelsCount}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase block">Original Weight</span>
+                        <span className="text-xs font-bold text-gray-900 mt-0.5 block">{originalWeight} KG</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase block">Available Weight</span>
+                        <span className="text-xs font-black text-emerald-600 mt-0.5 block">{(selectedLot.onHand || 0).toLocaleString()} KG</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase block">Rate / KG</span>
+                        <span className="text-xs font-bold text-gray-900 mt-0.5 block">₹{(selectedLot.sku?.price || 50.00).toFixed(2)}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase block">Lot Value (Material)</span>
+                        <span className="text-xs font-bold text-gray-900 mt-0.5 block">₹{((selectedLot.onHand || 0) * (selectedLot.sku?.price || 50)).toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+
+                    {/* Tabs */}
+                    <div className="flex items-center gap-4 border-b border-gray-200 text-xs font-bold pb-px">
+                      <button
+                        onClick={() => setDrawerTab('reels')}
+                        className={`pb-2 border-b-2 transition-colors ${drawerTab === 'reels' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+                      >
+                        Reels &amp; Locations
+                      </button>
+                      <button
+                        onClick={() => setDrawerTab('movements')}
+                        className={`pb-2 border-b-2 transition-colors ${drawerTab === 'movements' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+                      >
+                        Movements
+                      </button>
+                      <button
+                        onClick={() => setDrawerTab('cost')}
+                        className={`pb-2 border-b-2 transition-colors ${drawerTab === 'cost' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+                      >
+                        Origin &amp; Cost
+                      </button>
+                      <button
+                        onClick={() => setDrawerTab('notes')}
+                        className={`pb-2 border-b-2 transition-colors ${drawerTab === 'notes' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+                      >
+                        Notes
+                      </button>
+                    </div>
+
+                    {/* Reels in this Lot section */}
+                    {drawerTab === 'reels' && (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-gray-900">Reels in this Lot</span>
+                          <button
+                            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold shadow-xs transition-colors flex items-center gap-1"
+                          >
+                            <Plus className="w-3 h-3" /> Add Reel
+                          </button>
+                        </div>
+
+                        {/* Reels Mini Table */}
+                        <div className="border border-gray-200 rounded-xl overflow-hidden">
+                          <table className="w-full text-left text-[11px] border-collapse">
+                            <thead>
+                              <tr className="bg-gray-50/80 text-gray-400 uppercase font-black border-b border-gray-200 text-[9px]">
+                                <th className="px-3 py-2">REEL</th>
+                                <th className="px-3 py-2 text-center">WEIGHT (KG)</th>
+                                <th className="px-3 py-2 text-center">WIDTH (CM)</th>
+                                <th className="px-3 py-2">LOCATION</th>
+                                <th className="px-3 py-2 text-right">AVAILABLE (KG)</th>
+                                <th className="px-3 py-2 text-center">STATUS</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 font-semibold text-gray-700">
+                              <tr className="hover:bg-gray-50/50">
+                                <td className="px-3 py-2 font-bold text-gray-900">R-1</td>
+                                <td className="px-3 py-2 text-center">200</td>
+                                <td className="px-3 py-2 text-center">57</td>
+                                <td className="px-3 py-2">Asha &gt; Lower Left Rack</td>
+                                <td className="px-3 py-2 text-right font-black text-emerald-600">200</td>
+                                <td className="px-3 py-2 text-center">
+                                  <span className="text-[8.5px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-black uppercase">AVAILABLE</span>
+                                </td>
+                              </tr>
+                              <tr className="hover:bg-gray-50/50">
+                                <td className="px-3 py-2 font-bold text-gray-900">R-2</td>
+                                <td className="px-3 py-2 text-center">70</td>
+                                <td className="px-3 py-2 text-center">58</td>
+                                <td className="px-3 py-2">Murali &gt; Top Rack</td>
+                                <td className="px-3 py-2 text-right font-black text-emerald-600">70</td>
+                                <td className="px-3 py-2 text-center">
+                                  <span className="text-[8.5px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-black uppercase">AVAILABLE</span>
+                                </td>
+                              </tr>
+                              <tr className="hover:bg-gray-50/50">
+                                <td className="px-3 py-2 font-bold text-gray-900">R-3</td>
+                                <td className="px-3 py-2 text-center">30</td>
+                                <td className="px-3 py-2 text-center">57</td>
+                                <td className="px-3 py-2">Asha &gt; Upper Left Rack</td>
+                                <td className="px-3 py-2 text-right font-black text-emerald-600">30</td>
+                                <td className="px-3 py-2 text-center">
+                                  <span className="text-[8.5px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-black uppercase">AVAILABLE</span>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Location Summary Section */}
+                        <div className="space-y-2 pt-2">
+                          <h4 className="text-[11px] font-bold text-gray-800">Location Summary (By Weight)</h4>
+                          <div className="space-y-1.5 text-[11px] font-medium text-gray-700">
+                            <div className="flex justify-between items-center py-1 border-b border-gray-100">
+                              <span className="font-bold text-gray-800">Asha &gt; Lower Left Rack</span>
+                              <span className="font-black text-gray-900">200 KG</span>
+                            </div>
+                            <div className="flex justify-between items-center py-1 border-b border-gray-100">
+                              <span className="font-bold text-gray-800">Asha &gt; Upper Left Rack</span>
+                              <span className="font-black text-gray-900">30 KG</span>
+                            </div>
+                            <div className="flex justify-between items-center py-1 border-b border-gray-100">
+                              <span className="font-bold text-gray-800">Murali &gt; Top Rack</span>
+                              <span className="font-black text-gray-900">70 KG</span>
+                            </div>
+                            <div className="flex justify-between items-center pt-2 font-bold">
+                              <span className="text-gray-500">Total Available</span>
+                              <span className="text-emerald-600 font-black text-xs">{(selectedLot.onHand || 300).toLocaleString()} KG</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="pt-2">
+                  {/* Bottom Lot History Button */}
+                  <div className="p-4 border-t border-gray-200 bg-gray-50/50">
                     <button
                       onClick={() => {
                         setSelectedDetailLot(selectedLot);
                         setActiveSubPage('details');
+                        setShowLotDrawer(false);
                       }}
-                      className="w-full py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl text-xs font-bold transition-all shadow-3xs flex items-center justify-center gap-1.5"
+                      className="w-full py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 rounded-xl text-xs font-bold transition-all shadow-3xs flex items-center justify-center gap-2"
                     >
-                      View Lot Details <ArrowRight className="w-4 h-4" />
+                      <Eye className="w-3.5 h-3.5" /> View Full Lot History
                     </button>
                   </div>
                 </div>
-              )}
-
-              {/* QUICK ACTIONS */}
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 space-y-3.5">
-                <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider pb-2 border-b">
-                  Quick Actions
-                </h3>
-                <div className="space-y-2 text-xs font-bold text-gray-700">
-                  <button
-                    className="w-full py-2.5 bg-gray-50 border border-gray-200 hover:bg-gray-100 rounded-xl transition-all shadow-3xs flex items-center gap-3 px-4 text-left"
-                  >
-                    <span className="p-1 bg-green-50 text-green-700 rounded border border-green-200">
-                      <Plus className="w-3.5 h-3.5" />
-                    </span>
-                    Stock In (Add)
-                  </button>
-                  <button
-                    onClick={() => selectedLot && handleOpenTransferModal(selectedLot)}
-                    disabled={!selectedLot}
-                    className="w-full py-2.5 bg-gray-50 border border-gray-200 hover:bg-gray-100 rounded-xl transition-all shadow-3xs flex items-center gap-3 px-4 text-left disabled:opacity-50"
-                  >
-                    <span className="p-1 bg-blue-50 text-blue-700 rounded border border-blue-200">
-                      <ArrowRightLeft className="w-3.5 h-3.5" />
-                    </span>
-                    Move Stock
-                  </button>
-                  <button
-                    className="w-full py-2.5 bg-gray-50 border border-gray-200 hover:bg-gray-100 rounded-xl transition-all shadow-3xs flex items-center gap-3 px-4 text-left"
-                  >
-                    <span className="p-1 bg-purple-50 text-purple-700 rounded border border-purple-200">
-                      <Layers className="w-3.5 h-3.5" />
-                    </span>
-                    Convert / Use Stock
-                  </button>
-                  <button
-                    className="w-full py-2.5 bg-gray-50 border border-gray-200 hover:bg-gray-100 rounded-xl transition-all shadow-3xs flex items-center gap-3 px-4 text-left"
-                  >
-                    <span className="p-1 bg-amber-50 text-amber-700 rounded border border-amber-200">
-                      <RefreshCw className="w-3.5 h-3.5" />
-                    </span>
-                    Lot History
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Footer info box */}
-          <div className="bg-blue-50/50 p-4 border border-blue-150 rounded-2xl space-y-2 text-xs">
-            <h4 className="font-black text-blue-900 flex items-center gap-1.5">
-              <HelpCircle className="w-4.5 h-4.5 text-blue-600 shrink-0" />
-              About Batch Stock / Lot Inventory
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5 font-semibold text-blue-700 text-[11px]">
-              <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
-                Stock is tracked lot-wise for accuracy.
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
-                You can move stock between locations.
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
-                Reels are not numbered. We track by lot, reels count and KG.
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
-                Use "Convert / Use Stock" to consume this lot in production.
-              </div>
-            </div>
-          </div>
+              );
+            })()}
+          </Drawer>
         </div>
       )}
 
@@ -1192,6 +1437,7 @@ const BatchStockV2: React.FC = () => {
           </div>
         );
       })()}
+      </div>
     </div>
   );
 };

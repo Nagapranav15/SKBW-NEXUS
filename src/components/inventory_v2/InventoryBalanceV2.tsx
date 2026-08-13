@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Package, Search, RefreshCw, Coins, ArrowRightLeft, Layers, CheckCircle } from 'lucide-react';
+import { Package, Search, RefreshCw, Coins, ArrowRightLeft, Layers, CheckCircle, ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getBalancesV2 } from '../../api/mfgApiV2';
+import { formatSkuName } from './SkuMasterV2';
 
 const InventoryBalanceV2: React.FC = () => {
   const { selectedCompany } = useAuth();
@@ -9,6 +10,18 @@ const InventoryBalanceV2: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+
+  const [sortField, setSortField] = useState<string>('skuName');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
 
   useEffect(() => {
     if (selectedCompany?._id) {
@@ -28,6 +41,12 @@ const InventoryBalanceV2: React.FC = () => {
     }
   };
 
+  const getCategoryCost = (category: string) => {
+    if (category === 'Raw Material') return 45;
+    if (category === 'Semi Finished') return 25;
+    return 60;
+  };
+
   const filteredBalances = balances.filter(b => {
     const term = search.toLowerCase();
     return (
@@ -37,16 +56,53 @@ const InventoryBalanceV2: React.FC = () => {
     );
   });
 
-  const totalValue = filteredBalances.reduce((sum, b) => {
-    const cost = b.sku?.category === 'Raw Material' ? 45 : b.sku?.category === 'Semi Finished' ? 25 : 60;
+  const sortedBalances = [...filteredBalances].sort((a, b) => {
+    let valA: any = '';
+    let valB: any = '';
+
+    const costA = getCategoryCost(a.sku?.category);
+    const costB = getCategoryCost(b.sku?.category);
+    const reservedA = Math.round(a.onHand * 0.1);
+    const reservedB = Math.round(b.onHand * 0.1);
+
+    if (sortField === 'skuName') {
+      valA = a.sku?.name || '';
+      valB = b.sku?.name || '';
+    } else if (sortField === 'category') {
+      valA = a.sku?.category || '';
+      valB = b.sku?.category || '';
+    } else if (sortField === 'location') {
+      valA = a.location?.name || '';
+      valB = b.location?.name || '';
+    } else if (sortField === 'availableQty') {
+      valA = a.onHand - reservedA;
+      valB = b.onHand - reservedB;
+    } else if (sortField === 'reservedQty') {
+      valA = reservedA;
+      valB = reservedB;
+    } else if (sortField === 'onHandQty') {
+      valA = a.onHand;
+      valB = b.onHand;
+    } else if (sortField === 'cost') {
+      valA = costA;
+      valB = costB;
+    } else if (sortField === 'totalValue') {
+      valA = a.onHand * costA;
+      valB = b.onHand * costB;
+    }
+
+    if (typeof valA === 'number' && typeof valB === 'number') {
+      return sortOrder === 'asc' ? valA - valB : valB - valA;
+    }
+    valA = valA.toString().toLowerCase();
+    valB = valB.toString().toLowerCase();
+    return sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+  });
+
+  const totalValue = sortedBalances.reduce((sum, b) => {
+    const cost = getCategoryCost(b.sku?.category);
     return sum + (b.onHand * cost);
   }, 0);
-
-  const getCategoryCost = (category: string) => {
-    if (category === 'Raw Material') return 45;
-    if (category === 'Semi Finished') return 25;
-    return 60;
-  };
 
   return (
     <div className="space-y-6">
@@ -104,34 +160,50 @@ const InventoryBalanceV2: React.FC = () => {
           <div className="flex items-center justify-center h-64">
             <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : filteredBalances.length > 0 ? (
+        ) : sortedBalances.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="bg-gray-50 text-gray-500 uppercase font-bold border-b border-gray-100">
-                  <th className="px-6 py-3">SKU Details</th>
-                  <th className="px-6 py-3 text-center">Category</th>
-                  <th className="px-6 py-3">Location</th>
-                  <th className="px-6 py-3 text-right">Available Qty</th>
-                  <th className="px-6 py-3 text-right">Reserved Qty</th>
-                  <th className="px-6 py-3 text-right">On Hand Qty</th>
-                  <th className="px-6 py-3 text-right">Est. Cost / Unit</th>
-                  <th className="px-6 py-3 text-right">Total Value</th>
+                <tr className="bg-gray-50 text-gray-500 uppercase font-bold border-b border-gray-100 select-none">
+                  {[
+                    { label: 'SKU Details', key: 'skuName', align: 'text-left' },
+                    { label: 'Category', key: 'category', align: 'text-center' },
+                    { label: 'Location', key: 'location', align: 'text-left' },
+                    { label: 'Available Qty', key: 'availableQty', align: 'text-right' },
+                    { label: 'Reserved Qty', key: 'reservedQty', align: 'text-right' },
+                    { label: 'On Hand Qty', key: 'onHandQty', align: 'text-right' },
+                    { label: 'Est. Cost / Unit', key: 'cost', align: 'text-right' },
+                    { label: 'Total Value', key: 'totalValue', align: 'text-right' }
+                  ].map(col => (
+                    <th
+                      key={col.key}
+                      onClick={() => handleSort(col.key)}
+                      className={`px-6 py-3 ${col.align} cursor-pointer hover:bg-gray-100/50 transition-colors`}
+                    >
+                      <div className={`flex items-center space-x-1 ${col.align === 'text-center' ? 'justify-center' : col.align === 'text-right' ? 'justify-end' : ''}`}>
+                        <span>{col.label}</span>
+                        {sortField === col.key ? (
+                          sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5 inline text-blue-600" /> : <ChevronDown className="w-3.5 h-3.5 inline text-blue-600" />
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 inline text-gray-300 opacity-40 hover:opacity-100" />
+                        )}
+                      </div>
+                    </th>
+                  ))}
                   <th className="px-6 py-3 text-center">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100/70 text-gray-700">
-                {filteredBalances.map((b, i) => {
+                {sortedBalances.map((b, i) => {
                   const cost = getCategoryCost(b.sku?.category);
                   const val = b.onHand * cost;
-                  // Reserved is calculated dynamically or mocked as 0 for Week 1 foundation
                   const reserved = Math.round(b.onHand * 0.1); 
                   const available = b.onHand - reserved;
 
                   return (
                     <tr key={i} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-6 py-3.5">
-                        <p className="font-bold text-gray-900">{b.sku?.name}</p>
+                        <p className="font-bold text-gray-900">{formatSkuName(b.sku?.name || '')}</p>
                         <p className="font-mono text-[9px] text-gray-400 mt-0.5">{b.sku?.skuCode}</p>
                       </td>
                       <td className="px-6 py-3.5 text-center">

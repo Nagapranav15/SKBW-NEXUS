@@ -51,8 +51,7 @@ export const Drawer: React.FC<DrawerProps> = ({
   const maxWidthClass = sizeClasses[size] || size;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 overflow-hidden bg-gray-950/10 transition-opacity animate-in fade-in duration-200" onClick={onClose}></div>
+    <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden" role="dialog" aria-modal="true">
       <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
         <div className={`pointer-events-auto w-screen ${maxWidthClass} animate-in slide-in-from-right duration-200`}>
           <div className="flex h-full flex-col overflow-hidden bg-white shadow-2xl">

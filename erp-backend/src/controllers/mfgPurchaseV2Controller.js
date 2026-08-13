@@ -6,6 +6,7 @@ const WarehouseLocationV2 = require("../models/warehouseLocationV2Model");
 const InventoryLedger = require("../models/inventoryLedgerModelV2");
 const Sequence = require("../models/sequenceModel");
 const Transaction = require("../models/transactionModel");
+const ActivityLog = require("../models/activityLogModel");
 
 const toObjectId = (id) => {
   if (!id) return null;
@@ -201,6 +202,15 @@ exports.createPurchaseInvoice = async (req, res, next) => {
       source_type: "PURCHASE"
     });
     await financialTx.save();
+
+    ActivityLog.create({
+      action: "CREATE",
+      entityType: "purchase_invoice",
+      entityName: finalInvoiceNo,
+      details: `Purchase Batch '${finalInvoiceNo}' created for vendor '${vendor.firmName || vendor.ownerName}' (Amount: ₹${subTotal}).`,
+      performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
+      company: companyObjId
+    }).catch(e => console.error("ActivityLog error:", e));
 
     res.status(201).json(invoice);
   } catch (err) {
@@ -498,6 +508,15 @@ exports.editPurchaseInvoice = async (req, res, next) => {
 
     await invoice.save();
 
+    ActivityLog.create({
+      action: "UPDATE",
+      entityType: "PurchaseInvoiceV2",
+      entityName: invoice.invoiceNumber,
+      details: `Updated Purchase Batch '${invoice.invoiceNumber}' (${validatedItems.length} material lot(s), Total: ₹${newGrandTotal.toLocaleString('en-IN')}).`,
+      performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
+      company: companyObjId
+    }).catch(e => console.error("ActivityLog error:", e));
+
     res.json(invoice);
   } catch (err) {
     next(err);
@@ -545,6 +564,15 @@ exports.deletePurchaseInvoice = async (req, res, next) => {
 
     // Delete invoice document
     await PurchaseInvoiceV2.deleteOne({ _id: invoice._id });
+
+    ActivityLog.create({
+      action: "DELETE",
+      entityType: "PurchaseInvoiceV2",
+      entityName: invoice.invoiceNumber,
+      details: `Deleted Purchase Batch '${invoice.invoiceNumber}'.`,
+      performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
+      company: companyObjId
+    }).catch(e => console.error("ActivityLog error:", e));
 
     res.json({ msg: "Purchase invoice deleted successfully" });
   } catch (err) {

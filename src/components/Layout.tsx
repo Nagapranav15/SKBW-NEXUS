@@ -199,7 +199,7 @@ const Layout: React.FC = () => {
 
   // Inventory
   const inventoryV2Items = [
-    { label: 'Batch Stock / Lots', path: '/inventory-v2/batch-stock', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
+    { label: 'Stock', path: '/inventory-v2/batch-stock', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
     { label: 'Stock Ledger', path: '/inventory-v2/ledger?mode=stock', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
     { label: 'Warehouse Setup', path: '/inventory-v2/warehouse', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
   ];

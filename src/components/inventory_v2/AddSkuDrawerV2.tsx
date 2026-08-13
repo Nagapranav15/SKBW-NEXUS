@@ -326,12 +326,12 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
           if (form.title) parts.push(form.title);
           const formatType = form.paperType === 'Reels' ? 'Reel' : form.paperType === 'Sheets' ? 'Sheet' : '';
           if (formatType) parts.push(formatType);
-          if (form.gsm) parts.push(`${form.gsm}GSM`);
+          if (form.gsm) parts.push(`${form.gsm} GSM`);
           let sizeStr = '';
           if (form.width && form.length) {
-            sizeStr = `${form.width} * ${form.length}CM`;
+            sizeStr = `${form.width} x ${form.length} CM`;
           } else if (form.width) {
-            sizeStr = `${form.width}CM`;
+            sizeStr = `${form.width} CM`;
           }
           if (sizeStr) parts.push(sizeStr);
           setForm(prev => ({ ...prev, name: parts.join(' ') }));

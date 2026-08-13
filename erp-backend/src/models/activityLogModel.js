@@ -3,12 +3,10 @@ const mongoose = require("mongoose");
 const activityLogSchema = new mongoose.Schema({
   action: {
     type: String,
-    enum: ["CREATE", "UPDATE", "DELETE", "IMPORT"],
     required: true
   },
   entityType: {
     type: String,
-    enum: ["customer", "vendor", "agent", "route", "market", "transporter", "party", "other"],
     required: true
   },
   entityName: {
@@ -30,3 +28,4 @@ const activityLogSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 module.exports = mongoose.model("ActivityLog", activityLogSchema);
+

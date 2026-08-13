@@ -5,6 +5,7 @@ const InventoryLedgerV2 = require("../models/inventoryLedgerV2Model");
 const InventoryLedger = require("../models/inventoryLedgerModelV2");
 const Sequence = require("../models/sequenceModel");
 const Metadata = require("../models/metadataModel");
+const ActivityLog = require("../models/activityLogModel");
 
 const toObjectId = (id) => {
   if (!id) return null;
@@ -114,6 +115,14 @@ exports.createSku = async (req, res, next) => {
     });
 
     await newSku.save();
+    ActivityLog.create({
+      action: "CREATE",
+      entityType: "SkuV2",
+      entityName: newSku.skuCode,
+      details: `SKU Item '${newSku.name}' (${newSku.skuCode}) was created.`,
+      performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
+      company: toObjectId(company)
+    }).catch(e => console.error("ActivityLog error:", e));
     res.status(201).json(newSku);
   } catch (err) {
     next(err);
@@ -143,6 +152,19 @@ exports.updateSku = async (req, res, next) => {
       return res.status(400).json({ msg: `SKU Code '${skuCode}' already exists for this company` });
     }
 
+    const changes = [];
+    if (sku.name !== name) changes.push(`Name: '${sku.name}' → '${name}'`);
+    if (sku.skuCode !== skuCode) changes.push(`Code: '${sku.skuCode}' → '${skuCode}'`);
+    if (sku.category !== category) changes.push(`Category: '${sku.category}' → '${category}'`);
+    if (sku.unit !== unit) changes.push(`Unit: '${sku.unit}' → '${unit}'`);
+    if (sku.gsm !== (gsm ? Number(gsm) : undefined)) changes.push(`GSM: '${sku.gsm || ''}' → '${gsm || ''}'`);
+    if (sku.width !== (width ? Number(width) : undefined)) changes.push(`Width: '${sku.width || ''}' → '${width || ''}'`);
+    if (sku.brand !== (brand || "")) changes.push(`Brand: '${sku.brand || ''}' → '${brand || ''}'`);
+    if (sku.status !== (status || "Active")) changes.push(`Status: '${sku.status}' → '${status}'`);
+    if (sku.openingStock !== (openingStock !== undefined ? Number(openingStock) : sku.openingStock)) {
+      changes.push(`Opening Stock: '${sku.openingStock}' → '${openingStock}'`);
+    }
+
     sku.skuCode = skuCode;
     sku.name = name;
     sku.category = category;
@@ -168,6 +190,16 @@ exports.updateSku = async (req, res, next) => {
     }
 
     await sku.save();
+
+    ActivityLog.create({
+      action: "UPDATE",
+      entityType: "SkuV2",
+      entityName: sku.skuCode,
+      details: changes.length > 0 ? `Updated SKU '${sku.name}': ${changes.join(', ')}` : `Updated SKU '${sku.name}' specifications.`,
+      performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
+      company: toObjectId(company)
+    }).catch(e => console.error("ActivityLog error:", e));
+
     res.json(sku);
   } catch (err) {
     next(err);
@@ -199,12 +231,32 @@ exports.deleteSku = async (req, res, next) => {
         });
       }
       await SkuV2.deleteOne({ _id: skuObjId });
+
+      ActivityLog.create({
+        action: "PERMANENT_DELETE",
+        entityType: "SkuV2",
+        entityName: sku.skuCode,
+        details: `Permanently deleted SKU '${sku.name}' (${sku.skuCode}).`,
+        performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
+        company: companyObjId
+      }).catch(e => console.error("ActivityLog error:", e));
+
       return res.json({ msg: "SKU permanently deleted successfully" });
     }
 
     sku.isDeleted = true;
     sku.status = "Inactive";
     await sku.save();
+
+    ActivityLog.create({
+      action: "DELETE",
+      entityType: "SkuV2",
+      entityName: sku.skuCode,
+      details: `Moved SKU '${sku.name}' (${sku.skuCode}) to recycle bin.`,
+      performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
+      company: companyObjId
+    }).catch(e => console.error("ActivityLog error:", e));
+
     res.json({ msg: "SKU moved to recycle bin successfully" });
   } catch (err) {
     next(err);
@@ -272,6 +324,17 @@ exports.bulkImportSkus = async (req, res, next) => {
     }
 
     const totalProcessed = createdCount + modifiedCount;
+
+    if (totalProcessed > 0) {
+      ActivityLog.create({
+        action: "IMPORT",
+        entityType: "SkuV2",
+        entityName: "Bulk Import",
+        details: `Bulk imported ${totalProcessed} SKUs (${createdCount} created, ${modifiedCount} updated).`,
+        performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
+        company: companyObjId
+      }).catch(e => console.error("ActivityLog error:", e));
+    }
 
     res.json({
       msg: `Bulk import completed: ${createdCount} created, ${modifiedCount} updated.`,

@@ -969,22 +969,21 @@ exports.getParties = async (req, res) => {
     // This reduces network transfer from ~2.2MB to ~22KB per page (100x reduction)
     const listProjection = 'firmName ownerName contactName phone altPhone city district state pincode route agentAssigned status outstandingBalance outstanding code type company companies tags createdAt preferredTransport assignedMarket email whatsapp gstNumber creditLimit creditDays openingBalance contactPersons isDeleted vendorType doorNo streetName address1 area landmark aadharNumber remarks gpsLocation';
 
-    const [rawParties, total] = await Promise.all([
-      Party.find(filter).select(listProjection).sort(sortObj).skip(skip).limit(limit).lean(),
-      Party.countDocuments(filter)
-    ]);
-
     let parties;
     if (req.query.light === 'true') {
+      const [rawParties, total] = await Promise.all([
+        Party.find(filter).select(listProjection).sort(sortObj).skip(skip).limit(limit).lean(),
+        Party.countDocuments(filter)
+      ]);
       parties = rawParties;
+      return res.json({ parties, total, page, limit });
     } else if (req.query.type === 'market') {
-      const cityNames = rawParties.map(p => p.firmName).filter(Boolean);
-      const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-      const cityRegexes = cityNames.map(name => new RegExp('^' + escapeRegex(name) + '$', 'i'));
+      const allMarkets = await Party.find(filter).select(listProjection).lean();
+      const total = allMarkets.length;
+      
       const matchQuery = {
         type: 'customer',
-        isDeleted: { $ne: true },
-        city: { $in: cityRegexes }
+        isDeleted: { $ne: true }
       };
       if (companyId) {
         try {
@@ -1013,7 +1012,8 @@ exports.getParties = async (req, res) => {
       stats.forEach(s => {
         statsMap[s._id] = s;
       });
-      parties = rawParties.map(p => {
+
+      let fullList = allMarkets.map(p => {
         const partyObj = { ...p };
         const cityLower = (partyObj.firmName || '').toLowerCase();
         const cityStats = statsMap[cityLower] || { customerCount: 0, activeCustomersCount: 0, inactiveCustomersCount: 0, outstanding: 0 };
@@ -1024,7 +1024,31 @@ exports.getParties = async (req, res) => {
         partyObj.outstandingBalance = cityStats.outstanding;
         return partyObj;
       });
-    } else if (req.query.type === 'transporter') {
+
+      const isOutstandingSort = req.query.sortBy && (req.query.sortBy.includes('outstanding') || req.query.sortBy.includes('outstandingBalance'));
+      if (isOutstandingSort) {
+        const order = req.query.sortOrder === 'asc' ? 1 : -1;
+        fullList.sort((a, b) => ((a.outstandingBalance || 0) - (b.outstandingBalance || 0)) * order);
+      } else {
+        const sortBy = req.query.sortBy || 'firmName';
+        const order = req.query.sortOrder === 'desc' ? -1 : 1;
+        fullList.sort((a, b) => {
+          const valA = (a[sortBy] ?? '').toString();
+          const valB = (b[sortBy] ?? '').toString();
+          return valA.localeCompare(valB) * order;
+        });
+      }
+
+      parties = fullList.slice(skip, skip + limit);
+      return res.json({ parties, total, page, limit });
+    }
+
+    const [rawParties, total] = await Promise.all([
+      Party.find(filter).select(listProjection).sort(sortObj).skip(skip).limit(limit).lean(),
+      Party.countDocuments(filter)
+    ]);
+
+    if (req.query.type === 'transporter') {
       const transporterNames = rawParties.map(p => p.firmName).filter(Boolean);
       const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
       const transporterRegexes = transporterNames.map(name => new RegExp('^' + escapeRegex(name) + '$', 'i'));

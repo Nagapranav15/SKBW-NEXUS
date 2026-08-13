@@ -9,6 +9,18 @@ import { showToast } from '../ui/Toast';
 import * as XLSX from 'xlsx';
 import Modal from '../ui/Modal';
 import Drawer from '../ui/Drawer';
+// Helper to format SKU Name with clean spacing (e.g. MAPLITO 52 GSM 57 x 70 CM (UR))
+export const formatSkuName = (name: string): string => {
+  if (!name) return '';
+  return name
+    .replace(/(\d+)\s*GSM/gi, '$1 GSM')
+    .replace(/(\d+(?:\.\d+)?)\s*[xX\*]\s*(\d+(?:\.\d+)?)\s*CM/gi, '$1 x $2 CM')
+    .replace(/(\d+(?:\.\d+)?)\s*[xX\*]\s*(\d+(?:\.\d+)?)(?!\s*CM)/gi, '$1 x $2')
+    .replace(/(\d+(?:\.\d+)?)\s*CM(?!\w)/gi, '$1 CM')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
 // Helper to format Size
 const formatSize = (s: SkuV2) => {
   let w = s.width;
@@ -21,11 +33,11 @@ const formatSize = (s: SkuV2) => {
     }
   }
   if (w && l) {
-    return `${w} × ${l} cm`;
+    return `${w} x ${l} CM`;
   } else if (w) {
-    return `${w} cm (W)`;
+    return `${w} CM (W)`;
   } else if (l) {
-    return `${l} cm (L)`;
+    return `${l} CM (L)`;
   }
   return '—';
 };
@@ -308,7 +320,7 @@ const SkuMasterV2: React.FC = () => {
   useEffect(() => {
     if (selectedCompany?._id) {
       getSkusV2(selectedCompany._id)
-        .then(data => setAllSkus(data))
+        .then(data => setAllSkus((data || []).map(s => ({ ...s, name: formatSkuName(s.name) }))))
         .catch(err => console.error('Failed to load total counts', err));
     }
   }, [selectedCompany?._id]);
@@ -337,7 +349,7 @@ const SkuMasterV2: React.FC = () => {
       
       // Reload stats cards silently
       getSkusV2(selectedCompany._id)
-        .then(data => setAllSkus(data))
+        .then(data => setAllSkus((data || []).map(s => ({ ...s, name: formatSkuName(s.name) }))))
         .catch(() => {});
     }, 5000);
 
@@ -353,9 +365,13 @@ const SkuMasterV2: React.FC = () => {
         debouncedSearch || undefined,
         statusFilter || undefined
       );
-      setSkus(data);
+      const formattedData = (data || []).map(item => ({
+        ...item,
+        name: formatSkuName(item.name)
+      }));
+      setSkus(formattedData);
       if (!categoryFilter && !debouncedSearch && !statusFilter) {
-        setAllSkus(data);
+        setAllSkus(formattedData);
       }
     } catch (e) {
       console.error(e);
@@ -623,6 +639,7 @@ const SkuMasterV2: React.FC = () => {
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
@@ -633,21 +650,21 @@ const SkuMasterV2: React.FC = () => {
         }
 
         const data = new Uint8Array(arrayBuffer);
-        const wb = XLSX.read(data, { type: 'array' });
+        const wb = XLSX.read(data, { type: 'array', raw: false });
         if (!wb.SheetNames || wb.SheetNames.length === 0) {
           showToast('No sheets found in file.', 'error');
           return;
         }
 
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const rawData = XLSX.utils.sheet_to_json(ws) as any[];
+        const rawData = XLSX.utils.sheet_to_json(ws, { defval: '' }) as any[];
 
         if (rawData.length === 0) {
           showToast('No data rows found in file.', 'error');
           return;
         }
 
-        // Normalize Excel headers to lowercase alphanumeric keys only
+        // Normalize Excel/CSV headers to lowercase alphanumeric keys only
         const normalizedData = rawData.map(row => {
           const norm: Record<string, any> = {};
           Object.entries(row).forEach(([k, v]) => {
@@ -658,10 +675,15 @@ const SkuMasterV2: React.FC = () => {
         });
 
         const skusToImport = normalizedData.map((item, index) => {
-          const rawName = String(item['skuname'] || item['name'] || item['itemname'] || item['title'] || '').trim();
-          let rawCode = String(item['skucode'] || item['code'] || item['itemcode'] || '').trim();
+          const rawName = formatSkuName(String(
+            item['skuname'] || item['name'] || item['itemname'] || item['title'] || item['item'] || item['description'] || item['productname'] || item['product'] || ''
+          ).trim());
+
+          let rawCode = String(
+            item['skucode'] || item['code'] || item['itemcode'] || item['sku'] || item['id'] || item['itemno'] || item['itemnumber'] || item['skuno'] || ''
+          ).trim();
           
-          let rawCat = String(item['category'] || 'Raw Material').trim();
+          let rawCat = String(item['category'] || item['cat'] || item['group'] || item['itemcategory'] || 'Raw Material').trim();
           const lowerCat = rawCat.toLowerCase();
           if (lowerCat.includes('finished') && !lowerCat.includes('semi')) rawCat = 'Finished Goods';
           else if (lowerCat.includes('semi')) rawCat = 'Semi Finished';
@@ -673,32 +695,52 @@ const SkuMasterV2: React.FC = () => {
             rawCode = `${prefix}-${cleanName}-${Date.now().toString().slice(-4)}${index}`;
           }
 
-          let rawPaper = String(item['papertype'] || 'None').trim();
+          let rawPaper = String(item['papertype'] || item['paper'] || item['type'] || 'None').trim();
           if (rawPaper.toLowerCase().includes('sheet')) rawPaper = 'Sheets';
           else if (rawPaper.toLowerCase().includes('reel')) rawPaper = 'Reels';
+
+          // Extract GSM, Width, Length if missing from columns but present in SKU name
+          let gsmVal = (item['gsm'] !== undefined && item['gsm'] !== '') ? parseFloat(String(item['gsm']).replace(/[^0-9.]/g, '')) : undefined;
+          if ((gsmVal === undefined || isNaN(gsmVal)) && rawName) {
+            const gsmMatch = rawName.match(/(\d+)\s*GSM/i);
+            if (gsmMatch) gsmVal = parseFloat(gsmMatch[1]);
+          }
+
+          let widthVal = (item['width'] || item['widthcm'] || item['w'] || item['size']) ? parseFloat(String(item['width'] || item['widthcm'] || item['w'] || item['size']).replace(/[^0-9.]/g, '')) : undefined;
+          let lengthVal = (item['length'] || item['lengthcm'] || item['l']) ? parseFloat(String(item['length'] || item['lengthcm'] || item['l']).replace(/[^0-9.]/g, '')) : undefined;
+
+          if ((!widthVal || !lengthVal) && rawName) {
+            const sizeMatch = rawName.match(/(\d+(?:\.\d+)?)\s*[xX\*]\s*(\d+(?:\.\d+)?)/i);
+            if (sizeMatch) {
+              if (!widthVal) widthVal = parseFloat(sizeMatch[1]);
+              if (!lengthVal) lengthVal = parseFloat(sizeMatch[2]);
+            }
+          }
+
+          const parsedUnit = String(item['primaryunit'] || item['unit'] || item['uom'] || item['unitofmeasure'] || 'kg').trim();
 
           return {
             skuCode: rawCode,
             name: rawName,
             category: rawCat,
             paperType: rawPaper,
-            unit: String(item['primaryunit'] || item['unit'] || 'kg').trim(),
+            unit: parsedUnit || 'kg',
             altUnit: item['alternateunit'] || item['altunit'] || undefined,
-            altUnitConversion: item['conversionrate'] || item['altunitconversion'] ? Number(item['conversionrate'] || item['altunitconversion']) : undefined,
-            gsm: item['gsm'] ? Number(item['gsm']) : undefined,
-            width: item['width'] || item['widthcm'] ? Number(item['width'] || item['widthcm']) : undefined,
-            length: item['length'] || item['lengthcm'] ? Number(item['length'] || item['lengthcm']) : undefined,
-            pages: item['pages'] || item['pagesstdsheets'] || item['stdsheets'] || item['sheetsream'] ? Number(item['pages'] || item['pagesstdsheets'] || item['stdsheets'] || item['sheetsream']) : undefined,
-            reamWeight: item['reamweight'] || item['reamweightkg'] ? Number(item['reamweight'] || item['reamweightkg']) : undefined,
-            ruleType: item['ruletype'] || undefined,
+            altUnitConversion: (item['conversionrate'] || item['altunitconversion']) ? Number(item['conversionrate'] || item['altunitconversion']) : undefined,
+            gsm: gsmVal && !isNaN(gsmVal) ? gsmVal : undefined,
+            width: widthVal && !isNaN(widthVal) ? widthVal : undefined,
+            length: lengthVal && !isNaN(lengthVal) ? lengthVal : undefined,
+            pages: (item['pages'] || item['pagesstdsheets'] || item['stdsheets'] || item['sheetsream'] || item['sheets']) ? Number(item['pages'] || item['pagesstdsheets'] || item['stdsheets'] || item['sheetsream'] || item['sheets']) : undefined,
+            reamWeight: (item['reamweight'] || item['reamweightkg'] || item['ream']) ? Number(item['reamweight'] || item['reamweightkg'] || item['ream']) : undefined,
+            ruleType: item['ruletype'] || item['ruling'] || undefined,
             brand: String(item['brand'] || '').trim(),
             title: String(item['title'] || '').trim(),
             group: String(item['group'] || '').trim(),
-            openingStock: item['openingstock'] || item['stock'] || item['initialstock'] ? Number(item['openingstock'] || item['stock'] || item['initialstock']) : 0,
-            booksGbl: item['books'] || item['booksgbl'] || item['gbl'] ? Number(item['books'] || item['booksgbl'] || item['gbl']) : undefined,
+            openingStock: (item['openingstock'] || item['openingqty'] || item['stock'] || item['initialstock'] || item['qty'] || item['quantity']) ? Number(item['openingstock'] || item['openingqty'] || item['stock'] || item['initialstock'] || item['qty'] || item['quantity']) : 0,
+            booksGbl: (item['books'] || item['booksgbl'] || item['gbl']) ? Number(item['books'] || item['booksgbl'] || item['gbl']) : undefined,
             status: String(item['status'] || 'Active').trim()
           };
-        }).filter(s => s.skuCode && s.name);
+        }).filter(s => s.name);
 
         if (skusToImport.length === 0) {
           showToast('No valid SKU items found. Please check SKU Code and SKU Name headers.', 'error');
@@ -726,19 +768,28 @@ const SkuMasterV2: React.FC = () => {
       'SKU Code': s.skuCode,
       'SKU Name': s.name,
       'Category': s.category,
-      'Unit': s.unit,
+      'Paper Type': s.paperType || 'None',
+      'Primary Unit': s.unit,
+      'Alternate Unit': s.altUnit || '',
+      'Conversion Rate': s.altUnitConversion || '',
+      'GSM': s.gsm !== undefined ? s.gsm : '',
+      'Width (cm)': s.width !== undefined ? s.width : '',
+      'Length (cm)': s.length !== undefined ? s.length : '',
+      'Pages / Std Sheets': (s as any).pages !== undefined ? (s as any).pages : '',
+      'Ream Weight (kg)': (s as any).reamWeight !== undefined ? (s as any).reamWeight : '',
+      'Rule Type': s.ruleType || '',
+      'Brand': s.brand || '',
+      'Title': s.title || '',
+      'Group': s.group || '',
       'Opening Stock': s.openingStock || 0,
-      'GSM': s.gsm || 'N/A',
-      'Width': s.width || 'N/A',
-      'Length': s.length || 'N/A',
-      'Rule Type': s.ruleType || 'N/A',
+      'Books/GBL': (s as any).booksGbl !== undefined ? (s as any).booksGbl : '',
       'Status': s.status
     }));
 
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'SKUs V2');
-    XLSX.writeFile(wb, `SKU_Master_V2_${selectedCompany?.name || 'export'}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, 'SKU_Master');
+    XLSX.writeFile(wb, `SKU_Master_${selectedCompany?.name || 'export'}.xlsx`);
   };
 
   const handleBulkImport = async (e: React.FormEvent) => {
@@ -1722,8 +1773,8 @@ const SkuMasterV2: React.FC = () => {
                           </td>
                         )}
                         {visibleColumns.name && (
-                          <td className="px-3.5 py-2.5 whitespace-nowrap text-[13.5px] font-semibold text-gray-800 uppercase">
-                            {s.name}
+                          <td className="px-3.5 py-2.5 whitespace-nowrap text-[13.5px] font-semibold text-gray-800">
+                            {formatSkuName(s.name)}
                           </td>
                         )}
                         {visibleColumns.category && (

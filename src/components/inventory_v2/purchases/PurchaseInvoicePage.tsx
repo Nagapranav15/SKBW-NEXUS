@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, X, FileText, Trash2, Calendar, Coins, Download, Upload, HelpCircle, Check, Eye, MoreVertical, Edit, Printer, ArrowRight, Layers, IndianRupee, Clock, AlertTriangle, CheckCircle, Settings, Trash, RefreshCcw, User, MapPin as MapPinIcon } from 'lucide-react';
+import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ArrowUpDown, X, FileText, Trash2, Calendar, Coins, Download, Upload, HelpCircle, Check, Eye, MoreVertical, Edit, Printer, ArrowRight, Layers, IndianRupee, Clock, AlertTriangle, CheckCircle, Settings, Trash, RefreshCcw, User, MapPin as MapPinIcon } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { getActivityLogs, createActivityLog } from '../../../api/activityLogApi';
 import { getParties } from '../../../api/partyApi';
 import { getSkusV2, getWarehouseHierarchyV2, recordTransferV2, SkuV2, WarehouseLocationV2, getBalancesV2, getNextInvoiceNumberV2 } from '../../../api/mfgApiV2';
+import { formatSkuName } from '../SkuMasterV2';
 import { 
   getPurchaseInvoicesV2, 
   createPurchaseInvoiceV2, 
@@ -36,6 +37,18 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
   onEditInvoice,
   onDeleteInvoice
 }) => {
+  const [sortField, setSortField] = useState<string>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64 bg-white rounded-xl border border-gray-100 shadow-xs">
@@ -44,27 +57,94 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
     );
   }
 
+  const processedInvoices = invoices.map(inv => {
+    const supplierName = typeof inv.vendorId === 'object' && inv.vendorId !== null
+      ? (inv.vendorId.firmName || inv.vendorId.ownerName || 'Unknown') 
+      : 'Supplier';
+    
+    let totalReelsCount = 0;
+    let totalReamsCount = 0;
+    let totalSheetsCount = 0;
+    let totalKgWeight = 0;
+
+    inv.items?.forEach((item) => {
+      const resolvedSku = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null;
+      const paperType = resolvedSku?.paperType;
+      if (paperType === 'Sheets') {
+        const stdSheets = resolvedSku?.pages || 500;
+        const reamWeight = item.reamWeight || resolvedSku?.reamWeight || getFallbackReamWeight(resolvedSku) || 0;
+        const itemReams = (item.quantity || 0) / stdSheets;
+        totalReamsCount += itemReams;
+        totalSheetsCount += item.quantity || 0;
+        totalKgWeight += itemReams * reamWeight;
+      } else {
+        totalReelsCount += item.reels?.length || 0;
+        totalKgWeight += item.quantity || 0;
+      }
+    });
+
+    return {
+      ...inv,
+      supplierName,
+      lotsCount: inv.items?.length || 0,
+      totalReelsCount,
+      totalReamsCount,
+      totalKgWeight,
+      subTotal: inv.subTotal || 0,
+      date: inv.createdAt ? new Date(inv.createdAt).getTime() : 0
+    };
+  });
+
+  const sortedInvoices = [...processedInvoices].sort((a: any, b: any) => {
+    let valA = a[sortField] ?? '';
+    let valB = b[sortField] ?? '';
+
+    if (typeof valA === 'number' && typeof valB === 'number') {
+      return sortOrder === 'asc' ? valA - valB : valB - valA;
+    }
+    valA = valA.toString().toLowerCase();
+    valB = valB.toString().toLowerCase();
+    return sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+  });
+
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-xs overflow-hidden">
       {invoices.length > 0 ? (
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 text-[13px]">
             <thead>
-              <tr className="bg-gray-50 text-gray-400 uppercase font-bold text-xs tracking-wider select-none">
-                <th className="px-3.5 py-2 text-left">Batch No.</th>
-                <th className="px-3.5 py-2 text-left">Date</th>
-                <th className="px-3.5 py-2 text-left">Supplier</th>
-                <th className="px-3.5 py-2 text-left">Material Lots</th>
-                <th className="px-3.5 py-2 text-center">Total Reels</th>
-                <th className="px-3.5 py-2 text-center">Total Reams</th>
-                <th className="px-3.5 py-2 text-left">Total Qty</th>
-                <th className="px-3.5 py-2 text-left">Total Value</th>
-                <th className="px-3.5 py-2 text-center">Status</th>
+              <tr className="bg-gray-50 text-gray-400 uppercase font-bold text-xs tracking-wider select-none whitespace-nowrap">
+                {[
+                  { label: 'Batch No.', key: 'invoiceNumber', align: 'text-left' },
+                  { label: 'Date', key: 'date', align: 'text-left' },
+                  { label: 'Supplier', key: 'supplierName', align: 'text-left' },
+                  { label: 'Material Lots', key: 'lotsCount', align: 'text-left' },
+                  { label: 'Total Reels', key: 'totalReelsCount', align: 'text-center' },
+                  { label: 'Total Reams', key: 'totalReamsCount', align: 'text-center' },
+                  { label: 'Total Qty', key: 'totalKgWeight', align: 'text-left' },
+                  { label: 'Total Value', key: 'subTotal', align: 'text-left' },
+                  { label: 'Status', key: 'status', align: 'text-center' }
+                ].map(col => (
+                  <th
+                    key={col.key}
+                    onClick={() => handleSort(col.key)}
+                    className={`px-3.5 py-2 ${col.align} cursor-pointer hover:bg-gray-100/50 transition-colors select-none`}
+                  >
+                    <div className={`flex items-center space-x-1 ${col.align === 'text-center' ? 'justify-center' : ''}`}>
+                      <span>{col.label}</span>
+                      {sortField === col.key ? (
+                        sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5 inline text-blue-600" /> : <ChevronDown className="w-3.5 h-3.5 inline text-blue-600" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 inline text-gray-300 opacity-40 hover:opacity-100" />
+                      )}
+                    </div>
+                  </th>
+                ))}
                 <th className="px-3.5 py-2 text-center w-24">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-gray-700 font-medium bg-white">
-              {invoices.map((inv) => {
+              {sortedInvoices.map((inv) => {
                 const supplierName = typeof inv.vendorId === 'object' && inv.vendorId !== null
                   ? (inv.vendorId.firmName || inv.vendorId.ownerName || 'Unknown') 
                   : 'Supplier';
@@ -100,10 +180,10 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
                 return (
                   <tr 
                     key={inv._id} 
-                    className="hover:bg-gray-50 border-b border-gray-100/60 transition-colors cursor-pointer text-gray-700" 
+                    className="hover:bg-gray-50 border-b border-gray-100/60 transition-colors cursor-pointer text-gray-700 whitespace-nowrap" 
                     onClick={() => onViewDetails(inv)}
                   >
-                    <td className="px-3.5 py-2 font-bold text-blue-600 text-[13.5px]">{inv.invoiceNumber}</td>
+                    <td className="px-3.5 py-2 font-bold text-blue-600 text-[13.5px] whitespace-nowrap font-mono">{inv.invoiceNumber}</td>
                     <td className="px-3.5 py-2 text-gray-500 font-semibold text-[13px]">
                       {inv.createdAt ? new Date(inv.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                     </td>
@@ -1086,7 +1166,7 @@ const PurchaseInvoicePage: React.FC = () => {
   return (
     <div className="p-4 space-y-6">
       {/* Main Content Layout */}
-      <div className={`transition-all duration-300 ${activeSubPage === 'new' || (activeSubPage === 'details' && selectedInvoice) ? 'lg:mr-[640px]' : ''}`}>
+      <div>
         {/* ── SUB-PAGE 3: MAIN LIST VIEW ──────────────────────────────────────── */}
         <div className="space-y-6">
           {/* Top Bar with Navigation Back link and user profile pill (matching Customer module exactly) */}
@@ -1284,21 +1364,6 @@ const PurchaseInvoicePage: React.FC = () => {
                   <Download className="w-4 h-4 text-gray-505" />
                   <span>Import Excel</span>
                 </button>
-
-                <button
-                  onClick={() => {
-                    setSearch('');
-                    setVendorFilter('');
-                    setStatusFilter('');
-                    setStartDate('2024-06-01');
-                    setEndDate('2024-06-30');
-                    setPage(1);
-                  }}
-                  className="p-2 text-gray-400 hover:text-blue-600 bg-gray-50 hover:bg-gray-200 rounded-xl transition-all"
-                  title="Reset Filters"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                </button>
               </div>
             </div>
 
@@ -1368,28 +1433,22 @@ const PurchaseInvoicePage: React.FC = () => {
         </div>
       </div>
 
-      {/* ── SUB-PAGE 1: NEW/EDIT FORM SIDE DRAWER ─────────────────────────────── */}
-      {activeSubPage === 'new' && (
-        <div className="fixed top-0 right-0 h-full w-full sm:w-[640px] bg-white shadow-2xl border-l border-gray-200 z-[60] flex flex-col animate-in slide-in-from-right duration-250 font-sans text-xs !mt-0">
-          {/* Header */}
-          <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-bold text-gray-900">
-                {isEditing ? 'Edit Purchase Batch' : 'New Purchase Batch'}
-              </h2>
-              <p className="text-[10px] text-gray-500 mt-0.5 font-medium">
-                {isEditing ? 'Modify purchase invoice records and lots' : 'Record a new supplier materials lot delivery'}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setActiveSubPage('list')}
-              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+      <Drawer
+        isOpen={activeSubPage === 'new'}
+        onClose={() => setActiveSubPage('list')}
+        size="max-w-2xl"
+        title={
+          <div>
+            <h2 className="text-sm font-bold text-gray-900">
+              {isEditing ? 'Edit Purchase Batch' : 'New Purchase Batch'}
+            </h2>
+            <p className="text-[10px] text-gray-500 mt-0.5 normal-case font-medium">
+              {isEditing ? 'Modify purchase invoice records and lots' : 'Record a new supplier materials lot delivery'}
+            </p>
           </div>
-
+        }
+      >
+        <form onSubmit={handleInvoiceSubmit} className="flex flex-col h-full overflow-hidden">
           {/* Form Scrollable Body */}
           <div className="flex-1 overflow-y-auto p-5 space-y-6 bg-white">
             {addError && (
@@ -2199,41 +2258,40 @@ const PurchaseInvoicePage: React.FC = () => {
               )}
             </button>
           </div>
-        </div>
-      )}
+        </form>
+      </Drawer>
 
-      {/* ── SUB-PAGE 2: BATCH DETAILS SIDE DRAWER ────────────────────────────── */}
-      {activeSubPage === 'details' && selectedInvoice && (
-        <div className="fixed top-0 right-0 h-full w-full sm:w-[640px] bg-white shadow-2xl border-l border-gray-200 z-[60] flex flex-col animate-in slide-in-from-right duration-250 font-sans text-xs !mt-0">
-          {/* Header */}
-          <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
+       <Drawer
+        isOpen={activeSubPage === 'details' && !!selectedInvoice}
+        onClose={() => setActiveSubPage('list')}
+        size="max-w-2xl"
+        title={
+          <div className="flex items-center justify-between w-full pr-6">
             <div>
-              <h2 className="text-base font-bold text-gray-900 flex items-center gap-1.5">
+              <h2 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
                 <FileText className="w-4 h-4 text-blue-600 animate-pulse-slow" />
                 Purchase Batch Details
               </h2>
               <p className="text-[10px] text-gray-500 mt-0.5 font-medium">
-                Registered on {selectedInvoice.createdAt ? new Date(selectedInvoice.createdAt).toLocaleString('en-IN') : '—'} by Admin
+                Registered on {selectedInvoice?.createdAt ? new Date(selectedInvoice.createdAt).toLocaleString('en-IN') : '—'} by Admin
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            {selectedInvoice && (
               <button
+                type="button"
                 onClick={() => handleEditInvoice(selectedInvoice)}
                 className="px-2.5 py-1.5 border border-gray-200 text-gray-700 hover:bg-gray-50 bg-white rounded-lg text-[10px] font-bold shadow-3xs flex items-center gap-1 transition-all"
               >
                 <Edit className="w-3 h-3 text-amber-500" /> Edit
               </button>
-              <button
-                onClick={() => setActiveSubPage('list')}
-                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+            )}
           </div>
+        }
+      >
 
           {/* Details Content Scroll Area */}
           {(() => {
+            if (!selectedInvoice) return null;
             const isSheetsInvoice = selectedInvoice.items?.some(item => {
               const resolvedSku = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null;
               return resolvedSku?.paperType === 'Sheets';
@@ -2358,22 +2416,22 @@ const PurchaseInvoicePage: React.FC = () => {
 
               {/* LOTS TAB */}
               {detailsTab === 'lots' && (
-                <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4 shadow-3xs">
-                  <div className="overflow-x-auto border border-gray-100 rounded-xl">
-                    <table className="w-full text-left text-xs border-collapse">
+                <div className="bg-white rounded-xl border border-gray-200 shadow-3xs overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-[12px] border-collapse">
                       <thead>
-                        <tr className="bg-gray-50 text-gray-500 uppercase font-black border-b border-gray-200 text-[10px] tracking-wider">
-                          <th className="px-3 py-2.5">#</th>
-                          <th className="px-3 py-2.5">Item</th>
-                          <th className="px-3 py-2.5 text-center">GSM</th>
-                          <th className="px-3 py-2.5 text-center">Width</th>
-                          <th className="px-3 py-2.5 text-center">Reels</th>
-                          <th className="px-3 py-2.5 text-right">Total KG</th>
-                          <th className="px-3 py-2.5 text-right">Mat Amount (₹)</th>
-                          <th className="px-3 py-2.5 text-right">Landed Rate/KG (₹)</th>
+                        <tr className="bg-gradient-to-r from-gray-50 to-gray-100/80 text-gray-500 uppercase font-black border-b border-gray-200 text-[10px] tracking-wider">
+                          <th className="px-4 py-3 text-center w-10">#</th>
+                          <th className="px-4 py-3">Item</th>
+                          <th className="px-4 py-3 text-center">GSM</th>
+                          <th className="px-4 py-3 text-center">Width</th>
+                          <th className="px-4 py-3 text-center">Reels</th>
+                          <th className="px-4 py-3 text-right">Total KG</th>
+                          <th className="px-4 py-3 text-right">Mat Amount (₹)</th>
+                          <th className="px-4 py-3 text-right">Landed Rate/KG (₹)</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100 text-gray-700 font-medium">
+                      <tbody className="divide-y divide-gray-100/80">
                         {selectedInvoice.items?.map((item, idx) => {
                           const skuIdStr = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any)._id : item.skuId;
                           const resolvedSku = skus.find(s => s._id === skuIdStr) || (typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null);
@@ -2407,21 +2465,25 @@ const PurchaseInvoicePage: React.FC = () => {
                           const landedRatePerKg = displayQtyKg > 0 ? lotLandedTotal / displayQtyKg : 0;
 
                           return (
-                            <tr key={idx} className="hover:bg-gray-50/50">
-                              <td className="px-3 py-2.5 text-gray-450 font-bold">{idx + 1}</td>
-                              <td className="px-3 py-2.5 font-bold text-gray-900">
-                                <div>{skuName}</div>
-                                <div className="text-[10px] text-gray-400 font-normal">{brand}</div>
+                            <tr key={idx} className="hover:bg-blue-50/30 transition-colors group">
+                              <td className="px-4 py-3 text-center">
+                                <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-gray-100 text-gray-500 text-[10px] font-black group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">{idx + 1}</span>
                               </td>
-                              <td className="px-3 py-2.5 text-center font-bold text-gray-700">{gsm}</td>
-                              <td className="px-3 py-2.5 text-center font-bold text-gray-700">{widthDisplay}</td>
-                              <td className="px-3 py-2.5 text-center font-bold text-gray-800">{item.reels?.length || 0}</td>
-                              <td className="px-3 py-2.5 text-right font-black text-gray-955">
+                              <td className="px-4 py-3">
+                                <p className="font-bold text-gray-900 leading-tight">{formatSkuName(skuName)}</p>
+                                <p className="text-[10px] text-gray-400 mt-0.5">{brand}</p>
+                              </td>
+                              <td className="px-4 py-3 text-center font-semibold text-gray-700">{gsm}</td>
+                              <td className="px-4 py-3 text-center font-semibold text-gray-700">{widthDisplay}</td>
+                              <td className="px-4 py-3 text-center">
+                                <span className="inline-flex items-center justify-center min-w-[24px] px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[11px] font-black border border-blue-100">{item.reels?.length || 0}</span>
+                              </td>
+                              <td className="px-4 py-3 text-right font-black text-gray-900">
                                 {displayQtyKg.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                               </td>
-                              <td className="px-3 py-2.5 text-right font-black text-gray-955">₹{(item.totalPrice || 0).toLocaleString('en-IN')}</td>
-                              <td className="px-3 py-2.5 text-right font-black text-blue-700 font-mono">
-                                ₹{landedRatePerKg.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              <td className="px-4 py-3 text-right font-black text-gray-900">₹{(item.totalPrice || 0).toLocaleString('en-IN')}</td>
+                              <td className="px-4 py-3 text-right">
+                                <span className="font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100 text-[11px] font-mono">₹{landedRatePerKg.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                               </td>
                             </tr>
                           );
@@ -2569,8 +2631,7 @@ const PurchaseInvoicePage: React.FC = () => {
               Close Window
             </button>
           </div>
-        </div>
-      )}
+      </Drawer>
 
       {/* ── MULTI-LOCATION STORAGE ALLOCATION SPLIT MODAL ───────────────────────────── */}
       {splittingItemIdx !== null && (() => {

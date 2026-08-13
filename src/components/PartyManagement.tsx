@@ -710,6 +710,18 @@ const PartyManagement: React.FC = () => {
   const [cityCustomersSearchText, setCityCustomersSearchText] = useState('');
   const [popupCustomerDetails, setPopupCustomerDetails] = useState<any>(null);
 
+  const [drawerSortField, setDrawerSortField] = useState<string>('firmName');
+  const [drawerSortOrder, setDrawerSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  const handleDrawerSort = (field: string) => {
+    if (drawerSortField === field) {
+      setDrawerSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setDrawerSortField(field);
+      setDrawerSortOrder('asc');
+    }
+  };
+
   // Inline city panel customer list state
   const [inlineCityCustomers, setInlineCityCustomers] = useState<any[]>([]);
   const [inlineCityCustomersLoading, setInlineCityCustomersLoading] = useState(false);
@@ -5288,128 +5300,65 @@ const PartyManagement: React.FC = () => {
         </div>
       )}
 
-      {/* Recycle Bin Modal */}
-      {showRecycleBin && (
-        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm">
-          <div className="relative bg-white rounded-2xl max-w-3xl w-full shadow-2xl flex flex-col max-h-[85vh] overflow-hidden border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
-            
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-2xl flex justify-between items-center">
-              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <Trash2 className="w-5 h-5 text-red-500" />
-                Recycle Bin ({typeLabelPlural})
-              </h2>
-              <div className="flex items-center gap-3">
-                <span className="hidden sm:flex items-center gap-1.5 text-[10px] text-gray-400 font-mono select-none">
-                  <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-gray-500">↑↓</kbd> select &nbsp;
-                  <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-gray-500">Enter / R</kbd> restore &nbsp;
-                  <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-gray-500">Del</kbd> delete permanent &nbsp;
-                  <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-gray-500">Esc</kbd> close
-                </span>
-                <button onClick={() => setShowRecycleBin(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
-                  <X className="w-5 h-5" />
-                </button>
+      {/* Recycle Bin Drawer */}
+      <Drawer
+        isOpen={showRecycleBin}
+        onClose={() => setShowRecycleBin(false)}
+        size="max-w-md"
+        title={
+          <div className="flex items-center gap-1.5">
+            <Trash2 className="w-4 h-4 text-gray-500" />
+            <span>Recycle Bin ({typeLabelPlural})</span>
+          </div>
+        }
+      >
+        <div className="flex h-full flex-col overflow-hidden bg-white">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {recycleBinLoading ? (
+              <div className="flex justify-center items-center h-40">
+                <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
               </div>
-            </div>
-
-            {/* List Body */}
-            <div className="p-6 overflow-y-auto flex-1">
-              {recycleBinLoading ? (
-                <div className="flex justify-center items-center h-48">
-                  <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
-                </div>
-              ) : deletedItems.length === 0 ? (
-                <div className="text-center py-12">
-                  <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-3" />
-                  <p className="font-semibold text-gray-800 text-base">Recycle Bin is empty!</p>
-                  <p className="text-sm text-gray-400 mt-1">There are no deleted {typeLabelPlural.toLowerCase()} in the system.</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto border border-gray-200 rounded-xl">
-                  <table className="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">#</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
-                        {currentType !== 'route' && (
-                          <>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Mobile</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">City</th>
-                          </>
-                        )}
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Deleted At</th>
-                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {deletedItems.map((item, idx) => {
-                        const displayName = currentType === 'route' ? item.name : (item.firmName || item.contactName || 'Unnamed');
-                        const isHighlighted = idx === highlightedRecycleIdx;
-                        return (
-                          <tr 
-                            key={item._id} 
-                            className={`transition-colors ${
-                              isHighlighted
-                                ? 'bg-blue-50/70 hover:bg-blue-100/50 ring-2 ring-blue-500/20 shadow-sm font-semibold'
-                                : 'hover:bg-gray-50/50'
-                            }`}
-                            onMouseEnter={() => setHighlightedRecycleIdx(idx)}
-                          >
-                            <td className="px-4 py-3 text-gray-400 font-medium">{idx + 1}</td>
-                            <td className="px-4 py-3 text-gray-900 font-semibold truncate max-w-[200px]" title={displayName}>
-                              {displayName}
-                            </td>
-                            {currentType !== 'route' && (
-                              <>
-                                <td className="px-4 py-3 text-gray-700">{item.phone || '-'}</td>
-                                <td className="px-4 py-3 text-gray-700">{item.city || '-'}</td>
-                              </>
-                            )}
-                            <td className="px-4 py-3 text-gray-500">
-                              {new Date(item.updatedAt).toLocaleString('en-IN')}
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-right space-x-2">
-                              <button
-                                onClick={() => handleRestoreItem(item._id, displayName)}
-                                className="px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded hover:bg-emerald-100 transition-colors inline-flex items-center gap-1"
-                              >
-                                <span>Restore</span>
-                                {isHighlighted && (
-                                  <kbd className="hidden sm:inline-block font-mono text-[9px] text-emerald-600 bg-emerald-100 border border-emerald-350 px-1 rounded">R</kbd>
-                                )}
-                              </button>
-                              <button
-                                onClick={() => handlePermanentDeleteItem(item._id, displayName)}
-                                className="px-3 py-1.5 text-xs font-bold text-red-700 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition-colors inline-flex items-center gap-1"
-                              >
-                                <span>Delete Permanent</span>
-                                {isHighlighted && (
-                                  <kbd className="hidden sm:inline-block font-mono text-[9px] text-red-650 bg-red-100 border border-red-350 px-1 rounded">Del</kbd>
-                                )}
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-4 border-t border-gray-150 bg-gray-50 rounded-b-xl text-right">
-              <button
-                onClick={() => setShowRecycleBin(false)}
-                className="px-5 py-2 border border-gray-300 bg-white rounded-lg hover:bg-gray-100 font-semibold text-sm transition-colors text-gray-700"
-              >
-                Close Window
-              </button>
-            </div>
-
+            ) : deletedItems.length === 0 ? (
+              <div className="text-center py-12 text-gray-450">
+                <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
+                <p className="font-semibold text-gray-700">Recycle Bin is Empty!</p>
+                <p className="text-xs text-gray-400 mt-1">No deleted {typeLabelPlural.toLowerCase()} found.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {deletedItems.map((item, idx) => {
+                  const displayName = currentType === 'route' ? item.name : (item.firmName || item.contactName || 'Unnamed');
+                  return (
+                    <div key={item._id || idx} className="flex justify-between items-center p-3 border border-gray-200 rounded-xl bg-gray-50/50 hover:bg-white transition-all text-xs text-left">
+                      <div className="space-y-1">
+                        <p className="font-bold text-gray-800">{displayName}</p>
+                        <p className="font-mono text-gray-400 text-[10px]">
+                          {item.phone ? `${item.phone} • ` : ''}{item.city || 'No City'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleRestoreItem(item._id, displayName)}
+                          className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          Restore
+                        </button>
+                        <button
+                          onClick={() => handlePermanentDeleteItem(item._id, displayName)}
+                          className="p-1.5 text-gray-450 hover:bg-red-50 hover:text-red-650 rounded-lg transition-colors cursor-pointer"
+                          title="Delete Permanently"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
-      )}
+      </Drawer>
 
       {/* Dynamic Inline Creation Modal */}
       {inlineModalType && (
@@ -7130,7 +7079,18 @@ const PartyManagement: React.FC = () => {
                     );
                   });
 
-                  if (filtered.length === 0) {
+                  const sorted = [...filtered].sort((a, b) => {
+                    let valA = a[drawerSortField] ?? '';
+                    let valB = b[drawerSortField] ?? '';
+                    if (typeof valA === 'number' && typeof valB === 'number') {
+                      return drawerSortOrder === 'asc' ? valA - valB : valB - valA;
+                    }
+                    valA = valA.toString().toLowerCase();
+                    valB = valB.toString().toLowerCase();
+                    return drawerSortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                  });
+
+                  if (sorted.length === 0) {
                     return (
                       <div className="text-center py-12 text-gray-450">
                         <Users className="w-12 h-12 mx-auto mb-3 text-gray-300" />
@@ -7145,16 +7105,33 @@ const PartyManagement: React.FC = () => {
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead>
                           <tr className="bg-gray-50">
-                            <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Firm Name</th>
-                            <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Mobile Number</th>
-                            <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Region</th>
-                            <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Agent Assigned</th>
-                            <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Outstanding</th>
-                            <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
+                            {[
+                              { label: 'Firm Name', key: 'firmName' },
+                              { label: 'Mobile Number', key: 'phone' },
+                              { label: 'Region', key: 'route' },
+                              { label: 'Agent Assigned', key: 'agentAssigned' },
+                              { label: 'Outstanding', key: 'outstanding' },
+                              { label: 'Status', key: 'status' }
+                            ].map(col => (
+                              <th
+                                key={col.key}
+                                onClick={() => handleDrawerSort(col.key)}
+                                className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100/50 transition-colors select-none"
+                              >
+                                <div className="flex items-center space-x-1">
+                                  <span>{col.label}</span>
+                                  {drawerSortField === col.key ? (
+                                    drawerSortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5 inline text-blue-600" /> : <ChevronDown className="w-3.5 h-3.5 inline text-blue-600" />
+                                  ) : (
+                                    <ArrowUpDown className="w-3 h-3 inline text-gray-300 opacity-40 hover:opacity-100" />
+                                  )}
+                                </div>
+                              </th>
+                            ))}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 bg-white">
-                          {filtered.map((cust) => (
+                          {sorted.map((cust) => (
                             <tr key={cust._id} className="hover:bg-gray-50/50 transition-colors">
                               <td className="px-4 py-3">
                                 <div className="flex flex-col gap-0.5">
@@ -7603,7 +7580,7 @@ const PartyManagement: React.FC = () => {
 
       {/* Custom Confirm Modal Popup (Keyboard/Mouse controlled) */}
       {customConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-100">
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-100">
           <div className="relative bg-white rounded-2xl max-w-md w-full shadow-2xl p-6 border border-gray-150 animate-in fade-in zoom-in-95 duration-150 text-center space-y-4">
             <AlertTriangle className="w-12 h-12 text-red-500 mx-auto animate-bounce" />
 
