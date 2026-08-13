@@ -12,13 +12,22 @@ process.on("unhandledRejection", (reason) => {
   console.error("UNHANDLED REJECTION:", reason);
 });
 
-const server = app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port ${PORT} bound to 0.0.0.0`);
-});
+function startServer(portToUse) {
+  const server = app.listen(portToUse, "0.0.0.0", () => {
+    console.log(`Server running on port ${portToUse} bound to 0.0.0.0`);
+  });
 
-server.on("error", (err) => {
-  console.error("Server Listen Error:", err.message);
-});
+  server.on("error", (err) => {
+    if (err.code === "EADDRINUSE" && portToUse === 5000) {
+      console.warn("Port 5000 in use, attempting fallback to port 5001...");
+      startServer(5001);
+    } else {
+      console.error("Server Listen Error:", err.message);
+    }
+  });
+}
+
+startServer(PORT);
 
 // Connect to MongoDB asynchronously
 connectDB()
