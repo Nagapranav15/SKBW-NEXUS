@@ -242,16 +242,22 @@ const BatchStockV2: React.FC = () => {
     }
   };
 
-  // Helper to format Lot number
+  // Helper to format Lot number deterministically
   const getDisplayLotNo = (b: any) => {
     if (!b) return '—';
+    if (b.lotNo) return b.lotNo;
+    if (b.lotNumber) return b.lotNumber;
+    
     const batchNo = b.batchNumber || 'PB2407001';
     
-    // Find the first balance entry for this batch number in this SKU to determine the base lot
-    const batchBals = balances.filter(x => x.batchNumber === batchNo && (x.sku?._id || x.skuId) === (b.sku?._id || b.skuId));
+    // Sort batchBals deterministically by _id so primary lot is 100% stable across polls & renders
+    const batchBals = balances
+      .filter(x => x.batchNumber === batchNo && (x.sku?._id || x.skuId) === (b.sku?._id || b.skuId))
+      .sort((x, y) => (x._id || '').localeCompare(y._id || ''));
+      
     const isInitial = batchBals.length > 0 && batchBals[0]._id === b._id;
     
-    const baseLot = `${batchNo}-L01`;
+    const baseLot = batchNo.includes('-L') ? batchNo : `${batchNo}-L01`;
     if (isInitial) return baseLot;
     
     // Extract suffix from location name
@@ -276,7 +282,11 @@ const BatchStockV2: React.FC = () => {
     const matchesCategory = !filterCategory || b.sku?.category === filterCategory;
     const matchesItem = !filterItem || (b.sku?._id || b.skuId) === filterItem;
     const matchesLocation = !filterLocation || (b.location?._id || b.locationId) === filterLocation;
-    const matchesStatus = !filterStatus || (filterStatus === 'AVAILABLE' ? (b.onHand || 0) > 0 : filterStatus === 'EXHAUSTED' ? (b.onHand || 0) <= 0 : true);
+    const matchesStatus = !filterStatus || (
+      filterStatus === 'AVAILABLE' ? (b.onHand || 0) >= 100 : 
+      filterStatus === 'PARTIAL' ? ((b.onHand || 0) > 0 && (b.onHand || 0) < 100) : 
+      filterStatus === 'EXHAUSTED' ? (b.onHand || 0) <= 0 : true
+    );
     
     return matchesSearch && matchesCategory && matchesItem && matchesLocation && matchesStatus;
   });
@@ -326,12 +336,22 @@ const BatchStockV2: React.FC = () => {
       valB = b.location?.name || '';
     }
 
+    let result = 0;
     if (typeof valA === 'number' && typeof valB === 'number') {
-      return sortOrder === 'asc' ? valA - valB : valB - valA;
+      result = sortOrder === 'asc' ? valA - valB : valB - valA;
+    } else {
+      valA = valA.toString().toLowerCase();
+      valB = valB.toString().toLowerCase();
+      result = sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
     }
-    valA = valA.toString().toLowerCase();
-    valB = valB.toString().toLowerCase();
-    return sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+
+    // Stable tie-breaker to prevent rows from jumping position on render
+    if (result === 0) {
+      const idA = a._id || `${a.batchNumber}-${a.location?._id || a.locationId}`;
+      const idB = b._id || `${b.batchNumber}-${b.location?._id || b.locationId}`;
+      return idA.localeCompare(idB);
+    }
+    return result;
   });
 
   const totalPages = Math.max(Math.ceil(sortedBalances.length / limit), 1);
@@ -876,6 +896,7 @@ const BatchStockV2: React.FC = () => {
               >
                 <option value="">All Status</option>
                 <option value="AVAILABLE">Available</option>
+                <option value="PARTIAL">Partial</option>
                 <option value="EXHAUSTED">Exhausted</option>
               </select>
 
@@ -937,7 +958,7 @@ const BatchStockV2: React.FC = () => {
 
                     return (
                       <tr 
-                        key={`${b.sku?._id || b.skuId}-${b.location?._id || b.locationId}-${b.batchNumber}-${idx}`} 
+                        key={b._id || `${b.sku?._id || b.skuId}-${b.location?._id || b.locationId}-${b.batchNumber}`} 
                         className={`hover:bg-blue-50/20 transition-colors cursor-pointer border-b border-gray-100 ${
                           isSelected ? 'bg-blue-50/50' : ''
                         }`}
