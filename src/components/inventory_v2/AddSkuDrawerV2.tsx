@@ -613,6 +613,142 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                     required
                   />
                 </div>
+
+                {/* For Finished Goods: Pages, Rule Type, Primary Unit, Alternate Unit right below SKU Name */}
+                {form.category === 'Finished Goods' && (
+                  <>
+                    {/* Pages */}
+                    {activeFields.includes('pages') && (
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">
+                          {form.paperType === 'Sheets' ? 'Standard Sheets/Ream' : 'Pages'}
+                        </label>
+                        <input
+                          type="number"
+                          placeholder={form.paperType === 'Sheets' ? 'e.g. 500' : 'e.g. 112 / 132'}
+                          value={form.pages}
+                          onChange={e => setForm({ ...form, pages: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                        />
+                      </div>
+                    )}
+
+                    {/* Rule Type */}
+                    {activeFields.includes('ruleType') && (
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Rule Type</label>
+                        <select
+                          value={form.ruleType}
+                          onChange={e => {
+                            if (e.target.value === '__ADD_NEW__') {
+                              handleAddNewOption('ruleTypes');
+                            } else {
+                              setForm({ ...form, ruleType: e.target.value });
+                            }
+                          }}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                        >
+                          {ruleTypesList.map(rule => (
+                            <option key={rule} value={rule}>{rule}</option>
+                          ))}
+                          <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Primary Unit */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Primary Unit *</label>
+                      <select
+                        value={form.unit}
+                        onChange={e => {
+                          if (e.target.value === '__ADD_NEW__') {
+                            handleAddNewOption('units');
+                          } else {
+                            setForm({ ...form, unit: e.target.value });
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                      >
+                        <option value="">Select Unit</option>
+                        {unitsList.map(unit => (
+                          <option key={unit} value={unit}>{unit}</option>
+                        ))}
+                        <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
+                      </select>
+                    </div>
+
+                    {/* Alternate Unit Toggle */}
+                    {activeFields.includes('altUnit') && (
+                      <div className="flex items-end h-full">
+                        <label className="flex items-center space-x-2.5 bg-gray-50 border border-gray-200 hover:border-blue-300 hover:bg-blue-50/10 rounded-xl px-3 py-2 w-full cursor-pointer select-none transition-all">
+                          <input
+                            type="checkbox"
+                            checked={hasAltUnit}
+                            onChange={e => {
+                              const checked = e.target.checked;
+                              setHasAltUnit(checked);
+                              if (!checked) {
+                                setForm(prev => ({ ...prev, altUnit: '', altUnitConversion: '' }));
+                              }
+                            }}
+                            className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 border-gray-300 cursor-pointer"
+                          />
+                          <div className="text-left">
+                            <span className="block text-[11px] font-bold text-gray-700">Enable Alternate Unit</span>
+                            <span className="block text-[9px] text-gray-400 font-medium leading-tight">Packaging conversions</span>
+                          </div>
+                        </label>
+                      </div>
+                    )}
+
+                    {/* Alternate Unit & Conversion Rate if Enabled */}
+                    {activeFields.includes('altUnit') && hasAltUnit && (
+                      <div className="col-span-2 grid grid-cols-2 gap-3 bg-blue-50/20 p-3.5 rounded-xl border border-blue-100/50 animate-in fade-in duration-200">
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Alternative Unit</label>
+                          <select
+                            value={form.altUnit}
+                            onChange={e => {
+                              if (e.target.value === '__ADD_NEW__') {
+                                handleAddNewOption('units');
+                              } else {
+                                setForm({ ...form, altUnit: e.target.value });
+                              }
+                            }}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                          >
+                            <option value="">Select Alternative</option>
+                            {unitsList.map(unit => (
+                              <option key={unit} value={unit}>{unit}</option>
+                            ))}
+                            <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Conversion Rate</label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              placeholder="Multiplier rate"
+                              value={form.altUnitConversion}
+                              onChange={e => setForm({ ...form, altUnitConversion: e.target.value })}
+                              className="w-full pl-3 pr-14 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800 font-mono"
+                            />
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400 uppercase font-mono select-none">
+                              {form.altUnit || 'units'}
+                            </div>
+                          </div>
+                        </div>
+                        {form.altUnit && form.altUnitConversion && (
+                          <div className="col-span-2 text-center bg-white py-1.5 px-3 rounded-lg border border-slate-100 text-[10.5px] font-medium text-slate-500">
+                            Formula: <span className="font-bold text-slate-800">1 {form.unit}</span> = <span className="font-extrabold text-blue-600 font-mono text-xs">{form.altUnitConversion}</span> × <span className="font-bold text-slate-800">{form.altUnit}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
 
@@ -807,28 +943,32 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
               Inventory & Additional Attributes
             </h3>
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Primary Unit *</label>
-                <select
-                  value={form.unit}
-                  onChange={e => {
-                    if (e.target.value === '__ADD_NEW__') {
-                      handleAddNewOption('units');
-                    } else {
-                      setForm({ ...form, unit: e.target.value });
-                    }
-                  }}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
-                >
-                  <option value="">Select Unit</option>
-                  {unitsList.map(unit => (
-                    <option key={unit} value={unit}>{unit}</option>
-                  ))}
-                  <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
-                </select>
-              </div>
+              {/* Skip Primary Unit for Finished Goods as it's right below SKU Name */}
+              {form.category !== 'Finished Goods' && (
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Primary Unit *</label>
+                  <select
+                    value={form.unit}
+                    onChange={e => {
+                      if (e.target.value === '__ADD_NEW__') {
+                        handleAddNewOption('units');
+                      } else {
+                        setForm({ ...form, unit: e.target.value });
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                  >
+                    <option value="">Select Unit</option>
+                    {unitsList.map(unit => (
+                      <option key={unit} value={unit}>{unit}</option>
+                    ))}
+                    <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
+                  </select>
+                </div>
+              )}
 
-              {activeFields.includes('altUnit') && (
+              {/* Skip Alt Unit toggle for Finished Goods as it's right below SKU Name */}
+              {form.category !== 'Finished Goods' && activeFields.includes('altUnit') && (
                 <div className="flex items-end h-full">
                   <label className="flex items-center space-x-2.5 bg-gray-50 border border-gray-200 hover:border-blue-300 hover:bg-blue-50/10 rounded-xl px-3.5 py-2 w-full cursor-pointer select-none transition-all">
                     <input
@@ -851,7 +991,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                 </div>
               )}
 
-              {activeFields.includes('altUnit') && hasAltUnit && (
+              {form.category !== 'Finished Goods' && activeFields.includes('altUnit') && hasAltUnit && (
                 <div className="col-span-2 grid grid-cols-2 gap-3 bg-blue-50/20 p-3.5 rounded-xl border border-blue-100/50 animate-in fade-in duration-200">
                   <div>
                     <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Alternative Unit</label>
@@ -959,7 +1099,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                   </div>
                 </div>
               )}
-              {activeFields.includes('ruleType') && (
+              {form.category !== 'Finished Goods' && activeFields.includes('ruleType') && (
                 <div>
                   <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Rule Type</label>
                   <select
@@ -980,7 +1120,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                   </select>
                 </div>
               )}
-              {activeFields.includes('pages') && (
+              {form.category !== 'Finished Goods' && activeFields.includes('pages') && (
                 <div>
                   <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">
                     {form.paperType === 'Sheets' ? 'Standard Sheets/Ream' : 'Pages'}
