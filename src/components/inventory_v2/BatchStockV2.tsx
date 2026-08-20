@@ -242,6 +242,8 @@ const BatchStockV2: React.FC = () => {
     }
   };
 
+  const safeBalances = Array.isArray(balances) ? balances : [];
+
   // Helper to format Lot number deterministically
   const getDisplayLotNo = (b: any) => {
     if (!b) return '—';
@@ -251,9 +253,9 @@ const BatchStockV2: React.FC = () => {
     const batchNo = b.batchNumber || 'PB2407001';
     
     // Sort batchBals deterministically by _id so primary lot is 100% stable across polls & renders
-    const batchBals = balances
-      .filter(x => x.batchNumber === batchNo && (x.sku?._id || x.skuId) === (b.sku?._id || b.skuId))
-      .sort((x, y) => (x._id || '').localeCompare(y._id || ''));
+    const batchBals = safeBalances
+      .filter(x => x && x.batchNumber === batchNo && (x.sku?._id || x.skuId) === (b.sku?._id || b.skuId))
+      .sort((x, y) => ((x && x._id) || '').localeCompare((y && y._id) || ''));
       
     const isInitial = batchBals.length > 0 && batchBals[0]._id === b._id;
     
@@ -268,7 +270,8 @@ const BatchStockV2: React.FC = () => {
   };
 
   // Filters logic
-  const filteredBalances = balances.filter(b => {
+  const filteredBalances = safeBalances.filter(b => {
+    if (!b) return false;
     const displayLot = getDisplayLotNo(b).toLowerCase();
     const skuName = (b.sku?.name || '').toLowerCase();
     const brand = (b.sku?.brand || '').toLowerCase();
@@ -304,6 +307,7 @@ const BatchStockV2: React.FC = () => {
   };
 
   const sortedBalances = [...filteredBalances].sort((a, b) => {
+    if (!a || !b) return 0;
     let valA: any = '';
     let valB: any = '';
 
@@ -340,8 +344,8 @@ const BatchStockV2: React.FC = () => {
     if (typeof valA === 'number' && typeof valB === 'number') {
       result = sortOrder === 'asc' ? valA - valB : valB - valA;
     } else {
-      valA = valA.toString().toLowerCase();
-      valB = valB.toString().toLowerCase();
+      valA = (valA || '').toString().toLowerCase();
+      valB = (valB || '').toString().toLowerCase();
       result = sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
     }
 
@@ -358,20 +362,20 @@ const BatchStockV2: React.FC = () => {
   const paginatedBalances = sortedBalances.slice((page - 1) * limit, page * limit);
 
   // Stats
-  const statTotalLots = balances.length;
+  const statTotalLots = safeBalances.length;
   
-  const rawMatBalances = balances.filter(b => b.sku?.category === 'Raw Material');
+  const rawMatBalances = safeBalances.filter(b => b?.sku?.category === 'Raw Material');
   const statRawMatCount = rawMatBalances.length;
-  const statRawMatKg = rawMatBalances.reduce((sum, b) => sum + (b.onHand || 0), 0);
+  const statRawMatKg = rawMatBalances.reduce((sum, b) => sum + (b?.onHand || 0), 0);
 
-  const semiBalances = balances.filter(b => b.sku?.category === 'Semi Finished');
+  const semiBalances = safeBalances.filter(b => b?.sku?.category === 'Semi Finished');
   const statSemiCount = semiBalances.length;
-  const statSemiSheets = semiBalances.reduce((sum, b) => sum + (b.onHand || 0), 0);
+  const statSemiSheets = semiBalances.reduce((sum, b) => sum + (b?.onHand || 0), 0);
 
-  const fgBalances = balances.filter(b => b.sku?.category === 'Finished Goods');
+  const fgBalances = safeBalances.filter(b => b?.sku?.category === 'Finished Goods');
   const statFgCount = fgBalances.length;
-  const statFgGbl = fgBalances.reduce((sum, b) => sum + (b.sku?.booksGbl || 0), 0);
-  const statFgPcs = fgBalances.reduce((sum, b) => sum + (b.onHand || 0), 0);
+  const statFgGbl = fgBalances.reduce((sum, b) => sum + (b?.sku?.booksGbl || 0), 0);
+  const statFgPcs = fgBalances.reduce((sum, b) => sum + (b?.onHand || 0), 0);
 
   return (
     <div className="p-4 sm:p-6 space-y-6 flex-1 w-full relative transition-all duration-300">

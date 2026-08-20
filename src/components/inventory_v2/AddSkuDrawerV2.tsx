@@ -75,9 +75,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
 
   // Category specific field visibility mapping
   const [categoryFieldsMap, setCategoryFieldsMap] = useState<Record<string, string[]>>({
-    "Raw Material": ["gsm", "title", "width", "length", "paperType", "altUnit"],
-    "Semi Finished": ["gsm", "width", "length", "ruleType", "altUnit", "group"],
-    "Finished Goods": ["gsm", "width", "length", "ruleType", "pages", "altUnit"]
+    "Raw Material": ["gsm", "brand", "title", "width", "length", "paperType", "altUnit"],
+    "Semi Finished": ["gsm", "brand", "width", "length", "ruleType", "altUnit", "group"],
+    "Finished Goods": ["gsm", "brand", "width", "length", "ruleType", "pages", "altUnit"]
   });
 
   // Custom Options Modal Popup state
