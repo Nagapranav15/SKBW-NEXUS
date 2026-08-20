@@ -614,10 +614,10 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                   />
                 </div>
 
-                {/* For Finished Goods: Pages, Rule Type, Primary Unit, Alternate Unit right below SKU Name */}
+                {/* For Finished Goods: Pages, Brand, Rule Type, Primary Unit, Alternate Units right below SKU Name */}
                 {form.category === 'Finished Goods' && (
                   <>
-                    {/* Pages */}
+                    {/* 1. Pages */}
                     {activeFields.includes('pages') && (
                       <div>
                         <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">
@@ -633,7 +633,73 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                       </div>
                     )}
 
-                    {/* Rule Type */}
+                    {/* 2. Brand */}
+                    {activeFields.includes('brand') && (
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Brand</label>
+                        <div className="relative" ref={brandContainerRef}>
+                          <input
+                            type="text"
+                            placeholder="Search or type brand..."
+                            value={brandSearch}
+                            onChange={e => {
+                              setBrandSearch(e.target.value);
+                              setForm(prev => ({ ...prev, brand: e.target.value }));
+                            }}
+                            onFocus={() => {
+                              setShowBrandDropdown(true);
+                              setBrandAtFocus(form.brand);
+                            }}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                          />
+                          {showBrandDropdown && (
+                            <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-20 divide-y divide-gray-50">
+                              {fgBrandsList
+                                .filter(b => {
+                                  if (brandSearch === brandAtFocus) return true;
+                                  return b.toLowerCase().includes(brandSearch.toLowerCase());
+                                })
+                                .map(b => (
+                                  <button
+                                    key={b}
+                                    type="button"
+                                    onClick={() => {
+                                      setForm(prev => ({ ...prev, brand: b }));
+                                      setBrandSearch(b);
+                                      setShowBrandDropdown(false);
+                                    }}
+                                    className="w-full px-3 py-2 text-left text-xs hover:bg-blue-50 hover:text-blue-600 transition-colors font-semibold text-gray-700 block"
+                                  >
+                                    {b}
+                                  </button>
+                                ))
+                              }
+                              {brandSearch.trim() && !fgBrandsList.some(b => b.toLowerCase() === brandSearch.toLowerCase()) && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newBrand = brandSearch.trim();
+                                    if (!fgBrandsList.includes(newBrand)) {
+                                      setFgBrandsList(prev => [...prev, newBrand]);
+                                    }
+                                    setForm(prev => ({ ...prev, brand: newBrand }));
+                                    setShowBrandDropdown(false);
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-xs hover:bg-green-50 text-green-600 font-bold transition-colors block"
+                                >
+                                  + Add Brand "{brandSearch.trim()}"
+                                </button>
+                              )}
+                              {fgBrandsList.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase())).length === 0 && !brandSearch.trim() && (
+                                <div className="px-3 py-2 text-xs text-gray-400 italic">No brands found</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 3. Rule Type */}
                     {activeFields.includes('ruleType') && (
                       <div>
                         <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Rule Type</label>
@@ -656,7 +722,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                       </div>
                     )}
 
-                    {/* Primary Unit */}
+                    {/* 4. Primary Unit */}
                     <div>
                       <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Primary Unit *</label>
                       <select
@@ -678,7 +744,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                       </select>
                     </div>
 
-                    {/* Alternate Unit Toggle */}
+                    {/* 5. Alternate Units Toggle */}
                     {activeFields.includes('altUnit') && (
                       <div className="flex items-end h-full">
                         <label className="flex items-center space-x-2.5 bg-gray-50 border border-gray-200 hover:border-blue-300 hover:bg-blue-50/10 rounded-xl px-3 py-2 w-full cursor-pointer select-none transition-all">
@@ -771,130 +837,69 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({ isOpen, companyId, edit
                     />
                   </div>
                 )}
-                {activeFields.includes('brand') && (
+                {/* Skip Brand for Finished Goods as it's right below SKU Name */}
+                {form.category !== 'Finished Goods' && activeFields.includes('brand') && (
                   <div>
                     <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Brand</label>
-                    {form.category === 'Finished Goods' ? (
-                      <div className="relative" ref={brandContainerRef}>
-                        <input
-                          type="text"
-                          placeholder="Search or type brand..."
-                          value={brandSearch}
-                          onChange={e => {
-                            setBrandSearch(e.target.value);
-                            setForm(prev => ({ ...prev, brand: e.target.value }));
-                          }}
-                          onFocus={() => {
-                            setShowBrandDropdown(true);
-                            setBrandAtFocus(form.brand);
-                          }}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
-                        />
-                        {showBrandDropdown && (
-                          <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-20 divide-y divide-gray-50">
-                            {fgBrandsList
-                              .filter(b => {
-                                if (brandSearch === brandAtFocus) return true;
-                                return b.toLowerCase().includes(brandSearch.toLowerCase());
-                              })
-                              .map(b => (
-                                <button
-                                  key={b}
-                                  type="button"
-                                  onClick={() => {
-                                    setForm(prev => ({ ...prev, brand: b }));
-                                    setBrandSearch(b);
-                                    setShowBrandDropdown(false);
-                                  }}
-                                  className="w-full px-3 py-2 text-left text-xs hover:bg-blue-50 hover:text-blue-600 transition-colors font-semibold text-gray-700 block"
-                                >
-                                  {b}
-                                </button>
-                              ))
-                            }
-                            {brandSearch.trim() && !fgBrandsList.some(b => b.toLowerCase() === brandSearch.toLowerCase()) && (
+                    <div className="relative" ref={brandContainerRef}>
+                      <input
+                        type="text"
+                        placeholder="Search or type brand..."
+                        value={brandSearch}
+                        onChange={e => {
+                          setBrandSearch(e.target.value);
+                          setForm(prev => ({ ...prev, brand: e.target.value }));
+                        }}
+                        onFocus={() => {
+                          setShowBrandDropdown(true);
+                          setBrandAtFocus(form.brand);
+                        }}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
+                      />
+                      {showBrandDropdown && (
+                        <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-20 divide-y divide-gray-50">
+                          {existingBrands
+                            .filter(b => {
+                              if (brandSearch === brandAtFocus) return true;
+                              return b.toLowerCase().includes(brandSearch.toLowerCase());
+                            })
+                            .map(b => (
                               <button
+                                key={b}
                                 type="button"
                                 onClick={() => {
-                                  const newBrand = brandSearch.trim();
-                                  if (!fgBrandsList.includes(newBrand)) {
-                                    setFgBrandsList(prev => [...prev, newBrand]);
-                                  }
-                                  setForm(prev => ({ ...prev, brand: newBrand }));
+                                  setForm(prev => ({ ...prev, brand: b }));
+                                  setBrandSearch(b);
                                   setShowBrandDropdown(false);
                                 }}
-                                className="w-full px-3 py-2 text-left text-xs hover:bg-green-50 text-green-600 font-bold transition-colors block"
-                                >
-                                  + Add Brand "{brandSearch.trim()}"
-                                </button>
-                              )}
-                              {fgBrandsList.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase())).length === 0 && !brandSearch.trim() && (
-                                <div className="px-3 py-2 text-xs text-gray-400 italic">No brands found</div>
-                              )}
-                            </div>
+                                className="w-full px-3 py-2 text-left text-xs hover:bg-blue-50 hover:text-blue-600 transition-colors font-semibold text-gray-700 block"
+                              >
+                                {b}
+                              </button>
+                            ))
+                          }
+                          {brandSearch.trim() && !existingBrands.some(b => b.toLowerCase() === brandSearch.toLowerCase()) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newBrand = brandSearch.trim();
+                                if (!existingBrands.includes(newBrand)) {
+                                  setExistingBrands(prev => [...prev, newBrand]);
+                                }
+                                setForm(prev => ({ ...prev, brand: newBrand }));
+                                setShowBrandDropdown(false);
+                              }}
+                              className="w-full px-3 py-2 text-left text-xs hover:bg-green-50 text-green-600 font-bold transition-colors block"
+                            >
+                              + Add Brand "{brandSearch.trim()}"
+                            </button>
+                          )}
+                          {existingBrands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase())).length === 0 && !brandSearch.trim() && (
+                            <div className="px-3 py-2 text-xs text-gray-400 italic">No brands found</div>
                           )}
                         </div>
-                      ) : (
-                        <div className="relative" ref={brandContainerRef}>
-                          <input
-                            type="text"
-                            placeholder="Search or type brand..."
-                            value={brandSearch}
-                            onChange={e => {
-                              setBrandSearch(e.target.value);
-                              setForm(prev => ({ ...prev, brand: e.target.value }));
-                            }}
-                            onFocus={() => {
-                              setShowBrandDropdown(true);
-                              setBrandAtFocus(form.brand);
-                            }}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
-                          />
-                          {showBrandDropdown && (
-                            <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-20 divide-y divide-gray-50">
-                              {existingBrands
-                                .filter(b => {
-                                  if (brandSearch === brandAtFocus) return true;
-                                  return b.toLowerCase().includes(brandSearch.toLowerCase());
-                                })
-                                .map(b => (
-                                  <button
-                                    key={b}
-                                    type="button"
-                                    onClick={() => {
-                                      setForm(prev => ({ ...prev, brand: b }));
-                                      setBrandSearch(b);
-                                      setShowBrandDropdown(false);
-                                    }}
-                                    className="w-full px-3 py-2 text-left text-xs hover:bg-blue-50 hover:text-blue-600 transition-colors font-semibold text-gray-700 block"
-                                  >
-                                    {b}
-                                  </button>
-                                ))
-                              }
-                              {brandSearch.trim() && !existingBrands.some(b => b.toLowerCase() === brandSearch.toLowerCase()) && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newBrand = brandSearch.trim();
-                                    if (!existingBrands.includes(newBrand)) {
-                                      setExistingBrands(prev => [...prev, newBrand]);
-                                    }
-                                    setForm(prev => ({ ...prev, brand: newBrand }));
-                                    setShowBrandDropdown(false);
-                                  }}
-                                  className="w-full px-3 py-2 text-left text-xs hover:bg-green-50 text-green-600 font-bold transition-colors block"
-                                >
-                                  + Add Brand "{brandSearch.trim()}"
-                                </button>
-                              )}
-                              {existingBrands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase())).length === 0 && !brandSearch.trim() && (
-                                <div className="px-3 py-2 text-xs text-gray-400 italic">No brands found</div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 )}
                 {activeFields.includes('title') && (
