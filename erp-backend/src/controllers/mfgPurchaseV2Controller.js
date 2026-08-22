@@ -457,17 +457,14 @@ exports.editPurchaseInvoice = async (req, res, next) => {
     const { id } = req.params;
     const { items, taxAmount = 0, freight = 0, craneCharges = 0, otherCharges = 0, dueDate, remarks, company } = req.body;
 
-    if (!company) {
-      return res.status(400).json({ msg: "company is required" });
-    }
-    const companyObjId = toObjectId(company);
-
-    const invoice = await PurchaseInvoiceV2.findOne({ _id: toObjectId(id), company: companyObjId });
+    const invoice = await PurchaseInvoiceV2.findById(id);
     if (!invoice) {
       return res.status(404).json({ msg: "Purchase Invoice not found" });
     }
 
-    const vendor = await Party.findOne({ _id: invoice.vendorId, company: companyObjId });
+    const companyObjId = invoice.company;
+
+    const vendor = await Party.findById(invoice.vendorId);
     if (!vendor) {
       return res.status(400).json({ msg: "Vendor associated with invoice not found" });
     }
@@ -477,9 +474,9 @@ exports.editPurchaseInvoice = async (req, res, next) => {
     let subTotal = 0;
 
     for (const item of items) {
-      const { skuId, quantity, purchasePrice, lotNumber, locationId, reels } = item;
+      const { skuId, quantity, purchasePrice, lotNumber, locationId, reels, splits } = item;
       
-      if (!skuId || !quantity || !purchasePrice || !lotNumber || !locationId) {
+      if (!skuId || !quantity || !purchasePrice || !lotNumber) {
         return res.status(400).json({ msg: "Missing fields in purchase items" });
       }
 
@@ -489,36 +486,19 @@ exports.editPurchaseInvoice = async (req, res, next) => {
         return res.status(400).json({ msg: "Quantity and price must be greater than zero" });
       }
 
-      const sku = await SkuV2.findOne({ _id: toObjectId(skuId), company: companyObjId });
+      const sku = await SkuV2.findById(skuId);
       if (!sku) {
         return res.status(400).json({ msg: `SKU '${skuId}' not found` });
       }
 
-      const location = await WarehouseLocationV2.findOne({ _id: toObjectId(locationId), company: companyObjId });
-      if (!location) {
-        return res.status(400).json({ msg: `Location '${locationId}' not found` });
+      const primaryLocId = locationId || (splits && splits[0]?.locationId) || (reels && reels[0]?.locationId);
+      if (!primaryLocId) {
+        return res.status(400).json({ msg: `Storage location is required for SKU '${sku.skuCode}'` });
       }
 
-      let zoneId = location._id;
-      let floorId = location._id;
-      let warehouseId = location._id;
-
-      const parent1 = location.parentId ? await WarehouseLocationV2.findOne({ _id: location.parentId, company: companyObjId }) : null;
-      if (parent1) {
-        zoneId = parent1._id;
-        const parent2 = parent1.parentId ? await WarehouseLocationV2.findOne({ _id: parent1.parentId, company: companyObjId }) : null;
-        if (parent2) {
-          floorId = parent2._id;
-          const parent3 = parent2.parentId ? await WarehouseLocationV2.findOne({ _id: parent2.parentId, company: companyObjId }) : null;
-          if (parent3) {
-            warehouseId = parent3._id;
-          } else {
-            warehouseId = parent2._id;
-          }
-        } else {
-          floorId = parent1._id;
-          warehouseId = parent1._id;
-        }
+      const location = await WarehouseLocationV2.findById(primaryLocId);
+      if (!location) {
+        return res.status(400).json({ msg: `Location '${primaryLocId}' not found` });
       }
 
       const itemTotal = qty * price;
@@ -532,10 +512,10 @@ exports.editPurchaseInvoice = async (req, res, next) => {
         totalPrice: itemTotal,
         lotNumber,
         locationId: location._id,
-        reels: reels || [],
-        warehouseId,
-        floorId,
-        zoneId
+        splits: Array.isArray(splits) ? splits : [],
+        reels: Array.isArray(reels) ? reels : [],
+        reamWeight: item.reamWeight ? Number(item.reamWeight) : undefined,
+        ratePerKg: item.ratePerKg ? Number(item.ratePerKg) : undefined
       });
     }
 
@@ -567,45 +547,130 @@ exports.editPurchaseInvoice = async (req, res, next) => {
     );
 
     // Delete old stock ledger entries and inward new ones
-    await InventoryLedger.deleteMany({ referenceType: "PurchaseInvoice", referenceId: invoice.invoiceNumber, company: companyObjId });
+    await InventoryLedger.deleteMany({ referenceType: "PurchaseInvoice", referenceId: invoice.invoiceNumber });
+    await InventoryLedger.deleteMany({ batchNumber: invoice.invoiceNumber });
+
+    // Helper function to resolve hierarchy for any locationId
+    const getHierarchy = async (locId) => {
+      const loc = await WarehouseLocationV2.findById(locId);
+      if (!loc) return { warehouseId: locId, floorId: locId, zoneId: locId, locationId: locId };
+      let zoneId = loc._id, floorId = loc._id, warehouseId = loc._id;
+      const p1 = loc.parentId ? await WarehouseLocationV2.findById(loc.parentId) : null;
+      if (p1) {
+        zoneId = p1._id;
+        const p2 = p1.parentId ? await WarehouseLocationV2.findById(p1.parentId) : null;
+        if (p2) {
+          floorId = p2._id;
+          const p3 = p2.parentId ? await WarehouseLocationV2.findById(p2.parentId) : null;
+          warehouseId = p3 ? p3._id : p2._id;
+        } else {
+          floorId = p1._id; warehouseId = p1._id;
+        }
+      }
+      return { warehouseId, floorId, zoneId, locationId: loc._id };
+    };
 
     for (const valItem of validatedItems) {
-      const transactionNumber = await Sequence.getNextSequence("IL");
+      if (valItem.reels && valItem.reels.length > 0) {
+        const reelsByLoc = {};
+        valItem.reels.forEach(r => {
+          const lId = String(r.locationId || valItem.locationId);
+          if (!reelsByLoc[lId]) reelsByLoc[lId] = [];
+          reelsByLoc[lId].push(r);
+        });
 
-      const newLedgerEntry = new InventoryLedger({
-        transactionNumber,
-        transactionType: "Purchase",
-        skuId: valItem.skuId,
-        quantity: valItem.quantity,
-        unit: valItem.unit,
-        direction: "IN",
-        referenceType: "PurchaseInvoice",
-        referenceId: invoice.invoiceNumber,
-        batchNumber: invoice.invoiceNumber,
-        warehouseId: valItem.warehouseId,
-        floorId: valItem.floorId,
-        zoneId: valItem.zoneId,
-        locationId: valItem.locationId,
-        remarks: `Lot: ${valItem.lotNumber}. Inwarded via invoice ${invoice.invoiceNumber}`,
-        reels: valItem.reels || [],
-        createdBy: toObjectId(req.user.id),
-        company: companyObjId,
-        status: "Posted"
-      });
-      await newLedgerEntry.save();
+        for (const locIdStr of Object.keys(reelsByLoc)) {
+          const reelsGroup = reelsByLoc[locIdStr];
+          const groupWeight = reelsGroup.reduce((s, r) => s + (Number(r.weight) || 0), 0);
+          const h = await getHierarchy(locIdStr);
+          const transactionNumber = await Sequence.getNextSequence("IL");
+
+          await new InventoryLedger({
+            transactionNumber,
+            transactionType: "Purchase",
+            skuId: valItem.skuId,
+            quantity: groupWeight,
+            unit: valItem.unit,
+            direction: "IN",
+            referenceType: "PurchaseInvoice",
+            referenceId: invoice.invoiceNumber,
+            batchNumber: invoice.invoiceNumber,
+            warehouseId: h.warehouseId,
+            floorId: h.floorId,
+            zoneId: h.zoneId,
+            locationId: h.locationId,
+            remarks: `Lot: ${valItem.lotNumber}. Inwarded via invoice ${invoice.invoiceNumber}`,
+            reels: reelsGroup,
+            createdBy: toObjectId(req.user.id),
+            company: companyObjId,
+            status: "Posted"
+          }).save();
+        }
+      } else if (valItem.splits && valItem.splits.length > 0) {
+        for (const split of valItem.splits) {
+          const splitQty = Number(split.quantity) || 0;
+          if (splitQty <= 0) continue;
+          const h = await getHierarchy(split.locationId);
+          const transactionNumber = await Sequence.getNextSequence("IL");
+
+          await new InventoryLedger({
+            transactionNumber,
+            transactionType: "Purchase",
+            skuId: valItem.skuId,
+            quantity: splitQty,
+            unit: valItem.unit,
+            direction: "IN",
+            referenceType: "PurchaseInvoice",
+            referenceId: invoice.invoiceNumber,
+            batchNumber: invoice.invoiceNumber,
+            warehouseId: h.warehouseId,
+            floorId: h.floorId,
+            zoneId: h.zoneId,
+            locationId: h.locationId,
+            remarks: `Lot: ${valItem.lotNumber}. Inwarded via invoice ${invoice.invoiceNumber}`,
+            reels: [],
+            createdBy: toObjectId(req.user.id),
+            company: companyObjId,
+            status: "Posted"
+          }).save();
+        }
+      } else {
+        const h = await getHierarchy(valItem.locationId);
+        const transactionNumber = await Sequence.getNextSequence("IL");
+
+        await new InventoryLedger({
+          transactionNumber,
+          transactionType: "Purchase",
+          skuId: valItem.skuId,
+          quantity: valItem.quantity,
+          unit: valItem.unit,
+          direction: "IN",
+          referenceType: "PurchaseInvoice",
+          referenceId: invoice.invoiceNumber,
+          batchNumber: invoice.invoiceNumber,
+          warehouseId: h.warehouseId,
+          floorId: h.floorId,
+          zoneId: h.zoneId,
+          locationId: h.locationId,
+          remarks: `Lot: ${valItem.lotNumber}. Inwarded via invoice ${invoice.invoiceNumber}`,
+          reels: [],
+          createdBy: toObjectId(req.user.id),
+          company: companyObjId,
+          status: "Posted"
+        }).save();
+      }
     }
 
-    // Update Invoice document
+    // Update Invoice details
     invoice.items = validatedItems;
     invoice.subTotal = subTotal;
     invoice.taxAmount = Number(taxAmount);
     invoice.freight = Number(freight);
     invoice.craneCharges = Number(craneCharges);
-    invoice.otherCharges = Number(otherCharges);
     invoice.grandTotal = newGrandTotal;
-    invoice.dueDate = dueDate ? new Date(dueDate) : undefined;
-    invoice.remarks = remarks || "";
-    
+    if (dueDate) invoice.dueDate = new Date(dueDate);
+    if (remarks !== undefined) invoice.remarks = remarks;
+
     if (invoice.paidAmount >= newGrandTotal) {
       invoice.paymentStatus = "Paid";
     } else if (invoice.paidAmount > 0) {
