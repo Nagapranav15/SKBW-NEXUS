@@ -244,6 +244,18 @@ const BatchStockV2: React.FC = () => {
 
   const safeBalances = Array.isArray(balances) ? balances : [];
 
+  // Helper to safely extract string ID for sorting and comparison
+  const getIdString = (item: any) => {
+    if (!item) return '';
+    const idVal = item._id;
+    if (typeof idVal === 'string') return idVal;
+    if (idVal && typeof idVal === 'object') {
+      if (typeof idVal.toString === 'function') return idVal.toString();
+    }
+    if (idVal !== undefined && idVal !== null) return String(idVal);
+    return `${item.batchNumber || ''}-${item.location?._id || item.locationId || ''}`;
+  };
+
   // Helper to format Lot number deterministically
   const getDisplayLotNo = (b: any) => {
     if (!b) return '—';
@@ -254,10 +266,10 @@ const BatchStockV2: React.FC = () => {
     
     // Sort batchBals deterministically by _id so primary lot is 100% stable across polls & renders
     const batchBals = safeBalances
-      .filter(x => x && x.batchNumber === batchNo && (x.sku?._id || x.skuId) === (b.sku?._id || b.skuId))
-      .sort((x, y) => ((x && x._id) || '').localeCompare((y && y._id) || ''));
+      .filter(x => x && x.batchNumber === batchNo && String(x.sku?._id || x.skuId || '') === String(b.sku?._id || b.skuId || ''))
+      .sort((x, y) => getIdString(x).localeCompare(getIdString(y)));
       
-    const isInitial = batchBals.length > 0 && batchBals[0]._id === b._id;
+    const isInitial = batchBals.length > 0 && getIdString(batchBals[0]) === getIdString(b);
     
     const baseLot = batchNo.includes('-L') ? batchNo : `${batchNo}-L01`;
     if (isInitial) return baseLot;
@@ -344,15 +356,15 @@ const BatchStockV2: React.FC = () => {
     if (typeof valA === 'number' && typeof valB === 'number') {
       result = sortOrder === 'asc' ? valA - valB : valB - valA;
     } else {
-      valA = (valA || '').toString().toLowerCase();
-      valB = (valB || '').toString().toLowerCase();
+      valA = String(valA || '').toLowerCase();
+      valB = String(valB || '').toLowerCase();
       result = sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
     }
 
     // Stable tie-breaker to prevent rows from jumping position on render
     if (result === 0) {
-      const idA = a._id || `${a.batchNumber}-${a.location?._id || a.locationId}`;
-      const idB = b._id || `${b.batchNumber}-${b.location?._id || b.locationId}`;
+      const idA = getIdString(a);
+      const idB = getIdString(b);
       return idA.localeCompare(idB);
     }
     return result;
