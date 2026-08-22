@@ -197,11 +197,13 @@ const Layout: React.FC = () => {
 
   // Conversions
   const conversionsItems = [
+    { label: 'BOM / Recipes', path: '/inventory-v2/conversions/bom', permission: ['MANAGE_INVENTORY', 'MANAGE_ITEMS'] },
+    { label: 'Stock Transfers', path: '/inventory-v2/conversions/transfer', permission: ['MANAGE_INVENTORY', 'MANAGE_ITEMS'] },
     { label: 'Transactions (Test)', path: '/inventory-v2/testing-transactions', permission: ['MANAGE_INVENTORY', 'MANAGE_ITEMS'] },
   ];
   const visibleConversionsItems = conversionsItems.filter(item => hasPermission(item.permission));
   const hasConversionsAccess = visibleConversionsItems.length > 0;
-  const isConversionsActive = () => ['/inventory-v2/testing-transactions'].includes(location.pathname);
+  const isConversionsActive = () => location.pathname.startsWith('/inventory-v2/conversions') || location.pathname === '/inventory-v2/testing-transactions';
 
   // Sales
   const salesItems = [

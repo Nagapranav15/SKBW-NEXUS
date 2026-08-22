@@ -30,6 +30,8 @@ const PurchaseInvoicePage = lazy(() => import('./components/inventory_v2/purchas
 const InventoryBalanceV2 = lazy(() => import('./components/inventory_v2/InventoryBalanceV2'));
 const BatchStockV2 = lazy(() => import('./components/inventory_v2/BatchStockV2'));
 const SettingsPage = lazy(() => import('./components/inventory_v2/SettingsPage'));
+const BomRecipeMaster = lazy(() => import('./components/inventory_v2/conversions/BomRecipeMaster'));
+const StockTransferModule = lazy(() => import('./components/inventory_v2/conversions/StockTransferModule'));
 
 // Premium Micro-Loading Indicator
 const LoadingFallback = () => (
@@ -93,6 +95,8 @@ function App() {
                 <Route path="inventory-v2/purchases" element={<PurchaseInvoicePage />} />
                 <Route path="inventory-v2/batch-stock" element={<BatchStockV2 />} />
                 <Route path="inventory-v2/testing-transactions" element={<TestingTransactionsV2 />} />
+                <Route path="inventory-v2/conversions/bom" element={<BomRecipeMaster />} />
+                <Route path="inventory-v2/conversions/transfer" element={<StockTransferModule />} />
                 <Route path="inventory-v2/settings" element={<SettingsPage />} />
                 <Route path="inventory-v2/balances" element={<InventoryBalanceV2 />} />
               </Route>
