@@ -247,13 +247,14 @@ const BatchStockV2: React.FC = () => {
   // Helper to safely extract string ID for sorting and comparison
   const getIdString = (item: any) => {
     if (!item) return '';
-    const idVal = item._id;
-    if (typeof idVal === 'string') return idVal;
-    if (idVal && typeof idVal === 'object') {
-      if (typeof idVal.toString === 'function') return idVal.toString();
+    if (item._id && typeof item._id === 'object') {
+      const skuStr = String(item.sku?._id || item.skuId || item._id.skuId || '');
+      const locStr = String(item.location?._id || item.locationId || item._id.locationId || '');
+      const batchStr = String(item.batchNumber || item._id.batchNumber || '');
+      return `${batchStr}-${skuStr}-${locStr}`;
     }
-    if (idVal !== undefined && idVal !== null) return String(idVal);
-    return `${item.batchNumber || ''}-${item.location?._id || item.locationId || ''}`;
+    if (item._id) return String(item._id);
+    return `${item.batchNumber || ''}-${item.sku?._id || item.skuId || ''}-${item.location?._id || item.locationId || ''}`;
   };
 
   // Helper to format Lot / Batch number
@@ -309,6 +310,13 @@ const BatchStockV2: React.FC = () => {
     if (sortField === 'lotNo') {
       valA = getDisplayLotNo(a);
       valB = getDisplayLotNo(b);
+      if (valA === valB) {
+        const skuA = a.sku?.name || '';
+        const skuB = b.sku?.name || '';
+        if (skuA !== skuB) {
+          return sortOrder === 'asc' ? skuA.localeCompare(skuB) : skuB.localeCompare(skuA);
+        }
+      }
     } else if (sortField === 'item') {
       valA = a.sku?.name || '';
       valB = b.sku?.name || '';
