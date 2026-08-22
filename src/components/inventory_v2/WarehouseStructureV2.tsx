@@ -499,10 +499,13 @@ const WarehouseStructureV2: React.FC = () => {
 
           <button
             onClick={() => handleOpenAddModal('Factory', '')}
-            className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-2 transition-all cursor-pointer"
+            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-2xl text-xs font-extrabold shadow-md shadow-blue-500/25 flex items-center gap-2 transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>New Factory</span>
+            <span className="hidden sm:inline-block px-1.5 py-0.5 bg-blue-800/80 rounded-md text-[10px] font-mono text-blue-100 font-bold">
+              Alt/Opt+C
+            </span>
           </button>
         </div>
       </div>
