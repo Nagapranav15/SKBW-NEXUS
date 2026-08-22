@@ -1090,6 +1090,85 @@ exports.getDashboardStats = async (req, res, next) => {
   }
 };
 
+const migrateLedgerTransactionNumbers = async (companyId) => {
+  try {
+    const query = { company: companyId };
+    const entries = await InventoryLedger.find(query).sort({ createdAt: 1 });
+    if (!entries || entries.length === 0) return;
+
+    let index = 1;
+    for (const entry of entries) {
+      const oldNo = entry.transactionNumber;
+      if (!/^TRX-[A-Z]{3}-\d{3}$/i.test(oldNo)) {
+        const monthShort = entry.createdAt ? new Date(entry.createdAt).toLocaleString('en-US', { month: 'short' }).toUpperCase() : 'AUG';
+        const newNo = `TRX-${monthShort}-${String(index).padStart(3, '0')}`;
+        index++;
+        entry.transactionNumber = newNo;
+        await entry.save();
+      }
+    }
+  } catch (err) {
+    console.error("Error migrating ledger transaction numbers:", err);
+  }
+};
+
+exports.getLedgerEntries = async (req, res, next) => {
+  try {
+    const { companyId, skuId, locationId, transactionType, search, startDate, endDate, page = 1, limit = 20 } = req.query;
+    if (!companyId) {
+      return res.status(400).json({ msg: "companyId query parameter is required" });
+    }
+
+    const companyObjId = toObjectId(companyId);
+    await migrateLedgerTransactionNumbers(companyObjId);
+
+    const query = { company: companyObjId, status: { $ne: "Cancelled" } };
+    if (skuId) query.skuId = toObjectId(skuId);
+    if (locationId) query.locationId = toObjectId(locationId);
+    if (transactionType) query.transactionType = transactionType;
+
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) query.createdAt.$gte = new Date(startDate);
+      if (endDate) query.createdAt.$lte = new Date(endDate);
+    }
+
+    if (search) {
+      query.$or = [
+        { transactionNumber: { $regex: search, $options: "i" } },
+        { batchNumber: { $regex: search, $options: "i" } },
+        { referenceId: { $regex: search, $options: "i" } },
+        { remarks: { $regex: search, $options: "i" } }
+      ];
+    }
+
+    const skip = (Number(page) - 1) * Number(limit);
+    
+    const [entries, total] = await Promise.all([
+      InventoryLedger.find(query)
+        .populate("skuId", "skuCode name category unit gsm brand ruleType width")
+        .populate("warehouseId", "name level")
+        .populate("floorId", "name level")
+        .populate("zoneId", "name level")
+        .populate("locationId", "name level parentId")
+        .populate("createdBy", "fullName email")
+        .sort({ createdAt: -1, _id: -1 })
+        .skip(skip)
+        .limit(Number(limit)),
+      InventoryLedger.countDocuments(query)
+    ]);
+
+    res.json({
+      entries,
+      total,
+      page: Number(page),
+      limit: Number(limit)
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // ── NEW INVENTORY LEDGER ENGINE V2 ───────────────────────────────────────────
 
 exports.getInventoryLedger = async (req, res, next) => {

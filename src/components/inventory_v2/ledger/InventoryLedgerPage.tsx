@@ -12,18 +12,19 @@ import { fetchInventoryLedger } from './ledgerService';
 import Drawer from '../../ui/Drawer';
 
 // Exact demo records matching user's latest screenshot
+// Exact demo records matching user's latest requirement
 const DEMO_STOCK_LEDGER_ENTRIES: any[] = [
   {
     _id: 'demo-1',
-    transactionNumber: 'IL-00000052',
+    transactionNumber: 'TRX-AUG-001',
     createdAt: '2026-08-10T23:54:00.000Z',
     transactionType: 'PURCHASE',
     direction: 'IN',
     skuId: { name: 'vector Reel 52 GSM 64 CM', spec: '52 GSM', brand: 'BILT', unit: 'KG' },
     batchNumber: 'PB-AUG-001',
     reelBadge: 'PB-AUG-001-R01',
-    fromLocationName: 'SKBW',
-    toLocationName: 'Bottom',
+    fromLocationName: 'Supplier: Bang Paper',
+    toLocationName: 'SKBW > Ground > Asha > Bottom',
     quantity: 50,
     unit: 'KG',
     balance: '50 KG',
@@ -34,15 +35,15 @@ const DEMO_STOCK_LEDGER_ENTRIES: any[] = [
   },
   {
     _id: 'demo-2',
-    transactionNumber: 'IL-00000051',
+    transactionNumber: 'TRX-AUG-002',
     createdAt: '2026-08-10T23:54:00.000Z',
     transactionType: 'PURCHASE',
     direction: 'IN',
     skuId: { name: 'maplito Reel 52GSM 57CM', spec: '52 GSM', brand: 'BILT', unit: 'KG' },
     batchNumber: 'PB-AUG-002',
     reelBadge: 'PB-AUG-002-R01',
-    fromLocationName: 'SKBW',
-    toLocationName: 'Lower Left Rack',
+    fromLocationName: 'Supplier: Bang Paper',
+    toLocationName: 'SKBW > Ground > Asha > Lower Left Rack',
     quantity: 300,
     unit: 'KG',
     balance: '300 KG',
@@ -53,15 +54,15 @@ const DEMO_STOCK_LEDGER_ENTRIES: any[] = [
   },
   {
     _id: 'demo-3',
-    transactionNumber: 'IL-00000049',
+    transactionNumber: 'TRX-AUG-003',
     createdAt: '2026-08-08T17:57:00.000Z',
     transactionType: 'TRANSFER',
     direction: 'IN',
     skuId: { name: 'bilt maplito Reel 52GSM 78CM', spec: '52 GSM', brand: 'BILT', unit: 'KG' },
     batchNumber: 'PB-AUG-003',
     reelBadge: 'PB-AUG-003-R01',
-    fromLocationName: 'SKBW',
-    toLocationName: 'Top',
+    fromLocationName: 'SKBW > Ground > Asha > Storage Bin A',
+    toLocationName: 'SKBW > Ground > Asha > Top Rack',
     quantity: 300,
     unit: 'KG',
     balance: '300 kg',
@@ -72,15 +73,15 @@ const DEMO_STOCK_LEDGER_ENTRIES: any[] = [
   },
   {
     _id: 'demo-4',
-    transactionNumber: 'IL-00000048',
+    transactionNumber: 'TRX-AUG-004',
     createdAt: '2026-08-08T17:57:00.000Z',
     transactionType: 'TRANSFER',
     direction: 'IN',
     skuId: { name: 'bilt maplito Reel 52GSM 78CM', spec: '52 GSM', brand: 'BILT', unit: 'KG' },
     batchNumber: 'PB-AUG-003',
     reelBadge: 'PB-AUG-003-R01',
-    fromLocationName: 'SKBW',
-    toLocationName: 'Lower Left Rack',
+    fromLocationName: 'SKBW > Ground > Asha > Top Rack',
+    toLocationName: 'SKBW > Ground > Asha > Lower Left Rack',
     quantity: 300,
     unit: 'KG',
     balance: '300 kg',
@@ -91,15 +92,15 @@ const DEMO_STOCK_LEDGER_ENTRIES: any[] = [
   },
   {
     _id: 'demo-5',
-    transactionNumber: 'IL-00000037',
+    transactionNumber: 'TRX-AUG-005',
     createdAt: '2026-07-27T22:05:00.000Z',
     transactionType: 'TRANSFER',
     direction: 'IN',
     skuId: { name: 'Century Maplitho Reel 58 GSM 64cm', spec: '58 GSM', brand: 'BILT', unit: 'kg' },
     batchNumber: 'PB-AUG-001',
     reelBadge: 'PB-AUG-001-R01',
-    fromLocationName: 'SKBW',
-    toLocationName: 'Lower Left Rack',
+    fromLocationName: 'SKBW > Ground > Murali > Bottom Rack',
+    toLocationName: 'SKBW > Ground > Asha > Lower Left Rack',
     quantity: 1990,
     unit: 'kg',
     balance: '1990 kg',
@@ -110,15 +111,15 @@ const DEMO_STOCK_LEDGER_ENTRIES: any[] = [
   },
   {
     _id: 'demo-6',
-    transactionNumber: 'IL-00000036',
+    transactionNumber: 'TRX-AUG-006',
     createdAt: '2026-07-27T22:05:00.000Z',
     transactionType: 'TRANSFER',
     direction: 'IN',
     skuId: { name: 'Century Maplitho Reel 58 GSM 64cm', spec: '58 GSM', brand: 'BILT', unit: 'kg' },
     batchNumber: 'PB-AUG-001',
     reelBadge: 'PB-AUG-001-R01',
-    fromLocationName: 'SKBW',
-    toLocationName: 'Upper Left Rack',
+    fromLocationName: 'SKBW > Ground > Asha > Lower Left Rack',
+    toLocationName: 'SKBW > Ground > Asha > Upper Left Rack',
     quantity: 1990,
     unit: 'kg',
     balance: '1990 kg',
@@ -129,15 +130,15 @@ const DEMO_STOCK_LEDGER_ENTRIES: any[] = [
   },
   {
     _id: 'demo-7',
-    transactionNumber: 'IL-00000033',
+    transactionNumber: 'TRX-AUG-007',
     createdAt: '2026-07-27T22:00:00.000Z',
     transactionType: 'TRANSFER',
     direction: 'IN',
     skuId: { name: 'Century Maplitho Reel 58 GSM 64cm', spec: '58 GSM', brand: 'BILT', unit: 'kg' },
     batchNumber: 'PB-AUG-001',
     reelBadge: 'PB-AUG-001-R01',
-    fromLocationName: 'SKBW',
-    toLocationName: 'Upper Left Rack',
+    fromLocationName: 'SKBW > Ground > Asha > Storage Bin B',
+    toLocationName: 'SKBW > Ground > Asha > Upper Left Rack',
     quantity: 990,
     unit: 'kg',
     balance: '990 kg',
@@ -175,6 +176,41 @@ const getTypeBadgeStyle = (type: string) => {
     bg: 'bg-gray-50 text-gray-700 border-gray-200',
     icon: <ArrowRightLeft className="w-3 h-3 text-gray-500 shrink-0" />
   };
+};
+
+const renderLocationHierarchyBadge = (locationStr: string, isFrom: boolean, transactionType: string) => {
+  if (!locationStr) return <span className="text-gray-400 text-xs">—</span>;
+  const isSupplier = locationStr.toLowerCase().startsWith('supplier:') || locationStr.toLowerCase().includes('vendor') || locationStr.toLowerCase().includes('external');
+  
+  if (isSupplier) {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/80 shadow-3xs">
+        <Inbox className="w-3 h-3 text-emerald-600 shrink-0" />
+        <span>{locationStr.replace(/^Supplier:\s*/i, '')}</span>
+      </span>
+    );
+  }
+
+  // Parse path string separated by >
+  const parts = locationStr.split('>').map(s => s.trim()).filter(Boolean);
+
+  if (parts.length === 0) {
+    return <span className="text-gray-400 text-xs">—</span>;
+  }
+
+  return (
+    <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-gray-50/90 text-gray-700 border border-gray-200/80 shadow-3xs hover:bg-gray-100/70 transition-colors">
+      <MapPin className="w-3 h-3 text-blue-500 shrink-0" />
+      {parts.map((part, idx) => (
+        <React.Fragment key={idx}>
+          {idx > 0 && <ChevronRight className="w-3 h-3 text-gray-400 shrink-0" />}
+          <span className={idx === parts.length - 1 ? "font-bold text-gray-950" : "text-gray-500 font-medium"}>
+            {part}
+          </span>
+        </React.Fragment>
+      ))}
+    </div>
+  );
 };
 
 const formatDate = (dateStr: string) => {
@@ -918,8 +954,12 @@ const InventoryLedgerPage: React.FC = () => {
                         {reelBadge}
                       </div>
                     </td>
-                    <td className="py-3.5 px-4 font-semibold text-gray-700 whitespace-nowrap">{fromLoc}</td>
-                    <td className="py-3.5 px-4 font-semibold text-gray-700 whitespace-nowrap">{toLoc}</td>
+                    <td className="py-3.5 px-4 font-semibold text-gray-700 whitespace-nowrap">
+                      {renderLocationHierarchyBadge(fromLoc, true, tx.transactionType)}
+                    </td>
+                    <td className="py-3.5 px-4 font-semibold text-gray-700 whitespace-nowrap">
+                      {renderLocationHierarchyBadge(toLoc, false, tx.transactionType)}
+                    </td>
                     <td className={`py-3.5 px-4 text-right font-bold text-xs whitespace-nowrap ${isPositive ? 'text-emerald-600' : 'text-rose-600'}`}>
                       {qtyDisplay} {unitStr}
                     </td>

@@ -23,8 +23,9 @@ sequenceSchema.statics.getNextSequence = async function(prefix, session) {
     let code = "";
     let exists = false;
 
-    if (prefix === "IL") {
-      code = `IL-${String(seqDoc.sequence).padStart(8, '0')}`;
+    if (prefix === "TRX" || prefix === "IL") {
+      const monthShort = new Date().toLocaleString('en-US', { month: 'short' }).toUpperCase();
+      code = `TRX-${monthShort}-${String(seqDoc.sequence).padStart(3, '0')}`;
       exists = await InventoryLedger.exists({ transactionNumber: code });
     } else if (prefix === "PB") {
       const monthShort = new Date().toLocaleString('en-US', { month: 'short' }).toUpperCase();
@@ -40,20 +41,23 @@ sequenceSchema.statics.getNextSequence = async function(prefix, session) {
 
     // Sequence is out of sync! Find max sequence from collection
     let maxVal = seqDoc.sequence;
-    if (prefix === "IL") {
-      const maxDoc = await InventoryLedger.findOne({
-        transactionNumber: /^IL-\d{8}$/
-      }).sort({ transactionNumber: -1 }).lean();
-      if (maxDoc) {
-        const num = parseInt(maxDoc.transactionNumber.split("-")[1], 10);
-        if (!isNaN(num)) maxVal = Math.max(maxVal, num);
-      }
+    if (prefix === "TRX" || prefix === "IL") {
+      const monthShort = new Date().toLocaleString('en-US', { month: 'short' }).toUpperCase();
+      const regex = new RegExp(`^TRX-${monthShort}-(\\d+)$`, 'i');
+      const docs = await InventoryLedger.find({ transactionNumber: regex }).select('transactionNumber').lean();
+      docs.forEach(doc => {
+        const m = doc.transactionNumber ? doc.transactionNumber.match(regex) : null;
+        if (m && m[1]) {
+          const num = parseInt(m[1], 10);
+          if (!isNaN(num)) maxVal = Math.max(maxVal, num);
+        }
+      });
     } else if (prefix === "PB") {
       const monthShort = new Date().toLocaleString('en-US', { month: 'short' }).toUpperCase();
       const regex = new RegExp(`^PB-${monthShort}-(\\d+)$`, 'i');
       const docs = await PurchaseInvoiceV2.find({ invoiceNumber: regex }).select('invoiceNumber').lean();
       docs.forEach(doc => {
-        const m = doc.invoiceNumber.match(regex);
+        const m = doc.invoiceNumber ? doc.invoiceNumber.match(regex) : null;
         if (m && m[1]) {
           const num = parseInt(m[1], 10);
           if (!isNaN(num)) maxVal = Math.max(maxVal, num);
@@ -70,9 +74,9 @@ sequenceSchema.statics.getNextSequence = async function(prefix, session) {
   }
 
   const monthShort = new Date().toLocaleString('en-US', { month: 'short' }).toUpperCase();
-  return prefix === "IL" 
-    ? `IL-${String(seqDoc.sequence).padStart(8, '0')}` 
-    : `PB-${monthShort}-${String(seqDoc.sequence).padStart(3, '0')}`;
+  return prefix === "PB" 
+    ? `PB-${monthShort}-${String(seqDoc.sequence).padStart(3, '0')}` 
+    : `TRX-${monthShort}-${String(seqDoc.sequence).padStart(3, '0')}`;
 };
 
 module.exports = mongoose.model("Sequence", sequenceSchema);
