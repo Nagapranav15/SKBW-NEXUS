@@ -240,8 +240,10 @@ const TransactionDetailDrawer: React.FC<LedgerDetailDrawerProps> = ({ entry, onC
   const skuName = entry.skuId?.name || 'vector Reel 52 GSM 64 CM';
   const brandName = entry.skuId?.brand || 'BILT';
   const unitStr = entry.unit || entry.skuId?.unit || 'KG';
-  const lotNo = entry.batchNumber || 'PB-000004';
-  const reelVal = entry.reelBadge || 'PB-000004-L1-R01';
+  const lotNo = entry.batchNumber || entry.lotNumber || 'PB-AUG-001';
+  const firstReel = Array.isArray(entry.reels) && entry.reels.length > 0 ? entry.reels[0].reelNumber : null;
+  const rawReelVal = firstReel || entry.reelBadge || '';
+  const reelVal = (rawReelVal && !rawReelVal.includes('PB-00000')) ? rawReelVal : `${lotNo}-R01`;
   const fromLoc = entry.fromLocationName || 'SKBW';
   const toLoc = entry.toLocationName || 'Bottom';
   const userName = entry.createdBy?.fullName || 'System Administrator';
@@ -913,8 +915,10 @@ const InventoryLedgerPage: React.FC = () => {
                 const { date, time } = formatDate(tx.createdAt);
                 const isPositive = tx.direction === 'IN' || tx.quantity > 0;
                 const unitStr = tx.unit || tx.skuId?.unit || 'KG';
-                const lotNo = tx.batchNumber || 'PB-000004';
-                const reelBadge = tx.reelBadge || 'PB-000004-L1-R01';
+                const lotNo = tx.batchNumber || tx.lotNumber || 'PB-AUG-001';
+                const firstReel = Array.isArray(tx.reels) && tx.reels.length > 0 ? tx.reels[0].reelNumber : null;
+                const rawReelBadge = firstReel || tx.reelBadge || '';
+                const reelBadge = (rawReelBadge && !rawReelBadge.includes('PB-00000')) ? rawReelBadge : `${lotNo}-R01`;
                 const skuName = tx.skuId?.name || 'vector Reel 52 GSM 64 CM';
                 const skuSpec = tx.skuId?.spec || '52 GSM';
                 const brandName = tx.skuId?.brand || 'BILT';
