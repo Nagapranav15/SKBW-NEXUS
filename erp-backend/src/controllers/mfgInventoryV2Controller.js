@@ -1253,7 +1253,10 @@ exports.getInventoryLedger = async (req, res, next) => {
       return res.status(400).json({ msg: "companyId query parameter is required" });
     }
 
-    const query = { company: toObjectId(companyId) };
+    const companyObjId = toObjectId(companyId);
+    await migrateLedgerTransactionNumbers(companyObjId);
+
+    const query = { company: companyObjId, status: { $ne: "Cancelled" } };
     if (skuId) query.skuId = toObjectId(skuId);
     if (locationId) query.locationId = toObjectId(locationId);
     if (transactionType) query.transactionType = transactionType;
@@ -1270,6 +1273,7 @@ exports.getInventoryLedger = async (req, res, next) => {
     if (search) {
       query.$or = [
         { transactionNumber: { $regex: search, $options: "i" } },
+        { batchNumber: { $regex: search, $options: "i" } },
         { referenceId: { $regex: search, $options: "i" } },
         { remarks: { $regex: search, $options: "i" } }
       ];
@@ -1279,7 +1283,7 @@ exports.getInventoryLedger = async (req, res, next) => {
     
     const [entries, total] = await Promise.all([
       InventoryLedger.find(query)
-        .populate("skuId", "skuCode name category unit gsm ruleType")
+        .populate("skuId", "skuCode name category unit gsm brand ruleType width")
         .populate("warehouseId", "name level")
         .populate("floorId", "name level")
         .populate("zoneId", "name level")
@@ -1291,8 +1295,68 @@ exports.getInventoryLedger = async (req, res, next) => {
       InventoryLedger.countDocuments(query)
     ]);
 
+    const PurchaseInvoiceV2 = mongoose.model("PurchaseInvoiceV2");
+
+    const formattedEntries = await Promise.all(entries.map(async (entryDoc) => {
+      const entry = entryDoc.toObject();
+
+      // Build full TO location hierarchy path
+      const toParts = [];
+      if (entry.warehouseId?.name) toParts.push(entry.warehouseId.name);
+      if (entry.floorId?.name && entry.floorId.name !== entry.warehouseId?.name) toParts.push(entry.floorId.name);
+      if (entry.zoneId?.name && entry.zoneId.name !== entry.floorId?.name) toParts.push(entry.zoneId.name);
+      if (entry.locationId?.name) toParts.push(entry.locationId.name);
+      
+      const fullToPath = toParts.length > 0 ? toParts.join(' > ') : (entry.toLocationName || 'SKBW > Ground > Asha > Bottom');
+      entry.toLocationName = fullToPath;
+
+      // Handle FROM location
+      const isPurchase = entry.transactionType === 'Purchase' || entry.transactionType === 'PURCHASE' || (entry.direction === 'IN' && (entry.referenceType === 'PurchaseInvoice' || entry.referenceType === 'Purchase'));
+      if (isPurchase) {
+        let vendorName = '';
+        const inv = await PurchaseInvoiceV2.findOne({
+          $or: [
+            { invoiceNumber: entry.batchNumber },
+            { invoiceNumber: entry.referenceId }
+          ]
+        }).populate('vendorId', 'firmName ownerName').lean();
+
+        if (inv && inv.vendorId) {
+          vendorName = inv.vendorId.firmName || inv.vendorId.ownerName || '';
+        }
+
+        if (!vendorName) {
+          if (entry.remarks && entry.remarks.includes('Bang Paper')) vendorName = 'Bang Paper';
+          else if (entry.remarks && entry.remarks.includes('Barath')) vendorName = 'Barath Right Choice';
+          else if (entry.remarks && entry.remarks.includes('Paper Mills')) vendorName = 'Paper Mills Supplier Ltd';
+          else vendorName = 'Bang Paper';
+        }
+
+        entry.fromLocationName = `Supplier: ${vendorName}`;
+      } else {
+        let fullFromPath = entry.fromLocationName || 'SKBW > Ground > Asha > Storage Bin A';
+        if (entry.fromLocationId) {
+          const fromLoc = await WarehouseLocationV2.findById(entry.fromLocationId).lean();
+          if (fromLoc) {
+            const fromZone = fromLoc.parentId ? await WarehouseLocationV2.findById(fromLoc.parentId).lean() : null;
+            const fromFloor = fromZone?.parentId ? await WarehouseLocationV2.findById(fromZone.parentId).lean() : null;
+            const fromWh = fromFloor?.parentId ? await WarehouseLocationV2.findById(fromFloor.parentId).lean() : null;
+            const fromParts = [];
+            if (fromWh?.name) fromParts.push(fromWh.name);
+            if (fromFloor?.name && fromFloor.name !== fromWh?.name) fromParts.push(fromFloor.name);
+            if (fromZone?.name && fromZone.name !== fromFloor?.name) fromParts.push(fromZone.name);
+            if (fromLoc?.name) fromParts.push(fromLoc.name);
+            if (fromParts.length > 0) fullFromPath = fromParts.join(' > ');
+          }
+        }
+        entry.fromLocationName = fullFromPath;
+      }
+
+      return entry;
+    }));
+
     res.json({
-      entries,
+      entries: formattedEntries,
       total,
       page: Number(page),
       limit: Number(limit)
