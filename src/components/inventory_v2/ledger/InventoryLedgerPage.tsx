@@ -955,10 +955,10 @@ const InventoryLedgerPage: React.FC = () => {
                       </div>
                     </td>
                     <td className="py-3.5 px-4 font-semibold text-gray-700 whitespace-nowrap">
-                      {renderLocationHierarchyBadge(fromLoc, true, tx.transactionType)}
+                      {fromLoc.replace(/^Supplier:\s*/i, '')}
                     </td>
                     <td className="py-3.5 px-4 font-semibold text-gray-700 whitespace-nowrap">
-                      {renderLocationHierarchyBadge(toLoc, false, tx.transactionType)}
+                      {toLoc.includes('>') ? (toLoc.split('>').pop()?.trim() || toLoc) : toLoc}
                     </td>
                     <td className={`py-3.5 px-4 text-right font-bold text-xs whitespace-nowrap ${isPositive ? 'text-emerald-600' : 'text-rose-600'}`}>
                       {qtyDisplay} {unitStr}
