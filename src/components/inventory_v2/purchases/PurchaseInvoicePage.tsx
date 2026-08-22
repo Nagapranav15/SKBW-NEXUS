@@ -10,6 +10,7 @@ import {
   createPurchaseInvoiceV2, 
   recordPurchasePaymentV2, 
   updatePurchaseInvoiceV2,
+  cancelPurchaseInvoiceV2,
   deletePurchaseInvoiceV2,
   PurchaseInvoiceV2, 
   PurchaseInvoiceItemV2
@@ -716,6 +717,9 @@ const PurchaseInvoicePage: React.FC = () => {
         setAddError(`Quantity and price must be positive numbers in row ${i + 1}`);
         return;
       }
+
+      const selectedSku = skus.find(s => s._id === item.skuId);
+      const isReels = selectedSku?.paperType === 'Reels' || reelsCount > 0;
 
       if (isReels) {
         const totalReelsWeight = (item.reels || []).reduce((sum, r) => sum + (Number(r.weight) || 0), 0);
