@@ -507,6 +507,9 @@ exports.editPurchaseInvoice = async (req, res, next) => {
         return res.status(400).json({ msg: `Location '${primaryLocId}' not found` });
       }
 
+      const itemTotal = qty * price;
+      subTotal += itemTotal;
+
       const cleanReels = (Array.isArray(reels) ? reels : []).map((r, rIdx) => ({
         reelNumber: r.reelNumber || r.reelNo || `${lotNumber}-R${String(rIdx + 1).padStart(2, '0')}`,
         gsm: Number(r.gsm) || Number(sku.gsm) || 0,
