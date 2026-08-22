@@ -27,7 +27,8 @@ sequenceSchema.statics.getNextSequence = async function(prefix, session) {
       code = `IL-${String(seqDoc.sequence).padStart(8, '0')}`;
       exists = await InventoryLedger.exists({ transactionNumber: code });
     } else if (prefix === "PB") {
-      code = `PB-${String(seqDoc.sequence).padStart(6, '0')}`;
+      const monthShort = new Date().toLocaleString('en-US', { month: 'short' }).toUpperCase();
+      code = `PB-${monthShort}-${String(seqDoc.sequence).padStart(3, '0')}`;
       exists = await PurchaseInvoiceV2.exists({ invoiceNumber: code });
     } else {
       return seqDoc.sequence;
@@ -48,13 +49,16 @@ sequenceSchema.statics.getNextSequence = async function(prefix, session) {
         if (!isNaN(num)) maxVal = Math.max(maxVal, num);
       }
     } else if (prefix === "PB") {
-      const maxDoc = await PurchaseInvoiceV2.findOne({
-        invoiceNumber: /^PB-\d{6}$/
-      }).sort({ invoiceNumber: -1 }).lean();
-      if (maxDoc) {
-        const num = parseInt(maxDoc.invoiceNumber.split("-")[1], 10);
-        if (!isNaN(num)) maxVal = Math.max(maxVal, num);
-      }
+      const monthShort = new Date().toLocaleString('en-US', { month: 'short' }).toUpperCase();
+      const regex = new RegExp(`^PB-${monthShort}-(\\d+)$`, 'i');
+      const docs = await PurchaseInvoiceV2.find({ invoiceNumber: regex }).select('invoiceNumber').lean();
+      docs.forEach(doc => {
+        const m = doc.invoiceNumber.match(regex);
+        if (m && m[1]) {
+          const num = parseInt(m[1], 10);
+          if (!isNaN(num)) maxVal = Math.max(maxVal, num);
+        }
+      });
     }
 
     seqDoc = await this.findOneAndUpdate(
@@ -65,9 +69,10 @@ sequenceSchema.statics.getNextSequence = async function(prefix, session) {
     attempts++;
   }
 
+  const monthShort = new Date().toLocaleString('en-US', { month: 'short' }).toUpperCase();
   return prefix === "IL" 
     ? `IL-${String(seqDoc.sequence).padStart(8, '0')}` 
-    : `PB-${String(seqDoc.sequence).padStart(6, '0')}`;
+    : `PB-${monthShort}-${String(seqDoc.sequence).padStart(3, '0')}`;
 };
 
 module.exports = mongoose.model("Sequence", sequenceSchema);

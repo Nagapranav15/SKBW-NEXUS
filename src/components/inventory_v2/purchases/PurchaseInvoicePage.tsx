@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, X, FileText, Trash2, Calendar, Coins, Download, Upload, HelpCircle, Check, Eye, MoreVertical, Edit, Printer, ArrowRight, Layers, IndianRupee, Clock, AlertTriangle, CheckCircle, Settings, Trash, RefreshCcw, User, MapPin as MapPinIcon } from 'lucide-react';
+import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, X, FileText, Trash2, Calendar, Coins, Download, Upload, HelpCircle, Check, Eye, MoreVertical, Edit, Printer, ArrowRight, Layers, IndianRupee, Clock, AlertTriangle, CheckCircle, Settings, Trash, RefreshCcw, User, MapPin as MapPinIcon, Ban } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { getActivityLogs, createActivityLog } from '../../../api/activityLogApi';
@@ -25,7 +25,7 @@ interface InvoiceTableProps {
   skus: SkuV2[];
   onViewDetails: (invoice: PurchaseInvoiceV2) => void;
   onEditInvoice: (invoice: PurchaseInvoiceV2) => void;
-  onDeleteInvoice: (invoice: PurchaseInvoiceV2) => void;
+  onCancelInvoice: (invoice: PurchaseInvoiceV2) => void;
 }
 
 const InvoiceTable: React.FC<InvoiceTableProps> = ({ 
@@ -34,7 +34,7 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
   skus,
   onViewDetails,
   onEditInvoice,
-  onDeleteInvoice
+  onCancelInvoice
 }) => {
   if (loading) {
     return (
@@ -93,6 +93,7 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
                   }
                 });
 
+                const isCancelled = inv.status === 'Cancelled';
                 const statusColor = inv.status === 'Posted' ? 'bg-green-50 text-green-700 border-green-200' :
                                     inv.status === 'Draft' ? 'bg-amber-50 text-amber-700 border-amber-200' :
                                     'bg-red-50 text-red-700 border-red-200';
@@ -100,16 +101,24 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
                 return (
                   <tr 
                     key={inv._id} 
-                    className="hover:bg-gray-50 border-b border-gray-100/60 transition-colors cursor-pointer text-gray-700" 
+                    className={`border-b transition-colors cursor-pointer text-gray-700 ${
+                      isCancelled 
+                        ? 'bg-red-50/70 border-red-200/80 hover:bg-red-100/60 text-red-950 font-medium' 
+                        : 'hover:bg-gray-50 border-gray-100/60'
+                    }`}
                     onClick={() => onViewDetails(inv)}
                   >
-                    <td className="px-3.5 py-2 font-bold text-blue-600 text-[13.5px]">{inv.invoiceNumber}</td>
+                    <td className={`px-3.5 py-2 font-bold text-[13.5px] ${isCancelled ? 'text-red-700' : 'text-blue-600'}`}>
+                      {inv.invoiceNumber}
+                    </td>
                     <td className="px-3.5 py-2 text-gray-500 font-semibold text-[13px]">
                       {inv.createdAt ? new Date(inv.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                     </td>
                     <td className="px-3.5 py-2 font-bold text-gray-905 text-[13.5px]">{supplierName}</td>
                     <td className="px-3.5 py-2">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                        isCancelled ? 'bg-red-100 text-red-800 border-red-200' : 'bg-blue-50 text-blue-700 border-blue-100'
+                      }`}>
                         {lotsLabel}
                       </span>
                     </td>
@@ -127,7 +136,7 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
                     </td>
                     <td className="px-3.5 py-2 text-center">
                       <span className={`text-[9px] px-2 py-0.5 rounded font-bold uppercase border ${statusColor}`}>
-                        {inv.status === 'Posted' ? 'Received' : inv.status === 'Draft' ? 'Draft' : 'Cancelled'}
+                        {inv.status === 'Posted' ? 'Received' : inv.status === 'Draft' ? 'Draft' : 'CANCELLED'}
                       </span>
                     </td>
                     <td className="px-3.5 py-2 text-center" onClick={(e) => e.stopPropagation()}>
@@ -139,13 +148,15 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
                         >
                           <Eye className="w-3.5 h-3.5" />
                         </button>
-                        <button
-                          onClick={() => onDeleteInvoice(inv)}
-                          className="p-1.5 text-red-650 hover:bg-red-55 rounded-lg transition-colors border border-red-100/50 shadow-3xs"
-                          title="Delete Purchase Batch"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {!isCancelled && (
+                          <button
+                            onClick={() => onCancelInvoice(inv)}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-200/60 shadow-3xs"
+                            title="Cancel Purchase Batch"
+                          >
+                            <Ban className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -742,7 +753,7 @@ const PurchaseInvoicePage: React.FC = () => {
             unit: 'kg',
             purchasePrice: price,
             totalPrice: totalGroupWeight * price,
-            lotNumber: item.lotNumber || `${finalInvoiceNumber}-L0${i + 1}`,
+            lotNumber: item.lotNumber || finalInvoiceNumber,
             locationId: locId,
             reels: reelsGroup
           });
@@ -758,7 +769,7 @@ const PurchaseInvoicePage: React.FC = () => {
             unit: selectedSku?.unit || 'kg',
             purchasePrice: price,
             totalPrice: splitQty * price,
-            lotNumber: item.lotNumber || `${finalInvoiceNumber}-L0${i + 1}`,
+            lotNumber: item.lotNumber || finalInvoiceNumber,
             locationId: split.locationId,
             reels: [],
             reamWeight: (item as any).reamWeight ? Number((item as any).reamWeight) : undefined,
@@ -775,7 +786,7 @@ const PurchaseInvoicePage: React.FC = () => {
           unit: selectedSku?.unit || 'kg',
           purchasePrice: price,
           totalPrice: qty * price,
-          lotNumber: item.lotNumber || `${finalInvoiceNumber}-L0${i + 1}`,
+          lotNumber: item.lotNumber || finalInvoiceNumber,
           locationId: destLocId,
           reels: [],
           reamWeight: (item as any).reamWeight ? Number((item as any).reamWeight) : undefined,
@@ -1312,7 +1323,7 @@ const PurchaseInvoicePage: React.FC = () => {
                 setActiveSubPage('details');
               }}
               onEditInvoice={handleEditInvoice}
-              onDeleteInvoice={handleDeleteInvoice}
+              onCancelInvoice={handleCancelInvoice}
             />
 
             {/* Pagination Footer */}
@@ -2556,12 +2567,18 @@ const PurchaseInvoicePage: React.FC = () => {
 
           {/* Footer actions wrapper */}
           <div className="p-5 border-t border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
-            <button
-              onClick={() => handleDeleteInvoice(selectedInvoice)}
-              className="px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 bg-white rounded-xl text-xs font-bold transition-all flex items-center gap-1"
-            >
-              <Trash2 className="w-3.5 h-3.5" /> Delete Batch
-            </button>
+            {selectedInvoice.status !== 'Cancelled' ? (
+              <button
+                onClick={() => handleCancelInvoice(selectedInvoice)}
+                className="px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 bg-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-3xs"
+              >
+                <Ban className="w-3.5 h-3.5" /> Cancel Batch
+              </button>
+            ) : (
+              <span className="px-3 py-1.5 bg-red-100/70 text-red-800 border border-red-200 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <Ban className="w-3.5 h-3.5" /> Batch Cancelled
+              </span>
+            )}
             <button
               onClick={() => setActiveSubPage('list')}
               className="px-5 py-2 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 text-gray-700 font-bold text-xs shadow-3xs"

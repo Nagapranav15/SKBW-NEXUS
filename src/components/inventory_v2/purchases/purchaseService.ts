@@ -98,3 +98,10 @@ export const deletePurchaseInvoiceV2 = async (id: string, companyId: string): Pr
   });
   return response.data;
 };
+
+export const cancelPurchaseInvoiceV2 = async (id: string, companyId: string): Promise<any> => {
+  const response = await api.put(`/v2/purchases/invoices/${id}/cancel`, {
+    company: companyId
+  });
+  return response.data;
+};

@@ -45,6 +45,7 @@ router.get("/purchases/invoices", auth, rbac(view), purchaseCtrl.getPurchaseInvo
 router.post("/purchases/invoices", auth, rbac(manage), purchaseCtrl.createPurchaseInvoice);
 router.put("/purchases/invoices/:id", auth, rbac(manage), purchaseCtrl.editPurchaseInvoice);
 router.delete("/purchases/invoices/:id", auth, rbac(manage), purchaseCtrl.deletePurchaseInvoice);
+router.put("/purchases/invoices/:id/cancel", auth, rbac(manage), purchaseCtrl.cancelPurchaseInvoice);
 router.post("/purchases/payments", auth, rbac(manage), purchaseCtrl.recordPurchasePayment);
 
 // Metadata routes

@@ -256,29 +256,12 @@ const BatchStockV2: React.FC = () => {
     return `${item.batchNumber || ''}-${item.location?._id || item.locationId || ''}`;
   };
 
-  // Helper to format Lot number deterministically
+  // Helper to format Lot / Batch number
   const getDisplayLotNo = (b: any) => {
     if (!b) return '—';
     if (b.lotNo) return b.lotNo;
     if (b.lotNumber) return b.lotNumber;
-    
-    const batchNo = b.batchNumber || 'PB2407001';
-    
-    // Sort batchBals deterministically by _id so primary lot is 100% stable across polls & renders
-    const batchBals = safeBalances
-      .filter(x => x && x.batchNumber === batchNo && String(x.sku?._id || x.skuId || '') === String(b.sku?._id || b.skuId || ''))
-      .sort((x, y) => getIdString(x).localeCompare(getIdString(y)));
-      
-    const isInitial = batchBals.length > 0 && getIdString(batchBals[0]) === getIdString(b);
-    
-    const baseLot = batchNo.includes('-L') ? batchNo : `${batchNo}-L01`;
-    if (isInitial) return baseLot;
-    
-    // Extract suffix from location name
-    const name = b.location?.name || '';
-    const parts = name.split('-');
-    const suffix = parts[parts.length - 1]?.trim() || '';
-    return suffix ? `${baseLot}-${suffix}` : baseLot;
+    return b.batchNumber || 'PB-AUG-001';
   };
 
   // Filters logic

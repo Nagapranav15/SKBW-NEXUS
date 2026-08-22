@@ -580,6 +580,64 @@ exports.deletePurchaseInvoice = async (req, res, next) => {
   }
 };
 
+exports.cancelPurchaseInvoice = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { company } = req.body;
+
+    if (!company) {
+      return res.status(400).json({ msg: "company parameter is required" });
+    }
+    const companyObjId = toObjectId(company);
+
+    const invoice = await PurchaseInvoiceV2.findOne({ _id: toObjectId(id), company: companyObjId });
+    if (!invoice) {
+      return res.status(404).json({ msg: "Purchase batch not found" });
+    }
+
+    if (invoice.status === 'Cancelled') {
+      return res.status(400).json({ msg: "Purchase batch is already cancelled" });
+    }
+
+    // Revert vendor liability balance
+    const vendor = await Party.findOne({ _id: invoice.vendorId, company: companyObjId });
+    if (vendor) {
+      const supplierPayable = invoice.subTotal || 0;
+      vendor.outstanding = Math.max((vendor.outstanding || 0) - supplierPayable, 0);
+      vendor.outstandingBalance = Math.max((vendor.outstandingBalance || 0) - supplierPayable, 0);
+      await vendor.save();
+    }
+
+    // Delete financial Transaction
+    await Transaction.deleteOne({
+      company: companyObjId,
+      partyId: invoice.vendorId,
+      source_type: "PURCHASE",
+      description: { $regex: invoice.invoiceNumber }
+    });
+
+    // Delete stock ledger entries (removes stock balance from Stock and Stock Ledger modules)
+    await InventoryLedger.deleteMany({ referenceType: "PurchaseInvoice", referenceId: invoice.invoiceNumber, company: companyObjId });
+
+    // Mark status as Cancelled
+    invoice.status = "Cancelled";
+    await invoice.save();
+
+    ActivityLog.create({
+      action: "CANCEL",
+      entityType: "PurchaseInvoiceV2",
+      entityName: invoice.invoiceNumber,
+      details: `Cancelled Purchase Batch '${invoice.invoiceNumber}' and removed stock entries.`,
+      performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
+      company: companyObjId
+    }).catch(e => console.error("ActivityLog error:", e));
+
+    res.json({ msg: "Purchase batch cancelled successfully", invoice });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.getNextInvoiceNumber = async (req, res, next) => {
   try {
     const { companyId } = req.query;
@@ -588,18 +646,23 @@ exports.getNextInvoiceNumber = async (req, res, next) => {
     }
     const companyObjId = toObjectId(companyId);
 
-    const seqDoc = await Sequence.findOne({ prefix: "PB" });
-    const currentSeq = seqDoc ? seqDoc.sequence : 0;
+    const monthShort = new Date().toLocaleString('en-US', { month: 'short' }).toUpperCase();
+    const prefix = `PB-${monthShort}-`;
+    const regex = new RegExp(`^PB-${monthShort}-(\\d+)$`, 'i');
 
-    let nextSeq = currentSeq + 1;
-    let code = `PB-${String(nextSeq).padStart(6, '0')}`;
-    let exists = await PurchaseInvoiceV2.exists({ invoiceNumber: code, company: companyObjId });
+    const existingInvoices = await PurchaseInvoiceV2.find({ company: companyObjId, invoiceNumber: regex }).select('invoiceNumber').lean();
 
-    while (exists) {
-      nextSeq++;
-      code = `PB-${String(nextSeq).padStart(6, '0')}`;
-      exists = await PurchaseInvoiceV2.exists({ invoiceNumber: code, company: companyObjId });
-    }
+    let maxNum = 0;
+    existingInvoices.forEach(inv => {
+      const match = inv.invoiceNumber.match(regex);
+      if (match && match[1]) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num > maxNum) maxNum = num;
+      }
+    });
+
+    const nextSeq = maxNum + 1;
+    const code = `${prefix}${String(nextSeq).padStart(3, '0')}`;
 
     res.json({ nextInvoiceNumber: code });
   } catch (err) {
