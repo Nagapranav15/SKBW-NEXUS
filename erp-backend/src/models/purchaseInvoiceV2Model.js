@@ -15,10 +15,10 @@ const purchaseInvoiceItemSchema = new mongoose.Schema({
     quantity: { type: Number, required: true }
   }],
   reels: [{
-    reelNumber: { type: String, required: true },
-    gsm: { type: Number, required: true },
-    width: { type: Number, required: true },
-    weight: { type: Number, required: true },
+    reelNumber: { type: String },
+    gsm: { type: Number },
+    width: { type: Number },
+    weight: { type: Number },
     locationId: { type: mongoose.Schema.Types.ObjectId, ref: 'WarehouseLocationV2' }
   }]
 });

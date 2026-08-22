@@ -21,10 +21,10 @@ const inventoryLedgerSchema = new mongoose.Schema({
   locationId: { type: mongoose.Schema.Types.ObjectId, ref: 'WarehouseLocationV2', required: true, index: true }, 
   remarks: { type: String, default: "" },
   reels: [{
-    reelNumber: { type: String, required: true },
-    gsm: { type: Number, required: true },
-    width: { type: Number, required: true },
-    weight: { type: Number, required: true }
+    reelNumber: { type: String },
+    gsm: { type: Number },
+    width: { type: Number },
+    weight: { type: Number }
   }],
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   status: { type: String, required: true, enum: ["Posted", "Pending", "Cancelled"], default: "Posted" },

@@ -77,7 +77,13 @@ exports.createPurchaseInvoice = async (req, res, next) => {
       }
 
       const itemTotal = qty * price;
-      subTotal += itemTotal;
+      const cleanReels = (Array.isArray(reels) ? reels : []).map((r, rIdx) => ({
+        reelNumber: r.reelNumber || r.reelNo || `${lotNumber}-R${String(rIdx + 1).padStart(2, '0')}`,
+        gsm: Number(r.gsm) || Number(sku.gsm) || 0,
+        width: Number(r.width) || Number(sku.width) || 0,
+        weight: Number(r.weight) || 0,
+        locationId: r.locationId || location._id
+      }));
 
       validatedItems.push({
         skuId: sku._id,
@@ -88,7 +94,7 @@ exports.createPurchaseInvoice = async (req, res, next) => {
         lotNumber,
         locationId: location._id,
         splits: Array.isArray(splits) ? splits : [],
-        reels: Array.isArray(reels) ? reels : [],
+        reels: cleanReels,
         reamWeight: item.reamWeight ? Number(item.reamWeight) : undefined,
         ratePerKg: item.ratePerKg ? Number(item.ratePerKg) : undefined
       });
@@ -501,8 +507,13 @@ exports.editPurchaseInvoice = async (req, res, next) => {
         return res.status(400).json({ msg: `Location '${primaryLocId}' not found` });
       }
 
-      const itemTotal = qty * price;
-      subTotal += itemTotal;
+      const cleanReels = (Array.isArray(reels) ? reels : []).map((r, rIdx) => ({
+        reelNumber: r.reelNumber || r.reelNo || `${lotNumber}-R${String(rIdx + 1).padStart(2, '0')}`,
+        gsm: Number(r.gsm) || Number(sku.gsm) || 0,
+        width: Number(r.width) || Number(sku.width) || 0,
+        weight: Number(r.weight) || 0,
+        locationId: r.locationId || location._id
+      }));
 
       validatedItems.push({
         skuId: sku._id,
@@ -513,7 +524,7 @@ exports.editPurchaseInvoice = async (req, res, next) => {
         lotNumber,
         locationId: location._id,
         splits: Array.isArray(splits) ? splits : [],
-        reels: Array.isArray(reels) ? reels : [],
+        reels: cleanReels,
         reamWeight: item.reamWeight ? Number(item.reamWeight) : undefined,
         ratePerKg: item.ratePerKg ? Number(item.ratePerKg) : undefined
       });
