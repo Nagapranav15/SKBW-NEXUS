@@ -860,7 +860,7 @@ exports.getBalances = async (req, res, next) => {
       ? { skuId: "$skuId", locationId: "$locationId", batchNumber: "$batchNumber" }
       : { skuId: "$skuId", locationId: "$locationId" };
 
-    const matchObj = { company: toObjectId(companyId) };
+    const matchObj = { company: toObjectId(companyId), status: { $ne: "Cancelled" } };
     if (skuId) matchObj.skuId = toObjectId(skuId);
     if (batchNumber) matchObj.batchNumber = batchNumber;
 
@@ -925,7 +925,7 @@ exports.getBalances = async (req, res, next) => {
           }
         }
       },
-      { $match: { onHand: { $gt: 0 } } },
+      { $match: { onHand: { $gt: 0.0001 } } },
       {
         $lookup: {
           localField: "skuId",
