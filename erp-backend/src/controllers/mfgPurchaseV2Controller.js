@@ -218,6 +218,49 @@ exports.createPurchaseInvoice = async (req, res, next) => {
   }
 };
 
+const migratePurchaseBatchNumbers = async (companyObjId) => {
+  try {
+    const query = companyObjId ? { company: companyObjId } : {};
+    const allInvoices = await PurchaseInvoiceV2.find(query).sort({ createdAt: 1 });
+    if (!allInvoices || allInvoices.length === 0) return;
+
+    let index = 1;
+    for (const inv of allInvoices) {
+      const oldNo = inv.invoiceNumber;
+      if (!/^PB-[A-Z]{3}-\d{3}$/i.test(oldNo)) {
+        const monthShort = inv.createdAt ? new Date(inv.createdAt).toLocaleString('en-US', { month: 'short' }).toUpperCase() : 'AUG';
+        const newNo = `PB-${monthShort}-${String(index).padStart(3, '0')}`;
+        index++;
+
+        inv.invoiceNumber = newNo;
+        if (Array.isArray(inv.items)) {
+          inv.items.forEach(item => {
+            if (!item.lotNumber || !/^PB-[A-Z]{3}-\d{3}$/i.test(item.lotNumber) || item.lotNumber === oldNo) {
+              item.lotNumber = newNo;
+            }
+          });
+        }
+        await inv.save();
+
+        await InventoryLedger.updateMany(
+          { referenceId: oldNo },
+          { $set: { referenceId: newNo, batchNumber: newNo } }
+        );
+        await InventoryLedger.updateMany(
+          { batchNumber: oldNo },
+          { $set: { batchNumber: newNo } }
+        );
+        await Transaction.updateMany(
+          { source_type: "PURCHASE", description: { $regex: oldNo } },
+          { $set: { description: `Inwarded materials under invoice ${newNo}` } }
+        );
+      }
+    }
+  } catch (err) {
+    console.error("Error migrating batch numbers:", err);
+  }
+};
+
 exports.getPurchaseInvoices = async (req, res, next) => {
   try {
     const { companyId, vendorId, paymentStatus, status, search, page = 1, limit = 20 } = req.query;
@@ -225,7 +268,10 @@ exports.getPurchaseInvoices = async (req, res, next) => {
       return res.status(400).json({ msg: "companyId query parameter is required" });
     }
 
-    const query = { company: toObjectId(companyId) };
+    const companyObjId = toObjectId(companyId);
+    await migratePurchaseBatchNumbers(companyObjId);
+
+    const query = { company: companyObjId };
     if (vendorId) query.vendorId = toObjectId(vendorId);
     if (paymentStatus) query.paymentStatus = paymentStatus;
     if (status) query.status = status;
@@ -583,14 +629,8 @@ exports.deletePurchaseInvoice = async (req, res, next) => {
 exports.cancelPurchaseInvoice = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { company } = req.body;
 
-    if (!company) {
-      return res.status(400).json({ msg: "company parameter is required" });
-    }
-    const companyObjId = toObjectId(company);
-
-    const invoice = await PurchaseInvoiceV2.findOne({ _id: toObjectId(id), company: companyObjId });
+    const invoice = await PurchaseInvoiceV2.findById(id);
     if (!invoice) {
       return res.status(404).json({ msg: "Purchase batch not found" });
     }
@@ -599,25 +639,28 @@ exports.cancelPurchaseInvoice = async (req, res, next) => {
       return res.status(400).json({ msg: "Purchase batch is already cancelled" });
     }
 
+    const companyObjId = invoice.company;
+
     // Revert vendor liability balance
-    const vendor = await Party.findOne({ _id: invoice.vendorId, company: companyObjId });
-    if (vendor) {
-      const supplierPayable = invoice.subTotal || 0;
-      vendor.outstanding = Math.max((vendor.outstanding || 0) - supplierPayable, 0);
-      vendor.outstandingBalance = Math.max((vendor.outstandingBalance || 0) - supplierPayable, 0);
-      await vendor.save();
+    if (invoice.vendorId) {
+      const vendor = await Party.findById(invoice.vendorId);
+      if (vendor) {
+        const supplierPayable = invoice.subTotal || 0;
+        vendor.outstanding = Math.max((vendor.outstanding || 0) - supplierPayable, 0);
+        vendor.outstandingBalance = Math.max((vendor.outstandingBalance || 0) - supplierPayable, 0);
+        await vendor.save();
+      }
     }
 
     // Delete financial Transaction
     await Transaction.deleteOne({
-      company: companyObjId,
-      partyId: invoice.vendorId,
       source_type: "PURCHASE",
       description: { $regex: invoice.invoiceNumber }
     });
 
     // Delete stock ledger entries (removes stock balance from Stock and Stock Ledger modules)
-    await InventoryLedger.deleteMany({ referenceType: "PurchaseInvoice", referenceId: invoice.invoiceNumber, company: companyObjId });
+    await InventoryLedger.deleteMany({ referenceType: "PurchaseInvoice", referenceId: invoice.invoiceNumber });
+    await InventoryLedger.deleteMany({ batchNumber: invoice.invoiceNumber });
 
     // Mark status as Cancelled
     invoice.status = "Cancelled";
