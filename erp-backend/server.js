@@ -7,9 +7,6 @@ process.env.MONGO_URI = process.env.MONGO_URI || "mongodb+srv://ERPsys:NPK15@clu
 const app = require("./src/app");
 const connectDB = require("./src/config/db");
 
-const PRIMARY_PORT = parseInt(process.env.PORT || "5000", 10);
-const SECONDARY_PORT = PRIMARY_PORT === 5000 ? 5001 : 5000;
-
 process.on("uncaughtException", (err) => {
   console.error("UNCAUGHT EXCEPTION:", err.message, err.stack);
 });
@@ -18,20 +15,21 @@ process.on("unhandledRejection", (reason) => {
   console.error("UNHANDLED REJECTION:", reason);
 });
 
-// Primary HTTP Server Listener
-const server1 = app.listen(PRIMARY_PORT, "0.0.0.0", () => {
-  console.log(`Server running on primary port ${PRIMARY_PORT} bound to 0.0.0.0`);
-});
-server1.on("error", (err) => {
-  console.error(`Primary Port ${PRIMARY_PORT} Listen Error:`, err.message);
+const PORT = parseInt(process.env.PORT || "5001", 10);
+
+const server = app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running successfully on port ${PORT} bound to 0.0.0.0`);
 });
 
-// Secondary HTTP Server Listener so Nginx proxy_pass succeeds whether Nginx targets 5000 or 5001
-const server2 = app.listen(SECONDARY_PORT, "0.0.0.0", () => {
-  console.log(`Server running on secondary port ${SECONDARY_PORT} bound to 0.0.0.0`);
-});
-server2.on("error", (err) => {
-  console.warn(`Secondary Port ${SECONDARY_PORT} Notice:`, err.message);
+server.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    console.warn(`Port ${PORT} is busy. Trying fallback port 5000...`);
+    app.listen(5000, "0.0.0.0", () => {
+      console.log(`Server running successfully on fallback port 5000 bound to 0.0.0.0`);
+    });
+  } else {
+    console.error("Server listen error:", err.message);
+  }
 });
 
 // Connect to MongoDB asynchronously

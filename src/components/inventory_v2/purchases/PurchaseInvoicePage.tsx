@@ -717,65 +717,39 @@ const PurchaseInvoicePage: React.FC = () => {
         return;
       }
 
-      // Generate reels array and group by locationId if reels exist
-      if (reelsCount > 0) {
-        const reelsByLoc: Record<string, any[]> = {};
-        const itemReels = item.reels || [];
+      if (isReels) {
+        const totalReelsWeight = (item.reels || []).reduce((sum, r) => sum + (Number(r.weight) || 0), 0);
+        const primaryLocId = item.reels?.[0]?.locationId || item.locationId || firstStorage._id || '';
 
-        for (let r = 0; r < reelsCount; r++) {
-          const reelObj = itemReels[r] || {};
-          const reelWeight = Number(reelObj.weight) || 0;
-          const reelWidth = Number(reelObj.width) || Number(item.width) || 0;
-          const reelLocId = reelObj.locationId || item.locationId || firstStorage._id || '';
-
-          if (!reelsByLoc[reelLocId]) {
-            reelsByLoc[reelLocId] = [];
-          }
-
-          reelsByLoc[reelLocId].push({
-            reelNumber: reelObj.reelNumber || `${finalInvoiceNumber}-L${i + 1}-R${String(r + 1).padStart(2, '0')}`,
-            gsm: Number(item.gsm) || 0,
-            width: reelWidth,
-            weight: reelWeight
-          });
-        }
-
-        // Push a validated item for each unique location
-        const uniqueLocations = Object.keys(reelsByLoc);
-        for (let lIdx = 0; lIdx < uniqueLocations.length; lIdx++) {
-          const locId = uniqueLocations[lIdx];
-          const reelsGroup = reelsByLoc[locId];
-          const totalGroupWeight = reelsGroup.reduce((sum, r) => sum + r.weight, 0);
-
-          validatedItems.push({
-            skuId: item.skuId,
-            quantity: totalGroupWeight,
-            unit: 'kg',
-            purchasePrice: price,
-            totalPrice: totalGroupWeight * price,
-            lotNumber: item.lotNumber || finalInvoiceNumber,
-            locationId: locId,
-            reels: reelsGroup
-          });
-        }
+        validatedItems.push({
+          skuId: item.skuId,
+          quantity: totalReelsWeight,
+          unit: 'kg',
+          purchasePrice: price,
+          totalPrice: totalReelsWeight * price,
+          lotNumber: item.lotNumber || finalInvoiceNumber,
+          locationId: primaryLocId,
+          reels: item.reels || []
+        });
       } else if ((item as any).splits && (item as any).splits.length > 0) {
-        // Splitted non-reels lot (Multi-location)
+        // Splitted non-reels lot (Multi-location) - keep as 1 single material lot entry
         const selectedSku = skus.find(s => s._id === item.skuId);
-        for (const split of (item as any).splits) {
-          const splitQty = Number(split.quantity) || 0;
-          validatedItems.push({
-            skuId: item.skuId,
-            quantity: splitQty,
-            unit: selectedSku?.unit || 'kg',
-            purchasePrice: price,
-            totalPrice: splitQty * price,
-            lotNumber: item.lotNumber || finalInvoiceNumber,
-            locationId: split.locationId,
-            reels: [],
-            reamWeight: (item as any).reamWeight ? Number((item as any).reamWeight) : undefined,
-            ratePerKg: (item as any).ratePerKg ? Number((item as any).ratePerKg) : undefined
-          });
-        }
+        const totalSplitQty = (item as any).splits.reduce((sum: number, s: any) => sum + (Number(s.quantity) || 0), 0);
+        const primaryLocId = (item as any).splits[0]?.locationId || item.locationId || firstStorage._id || '';
+
+        validatedItems.push({
+          skuId: item.skuId,
+          quantity: totalSplitQty,
+          unit: selectedSku?.unit || 'kg',
+          purchasePrice: price,
+          totalPrice: totalSplitQty * price,
+          lotNumber: item.lotNumber || finalInvoiceNumber,
+          locationId: primaryLocId,
+          splits: (item as any).splits,
+          reels: [],
+          reamWeight: (item as any).reamWeight ? Number((item as any).reamWeight) : undefined,
+          ratePerKg: (item as any).ratePerKg ? Number((item as any).ratePerKg) : undefined
+        });
       } else {
         // Non-reels lot (standard single location)
         const selectedSku = skus.find(s => s._id === item.skuId);

@@ -48,9 +48,9 @@ exports.createPurchaseInvoice = async (req, res, next) => {
     let subTotal = 0;
 
     for (const item of items) {
-      const { skuId, quantity, purchasePrice, lotNumber, locationId, reels } = item;
+      const { skuId, quantity, purchasePrice, lotNumber, locationId, reels, splits } = item;
       
-      if (!skuId || !quantity || !purchasePrice || !lotNumber || !locationId) {
+      if (!skuId || !quantity || !purchasePrice || !lotNumber) {
         return res.status(400).json({ msg: "Missing fields in purchase items" });
       }
 
@@ -65,36 +65,15 @@ exports.createPurchaseInvoice = async (req, res, next) => {
       if (!sku) {
         return res.status(400).json({ msg: `SKU '${skuId}' not found` });
       }
-      if (sku.category !== "Raw Material" && sku.category !== "Consumables" && sku.category !== "Semi Finished") {
-        return res.status(400).json({ msg: `Only Raw Materials, Consumables, or Semi Finished goods can be purchased (SKU: ${sku.skuCode})` });
+
+      const primaryLocId = locationId || (splits && splits[0]?.locationId) || (reels && reels[0]?.locationId);
+      if (!primaryLocId) {
+        return res.status(400).json({ msg: `Storage location is required for SKU '${sku.skuCode}'` });
       }
 
-      // Resolve Location Hierarchy dynamically
-      const location = await WarehouseLocationV2.findOne({ _id: toObjectId(locationId), company: companyObjId });
+      const location = await WarehouseLocationV2.findOne({ _id: toObjectId(primaryLocId), company: companyObjId });
       if (!location) {
-        return res.status(400).json({ msg: `Storage Location '${locationId}' not found` });
-      }
-
-      let zoneId = location._id;
-      let floorId = location._id;
-      let warehouseId = location._id;
-
-      const parent1 = location.parentId ? await WarehouseLocationV2.findOne({ _id: location.parentId, company: companyObjId }) : null;
-      if (parent1) {
-        zoneId = parent1._id;
-        const parent2 = parent1.parentId ? await WarehouseLocationV2.findOne({ _id: parent1.parentId, company: companyObjId }) : null;
-        if (parent2) {
-          floorId = parent2._id;
-          const parent3 = parent2.parentId ? await WarehouseLocationV2.findOne({ _id: parent2.parentId, company: companyObjId }) : null;
-          if (parent3) {
-            warehouseId = parent3._id;
-          } else {
-            warehouseId = parent2._id;
-          }
-        } else {
-          floorId = parent1._id;
-          warehouseId = parent1._id;
-        }
+        return res.status(400).json({ msg: `Storage Location '${primaryLocId}' not found` });
       }
 
       const itemTotal = qty * price;
@@ -108,13 +87,10 @@ exports.createPurchaseInvoice = async (req, res, next) => {
         totalPrice: itemTotal,
         lotNumber,
         locationId: location._id,
-        reels: reels || [],
+        splits: Array.isArray(splits) ? splits : [],
+        reels: Array.isArray(reels) ? reels : [],
         reamWeight: item.reamWeight ? Number(item.reamWeight) : undefined,
-        ratePerKg: item.ratePerKg ? Number(item.ratePerKg) : undefined,
-        // Cached hierarchies for ledger creation
-        warehouseId,
-        floorId,
-        zoneId
+        ratePerKg: item.ratePerKg ? Number(item.ratePerKg) : undefined
       });
     }
 
@@ -152,29 +128,115 @@ exports.createPurchaseInvoice = async (req, res, next) => {
 
     // 5. Inward stock using V2 Ledger Engine for each item
     for (const valItem of validatedItems) {
-      const transactionNumber = await Sequence.getNextSequence("IL");
+      // Helper function to resolve hierarchy for any locationId
+      const getHierarchy = async (locId) => {
+        const loc = await WarehouseLocationV2.findOne({ _id: toObjectId(locId), company: companyObjId });
+        if (!loc) return { warehouseId: locId, floorId: locId, zoneId: locId, locationId: locId };
+        let zoneId = loc._id, floorId = loc._id, warehouseId = loc._id;
+        const p1 = loc.parentId ? await WarehouseLocationV2.findOne({ _id: loc.parentId, company: companyObjId }) : null;
+        if (p1) {
+          zoneId = p1._id;
+          const p2 = p1.parentId ? await WarehouseLocationV2.findOne({ _id: p1.parentId, company: companyObjId }) : null;
+          if (p2) {
+            floorId = p2._id;
+            const p3 = p2.parentId ? await WarehouseLocationV2.findOne({ _id: p2.parentId, company: companyObjId }) : null;
+            warehouseId = p3 ? p3._id : p2._id;
+          } else {
+            floorId = p1._id; warehouseId = p1._id;
+          }
+        }
+        return { warehouseId, floorId, zoneId, locationId: loc._id };
+      };
 
-      const newLedgerEntry = new InventoryLedger({
-        transactionNumber,
-        transactionType: "Purchase",
-        skuId: valItem.skuId,
-        quantity: valItem.quantity,
-        unit: valItem.unit,
-        direction: "IN",
-        referenceType: "PurchaseInvoice",
-        referenceId: finalInvoiceNo,
-        batchNumber: finalInvoiceNo,
-        warehouseId: valItem.warehouseId,
-        floorId: valItem.floorId,
-        zoneId: valItem.zoneId,
-        locationId: valItem.locationId,
-        remarks: `Lot: ${valItem.lotNumber}. Inwarded via invoice ${finalInvoiceNo}`,
-        reels: valItem.reels || [],
-        createdBy: toObjectId(req.user.id),
-        company: companyObjId,
-        status: "Posted"
-      });
-      await newLedgerEntry.save();
+      if (valItem.reels && valItem.reels.length > 0) {
+        // Group reels by locationId if present
+        const reelsByLoc = {};
+        valItem.reels.forEach(r => {
+          const lId = String(r.locationId || valItem.locationId);
+          if (!reelsByLoc[lId]) reelsByLoc[lId] = [];
+          reelsByLoc[lId].push(r);
+        });
+
+        for (const locIdStr of Object.keys(reelsByLoc)) {
+          const reelsGroup = reelsByLoc[locIdStr];
+          const groupWeight = reelsGroup.reduce((s, r) => s + (Number(r.weight) || 0), 0);
+          const h = await getHierarchy(locIdStr);
+          const transactionNumber = await Sequence.getNextSequence("IL");
+
+          await new InventoryLedger({
+            transactionNumber,
+            transactionType: "Purchase",
+            skuId: valItem.skuId,
+            quantity: groupWeight,
+            unit: valItem.unit,
+            direction: "IN",
+            referenceType: "PurchaseInvoice",
+            referenceId: finalInvoiceNo,
+            batchNumber: finalInvoiceNo,
+            warehouseId: h.warehouseId,
+            floorId: h.floorId,
+            zoneId: h.zoneId,
+            locationId: h.locationId,
+            remarks: `Lot: ${valItem.lotNumber}. Inwarded via invoice ${finalInvoiceNo}`,
+            reels: reelsGroup,
+            createdBy: toObjectId(req.user.id),
+            company: companyObjId,
+            status: "Posted"
+          }).save();
+        }
+      } else if (valItem.splits && valItem.splits.length > 0) {
+        for (const split of valItem.splits) {
+          const splitQty = Number(split.quantity) || 0;
+          if (splitQty <= 0) continue;
+          const h = await getHierarchy(split.locationId);
+          const transactionNumber = await Sequence.getNextSequence("IL");
+
+          await new InventoryLedger({
+            transactionNumber,
+            transactionType: "Purchase",
+            skuId: valItem.skuId,
+            quantity: splitQty,
+            unit: valItem.unit,
+            direction: "IN",
+            referenceType: "PurchaseInvoice",
+            referenceId: finalInvoiceNo,
+            batchNumber: finalInvoiceNo,
+            warehouseId: h.warehouseId,
+            floorId: h.floorId,
+            zoneId: h.zoneId,
+            locationId: h.locationId,
+            remarks: `Lot: ${valItem.lotNumber}. Inwarded via invoice ${finalInvoiceNo}`,
+            reels: [],
+            createdBy: toObjectId(req.user.id),
+            company: companyObjId,
+            status: "Posted"
+          }).save();
+        }
+      } else {
+        const h = await getHierarchy(valItem.locationId);
+        const transactionNumber = await Sequence.getNextSequence("IL");
+
+        await new InventoryLedger({
+          transactionNumber,
+          transactionType: "Purchase",
+          skuId: valItem.skuId,
+          quantity: valItem.quantity,
+          unit: valItem.unit,
+          direction: "IN",
+          referenceType: "PurchaseInvoice",
+          referenceId: finalInvoiceNo,
+          batchNumber: finalInvoiceNo,
+          warehouseId: h.warehouseId,
+          floorId: h.floorId,
+          zoneId: h.zoneId,
+          locationId: h.locationId,
+          remarks: `Lot: ${valItem.lotNumber}. Inwarded via invoice ${finalInvoiceNo}`,
+          reels: [],
+          createdBy: toObjectId(req.user.id),
+          company: companyObjId,
+          status: "Posted"
+        }).save();
+      }
     }
 
     // 6. Automatically increase Vendor's outstanding liability (Material Cost Subtotal)

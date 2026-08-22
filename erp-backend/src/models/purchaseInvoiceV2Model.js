@@ -10,11 +10,16 @@ const purchaseInvoiceItemSchema = new mongoose.Schema({
   locationId: { type: mongoose.Schema.Types.ObjectId, ref: 'WarehouseLocationV2', required: true },
   reamWeight: { type: Number },
   ratePerKg: { type: Number },
+  splits: [{
+    locationId: { type: mongoose.Schema.Types.ObjectId, ref: 'WarehouseLocationV2', required: true },
+    quantity: { type: Number, required: true }
+  }],
   reels: [{
     reelNumber: { type: String, required: true },
     gsm: { type: Number, required: true },
     width: { type: Number, required: true },
-    weight: { type: Number, required: true }
+    weight: { type: Number, required: true },
+    locationId: { type: mongoose.Schema.Types.ObjectId, ref: 'WarehouseLocationV2' }
   }]
 });
 
