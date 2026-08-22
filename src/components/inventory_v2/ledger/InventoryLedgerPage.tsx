@@ -955,7 +955,10 @@ const InventoryLedgerPage: React.FC = () => {
                       </div>
                     </td>
                     <td className="py-3.5 px-4 font-semibold text-gray-700 whitespace-nowrap">
-                      {fromLoc.replace(/^Supplier:\s*/i, '')}
+                      {(() => {
+                        const rawFrom = fromLoc.replace(/^Supplier:\s*/i, '');
+                        return rawFrom.includes('>') ? (rawFrom.split('>').pop()?.trim() || rawFrom) : rawFrom;
+                      })()}
                     </td>
                     <td className="py-3.5 px-4 font-semibold text-gray-700 whitespace-nowrap">
                       {toLoc.includes('>') ? (toLoc.split('>').pop()?.trim() || toLoc) : toLoc}
