@@ -951,24 +951,28 @@ const PurchaseInvoicePage: React.FC = () => {
     }
   };
 
-  const handleDeleteInvoice = async (invoice: PurchaseInvoiceV2) => {
-    if (!window.confirm(`Are you sure you want to delete purchase invoice ${invoice.invoiceNumber}? This will reverse the stock entries and adjust the vendor's outstanding balance.`)) {
+  const handleCancelInvoice = async (invoice: PurchaseInvoiceV2) => {
+    if (invoice.status === 'Cancelled') {
+      showToast('This purchase batch is already cancelled.', 'warning');
+      return;
+    }
+    if (!window.confirm(`Are you sure you want to cancel purchase batch ${invoice.invoiceNumber}? This will mark the batch as Cancelled and remove its stock from Stock and Stock Ledger modules.`)) {
       return;
     }
     try {
-      await deletePurchaseInvoiceV2(invoice._id || '', selectedCompany?._id || '');
-      showToast('Purchase invoice deleted successfully!', 'success');
+      await cancelPurchaseInvoiceV2(invoice._id || '', selectedCompany?._id || '');
+      showToast(`Purchase batch ${invoice.invoiceNumber} cancelled successfully!`, 'success');
       createActivityLog({
-        action: 'DELETE',
+        action: 'CANCEL',
         entityType: 'PurchaseInvoiceV2',
         entityName: invoice.invoiceNumber,
-        details: `Purchase Batch '${invoice.invoiceNumber}' was deleted permanently`,
+        details: `Purchase Batch '${invoice.invoiceNumber}' was cancelled and stock removed`,
         company: selectedCompany?._id
       }).catch(() => {});
       loadInvoices();
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      showToast('Failed to delete purchase invoice', 'error');
+      showToast(e.response?.data?.msg || 'Failed to cancel purchase batch', 'error');
     }
   };
 
