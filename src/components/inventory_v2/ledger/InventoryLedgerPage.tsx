@@ -350,15 +350,15 @@ const TransactionDetailDrawer: React.FC<LedgerDetailDrawerProps> = ({ entry, onC
           </div>
 
           <div className="space-y-3 pt-3 border-t border-gray-100">
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">LOCATION DETAILS</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">LOCATION & HIERARCHY DETAILS</h3>
+            <div className="space-y-3">
               <div>
-                <span className="block text-[11px] text-gray-400 font-medium">From Location</span>
-                <span className="font-semibold text-gray-900 block mt-0.5">{fromLoc}</span>
+                <span className="block text-[11px] text-gray-400 font-medium mb-1">From Source / Supplier</span>
+                <div>{renderLocationHierarchyBadge(fromLoc, true, entry.transactionType)}</div>
               </div>
               <div>
-                <span className="block text-[11px] text-gray-400 font-medium">To Location</span>
-                <span className="font-semibold text-gray-900 block mt-0.5">{toLoc}</span>
+                <span className="block text-[11px] text-gray-400 font-medium mb-1">To Destination Storage</span>
+                <div>{renderLocationHierarchyBadge(toLoc, false, entry.transactionType)}</div>
               </div>
             </div>
           </div>

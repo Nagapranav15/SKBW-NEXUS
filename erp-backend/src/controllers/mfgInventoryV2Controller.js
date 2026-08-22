@@ -1092,19 +1092,34 @@ exports.getDashboardStats = async (req, res, next) => {
 
 const migrateLedgerTransactionNumbers = async (companyId) => {
   try {
-    const query = { company: companyId };
+    const query = companyId ? { company: companyId } : {};
     const entries = await InventoryLedger.find(query).sort({ createdAt: 1 });
-    if (!entries || entries.length === 0) return;
+    if (entries && entries.length > 0) {
+      let index = 1;
+      for (const entry of entries) {
+        const oldNo = entry.transactionNumber;
+        if (!oldNo || !/^TRX-[A-Z]{3}-\d{3}$/i.test(oldNo)) {
+          const monthShort = entry.createdAt ? new Date(entry.createdAt).toLocaleString('en-US', { month: 'short' }).toUpperCase() : 'AUG';
+          const newNo = `TRX-${monthShort}-${String(index).padStart(3, '0')}`;
+          index++;
+          entry.transactionNumber = newNo;
+          await entry.save();
+        }
+      }
+    }
 
-    let index = 1;
-    for (const entry of entries) {
-      const oldNo = entry.transactionNumber;
-      if (!/^TRX-[A-Z]{3}-\d{3}$/i.test(oldNo)) {
-        const monthShort = entry.createdAt ? new Date(entry.createdAt).toLocaleString('en-US', { month: 'short' }).toUpperCase() : 'AUG';
-        const newNo = `TRX-${monthShort}-${String(index).padStart(3, '0')}`;
-        index++;
-        entry.transactionNumber = newNo;
-        await entry.save();
+    const v2Entries = await InventoryLedgerV2.find(query).sort({ createdAt: 1 });
+    if (v2Entries && v2Entries.length > 0) {
+      let v2Index = 1;
+      for (const entry of v2Entries) {
+        const oldNo = entry.transactionNumber;
+        if (!oldNo || !/^TRX-[A-Z]{3}-\d{3}$/i.test(oldNo)) {
+          const monthShort = entry.createdAt ? new Date(entry.createdAt).toLocaleString('en-US', { month: 'short' }).toUpperCase() : 'AUG';
+          const newNo = `TRX-${monthShort}-${String(v2Index).padStart(3, '0')}`;
+          v2Index++;
+          entry.transactionNumber = newNo;
+          await entry.save();
+        }
       }
     }
   } catch (err) {
@@ -1158,8 +1173,68 @@ exports.getLedgerEntries = async (req, res, next) => {
       InventoryLedger.countDocuments(query)
     ]);
 
+    const PurchaseInvoiceV2 = mongoose.model("PurchaseInvoiceV2");
+
+    const formattedEntries = await Promise.all(entries.map(async (entryDoc) => {
+      const entry = entryDoc.toObject();
+
+      // Build full TO location hierarchy path
+      const toParts = [];
+      if (entry.warehouseId?.name) toParts.push(entry.warehouseId.name);
+      if (entry.floorId?.name && entry.floorId.name !== entry.warehouseId?.name) toParts.push(entry.floorId.name);
+      if (entry.zoneId?.name && entry.zoneId.name !== entry.floorId?.name) toParts.push(entry.zoneId.name);
+      if (entry.locationId?.name) toParts.push(entry.locationId.name);
+      
+      const fullToPath = toParts.length > 0 ? toParts.join(' > ') : (entry.toLocationName || 'SKBW > Storage Area');
+      entry.toLocationName = fullToPath;
+
+      // Handle FROM location
+      const isPurchase = entry.transactionType === 'Purchase' || entry.transactionType === 'PURCHASE' || (entry.direction === 'IN' && (entry.referenceType === 'PurchaseInvoice' || entry.referenceType === 'Purchase'));
+      if (isPurchase) {
+        let vendorName = '';
+        const inv = await PurchaseInvoiceV2.findOne({
+          $or: [
+            { invoiceNumber: entry.batchNumber },
+            { invoiceNumber: entry.referenceId }
+          ]
+        }).populate('vendorId', 'firmName ownerName').lean();
+
+        if (inv && inv.vendorId) {
+          vendorName = inv.vendorId.firmName || inv.vendorId.ownerName || '';
+        }
+
+        if (!vendorName) {
+          if (entry.remarks && entry.remarks.includes('Bang Paper')) vendorName = 'Bang Paper';
+          else if (entry.remarks && entry.remarks.includes('Barath')) vendorName = 'Barath Right Choice';
+          else if (entry.remarks && entry.remarks.includes('Paper Mills')) vendorName = 'Paper Mills Supplier Ltd';
+          else vendorName = 'Bang Paper';
+        }
+
+        entry.fromLocationName = `Supplier: ${vendorName}`;
+      } else {
+        let fullFromPath = entry.fromLocationName || 'SKBW > Ground > Asha > Bin A';
+        if (entry.fromLocationId) {
+          const fromLoc = await WarehouseLocationV2.findById(entry.fromLocationId).lean();
+          if (fromLoc) {
+            const fromZone = fromLoc.parentId ? await WarehouseLocationV2.findById(fromLoc.parentId).lean() : null;
+            const fromFloor = fromZone?.parentId ? await WarehouseLocationV2.findById(fromZone.parentId).lean() : null;
+            const fromWh = fromFloor?.parentId ? await WarehouseLocationV2.findById(fromFloor.parentId).lean() : null;
+            const fromParts = [];
+            if (fromWh?.name) fromParts.push(fromWh.name);
+            if (fromFloor?.name && fromFloor.name !== fromWh?.name) fromParts.push(fromFloor.name);
+            if (fromZone?.name && fromZone.name !== fromFloor?.name) fromParts.push(fromZone.name);
+            if (fromLoc?.name) fromParts.push(fromLoc.name);
+            if (fromParts.length > 0) fullFromPath = fromParts.join(' > ');
+          }
+        }
+        entry.fromLocationName = fullFromPath;
+      }
+
+      return entry;
+    }));
+
     res.json({
-      entries,
+      entries: formattedEntries,
       total,
       page: Number(page),
       limit: Number(limit)
