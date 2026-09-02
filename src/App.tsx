@@ -11,6 +11,7 @@ const Login = lazy(() => import('./components/Login'));
 const CompanySelection = lazy(() => import('./components/CompanySelection'));
 const Dashboard = lazy(() => import('./components/Dashboard'));
 const PartyManagement = lazy(() => import('./components/PartyManagement'));
+const BusinessDirectoryV2 = lazy(() => import('./components/directory_v2/BusinessDirectoryV2'));
 const SalesQuotes = lazy(() => import('./components/sales/SalesQuotes'));
 const SalesOrders = lazy(() => import('./components/sales/SalesOrders'));
 const PendingOrders = lazy(() => import('./components/sales/PendingOrders'));
@@ -65,6 +66,7 @@ function App() {
               }>
                 <Route index element={<Navigate to="/dashboard" replace />} />
                 <Route path="dashboard" element={<Dashboard />} />
+                <Route path="directory" element={<BusinessDirectoryV2 />} />
                 <Route path="party" element={<Navigate to="/party/customers" replace />} />
                 <Route path="party/customers" element={<PartyManagement />} />
                 <Route path="party/vendors" element={<PartyManagement />} />
@@ -72,7 +74,8 @@ function App() {
                 <Route path="party/routes" element={<PartyManagement />} />
                 <Route path="party/markets" element={<PartyManagement />} />
                 <Route path="party/transporters" element={<PartyManagement />} />
-                <Route path="items" element={<Navigate to="/inventory-v2/skus" replace />} />
+                <Route path="party/directory" element={<BusinessDirectoryV2 />} />
+                <Route path="items" element={<SkuMasterV2 />} />
                 <Route path="sales/quotes" element={<SalesQuotes />} />
                 <Route path="sales/orders" element={<SalesOrders />} />
                 <Route path="sales/pending" element={<PendingOrders />} />

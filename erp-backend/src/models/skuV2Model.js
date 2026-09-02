@@ -31,10 +31,12 @@ const skuV2Schema = new mongoose.Schema({
   booksGbl: { type: Number, required: false },
   openingStock: { type: Number, default: 0 },
   status: { type: String, required: true, enum: ["Active", "Inactive"], default: "Active" },
+  bomItems: { type: Array, default: [] },
+  processSteps: { type: Array, default: [] },
   company: { type: mongoose.Schema.Types.ObjectId, ref: "Company", required: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   isDeleted: { type: Boolean, default: false, index: true }
-}, { timestamps: true });
+}, { timestamps: true, strict: false });
 
 skuV2Schema.index({ skuCode: 1, company: 1 }, { unique: true });
 skuV2Schema.index({ company: 1, category: 1 });

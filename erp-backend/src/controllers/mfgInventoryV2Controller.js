@@ -110,6 +110,8 @@ exports.createSku = async (req, res, next) => {
       booksGbl: booksGbl ? Number(booksGbl) : undefined,
       openingStock: openingStock ? Number(openingStock) : 0,
       status: status || "Active",
+      bomItems: req.body.bomItems || [],
+      processSteps: req.body.processSteps || [],
       company: toObjectId(company),
       createdBy: req.user?.id ? toObjectId(req.user.id) : undefined
     });
@@ -132,61 +134,61 @@ exports.createSku = async (req, res, next) => {
 exports.updateSku = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { skuCode, name, category, unit, altUnit, altUnitConversion, paperType, gsm, width, length, brand, title, group, ruleType, pages, booksGbl, openingStock, status, company } = req.body;
-    
-    if (!company) {
-      return res.status(400).json({ msg: "company is required" });
+    const compId = req.body.company || req.query.companyId;
+
+    let sku;
+    if (compId) {
+      sku = await SkuV2.findOne({ _id: toObjectId(id), company: toObjectId(compId) });
+    } else {
+      sku = await SkuV2.findById(toObjectId(id));
     }
 
-    const sku = await SkuV2.findOne({ _id: toObjectId(id), company: toObjectId(company) });
     if (!sku) {
       return res.status(404).json({ msg: "SKU not found" });
     }
 
-    const exists = await SkuV2.findOne({ 
-      skuCode, 
-      company: toObjectId(company), 
-      _id: { $ne: toObjectId(id) } 
-    });
-    if (exists) {
-      return res.status(400).json({ msg: `SKU Code '${skuCode}' already exists for this company` });
-    }
-
     const changes = [];
-    if (sku.name !== name) changes.push(`Name: '${sku.name}' → '${name}'`);
-    if (sku.skuCode !== skuCode) changes.push(`Code: '${sku.skuCode}' → '${skuCode}'`);
-    if (sku.category !== category) changes.push(`Category: '${sku.category}' → '${category}'`);
-    if (sku.unit !== unit) changes.push(`Unit: '${sku.unit}' → '${unit}'`);
-    if (sku.gsm !== (gsm ? Number(gsm) : undefined)) changes.push(`GSM: '${sku.gsm || ''}' → '${gsm || ''}'`);
-    if (sku.width !== (width ? Number(width) : undefined)) changes.push(`Width: '${sku.width || ''}' → '${width || ''}'`);
-    if (sku.brand !== (brand || "")) changes.push(`Brand: '${sku.brand || ''}' → '${brand || ''}'`);
-    if (sku.status !== (status || "Active")) changes.push(`Status: '${sku.status}' → '${status}'`);
-    if (sku.openingStock !== (openingStock !== undefined ? Number(openingStock) : sku.openingStock)) {
-      changes.push(`Opening Stock: '${sku.openingStock}' → '${openingStock}'`);
+    if (req.body.name !== undefined && req.body.name !== sku.name) changes.push(`Name: '${sku.name}' → '${req.body.name}'`);
+    if (req.body.skuCode !== undefined && req.body.skuCode !== sku.skuCode) changes.push(`Code: '${sku.skuCode}' → '${req.body.skuCode}'`);
+    if (req.body.category !== undefined && req.body.category !== sku.category) changes.push(`Category: '${sku.category}' → '${req.body.category}'`);
+    if (req.body.unit !== undefined && req.body.unit !== sku.unit) changes.push(`Unit: '${sku.unit}' → '${req.body.unit}'`);
+    if (req.body.status !== undefined && req.body.status !== sku.status) changes.push(`Status: '${sku.status}' → '${req.body.status}'`);
+    if (req.body.bomItems !== undefined) changes.push(`BOM Recipe updated (${req.body.bomItems.length} items)`);
+
+    if (req.body.skuCode && req.body.skuCode !== sku.skuCode) {
+      const exists = await SkuV2.findOne({ 
+        skuCode: req.body.skuCode, 
+        company: sku.company, 
+        _id: { $ne: toObjectId(id) } 
+      });
+      if (exists) {
+        return res.status(400).json({ msg: `SKU Code '${req.body.skuCode}' already exists for this company` });
+      }
+      sku.skuCode = req.body.skuCode;
     }
 
-    sku.skuCode = skuCode;
-    sku.name = name;
-    sku.category = category;
-    sku.unit = unit;
-    sku.altUnit = altUnit;
-    sku.altUnitConversion = altUnitConversion ? Number(altUnitConversion) : undefined;
-    sku.paperType = paperType || "None";
-    sku.gsm = gsm ? Number(gsm) : undefined;
-    sku.width = width ? Number(width) : undefined;
-    sku.length = length ? Number(length) : undefined;
-    sku.brand = brand || "";
-    sku.title = title || "";
-    sku.group = group || "";
-    sku.ruleType = ruleType;
-    sku.pages = pages ? Number(pages) : undefined;
-    sku.booksGbl = booksGbl ? Number(booksGbl) : undefined;
-    sku.openingStock = openingStock !== undefined ? Number(openingStock) : sku.openingStock;
-    sku.status = status || "Active";
+    if (req.body.name !== undefined) sku.name = req.body.name;
+    if (req.body.category !== undefined) sku.category = req.body.category;
+    if (req.body.unit !== undefined) sku.unit = req.body.unit;
+    if (req.body.altUnit !== undefined) sku.altUnit = req.body.altUnit;
+    if (req.body.altUnitConversion !== undefined) sku.altUnitConversion = req.body.altUnitConversion ? Number(req.body.altUnitConversion) : undefined;
+    if (req.body.paperType !== undefined) sku.paperType = req.body.paperType || "None";
+    if (req.body.gsm !== undefined) sku.gsm = req.body.gsm ? Number(req.body.gsm) : undefined;
+    if (req.body.width !== undefined) sku.width = req.body.width ? Number(req.body.width) : undefined;
+    if (req.body.length !== undefined) sku.length = req.body.length ? Number(req.body.length) : undefined;
+    if (req.body.brand !== undefined) sku.brand = req.body.brand || "";
+    if (req.body.title !== undefined) sku.title = req.body.title || "";
+    if (req.body.group !== undefined) sku.group = req.body.group || "";
+    if (req.body.ruleType !== undefined) sku.ruleType = req.body.ruleType;
+    if (req.body.pages !== undefined) sku.pages = req.body.pages ? Number(req.body.pages) : undefined;
+    if (req.body.booksGbl !== undefined) sku.booksGbl = req.body.booksGbl ? Number(req.body.booksGbl) : undefined;
+    if (req.body.openingStock !== undefined) sku.openingStock = req.body.openingStock !== undefined ? Number(req.body.openingStock) : sku.openingStock;
+    if (req.body.status !== undefined) sku.status = req.body.status || "Active";
+    if (req.body.bomItems !== undefined) sku.bomItems = req.body.bomItems;
+    if (req.body.processSteps !== undefined) sku.processSteps = req.body.processSteps;
+
     if (req.body.isDeleted !== undefined) {
       sku.isDeleted = req.body.isDeleted;
-    } else if (status === "Active") {
-      sku.isDeleted = false;
     }
 
     await sku.save();
@@ -197,7 +199,7 @@ exports.updateSku = async (req, res, next) => {
       entityName: sku.skuCode,
       details: changes.length > 0 ? `Updated SKU '${sku.name}': ${changes.join(', ')}` : `Updated SKU '${sku.name}' specifications.`,
       performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
-      company: toObjectId(company)
+      company: sku.company
     }).catch(e => console.error("ActivityLog error:", e));
 
     res.json(sku);

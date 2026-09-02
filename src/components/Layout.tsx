@@ -166,7 +166,9 @@ const Layout: React.FC = () => {
   // Masters
   const mastersItems = [
     { label: 'Item Master', path: '/inventory-v2/skus', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
+    { label: 'Business Directory', path: '/directory', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
     { label: 'Customers', path: '/party/customers', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
+    { label: 'Suppliers', path: '/party/vendors', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
     { label: 'Agents', path: '/party/agents', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
     { label: 'Regions', path: '/party/routes', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
     { label: 'Cities', path: '/party/markets', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
@@ -174,7 +176,7 @@ const Layout: React.FC = () => {
   ];
   const visibleMastersItems = mastersItems.filter(item => hasPermission(item.permission));
   const hasMastersAccess = visibleMastersItems.length > 0;
-  const isMastersActive = () => ['/inventory-v2/skus', '/party/customers', '/party/agents', '/party/routes', '/party/markets', '/party/transporters'].includes(location.pathname);
+  const isMastersActive = () => ['/inventory-v2/skus', '/party/customers', '/party/vendors', '/party/agents', '/party/routes', '/party/markets', '/party/transporters', '/party/directory'].includes(location.pathname);
 
   // Purchase
   const purchaseItems = [
