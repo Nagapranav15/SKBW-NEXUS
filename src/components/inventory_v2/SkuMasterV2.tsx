@@ -679,22 +679,49 @@ const SkuMasterV2: React.FC = () => {
     return skus.filter(item => getItemType(item) === 'semi');
   }, [skus]);
 
+  // Helper to determine if an item is strictly Finished Goods (Products)
+  const isFinishedGoodsItem = (s: SkuV2): boolean => {
+    const cat = (s.category || '').trim().toLowerCase();
+    const code = (s.skuCode || '').trim().toUpperCase();
+    const name = (s.name || '').trim().toLowerCase();
+
+    // Exclude Raw Materials & Semi-Finished items or items starting with RM- / SF-
+    if (
+      cat === 'raw material' ||
+      cat === 'semi finished' ||
+      code.startsWith('RM-') ||
+      code.startsWith('SF-') ||
+      code.startsWith('RM') ||
+      code.startsWith('SF') ||
+      name.includes('reel') ||
+      name.includes('board') ||
+      name.includes('wire') ||
+      name.includes('adhesive')
+    ) {
+      return false;
+    }
+
+    return true;
+  };
+
+  const finishedGoodsSkus = useMemo(() => {
+    return skus.filter(isFinishedGoodsItem);
+  }, [skus]);
+
   // Build BOMs memoized helpers & handlers (Placed after materialsList & semiList initialization)
   const productsWithRecipeCount = useMemo(() => {
-    return skus.filter(s => s.category === 'Finished Goods' || s.category === 'Products' || (s.category || '').includes('Notebook') || activeMainTab === 'products')
-      .filter(s => (s as any).bomItems && (s as any).bomItems.length > 0).length;
-  }, [skus, activeMainTab]);
+    return finishedGoodsSkus.filter(s => (s as any).bomItems && (s as any).bomItems.length > 0).length;
+  }, [finishedGoodsSkus]);
 
   const filteredBuildProducts = useMemo(() => {
-    const prods = skus.filter(s => s.category === 'Finished Goods' || s.category === 'Products' || (s.category || '').includes('Notebook') || activeMainTab === 'products');
-    return prods.filter(p => {
+    return finishedGoodsSkus.filter(p => {
       const matchesSearch = (p.name || '').toLowerCase().includes(buildBomsSearch.toLowerCase()) ||
                             (p.skuCode || '').toLowerCase().includes(buildBomsSearch.toLowerCase());
       const hasRecipe = (p as any).bomItems && (p as any).bomItems.length > 0;
       if (onlyNoRecipeFilter && hasRecipe) return false;
       return matchesSearch;
     });
-  }, [skus, buildBomsSearch, onlyNoRecipeFilter, activeMainTab]);
+  }, [finishedGoodsSkus, buildBomsSearch, onlyNoRecipeFilter]);
 
   const filteredRawCatalog = useMemo(() => {
     const rawList = materialsList.length > 0 ? materialsList : DEMO_RAW_LIBRARY as any[];
@@ -3083,7 +3110,7 @@ const SkuMasterV2: React.FC = () => {
                   <Download className="w-3.5 h-3.5 text-gray-500" /> Export all (CSV)
                 </button>
                 <div className="text-xs font-semibold text-gray-500 bg-gray-100 px-3 py-1.5 rounded-xl">
-                  {productsWithRecipeCount} of {skus.filter(s => s.category === 'Finished Goods' || s.category === 'Products' || activeMainTab === 'products').length} products have a recipe
+                  {productsWithRecipeCount} of {finishedGoodsSkus.length} products have a recipe
                 </div>
                 <button
                   onClick={() => setShowBuildBomsModal(false)}
