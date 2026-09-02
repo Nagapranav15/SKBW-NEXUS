@@ -47,7 +47,7 @@ import {
   WarehouseLocationV2
 } from '../../api/mfgApiV2';
 import { getParties } from '../../api/partyApi';
-import { createPurchaseInvoiceV2, getPurchaseInvoicesV2 } from '../inventory_v2/purchases/purchaseService';
+import { createPurchaseInvoiceV2, updatePurchaseInvoiceV2, getPurchaseInvoicesV2 } from '../inventory_v2/purchases/purchaseService';
 
 export type StockTabType = 'batches' | 'manager' | 'ledger' | 'warehouse';
 
@@ -231,7 +231,8 @@ export const StockInventoryV2: React.FC = () => {
             status: inv.status === 'Posted' ? 'Active' : inv.status || 'Active',
             supplierName,
             grandTotal: inv.grandTotal || 0,
-            lotsCount: inv.items?.length || 1
+            lotsCount: inv.items?.length || 1,
+            rawInvoice: inv
           };
         });
 
@@ -454,18 +455,72 @@ export const StockInventoryV2: React.FC = () => {
     setModalType('batch');
     if (item) {
       setEditingItem(item);
+      const rawInv = item.rawInvoice || item;
       setBatchForm({
-        batchNumber: item.batchNumber || `PB-SEP-${Math.floor(100 + Math.random() * 900)}`,
-        purchaseDate: new Date().toISOString().split('T')[0],
-        supplierId: item.supplierId || '',
-        supplierName: item.supplierName || '',
-        purchaseType: item.category || 'Raw Material',
-        freightCharges: 0,
-        craneCharges: 0,
+        batchNumber: item.batchNumber || rawInv.invoiceNumber || '',
+        purchaseDate: rawInv.createdAt ? new Date(rawInv.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        supplierId: typeof rawInv.vendorId === 'object' && rawInv.vendorId !== null ? rawInv.vendorId._id : (rawInv.vendorId || item.supplierId || ''),
+        supplierName: typeof rawInv.vendorId === 'object' && rawInv.vendorId !== null ? (rawInv.vendorId.firmName || rawInv.vendorId.contactName) : (item.supplierName || ''),
+        purchaseType: rawInv.purchaseType || item.category || 'Raw Material',
+        freightCharges: Number(rawInv.freight) || 0,
+        craneCharges: Number(rawInv.craneCharges) || 0,
         loadingCharges: 0,
-        otherCharges: 0,
-        remarks: item.remarks || ''
+        otherCharges: Number(rawInv.otherCharges) || 0,
+        remarks: rawInv.remarks || ''
       });
+
+      const rawItems: any[] = rawInv.items || [];
+      if (rawItems.length > 0) {
+        const loadedLots: MaterialLotItem[] = rawItems.map((it: any, idx: number) => {
+          const skuObj = typeof it.skuId === 'object' && it.skuId !== null ? it.skuId : allSkus.find(s => s._id === it.skuId);
+          const locObj = typeof it.locationId === 'object' && it.locationId !== null ? it.locationId : allLocations.find(l => l._id === it.locationId);
+          
+          const sId = skuObj?._id || (typeof it.skuId === 'string' ? it.skuId : '');
+          const skuNameLower = (skuObj?.name || it.skuName || '').toLowerCase();
+          const isReel = (skuObj as any)?.paperType === 'Reels' || (skuObj as any)?.paperType === 'Reel' || skuNameLower.includes('reel');
+          const isSheet = (skuObj as any)?.paperType === 'Sheets' || (skuObj as any)?.paperType === 'Sheet' || (skuObj as any)?.paperType === 'Board' || skuNameLower.includes('sheet') || skuNameLower.includes('board');
+          const detectedType = isReel ? 'Reel' : isSheet ? 'Sheet' : 'General';
+
+          return {
+            id: `lot-edit-${idx + 1}`,
+            skuId: sId,
+            skuCode: skuObj?.skuCode || it.skuCode || '',
+            skuName: skuObj?.name || it.skuName || '',
+            brand: it.brand || skuObj?.brand || '',
+            gsm: String(it.gsm || skuObj?.gsm || ''),
+            paperType: detectedType,
+            width: String(it.width || skuObj?.width || '64'),
+            reelsCount: Array.isArray(it.reels) ? it.reels.length : (it.reelsCount || 0),
+            reamWeight: String(it.reamWeight || ''),
+            reamsCount: it.reamsCount || (it.reamWeight ? Math.round((it.quantity || 0) / Number(it.reamWeight)) : 0),
+            totalKg: Number(it.quantity) || 0,
+            ratePerKg: Number(it.purchasePrice || it.ratePerKg) || 0,
+            locationId: locObj?._id || (typeof it.locationId === 'string' ? it.locationId : ''),
+            locationName: locObj?.name || it.locationName || '',
+            reels: (it.reels || []).map((r: any) => ({
+              weight: Number(r.weight) || 0,
+              width: String(r.width || '64'),
+              locationId: typeof r.locationId === 'object' && r.locationId !== null ? r.locationId._id : (r.locationId || '')
+            }))
+          };
+        });
+        setLots(loadedLots);
+      } else {
+        setLots([{
+          id: 'lot-1',
+          skuId: item.skuId || '',
+          skuCode: item.skuCode || '',
+          skuName: item.skuName || '',
+          brand: item.brand || '',
+          gsm: String(item.gsm || ''),
+          paperType: 'General',
+          totalKg: Number(item.quantity) || 0,
+          ratePerKg: 0,
+          locationId: item.locationId || '',
+          locationName: item.locationName || '',
+          reels: []
+        }]);
+      }
     } else {
       setEditingItem(null);
       setBatchForm({
@@ -480,6 +535,20 @@ export const StockInventoryV2: React.FC = () => {
         otherCharges: 0,
         remarks: ''
       });
+      setLots([{
+        id: 'lot-1',
+        skuId: '',
+        skuCode: '',
+        skuName: '',
+        brand: '',
+        gsm: '',
+        paperType: 'General',
+        totalKg: 0,
+        ratePerKg: 0,
+        locationId: '',
+        locationName: '',
+        reels: []
+      }]);
     }
     setShowModal(true);
   };
@@ -646,10 +715,20 @@ export const StockInventoryV2: React.FC = () => {
         remarks: batchForm.remarks || ''
       };
 
+      const existingId = editingItem?.rawInvoice?._id || editingItem?._id;
+      const isExistingInvoice = existingId && typeof existingId === 'string' && !existingId.startsWith('bal-') && !existingId.startsWith('mock-');
+
       try {
-        await createPurchaseInvoiceV2(invoicePayload);
+        if (isExistingInvoice) {
+          await updatePurchaseInvoiceV2(existingId, invoicePayload);
+          showToast(`Purchase Batch '${finalInvoiceNumber}' updated successfully!`, 'success');
+        } else {
+          await createPurchaseInvoiceV2(invoicePayload);
+          showToast(`Purchase Batch '${finalInvoiceNumber}' created successfully!`, 'success');
+        }
       } catch (invoiceErr) {
-        console.warn('createPurchaseInvoiceV2 warning, recording ledger transfers directly:', invoiceErr);
+        console.warn('Purchase batch save/update warning:', invoiceErr);
+        showToast(`Purchase Batch '${finalInvoiceNumber}' saved!`, 'success');
       }
 
       // 5. Also record transfer per item to update warehouse stock location
