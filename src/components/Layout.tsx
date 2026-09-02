@@ -167,6 +167,7 @@ const Layout: React.FC = () => {
   const mastersItems = [
     { label: 'Item Master', path: '/inventory-v2/skus', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
     { label: 'Business Directory', path: '/directory', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
+    { label: 'Stock & Inventory', path: '/stock-inventory', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
     { label: 'Customers', path: '/party/customers', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
     { label: 'Suppliers', path: '/party/vendors', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
     { label: 'Agents', path: '/party/agents', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
