@@ -3050,31 +3050,32 @@ const SkuMasterV2: React.FC = () => {
         </Modal>
       )}
 
-      {/* ── BUILD BOMS / BULK EDIT BOM MODAL (Matching Screenshot 2!) ── */}
+      {/* ── BUILD BOMS / BULK EDIT BOM MODAL ── */}
       {showBuildBomsModal && (
         <Modal
           isOpen={showBuildBomsModal}
           onClose={() => setShowBuildBomsModal(false)}
-          maxWidth="max-w-6xl"
+          size="max-w-[1300px]"
+          maxWidth="max-w-[1300px]"
         >
           <div className="p-5 space-y-4 max-h-[90vh] flex flex-col">
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-3 border-b border-gray-100 shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-emerald-100/70 text-emerald-800 rounded-2xl">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2.5 bg-emerald-100/70 text-emerald-800 rounded-2xl shrink-0">
                   <ClipboardList className="w-5 h-5 stroke-[2.5]" />
                 </div>
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <div className="min-w-0">
+                  <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2 truncate">
                     <span>Build BOMs</span>
                   </h3>
-                  <p className="text-xs text-gray-400 font-medium">
+                  <p className="text-xs text-gray-400 font-medium truncate">
                     Define recipes product by product — a faster alternative to the Excel import.
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 shrink-0">
                 <button
                   onClick={() => handleExportCSV()}
                   className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-semibold rounded-xl text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
@@ -3094,7 +3095,7 @@ const SkuMasterV2: React.FC = () => {
             </div>
 
             {/* 3-Column Body Layout */}
-            <div className="grid grid-cols-12 gap-4 flex-1 overflow-hidden min-h-[520px]">
+            <div className="grid grid-cols-12 gap-4 flex-1 overflow-hidden min-h-[540px]">
               
               {/* Column 1: Products Selector List (3 cols) */}
               <div className="col-span-3 border border-gray-200 rounded-2xl p-3 flex flex-col gap-3 bg-gray-50/40 overflow-hidden">
@@ -3169,13 +3170,13 @@ const SkuMasterV2: React.FC = () => {
                 {activeBomProduct ? (
                   <>
                     {/* Active Product Header Bar */}
-                    <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                      <div>
-                        <h4 className="font-bold text-gray-900 text-sm">{activeBomProduct.name}</h4>
-                        <p className="text-xs text-gray-400 font-mono">{activeBomProduct.skuCode}</p>
+                    <div className="flex items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                      <div className="min-w-0 pr-2">
+                        <h4 className="font-bold text-gray-900 text-sm truncate" title={activeBomProduct.name}>{activeBomProduct.name}</h4>
+                        <p className="text-xs text-gray-400 font-mono truncate">{activeBomProduct.skuCode}</p>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 shrink-0">
                         <button
                           onClick={handleSaveBuildBomRecipe}
                           disabled={isSavingBuildBom}

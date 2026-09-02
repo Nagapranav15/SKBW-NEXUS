@@ -8,6 +8,7 @@ interface ModalProps {
   children: React.ReactNode;
   /** Tailwind width class, e.g. "max-w-2xl" */
   size?: string;
+  maxWidth?: string;
   className?: string;
 }
 
@@ -16,9 +17,11 @@ export const Modal: React.FC<ModalProps> = ({
   onClose,
   title,
   children,
-  size = 'max-w-lg',
+  size,
+  maxWidth,
   className = '',
 }) => {
+  const modalSize = maxWidth || size || 'max-w-lg';
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -35,7 +38,7 @@ export const Modal: React.FC<ModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[70] overflow-y-auto flex items-center justify-center p-4 bg-gray-950/20">
-      <div className={`relative bg-white rounded-xl shadow-2xl flex flex-col w-full ${size} max-h-[90vh] overflow-hidden ${className}`}>
+      <div className={`relative bg-white rounded-xl shadow-2xl flex flex-col w-full ${modalSize} max-h-[90vh] overflow-hidden ${className}`}>
         {title && (
           <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center shrink-0">
             <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
