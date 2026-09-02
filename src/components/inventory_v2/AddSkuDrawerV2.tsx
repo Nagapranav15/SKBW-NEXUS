@@ -1570,7 +1570,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                 </div>
               )}
 
-                {(form.category !== 'Raw Material' && form.category !== 'Semi Finished') && (
+                {/* BOM is ONLY for Finished Goods / Products */}
+                {(form.category === 'Finished Goods' || form.category === 'Products' || (form.category || '').toLowerCase().includes('notebook') || (form.category || '').toLowerCase().includes('diary')) && (
                   <div className="space-y-4 border-t border-gray-100 pt-4">
                     {/* BOM Header card banner */}
                     <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-3 flex items-center justify-between">

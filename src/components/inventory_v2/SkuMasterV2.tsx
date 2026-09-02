@@ -1627,9 +1627,9 @@ const SkuMasterV2: React.FC = () => {
                       );
                     }
 
-                    // BOM status
-                    const isBomApplicable = activeMainTab === 'products' || sku.category === 'Finished Goods' || sku.category === 'Products' || sku.category === 'Notebooks' || sku.category === 'Executive Diaries' || sku.category === 'Drawing Books';
-                    const hasBom = isBomApplicable && (((sku as any).bomItems && (sku as any).bomItems.length > 0) || sku.paperType === 'Sheets' || sku.paperType === 'Reels');
+                    // BOM status - Applicable ONLY for Finished Goods / Products
+                    const isBomApplicable = activeMainTab === 'products' || sku.category === 'Finished Goods' || sku.category === 'Products' || (sku.category || '').toLowerCase().includes('notebook') || (sku.category || '').toLowerCase().includes('diary');
+                    const hasBom = isBomApplicable && Array.isArray((sku as any).bomItems) && (sku as any).bomItems.length > 0;
 
                     // Extract Pages
                     const pageMatch = sku.name.match(/(\d+)P/i);
@@ -2434,7 +2434,7 @@ const SkuMasterV2: React.FC = () => {
                 </div>
 
                 {/* 3. Bill of Materials (BOM) - Shown ONLY for Finished Goods! */}
-                {(selectedSkuDetails?.category !== 'Raw Material' && selectedSkuDetails?.category !== 'Semi Finished') && (
+                {(selectedSkuDetails?.category === 'Finished Goods' || selectedSkuDetails?.category === 'Products' || (selectedSkuDetails?.category || '').toLowerCase().includes('notebook') || (selectedSkuDetails?.category || '').toLowerCase().includes('diary')) && (
                   <div className="space-y-3 border-t border-gray-100 pt-4">
                     {/* Yellow Notice Banner */}
                     <div className="bg-amber-50/90 border border-amber-200/90 rounded-xl p-3 flex items-center justify-between text-xs font-semibold text-amber-900 shadow-2xs">
