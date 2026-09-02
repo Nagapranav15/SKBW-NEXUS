@@ -48,6 +48,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { 
   getSkusV2, 
+  getBalancesV2,
   bulkImportSkusV2, 
   deleteSkuV2, 
   updateSkuV2, 
@@ -459,16 +460,37 @@ const SkuMasterV2: React.FC = () => {
   const loadSkus = async (showSpinner = true) => {
     if (showSpinner) setLoading(true);
     try {
-      const data = await getSkusV2(
-        selectedCompany?._id || '', 
-        categoryFilter || undefined, 
-        debouncedSearch || undefined,
-        statusFilter || undefined
-      );
-      const formatted = (data || []).map(item => ({
-        ...item,
-        name: formatSkuName(item.name)
-      }));
+      const companyId = selectedCompany?._id || '';
+      const [data, balancesData] = await Promise.all([
+        getSkusV2(
+          companyId, 
+          categoryFilter || undefined, 
+          debouncedSearch || undefined,
+          statusFilter || undefined
+        ),
+        companyId ? getBalancesV2(companyId).catch(() => []) : Promise.resolve([])
+      ]);
+
+      const balanceMap = new Map<string, number>();
+      if (Array.isArray(balancesData)) {
+        balancesData.forEach((b: any) => {
+          const sId = b.skuId || b.sku?._id;
+          const qty = Number(b.onHand) || Number(b.quantity) || 0;
+          if (sId) {
+            balanceMap.set(sId, (balanceMap.get(sId) || 0) + qty);
+          }
+        });
+      }
+
+      const formatted = (data || []).map(item => {
+        const liveStock = balanceMap.has(item._id) ? balanceMap.get(item._id)! : (item.openingStock ?? 0);
+        return {
+          ...item,
+          name: formatSkuName(item.name),
+          openingStock: liveStock,
+          presentStock: liveStock
+        };
+      });
       setSkus(formatted);
     } catch (e) {
       console.error(e);
@@ -1634,22 +1656,23 @@ const SkuMasterV2: React.FC = () => {
                       itemDomainIcon = '📚';
                     }
 
-                    // Stock badge coloring
+                    // Dynamic Live Present Stock badge coloring
+                    const liveStockQty = Number(sku.presentStock ?? sku.openingStock ?? 0);
                     let stockBadge = (
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 shadow-2xs">
-                        {stockQty || 1100}
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-mono font-extrabold bg-emerald-100 text-emerald-800 shadow-2xs">
+                        {liveStockQty.toLocaleString('en-IN')} {sku.unit || 'Pcs'}
                       </span>
                     );
-                    if (stockQty === 0 && index % 2 === 1) {
+                    if (liveStockQty <= 0) {
                       stockBadge = (
                         <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-700 shadow-2xs">
-                          Out of Stock
+                          0 {sku.unit || 'Pcs'}
                         </span>
                       );
-                    } else if (stockQty > 0 && stockQty < 200) {
+                    } else if (liveStockQty < 200) {
                       stockBadge = (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 shadow-2xs">
-                          Low (150)
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-amber-100 text-amber-800 shadow-2xs">
+                          Low ({liveStockQty.toLocaleString('en-IN')} {sku.unit || 'Pcs'})
                         </span>
                       );
                     }
