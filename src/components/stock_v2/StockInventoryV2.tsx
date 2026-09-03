@@ -24,7 +24,9 @@ import {
   Settings,
   ShieldCheck,
   Check,
-  Warehouse
+  Warehouse,
+  BarChart3,
+  FileText
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import Modal from '../ui/Modal';
@@ -940,7 +942,7 @@ export const StockInventoryV2: React.FC = () => {
                 : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50'
             }`}
           >
-            <span>📦</span>
+            <Package className={`w-4 h-4 ${activeTab === 'batches' ? 'text-purple-600' : 'text-gray-400'}`} />
             <span>Purchase Batches</span>
           </button>
 
@@ -952,7 +954,7 @@ export const StockInventoryV2: React.FC = () => {
                 : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50'
             }`}
           >
-            <span>📊</span>
+            <BarChart3 className={`w-4 h-4 ${activeTab === 'manager' ? 'text-purple-600' : 'text-gray-400'}`} />
             <span>Stock Manager</span>
           </button>
 
@@ -964,7 +966,7 @@ export const StockInventoryV2: React.FC = () => {
                 : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50'
             }`}
           >
-            <span>📜</span>
+            <FileText className={`w-4 h-4 ${activeTab === 'ledger' ? 'text-purple-600' : 'text-gray-400'}`} />
             <span>Stock Ledger</span>
           </button>
 
@@ -976,7 +978,7 @@ export const StockInventoryV2: React.FC = () => {
                 : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50'
             }`}
           >
-            <span>🏢</span>
+            <Warehouse className={`w-4 h-4 ${activeTab === 'warehouse' ? 'text-purple-600' : 'text-gray-400'}`} />
             <span>Warehouse Setup</span>
           </button>
         </div>

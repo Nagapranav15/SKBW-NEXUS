@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, RefreshCw, BookOpen, Layers, Plus, Trash2, Tag, AlertCircle, MapPin, Search, ChevronDown, Check } from 'lucide-react';
-import { createSkuV2, updateSkuV2, SkuV2, getMetadataV2, updateMetadataV2, getSkusV2 } from '../../api/mfgApiV2';
+import { Save, RefreshCw, BookOpen, Layers, Plus, Trash2, Tag, AlertCircle, MapPin, Search, ChevronDown, Check, Building2, Lock } from 'lucide-react';
+import { createSkuV2, updateSkuV2, SkuV2, getMetadataV2, updateMetadataV2, getSkusV2, getBalancesV2, getWarehouseHierarchyV2, WarehouseLocationV2 } from '../../api/mfgApiV2';
 import Modal from '../ui/Modal';
 import Drawer from '../ui/Drawer';
 
@@ -9,6 +9,10 @@ interface AddSkuDrawerV2Props {
   companyId: string;
   editSku?: SkuV2 | null;
   defaultCategory?: string;
+  activeSection?: 'products' | 'materials' | 'semi';
+  existingProductsCount?: number;
+  existingMaterialsCount?: number;
+  existingSemiCount?: number;
   onClose: () => void;
   onSaveSuccess: (savedSku: SkuV2) => void;
   customColumns?: string[];
@@ -17,14 +21,6 @@ interface AddSkuDrawerV2Props {
   setCustomColumnValues?: React.Dispatch<React.SetStateAction<{ [key: string]: any }>>;
   customColumnOptions?: { [colName: string]: { label: string; color: string }[] };
 }
-
-export const DEMO_RAW_LIBRARY: SkuV2[] = [
-  { skuCode: 'RM-REEL-70', name: 'Maplitho Paper Reel 70 GSM', category: 'Paper Reels', unit: 'Kg', status: 'Active' },
-  { skuCode: 'RM-BOARD-300', name: 'Grey Duplex Cover Board 300 GSM', category: 'Cover Board', unit: 'Pcs', status: 'Active' },
-  { skuCode: 'RM-WIRE-24', name: 'Book Stitching Wire #24', category: 'Stitching Wire', unit: 'Kg', status: 'Active' },
-  { skuCode: 'RM-GLUE-HM', name: 'Hotmelt Binding Adhesive', category: 'Adhesives', unit: 'Kg', status: 'Active' },
-  { skuCode: 'RM-KRAFT-120', name: 'Kraft Packing Paper 120 GSM', category: 'Packaging', unit: 'Kg', status: 'Active' }
-];
 
 export const SearchableMaterialDropdown: React.FC<{
   value: string;
@@ -46,13 +42,12 @@ export const SearchableMaterialDropdown: React.FC<{
   }, []);
 
   const allMaterials = React.useMemo(() => {
-    const list = [...materials];
-    for (const demo of DEMO_RAW_LIBRARY) {
-      if (!list.some(m => (m.name || '').toLowerCase() === demo.name.toLowerCase())) {
-        list.push(demo);
-      }
-    }
-    return list;
+    return (materials || []).filter(m => {
+      const cat = (m.category || '').trim().toLowerCase();
+      const code = (m.skuCode || '').trim().toUpperCase();
+      const isFinishedGoods = cat === 'finished goods' || cat === 'products' || cat === 'finished' || code.startsWith('FG-') || code.startsWith('FG');
+      return !isFinishedGoods;
+    });
   }, [materials]);
 
   const filtered = allMaterials.filter(m =>
@@ -75,7 +70,7 @@ export const SearchableMaterialDropdown: React.FC<{
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1.5 w-72 bg-white border border-gray-200 rounded-2xl shadow-2xl p-2 space-y-2 text-xs z-[100]">
+        <div className="absolute top-full left-0 mt-1.5 w-72 bg-white border border-gray-200 rounded-2xl shadow-2xl p-2 space-y-2 text-xs z-[999]">
           <div className="relative">
             <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
             <input
@@ -157,6 +152,10 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   companyId,
   editSku,
   defaultCategory,
+  activeSection,
+  existingProductsCount,
+  existingMaterialsCount,
+  existingSemiCount,
   onClose,
   onSaveSuccess,
   customColumns = [],
@@ -168,7 +167,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   const [form, setForm] = useState({
     skuCode: '',
     name: '',
-    category: defaultCategory || 'Raw Material',
+    category: defaultCategory || (activeSection === 'products' ? 'Finished Goods' : activeSection === 'semi' ? 'Semi Finished' : 'Raw Material'),
     paperType: 'None' as 'Reels' | 'Sheets' | 'None',
     unit: 'kg',
     altUnit: '',
@@ -186,22 +185,105 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     defaultLocation: 'Main Warehouse - Bay A1',
     minStockLevel: '500',
     reorderLevel: '',
-    maxStockLevel: '',
+    recipeYieldQty: '1',
     status: 'Active' as 'Active' | 'Inactive'
   });
 
   const [rawMaterialsList, setRawMaterialsList] = useState<SkuV2[]>([]);
   const [formCustomValues, setFormCustomValues] = useState<{ [colName: string]: any }>({});
+  const [dynamicLocationText, setDynamicLocationText] = useState<string>('Loading location...');
+
+  // Helper to build parent-to-child location path (Factory ➔ Zone ➔ Storage Location)
+  const buildLocationPath = (locId: string, allLocations: WarehouseLocationV2[]): string => {
+    const locMap = new Map(allLocations.map(l => [l._id, l]));
+    const current = locMap.get(locId);
+    if (!current) return locId;
+
+    const path: string[] = [current.name];
+    let parentId = current.parentId;
+    let guard = 0;
+
+    while (parentId && guard < 10) {
+      const parent = locMap.get(parentId);
+      if (!parent) break;
+      path.unshift(parent.name);
+      parentId = parent.parentId;
+      guard++;
+    }
+
+    return path.join(' ➔ ');
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+    if (!isOpen || !companyId) return;
+
+    const fetchLocationData = async () => {
+      try {
+        const hierarchy = await getWarehouseHierarchyV2(companyId).catch(() => []);
+        
+        if (editSku?._id) {
+          const balances = await getBalancesV2(companyId, undefined, undefined, editSku._id).catch(() => []);
+          
+          if (balances && balances.length > 0) {
+            const locPaths: string[] = [];
+            for (const b of balances) {
+              const locObj = b.locationId || b.location;
+              if (locObj) {
+                if (typeof locObj === 'object' && locObj._id) {
+                  const p = buildLocationPath(locObj._id, hierarchy);
+                  const qtyText = b.onHand !== undefined ? ` (${b.onHand} ${editSku.unit || ''})` : '';
+                  locPaths.push(`${p}${qtyText}`);
+                } else if (typeof locObj === 'object' && locObj.name) {
+                  locPaths.push(locObj.name);
+                } else if (typeof locObj === 'string') {
+                  const p = buildLocationPath(locObj, hierarchy);
+                  locPaths.push(p);
+                }
+              }
+            }
+            if (locPaths.length > 0) {
+              const unique = Array.from(new Set(locPaths));
+              if (isMounted) setDynamicLocationText(unique.join(' • '));
+              return;
+            }
+          }
+
+          const directLoc = (editSku as any)?.locationId || (editSku as any)?.warehouseLocation || (editSku as any)?.location || (editSku as any)?.locationName;
+          if (directLoc) {
+            if (typeof directLoc === 'object' && directLoc._id) {
+              if (isMounted) setDynamicLocationText(buildLocationPath(directLoc._id, hierarchy));
+              return;
+            } else if (typeof directLoc === 'string') {
+              if (isMounted) setDynamicLocationText(buildLocationPath(directLoc, hierarchy));
+              return;
+            }
+          }
+        }
+
+        if (isMounted) setDynamicLocationText('Not assigned to any location');
+      } catch (err) {
+        if (isMounted) setDynamicLocationText('Not assigned to any location');
+      }
+    };
+
+    fetchLocationData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, editSku, companyId, form.category, defaultCategory]);
 
   useEffect(() => {
     if (isOpen && companyId) {
       getSkusV2(companyId).then(skus => {
-        const rawOnly = (skus || []).filter(item => {
-          const cat = (item.category || '').toLowerCase();
-          const name = (item.name || '').toLowerCase();
-          return cat.includes('raw') || cat.includes('material') || cat === 'raw material' || cat.includes('reel') || cat.includes('board') || name.includes('reel') || name.includes('wire') || name.includes('adhesive') || name.includes('glue');
+        const rawAndSemi = (skus || []).filter(item => {
+          const cat = (item.category || '').trim().toLowerCase();
+          const code = (item.skuCode || '').trim().toUpperCase();
+          const isFinishedGoods = cat === 'finished goods' || cat === 'products' || cat === 'finished' || code.startsWith('FG-') || code.startsWith('FG');
+          return !isFinishedGoods;
         });
-        setRawMaterialsList(rawOnly);
+        setRawMaterialsList(rawAndSemi);
       }).catch(console.error);
     }
   }, [isOpen, companyId]);
@@ -217,6 +299,16 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       setFormCustomValues(initial);
     }
   }, [isOpen, editSku, customColumns, customColumnValues]);
+
+  const sectionCategories = React.useMemo(() => {
+    if (activeSection === 'products' || defaultCategory === 'Finished Goods') {
+      return ['Finished Goods'];
+    }
+    if (activeSection === 'semi' || defaultCategory === 'Semi Finished') {
+      return ['Semi Finished'];
+    }
+    return ['Raw Material'];
+  }, [activeSection, defaultCategory]);
 
   const [categoriesList, setCategoriesList] = useState<string[]>(["Raw Material", "Semi Finished", "Finished Goods"]);
   const [unitsList, setUnitsList] = useState<string[]>(["kg", "pcs", "Sheets", "Reels", "mtr"]);
@@ -249,7 +341,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   const handleAddBomItem = () => {
     setBomItems(prev => [
       ...prev,
-      { id: 'bom_' + Date.now(), name: '', qty: '1', uom: 'Pcs', inStock: 500, notes: '' }
+      { id: 'bom_' + Date.now(), name: '', qty: '', uom: form.unit || 'Kg', inStock: 0, notes: '' }
     ]);
   };
 
@@ -477,6 +569,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         reamWeight: (editSku as any).reamWeight !== undefined ? String((editSku as any).reamWeight) : '',
         booksGbl: (editSku as any).booksGbl !== undefined ? String((editSku as any).booksGbl) : '',
         openingStock: (editSku as any).openingStock !== undefined ? String((editSku as any).openingStock) : '',
+        recipeYieldQty: (editSku as any).recipeYieldQty !== undefined ? String((editSku as any).recipeYieldQty) : ((editSku as any).batchYieldQty !== undefined ? String((editSku as any).batchYieldQty) : '1'),
         status: editSku.status || 'Active'
       });
       setHasAltUnit(!!editSku.altUnit);
@@ -511,6 +604,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         reamWeight: '',
         booksGbl: '',
         openingStock: '',
+        recipeYieldQty: '1',
         status: 'Active'
       });
       setHasAltUnit(false);
@@ -529,23 +623,33 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   }, [companyId]);
 
   const activeFields = [...(categoryFieldsMap[form.category] || ['gsm', 'width', 'length'])];
-  if (form.paperType === 'Sheets' && !activeFields.includes('pages')) {
-    activeFields.push('pages');
-    activeFields.push('reamWeight');
-  }
 
   // Auto-generate SKU Code
   useEffect(() => {
     if (!editSku) {
       regenerateSkuCode();
     }
-  }, [form.category, editSku]);
+  }, [form.category, editSku, activeSection, existingProductsCount, existingMaterialsCount, existingSemiCount]);
 
-    const regenerateSkuCode = () => {
-      const prefix = form.category === 'Raw Material' ? 'RM' : form.category === 'Semi Finished' ? 'SF' : 'FG';
-      const rand = Math.floor(10000 + Math.random() * 90000);
-      setForm(prev => ({ ...prev, skuCode: `${prefix}-${rand}` }));
-    };
+  const regenerateSkuCode = () => {
+    let prefix = 'RM';
+    let count = 0;
+
+    const cat = form.category || defaultCategory || '';
+    if (cat === 'Finished Goods' || activeSection === 'products') {
+      prefix = 'FG';
+      count = existingProductsCount !== undefined ? existingProductsCount : 5;
+    } else if (cat === 'Semi Finished' || activeSection === 'semi') {
+      prefix = 'SEM';
+      count = existingSemiCount !== undefined ? existingSemiCount : 3;
+    } else {
+      prefix = 'RM';
+      count = existingMaterialsCount !== undefined ? existingMaterialsCount : 4;
+    }
+
+    const nextSeq = String(count + 1).padStart(3, '0');
+    setForm(prev => ({ ...prev, skuCode: `${prefix}-${nextSeq}` }));
+  };
 
     // Compile Sku Name dynamically from other inputs
     useEffect(() => {
@@ -656,6 +760,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           reamWeight: form.reamWeight ? Number(form.reamWeight) : undefined,
           booksGbl: form.booksGbl ? Number(form.booksGbl) : undefined,
           openingStock: form.openingStock ? Number(form.openingStock) : 0,
+          recipeYieldQty: Number(form.recipeYieldQty) || 1,
           status: form.status || 'Active',
           company: companyId,
           bomItems: bomItems.length > 0 ? bomItems : undefined,
@@ -793,7 +898,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     }}
                     className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800 cursor-pointer"
                   >
-                    {categoriesList.map(cat => (
+                    {sectionCategories.map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
                     <option value="__ADD_NEW__" className="text-purple-600 font-bold">+ Add Custom...</option>
@@ -1041,19 +1146,19 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           <div className="relative">
                             <input
                               type="number"
-                              placeholder="Multiplier rate"
+                              placeholder="e.g. 20"
                               value={form.altUnitConversion}
                               onChange={e => setForm({ ...form, altUnitConversion: e.target.value })}
-                              className="w-full pl-3 pr-14 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800 font-mono"
+                              className="w-full pl-3 pr-24 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800 font-mono"
                             />
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400 uppercase font-mono select-none">
-                              {form.altUnit || 'units'}
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-purple-600 uppercase font-mono select-none">
+                              {form.unit || 'units'} / {form.altUnit || 'AUOM'}
                             </div>
                           </div>
                         </div>
                         {form.altUnit && form.altUnitConversion && (
-                          <div className="col-span-2 text-center bg-white py-1.5 px-3 rounded-lg border border-slate-100 text-[10.5px] font-medium text-slate-500">
-                            Formula: <span className="font-bold text-slate-800">1 {form.unit}</span> = <span className="font-extrabold text-purple-600 font-mono text-xs">{form.altUnitConversion}</span> × <span className="font-bold text-slate-800">{form.altUnit}</span>
+                          <div className="col-span-2 text-center bg-purple-50/70 py-1.5 px-3 rounded-lg border border-purple-100 text-[10.5px] font-medium text-purple-900">
+                            Formula: <span className="font-extrabold text-slate-900">1 {form.altUnit}</span> = <span className="font-extrabold text-purple-700 font-mono text-xs">{form.altUnitConversion}</span> <span className="font-extrabold text-slate-900">{form.unit}</span>
                           </div>
                         )}
                       </div>
@@ -1274,19 +1379,19 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           <div className="relative">
                             <input
                               type="number"
-                              placeholder="Multiplier rate"
+                              placeholder="e.g. 20"
                               value={form.altUnitConversion}
                               onChange={e => setForm({ ...form, altUnitConversion: e.target.value })}
-                              className="w-full pl-3 pr-14 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800 font-mono"
+                              className="w-full pl-3 pr-24 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800 font-mono"
                             />
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400 uppercase font-mono select-none">
-                              {form.altUnit || 'units'}
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-purple-600 uppercase font-mono select-none">
+                              {form.unit || 'units'} / {form.altUnit || 'AUOM'}
                             </div>
                           </div>
                         </div>
                         {form.altUnit && form.altUnitConversion && (
-                          <div className="col-span-2 text-center bg-white py-1.5 px-3 rounded-lg border border-slate-100 text-[10.5px] font-medium text-slate-500">
-                            Formula: <span className="font-bold text-slate-800">1 {form.unit}</span> = <span className="font-extrabold text-purple-600 font-mono text-xs">{form.altUnitConversion}</span> × <span className="font-bold text-slate-800">{form.altUnit}</span>
+                          <div className="col-span-2 text-center bg-purple-50/70 py-1.5 px-3 rounded-lg border border-purple-100 text-[10.5px] font-medium text-purple-900">
+                            Formula: <span className="font-extrabold text-slate-900">1 {form.altUnit}</span> = <span className="font-extrabold text-purple-700 font-mono text-xs">{form.altUnitConversion}</span> <span className="font-extrabold text-slate-900">{form.unit}</span>
                           </div>
                         )}
                       </div>
@@ -1439,7 +1544,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                 Stock Levels
               </h3>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* 1. Min Stock Level */}
                 <div>
                   <label className="block text-[11px] font-bold text-gray-700 mb-1 flex items-center gap-1">
@@ -1475,23 +1580,33 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     Reorder when stock reaches this level
                   </span>
                 </div>
+              </div>
 
-                {/* 3. Max Stock Level */}
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-700 mb-1 flex items-center gap-1">
-                    <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
-                    <span>Max Stock Level</span>
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="e.g. 100"
-                    value={form.maxStockLevel || ''}
-                    onChange={(e) => setForm({ ...form, maxStockLevel: e.target.value })}
-                    className="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-amber-400 bg-white"
-                  />
-                  <span className="block text-[10px] text-gray-400 mt-1 font-medium leading-tight">
-                    Upper limit — don't stock beyond this
+              {/* Minimal Clean Read-Only Warehouse Location */}
+              <div className="space-y-1 mt-3">
+                <label className="block text-[11px] font-bold text-gray-700 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Warehouse Storage Location</span>
+                  </div>
+                  <span className="text-[10px] font-semibold text-gray-400 flex items-center gap-1">
+                    <Lock className="w-3 h-3 text-gray-400" />
+                    Read-Only
                   </span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    readOnly
+                    disabled
+                    value={dynamicLocationText || 'Unassigned (No warehouse stock entry)'}
+                    className="w-full pl-3 pr-24 py-2 bg-gray-50/80 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 font-mono cursor-not-allowed select-none"
+                  />
+                  <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                    <span className="text-[9.5px] font-bold text-purple-600 bg-purple-50 border border-purple-100 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                      System Tracked
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1570,8 +1685,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                 </div>
               )}
 
-                {/* BOM is ONLY for Finished Goods / Products */}
-                {(form.category === 'Finished Goods' || form.category === 'Products' || (form.category || '').toLowerCase().includes('notebook') || (form.category || '').toLowerCase().includes('diary')) && (
+                {/* BOM is for Finished Goods / Products AND Semi Finished materials */}
+                {(form.category === 'Finished Goods' || form.category === 'Semi Finished' || form.category === 'Products' || form.category === 'Semi' || (form.category || '').toLowerCase().includes('notebook') || (form.category || '').toLowerCase().includes('diary') || (form.category || '').toLowerCase().includes('semi')) && (
                   <div className="space-y-4 border-t border-gray-100 pt-4">
                     {/* BOM Header card banner */}
                     <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-3 flex items-center justify-between">
@@ -1586,7 +1701,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     </div>
 
                     {/* Bill of Materials (Paper & Covers) Table */}
-                    <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3">
+                    <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3 relative">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <div className="p-1.5 bg-purple-50 text-purple-700 rounded-lg">
@@ -1607,13 +1722,28 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         </button>
                       </div>
 
+                      {/* Customizable Batch Size Yield Row */}
+                      <div className="flex items-center gap-2 text-xs text-gray-600 font-medium py-1 border-b border-gray-100">
+                        <span>This recipe makes</span>
+                        <input
+                          type="number"
+                          min="1"
+                          placeholder="1"
+                          value={form.recipeYieldQty || '1'}
+                          onChange={(e) => setForm({ ...form, recipeYieldQty: e.target.value })}
+                          className="w-16 px-2 py-0.5 border border-purple-300 rounded-md text-xs font-extrabold text-purple-700 text-center focus:ring-2 focus:ring-purple-500 bg-purple-50/60"
+                        />
+                        <span className="font-bold text-gray-800 uppercase">{form.unit || 'Pcs'}</span>
+                        <span className="italic text-gray-400 text-[11px]">(use 1 for per-unit quantities)</span>
+                      </div>
+
                       {/* BOM Table Grid */}
                       {bomItems.length === 0 ? (
                         <div className="bg-gray-50/60 border border-dashed border-gray-200 rounded-xl p-4 text-center text-xs text-gray-400">
                           No BOM materials added yet — click "+ Add Material" to define raw material consumption
                         </div>
                       ) : (
-                        <div className="overflow-x-auto">
+                        <div className="overflow-visible relative min-h-[160px]">
                           <table className="w-full text-left text-xs border-collapse">
                             <thead>
                               <tr className="border-b border-gray-100 text-[10px] font-bold text-gray-400 uppercase">
@@ -1626,8 +1756,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
-                              {bomItems.map((item) => (
-                                <tr key={item.id}>
+                              {bomItems.map((item, idx) => (
+                                <tr key={item.id} className="relative z-10" style={{ zIndex: 100 - idx }}>
                                   <td className="py-2 px-2">
                                     <SearchableMaterialDropdown
                                       value={item.name}

@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ToastContainer } from './components/ui/Toast';
@@ -46,6 +46,18 @@ const LoadingFallback = () => (
 );
 
 function App() {
+  // Prevent mouse wheel scrolling from changing number input values globally
+  useEffect(() => {
+    const handleWheel = () => {
+      const activeEl = document.activeElement as HTMLInputElement | null;
+      if (activeEl && activeEl.tagName === 'INPUT' && activeEl.type === 'number') {
+        activeEl.blur();
+      }
+    };
+    window.addEventListener('wheel', handleWheel, { passive: true });
+    return () => window.removeEventListener('wheel', handleWheel);
+  }, []);
+
   return (
     <AuthProvider>
       <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>

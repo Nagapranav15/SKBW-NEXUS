@@ -34,6 +34,9 @@ import {
   Bell, 
   Paperclip,
   Building,
+  Building2,
+  Lock,
+  MapPin,
   SlidersHorizontal,
   ExternalLink,
   ClipboardList,
@@ -54,10 +57,12 @@ import {
   updateSkuV2, 
   getMetadataV2,
   updateMetadataV2,
+  getWarehouseHierarchyV2,
+  WarehouseLocationV2,
   SkuV2 
 } from '../../api/mfgApiV2';
 import { getActivityLogs, createActivityLog } from '../../api/activityLogApi';
-import AddSkuDrawerV2, { SearchableMaterialDropdown, DEMO_RAW_LIBRARY } from './AddSkuDrawerV2';
+import AddSkuDrawerV2, { SearchableMaterialDropdown } from './AddSkuDrawerV2';
 import { showToast } from '../ui/Toast';
 import * as XLSX from 'xlsx';
 import Modal from '../ui/Modal';
@@ -137,6 +142,7 @@ interface BomRecipeItem {
 const SkuMasterV2: React.FC = () => {
   const navigate = useNavigate();
   const { selectedCompany } = useAuth();
+  const currentCompanyId = selectedCompany?._id || '';
 
   // Key to force row animation trigger on reload / tab change
   const [animationKey, setAnimationKey] = useState(Date.now());
@@ -229,19 +235,19 @@ const SkuMasterV2: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Dynamic work order & dispatch order calculation helpers
+  // Dynamic work order & dispatch order calculation helpers (Remove fake defaults)
   const getWorkOrderCount = (sku: SkuV2 | null) => {
     if (!sku) return 0;
-    if ((sku as any).workOrderCount !== undefined) return (sku as any).workOrderCount;
-    const codeNum = (sku.skuCode || sku.name || '').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    return (codeNum % 3) + 1;
+    if ((sku as any).workOrderCount !== undefined) return Number((sku as any).workOrderCount) || 0;
+    if ((sku as any).workOrdersCount !== undefined) return Number((sku as any).workOrdersCount) || 0;
+    return 0;
   };
 
   const getDispatchOrderCount = (sku: SkuV2 | null) => {
     if (!sku) return 0;
-    if ((sku as any).dispatchOrderCount !== undefined) return (sku as any).dispatchOrderCount;
-    const codeNum = (sku.skuCode || sku.name || '').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    return (codeNum % 2) + 1;
+    if ((sku as any).dispatchOrderCount !== undefined) return Number((sku as any).dispatchOrderCount) || 0;
+    if ((sku as any).dispatchOrdersCount !== undefined) return Number((sku as any).dispatchOrdersCount) || 0;
+    return 0;
   };
 
   // Add Custom Column Modal State (exact match to user screenshot!)
@@ -360,8 +366,7 @@ const SkuMasterV2: React.FC = () => {
   });
   const [stockLevels, setStockLevels] = useState({
     minLevel: '500',
-    reorderLevel: '',
-    maxLevel: ''
+    reorderLevel: ''
   });
   const [bomRecipeItems, setBomRecipeItems] = useState<BomRecipeItem[]>([
     { id: 'b-1', name: 'Maplitho Paper Reel 70 GSM (Kraft Roll)', qty: 0.2, uom: 'Kg', inStock: 600, notes: 'Paper Reel' },
@@ -369,6 +374,8 @@ const SkuMasterV2: React.FC = () => {
     { id: 'b-3', name: 'Book Stitching Wire #24', qty: 0.02, uom: 'Kg', inStock: 180, notes: 'Wire' },
     { id: 'b-4', name: 'Hotmelt Binding Adhesive', qty: 0.05, uom: 'Kg', inStock: 2200, notes: 'Glue' }
   ]);
+  const [recipeYieldQty, setRecipeYieldQty] = useState<string>('1');
+  const [buildBatchYieldQty, setBuildBatchYieldQty] = useState<string>('1');
   const [itemGrade, setItemGrade] = useState('Option 2');
   const [isSavingBom, setIsSavingBom] = useState(false);
 
@@ -381,9 +388,10 @@ const SkuMasterV2: React.FC = () => {
     try {
       await updateSkuV2(selectedSkuDetails._id, {
         bomItems: bomRecipeItems,
+        recipeYieldQty: Number(recipeYieldQty) || 1,
         company: selectedCompany?._id
       });
-      setSelectedSkuDetails(prev => prev ? ({ ...prev, bomItems: bomRecipeItems }) : null);
+      setSelectedSkuDetails(prev => prev ? ({ ...prev, bomItems: bomRecipeItems, recipeYieldQty: Number(recipeYieldQty) || 1 }) : null);
       showToast('BOM Recipe saved successfully to database!', 'success');
       loadSkus(false);
     } catch (err: any) {
@@ -395,6 +403,168 @@ const SkuMasterV2: React.FC = () => {
   };
 
   // ── Build BOMs / Bulk Edit BOM Modal state & handlers ──
+  // ── Per-Tab Independent Column Customizer Tool State ──
+  const DEFAULT_PRODUCTS_COLUMNS = [
+    { id: 'skuCode', label: 'ID / SKU Code', visible: true },
+    { id: 'name', label: 'Item Name', visible: true },
+    { id: 'category', label: 'Category', visible: true },
+    { id: 'unit', label: 'UOM', visible: true },
+    { id: 'altUnit', label: 'AUOM (Alt Unit)', visible: true },
+    { id: 'altUnitConversion', label: 'Con Rate', visible: true },
+    { id: 'gsm', label: 'GSM', visible: true },
+    { id: 'size', label: 'Size', visible: true },
+    { id: 'pages', label: 'Pages / Sheets', visible: true },
+    { id: 'bom', label: 'BOM Recipe', visible: true },
+    { id: 'openingStock', label: 'Stock', visible: true },
+    { id: 'workOrders', label: 'Work Orders', visible: true },
+    { id: 'dispatchOrders', label: 'Dispatch Orders', visible: true }
+  ];
+
+  const DEFAULT_MATERIALS_COLUMNS = [
+    { id: 'skuCode', label: 'ID / SKU Code', visible: true },
+    { id: 'name', label: 'Item Name', visible: true },
+    { id: 'category', label: 'Category', visible: true },
+    { id: 'unit', label: 'UOM', visible: true },
+    { id: 'altUnit', label: 'AUOM (Alt Unit)', visible: true },
+    { id: 'altUnitConversion', label: 'Con Rate', visible: true },
+    { id: 'gsm', label: 'GSM', visible: true },
+    { id: 'size', label: 'Size', visible: true },
+    { id: 'openingStock', label: 'Stock', visible: true },
+    { id: 'workOrders', label: 'Work Orders', visible: true },
+    { id: 'dispatchOrders', label: 'Dispatch Orders', visible: true }
+  ];
+
+  const DEFAULT_SEMI_COLUMNS = [
+    { id: 'skuCode', label: 'ID / SKU Code', visible: true },
+    { id: 'name', label: 'Item Name', visible: true },
+    { id: 'category', label: 'Category', visible: true },
+    { id: 'unit', label: 'UOM', visible: true },
+    { id: 'altUnit', label: 'AUOM (Alt Unit)', visible: true },
+    { id: 'altUnitConversion', label: 'Con Rate', visible: true },
+    { id: 'gsm', label: 'GSM', visible: true },
+    { id: 'size', label: 'Size', visible: true },
+    { id: 'pages', label: 'Pages / Sheets', visible: true },
+    { id: 'bom', label: 'BOM Recipe', visible: true },
+    { id: 'openingStock', label: 'Stock', visible: true },
+    { id: 'workOrders', label: 'Work Orders', visible: true },
+    { id: 'dispatchOrders', label: 'Dispatch Orders', visible: true }
+  ];
+
+  const STORAGE_KEY = 'skbw_sku_master_tab_columns_v2';
+
+  const [tabColumnsMap, setTabColumnsMap] = useState<Record<string, typeof DEFAULT_PRODUCTS_COLUMNS>>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') {
+          return {
+            products: Array.isArray(parsed.products) ? parsed.products : DEFAULT_PRODUCTS_COLUMNS,
+            materials: Array.isArray(parsed.materials) ? parsed.materials : DEFAULT_MATERIALS_COLUMNS,
+            semi: Array.isArray(parsed.semi) ? parsed.semi : DEFAULT_SEMI_COLUMNS
+          };
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load column settings from localStorage', e);
+    }
+    return {
+      products: DEFAULT_PRODUCTS_COLUMNS,
+      materials: DEFAULT_MATERIALS_COLUMNS,
+      semi: DEFAULT_SEMI_COLUMNS
+    };
+  });
+
+  // Persist tabColumnsMap whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(tabColumnsMap));
+    } catch (e) {
+      console.error('Failed to save column settings to localStorage', e);
+    }
+  }, [tabColumnsMap]);
+
+  const columnsConfig = tabColumnsMap[activeMainTab] || DEFAULT_PRODUCTS_COLUMNS;
+  const setColumnsConfig = (newVal: typeof DEFAULT_PRODUCTS_COLUMNS | ((prev: typeof DEFAULT_PRODUCTS_COLUMNS) => typeof DEFAULT_PRODUCTS_COLUMNS)) => {
+    setTabColumnsMap(prevMap => {
+      const currentTab = activeMainTab in prevMap ? activeMainTab : 'products';
+      const currentList = prevMap[currentTab] || DEFAULT_PRODUCTS_COLUMNS;
+      const updated = typeof newVal === 'function' ? newVal(currentList) : newVal;
+      return { ...prevMap, [currentTab]: updated };
+    });
+  };
+
+  const [showColumnCustomizer, setShowColumnCustomizer] = useState(false);
+  const columnCustomizerRef = useRef<HTMLDivElement>(null);
+  const [draggedPopoverColIdx, setDraggedPopoverColIdx] = useState<number | null>(null);
+
+  const handlePopoverDragStart = (e: React.DragEvent, idx: number) => {
+    setDraggedPopoverColIdx(idx);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handlePopoverDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handlePopoverDrop = (e: React.DragEvent, dropIdx: number) => {
+    e.preventDefault();
+    if (draggedPopoverColIdx === null || draggedPopoverColIdx === dropIdx) return;
+    const updated = [...columnsConfig];
+    const [moved] = updated.splice(draggedPopoverColIdx, 1);
+    updated.splice(dropIdx, 0, moved);
+    setColumnsConfig(updated);
+    setDraggedPopoverColIdx(null);
+  };
+
+  // Memoized visible columns according to current tab columnsConfig order and visibility
+  const visibleColumns = useMemo(() => {
+    return columnsConfig.filter(col => {
+      if (col.id === 'bom' && activeMainTab !== 'products' && activeMainTab !== 'semi') {
+        return false;
+      }
+      if (col.id === 'pages' && activeMainTab === 'materials') {
+        return false;
+      }
+      return col.visible;
+    });
+  }, [columnsConfig, activeMainTab]);
+
+  const [draggedHeaderIdx, setDraggedHeaderIdx] = useState<number | null>(null);
+
+  const handleHeaderDragStart = (e: React.DragEvent, visibleIdx: number) => {
+    setDraggedHeaderIdx(visibleIdx);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleHeaderDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleHeaderDrop = (e: React.DragEvent, dropVisibleIdx: number) => {
+    e.preventDefault();
+    if (draggedHeaderIdx === null || draggedHeaderIdx === dropVisibleIdx) return;
+    
+    const sourceCol = visibleColumns[draggedHeaderIdx];
+    const targetCol = visibleColumns[dropVisibleIdx];
+    
+    if (!sourceCol || !targetCol) return;
+
+    const sourceFullIdx = columnsConfig.findIndex(c => c.id === sourceCol.id);
+    const targetFullIdx = columnsConfig.findIndex(c => c.id === targetCol.id);
+
+    if (sourceFullIdx === -1 || targetFullIdx === -1) return;
+
+    const next = [...columnsConfig];
+    const [moved] = next.splice(sourceFullIdx, 1);
+    next.splice(targetFullIdx, 0, moved);
+    
+    setColumnsConfig(next);
+    setDraggedHeaderIdx(null);
+  };
+
   const [showBuildBomsModal, setShowBuildBomsModal] = useState(false);
   const [activeBomProduct, setActiveBomProduct] = useState<SkuV2 | null>(null);
   const [activeRecipeItems, setActiveRecipeItems] = useState<BomRecipeItem[]>([]);
@@ -403,14 +573,118 @@ const SkuMasterV2: React.FC = () => {
   const [catalogSearch, setCatalogSearch] = useState('');
   const [isSavingBuildBom, setIsSavingBuildBom] = useState(false);
 
-  // Sync saved SKU BOM items when viewing item details
+  const [modalDynamicLocation, setModalDynamicLocation] = useState<string>('Loading location...');
+
+  // Helper to build parent-to-child location path (Factory ➔ Zone ➔ Storage Location)
+  const buildModalLocationPath = (locId: string, allLocations: WarehouseLocationV2[]): string => {
+    const locMap = new Map(allLocations.map(l => [l._id, l]));
+    const current = locMap.get(locId);
+    if (!current) return locId;
+
+    const path: string[] = [current.name];
+    let parentId = current.parentId;
+    let guard = 0;
+
+    while (parentId && guard < 10) {
+      const parent = locMap.get(parentId);
+      if (!parent) break;
+      path.unshift(parent.name);
+      parentId = parent.parentId;
+      guard++;
+    }
+
+    return path.join(' ➔ ');
+  };
+
+  // Sync saved SKU attributes, stock levels, BOM items & yield quantity when viewing item details
+  useEffect(() => {
+    let isMounted = true;
+    if (!selectedSkuDetails) return;
+
+    const fetchModalLocationData = async () => {
+      try {
+        const hierarchy = currentCompanyId ? await getWarehouseHierarchyV2(currentCompanyId).catch(() => []) : [];
+        
+        if (selectedSkuDetails._id && currentCompanyId) {
+          const balances = await getBalancesV2(currentCompanyId, undefined, undefined, selectedSkuDetails._id).catch(() => []);
+          
+          if (balances && balances.length > 0) {
+            const locPaths: string[] = [];
+            for (const b of balances) {
+              const locObj = b.locationId || b.location;
+              if (locObj) {
+                if (typeof locObj === 'object' && locObj._id) {
+                  const p = buildModalLocationPath(locObj._id, hierarchy);
+                  const qtyText = b.onHand !== undefined ? ` (${b.onHand} ${selectedSkuDetails.unit || ''})` : '';
+                  locPaths.push(`${p}${qtyText}`);
+                } else if (typeof locObj === 'object' && locObj.name) {
+                  locPaths.push(locObj.name);
+                } else if (typeof locObj === 'string') {
+                  const p = buildModalLocationPath(locObj, hierarchy);
+                  locPaths.push(p);
+                }
+              }
+            }
+            if (locPaths.length > 0) {
+              const unique = Array.from(new Set(locPaths));
+              if (isMounted) setModalDynamicLocation(unique.join(' • '));
+              return;
+            }
+          }
+
+          const directLoc = (selectedSkuDetails as any)?.locationId || (selectedSkuDetails as any)?.warehouseLocation || (selectedSkuDetails as any)?.location || (selectedSkuDetails as any)?.locationName;
+          if (directLoc) {
+            if (typeof directLoc === 'object' && directLoc._id) {
+              if (isMounted) setModalDynamicLocation(buildModalLocationPath(directLoc._id, hierarchy));
+              return;
+            } else if (typeof directLoc === 'string') {
+              if (isMounted) setModalDynamicLocation(buildModalLocationPath(directLoc, hierarchy));
+              return;
+            }
+          }
+        }
+
+        if (isMounted) setModalDynamicLocation('Not assigned to any location');
+      } catch (err) {
+        if (isMounted) setModalDynamicLocation('Not assigned to any location');
+      }
+    };
+
+    fetchModalLocationData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedSkuDetails, currentCompanyId]);
+
   useEffect(() => {
     if (selectedSkuDetails) {
+      setRecipeYieldQty(String((selectedSkuDetails as any).recipeYieldQty || (selectedSkuDetails as any).batchYieldQty || '1'));
+      
+      const pType = selectedSkuDetails.paperType && selectedSkuDetails.paperType !== 'None' ? selectedSkuDetails.paperType : '';
+      const gsmStr = selectedSkuDetails.gsm ? `${selectedSkuDetails.gsm} GSM` : '';
+      const gsmCombined = [pType, gsmStr].filter(Boolean).join(' ') || 'Standard Paper';
+
+      const w = selectedSkuDetails.width;
+      const l = selectedSkuDetails.length;
+      const sizeStr = w && l ? `${w} x ${l} CM` : formatSize(selectedSkuDetails);
+
+      setItemAttributes({
+        fabricGsm: gsmCombined,
+        size: sizeStr,
+        color: selectedSkuDetails.ruleType || 'Single Line Ruled'
+      });
+
+      setStockLevels({
+        minLevel: String((selectedSkuDetails as any).minStockLevel ?? '500'),
+        reorderLevel: String((selectedSkuDetails as any).reorderLevel ?? '')
+      });
+
       if ((selectedSkuDetails as any).bomItems && Array.isArray((selectedSkuDetails as any).bomItems) && (selectedSkuDetails as any).bomItems.length > 0) {
         setBomRecipeItems((selectedSkuDetails as any).bomItems.map((item: any, idx: number) => ({
           id: item.id || `b-${idx}`,
           name: item.name,
-          qty: Number(item.qty) || 1,
+          qty: item.qty ?? '',
           uom: item.uom || 'Pcs',
           inStock: Number(item.inStock) || 0,
           notes: item.notes || ''
@@ -483,7 +757,8 @@ const SkuMasterV2: React.FC = () => {
       }
 
       const formatted = (data || []).map(item => {
-        const liveStock = balanceMap.has(item._id) ? balanceMap.get(item._id)! : (item.openingStock ?? 0);
+        const hasBalance = balanceMap.has(item._id);
+        const liveStock = hasBalance ? balanceMap.get(item._id)! : (Array.isArray(balancesData) && balancesData.length > 0 ? 0 : (item.openingStock ?? 0));
         return {
           ...item,
           name: formatSkuName(item.name),
@@ -503,9 +778,9 @@ const SkuMasterV2: React.FC = () => {
   const DEMO_FINISHED_PRODUCTS: SkuV2[] = [
     {
       _id: 'demo-p-1',
-      skuCode: 'NB-132P-UR',
+      skuCode: 'FG-001',
       name: '132P Happy Days Notebook (UR) · 57x70 CM',
-      category: 'Notebooks',
+      category: 'Finished Goods',
       unit: 'Pcs',
       altUnit: 'Box',
       altUnitConversion: 10,
@@ -518,9 +793,9 @@ const SkuMasterV2: React.FC = () => {
     },
     {
       _id: 'demo-p-2',
-      skuCode: 'NB-220P-SR',
+      skuCode: 'FG-002',
       name: '220P Classmate Longbook (SR) · 18x24 CM',
-      category: 'Notebooks',
+      category: 'Finished Goods',
       unit: 'Pcs',
       altUnit: 'Dozen',
       altUnitConversion: 12,
@@ -533,9 +808,9 @@ const SkuMasterV2: React.FC = () => {
     },
     {
       _id: 'demo-p-3',
-      skuCode: 'DIARY-2026',
+      skuCode: 'FG-003',
       name: 'Hardbound Executive Diary 2026',
-      category: 'Executive Diaries',
+      category: 'Finished Goods',
       unit: 'Pcs',
       altUnit: 'Box',
       altUnitConversion: 5,
@@ -547,9 +822,9 @@ const SkuMasterV2: React.FC = () => {
     },
     {
       _id: 'demo-p-4',
-      skuCode: 'NB-192P-DRW',
+      skuCode: 'FG-004',
       name: '192P Premium Drawing Book · A4',
-      category: 'Drawing Books',
+      category: 'Finished Goods',
       unit: 'Pcs',
       altUnit: 'Pack',
       altUnitConversion: 10,
@@ -561,9 +836,9 @@ const SkuMasterV2: React.FC = () => {
     },
     {
       _id: 'demo-p-5',
-      skuCode: 'REG-300P-HB',
+      skuCode: 'FG-005',
       name: '300P Hardbound Account Register',
-      category: 'Hardbound Register',
+      category: 'Finished Goods',
       unit: 'Pcs',
       altUnit: 'Box',
       altUnitConversion: 6,
@@ -578,9 +853,9 @@ const SkuMasterV2: React.FC = () => {
   const DEMO_SEMI_MATERIALS: SkuV2[] = [
     {
       _id: 'demo-sf-1',
-      skuCode: 'SF-CUT-70GSM',
+      skuCode: 'SEM-001',
       name: 'Ruled Cut Sheets 70 GSM · 32x44 CM',
-      category: 'Ruled Cut Sheets',
+      category: 'Semi Finished',
       unit: 'Ream',
       altUnit: 'Bundle',
       altUnitConversion: 5,
@@ -591,9 +866,9 @@ const SkuMasterV2: React.FC = () => {
     },
     {
       _id: 'demo-sf-2',
-      skuCode: 'SF-INNER-132P',
+      skuCode: 'SEM-002',
       name: 'Printed Inner Signatures (132P Block)',
-      category: 'Printed Inner Signatures',
+      category: 'Semi Finished',
       unit: 'Set',
       altUnit: 'Box',
       altUnitConversion: 20,
@@ -604,9 +879,9 @@ const SkuMasterV2: React.FC = () => {
     },
     {
       _id: 'demo-sf-3',
-      skuCode: 'SF-BLOCK-A4',
+      skuCode: 'SEM-003',
       name: 'Folded Book Blocks A4 (192P)',
-      category: 'Folded Book Blocks',
+      category: 'Semi Finished',
       unit: 'Pcs',
       altUnit: 'Crate',
       altUnitConversion: 50,
@@ -621,9 +896,9 @@ const SkuMasterV2: React.FC = () => {
   const DEMO_RAW_MATERIALS: SkuV2[] = [
     {
       _id: 'demo-rm-1',
-      skuCode: 'RM-REEL-70',
+      skuCode: 'RM-001',
       name: 'Maplitho Paper Reel 70 GSM (Kraft Roll)',
-      category: 'Paper Reels',
+      category: 'Raw Material',
       unit: 'Kg',
       altUnit: 'Roll',
       altUnitConversion: 250,
@@ -635,9 +910,9 @@ const SkuMasterV2: React.FC = () => {
     },
     {
       _id: 'demo-rm-2',
-      skuCode: 'RM-BOARD-300',
+      skuCode: 'RM-002',
       name: 'Grey Duplex Cover Board 300 GSM',
-      category: 'Duplex Cover Board',
+      category: 'Raw Material',
       unit: 'Pcs',
       altUnit: 'Pallet',
       altUnitConversion: 1000,
@@ -649,9 +924,9 @@ const SkuMasterV2: React.FC = () => {
     },
     {
       _id: 'demo-rm-3',
-      skuCode: 'RM-WIRE-24',
+      skuCode: 'RM-003',
       name: 'Book Stitching Wire #24',
-      category: 'Stitching Wire & Thread',
+      category: 'Raw Material',
       unit: 'Kg',
       altUnit: 'Spool',
       altUnitConversion: 15,
@@ -661,9 +936,9 @@ const SkuMasterV2: React.FC = () => {
     },
     {
       _id: 'demo-rm-4',
-      skuCode: 'RM-GLUE-HM',
+      skuCode: 'RM-004',
       name: 'Hotmelt Binding Adhesive',
-      category: 'Binding Glue & Adhesives',
+      category: 'Raw Material',
       unit: 'Kg',
       altUnit: 'Bag',
       altUnitConversion: 25,
@@ -677,44 +952,95 @@ const SkuMasterV2: React.FC = () => {
   const getItemType = (item: SkuV2): 'products' | 'materials' | 'semi' => {
     const cat = (item.category || '').toLowerCase();
     const name = (item.name || '').toLowerCase();
-    if (cat.includes('semi') || cat.includes('wip') || cat === 'semi finished' || cat.includes('sub') || name.includes('ruled cut') || name.includes('inner signature') || name.includes('book block')) {
+    const code = (item.skuCode || '').toUpperCase();
+    if (cat.includes('semi') || cat.includes('wip') || cat === 'semi finished' || cat.includes('sub') || code.startsWith('SEM') || code.startsWith('SF') || name.includes('ruled cut') || name.includes('inner signature') || name.includes('book block')) {
       return 'semi';
     }
-    if (cat.includes('raw') || cat.includes('material') || cat === 'raw material' || cat.includes('reel') || cat.includes('board') || name.includes('reel') || name.includes('wire') || name.includes('adhesive') || name.includes('glue')) {
+    if (cat.includes('raw') || cat.includes('material') || cat === 'raw material' || cat.includes('reel') || cat.includes('board') || code.startsWith('RM') || name.includes('reel') || name.includes('wire') || name.includes('adhesive') || name.includes('glue')) {
       return 'materials';
     }
     return 'products';
   };
 
+  // Helper to format SKU Code with exact sequential pattern (FG-001, RM-001, SEM-001)
+  const formatSkuCodeWithSeq = (item: SkuV2, prefix: 'FG' | 'RM' | 'SEM', index: number): string => {
+    const code = (item.skuCode || '').trim();
+    const match = code.match(/^(FG|RM|SEM)-(\d+)$/i);
+    if (match && match[1].toUpperCase() === prefix) {
+      const num = parseInt(match[2], 10);
+      return `${prefix}-${String(num).padStart(3, '0')}`;
+    }
+    return `${prefix}-${String(index + 1).padStart(3, '0')}`;
+  };
+
   // Products List (Only database finished products)
   const productsList = useMemo(() => {
-    return skus.filter(item => getItemType(item) === 'products');
+    const raw = skus.length > 0 ? skus.filter(item => getItemType(item) === 'products') : DEMO_FINISHED_PRODUCTS;
+    return raw.map((item, idx) => ({
+      ...item,
+      skuCode: formatSkuCodeWithSeq(item, 'FG', idx)
+    }));
   }, [skus]);
 
   // Materials List (Only database raw materials)
   const materialsList = useMemo(() => {
-    return skus.filter(item => getItemType(item) === 'materials');
+    const raw = skus.length > 0 ? skus.filter(item => getItemType(item) === 'materials') : DEMO_RAW_MATERIALS;
+    return raw.map((item, idx) => ({
+      ...item,
+      skuCode: formatSkuCodeWithSeq(item, 'RM', idx)
+    }));
   }, [skus]);
 
   // Semi List (Only database semi-finished materials)
   const semiList = useMemo(() => {
-    return skus.filter(item => getItemType(item) === 'semi');
+    const raw = skus.length > 0 ? skus.filter(item => getItemType(item) === 'semi') : DEMO_SEMI_MATERIALS;
+    return raw.map((item, idx) => ({
+      ...item,
+      skuCode: formatSkuCodeWithSeq(item, 'SEM', idx)
+    }));
   }, [skus]);
 
-  // Helper to determine if an item is strictly Finished Goods (Products)
-  const isFinishedGoodsItem = (s: SkuV2): boolean => {
+  // Combined Raw Materials and Semi-Finished Materials ONLY (excluding Finished Goods) for BOM Recipe selection
+  const rawAndSemiMaterials = useMemo(() => {
+    const combined = [...materialsList, ...semiList];
+    return combined.filter(item => {
+      const cat = (item.category || '').trim().toLowerCase();
+      const code = (item.skuCode || '').trim().toUpperCase();
+      const isFinishedGoods = cat === 'finished goods' || cat === 'products' || cat === 'finished' || code.startsWith('FG-') || code.startsWith('FG');
+      return !isFinishedGoods;
+    });
+  }, [materialsList, semiList]);
+
+  // BOM handlers inside Item Details Modal
+  const handleDeleteBomItem = (id: string) => {
+    setBomRecipeItems(prev => prev.filter(b => b.id !== id));
+    showToast('Recipe ingredient removed', 'info');
+  };
+
+  const handleAddBomItem = () => {
+    const newIngredient: BomRecipeItem = {
+      id: `b-${Date.now()}`,
+      name: '',
+      qty: '' as any,
+      uom: 'Kg',
+      inStock: 0,
+      notes: ''
+    };
+    setBomRecipeItems(prev => [...prev, newIngredient]);
+    showToast('New ingredient row added to recipe', 'success');
+  };
+
+  // Helper to determine if an item can have a BOM recipe (Finished Goods & Semi-Finished Materials)
+  const isBomProductItem = (s: SkuV2): boolean => {
     const cat = (s.category || '').trim().toLowerCase();
     const code = (s.skuCode || '').trim().toUpperCase();
     const name = (s.name || '').trim().toLowerCase();
 
-    // Exclude Raw Materials & Semi-Finished items or items starting with RM- / SF-
+    // Exclude Raw Materials or items starting with RM-
     if (
       cat === 'raw material' ||
-      cat === 'semi finished' ||
       code.startsWith('RM-') ||
-      code.startsWith('SF-') ||
       code.startsWith('RM') ||
-      code.startsWith('SF') ||
       name.includes('reel') ||
       name.includes('board') ||
       name.includes('wire') ||
@@ -726,28 +1052,28 @@ const SkuMasterV2: React.FC = () => {
     return true;
   };
 
-  const finishedGoodsSkus = useMemo(() => {
-    return skus.filter(isFinishedGoodsItem);
+  const bomProductSkus = useMemo(() => {
+    return skus.filter(isBomProductItem);
   }, [skus]);
 
   // Build BOMs memoized helpers & handlers (Placed after materialsList & semiList initialization)
   const productsWithRecipeCount = useMemo(() => {
-    return finishedGoodsSkus.filter(s => (s as any).bomItems && (s as any).bomItems.length > 0).length;
-  }, [finishedGoodsSkus]);
+    return bomProductSkus.filter(s => (s as any).bomItems && (s as any).bomItems.length > 0).length;
+  }, [bomProductSkus]);
 
   const filteredBuildProducts = useMemo(() => {
-    return finishedGoodsSkus.filter(p => {
+    const baseList = bomProductSkus.length > 0 ? bomProductSkus : [...productsList, ...semiList];
+    return baseList.filter(p => {
       const matchesSearch = (p.name || '').toLowerCase().includes(buildBomsSearch.toLowerCase()) ||
                             (p.skuCode || '').toLowerCase().includes(buildBomsSearch.toLowerCase());
       const hasRecipe = (p as any).bomItems && (p as any).bomItems.length > 0;
       if (onlyNoRecipeFilter && hasRecipe) return false;
       return matchesSearch;
     });
-  }, [finishedGoodsSkus, buildBomsSearch, onlyNoRecipeFilter]);
+  }, [bomProductSkus, productsList, semiList, buildBomsSearch, onlyNoRecipeFilter]);
 
   const filteredRawCatalog = useMemo(() => {
-    const rawList = materialsList.length > 0 ? materialsList : DEMO_RAW_LIBRARY as any[];
-    return rawList.filter(m => (m.name || '').toLowerCase().includes(catalogSearch.toLowerCase()));
+    return materialsList.filter(m => (m.name || '').toLowerCase().includes(catalogSearch.toLowerCase()));
   }, [materialsList, catalogSearch]);
 
   const filteredSemiCatalog = useMemo(() => {
@@ -1076,28 +1402,9 @@ const SkuMasterV2: React.FC = () => {
 
   // Default category parameter for Add SKU drawer
   const getDefaultCategoryForDrawer = () => {
-    if (activeMainTab === 'products') return 'Notebooks';
-    if (activeMainTab === 'semi') return 'Ruled Cut Sheets';
-    return 'Paper Reels';
-  };
-
-  // BOM handlers inside Item Details Modal
-  const handleDeleteBomItem = (id: string) => {
-    setBomRecipeItems(prev => prev.filter(b => b.id !== id));
-    showToast('Recipe ingredient removed', 'info');
-  };
-
-  const handleAddBomItem = () => {
-    const newIngredient: BomRecipeItem = {
-      id: `b-${Date.now()}`,
-      name: 'Maplitho Paper Reel 70 GSM',
-      qty: 0.1,
-      uom: 'Kg',
-      inStock: 500,
-      notes: 'Paper'
-    };
-    setBomRecipeItems(prev => [...prev, newIngredient]);
-    showToast('New paper material added to recipe', 'success');
+    if (activeMainTab === 'products') return 'Finished Goods';
+    if (activeMainTab === 'semi') return 'Semi Finished';
+    return 'Raw Material';
   };
 
   return (
@@ -1106,7 +1413,7 @@ const SkuMasterV2: React.FC = () => {
       {/* ── CLEAN TOP HEADER ── */}
       <div className="flex items-center justify-between pt-1">
         <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
-          Item
+          Item Master
         </h1>
       </div>
 
@@ -1170,10 +1477,10 @@ const SkuMasterV2: React.FC = () => {
       {activeMainTab !== 'categories' ? (
         
         /* ── GOODS / MATERIALS DATA TABLE VIEW ── */
-        <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden">
+        <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs relative">
           
           {/* Header Control Row (Toolbar matching Makoro Image 2 & 3!) */}
-          <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-gray-100 bg-white">
+          <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-gray-100 bg-white rounded-t-2xl relative z-30">
             
             {/* Left Counter */}
             <div className="flex items-center gap-2">
@@ -1184,6 +1491,81 @@ const SkuMasterV2: React.FC = () => {
 
             {/* Right Toolbar Controls */}
             <div className="flex items-center flex-wrap gap-2.5">
+
+              {/* 0. Column Customizer Popover Tool */}
+              <div className="relative" ref={columnCustomizerRef}>
+                <button
+                  type="button"
+                  onClick={() => setShowColumnCustomizer(!showColumnCustomizer)}
+                  className={`px-3 py-2 rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-2xs ${
+                    showColumnCustomizer ? 'bg-purple-50 text-purple-700 border-purple-300' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                  }`}
+                  title="Customize & Rearrange Columns"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-purple-600" />
+                  <span>Columns ({columnsConfig.filter(c => c.visible).length})</span>
+                </button>
+
+                {showColumnCustomizer && (
+                  <div className="absolute left-0 sm:right-0 sm:left-auto top-full mt-2 w-72 bg-white/95 backdrop-blur-md rounded-2xl border border-gray-200 shadow-2xl p-3.5 z-50 animate-in fade-in duration-150 text-left">
+                    <div className="flex items-center justify-between pb-2.5 border-b border-gray-100 mb-2.5">
+                      <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Customize Columns</h4>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (activeMainTab === 'materials') setColumnsConfig(DEFAULT_MATERIALS_COLUMNS);
+                          else if (activeMainTab === 'semi') setColumnsConfig(DEFAULT_SEMI_COLUMNS);
+                          else setColumnsConfig(DEFAULT_PRODUCTS_COLUMNS);
+                        }}
+                        className="text-[10.5px] font-bold text-purple-600 hover:underline cursor-pointer"
+                      >
+                        Reset default
+                      </button>
+                    </div>
+
+                    <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+                      {columnsConfig
+                        .filter(col => {
+                          if (col.id === 'bom' && activeMainTab !== 'products' && activeMainTab !== 'semi') return false;
+                          if (col.id === 'pages' && activeMainTab === 'materials') return false;
+                          return true;
+                        })
+                        .map((col, idx) => (
+                        <div
+                          key={col.id}
+                          draggable={true}
+                          onDragStart={(e) => handlePopoverDragStart(e, idx)}
+                          onDragOver={handlePopoverDragOver}
+                          onDrop={(e) => handlePopoverDrop(e, idx)}
+                          className={`flex items-center justify-between p-2.5 rounded-xl border text-xs font-semibold cursor-grab active:cursor-grabbing transition-all select-none ${
+                            draggedPopoverColIdx === idx
+                              ? 'bg-purple-100/90 border-purple-500 shadow-xl scale-[1.02] opacity-80 ring-2 ring-purple-400 z-10'
+                              : 'bg-gray-50/80 border-gray-200/80 hover:bg-purple-50/40 hover:border-purple-300'
+                          }`}
+                        >
+                          <label className="flex items-center gap-2.5 cursor-pointer text-gray-800 font-semibold" onClick={(e) => e.stopPropagation()}>
+                            <span className="text-gray-400 font-bold select-none text-xs">⋮⋮</span>
+                            <input
+                              type="checkbox"
+                              checked={col.visible}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                setColumnsConfig(prev => prev.map(c => c.id === col.id ? { ...c, visible: checked } : c));
+                              }}
+                              className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-3.5 h-3.5 cursor-pointer"
+                            />
+                            <span className="text-[12px]">{col.label}</span>
+                          </label>
+
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-white border border-gray-200 px-1.5 py-0.5 rounded shadow-2xs">
+                            Drag
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
               
               {/* 1. Filter funnel icon button with Popover matching Images 3 & 4 */}
               <div className="relative" ref={filterDropdownRef}>
@@ -1317,7 +1699,7 @@ const SkuMasterV2: React.FC = () => {
                       showProductTypeDropdown ? 'border-emerald-600 ring-2 ring-emerald-100' : 'border-gray-200'
                     }`}
                   >
-                    <span className="text-sm">📚</span>
+                    <BookOpen className="w-3.5 h-3.5 text-purple-600" />
                     <span>
                       {selectedProductSubFilter === 'all'
                         ? 'All products'
@@ -1349,7 +1731,7 @@ const SkuMasterV2: React.FC = () => {
                         }`}
                       >
                         <div className="flex items-center gap-2.5">
-                          <span className="text-base">📚</span>
+                          <BookOpen className="w-4 h-4 text-purple-600" />
                           <span>All products ({productCounts.all})</span>
                         </div>
                         {selectedProductSubFilter === 'all' && (
@@ -1370,7 +1752,7 @@ const SkuMasterV2: React.FC = () => {
                         }`}
                       >
                         <div className="flex items-center gap-2.5">
-                          <span className="text-base">📖</span>
+                          <Book className="w-4 h-4 text-purple-600" />
                           <span>Finished Goods ({productCounts.finishedGoods})</span>
                         </div>
                         {selectedProductSubFilter === 'finished-goods' && (
@@ -1391,7 +1773,7 @@ const SkuMasterV2: React.FC = () => {
                         }`}
                       >
                         <div className="flex items-center gap-2.5">
-                          <span className="text-base">📘</span>
+                          <Scroll className="w-4 h-4 text-purple-600" />
                           <span>Diaries & Registers ({productCounts.subAssemblies})</span>
                         </div>
                         {selectedProductSubFilter === 'sub-assemblies' && (
@@ -1532,35 +1914,30 @@ const SkuMasterV2: React.FC = () => {
           )}
 
           {/* Table Element with All Requested Columns & Actions */}
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-b-2xl">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider select-none">
                   <th className="py-3 px-3 w-8 text-center whitespace-nowrap">
                     <input
                       type="checkbox"
                       checked={paginatedSkus.length > 0 && selectedIds.length === paginatedSkus.length}
                       onChange={(e) => handleSelectAll(e.target.checked)}
-                      className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                      className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
                     />
                   </th>
-                  <th className="py-3 px-3 whitespace-nowrap">ID</th>
-                  <th className="py-3 px-3 whitespace-nowrap">NAME</th>
-                  <th className="py-3 px-3 whitespace-nowrap">CATEGORY</th>
-                  <th className="py-3 px-3 whitespace-nowrap">UOM</th>
-                  <th className="py-3 px-3 whitespace-nowrap">AUOM</th>
-                  <th className="py-3 px-3 whitespace-nowrap">CON RATE</th>
-                  <th className="py-3 px-3 whitespace-nowrap">GSM</th>
-                  <th className="py-3 px-3 whitespace-nowrap">SIZE</th>
-                  <th className="py-3 px-3 whitespace-nowrap">PAGES/SHEETS</th>
-                  {activeMainTab === 'products' && (
-                    <th className="py-3 px-3 whitespace-nowrap">BOM</th>
-                  )}
-                  <th className="py-3 px-3 whitespace-nowrap">STOCK</th>
-                  <th className="py-3 px-3 whitespace-nowrap">WORK ORDERS</th>
-                  <th className="py-3 px-3 whitespace-nowrap">DISPATCH ORDERS</th>
+
+                  {/* Dynamic Table Headers matching visibleColumns order */}
+                  {visibleColumns.map((col) => (
+                    <th
+                      key={col.id}
+                      className="py-3 px-3 whitespace-nowrap"
+                    >
+                      {col.label}
+                    </th>
+                  ))}
                   
-                  {/* Dynamic Custom Columns with Drag & Drop + Move Around Controls */}
+                  {/* Dynamic Custom Columns */}
                   {customColumns.map((col, idx) => (
                     <th
                       key={col}
@@ -1624,7 +2001,7 @@ const SkuMasterV2: React.FC = () => {
               <tbody key={animationKey} className="divide-y divide-gray-100 text-xs text-gray-700">
                 {loading ? (
                   <tr>
-                    <td colSpan={(activeMainTab === 'products' ? 15 : 14) + customColumns.length} className="py-12 text-center text-gray-400 whitespace-nowrap">
+                    <td colSpan={1 + visibleColumns.length + customColumns.length + 2} className="py-12 text-center text-gray-400 whitespace-nowrap">
                       <div className="inline-flex items-center gap-2">
                         <RefreshCw className="w-4 h-4 animate-spin text-purple-600" />
                         <span>Loading items...</span>
@@ -1633,7 +2010,7 @@ const SkuMasterV2: React.FC = () => {
                   </tr>
                 ) : paginatedSkus.length === 0 ? (
                   <tr>
-                    <td colSpan={(activeMainTab === 'products' ? 15 : 14) + customColumns.length} className="py-12 text-center text-gray-400 whitespace-nowrap">
+                    <td colSpan={1 + visibleColumns.length + customColumns.length + 2} className="py-12 text-center text-gray-400 whitespace-nowrap">
                       <div className="flex flex-col items-center gap-2">
                         <Package className="w-8 h-8 text-gray-300" />
                         <p className="font-semibold text-gray-600">No {getTabLabel(activeMainTab).toLowerCase()} found</p>
@@ -1644,53 +2021,13 @@ const SkuMasterV2: React.FC = () => {
                 ) : (
                   paginatedSkus.map((sku, index) => {
                     const isSelected = selectedIds.includes(sku._id!);
-                    const stockQty = sku.openingStock ?? 0;
-                    
-                    // Book Manufacturing Domain Icons
-                    let itemDomainIcon = '📖';
-                    if (activeMainTab === 'materials' || (sku.name || '').toLowerCase().includes('reel') || (sku.name || '').toLowerCase().includes('wire') || (sku.name || '').toLowerCase().includes('adhesive')) {
-                      itemDomainIcon = '🗞️';
-                    } else if (activeMainTab === 'semi' || (sku.name || '').toLowerCase().includes('sheet') || (sku.name || '').toLowerCase().includes('signature')) {
-                      itemDomainIcon = '📑';
-                    } else if ((sku.name || '').toLowerCase().includes('diary')) {
-                      itemDomainIcon = '📚';
-                    }
-
-                    // Dynamic Live Present Stock badge coloring
-                    const liveStockQty = Number(sku.presentStock ?? sku.openingStock ?? 0);
-                    let stockBadge = (
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-mono font-extrabold bg-emerald-100 text-emerald-800 shadow-2xs">
-                        {liveStockQty.toLocaleString('en-IN')} {sku.unit || 'Pcs'}
-                      </span>
-                    );
-                    if (liveStockQty <= 0) {
-                      stockBadge = (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-700 shadow-2xs">
-                          0 {sku.unit || 'Pcs'}
-                        </span>
-                      );
-                    } else if (liveStockQty < 200) {
-                      stockBadge = (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-amber-100 text-amber-800 shadow-2xs">
-                          Low ({liveStockQty.toLocaleString('en-IN')} {sku.unit || 'Pcs'})
-                        </span>
-                      );
-                    }
-
-                    // BOM status - Applicable ONLY for Finished Goods / Products
-                    const isBomApplicable = activeMainTab === 'products' || sku.category === 'Finished Goods' || sku.category === 'Products' || (sku.category || '').toLowerCase().includes('notebook') || (sku.category || '').toLowerCase().includes('diary');
-                    const hasBom = isBomApplicable && Array.isArray((sku as any).bomItems) && (sku as any).bomItems.length > 0;
-
-                    // Extract Pages
-                    const pageMatch = sku.name.match(/(\d+)P/i);
-                    const pagesStr = sku.pages ? `${sku.pages} P` : pageMatch ? `${pageMatch[1]} P` : (activeMainTab === 'products' ? '132 P' : '—');
 
                     return (
                       <tr 
                         key={sku._id || index}
                         onClick={() => {
-                          setSelectedSkuDetails(sku);
-                          fetchItemRecipeBOM(sku);
+                          setEditSku(sku);
+                          setShowAddDrawer(true);
                         }}
                         style={{
                           animation: 'slideDownFade 0.35s ease-out forwards',
@@ -1707,87 +2044,143 @@ const SkuMasterV2: React.FC = () => {
                           />
                         </td>
 
-                        {/* ID */}
-                        <td className="py-3 px-3 font-mono font-semibold text-gray-700 text-xs whitespace-nowrap">
-                          {sku.skuCode}
-                        </td>
+                        {/* Render cells dynamically based on visibleColumns order */}
+                        {visibleColumns.map(c => {
+                          switch (c.id) {
+                            case 'skuCode':
+                              return (
+                                <td key="skuCode" className="py-3 px-3 font-mono font-semibold text-gray-700 text-xs whitespace-nowrap">
+                                  {sku.skuCode}
+                                </td>
+                              );
+                            case 'name':
+                              let itemDomainIcon = '📖';
+                              if (activeMainTab === 'materials' || (sku.name || '').toLowerCase().includes('reel') || (sku.name || '').toLowerCase().includes('wire') || (sku.name || '').toLowerCase().includes('adhesive')) {
+                                itemDomainIcon = '🗞️';
+                              } else if (activeMainTab === 'semi' || (sku.name || '').toLowerCase().includes('sheet') || (sku.name || '').toLowerCase().includes('signature')) {
+                                itemDomainIcon = '📑';
+                              } else if ((sku.name || '').toLowerCase().includes('diary')) {
+                                itemDomainIcon = '📚';
+                              }
+                              return (
+                                <td key="name" className="py-3 px-3 font-medium text-gray-900 whitespace-nowrap">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-base">{itemDomainIcon}</span>
+                                    <span className="font-semibold text-gray-900">{sku.name}</span>
+                                  </div>
+                                </td>
+                              );
+                            case 'category':
+                              const categoryText = sku.category || (
+                                (sku.skuCode || '').toUpperCase().startsWith('RM') || activeMainTab === 'materials' ? 'Raw Material' :
+                                (sku.skuCode || '').toUpperCase().startsWith('SEM') || activeMainTab === 'semi' ? 'Semi Finished' : 'Finished Goods'
+                              );
+                              return (
+                                <td key="category" className="py-3 px-3 text-gray-600 font-medium whitespace-nowrap">
+                                  {categoryText}
+                                </td>
+                              );
+                            case 'unit':
+                              return (
+                                <td key="unit" className="py-3 px-3 text-gray-600 font-medium whitespace-nowrap">
+                                  {sku.unit || 'Pcs'}
+                                </td>
+                              );
+                            case 'altUnit':
+                              return (
+                                <td key="altUnit" className="py-3 px-3 text-gray-500 whitespace-nowrap">
+                                  {sku.altUnit ? sku.altUnit : '-'}
+                                </td>
+                              );
+                            case 'altUnitConversion':
+                              return (
+                                <td key="altUnitConversion" className="py-3 px-3 text-gray-700 font-mono text-[11px] font-semibold whitespace-nowrap">
+                                  {sku.altUnit && sku.altUnitConversion ? `1 ${sku.altUnit} = ${sku.altUnitConversion} ${sku.unit || 'Pcs'}` : '-'}
+                                </td>
+                              );
+                            case 'gsm':
+                              return (
+                                <td key="gsm" className="py-3 px-3 text-gray-600 font-medium whitespace-nowrap">
+                                  {sku.gsm ? `${sku.gsm} GSM` : '52 GSM'}
+                                </td>
+                              );
+                            case 'size':
+                              return (
+                                <td key="size" className="py-3 px-3 text-gray-600 font-medium whitespace-nowrap">
+                                  {formatSize(sku)}
+                                </td>
+                              );
+                            case 'pages':
+                              const pageMatch = sku.name.match(/(\d+)P/i);
+                              const pagesStr = sku.pages ? `${sku.pages} P` : pageMatch ? `${pageMatch[1]} P` : (activeMainTab === 'products' ? '132 P' : '—');
+                              return (
+                                <td key="pages" className="py-3 px-3 text-gray-600 font-medium whitespace-nowrap">
+                                  {pagesStr}
+                                </td>
+                              );
+                            case 'bom':
+                              const isBomApplicable = activeMainTab === 'products' || activeMainTab === 'semi' || sku.category === 'Finished Goods' || sku.category === 'Semi Finished' || sku.category === 'Products' || sku.category === 'Semi' || (sku.category || '').toLowerCase().includes('notebook') || (sku.category || '').toLowerCase().includes('diary') || (sku.category || '').toLowerCase().includes('semi');
+                              const hasBom = isBomApplicable && Array.isArray((sku as any).bomItems) && (sku as any).bomItems.length > 0;
+                              return (
+                                <td key="bom" className="py-3 px-3 whitespace-nowrap">
+                                  {hasBom ? (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                      Defined
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                      Pending
+                                    </span>
+                                  )}
+                                </td>
+                              );
+                            case 'openingStock':
+                              const liveStockQty = Number(sku.presentStock ?? sku.openingStock ?? 0);
+                              const minThreshold = Number(sku.minStockLevel || 0);
 
-                        {/* NAME with Domain Icon */}
-                        <td className="py-3 px-3 font-medium text-gray-900 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <span className="text-base">{itemDomainIcon}</span>
-                            <span className="font-semibold text-gray-900">{sku.name}</span>
-                          </div>
-                        </td>
-
-                        {/* CATEGORY */}
-                        <td className="py-3 px-3 text-gray-600 font-medium whitespace-nowrap">
-                          {sku.category || 'Notebooks'}
-                        </td>
-
-                        {/* UOM */}
-                        <td className="py-3 px-3 text-gray-600 font-medium whitespace-nowrap">
-                          {sku.unit || 'Pcs'}
-                        </td>
-
-                        {/* AUOM */}
-                        <td className="py-3 px-3 text-gray-500 whitespace-nowrap">
-                          {sku.altUnit || (activeMainTab === 'products' ? 'Box' : 'Ream')}
-                        </td>
-
-                        {/* CON RATE */}
-                        <td className="py-3 px-3 text-gray-500 font-mono text-[11px] whitespace-nowrap">
-                          {sku.altUnitConversion ? `1:${sku.altUnitConversion}` : '1:10'}
-                        </td>
-
-                        {/* GSM */}
-                        <td className="py-3 px-3 text-gray-600 font-medium whitespace-nowrap">
-                          {sku.gsm ? `${sku.gsm} GSM` : '52 GSM'}
-                        </td>
-
-                        {/* SIZE */}
-                        <td className="py-3 px-3 text-gray-600 font-medium whitespace-nowrap">
-                          {formatSize(sku)}
-                        </td>
-
-                        {/* PAGES/SHEETS */}
-                        <td className="py-3 px-3 text-gray-600 font-medium whitespace-nowrap">
-                          {pagesStr}
-                        </td>
-
-                        {/* BOM - Shown ONLY for Products tab */}
-                        {activeMainTab === 'products' && (
-                          <td className="py-3 px-3 whitespace-nowrap">
-                            {hasBom ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                Defined
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                                Pending
-                              </span>
-                            )}
-                          </td>
-                        )}
-
-                        {/* STOCK */}
-                        <td className="py-3 px-3 whitespace-nowrap">
-                          {stockBadge}
-                        </td>
-
-                        {/* WORK ORDERS */}
-                        <td className="py-3 px-3 whitespace-nowrap">
-                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-200">
-                            {getWorkOrderCount(sku)}
-                          </span>
-                        </td>
-
-                        {/* DISPATCH ORDERS */}
-                        <td className="py-3 px-3 whitespace-nowrap">
-                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold bg-purple-50 text-purple-600 border border-purple-200">
-                            {getDispatchOrderCount(sku)}
-                          </span>
-                        </td>
+                              let stockBadge = (
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-mono font-extrabold bg-emerald-100 text-emerald-800 shadow-2xs">
+                                  {liveStockQty.toLocaleString('en-IN')} {sku.unit || 'Pcs'}
+                                </span>
+                              );
+                              if (liveStockQty <= 0) {
+                                stockBadge = (
+                                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-700 shadow-2xs">
+                                    0 {sku.unit || 'Pcs'}
+                                  </span>
+                                );
+                              } else if (minThreshold > 0 && liveStockQty <= minThreshold) {
+                                stockBadge = (
+                                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-amber-100 text-amber-800 shadow-2xs">
+                                    Low ({liveStockQty.toLocaleString('en-IN')} {sku.unit || 'Pcs'})
+                                  </span>
+                                );
+                              }
+                              return (
+                                <td key="openingStock" className="py-3 px-3 whitespace-nowrap">
+                                  {stockBadge}
+                                </td>
+                              );
+                            case 'workOrders':
+                              return (
+                                <td key="workOrders" className="py-3 px-3 whitespace-nowrap">
+                                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-200">
+                                    {getWorkOrderCount(sku)}
+                                  </span>
+                                </td>
+                              );
+                            case 'dispatchOrders':
+                              return (
+                                <td key="dispatchOrders" className="py-3 px-3 whitespace-nowrap">
+                                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold bg-purple-50 text-purple-600 border border-purple-200">
+                                    {getDispatchOrderCount(sku)}
+                                  </span>
+                                </td>
+                              );
+                            default:
+                              return null;
+                          }
+                        })}
 
                         {/* Dynamic Custom Column Cells */}
                         {customColumns.map(col => {
@@ -1904,16 +2297,19 @@ const SkuMasterV2: React.FC = () => {
                           +
                         </td>
 
-                        {/* ACTIONS Column (Eye & Red Trash icons matching Image 2!) */}
+                        {/* ACTIONS Column (Edit & Trash icons) */}
                         <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1.5">
-                            {/* Eye View Details Icon */}
+                            {/* Edit Icon */}
                             <button
-                              onClick={() => setSelectedSkuDetails(sku)}
-                              className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all cursor-pointer"
-                              title="View details & BOM recipe"
+                              onClick={() => {
+                                setEditSku(sku);
+                                setShowAddDrawer(true);
+                              }}
+                              className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-all cursor-pointer font-bold"
+                              title="Edit item"
                             >
-                              <Eye className="w-4 h-4" />
+                              <Edit className="w-4 h-4 text-purple-600" />
                             </button>
 
                             {/* Trash Delete Icon */}
@@ -2274,6 +2670,10 @@ const SkuMasterV2: React.FC = () => {
         companyId={selectedCompany?._id || ''}
         editSku={editSku}
         defaultCategory={getDefaultCategoryForDrawer()}
+        activeSection={activeMainTab === 'products' ? 'products' : activeMainTab === 'semi' ? 'semi' : 'materials'}
+        existingProductsCount={productsList.length}
+        existingMaterialsCount={materialsList.length}
+        existingSemiCount={semiList.length}
         onClose={() => setShowAddDrawer(false)}
         onSaveSuccess={() => {
           setShowAddDrawer(false);
@@ -2322,20 +2722,38 @@ const SkuMasterV2: React.FC = () => {
           onClose={() => setSelectedSkuDetails(null)}
           size="max-w-4xl"
           title={
-            <div className="flex items-center gap-2 text-left">
-              <div className="p-2 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-200">
-                <Book className="w-4 h-4" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-gray-900 text-base">{selectedSkuDetails.name}</span>
-                  <span className="font-mono text-xs text-gray-400">{selectedSkuDetails.skuCode}</span>
-                  <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold px-2 py-0.5 rounded-md flex items-center gap-1">
-                    <Tag className="w-3 h-3" />
-                    {selectedSkuDetails.category || 'Notebooks'}
-                  </span>
+            <div className="flex items-center justify-between w-full pr-6 text-left">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-200">
+                  <Book className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-gray-900 text-base">{selectedSkuDetails.name}</span>
+                    <span className="font-mono text-xs text-gray-400">{selectedSkuDetails.skuCode}</span>
+                    <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold px-2 py-0.5 rounded-md flex items-center gap-1">
+                      <Tag className="w-3 h-3" />
+                      {selectedSkuDetails.category || (
+                        (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('RM') ? 'Raw Material' :
+                        (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SEM') ? 'Semi Finished' : 'Finished Goods'
+                      )}
+                    </span>
+                  </div>
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const itemToEdit = selectedSkuDetails;
+                  setSelectedSkuDetails(null);
+                  setEditSku(itemToEdit);
+                  setShowAddDrawer(true);
+                }}
+                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+              >
+                <Edit className="w-3.5 h-3.5" />
+                <span>Edit Full Item</span>
+              </button>
             </div>
           }
         >
@@ -2378,6 +2796,34 @@ const SkuMasterV2: React.FC = () => {
             {/* TAB CONTENT: Details */}
             {detailsSubTab === 'details' && (
               <div className="space-y-6">
+
+                {/* Read-Only Warehouse Storage Location */}
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-bold text-gray-700 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-purple-600" />
+                      <span>Warehouse Storage Location</span>
+                    </div>
+                    <span className="text-[10px] font-semibold text-gray-400 flex items-center gap-1">
+                      <Lock className="w-3 h-3 text-gray-400" />
+                      Read-Only
+                    </span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      readOnly
+                      disabled
+                      value={modalDynamicLocation || 'Unassigned (No warehouse stock entry)'}
+                      className="w-full pl-3 pr-24 py-2 bg-gray-50/80 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 font-mono cursor-not-allowed select-none"
+                    />
+                    <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                      <span className="text-[9.5px] font-bold text-purple-600 bg-purple-50 border border-purple-100 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                        System Tracked
+                      </span>
+                    </div>
+                  </div>
+                </div>
                 
                 {/* 1. Item Attributes */}
                 <div className="space-y-3">
@@ -2413,13 +2859,36 @@ const SkuMasterV2: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2 pt-1">
                     <button
-                      onClick={() => showToast('Attributes updated', 'success')}
+                      onClick={async () => {
+                        if (!selectedSkuDetails?._id) return;
+                        try {
+                          await updateSkuV2(selectedSkuDetails._id, {
+                            ruleType: itemAttributes.color,
+                            company: selectedCompany?._id
+                          });
+                          setSelectedSkuDetails(prev => prev ? { ...prev, ruleType: itemAttributes.color } : null);
+                          showToast('Item Attributes updated successfully!', 'success');
+                          loadSkus(false);
+                        } catch (err: any) {
+                          showToast(err.message || 'Failed to update attributes', 'error');
+                        }
+                      }}
                       className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold text-xs shadow-2xs cursor-pointer"
                     >
                       Save Attributes
                     </button>
                     <button
-                      onClick={() => setItemAttributes({ fabricGsm: '70 GSM Maplitho', size: '18 x 24 CM', color: 'Single Line Ruled' })}
+                      onClick={() => {
+                        if (selectedSkuDetails) {
+                          const pType = selectedSkuDetails.paperType && selectedSkuDetails.paperType !== 'None' ? selectedSkuDetails.paperType : '';
+                          const gsmStr = selectedSkuDetails.gsm ? `${selectedSkuDetails.gsm} GSM` : '';
+                          setItemAttributes({
+                            fabricGsm: [pType, gsmStr].filter(Boolean).join(' ') || 'Standard Paper',
+                            size: formatSize(selectedSkuDetails),
+                            color: selectedSkuDetails.ruleType || 'Single Line Ruled'
+                          });
+                        }
+                      }}
                       className="px-4 py-2 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl font-semibold text-xs shadow-2xs cursor-pointer"
                     >
                       Reset
@@ -2459,32 +2928,35 @@ const SkuMasterV2: React.FC = () => {
                       />
                       <p className="text-[10px] text-gray-400 mt-1">Reorder when stock reaches this level</p>
                     </div>
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-gray-600 mb-1 flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3 text-amber-500" />
-                        <span>Max Stock Level</span>
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. 100"
-                        value={stockLevels.maxLevel}
-                        onChange={(e) => setStockLevels(prev => ({ ...prev, maxLevel: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-purple-500 font-semibold"
-                      />
-                      <p className="text-[10px] text-gray-400 mt-1">Upper limit — don't stock beyond this</p>
-                    </div>
                   </div>
                   <button
-                    onClick={() => showToast('Stock levels saved', 'success')}
+                    onClick={async () => {
+                      if (!selectedSkuDetails?._id) return;
+                      try {
+                        await updateSkuV2(selectedSkuDetails._id, {
+                          minStockLevel: Number(stockLevels.minLevel) || 0,
+                          reorderLevel: Number(stockLevels.reorderLevel) || 0,
+                          company: selectedCompany?._id
+                        });
+                        setSelectedSkuDetails(prev => prev ? {
+                          ...prev,
+                          minStockLevel: Number(stockLevels.minLevel) || 0,
+                          reorderLevel: Number(stockLevels.reorderLevel) || 0
+                        } : null);
+                        showToast('Stock levels saved successfully!', 'success');
+                        loadSkus(false);
+                      } catch (err: any) {
+                        showToast(err.message || 'Failed to save stock levels', 'error');
+                      }
+                    }}
                     className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold text-xs shadow-2xs cursor-pointer mt-1"
                   >
                     Save levels
                   </button>
                 </div>
 
-                {/* 3. Bill of Materials (BOM) - Shown ONLY for Finished Goods! */}
-                {(selectedSkuDetails?.category === 'Finished Goods' || selectedSkuDetails?.category === 'Products' || (selectedSkuDetails?.category || '').toLowerCase().includes('notebook') || (selectedSkuDetails?.category || '').toLowerCase().includes('diary')) && (
+                {/* 3. Bill of Materials (BOM) - Shown for Finished Goods & Semi-Finished Materials! */}
+                {(selectedSkuDetails?.category === 'Finished Goods' || selectedSkuDetails?.category === 'Semi Finished' || selectedSkuDetails?.category === 'Products' || selectedSkuDetails?.category === 'Semi' || (selectedSkuDetails?.category || '').toLowerCase().includes('notebook') || (selectedSkuDetails?.category || '').toLowerCase().includes('diary') || (selectedSkuDetails?.category || '').toLowerCase().includes('semi')) && (
                   <div className="space-y-3 border-t border-gray-100 pt-4">
                     {/* Yellow Notice Banner */}
                     <div className="bg-amber-50/90 border border-amber-200/90 rounded-xl p-3 flex items-center justify-between text-xs font-semibold text-amber-900 shadow-2xs">
@@ -2507,29 +2979,28 @@ const SkuMasterV2: React.FC = () => {
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <button className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-semibold rounded-lg text-xs shadow-2xs">
-                          📂 Category
-                        </button>
                         <button 
                           onClick={handleAddBomItem}
                           className="px-3 py-1.5 border border-emerald-600 text-emerald-700 hover:bg-emerald-50 font-semibold rounded-lg text-xs shadow-2xs flex items-center gap-1 cursor-pointer"
                         >
                           <Plus className="w-3.5 h-3.5" /> Add Material
                         </button>
-                        <button 
-                          onClick={handleSaveBomRecipe}
-                          disabled={isSavingBom}
-                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs shadow-2xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-all"
-                        >
-                          {isSavingBom ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                          <span>Save BOM</span>
-                        </button>
                       </div>
                     </div>
 
-                    <p className="text-xs text-gray-500 font-medium italic">
-                      This recipe makes <strong>1 Pcs</strong> ✏️ (use 1 for per-unit quantities)
-                    </p>
+                    <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
+                      <span>This recipe makes</span>
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="1"
+                        value={recipeYieldQty}
+                        onChange={(e) => setRecipeYieldQty(e.target.value)}
+                        className="w-16 px-2 py-0.5 border border-purple-300 rounded-md text-xs font-extrabold text-purple-700 text-center focus:ring-2 focus:ring-purple-500 bg-purple-50/60"
+                      />
+                      <span className="font-bold text-gray-700">{selectedSkuDetails?.unit || 'Pcs'}</span>
+                      <span className="italic text-gray-400">(use 1 for per-unit quantities)</span>
+                    </div>
 
                     {/* Recipe Items Table */}
                     <div className="border border-gray-200 rounded-xl shadow-2xs relative">
@@ -2550,7 +3021,7 @@ const SkuMasterV2: React.FC = () => {
                               <td className="py-2 px-3">
                                 <SearchableMaterialDropdown
                                   value={b.name}
-                                  materials={materialsList}
+                                  materials={rawAndSemiMaterials}
                                   onChange={(selectedName, matchedSku) => {
                                     setBomRecipeItems(prev => prev.map(item => {
                                       if (item.id === b.id) {
@@ -2566,14 +3037,15 @@ const SkuMasterV2: React.FC = () => {
                                   }}
                                 />
                               </td>
-                              <td className="py-2 px-3 w-20">
+                              <td className="py-2 px-3 w-24">
                                 <input
                                   type="number"
                                   step="any"
-                                  value={b.qty}
+                                  placeholder="Qty"
+                                  value={b.qty === 0 || b.qty === undefined ? '' : b.qty}
                                   onChange={(e) => {
-                                    const val = Number(e.target.value);
-                                    setBomRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, qty: val } : item));
+                                    const val = e.target.value;
+                                    setBomRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, qty: val === '' ? ('' as any) : Number(val) } : item));
                                   }}
                                   className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs font-semibold text-center focus:outline-none focus:border-purple-500"
                                 />
@@ -2799,10 +3271,10 @@ const SkuMasterV2: React.FC = () => {
               Welcome to the <strong>Book Manufacturing Items Module</strong>:
             </p>
             <ul className="list-disc pl-4 space-y-1">
-              <li>📚 <strong>Products:</strong> Finished notebooks, diaries, longbooks, registers.</li>
-              <li>🗞️ <strong>Materials:</strong> Paper reels, kraft rolls, duplex board, stitching wire.</li>
-              <li>📑 <strong>Semi:</strong> Ruled cut sheets, inner signatures, folded book blocks.</li>
-              <li>📁 <strong>Categories:</strong> Category structures and default UOM specifications.</li>
+              <li><strong>Products:</strong> Finished notebooks, diaries, longbooks, registers.</li>
+              <li><strong>Materials:</strong> Paper reels, kraft rolls, duplex board, stitching wire.</li>
+              <li><strong>Semi:</strong> Ruled cut sheets, inner signatures, folded book blocks.</li>
+              <li><strong>Categories:</strong> Category structures and default UOM specifications.</li>
             </ul>
             <div className="pt-3 flex justify-end">
               <button
@@ -3133,7 +3605,7 @@ const SkuMasterV2: React.FC = () => {
                   <Download className="w-3.5 h-3.5 text-gray-500" /> Export all (CSV)
                 </button>
                 <div className="text-xs font-semibold text-gray-500 bg-gray-100 px-3 py-1.5 rounded-xl">
-                  {productsWithRecipeCount} of {finishedGoodsSkus.length} products have a recipe
+                  {productsWithRecipeCount} of {bomProductSkus.length} items have a recipe
                 </div>
                 <button
                   onClick={() => setShowBuildBomsModal(false)}
@@ -3239,10 +3711,21 @@ const SkuMasterV2: React.FC = () => {
                     </div>
 
                     {/* Sub-header details bar */}
-                    <div className="flex items-center gap-4 text-xs font-semibold text-gray-500 bg-gray-50 p-2.5 rounded-xl border border-gray-100">
+                    <div className="flex items-center gap-3 text-xs font-semibold text-gray-500 bg-gray-50 p-2.5 rounded-xl border border-gray-100">
                       <span>ITEMS <strong>{activeRecipeItems.length}</strong></span>
                       <span>·</span>
-                      <span>BATCH SIZE <strong>1 Pcs ✏️</strong></span>
+                      <div className="flex items-center gap-1.5">
+                        <span>BATCH SIZE:</span>
+                        <input
+                          type="number"
+                          min="1"
+                          placeholder="1"
+                          value={buildBatchYieldQty}
+                          onChange={(e) => setBuildBatchYieldQty(e.target.value)}
+                          className="w-14 px-1.5 py-0.5 border border-purple-300 rounded text-xs font-bold text-purple-700 text-center bg-white"
+                        />
+                        <strong className="text-gray-800">{activeBomProduct?.unit || 'Pcs'}</strong>
+                      </div>
                       <span>·</span>
                       <span className="text-[11px] font-normal text-gray-400">Quantities are per unit produced</span>
                     </div>
@@ -3251,7 +3734,7 @@ const SkuMasterV2: React.FC = () => {
                     <div className="relative z-30">
                       <SearchableMaterialDropdown
                         value=""
-                        materials={materialsList}
+                        materials={rawAndSemiMaterials}
                         onChange={(selectedName, matchedSku) => {
                           if (!selectedName) return;
                           setActiveRecipeItems(prev => [
@@ -3259,9 +3742,9 @@ const SkuMasterV2: React.FC = () => {
                             {
                               id: `b-${Date.now()}`,
                               name: selectedName,
-                              qty: 1,
+                              qty: '' as any,
                               uom: matchedSku?.unit || 'Kg',
-                              inStock: (matchedSku as any)?.openingStock ?? 500,
+                              inStock: (matchedSku as any)?.openingStock ?? 0,
                               notes: ''
                             }
                           ]);
@@ -3378,7 +3861,7 @@ const SkuMasterV2: React.FC = () => {
                                   name: mat.name,
                                   qty: 1,
                                   uom: mat.unit || 'Kg',
-                                  inStock: (mat as any).openingStock ?? 500,
+                                  inStock: Number((mat as any).presentStock ?? (mat as any).openingStock ?? 0),
                                   notes: ''
                                 }
                               ]);
@@ -3397,7 +3880,7 @@ const SkuMasterV2: React.FC = () => {
                             <span className="truncate text-[11px]">{mat.name}</span>
                           </div>
                           <span className="text-[10px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">
-                            {(mat as any).openingStock ?? 500}
+                            {Number((mat as any).presentStock ?? (mat as any).openingStock ?? 0)}
                           </span>
                         </div>
                       );
@@ -3427,7 +3910,7 @@ const SkuMasterV2: React.FC = () => {
                                   name: semi.name,
                                   qty: 1,
                                   uom: semi.unit || 'Pcs',
-                                  inStock: (semi as any).openingStock ?? 100,
+                                  inStock: Number((semi as any).presentStock ?? (semi as any).openingStock ?? 0),
                                   notes: ''
                                 }
                               ]);
@@ -3446,7 +3929,7 @@ const SkuMasterV2: React.FC = () => {
                             <span className="truncate text-[11px]">{semi.name}</span>
                           </div>
                           <span className="text-[10px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">
-                            {(semi as any).openingStock ?? 100}
+                            {Number((semi as any).presentStock ?? (semi as any).openingStock ?? 0)}
                           </span>
                         </div>
                       );
