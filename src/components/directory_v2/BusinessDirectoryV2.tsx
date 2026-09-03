@@ -1096,6 +1096,7 @@ export const BusinessDirectoryV2: React.FC = () => {
           isOpen={showModal}
           onClose={() => setShowModal(false)}
           maxWidth={activeMainTab === 'customers' ? 'max-w-4xl' : activeMainTab === 'vendors' ? 'max-w-3xl' : 'max-w-xl'}
+          hideCloseButton
         >
           <form onSubmit={handleSaveItem} className="space-y-4 p-1">
             
@@ -2267,6 +2268,7 @@ export const BusinessDirectoryV2: React.FC = () => {
             setRegionCitySearch('');
           }}
           maxWidth="max-w-3xl"
+          hideCloseButton
         >
           <div className="space-y-4 p-1">
             {/* Modal Header */}

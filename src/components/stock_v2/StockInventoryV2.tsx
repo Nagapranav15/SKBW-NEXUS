@@ -1477,6 +1477,7 @@ export const StockInventoryV2: React.FC = () => {
           isOpen={showModal}
           onClose={() => setShowModal(false)}
           maxWidth={modalType === 'location' ? 'max-w-md' : 'max-w-4xl'}
+          hideCloseButton
         >
           {modalType === 'location' ? (
             <form onSubmit={handleSaveLocation} className="space-y-4 p-1">

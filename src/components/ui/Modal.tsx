@@ -10,6 +10,7 @@ interface ModalProps {
   size?: string;
   maxWidth?: string;
   className?: string;
+  hideCloseButton?: boolean;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -20,6 +21,7 @@ export const Modal: React.FC<ModalProps> = ({
   size,
   maxWidth,
   className = '',
+  hideCloseButton = false,
 }) => {
   const modalSize = maxWidth || size || 'max-w-lg';
   useEffect(() => {
@@ -44,14 +46,16 @@ export const Modal: React.FC<ModalProps> = ({
             <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
               {title}
             </h3>
-            <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded-lg">
-              <X className="w-5 h-5" />
-            </button>
+            {!hideCloseButton && (
+              <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded-lg cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            )}
           </div>
         )}
         <div className="p-6 overflow-y-auto flex-1">
-          {!title && (
-            <button type="button" onClick={onClose} className="absolute top-4 right-4 text-gray-450 hover:text-gray-700 p-1 hover:bg-gray-100 rounded-lg z-10">
+          {!title && !hideCloseButton && (
+            <button type="button" onClick={onClose} className="absolute top-4 right-4 text-gray-450 hover:text-gray-700 p-1 hover:bg-gray-100 rounded-lg z-10 cursor-pointer">
               <X className="w-5 h-5" />
             </button>
           )}
