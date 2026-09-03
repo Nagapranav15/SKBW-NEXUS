@@ -849,12 +849,17 @@ export const BusinessDirectoryV2: React.FC = () => {
                           </td>
                           <td className="py-3 px-3">
                             {Array.isArray(item.tags) && item.tags.length > 0 ? (
-                              <div className="flex items-center gap-1 flex-wrap max-w-[150px]">
-                                {item.tags.map((t: string, i: number) => (
-                                  <span key={i} className="px-2 py-0.5 bg-purple-50 text-purple-700 text-[10px] font-bold rounded-full border border-purple-200">
+                              <div className="flex items-center gap-1 whitespace-nowrap" title={item.tags.join(', ')}>
+                                {item.tags.slice(0, 2).map((t: string, i: number) => (
+                                  <span key={i} className="px-2 py-0.5 bg-purple-50 text-purple-700 text-[10px] font-bold rounded-md border border-purple-200 uppercase shrink-0">
                                     {t}
                                   </span>
                                 ))}
+                                {item.tags.length > 2 && (
+                                  <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-[10px] font-extrabold rounded-md border border-gray-200 shrink-0">
+                                    +{item.tags.length - 2}
+                                  </span>
+                                )}
                               </div>
                             ) : (
                               <span className="text-gray-400 font-normal text-[11px]">—</span>
@@ -890,12 +895,17 @@ export const BusinessDirectoryV2: React.FC = () => {
                           </td>
                           <td className="py-3 px-3">
                             {Array.isArray(item.tags) && item.tags.length > 0 ? (
-                              <div className="flex items-center gap-1 flex-wrap max-w-[150px]">
-                                {item.tags.map((t: string, i: number) => (
-                                  <span key={i} className="px-2 py-0.5 bg-purple-50 text-purple-700 text-[10px] font-bold rounded-full border border-purple-200">
+                              <div className="flex items-center gap-1 whitespace-nowrap" title={item.tags.join(', ')}>
+                                {item.tags.slice(0, 2).map((t: string, i: number) => (
+                                  <span key={i} className="px-2 py-0.5 bg-purple-50 text-purple-700 text-[10px] font-bold rounded-md border border-purple-200 uppercase shrink-0">
                                     {t}
                                   </span>
                                 ))}
+                                {item.tags.length > 2 && (
+                                  <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-[10px] font-extrabold rounded-md border border-gray-200 shrink-0">
+                                    +{item.tags.length - 2}
+                                  </span>
+                                )}
                               </div>
                             ) : (
                               <span className="text-gray-400 font-normal text-[11px]">—</span>
