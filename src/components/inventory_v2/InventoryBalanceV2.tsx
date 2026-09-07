@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Search, RefreshCw, Coins, CheckCircle, ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react';
+import { Search, RefreshCw, Coins, CheckCircle, ChevronUp, ChevronDown, ArrowUpDown, AlertTriangle, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getBalancesV2 } from '../../api/mfgApiV2';
 import { formatSkuName } from './SkuMasterV2';
@@ -197,8 +197,11 @@ const InventoryBalanceV2: React.FC = () => {
                 {sortedBalances.map((b, i) => {
                   const cost = getCategoryCost(b.sku?.category);
                   const val = b.onHand * cost;
-                  const reserved = Math.round(b.onHand * 0.1); 
-                  const available = b.onHand - reserved;
+                  const onHandQty = Number(b.onHand) || 0;
+                  const reserved = Math.round(onHandQty * 0.1); 
+                  const available = Math.max(0, onHandQty - reserved);
+                  const minStock = Number(b.sku?.minStockLevel || 100);
+                  const status = onHandQty <= 0 ? 'Out of Stock' : onHandQty <= minStock ? 'Low Stock' : 'Normal';
 
                   return (
                     <tr key={i} className="hover:bg-gray-50/50 transition-colors">
@@ -226,14 +229,26 @@ const InventoryBalanceV2: React.FC = () => {
                         {reserved.toLocaleString()} <span className="text-[10px] text-gray-400 font-medium font-mono">{b.sku?.unit}</span>
                       </td>
                       <td className="px-6 py-3.5 text-right font-black text-gray-900">
-                        {b.onHand.toLocaleString()} <span className="text-[10px] text-gray-400 font-medium font-mono">{b.sku?.unit}</span>
+                        {onHandQty.toLocaleString()} <span className="text-[10px] text-gray-400 font-medium font-mono">{b.sku?.unit}</span>
                       </td>
                       <td className="px-6 py-3.5 text-right font-medium text-gray-600">₹{cost}</td>
                       <td className="px-6 py-3.5 text-right font-black text-emerald-700">₹{val.toLocaleString('en-IN')}</td>
                       <td className="px-6 py-3.5 text-center">
-                        <span className="text-[9px] px-1.5 py-0.5 rounded font-extrabold uppercase bg-green-50 text-green-700 inline-flex items-center gap-0.5 border border-green-100">
-                          <CheckCircle className="w-2.5 h-2.5" /> Normal
-                        </span>
+                        {status === 'Normal' && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded font-extrabold uppercase bg-emerald-50 text-emerald-700 inline-flex items-center gap-0.5 border border-emerald-100">
+                            <CheckCircle className="w-2.5 h-2.5" /> Normal
+                          </span>
+                        )}
+                        {status === 'Low Stock' && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded font-extrabold uppercase bg-amber-50 text-amber-700 inline-flex items-center gap-0.5 border border-amber-100">
+                            <AlertTriangle className="w-2.5 h-2.5" /> Low Stock
+                          </span>
+                        )}
+                        {status === 'Out of Stock' && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded font-extrabold uppercase bg-rose-50 text-rose-700 inline-flex items-center gap-0.5 border border-rose-100">
+                            <AlertCircle className="w-2.5 h-2.5" /> Out of Stock
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );

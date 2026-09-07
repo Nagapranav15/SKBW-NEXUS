@@ -212,18 +212,44 @@ export const StockInventoryV2: React.FC = () => {
   };
 
   // Load auxiliary lists from backend for dropdowns
-  const loadAuxiliaryData = useCallback(async () => {
-    if (!selectedCompany?._id || auxLoaded) return;
+  const loadAuxiliaryData = useCallback(async (force = false) => {
+    if (!selectedCompany?._id || (auxLoaded && !force)) return;
     try {
-      const [supRes, skusRes, locsRes] = await Promise.all([
+      const [supRes, skusRes, locsRes, balancesRes] = await Promise.all([
         getParties({ company: selectedCompany._id, type: 'vendor', limit: 1000, light: true }),
         getSkusV2(selectedCompany._id),
-        getWarehouseHierarchyV2(selectedCompany._id)
+        getWarehouseHierarchyV2(selectedCompany._id),
+        getBalancesV2(selectedCompany._id).catch(() => [])
       ]);
 
       const vendors = supRes.data?.parties || supRes.data || [];
       setAllSuppliers(vendors);
-      setAllSkus(skusRes || []);
+
+      const balanceMap = new Map<string, number>();
+      if (Array.isArray(balancesRes)) {
+        balancesRes.forEach((b: any) => {
+          const rawId = b.skuId || b.sku?._id;
+          const sId = rawId ? String(rawId._id || rawId) : '';
+          const qty = Number(b.onHand) || Number(b.quantity) || 0;
+          if (sId) {
+            balanceMap.set(sId, (balanceMap.get(sId) || 0) + qty);
+          }
+        });
+      }
+
+      const formattedSkus: SkuV2[] = (skusRes || []).map((s: SkuV2) => {
+        const sId = String(s._id);
+        const hasBalance = balanceMap.has(sId);
+        const ledgerStock = balanceMap.get(sId) || 0;
+        const initialStock = Number(s.openingStock) || 0;
+        const liveStock = hasBalance ? (ledgerStock + initialStock) : initialStock;
+        return {
+          ...s,
+          presentStock: liveStock
+        };
+      });
+
+      setAllSkus(formattedSkus);
       setAllLocations(locsRes || []);
       setAuxLoaded(true);
     } catch (err) {
@@ -231,7 +257,12 @@ export const StockInventoryV2: React.FC = () => {
     }
   }, [selectedCompany?._id, auxLoaded]);
 
-  // Load auxiliary data on mount
+  // Reset auxiliary state when company changes
+  useEffect(() => {
+    setAuxLoaded(false);
+  }, [selectedCompany?._id]);
+
+  // Load auxiliary data on mount or company change
   useEffect(() => {
     if (selectedCompany?._id) {
       loadAuxiliaryData();
@@ -276,18 +307,21 @@ export const StockInventoryV2: React.FC = () => {
           };
         });
 
-        const balancesFormatted = (balances || []).map((b: any, idx: number) => ({
-          _id: b._id || `bal-${idx}`,
-          batchNumber: b.batchNumber || b.batchNo || `PB-SEP-${100 + idx}`,
-          skuCode: b.skuCode || b.sku?.skuCode || 'RM-75552',
-          skuName: b.skuName || b.sku?.name || b.name || 'Raw Paper Board Sheet',
-          category: b.category || b.sku?.category || 'Raw Material',
-          locationName: b.locationName || b.location?.name || 'Main Warehouse',
-          quantity: b.quantity ?? b.onHand ?? b.balance ?? 1000,
-          unit: b.unit || b.sku?.unit || 'Kg',
-          date: b.createdAt || b.date || new Date().toISOString().split('T')[0],
-          status: (b.quantity ?? 1000) > 0 ? 'Active' : 'Depleted'
-        }));
+        const balancesFormatted = (balances || []).map((b: any, idx: number) => {
+          const qty = Number(b.onHand ?? b.quantity ?? b.balance ?? 0);
+          return {
+            _id: b._id || `bal-${idx}`,
+            batchNumber: b.batchNumber || b.batchNo || `PB-SEP-${100 + idx}`,
+            skuCode: b.skuCode || b.sku?.skuCode || 'RM-75552',
+            skuName: b.skuName || b.sku?.name || b.name || 'Raw Paper Board Sheet',
+            category: b.category || b.sku?.category || 'Raw Material',
+            locationName: b.locationName || b.location?.name || 'Main Warehouse',
+            quantity: qty,
+            unit: b.unit || b.sku?.unit || 'Kg',
+            date: b.createdAt || b.date || new Date().toISOString().split('T')[0],
+            status: qty > 0 ? 'Active' : 'Depleted'
+          };
+        });
 
         const combined: any[] = [...invoiceFormatted];
         const existingNumbers = new Set(invoiceFormatted.map((i: any) => i.batchNumber));
@@ -303,11 +337,12 @@ export const StockInventoryV2: React.FC = () => {
       } else if (activeTab === 'manager') {
         const balances = await getBalancesV2(selectedCompany._id);
         const formatted = (balances || []).map((b: any, idx: number) => {
-          const onHand = b.onHand ?? 500;
+          const onHand = Number(b.onHand ?? b.quantity ?? 0);
           const reservedQty = Math.round(onHand * 0.1);
-          const availableQty = onHand - reservedQty;
+          const availableQty = Math.max(0, onHand - reservedQty);
           const cost = getCategoryCost(b.sku?.category);
           const totalVal = onHand * cost;
+          const minStock = Number(b.sku?.minStockLevel || 100);
 
           return {
             _id: b._id || `bal-${idx}`,
@@ -321,7 +356,7 @@ export const StockInventoryV2: React.FC = () => {
             availableQty,
             cost,
             totalVal,
-            status: onHand > 100 ? 'Normal' : onHand > 0 ? 'Low Stock' : 'Out of Stock'
+            status: onHand <= 0 ? 'Out of Stock' : onHand <= minStock ? 'Low Stock' : 'Normal'
           };
         });
         setItems(formatted);
@@ -488,7 +523,7 @@ export const StockInventoryV2: React.FC = () => {
   }, [lots, batchForm]);
 
   const openModal = (item?: any) => {
-    loadAuxiliaryData();
+    loadAuxiliaryData(true);
     if (activeTab === 'warehouse') {
       openLocationModal('Factory');
       return;
@@ -851,6 +886,7 @@ export const StockInventoryV2: React.FC = () => {
       
       // 5. Reload live Stock & Purchase Batch data
       loadStockData();
+      loadAuxiliaryData(true);
     } catch (err: any) {
       console.error('Failed to create purchase batch:', err);
       showToast(err.message || 'Failed to save purchase batch', 'error');
@@ -1855,11 +1891,21 @@ export const StockInventoryV2: React.FC = () => {
                           <div className="col-span-2">
                             <div className="flex items-center justify-between mb-1">
                               <label className="block text-gray-400 font-bold uppercase text-[9px]">ITEM SKU *</label>
-                              {lot.skuId && (
-                                <span className="text-[9px] font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                                  Present Stock: {(allSkus.find(s => s._id === lot.skuId)?.openingStock ?? 0).toLocaleString('en-IN')} {allSkus.find(s => s._id === lot.skuId)?.unit || 'KG'}
-                                </span>
-                              )}
+                              {lot.skuId && (() => {
+                                const matchedSku = allSkus.find(s => s._id === lot.skuId);
+                                const liveStock = Number(matchedSku?.presentStock ?? matchedSku?.openingStock ?? 0);
+                                const unit = matchedSku?.unit || 'KG';
+                                const isPositive = liveStock > 0;
+                                return (
+                                  <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded border ${
+                                    isPositive
+                                      ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                                      : 'text-rose-700 bg-rose-50 border-rose-200'
+                                  }`}>
+                                    Present Stock: {liveStock.toLocaleString('en-IN')} {unit}
+                                  </span>
+                                );
+                              })()}
                             </div>
                             <select
                               required

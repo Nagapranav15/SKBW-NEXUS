@@ -18,6 +18,8 @@ export interface SkuV2 {
   reamWeight?: number;
   booksGbl?: number;
   openingStock?: number;
+  presentStock?: number;
+  minStockLevel?: number;
   altUnit?: string;
   altUnitConversion?: number;
   status: 'Active' | 'Inactive';
