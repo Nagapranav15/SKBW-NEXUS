@@ -39,15 +39,15 @@ export const Modal: React.FC<ModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[70] overflow-y-auto flex items-center justify-center p-4 bg-gray-950/20">
-      <div className={`relative bg-white rounded-xl shadow-2xl flex flex-col w-full ${modalSize} max-h-[90vh] overflow-hidden ${className}`}>
+    <div className="fixed inset-0 z-[70] overflow-y-auto flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs transition-all animate-fadeIn">
+      <div className={`relative bg-white rounded-2xl shadow-2xl shadow-slate-900/10 border border-slate-200/80 flex flex-col w-full ${modalSize} max-h-[92vh] overflow-hidden ${className}`}>
         {title && (
-          <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center shrink-0">
-            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+          <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/70 flex justify-between items-center shrink-0">
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               {title}
             </h3>
             {!hideCloseButton && (
-              <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded-lg cursor-pointer">
+              <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700 p-1.5 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             )}
@@ -55,7 +55,7 @@ export const Modal: React.FC<ModalProps> = ({
         )}
         <div className="p-6 overflow-y-auto flex-1">
           {!title && !hideCloseButton && (
-            <button type="button" onClick={onClose} className="absolute top-4 right-4 text-gray-450 hover:text-gray-700 p-1 hover:bg-gray-100 rounded-lg z-10 cursor-pointer">
+            <button type="button" onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1.5 hover:bg-slate-100 rounded-xl z-10 cursor-pointer transition-colors">
               <X className="w-5 h-5" />
             </button>
           )}

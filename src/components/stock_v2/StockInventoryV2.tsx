@@ -1725,15 +1725,31 @@ export const StockInventoryV2: React.FC = () => {
           ) : (
             <form onSubmit={handleSavePurchaseBatch} className="space-y-4 p-1">
               {/* Modal Header */}
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900">New Purchase Batch</h3>
-                  <p className="text-xs text-gray-500 mt-0.5">Record a new supplier materials lot delivery</p>
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3.5 mb-1">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-gradient-to-br from-purple-600 to-indigo-600 text-white rounded-xl shadow-sm">
+                    <Package className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-black text-slate-900 tracking-tight">
+                        {editingItem ? 'Edit Purchase Batch' : 'New Purchase Batch'}
+                      </h3>
+                      {editingItem && batchForm.batchNumber && (
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+                          {batchForm.batchNumber}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 font-medium">
+                      {editingItem ? 'Update details for this supplier lot delivery' : 'Record a new supplier materials lot delivery'}
+                    </p>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+                  className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1743,38 +1759,41 @@ export const StockInventoryV2: React.FC = () => {
               <div className="space-y-5 max-h-[75vh] overflow-y-auto pr-2 text-xs">
                 
                 {/* 1. PURCHASE BATCH DETAILS */}
-                <div className="bg-white p-4 rounded-2xl border border-gray-200/80 space-y-3 shadow-2xs">
-                  <h4 className="font-bold text-gray-900 uppercase tracking-wider text-[11px]">
-                    1. PURCHASE BATCH DETAILS
-                  </h4>
+                <div className="bg-slate-50/80 p-4.5 rounded-2xl border border-slate-200/80 space-y-3.5 shadow-3xs">
+                  <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+                    <h4 className="font-extrabold text-slate-800 uppercase tracking-wider text-[11px] flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+                      1. Purchase Batch Details
+                    </h4>
+                  </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-3.5">
                     <div>
-                      <label className="block text-gray-700 font-bold mb-1 uppercase text-[10px]">BATCH NO. *</label>
+                      <label className="block text-slate-600 font-bold mb-1 uppercase text-[10px]">BATCH NO. *</label>
                       <input
                         type="text"
                         required
                         value={batchForm.batchNumber}
                         onChange={e => setBatchForm(f => ({ ...f, batchNumber: e.target.value }))}
                         placeholder="e.g. PB-SEP-001"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono font-bold focus:outline-none focus:border-blue-500 bg-gray-50/50 shadow-2xs"
+                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 bg-white shadow-3xs transition-all"
                       />
-                      <span className="text-[10px] text-gray-400 mt-1 block">Auto-generated if empty</span>
+                      <span className="text-[10px] text-slate-400 mt-1 block font-medium">Auto-generated if left empty</span>
                     </div>
 
                     <div>
-                      <label className="block text-gray-700 font-bold mb-1 uppercase text-[10px]">PURCHASE DATE *</label>
+                      <label className="block text-slate-600 font-bold mb-1 uppercase text-[10px]">PURCHASE DATE *</label>
                       <input
                         type="date"
                         required
                         value={batchForm.purchaseDate}
                         onChange={e => setBatchForm(f => ({ ...f, purchaseDate: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-500 bg-white shadow-2xs"
+                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 bg-white shadow-3xs transition-all"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-gray-700 font-bold mb-1 uppercase text-[10px]">SUPPLIER *</label>
+                      <label className="block text-slate-600 font-bold mb-1 uppercase text-[10px]">SUPPLIER *</label>
                       <select
                         required
                         value={batchForm.supplierId}
@@ -1782,7 +1801,7 @@ export const StockInventoryV2: React.FC = () => {
                           const sel = allSuppliers.find(s => s._id === e.target.value);
                           setBatchForm(f => ({ ...f, supplierId: e.target.value, supplierName: sel?.firmName || sel?.contactName || '' }));
                         }}
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-500 bg-white shadow-2xs"
+                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 bg-white shadow-3xs transition-all"
                       >
                         <option value="">Search or select Supplier...</option>
                         {allSuppliers.map((s: any) => (
@@ -1792,7 +1811,7 @@ export const StockInventoryV2: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-gray-700 font-bold mb-1 uppercase text-[10px]">PURCHASE TYPE</label>
+                      <label className="block text-slate-600 font-bold mb-1 uppercase text-[10px]">PURCHASE TYPE</label>
                       <select
                         value={batchForm.purchaseType}
                         onChange={e => {
@@ -1830,11 +1849,11 @@ export const StockInventoryV2: React.FC = () => {
                             return lot;
                           }));
                         }}
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-500 bg-white shadow-2xs"
+                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 bg-white shadow-3xs transition-all"
                       >
                         <option value="Materials">Materials</option>
-                        <option value="Semi">Semi</option>
-                        <option value="Products">Products</option>
+                        <option value="Semi">Semi-Finished</option>
+                        <option value="Products">Finished Products</option>
                       </select>
                     </div>
                   </div>
@@ -2401,96 +2420,85 @@ export const StockInventoryV2: React.FC = () => {
                   })}
                 </div>
 
-                {/* 3. SUMMARY & OTHER CHARGES MATCHING SCREENSHOT 2 & 4 */}
-                <div className="bg-white p-5 rounded-2xl border border-gray-200 space-y-4 shadow-2xs text-left">
-                  <h4 className="font-bold text-gray-900 uppercase tracking-wider text-xs border-b pb-2">
-                    3. SUMMARY & OTHER CHARGES
+                {/* 3. SUMMARY & OTHER CHARGES */}
+                <div className="bg-slate-50/80 p-4.5 rounded-2xl border border-slate-200/80 space-y-4 shadow-3xs text-left">
+                  <h4 className="font-extrabold text-slate-800 uppercase tracking-wider text-[11px] border-b border-slate-200/60 pb-2 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+                    3. Freight & Other Charges
                   </h4>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div>
-                      <label className="block text-gray-500 font-bold mb-1.5 uppercase text-[10px]">FREIGHT CHARGES (₹)</label>
+                      <label className="block text-slate-600 font-bold mb-1 uppercase text-[10px]">FREIGHT (₹)</label>
                       <input
                         type="number"
                         value={batchForm.freightCharges}
                         onChange={e => setBatchForm(f => ({ ...f, freightCharges: Number(e.target.value) }))}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono text-right focus:outline-none focus:border-blue-500 bg-white"
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-right focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 bg-white shadow-3xs transition-all"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-gray-500 font-bold mb-1.5 uppercase text-[10px]">CRANE CHARGES (₹)</label>
+                      <label className="block text-slate-600 font-bold mb-1 uppercase text-[10px]">CRANE (₹)</label>
                       <input
                         type="number"
                         value={batchForm.craneCharges}
                         onChange={e => setBatchForm(f => ({ ...f, craneCharges: Number(e.target.value) }))}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono text-right focus:outline-none focus:border-blue-500 bg-white"
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-right focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 bg-white shadow-3xs transition-all"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-gray-500 font-bold mb-1.5 uppercase text-[10px]">LOADING / UNLOADING (₹)</label>
+                      <label className="block text-slate-600 font-bold mb-1 uppercase text-[10px]">LOADING (₹)</label>
                       <input
                         type="number"
                         value={batchForm.loadingCharges}
                         onChange={e => setBatchForm(f => ({ ...f, loadingCharges: Number(e.target.value) }))}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono text-right focus:outline-none focus:border-blue-500 bg-white"
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-right focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 bg-white shadow-3xs transition-all"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-gray-500 font-bold mb-1.5 uppercase text-[10px]">OTHER CHARGES (₹)</label>
+                      <label className="block text-slate-600 font-bold mb-1 uppercase text-[10px]">OTHER (₹)</label>
                       <input
                         type="number"
                         value={batchForm.otherCharges}
                         onChange={e => setBatchForm(f => ({ ...f, otherCharges: Number(e.target.value) }))}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono text-right focus:outline-none focus:border-blue-500 bg-white"
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-right focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 bg-white shadow-3xs transition-all"
                       />
                     </div>
                   </div>
 
-                  {/* Summary Breakdown Card Matching Screenshots */}
-                  <div className="bg-gray-50/80 p-4 rounded-xl border border-gray-100 space-y-2.5 text-xs">
-                    <div className="flex justify-between font-bold text-gray-600 uppercase text-[11px]">
-                      <span>TOTAL LOTS:</span>
-                      <span className="text-gray-900 font-extrabold">{lots.length} Lots</span>
+                  {/* Summary Breakdown Card */}
+                  <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-purple-950 text-white p-4.5 rounded-2xl shadow-md border border-slate-700/50 space-y-3 text-xs">
+                    <div className="flex justify-between font-bold text-slate-300 uppercase text-[11px] tracking-wider border-b border-slate-700/60 pb-2">
+                      <span className="flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-purple-400" /> BATCH SUMMARY</span>
+                      <span className="text-purple-300 font-extrabold">{lots.length} Lots</span>
                     </div>
 
                     {lots.some(l => l.paperType === 'Reel') ? (
-                      <>
-                        <div className="flex justify-between font-bold text-gray-600 uppercase text-[11px]">
-                          <span>TOTAL REELS:</span>
-                          <span className="text-gray-900 font-mono font-extrabold">{lots.reduce((acc, l) => acc + (Number(l.reelsCount) || 0), 0)} Reels</span>
-                        </div>
-                        <div className="flex justify-between font-bold text-gray-600 uppercase text-[11px]">
-                          <span>TOTAL REEL WEIGHT:</span>
-                          <span className="text-gray-900 font-mono font-extrabold">{lotCalculations.totalQty.toLocaleString('en-IN')} KG</span>
-                        </div>
-                      </>
+                      <div className="grid grid-cols-2 gap-2 text-slate-300 text-[11px] font-semibold">
+                        <div>TOTAL REELS: <strong className="text-white font-mono">{lots.reduce((acc, l) => acc + (Number(l.reelsCount) || 0), 0)}</strong></div>
+                        <div className="text-right">TOTAL REEL WEIGHT: <strong className="text-white font-mono">{lotCalculations.totalQty.toLocaleString('en-IN')} KG</strong></div>
+                      </div>
                     ) : (
-                      <>
-                        <div className="flex justify-between font-bold text-gray-600 uppercase text-[11px]">
-                          <span>TOTAL REAMS:</span>
-                          <span className="text-gray-900 font-mono font-extrabold">{lots.reduce((acc, l) => acc + (Number(l.reamsCount) || 0), 0)} Reams</span>
-                        </div>
-                        <div className="flex justify-between font-bold text-gray-600 uppercase text-[11px]">
-                          <span>TOTAL SHEETS:</span>
-                          <span className="text-gray-900 font-mono font-extrabold">{(lots.reduce((acc, l) => acc + (Number(l.reamsCount) || 0), 0) * 500).toLocaleString('en-IN')} Sheets</span>
-                        </div>
-                      </>
+                      <div className="grid grid-cols-2 gap-2 text-slate-300 text-[11px] font-semibold">
+                        <div>TOTAL REAMS: <strong className="text-white font-mono">{lots.reduce((acc, l) => acc + (Number(l.reamsCount) || 0), 0)}</strong></div>
+                        <div className="text-right">TOTAL SHEETS: <strong className="text-white font-mono">{(lots.reduce((acc, l) => acc + (Number(l.reamsCount) || 0), 0) * 500).toLocaleString('en-IN')}</strong></div>
+                      </div>
                     )}
 
-                    <div className="flex justify-between text-gray-600 border-t border-gray-200 pt-2 text-xs">
-                      <span>Material Total:</span>
-                      <span className="font-mono font-bold text-gray-900">₹{lotCalculations.materialTotal.toLocaleString('en-IN')}</span>
+                    <div className="pt-2 border-t border-slate-700/60 flex items-center justify-between text-xs font-semibold">
+                      <span className="text-slate-300">Material Subtotal:</span>
+                      <span className="font-mono font-bold text-slate-100">₹{lotCalculations.materialTotal.toLocaleString('en-IN')}</span>
                     </div>
-                    <div className="flex justify-between text-gray-600 text-xs">
-                      <span>Other Charges Total:</span>
-                      <span className="font-mono font-bold text-gray-900">₹{lotCalculations.otherChargesTotal.toLocaleString('en-IN')}</span>
+                    <div className="flex items-center justify-between text-xs font-semibold">
+                      <span className="text-slate-300">Other Charges Subtotal:</span>
+                      <span className="font-mono font-bold text-slate-100">₹{lotCalculations.otherChargesTotal.toLocaleString('en-IN')}</span>
                     </div>
-                    <div className="flex justify-between text-sm font-extrabold text-blue-600 border-t border-gray-300 pt-2">
-                      <span>Grand Total:</span>
-                      <span className="font-mono text-base text-blue-600 font-black">₹{lotCalculations.grandTotal.toLocaleString('en-IN')}</span>
+                    <div className="flex items-center justify-between text-sm font-black text-purple-300 border-t border-slate-700/80 pt-2.5">
+                      <span>GRAND TOTAL:</span>
+                      <span className="font-mono text-lg text-emerald-400 font-black">₹{lotCalculations.grandTotal.toLocaleString('en-IN')}</span>
                     </div>
                   </div>
                 </div>
@@ -2498,21 +2506,21 @@ export const StockInventoryV2: React.FC = () => {
               </div>
 
               {/* Modal Footer */}
-              <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-3">
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 border border-gray-200 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-all cursor-pointer"
+                  className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-semibold hover:bg-slate-50 transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm disabled:opacity-50 flex items-center gap-1.5 transition-all cursor-pointer"
+                  className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-md disabled:opacity-50 flex items-center gap-1.5 transition-all cursor-pointer"
                 >
                   {isSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                  <span>Save Purchase Batch</span>
+                  <span>{editingItem ? 'Update Purchase Batch' : 'Save Purchase Batch'}</span>
                 </button>
               </div>
             </form>
