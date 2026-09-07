@@ -2,8 +2,8 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowRightLeft, Search, Calendar, RefreshCw, ChevronLeft, ChevronRight, 
-  ChevronDown, Filter, FileText, Download, User, ShieldAlert, Layers, 
-  MapPin, Box, History, Inbox, PackageMinus, Scale, X, ArrowUpRight, ArrowDownLeft, Eye, RotateCcw, ArrowUpDown, Printer
+  ChevronDown, Filter, FileText, Download, User, 
+  MapPin, Box, Inbox, X, ArrowUpRight, RotateCcw, ArrowUpDown, Printer
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../../../context/AuthContext';
@@ -178,7 +178,7 @@ const getTypeBadgeStyle = (type: string) => {
   };
 };
 
-const renderLocationHierarchyBadge = (locationStr: string, isFrom: boolean, transactionType: string) => {
+const renderLocationHierarchyBadge = (locationStr: string, _isFrom?: boolean, _transactionType?: string) => {
   if (!locationStr) return <span className="text-gray-400 text-xs">—</span>;
   const isSupplier = locationStr.toLowerCase().startsWith('supplier:') || locationStr.toLowerCase().includes('vendor') || locationStr.toLowerCase().includes('external');
   
@@ -406,7 +406,7 @@ const TransactionDetailDrawer: React.FC<LedgerDetailDrawerProps> = ({ entry, onC
 
 const InventoryLedgerPage: React.FC = () => {
   const { selectedCompany, user } = useAuth();
-  const [searchParams] = useSearchParams();
+  const [_searchParams] = useSearchParams();
   const navigate = useNavigate();
 
   const [entries, setEntries] = useState<any[]>(DEMO_STOCK_LEDGER_ENTRIES);
@@ -910,7 +910,21 @@ const InventoryLedgerPage: React.FC = () => {
             </thead>
 
             <tbody className="divide-y divide-gray-100 text-gray-700 font-medium bg-white">
-              {sortedAndFilteredEntries.map((tx) => {
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-gray-400">
+                    <RefreshCw className="w-5 h-5 animate-spin mx-auto text-blue-500 mb-2" />
+                    Loading stock transactions...
+                  </td>
+                </tr>
+              ) : sortedAndFilteredEntries.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-gray-400">
+                    No ledger transactions found.
+                  </td>
+                </tr>
+              ) : (
+                sortedAndFilteredEntries.map((tx) => {
                 const typeStyle = getTypeBadgeStyle(tx.transactionType);
                 const { date, time } = formatDate(tx.createdAt);
                 const isPositive = tx.direction === 'IN' || tx.quantity > 0;
@@ -981,7 +995,7 @@ const InventoryLedgerPage: React.FC = () => {
                     </td>
                   </tr>
                 );
-              })}
+              }))}
             </tbody>
           </table>
         </div>

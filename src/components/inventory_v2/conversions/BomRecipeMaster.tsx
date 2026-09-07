@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { 
-  BookOpen, Plus, Search, Layers, RefreshCw, Trash2, Edit, Check, 
-  ChevronRight, ArrowRight, Play, Scale, Sparkles, Box, FileText, AlertCircle, X 
+  BookOpen, Plus, Search, RefreshCw, Trash2, Edit, Play, X 
 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
-import { getSkusV2, getBalancesV2, SkuV2 } from '../../../api/mfgApiV2';
+import { getSkusV2, SkuV2 } from '../../../api/mfgApiV2';
 import { showToast } from '../../ui/Toast';
 import Modal from '../../ui/Modal';
 import Drawer from '../../ui/Drawer';

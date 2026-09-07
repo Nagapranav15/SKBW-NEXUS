@@ -1,24 +1,37 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, X, FileText, Trash2, Calendar, Coins, Download, Upload, HelpCircle, Check, Eye, MoreVertical, Edit, Printer, ArrowRight, Layers, IndianRupee, Clock, AlertTriangle, CheckCircle, Settings, Trash, RefreshCcw, User, MapPin as MapPinIcon, Ban } from 'lucide-react';
+import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, X, FileText, Trash2, Download, HelpCircle, Check, Eye, Edit, ArrowRight, Layers, Clock, AlertTriangle, CheckCircle, Settings, User, MapPin as MapPinIcon, Ban } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { getActivityLogs, createActivityLog } from '../../../api/activityLogApi';
 import { getParties } from '../../../api/partyApi';
 import { getSkusV2, getWarehouseHierarchyV2, recordTransferV2, SkuV2, WarehouseLocationV2, getBalancesV2, getNextInvoiceNumberV2 } from '../../../api/mfgApiV2';
 import { 
   getPurchaseInvoicesV2, 
   createPurchaseInvoiceV2, 
-  recordPurchasePaymentV2, 
   updatePurchaseInvoiceV2,
   cancelPurchaseInvoiceV2,
-  deletePurchaseInvoiceV2,
-  PurchaseInvoiceV2, 
-  PurchaseInvoiceItemV2
+  PurchaseInvoiceV2 
 } from './purchaseService';
 import { showToast } from '../../ui/Toast';
 import * as XLSX from 'xlsx';
 import Modal from '../../ui/Modal';
-import Drawer from '../../ui/Drawer';
+
+interface PurchaseInvoiceFormItem {
+  skuId: string;
+  brand: string;
+  gsm: string;
+  width: string;
+  length: string;
+  reelsCount: string;
+  quantity: string;
+  purchasePrice: string;
+  reamWeight: string;
+  ratePerKg: string;
+  lotNumber: string;
+  locationId?: string;
+  splits?: any[];
+  reels: any[];
+}
 
 interface InvoiceTableProps {
   invoices: PurchaseInvoiceV2[];
@@ -32,9 +45,9 @@ interface InvoiceTableProps {
 const InvoiceTable: React.FC<InvoiceTableProps> = ({ 
   invoices, 
   loading, 
-  skus,
+  skus: _skus,
   onViewDetails,
-  onEditInvoice,
+  onEditInvoice: _onEditInvoice,
   onCancelInvoice
 }) => {
   if (loading) {
@@ -213,8 +226,6 @@ const PurchaseInvoicePage: React.FC = () => {
   // Tools action data
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [activityLogLoading, setActivityLogLoading] = useState(false);
-  const [logSearch, setLogSearch] = useState('');
-  const [logActionFilter, setLogActionFilter] = useState('ALL');
   const [duplicateGroups, setDuplicateGroups] = useState<{ field: string; value: string; items: PurchaseInvoiceV2[] }[]>([]);
   const [recycleBinItems, setRecycleBinItems] = useState<PurchaseInvoiceV2[]>([]);
   const [recycleBinLoading, setRecycleBinLoading] = useState(false);
@@ -269,7 +280,18 @@ const PurchaseInvoicePage: React.FC = () => {
   const [supplierFocused, setSupplierFocused] = useState<boolean>(false);
 
   // Form states: Add Invoice
-  const [invoiceForm, setInvoiceForm] = useState({
+  const [invoiceForm, setInvoiceForm] = useState<{
+    purchaseType: string;
+    invoiceNumber: string;
+    vendorId: string;
+    taxAmount: string;
+    freight: string;
+    craneCharges: string;
+    loadingUnloading: string;
+    otherCharges: string;
+    dueDate: string;
+    items: PurchaseInvoiceFormItem[];
+  }>({
     purchaseType: 'Raw Material',
     invoiceNumber: '',
     vendorId: '',
@@ -292,7 +314,9 @@ const PurchaseInvoicePage: React.FC = () => {
         reamWeight: '',
         ratePerKg: '',
         lotNumber: '',
-        reels: [] as any[]
+        locationId: '',
+        splits: [],
+        reels: []
       }
     ]
   });
@@ -301,7 +325,7 @@ const PurchaseInvoicePage: React.FC = () => {
   const [addError, setAddError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
-  const [activeReelModalIdx, setActiveReelModalIdx] = useState<number | null>(null);
+  const [, setActiveReelModalIdx] = useState<number | null>(null);
 
   // Date range filters
   const [startDate, setStartDate] = useState('2024-06-01');
@@ -409,7 +433,7 @@ const PurchaseInvoicePage: React.FC = () => {
     });
 
     const groups: { field: string; value: string; items: PurchaseInvoiceV2[] }[] = [];
-    codeMap.forEach((items, code) => {
+    codeMap.forEach((items) => {
       if (items.length > 1) {
         groups.push({ field: 'Batch / Invoice Number', value: items[0].invoiceNumber, items });
       }
@@ -593,7 +617,7 @@ const PurchaseInvoicePage: React.FC = () => {
       ...invoiceForm,
       items: [
         ...invoiceForm.items,
-        { skuId: '', brand: '', gsm: '', width: '', length: '', reelsCount: '', quantity: '', purchasePrice: '', reamWeight: '', ratePerKg: '', lotNumber: '', reels: [] as any[] }
+        { skuId: '', brand: '', gsm: '', width: '', length: '', reelsCount: '', quantity: '', purchasePrice: '', reamWeight: '', ratePerKg: '', lotNumber: '', locationId: '', splits: [], reels: [] }
       ]
     });
   };
@@ -722,7 +746,7 @@ const PurchaseInvoicePage: React.FC = () => {
       const isReels = selectedSku?.paperType === 'Reels' || reelsCount > 0;
 
       if (isReels) {
-        const totalReelsWeight = (item.reels || []).reduce((sum, r) => sum + (Number(r.weight) || 0), 0);
+        const totalReelsWeight = (item.reels || []).reduce((sum: number, r: any) => sum + (Number(r.weight) || 0), 0);
         const primaryLocId = item.reels?.[0]?.locationId || item.locationId || firstStorage._id || '';
 
         validatedItems.push({
@@ -913,7 +937,7 @@ const PurchaseInvoicePage: React.FC = () => {
       loadingUnloading: '0',
       otherCharges: '0',
       dueDate: new Date().toISOString().split('T')[0],
-      items: [{ skuId: '', brand: '', gsm: '', width: '', length: '', reelsCount: '', quantity: '', purchasePrice: '', reamWeight: '', ratePerKg: '', lotNumber: '', reels: [] as any[] }]
+      items: [{ skuId: '', brand: '', gsm: '', width: '', length: '', reelsCount: '', quantity: '', purchasePrice: '', reamWeight: '', ratePerKg: '', lotNumber: '', locationId: '', splits: [], reels: [] }]
     });
     setAddError('');
     setActiveSubPage('new');
@@ -1072,7 +1096,6 @@ const PurchaseInvoicePage: React.FC = () => {
 
   // Dashboard Stats (mocked or loaded)
   const dashboardTotalBatches = total;
-  const dashboardTotalWeight = invoices.reduce((sum, inv) => sum + (inv.items?.reduce((s, i) => s + (i.quantity || 0), 0) || 0), 0);
   const dashboardTotalValue = invoices.reduce((sum, inv) => sum + (inv.subTotal || 0), 0);
   const dashboardPendingReceipts = invoices.filter(inv => inv.status === 'Draft').length;
 
@@ -1576,7 +1599,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                         key={s._id}
                                         type="button"
                                         onClick={() => {
-                                          handleItemRowChange(idx, 'skuId', s._id);
+                                          handleItemRowChange(idx, 'skuId', s._id || '');
                                           setFocusedRowIdx(null);
                                           setSkuSearchText('');
                                         }}
@@ -1955,7 +1978,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                   >
                                     <option value="">-- Select Destination Storage --</option>
                                     {locations.filter(loc => loc.level === 'Storage Location').map(loc => {
-                                      const paths = resolveLocationPath(loc._id);
+                                      const paths = resolveLocationPath(loc._id || '');
                                       const hierarchy = [paths.factory, paths.floor, paths.zone].filter(p => p && p !== '—').join(' > ');
                                       return (
                                         <option key={loc._id} value={loc._id}>
@@ -2027,7 +2050,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                         >
                                           <option value="">-- Choose Storage Area --</option>
                                           {locations.filter(loc => loc.level === 'Storage Location').map(loc => {
-                                            const paths = resolveLocationPath(loc._id);
+                                            const paths = resolveLocationPath(loc._id || '');
                                             const hierarchy = [paths.factory, paths.floor, paths.zone].filter(p => p && p !== '—').join(' > ');
                                             return (
                                               <option key={loc._id} value={loc._id}>
@@ -2227,10 +2250,7 @@ const PurchaseInvoicePage: React.FC = () => {
 
           {/* Details Content Scroll Area */}
           {(() => {
-            const isSheetsInvoice = selectedInvoice.items?.some(item => {
-              const resolvedSku = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null;
-              return resolvedSku?.paperType === 'Sheets';
-            });
+            
 
             let totalReelsCount = 0;
             let totalReamsCount = 0;
@@ -2441,7 +2461,7 @@ const PurchaseInvoicePage: React.FC = () => {
                             {item.reels?.map((reel, rIdx) => {
                               const balance = inventoryBalances.find(
                                 b => b.batchNumber === selectedInvoice.invoiceNumber && 
-                                     b.reels?.some(r => r.reelNumber === reel.reelNumber)
+                                     b.reels?.some((r: any) => r.reelNumber === reel.reelNumber)
                               );
                               const locationName = balance && balance.location
                                 ? balance.location.name 
@@ -2606,7 +2626,7 @@ const PurchaseInvoicePage: React.FC = () => {
                   >
                     <option value="">-- Choose Storage Location --</option>
                     {physicalLocations.map(loc => {
-                      const paths = resolveLocationPath(loc._id);
+                      const paths = resolveLocationPath(loc._id || '');
                       const hierarchy = [paths.factory, paths.floor, paths.zone].filter(p => p && p !== '—').join(' > ');
                       return (
                         <option key={loc._id} value={loc._id}>
@@ -2907,7 +2927,7 @@ const PurchaseInvoicePage: React.FC = () => {
                       >
                         <option value="">-- Choose Storage Area --</option>
                         {physicalLocations.map(loc => {
-                          const paths = resolveLocationPath(loc._id);
+                          const paths = resolveLocationPath(loc._id || '');
                           const hierarchy = [paths.factory, paths.floor, paths.zone].filter(p => p && p !== '—').join(' > ');
                           return (
                             <option key={loc._id} value={loc._id}>
@@ -2934,7 +2954,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                   setAllocateForm(prev => ({ ...prev, quantity: '' }));
                                 } else {
                                   setSelectedReelsForAllocation([...unallocatedBal.reels]);
-                                  const totalWeight = unallocatedBal.reels.reduce((sum, r) => sum + (r.weight || 0), 0);
+                                  const totalWeight = unallocatedBal.reels.reduce((sum: number, r: any) => sum + (r.weight || 0), 0);
                                   setAllocateForm(prev => ({ ...prev, quantity: String(totalWeight) }));
                                 }
                               }}

@@ -1,62 +1,39 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { 
   Package, 
-  Layers, 
-  Settings, 
   Folder, 
   Search, 
   Plus, 
   Download, 
-  Upload, 
   X, 
-  Eye, 
   Edit, 
   Trash2, 
   RefreshCw, 
   Save,
-  Clock, 
-  AlertTriangle, 
-  CheckCircle, 
   ChevronDown, 
   ChevronUp, 
-  ChevronLeft, 
-  ChevronRight, 
   Filter, 
-  History, 
   HelpCircle, 
   Share2, 
-  FileText, 
   Tag, 
-  Columns, 
-  ArrowUpDown, 
   Check, 
-  Sparkles, 
-  Bell, 
   Paperclip,
-  Building,
-  Building2,
   Lock,
   MapPin,
   SlidersHorizontal,
-  ExternalLink,
   ClipboardList,
   AlertCircle,
   Book,
   BookOpen,
   Scroll,
-  Disc,
   Copy
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
 import { 
   getSkusV2, 
   getBalancesV2,
-  bulkImportSkusV2, 
   deleteSkuV2, 
   updateSkuV2, 
-  getMetadataV2,
-  updateMetadataV2,
   getWarehouseHierarchyV2,
   WarehouseLocationV2,
   SkuV2 
@@ -140,7 +117,6 @@ interface BomRecipeItem {
 }
 
 const SkuMasterV2: React.FC = () => {
-  const navigate = useNavigate();
   const { selectedCompany } = useAuth();
   const currentCompanyId = selectedCompany?._id || '';
 
@@ -376,7 +352,6 @@ const SkuMasterV2: React.FC = () => {
   ]);
   const [recipeYieldQty, setRecipeYieldQty] = useState<string>('1');
   const [buildBatchYieldQty, setBuildBatchYieldQty] = useState<string>('1');
-  const [itemGrade, setItemGrade] = useState('Option 2');
   const [isSavingBom, setIsSavingBom] = useState(false);
 
   const handleSaveBomRecipe = async () => {
@@ -530,40 +505,6 @@ const SkuMasterV2: React.FC = () => {
       return col.visible;
     });
   }, [columnsConfig, activeMainTab]);
-
-  const [draggedHeaderIdx, setDraggedHeaderIdx] = useState<number | null>(null);
-
-  const handleHeaderDragStart = (e: React.DragEvent, visibleIdx: number) => {
-    setDraggedHeaderIdx(visibleIdx);
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleHeaderDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  };
-
-  const handleHeaderDrop = (e: React.DragEvent, dropVisibleIdx: number) => {
-    e.preventDefault();
-    if (draggedHeaderIdx === null || draggedHeaderIdx === dropVisibleIdx) return;
-    
-    const sourceCol = visibleColumns[draggedHeaderIdx];
-    const targetCol = visibleColumns[dropVisibleIdx];
-    
-    if (!sourceCol || !targetCol) return;
-
-    const sourceFullIdx = columnsConfig.findIndex(c => c.id === sourceCol.id);
-    const targetFullIdx = columnsConfig.findIndex(c => c.id === targetCol.id);
-
-    if (sourceFullIdx === -1 || targetFullIdx === -1) return;
-
-    const next = [...columnsConfig];
-    const [moved] = next.splice(sourceFullIdx, 1);
-    next.splice(targetFullIdx, 0, moved);
-    
-    setColumnsConfig(next);
-    setDraggedHeaderIdx(null);
-  };
 
   const [showBuildBomsModal, setShowBuildBomsModal] = useState(false);
   const [activeBomProduct, setActiveBomProduct] = useState<SkuV2 | null>(null);
@@ -748,7 +689,8 @@ const SkuMasterV2: React.FC = () => {
       const balanceMap = new Map<string, number>();
       if (Array.isArray(balancesData)) {
         balancesData.forEach((b: any) => {
-          const sId = b.skuId || b.sku?._id;
+          const rawId = b.skuId || b.sku?._id;
+          const sId = rawId ? String(rawId._id || rawId) : '';
           const qty = Number(b.onHand) || Number(b.quantity) || 0;
           if (sId) {
             balanceMap.set(sId, (balanceMap.get(sId) || 0) + qty);
@@ -757,8 +699,11 @@ const SkuMasterV2: React.FC = () => {
       }
 
       const formatted = (data || []).map(item => {
-        const hasBalance = balanceMap.has(item._id);
-        const liveStock = hasBalance ? balanceMap.get(item._id)! : (Array.isArray(balancesData) && balancesData.length > 0 ? 0 : (item.openingStock ?? 0));
+        const itemId = String(item._id);
+        const hasBalance = balanceMap.has(itemId);
+        const ledgerStock = balanceMap.get(itemId) || 0;
+        const initialStock = Number(item.openingStock) || 0;
+        const liveStock = hasBalance ? (ledgerStock + initialStock) : initialStock;
         return {
           ...item,
           name: formatSkuName(item.name),
@@ -1272,6 +1217,12 @@ const SkuMasterV2: React.FC = () => {
       setActivityLogLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (showActivityLog) {
+      fetchActivityLogs();
+    }
+  }, [showActivityLog]);
 
   // Export handlers
   const handleExportCSV = () => {
@@ -2039,7 +1990,7 @@ const SkuMasterV2: React.FC = () => {
                           <input
                             type="checkbox"
                             checked={isSelected}
-                            onChange={(e) => handleSelectAll ? (e.target.checked ? handleSelectRow(sku._id!, true) : handleSelectRow(sku._id!, false)) : null}
+                            onChange={(e) => handleSelectRow(sku._id!, e.target.checked)}
                             className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
                           />
                         </td>
@@ -2135,8 +2086,8 @@ const SkuMasterV2: React.FC = () => {
                                 </td>
                               );
                             case 'openingStock':
-                              const liveStockQty = Number(sku.presentStock ?? sku.openingStock ?? 0);
-                              const minThreshold = Number(sku.minStockLevel || 0);
+                              const liveStockQty = Number((sku as any).presentStock ?? sku.openingStock ?? 0);
+                              const minThreshold = Number((sku as any).minStockLevel || 0);
 
                               let stockBadge = (
                                 <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-mono font-extrabold bg-emerald-100 text-emerald-800 shadow-2xs">

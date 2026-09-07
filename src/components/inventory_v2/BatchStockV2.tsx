@@ -951,7 +951,7 @@ const BatchStockV2: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-gray-700 text-xs">
-                  {paginatedBalances.map((b, idx) => {
+                  {paginatedBalances.map((b) => {
                     const displayLot = getDisplayLotNo(b);
                     const isSelected = selectedLot && (
                       selectedLot._id === b._id || 

@@ -10,20 +10,8 @@ import {
   RefreshCw, 
   ChevronLeft, 
   ChevronRight,
-  ChevronDown,
-  Building2,
-  Folder,
   Layers,
-  MapPin,
   CheckCircle2,
-  AlertTriangle,
-  Boxes as BoxesIcon,
-  PieChart,
-  Box,
-  Eye,
-  Settings,
-  ShieldCheck,
-  Check,
   Warehouse,
   BarChart3,
   FileText
@@ -33,9 +21,6 @@ import Modal from '../ui/Modal';
 import { showToast } from '../ui/Toast';
 import { 
   getSkusV2, 
-  createSkuV2, 
-  updateSkuV2, 
-  deleteSkuV2, 
   getLedgerV2, 
   getBalancesV2, 
   getWarehouseHierarchyV2,
@@ -43,7 +28,6 @@ import {
   createWarehouseLocationV2,
   updateWarehouseLocationV2,
   deleteWarehouseLocationV2,
-  recordTransferV2,
   SkuV2,
   LedgerEntryV2,
   WarehouseLocationV2
@@ -64,13 +48,60 @@ interface MaterialLotItem {
   reelsCount?: number;
   reamsCount?: number;
   reamWeight?: string;
+  totalSheets?: number;
   width?: string;
   length?: string;
   totalKg: number;
   ratePerKg: number;
   locationId: string;
   locationName: string;
+  reels?: { weight: number; width?: string; locationId?: string }[];
 }
+
+// Helper to determine accurate item type group: 'products' | 'materials' | 'semi'
+export const getSkuCategoryGroup = (item: SkuV2): 'products' | 'materials' | 'semi' => {
+  const cat = (item.category || '').trim().toLowerCase();
+  const name = (item.name || '').trim().toLowerCase();
+  const code = (item.skuCode || '').trim().toUpperCase();
+
+  // Semi-finished / WIP
+  if (
+    cat.includes('semi') || 
+    cat.includes('wip') || 
+    cat === 'semi finished' || 
+    cat.includes('sub') || 
+    code.startsWith('SEM') || 
+    code.startsWith('SF') ||
+    name.includes('ruled cut') ||
+    name.includes('inner signature') ||
+    name.includes('book block')
+  ) {
+    return 'semi';
+  }
+
+  // Products / Finished Goods
+  if (
+    cat.includes('finish') || 
+    cat.includes('product')
+  ) {
+    return 'products';
+  }
+
+  // Materials / Raw Material / Paper Reels
+  if (
+    cat.includes('raw') || 
+    cat.includes('material') || 
+    cat.includes('reel') || 
+    cat.includes('board') || 
+    code.startsWith('RM')
+  ) {
+    return 'materials';
+  }
+
+  if (code.startsWith('FG')) return 'products';
+  if (code.startsWith('SF') || code.startsWith('SEM')) return 'semi';
+  return 'materials';
+};
 
 export const StockInventoryV2: React.FC = () => {
   const { selectedCompany } = useAuth();
@@ -85,7 +116,7 @@ export const StockInventoryV2: React.FC = () => {
   const [debouncedSearch, setDebouncedSearch] = useState(search);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(50);
+  const [limit] = useState(50);
   const [totalRecords, setTotalRecords] = useState(0);
 
   // Dynamic Backend Dropdown Lists
@@ -133,7 +164,7 @@ export const StockInventoryV2: React.FC = () => {
     purchaseDate: new Date().toISOString().split('T')[0],
     supplierId: '',
     supplierName: '',
-    purchaseType: 'Raw Material',
+    purchaseType: 'Materials',
     freightCharges: 0,
     craneCharges: 0,
     loadingCharges: 0,
@@ -200,6 +231,13 @@ export const StockInventoryV2: React.FC = () => {
     }
   }, [selectedCompany?._id, auxLoaded]);
 
+  // Load auxiliary data on mount
+  useEffect(() => {
+    if (selectedCompany?._id) {
+      loadAuxiliaryData();
+    }
+  }, [selectedCompany?._id, loadAuxiliaryData]);
+
   // Fast Server-Side Data Loading for Active Tab
   const loadStockData = useCallback(async () => {
     if (!selectedCompany?._id) return;
@@ -251,7 +289,7 @@ export const StockInventoryV2: React.FC = () => {
           status: (b.quantity ?? 1000) > 0 ? 'Active' : 'Depleted'
         }));
 
-        const combined = [...invoiceFormatted];
+        const combined: any[] = [...invoiceFormatted];
         const existingNumbers = new Set(invoiceFormatted.map((i: any) => i.batchNumber));
         for (const bal of balancesFormatted) {
           if (!existingNumbers.has(bal.batchNumber)) {
@@ -400,6 +438,7 @@ export const StockInventoryV2: React.FC = () => {
 
   // Lot Handlers for New Purchase Batch
   const handleAddLot = () => {
+    const defaultPaperType = batchForm.purchaseType === 'Semi' ? 'Sheet' : batchForm.purchaseType === 'Products' ? 'General' : 'Reel';
     setLots(prev => [
       ...prev,
       {
@@ -409,6 +448,7 @@ export const StockInventoryV2: React.FC = () => {
         skuName: '',
         brand: '',
         gsm: '',
+        paperType: defaultPaperType,
         totalKg: 0,
         ratePerKg: 0,
         locationId: '',
@@ -458,12 +498,22 @@ export const StockInventoryV2: React.FC = () => {
     if (item) {
       setEditingItem(item);
       const rawInv = item.rawInvoice || item;
+      let loadedPurchaseType = rawInv.purchaseType || item.category || 'Materials';
+      const pLower = loadedPurchaseType.toLowerCase();
+      if (pLower.includes('semi') || pLower.includes('wip') || pLower.includes('sub')) {
+        loadedPurchaseType = 'Semi';
+      } else if (pLower.includes('finish') || pLower.includes('product')) {
+        loadedPurchaseType = 'Products';
+      } else {
+        loadedPurchaseType = 'Materials';
+      }
+
       setBatchForm({
         batchNumber: item.batchNumber || rawInv.invoiceNumber || '',
         purchaseDate: rawInv.createdAt ? new Date(rawInv.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
         supplierId: typeof rawInv.vendorId === 'object' && rawInv.vendorId !== null ? rawInv.vendorId._id : (rawInv.vendorId || item.supplierId || ''),
         supplierName: typeof rawInv.vendorId === 'object' && rawInv.vendorId !== null ? (rawInv.vendorId.firmName || rawInv.vendorId.contactName) : (item.supplierName || ''),
-        purchaseType: rawInv.purchaseType || item.category || 'Raw Material',
+        purchaseType: loadedPurchaseType,
         freightCharges: Number(rawInv.freight) || 0,
         craneCharges: Number(rawInv.craneCharges) || 0,
         loadingCharges: 0,
@@ -530,7 +580,7 @@ export const StockInventoryV2: React.FC = () => {
         purchaseDate: new Date().toISOString().split('T')[0],
         supplierId: '',
         supplierName: '',
-        purchaseType: 'Raw Material',
+        purchaseType: 'Materials',
         freightCharges: 0,
         craneCharges: 0,
         loadingCharges: 0,
@@ -544,7 +594,7 @@ export const StockInventoryV2: React.FC = () => {
         skuName: '',
         brand: '',
         gsm: '',
-        paperType: 'General',
+        paperType: 'Reel',
         totalKg: 0,
         ratePerKg: 0,
         locationId: '',
@@ -645,49 +695,109 @@ export const StockInventoryV2: React.FC = () => {
       const validatedItems: any[] = [];
       for (let i = 0; i < lots.length; i++) {
         const lot = lots[i];
-        let targetSku = skusList.find(s => s._id === lot.skuId) || skusList[0];
+        let targetSku = skusList.find(s => s._id === lot.skuId);
+        if (!targetSku) {
+          showToast(`Please select a valid SKU for Lot #${i + 1}`, 'error');
+          setIsSaving(false);
+          return;
+        }
+
         let targetLoc = locsList.find(loc => loc._id === lot.locationId) || firstStorage;
+        if (!targetLoc?._id) {
+          showToast(`Please select a destination storage location for Lot #${i + 1}`, 'error');
+          setIsSaving(false);
+          return;
+        }
 
-        const qty = Number(lot.totalKg) || 100;
-        const price = Number(lot.ratePerKg) || 50;
-
-        const isReel = lot.paperType === 'Reel' || (targetSku as any)?.paperType === 'Reels' || (targetSku as any)?.paperType === 'Reel';
+        const isReel = lot.paperType === 'Reel';
+        const isSheet = lot.paperType === 'Sheet' || lot.paperType === 'Board';
 
         if (isReel) {
-          const reelsCount = lot.reelsCount || 1;
-          const avgWeight = Math.round(qty / reelsCount);
-          const reelsArr = Array.from({ length: reelsCount }).map((_, rIdx) => ({
-            reelNumber: `${finalInvoiceNumber}-R${String(rIdx + 1).padStart(2, '0')}`,
-            weight: avgWeight,
-            locationId: targetLoc?._id || ''
-          }));
+          const reelsList = lot.reels || [];
+          let reelsArr: any[] = [];
+          if (reelsList.length > 0) {
+            reelsArr = reelsList.map((r: any, rIdx: number) => ({
+              reelNumber: r.reelNumber || `${finalInvoiceNumber}-R${String(rIdx + 1).padStart(2, '0')}`,
+              gsm: Number(lot.gsm) || Number(targetSku?.gsm) || 0,
+              width: Number(r.width) || Number(lot.width) || Number(targetSku?.width) || 0,
+              weight: Number(r.weight) || 0,
+              locationId: r.locationId || targetLoc?._id || ''
+            }));
+          } else {
+            const reelsCount = lot.reelsCount || 1;
+            const avgWeight = Math.round((Number(lot.totalKg) || 100) / reelsCount);
+            reelsArr = Array.from({ length: reelsCount }).map((_, rIdx) => ({
+              reelNumber: `${finalInvoiceNumber}-R${String(rIdx + 1).padStart(2, '0')}`,
+              gsm: Number(lot.gsm) || Number(targetSku?.gsm) || 0,
+              width: Number(lot.width) || Number(targetSku?.width) || 0,
+              weight: avgWeight,
+              locationId: targetLoc?._id || ''
+            }));
+          }
+
+          const totalWeight = reelsArr.reduce((s, r) => s + (Number(r.weight) || 0), 0) || Number(lot.totalKg) || 100;
+          const price = Number(lot.ratePerKg) || 0;
 
           validatedItems.push({
-            skuId: targetSku?._id || lot.skuId,
-            quantity: qty,
-            unit: targetSku?.unit || 'Kg',
+            skuId: targetSku._id,
+            quantity: totalWeight,
+            unit: targetSku.unit || 'Kg',
             purchasePrice: price,
-            totalPrice: qty * price,
+            totalPrice: totalWeight * price,
             lotNumber: finalInvoiceNumber,
-            locationId: targetLoc?._id || '',
+            locationId: targetLoc._id,
             reels: reelsArr,
-            gsm: Number(lot.gsm) || targetSku?.gsm || undefined,
-            brand: lot.brand || targetSku?.brand || undefined
+            gsm: Number(lot.gsm) || targetSku.gsm || undefined,
+            brand: lot.brand || targetSku.brand || undefined
+          });
+        } else if (isSheet) {
+          const reams = Number(lot.reamsCount) || 0;
+          const rw = Number(lot.reamWeight) || 0;
+          const rkg = Number(lot.ratePerKg) || 0;
+          const stdSheets = (targetSku as any)?.pages || 500;
+
+          const totalSheets = reams > 0 ? (reams * stdSheets) : (Number(lot.totalKg) || 100);
+          const totalWeight = reams > 0 && rw > 0 ? Number((reams * rw).toFixed(2)) : (Number(lot.totalKg) || 100);
+          const totalCost = Number((totalWeight * rkg).toFixed(2));
+          const ratePerSheet = totalSheets > 0 && totalCost > 0 ? Number((totalCost / totalSheets).toFixed(4)) : rkg;
+
+          const skuUnitLower = (targetSku.unit || '').toLowerCase();
+          const isKgUnit = skuUnitLower === 'kg';
+          const invQuantity = isKgUnit ? totalWeight : totalSheets;
+          const invPrice = isKgUnit ? rkg : ratePerSheet;
+
+          validatedItems.push({
+            skuId: targetSku._id,
+            quantity: invQuantity,
+            unit: targetSku.unit || 'PCS',
+            purchasePrice: invPrice,
+            totalPrice: totalCost,
+            lotNumber: finalInvoiceNumber,
+            locationId: targetLoc._id,
+            reels: [],
+            reamWeight: rw || undefined,
+            ratePerKg: rkg || undefined,
+            gsm: Number(lot.gsm) || targetSku.gsm || undefined,
+            brand: lot.brand || targetSku.brand || undefined
           });
         } else {
+          // General Material
+          const qty = Number(lot.totalKg) || 100;
+          const price = Number(lot.ratePerKg) || 50;
+
           validatedItems.push({
-            skuId: targetSku?._id || lot.skuId,
+            skuId: targetSku._id,
             quantity: qty,
-            unit: targetSku?.unit || 'Kg',
+            unit: targetSku.unit || 'Kg',
             purchasePrice: price,
             totalPrice: qty * price,
             lotNumber: finalInvoiceNumber,
-            locationId: targetLoc?._id || '',
+            locationId: targetLoc._id,
             reels: [],
             reamWeight: lot.reamWeight ? Number(lot.reamWeight) : undefined,
             ratePerKg: price,
-            gsm: Number(lot.gsm) || targetSku?.gsm || undefined,
-            brand: lot.brand || targetSku?.brand || undefined
+            gsm: Number(lot.gsm) || targetSku.gsm || undefined,
+            brand: lot.brand || targetSku.brand || undefined
           });
         }
       }
@@ -713,7 +823,7 @@ export const StockInventoryV2: React.FC = () => {
         grandTotal,
         company: selectedCompany._id,
         status: 'Posted',
-        purchaseType: batchForm.purchaseType || 'Raw Material',
+        purchaseType: batchForm.purchaseType || 'Materials',
         remarks: batchForm.remarks || ''
       };
 
@@ -728,35 +838,18 @@ export const StockInventoryV2: React.FC = () => {
           await createPurchaseInvoiceV2(invoicePayload);
           showToast(`Purchase Batch '${finalInvoiceNumber}' created successfully!`, 'success');
         }
-      } catch (invoiceErr) {
-        console.warn('Purchase batch save/update warning:', invoiceErr);
-        showToast(`Purchase Batch '${finalInvoiceNumber}' saved!`, 'success');
+      } catch (invoiceErr: any) {
+        console.error('Purchase batch save/update error:', invoiceErr);
+        const errMsg = invoiceErr.response?.data?.msg || invoiceErr.message || 'Failed to save purchase batch';
+        showToast(`Error: ${errMsg}`, 'error');
+        setIsSaving(false);
+        return;
       }
 
-      // 5. Also record transfer per item to update warehouse stock location
-      for (const item of validatedItems) {
-        if (item.skuId && item.locationId) {
-          try {
-            await recordTransferV2({
-              skuId: item.skuId,
-              fromLocationId: item.locationId,
-              toLocationId: item.locationId,
-              quantity: item.quantity,
-              remarks: `Purchase Batch Inward: ${finalInvoiceNumber}`,
-              company: selectedCompany._id,
-              batchNumber: finalInvoiceNumber
-            });
-          } catch (e) {
-            // Ignore
-          }
-        }
-      }
-
-      showToast(`Purchase Batch '${finalInvoiceNumber}' created successfully!`, 'success');
       setShowModal(false);
       setEditingItem(null);
       
-      // 6. Reload live Stock & Purchase Batch data
+      // 5. Reload live Stock & Purchase Batch data
       loadStockData();
     } catch (err: any) {
       console.error('Failed to create purchase batch:', err);
@@ -1104,7 +1197,6 @@ export const StockInventoryV2: React.FC = () => {
                           <span className={`px-2.5 py-0.5 rounded-full font-extrabold text-[9px] uppercase ${getLevelChip(selectedNode.level)}`}>
                             {selectedNode.level}
                           </span>
-                          <span className="text-[10px] font-mono text-gray-400 truncate">ID: {selectedNode._id}</span>
                         </div>
                         <h2 className="text-lg font-bold text-gray-900 mt-0.5 truncate">{selectedNode.name}</h2>
                       </div>
@@ -1112,7 +1204,7 @@ export const StockInventoryV2: React.FC = () => {
 
                     <div className="flex items-center gap-2 self-end sm:self-center">
                       <button
-                        onClick={(e) => openLocationModal(selectedNode.level, selectedNode.parentId || undefined, selectedNode)}
+                        onClick={() => openLocationModal(selectedNode.level, selectedNode.parentId || undefined, selectedNode)}
                         className="px-3 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer"
                       >
                         <Edit className="w-3.5 h-3.5" /> Edit
@@ -1132,7 +1224,17 @@ export const StockInventoryV2: React.FC = () => {
                       <h4 className="font-extrabold text-purple-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
                         <span>📦 LIVE STORED STOCK</span>
                         <span className="bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full text-[10px]">
-                          {nodeLoading ? '...' : `${(nodeDetails?.totalQty || 0).toLocaleString()} ${selectedNode.unit || 'Kg'}`}
+                          {nodeLoading ? (
+                            '...'
+                          ) : !nodeDetails?.storedSkus || nodeDetails.storedSkus.length === 0 ? (
+                            '0 Items'
+                          ) : (() => {
+                            const units = Array.from(new Set(nodeDetails.storedSkus.map((s: any) => s.sku?.unit).filter(Boolean)));
+                            if (units.length === 1) {
+                              return `${(nodeDetails.totalQty || 0).toLocaleString()} ${units[0]}`;
+                            }
+                            return `${nodeDetails.storedSkus.length} SKUs • ${(nodeDetails.totalQty || 0).toLocaleString()} Total`;
+                          })()}
                         </span>
                       </h4>
                     </div>
@@ -1607,8 +1709,8 @@ export const StockInventoryV2: React.FC = () => {
                         className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-500 bg-white shadow-2xs"
                       >
                         <option value="">Search or select Supplier...</option>
-                        {allSuppliers.map((s: any, idx: number) => (
-                          <option key={getKey(s._id, `sup-opt-${idx}`)} value={getKey(s._id, `sup-val-${idx}`)}>{s.firmName || s.contactName}</option>
+                        {allSuppliers.map((s: any) => (
+                          <option key={s._id} value={s._id}>{s.firmName || s.contactName}</option>
                         ))}
                       </select>
                     </div>
@@ -1617,14 +1719,46 @@ export const StockInventoryV2: React.FC = () => {
                       <label className="block text-gray-700 font-bold mb-1 uppercase text-[10px]">PURCHASE TYPE</label>
                       <select
                         value={batchForm.purchaseType}
-                        onChange={e => setBatchForm(f => ({ ...f, purchaseType: e.target.value }))}
+                        onChange={e => {
+                          const newType = e.target.value;
+                          setBatchForm(f => ({ ...f, purchaseType: newType }));
+                          // Dynamically reset lots that don't match the newly selected purchase type
+                          setLots(prevLots => prevLots.map(lot => {
+                            if (!lot.skuId) {
+                              return {
+                                ...lot,
+                                paperType: newType === 'Semi' ? 'Sheet' : newType === 'Products' ? 'General' : 'Reel'
+                              };
+                            }
+                            const curSku = allSkus.find(s => s._id === lot.skuId);
+                            if (curSku) {
+                              const grp = getSkuCategoryGroup(curSku);
+                              const isMatch = (newType === 'Products' && grp === 'products') ||
+                                              (newType === 'Semi' && grp === 'semi') ||
+                                              (newType === 'Materials' && grp === 'materials');
+                              if (!isMatch) {
+                                return {
+                                  ...lot,
+                                  skuId: '',
+                                  skuCode: '',
+                                  skuName: '',
+                                  brand: '',
+                                  gsm: '',
+                                  paperType: newType === 'Semi' ? 'Sheet' : newType === 'Products' ? 'General' : 'Reel',
+                                  totalKg: 0,
+                                  ratePerKg: 0,
+                                  reels: []
+                                };
+                              }
+                            }
+                            return lot;
+                          }));
+                        }}
                         className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-500 bg-white shadow-2xs"
                       >
-                        <option value="Raw Material">Raw Material</option>
-                        <option value="Paper Reels">Paper Reels</option>
-                        <option value="Cover Board">Cover Board</option>
-                        <option value="Sub-Assemblies">Sub-Assemblies</option>
-                        <option value="Finished Goods">Finished Goods</option>
+                        <option value="Materials">Materials</option>
+                        <option value="Semi">Semi</option>
+                        <option value="Products">Products</option>
                       </select>
                     </div>
                   </div>
@@ -1653,20 +1787,57 @@ export const StockInventoryV2: React.FC = () => {
                       <div key={getKey(lot.id, `lot-card-${idx}`)} className="bg-white p-4 rounded-2xl border border-gray-200/80 space-y-3 shadow-2xs relative">
                         <div className="flex items-center justify-between border-b border-gray-100 pb-2">
                           <div className="flex items-center gap-2">
-                            <span className="px-2.5 py-0.5 bg-gray-100 text-gray-700 font-bold rounded-md text-[10px] uppercase">
+                            <span className="px-2.5 py-1 bg-gray-100 text-gray-700 font-black rounded-lg text-[10px] uppercase">
                               LOT - {idx + 1}
                             </span>
-                            {lot.paperType && (
-                              <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase border ${
-                                lot.paperType === 'Reel' 
-                                  ? 'bg-amber-50 text-amber-700 border-amber-200' 
-                                  : lot.paperType === 'Sheet' 
-                                  ? 'bg-blue-50 text-blue-700 border-blue-200' 
-                                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              }`}>
-                                {lot.paperType === 'Reel' ? '🗞️ Paper Reel' : lot.paperType === 'Sheet' ? '📄 Paper Sheet/Board' : '📦 General Material'}
-                              </span>
-                            )}
+                            
+                            {/* Interactive Format Switcher */}
+                            <div className="inline-flex rounded-lg bg-gray-100 p-0.5 text-[10px] font-bold">
+                              <button
+                                type="button"
+                                onClick={() => updateLotField(lot.id, 'paperType', 'Reel')}
+                                className={`px-2.5 py-0.5 rounded-md transition-all cursor-pointer ${
+                                  lot.paperType === 'Reel'
+                                    ? 'bg-amber-500 text-white shadow-xs font-black'
+                                    : 'text-gray-600 hover:text-gray-900'
+                                }`}
+                              >
+                                🗞️ Reel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  updateLotField(lot.id, 'paperType', 'Sheet');
+                                  if (!lot.reamWeight && lot.width && lot.length && lot.gsm) {
+                                    const rw = ((Number(lot.width) * Number(lot.length) * Number(lot.gsm) * 500) / 10000000).toFixed(4);
+                                    updateLotField(lot.id, 'reamWeight', rw);
+                                    const reams = Number(lot.reamsCount) || 0;
+                                    if (reams > 0) {
+                                      updateLotField(lot.id, 'totalKg', Number((Number(rw) * reams).toFixed(2)));
+                                      updateLotField(lot.id, 'totalSheets', reams * 500);
+                                    }
+                                  }
+                                }}
+                                className={`px-2.5 py-0.5 rounded-md transition-all cursor-pointer ${
+                                  lot.paperType === 'Sheet' || lot.paperType === 'Board'
+                                    ? 'bg-blue-600 text-white shadow-xs font-black'
+                                    : 'text-gray-600 hover:text-gray-900'
+                                }`}
+                              >
+                                📄 Sheet / Board
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => updateLotField(lot.id, 'paperType', 'General')}
+                                className={`px-2.5 py-0.5 rounded-md transition-all cursor-pointer ${
+                                  !lot.paperType || lot.paperType === 'General'
+                                    ? 'bg-emerald-600 text-white shadow-xs font-black'
+                                    : 'text-gray-600 hover:text-gray-900'
+                                }`}
+                              >
+                                📦 General Material
+                              </button>
+                            </div>
                           </div>
 
                           {lots.length > 1 && (
@@ -1699,26 +1870,81 @@ export const StockInventoryV2: React.FC = () => {
                                 if (selSku) {
                                   const skuNameLower = (selSku.name || '').toLowerCase();
                                   const catLower = (selSku.category || '').toLowerCase();
-                                  const isReel = (selSku as any).paperType === 'Reels' || (selSku as any).paperType === 'Reel' || skuNameLower.includes('reel') || catLower.includes('reel');
-                                  const isSheet = (selSku as any).paperType === 'Sheets' || (selSku as any).paperType === 'Sheet' || (selSku as any).paperType === 'Board' || skuNameLower.includes('sheet') || skuNameLower.includes('board') || catLower.includes('board');
+                                  const rawType = (selSku as any).paperType;
+
+                                  let detectedWidth = selSku.width ? String(selSku.width) : '';
+                                  let detectedLength = selSku.length ? String(selSku.length) : '';
+                                  if ((!detectedWidth || !detectedLength) && selSku.name) {
+                                    const match = selSku.name.match(/(\d+(?:\.\d+)?)\s*[xX\*]\s*(\d+(?:\.\d+)?)/i);
+                                    if (match) {
+                                      if (!detectedWidth) detectedWidth = match[1];
+                                      if (!detectedLength) detectedLength = match[2];
+                                    }
+                                  }
+
+                                  const isReel = rawType === 'Reels' || rawType === 'Reel' || (!detectedLength && (skuNameLower.includes('reel') || catLower.includes('reel')));
+                                  const isSheet = rawType === 'Sheets' || rawType === 'Sheet' || rawType === 'Board' || 
+                                    catLower.includes('semi') || catLower.includes('board') || catLower.includes('sheet') || 
+                                    (Boolean(detectedWidth) && Boolean(detectedLength)) || (selSku.unit || '').toUpperCase() === 'PCS';
+
                                   const detectedType: 'Reel' | 'Sheet' | 'Board' | 'General' = isReel ? 'Reel' : isSheet ? 'Sheet' : 'General';
+
+                                  let calcReamWeight = (selSku as any).reamWeight ? String((selSku as any).reamWeight) : '';
+                                  const wNum = Number(detectedWidth) || 0;
+                                  const lNum = Number(detectedLength) || 0;
+                                  const gsmNum = Number(selSku.gsm) || 0;
+                                  const stdSheets = Number((selSku as any).pages) || 500;
+                                  if (!calcReamWeight && wNum > 0 && lNum > 0 && gsmNum > 0) {
+                                    calcReamWeight = ((wNum * lNum * gsmNum * stdSheets) / 10000000).toFixed(4);
+                                  }
 
                                   updateLotField(lot.id, 'skuCode', selSku.skuCode);
                                   updateLotField(lot.id, 'skuName', selSku.name);
                                   updateLotField(lot.id, 'brand', selSku.brand || '');
                                   updateLotField(lot.id, 'gsm', String(selSku.gsm || ''));
                                   updateLotField(lot.id, 'paperType', detectedType);
-                                  updateLotField(lot.id, 'width', selSku.width ? String(selSku.width) : (selSku.name.match(/(\d+(?:\.\d+)?)\s*[xX\*]\s*(\d+(?:\.\d+)?)/i)?.[1] || '64'));
-                                  updateLotField(lot.id, 'length', selSku.length ? String(selSku.length) : '');
-                                  updateLotField(lot.id, 'reamWeight', (selSku as any).reamWeight ? String((selSku as any).reamWeight) : '');
+                                  updateLotField(lot.id, 'width', detectedWidth || '64');
+                                  updateLotField(lot.id, 'length', detectedLength || '');
+                                  updateLotField(lot.id, 'reamWeight', calcReamWeight);
                                 }
                               }}
                               className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:border-blue-500 bg-white"
                             >
-                              <option value="">Search or select SKU...</option>
-                              {allSkus.map((s: SkuV2, sIdx: number) => (
-                                <option key={getKey(s._id, `sku-opt-${sIdx}`)} value={getKey(s._id, `sku-val-${sIdx}`)}>{s.name} ({s.skuCode})</option>
-                              ))}
+                              <option value="">
+                                {(() => {
+                                  const matchingCount = allSkus.filter(s => {
+                                    const grp = getSkuCategoryGroup(s);
+                                    if (batchForm.purchaseType === 'Products') return grp === 'products';
+                                    if (batchForm.purchaseType === 'Semi') return grp === 'semi';
+                                    return grp === 'materials';
+                                  }).length;
+                                  return matchingCount === 0
+                                    ? `No ${batchForm.purchaseType} items found...`
+                                    : `Select ${batchForm.purchaseType} SKU (${matchingCount} items)...`;
+                                })()}
+                              </option>
+                              {lot.skuId && !allSkus.filter(s => {
+                                const grp = getSkuCategoryGroup(s);
+                                if (batchForm.purchaseType === 'Products') return grp === 'products';
+                                if (batchForm.purchaseType === 'Semi') return grp === 'semi';
+                                return grp === 'materials';
+                              }).some(s => s._id === lot.skuId) && (
+                                (() => {
+                                  const cur = allSkus.find(s => s._id === lot.skuId);
+                                  return cur ? <option key={cur._id} value={cur._id}>{cur.name} ({cur.skuCode})</option> : null;
+                                })()
+                              )}
+                              {allSkus
+                                .filter(s => {
+                                  const grp = getSkuCategoryGroup(s);
+                                  if (batchForm.purchaseType === 'Products') return grp === 'products';
+                                  if (batchForm.purchaseType === 'Semi') return grp === 'semi';
+                                  return grp === 'materials';
+                                })
+                                .map((s: SkuV2) => (
+                                  <option key={s._id} value={s._id}>{s.name} ({s.skuCode})</option>
+                                ))
+                              }
                             </select>
                           </div>
 
@@ -1806,8 +2032,8 @@ export const StockInventoryV2: React.FC = () => {
                             </>
                           )}
 
-                          {/* SHEETS ROW MATCHING SCREENSHOT 3 & 4 */}
-                          {lot.paperType === 'Sheet' && (
+                          {/* SHEETS ROW MATCHING OLD PURCHASE BATCH MODULE */}
+                          {(lot.paperType === 'Sheet' || lot.paperType === 'Board') && (
                             <>
                               <div>
                                 <label className="block text-blue-600 font-bold mb-1 uppercase text-[9px]">QTY IN REAMS *</label>
@@ -1818,9 +2044,9 @@ export const StockInventoryV2: React.FC = () => {
                                     const reams = Number(e.target.value) || 0;
                                     updateLotField(lot.id, 'reamsCount', reams);
                                     const rw = Number(lot.reamWeight) || 0;
-                                    if (rw > 0 && reams > 0) {
-                                      updateLotField(lot.id, 'totalKg', Math.round(rw * reams));
-                                    }
+                                    const totalKg = Number((rw * reams).toFixed(2));
+                                    updateLotField(lot.id, 'totalKg', totalKg);
+                                    updateLotField(lot.id, 'totalSheets', reams * 500);
                                   }}
                                   placeholder="0"
                                   className="w-full border border-blue-200 bg-blue-50/20 rounded-lg px-2.5 py-1.5 text-xs font-mono text-right font-bold text-blue-800 focus:ring-2 focus:ring-blue-500"
@@ -1838,11 +2064,11 @@ export const StockInventoryV2: React.FC = () => {
                                     updateLotField(lot.id, 'reamWeight', rw);
                                     const reams = Number(lot.reamsCount) || 0;
                                     const rwNum = Number(rw) || 0;
-                                    if (rwNum > 0 && reams > 0) {
-                                      updateLotField(lot.id, 'totalKg', Math.round(rwNum * reams));
-                                    }
+                                    const totalKg = Number((rwNum * reams).toFixed(2));
+                                    updateLotField(lot.id, 'totalKg', totalKg);
+                                    updateLotField(lot.id, 'totalSheets', reams * 500);
                                   }}
-                                  placeholder="e.g. 10.37"
+                                  placeholder="e.g. 13.7982"
                                   className="w-full border border-blue-200 bg-blue-50/20 rounded-lg px-2.5 py-1.5 text-xs font-mono text-right font-bold text-blue-800 focus:ring-2 focus:ring-blue-500"
                                 />
                               </div>
@@ -1871,12 +2097,12 @@ export const StockInventoryV2: React.FC = () => {
 
                               {/* Row 3 for Sheet Lots */}
                               <div>
-                                <label className="block text-gray-400 font-bold mb-1 uppercase text-[9px]">TOTAL KG</label>
+                                <label className="block text-gray-400 font-bold mb-1 uppercase text-[9px]">TOTAL SHEETS</label>
                                 <input
-                                  type="number"
+                                  type="text"
                                   disabled
-                                  value={lot.totalKg || 0}
-                                  className="w-full border border-gray-150 bg-gray-50 rounded-lg px-2.5 py-1.5 text-xs font-mono text-right font-bold text-gray-500 cursor-not-allowed"
+                                  value={((Number(lot.reamsCount) || 0) * 500).toLocaleString('en-IN')}
+                                  className="w-full border border-gray-150 bg-gray-50 rounded-lg px-2.5 py-1.5 text-xs font-mono text-right font-black text-blue-900 cursor-not-allowed"
                                 />
                               </div>
 
@@ -1885,17 +2111,17 @@ export const StockInventoryV2: React.FC = () => {
                                 <input
                                   type="text"
                                   disabled
-                                  value={`₹${lotSubtotal.toLocaleString('en-IN')}`}
+                                  value={`₹${((Number(lot.totalKg) || 0) * (Number(lot.ratePerKg) || 0)).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`}
                                   className="w-full border border-gray-150 bg-gray-50 rounded-lg px-2.5 py-1.5 text-xs font-mono text-right font-bold text-gray-700 cursor-not-allowed"
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-gray-400 font-bold mb-1 uppercase text-[9px]">RATE / KG (₹)</label>
+                                <label className="block text-gray-400 font-bold mb-1 uppercase text-[9px]">RATE / SHEET (₹)</label>
                                 <input
                                   type="text"
                                   disabled
-                                  value={`₹${(Number(lot.ratePerKg) || 0).toFixed(4)}`}
+                                  value={`₹${(500 > 0 && (Number(lot.reamsCount) || 0) > 0) ? (((Number(lot.totalKg) || 0) * (Number(lot.ratePerKg) || 0)) / ((Number(lot.reamsCount) || 0) * 500)).toFixed(4) : '0.0000'}`}
                                   className="w-full border border-gray-150 bg-gray-50 rounded-lg px-2.5 py-1.5 text-xs font-mono text-right font-bold text-gray-500 cursor-not-allowed"
                                 />
                               </div>
@@ -1973,8 +2199,8 @@ export const StockInventoryV2: React.FC = () => {
                                 <option value="">-- Select Destination Storage --</option>
                                 {allLocations
                                   .filter(loc => loc.level === 'Storage Location' || !allLocations.some(c => c.parentId === loc._id))
-                                  .map((loc: any, lIdx: number) => (
-                                    <option key={getKey(loc._id, `dest-loc-${lIdx}`)} value={getKey(loc._id, `dest-val-${lIdx}`)}>
+                                  .map((loc: any) => (
+                                    <option key={loc._id} value={loc._id}>
                                       {resolveLocationPath(loc._id)}
                                     </option>
                                   ))}
@@ -2050,8 +2276,8 @@ export const StockInventoryV2: React.FC = () => {
                                             <option value="">-- Choose Storage Area --</option>
                                             {allLocations
                                               .filter(loc => loc.level === 'Storage Location' || !allLocations.some(c => c.parentId === loc._id))
-                                              .map((loc: any, lIdx: number) => (
-                                                <option key={getKey(loc._id, `reel-loc-${lIdx}`)} value={getKey(loc._id, `reel-val-${lIdx}`)}>
+                                              .map((loc: any) => (
+                                                <option key={loc._id} value={loc._id}>
                                                   {resolveLocationPath(loc._id)}
                                                 </option>
                                               ))}
@@ -2068,7 +2294,7 @@ export const StockInventoryV2: React.FC = () => {
                             {(() => {
                               const reelsList = lot.reels || [];
                               const validCount = Number(lot.reelsCount) || 0;
-                              const totalWeight = reelsList.reduce((sum, r) => sum + (Number(r?.weight) || 0), 0);
+                              const totalWeight = reelsList.reduce((sum: number, r: any) => sum + (Number(r?.weight) || 0), 0);
 
                               return (
                                 <div className="mt-2 bg-blue-50/70 border border-blue-200 rounded-lg px-3 py-2 flex items-center justify-between text-xs font-bold text-blue-900">

@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { 
   Warehouse, RefreshCw, Building2, Folder, Layers, MapPin, Search, 
-  Edit, Trash2, ChevronDown, ChevronRight, Eye, Clock, AlertTriangle, 
-  CheckCircle, Settings, X, Plus, ShieldCheck, PieChart, Sparkles, Filter, Check, Box, ArrowRight
+  Edit, Trash2, ChevronDown, ChevronRight, Clock, AlertTriangle, 
+  Settings, Plus
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { 
@@ -12,11 +12,10 @@ import {
   deleteWarehouseLocationV2, 
   WarehouseLocationV2 
 } from '../../api/mfgApiV2';
-import { getActivityLogs, createActivityLog } from '../../api/activityLogApi';
+import { getActivityLogs } from '../../api/activityLogApi';
 import StorageLocationDetailsV2 from './StorageLocationDetailsV2';
 import { showToast } from '../ui/Toast';
 import Modal from '../ui/Modal';
-import Drawer from '../ui/Drawer';
 
 const WarehouseStructureV2: React.FC = () => {
   const { selectedCompany } = useAuth();
@@ -43,10 +42,8 @@ const WarehouseStructureV2: React.FC = () => {
   const [showToolsDropdown, setShowToolsDropdown] = useState(false);
   const [showActivityLog, setShowActivityLog] = useState(false);
   const [showDuplicates, setShowDuplicates] = useState(false);
-  const [showRecycleBin, setShowRecycleBin] = useState(false);
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [duplicateGroups, setDuplicateGroups] = useState<{ field: string; value: string; items: WarehouseLocationV2[] }[]>([]);
-  const [recycleBinItems, setRecycleBinItems] = useState<WarehouseLocationV2[]>([]);
 
   // Add / Edit Form State
   const [addForm, setAddForm] = useState<{
@@ -297,7 +294,7 @@ const WarehouseStructureV2: React.FC = () => {
     : 0;
 
   // Level Icon Renderer
-  const getLevelIcon = (level: string, isExpanded?: boolean) => {
+  const getLevelIcon = (level: string, _isExpanded?: boolean) => {
     switch (level) {
       case 'Factory':
         return <Building2 className="w-4 h-4 text-slate-800 shrink-0" />;
@@ -341,7 +338,8 @@ const WarehouseStructureV2: React.FC = () => {
     const matchesStatus = !filterStatus || node.status === filterStatus;
 
     if (!matchesSearch && !hasChildren) return null;
-    if (filterLevel && node.level !== filterLevel && !hasChildren) return null;
+    if (!matchesLevel && !hasChildren) return null;
+    if (!matchesStatus && !hasChildren) return null;
 
     return (
       <div key={node._id} className="select-none text-left">
@@ -638,7 +636,6 @@ const WarehouseStructureV2: React.FC = () => {
                         <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${getLevelBadgeStyle(selectedNode.level)}`}>
                           {selectedNode.level}
                         </span>
-                        <span className="text-xs font-bold text-gray-400">ID: {selectedNode._id}</span>
                       </div>
                       <h2 className="text-lg font-black text-gray-900 mt-1">{selectedNode.name}</h2>
                     </div>
@@ -689,6 +686,18 @@ const WarehouseStructureV2: React.FC = () => {
                       </div>
                     ))}
                   </div>
+                </div>
+
+                {/* Stored Materials Summary for this Node (Aggregated across all descendant bins) */}
+                <div className="pt-4 border-t border-gray-150">
+                  <h3 className="text-xs font-extrabold text-gray-900 uppercase tracking-wider mb-3">
+                    Live Stock Occupancy & Stored Materials in {selectedNode.name}
+                  </h3>
+                  <StorageLocationDetailsV2
+                    locationId={selectedNode._id!}
+                    companyId={selectedCompany?._id || ''}
+                    isInline={true}
+                  />
                 </div>
               </div>
             )
@@ -849,6 +858,64 @@ const WarehouseStructureV2: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Modal: Activity Logs */}
+      {showActivityLog && (
+        <Modal
+          isOpen={showActivityLog}
+          onClose={() => setShowActivityLog(false)}
+          title="Warehouse Activity History Log"
+        >
+          <div className="space-y-3 text-xs max-h-[60vh] overflow-y-auto pr-1">
+            {activityLogs.length === 0 ? (
+              <p className="text-center py-6 text-gray-400">No activity logs found.</p>
+            ) : (
+              activityLogs.map((log, idx) => (
+                <div key={log._id || idx} className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-blue-700">{log.action}</span>
+                    <span className="text-[10px] text-gray-400">{new Date(log.createdAt).toLocaleString()}</span>
+                  </div>
+                  <p className="text-gray-800 font-medium">{log.entityName}</p>
+                  <p className="text-gray-500 text-[11px]">{log.details}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal: Potential Duplicates */}
+      {showDuplicates && (
+        <Modal
+          isOpen={showDuplicates}
+          onClose={() => setShowDuplicates(false)}
+          title="Potential Duplicate Warehouse Locations"
+        >
+          <div className="space-y-3 text-xs max-h-[60vh] overflow-y-auto pr-1">
+            {duplicateGroups.length === 0 ? (
+              <p className="text-center py-6 text-gray-400">No duplicate location names found under the same parent.</p>
+            ) : (
+              duplicateGroups.map((group, idx) => (
+                <div key={idx} className="p-3 bg-amber-50/50 border border-amber-200 rounded-xl space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-amber-900">{group.field}</span>
+                    <span className="text-[10px] font-bold text-amber-700">{group.items.length} occurrences</span>
+                  </div>
+                  <p className="text-gray-800 font-medium">{group.value}</p>
+                  <div className="space-y-1 pt-1">
+                    {group.items.map(item => (
+                      <div key={item._id} className="text-[11px] text-gray-600 bg-white px-2 py-1 rounded border border-gray-200">
+                        {item.name} ({item.level}) — ID: {item._id}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };

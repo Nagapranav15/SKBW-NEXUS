@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, RefreshCw, BookOpen, Layers, Plus, Trash2, Tag, AlertCircle, MapPin, Search, ChevronDown, Check, Building2, Lock } from 'lucide-react';
+import { Save, RefreshCw, BookOpen, Layers, Plus, Trash2, AlertCircle, MapPin, Search, ChevronDown, Lock } from 'lucide-react';
 import { createSkuV2, updateSkuV2, SkuV2, getMetadataV2, updateMetadataV2, getSkusV2, getBalancesV2, getWarehouseHierarchyV2, WarehouseLocationV2 } from '../../api/mfgApiV2';
 import Modal from '../ui/Modal';
-import Drawer from '../ui/Drawer';
 
 interface AddSkuDrawerV2Props {
   isOpen: boolean;
@@ -185,6 +184,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     defaultLocation: 'Main Warehouse - Bay A1',
     minStockLevel: '500',
     reorderLevel: '',
+    openingStock: '',
     recipeYieldQty: '1',
     status: 'Active' as 'Active' | 'Inactive'
   });
@@ -568,6 +568,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         pages: (editSku as any).pages !== undefined ? String((editSku as any).pages) : '',
         reamWeight: (editSku as any).reamWeight !== undefined ? String((editSku as any).reamWeight) : '',
         booksGbl: (editSku as any).booksGbl !== undefined ? String((editSku as any).booksGbl) : '',
+        defaultLocation: (editSku as any).defaultLocation || 'Main Warehouse - Bay A1',
+        minStockLevel: (editSku as any).minStockLevel !== undefined ? String((editSku as any).minStockLevel) : '500',
+        reorderLevel: (editSku as any).reorderLevel !== undefined ? String((editSku as any).reorderLevel) : '',
         openingStock: (editSku as any).openingStock !== undefined ? String((editSku as any).openingStock) : '',
         recipeYieldQty: (editSku as any).recipeYieldQty !== undefined ? String((editSku as any).recipeYieldQty) : ((editSku as any).batchYieldQty !== undefined ? String((editSku as any).batchYieldQty) : '1'),
         status: editSku.status || 'Active'
@@ -603,6 +606,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         pages: '',
         reamWeight: '',
         booksGbl: '',
+        defaultLocation: 'Main Warehouse - Bay A1',
+        minStockLevel: '500',
+        reorderLevel: '',
         openingStock: '',
         recipeYieldQty: '1',
         status: 'Active'

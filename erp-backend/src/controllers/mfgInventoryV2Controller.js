@@ -6,6 +6,7 @@ const InventoryLedger = require("../models/inventoryLedgerModelV2");
 const Sequence = require("../models/sequenceModel");
 const Metadata = require("../models/metadataModel");
 const ActivityLog = require("../models/activityLogModel");
+const User = require("../models/userModel");
 
 const toObjectId = (id) => {
   if (!id) return null;
@@ -539,15 +540,39 @@ exports.getLocationDetails = async (req, res, next) => {
       return res.status(404).json({ msg: "Warehouse location not found" });
     }
 
+    // Collect target location and all its descendant locations in the warehouse hierarchy
+    const allCompanyLocations = await WarehouseLocationV2.find({ company: toObjectId(companyId) }).lean();
+    const targetLocationIds = [location._id];
+    const queue = [String(location._id)];
+    const visited = new Set(queue);
+
+    while (queue.length > 0) {
+      const currentParentId = queue.shift();
+      const children = allCompanyLocations.filter(loc => loc.parentId && String(loc.parentId) === currentParentId);
+      for (const child of children) {
+        const childIdStr = String(child._id);
+        if (!visited.has(childIdStr)) {
+          visited.add(childIdStr);
+          targetLocationIds.push(child._id);
+          queue.push(childIdStr);
+        }
+      }
+    }
+
+    const matchCondition = {
+      company: toObjectId(companyId),
+      status: { $ne: "Cancelled" },
+      $or: [
+        { locationId: { $in: targetLocationIds } },
+        { zoneId: { $in: targetLocationIds } },
+        { floorId: { $in: targetLocationIds } },
+        { warehouseId: { $in: targetLocationIds } }
+      ]
+    };
+
     // Aggregate stored SKUs from ledger entries
-    const ledgerAgg = await InventoryLedger.aggregate([
-      { 
-        $match: { 
-          locationId: toObjectId(id), 
-          company: toObjectId(companyId),
-          status: "Posted"
-        } 
-      },
+    let ledgerAgg = await InventoryLedger.aggregate([
+      { $match: matchCondition },
       {
         $group: {
           _id: "$skuId",
@@ -568,8 +593,36 @@ exports.getLocationDetails = async (req, res, next) => {
           onHand: { $subtract: ["$qtyInTotal", "$qtyOutTotal"] }
         }
       },
-      { $match: { onHand: { $gt: 0 } } }
+      { $match: { onHand: { $gt: 0.0001 } } }
     ]);
+
+    // Fallback: If no records in InventoryLedger, check InventoryLedgerV2 (for legacy entries)
+    if (ledgerAgg.length === 0) {
+      const v2Agg = await InventoryLedgerV2.aggregate([
+        {
+          $match: {
+            company: toObjectId(companyId),
+            locationId: { $in: targetLocationIds }
+          }
+        },
+        {
+          $group: {
+            _id: "$skuId",
+            qtyInTotal: { $sum: "$qtyIn" },
+            qtyOutTotal: { $sum: "$qtyOut" }
+          }
+        },
+        {
+          $project: {
+            onHand: { $subtract: ["$qtyInTotal", "$qtyOutTotal"] }
+          }
+        },
+        { $match: { onHand: { $gt: 0.0001 } } }
+      ]);
+      if (v2Agg.length > 0) {
+        ledgerAgg = v2Agg;
+      }
+    }
 
     const storedSkuIds = ledgerAgg.map(a => a._id);
     const skus = await SkuV2.find({ _id: { $in: storedSkuIds } }).lean();
@@ -577,17 +630,13 @@ exports.getLocationDetails = async (req, res, next) => {
     const storedSkus = ledgerAgg.map(agg => {
       const matchSku = skus.find(s => String(s._id) === String(agg._id));
       return {
-        sku: matchSku || { skuCode: "Unknown", name: "Unknown", category: "Unknown" },
-        quantity: agg.onHand
+        sku: matchSku || { skuCode: "Unknown", name: "Unknown", category: "Unknown", unit: "Kg" },
+        quantity: Math.round(agg.onHand * 1000) / 1000
       };
     });
 
-    // Fetch recent movements inside this location
-    const recentMovements = await InventoryLedger.find({ 
-      locationId: toObjectId(id), 
-      company: toObjectId(companyId),
-      status: "Posted"
-    })
+    // Fetch recent movements inside this location / its descendants
+    const recentMovements = await InventoryLedger.find(matchCondition)
       .populate("skuId", "skuCode name category unit")
       .populate("createdBy", "fullName")
       .sort({ createdAt: -1 })
@@ -936,7 +985,7 @@ exports.getBalances = async (req, res, next) => {
           as: "sku"
         }
       },
-      { $unwind: "$sku" },
+      { $unwind: { path: "$sku", preserveNullAndEmptyArrays: true } },
       {
         $lookup: {
           localField: "locationId",
@@ -945,7 +994,7 @@ exports.getBalances = async (req, res, next) => {
           as: "location"
         }
       },
-      { $unwind: "$location" }
+      { $unwind: { path: "$location", preserveNullAndEmptyArrays: true } }
     ];
 
     if (category) {

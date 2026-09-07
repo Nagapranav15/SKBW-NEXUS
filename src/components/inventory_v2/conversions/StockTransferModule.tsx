@@ -1,14 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { 
-  ArrowRightLeft, Plus, Search, Calendar, RefreshCw, ChevronRight, 
-  MapPin, Check, FileText, AlertCircle, X, ArrowUpRight, ShieldCheck 
+  ArrowRightLeft, Plus, Search, RefreshCw, AlertCircle 
 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { getSkusV2, getWarehouseHierarchyV2, getBalancesV2, recordTransferV2, SkuV2, WarehouseLocationV2 } from '../../../api/mfgApiV2';
 import { fetchInventoryLedger } from '../ledger/ledgerService';
 import { showToast } from '../../ui/Toast';
 import Modal from '../../ui/Modal';
-import Drawer from '../../ui/Drawer';
 
 const StockTransferModule: React.FC = () => {
   const { selectedCompany } = useAuth();
@@ -21,8 +19,6 @@ const StockTransferModule: React.FC = () => {
   // Filter & Search
   const [search, setSearch] = useState('');
   const [filterSku, setFilterSku] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -124,7 +120,7 @@ const StockTransferModule: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const res = await recordTransferV2({
+      await recordTransferV2({
         company: selectedCompany?._id || '',
         skuId: form.skuId,
         fromLocationId: form.fromLocationId,
@@ -142,14 +138,9 @@ const StockTransferModule: React.FC = () => {
       const msg = e.response?.data?.msg || e.message || 'Stock transfer failed';
       setError(msg);
       showToast(msg, 'error');
-    } fontally: {
+    } finally {
       setSubmitting(false);
     }
-  };
-
-  const getLocationPath = (locId: string) => {
-    const loc = locations.find(l => l._id === locId);
-    return loc ? loc.name : 'Storage Location';
   };
 
   const filteredTransfers = transfers.filter(tx => {

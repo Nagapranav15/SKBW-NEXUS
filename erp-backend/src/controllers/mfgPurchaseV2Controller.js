@@ -77,6 +77,7 @@ exports.createPurchaseInvoice = async (req, res, next) => {
       }
 
       const itemTotal = qty * price;
+      subTotal += itemTotal;
       const cleanReels = (Array.isArray(reels) ? reels : []).map((r, rIdx) => ({
         reelNumber: r.reelNumber || r.reelNo || `${lotNumber}-R${String(rIdx + 1).padStart(2, '0')}`,
         gsm: Number(r.gsm) || Number(sku.gsm) || 0,
@@ -88,7 +89,7 @@ exports.createPurchaseInvoice = async (req, res, next) => {
       validatedItems.push({
         skuId: sku._id,
         quantity: qty,
-        unit: sku.unit,
+        unit: sku.unit || "kg",
         purchasePrice: price,
         totalPrice: itemTotal,
         lotNumber,
@@ -138,20 +139,27 @@ exports.createPurchaseInvoice = async (req, res, next) => {
       const getHierarchy = async (locId) => {
         const loc = await WarehouseLocationV2.findOne({ _id: toObjectId(locId), company: companyObjId });
         if (!loc) return { warehouseId: locId, floorId: locId, zoneId: locId, locationId: locId };
-        let zoneId = loc._id, floorId = loc._id, warehouseId = loc._id;
-        const p1 = loc.parentId ? await WarehouseLocationV2.findOne({ _id: loc.parentId, company: companyObjId }) : null;
-        if (p1) {
-          zoneId = p1._id;
-          const p2 = p1.parentId ? await WarehouseLocationV2.findOne({ _id: p1.parentId, company: companyObjId }) : null;
-          if (p2) {
-            floorId = p2._id;
-            const p3 = p2.parentId ? await WarehouseLocationV2.findOne({ _id: p2.parentId, company: companyObjId }) : null;
-            warehouseId = p3 ? p3._id : p2._id;
-          } else {
-            floorId = p1._id; warehouseId = p1._id;
-          }
+
+        const chain = [loc];
+        let curr = loc;
+        while (curr && curr.parentId) {
+          const parent = await WarehouseLocationV2.findOne({ _id: curr.parentId, company: companyObjId });
+          if (!parent) break;
+          chain.unshift(parent);
+          curr = parent;
         }
-        return { warehouseId, floorId, zoneId, locationId: loc._id };
+
+        const factoryNode = chain.find(n => n.level === "Factory");
+        const floorNode = chain.find(n => n.level === "Floor");
+        const zoneNode = chain.find(n => n.level === "Zone");
+        const storageNode = chain.find(n => n.level === "Storage Location");
+
+        const warehouseId = factoryNode ? factoryNode._id : (chain[0]?._id || loc._id);
+        const floorId = floorNode ? floorNode._id : (chain[1]?._id || warehouseId);
+        const zoneId = zoneNode ? zoneNode._id : (chain[2]?._id || floorId);
+        const locationId = storageNode ? storageNode._id : loc._id;
+
+        return { warehouseId, floorId, zoneId, locationId };
       };
 
       if (valItem.reels && valItem.reels.length > 0) {
@@ -165,7 +173,10 @@ exports.createPurchaseInvoice = async (req, res, next) => {
 
         for (const locIdStr of Object.keys(reelsByLoc)) {
           const reelsGroup = reelsByLoc[locIdStr];
-          const groupWeight = reelsGroup.reduce((s, r) => s + (Number(r.weight) || 0), 0);
+          let groupWeight = reelsGroup.reduce((s, r) => s + (Number(r.weight) || 0), 0);
+          if (groupWeight <= 0) {
+            groupWeight = valItem.quantity;
+          }
           const h = await getHierarchy(locIdStr);
           const transactionNumber = await Sequence.getNextSequence("IL");
 

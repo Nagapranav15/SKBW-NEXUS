@@ -1,28 +1,20 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { 
   Users, 
   Building, 
-  Building2,
-  Factory,
-  Briefcase,
-  Truck,
-  Map,
+  Factory, 
+  Briefcase, 
+  Truck, 
+  Map, 
   Search, 
   Plus, 
   X, 
-  Eye, 
   Edit, 
   Trash2, 
   RefreshCw, 
-  Check, 
   Phone, 
-  AlertTriangle,
-  MapPin,
-  Camera,
-  Image as ImageIcon,
-  SlidersHorizontal,
-  ChevronLeft,
-  ChevronRight
+  ChevronLeft, 
+  ChevronRight 
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import Modal from '../ui/Modal';
@@ -173,18 +165,18 @@ export const BusinessDirectoryV2: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState(search);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(50);
+  const [limit] = useState(50);
   const [totalRecords, setTotalRecords] = useState(0);
 
-  // Lazy-Loaded Dropdown Lists (Fetched only when modal opens or on demand)
+  // Lazy-Loaded Dropdown Lists (Fetched on mount and kept updated)
   const [allAgents, setAllAgents] = useState<any[]>([]);
   const [allRoutes, setAllRoutes] = useState<any[]>([]);
   const [allCities, setAllCities] = useState<any[]>([]);
   const [allTransporters, setAllTransporters] = useState<any[]>([]);
-  const [auxLoaded, setAuxLoaded] = useState(false);
+  const [allCustomers, setAllCustomers] = useState<any[]>([]);
+  const [, setAuxLoaded] = useState(false);
 
   // Modal Dialog Pop-up State
   const [showModal, setShowModal] = useState(false);
@@ -192,6 +184,12 @@ export const BusinessDirectoryV2: React.FC = () => {
   const [selectedDetails, setSelectedDetails] = useState<DirectoryItem | null>(null);
   const [regionCitySearch, setRegionCitySearch] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [cardCustomersModal, setCardCustomersModal] = useState<{
+    title: string;
+    subtitle?: string;
+    customers: any[];
+  } | null>(null);
+  const [cardCustomerSearch, setCardCustomerSearch] = useState('');
 
   // Complete Form State matching the exact 3 screenshots
   const [form, setForm] = useState({
@@ -227,7 +225,9 @@ export const BusinessDirectoryV2: React.FC = () => {
     customerPhoto: '',
     shopPhoto: '',
     code: '',
-    assignedRoutes: [] as string[]
+    contactName: '',
+    assignedRoutes: [] as string[],
+    contactPersons: [] as { name: string; phone: string; email: string; role?: string; designation?: string }[]
   });
 
   // Debounce search input
@@ -236,26 +236,43 @@ export const BusinessDirectoryV2: React.FC = () => {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Lazy-load auxiliary dropdown data when opening modal or on tab load
+  // Handle Escape key for customer card modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && cardCustomersModal) {
+        setCardCustomersModal(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [cardCustomersModal]);
+
+  // Lazy-load auxiliary dropdown data on mount and whenever needed
   const loadAuxiliaryData = useCallback(async () => {
-    if (!selectedCompany?._id || auxLoaded) return;
+    if (!selectedCompany?._id) return;
     try {
-      const [agRes, rtRes, mkRes, trRes] = await Promise.all([
+      const [agRes, rtRes, mkRes, trRes, custRes] = await Promise.all([
         getParties({ company: selectedCompany._id, type: 'agent', limit: 500, light: true }),
         getRoutes(selectedCompany._id),
-        getParties({ company: selectedCompany._id, type: 'market', limit: 500 }),
-        getParties({ company: selectedCompany._id, type: 'transporter', limit: 500, light: true })
+        getParties({ company: selectedCompany._id, type: 'market', limit: 1000 }),
+        getParties({ company: selectedCompany._id, type: 'transporter', limit: 500, light: true }),
+        getParties({ company: selectedCompany._id, type: 'customer', limit: 5000, light: true })
       ]);
 
       setAllAgents(agRes.data.parties || agRes.data || []);
       setAllRoutes(rtRes.data.routes || rtRes.data || []);
       setAllCities(mkRes.data.parties || mkRes.data || []);
       setAllTransporters(trRes.data.parties || trRes.data || []);
+      setAllCustomers(custRes.data.parties || custRes.data || []);
       setAuxLoaded(true);
     } catch (err) {
       console.error('Failed to load auxiliary dropdown lists:', err);
     }
-  }, [selectedCompany?._id, auxLoaded]);
+  }, [selectedCompany?._id]);
+
+  useEffect(() => {
+    loadAuxiliaryData();
+  }, [loadAuxiliaryData]);
 
   // Auto-retrieve Region (Route), District, State, and Agent when City is selected
   const handleCitySelect = (cityName: string) => {
@@ -370,9 +387,11 @@ export const BusinessDirectoryV2: React.FC = () => {
         customerPhoto: item.customerPhoto || '',
         shopPhoto: item.shopPhoto || '',
         code: item.code || '',
+        contactName: item.contactName || item.ownerName || '',
         assignedRoutes: allRoutes
           .filter((r: any) => r.assignedAgent && r.assignedAgent === (item.firmName || item.contactName))
-          .map((r: any) => r._id)
+          .map((r: any) => r._id),
+        contactPersons: (item as any).contactPersons || []
       });
     } else {
       setEditingItem(null);
@@ -409,7 +428,9 @@ export const BusinessDirectoryV2: React.FC = () => {
         customerPhoto: '',
         shopPhoto: '',
         code: '',
-        assignedRoutes: []
+        contactName: '',
+        assignedRoutes: [],
+        contactPersons: []
       });
     }
     setShowModal(true);
@@ -505,6 +526,7 @@ export const BusinessDirectoryV2: React.FC = () => {
       setEditingItem(null);
       setAuxLoaded(false);
       loadDirectoryData();
+      loadAuxiliaryData();
     } catch (err: any) {
       console.error('Failed to save record:', err);
       showToast(err.response?.data?.msg || err.message || 'Failed to save directory item', 'error');
@@ -524,6 +546,7 @@ export const BusinessDirectoryV2: React.FC = () => {
       }
       showToast('Record deleted successfully', 'success');
       loadDirectoryData();
+      loadAuxiliaryData();
     } catch (err: any) {
       showToast(err.message || 'Failed to delete record', 'error');
     }
@@ -723,21 +746,35 @@ export const BusinessDirectoryV2: React.FC = () => {
 
                 {activeMainTab === 'agents' && (
                   <>
-                    <th className="py-3 px-3 whitespace-nowrap">AGENT / AGENCY NAME</th>
-                    <th className="py-3 px-3 whitespace-nowrap">CONTACT PERSON</th>
-                    <th className="py-3 px-3 whitespace-nowrap">MOBILE / WHATSAPP</th>
-                    <th className="py-3 px-3 whitespace-nowrap">EMAIL</th>
-                    <th className="py-3 px-3 whitespace-nowrap">CITY & DISTRICT</th>
+                    <th className="py-3 px-3 whitespace-nowrap">
+                      <span>AGENT NAME</span>
+                      <span className="text-[10px] text-gray-400 font-normal ml-1 inline-block">⇅</span>
+                    </th>
+                    <th className="py-3 px-3 whitespace-nowrap">
+                      <span>MOBILE</span>
+                      <span className="text-[10px] text-gray-400 font-normal ml-1 inline-block">⇅</span>
+                    </th>
+                    <th className="py-3 px-3 whitespace-nowrap">
+                      <span>ASSIGNED REGIONS</span>
+                      <span className="text-[10px] text-gray-400 font-normal ml-1 inline-block">⇅</span>
+                    </th>
                   </>
                 )}
 
                 {activeMainTab === 'transporters' && (
                   <>
-                    <th className="py-3 px-3 whitespace-nowrap">TRANSPORTER NAME</th>
-                    <th className="py-3 px-3 whitespace-nowrap">CONTACT PERSON</th>
-                    <th className="py-3 px-3 whitespace-nowrap">MOBILE / CONTACT</th>
-                    <th className="py-3 px-3 whitespace-nowrap">CITY & LOCATION</th>
-                    <th className="py-3 px-3 whitespace-nowrap">FLEET / VEHICLES</th>
+                    <th className="py-3 px-3 whitespace-nowrap">
+                      <span>TRANSPORTER</span>
+                      <span className="text-[10px] text-gray-400 font-normal ml-1 inline-block">⇅</span>
+                    </th>
+                    <th className="py-3 px-3 whitespace-nowrap">
+                      <span>MOBILE</span>
+                      <span className="text-[10px] text-gray-400 font-normal ml-1 inline-block">⇅</span>
+                    </th>
+                    <th className="py-3 px-3 whitespace-nowrap">
+                      <span>CUSTOMERS USING</span>
+                      <span className="text-[10px] text-gray-400 font-normal ml-1 inline-block">⇅</span>
+                    </th>
                   </>
                 )}
 
@@ -760,7 +797,12 @@ export const BusinessDirectoryV2: React.FC = () => {
                   </>
                 )}
 
-                <th className="py-3 px-3 whitespace-nowrap">STATUS</th>
+                <th className="py-3 px-3 whitespace-nowrap">
+                  <span>STATUS</span>
+                  {(activeMainTab === 'agents' || activeMainTab === 'transporters') && (
+                    <span className="text-[10px] text-gray-400 font-normal ml-1 inline-block">⇅</span>
+                  )}
+                </th>
                 <th className="py-3 px-3 text-right whitespace-nowrap">ACTIONS</th>
               </tr>
             </thead>
@@ -792,7 +834,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                   return (
                     <tr
                       key={item._id || index}
-                      onClick={() => openModal(item)}
+                      onClick={() => setSelectedDetails(item)}
                       style={{
                         animation: 'slideDownFade 0.35s ease-out forwards',
                         animationDelay: `${index * 35}ms`
@@ -914,39 +956,91 @@ export const BusinessDirectoryV2: React.FC = () => {
                         </>
                       )}
 
-                      {/* AGENTS ROW */}
+                      {/* AGENTS ROW (Matches Screenshot 1 100%) */}
                       {activeMainTab === 'agents' && (
                         <>
                           <td className="py-3 px-3 font-semibold text-gray-900">
-                            <div className="flex items-center gap-2">
-                              <Briefcase className="w-4 h-4 text-purple-600 shrink-0" />
-                              <span className="font-bold text-gray-900">{item.firmName}</span>
+                            <span className="font-bold text-gray-900">{item.firmName || item.contactName || item.name}</span>
+                          </td>
+                          <td className="py-3 px-3 font-mono text-gray-700">
+                            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                              <span className={item.phone ? "font-bold text-blue-600" : "text-gray-400 font-normal"}>{item.phone || '—'}</span>
+                              {item.phone && item.phone.length >= 10 && (
+                                <a href={`https://wa.me/91${item.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="Chat on WhatsApp">
+                                  <WhatsAppIcon />
+                                </a>
+                              )}
                             </div>
                           </td>
-                          <td className="py-3 px-3 text-gray-600 font-medium">{item.contactName || '—'}</td>
-                          <td className="py-3 px-3 font-mono text-gray-700">{item.phone || '—'}</td>
-                          <td className="py-3 px-3 text-gray-600 font-medium">{item.email || '—'}</td>
-                          <td className="py-3 px-3 text-gray-600 font-medium">{[item.city, item.district].filter(Boolean).join(', ') || '—'}</td>
+                          <td className="py-3 px-3">
+                            {(() => {
+                              const agentName = (item.firmName || item.contactName || item.name || '').toLowerCase().trim();
+                              const assigned = allRoutes.filter((r: any) => 
+                                (r.assignedAgent && r.assignedAgent.toLowerCase().trim() === agentName) ||
+                                (Array.isArray(item.assignedRoutes) && item.assignedRoutes.includes(r._id))
+                              );
+                              if (assigned.length === 0) {
+                                return <span className="text-gray-400 italic text-xs">No regions assigned</span>;
+                              }
+                              return (
+                                <div className="flex flex-wrap items-center gap-1.5 max-w-[320px]">
+                                  {assigned.map((r: any, idx: number) => (
+                                    <span
+                                      key={r._id || idx}
+                                      className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-xs font-bold border border-purple-100/80"
+                                      title={r.name}
+                                    >
+                                      {r.code || r.name}
+                                    </span>
+                                  ))}
+                                </div>
+                              );
+                            })()}
+                          </td>
                         </>
                       )}
 
-                      {/* TRANSPORTERS ROW */}
+                      {/* TRANSPORTERS ROW (Matches Screenshot 3 100%) */}
                       {activeMainTab === 'transporters' && (
                         <>
                           <td className="py-3 px-3 font-semibold text-gray-900">
-                            <div className="flex items-center gap-2">
-                              <Truck className="w-4 h-4 text-purple-600 shrink-0" />
-                              <span className="font-bold text-gray-900">{item.firmName}</span>
+                            <span className="font-bold text-gray-900">{item.firmName || item.name}</span>
+                          </td>
+                          <td className="py-3 px-3 font-mono font-medium">
+                            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                              {item.phone || item.contactPersons?.[0]?.phone ? (
+                                <span className="font-bold text-blue-600 font-mono">
+                                  {item.phone || item.contactPersons?.[0]?.phone}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 font-normal">—</span>
+                              )}
+                              {(item.phone || item.contactPersons?.[0]?.phone) && (
+                                <a
+                                  href={`https://wa.me/91${(item.phone || item.contactPersons?.[0]?.phone || '').replace(/\D/g, '')}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  title="Chat on WhatsApp"
+                                  className="inline-flex items-center"
+                                >
+                                  <WhatsAppIcon />
+                                </a>
+                              )}
                             </div>
                           </td>
-                          <td className="py-3 px-3 text-gray-600 font-medium">{item.contactName || '—'}</td>
-                          <td className="py-3 px-3 font-mono text-gray-700">{item.phone || '—'}</td>
-                          <td className="py-3 px-3 text-gray-600 font-medium">{[item.city, item.district, item.state].filter(Boolean).join(', ') || '—'}</td>
-                          <td className="py-3 px-3 font-medium text-gray-700">{item.preferredTransport || 'General Freight'}</td>
+                          <td className="py-3 px-3 font-bold text-gray-900 text-xs">
+                            {(() => {
+                              const transName = (item.firmName || item.name || '').toLowerCase().trim();
+                              return allCustomers.filter((c: any) => {
+                                const pref = (c.preferredTransport || '').toLowerCase().trim();
+                                return pref && pref === transName;
+                              }).length;
+                            })()}
+                          </td>
                         </>
                       )}
 
-                      {/* REGIONS ROW (Matches User Screenshot 100%) */}
+                      {/* REGIONS ROW (Matches User Screenshot 2 100%) */}
                       {activeMainTab === 'regions' && (
                         <>
                           <td className="py-3 px-3 font-semibold text-gray-900">
@@ -961,19 +1055,66 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 {item.agentAssigned || item.assignedAgent}
                               </span>
                             ) : (
-                              <span className="text-gray-400 italic text-xs font-medium">Not Assigned</span>
+                              <span className="px-2.5 py-0.5 rounded-md bg-purple-50 text-purple-700 text-xs font-bold border border-purple-100/60 inline-block">
+                                —
+                              </span>
                             )}
                           </td>
                           <td className="py-3 px-3 font-bold text-gray-900 text-xs">
-                            {allCities.filter((c: any) => c.route === (item.firmName || item.name)).length}
+                            {allCities.filter((c: any) => {
+                              const rName = (item.firmName || item.name || '').toLowerCase().trim();
+                              const rCode = (item.code || '').toLowerCase().trim();
+                              const cRoute = (c.route || '').toLowerCase().trim();
+                              return cRoute && (cRoute === rName || (rCode && cRoute === rCode));
+                            }).length}
                           </td>
                           <td className="py-3 px-3 font-bold text-gray-900 text-xs">
-                            {items.filter((c: any) => c.route === (item.firmName || item.name)).length}
+                            {(() => {
+                              const rName = (item.firmName || item.name || '').toLowerCase().trim();
+                              const rCode = (item.code || '').toLowerCase().trim();
+                              const regionCityNames = new Set(
+                                allCities
+                                  .filter((c: any) => {
+                                    const cRoute = (c.route || '').toLowerCase().trim();
+                                    return cRoute && (cRoute === rName || (rCode && cRoute === rCode));
+                                  })
+                                  .map((c: any) => (c.firmName || c.name || '').toLowerCase().trim())
+                              );
+
+                              return allCustomers.filter((c: any) => {
+                                const cRoute = (c.route || '').toLowerCase().trim();
+                                if (cRoute && (cRoute === rName || (rCode && cRoute === rCode))) return true;
+                                const cCity = (c.city || '').toLowerCase().trim();
+                                if (cCity && regionCityNames.has(cCity)) return true;
+                                const cMarket = (c.assignedMarket || '').toLowerCase().trim();
+                                if (cMarket && regionCityNames.has(cMarket)) return true;
+                                return false;
+                              }).length;
+                            })()}
                           </td>
                           <td className="py-3 px-3">
                             {(() => {
-                              const regionName = item.firmName || item.name || '';
-                              const regionCusts = items.filter((c: any) => c.route === regionName);
+                              const rName = (item.firmName || item.name || '').toLowerCase().trim();
+                              const rCode = (item.code || '').toLowerCase().trim();
+                              const regionCityNames = new Set(
+                                allCities
+                                  .filter((c: any) => {
+                                    const cRoute = (c.route || '').toLowerCase().trim();
+                                    return cRoute && (cRoute === rName || (rCode && cRoute === rCode));
+                                  })
+                                  .map((c: any) => (c.firmName || c.name || '').toLowerCase().trim())
+                              );
+
+                              const regionCusts = allCustomers.filter((c: any) => {
+                                const cRoute = (c.route || '').toLowerCase().trim();
+                                if (cRoute && (cRoute === rName || (rCode && cRoute === rCode))) return true;
+                                const cCity = (c.city || '').toLowerCase().trim();
+                                if (cCity && regionCityNames.has(cCity)) return true;
+                                const cMarket = (c.assignedMarket || '').toLowerCase().trim();
+                                if (cMarket && regionCityNames.has(cMarket)) return true;
+                                return false;
+                              });
+
                               const totalOut = regionCusts.reduce((sum: number, c: any) => sum + (Number(c.outstandingBalance) || Number(c.outstanding) || 0), 0);
                               if (totalOut > 0) {
                                 return (
@@ -997,7 +1138,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                               }
                               return (
                                 <div className="flex flex-col items-start">
-                                  <span className="px-2 py-0.5 rounded-md bg-gray-50 text-gray-600 border border-gray-200 font-mono font-bold text-xs">
+                                  <span className="font-bold text-xs text-gray-800 font-mono">
                                     ₹0
                                   </span>
                                   <span className="text-[10px] text-gray-400 font-medium mt-0.5">No outstanding</span>
@@ -1077,7 +1218,12 @@ export const BusinessDirectoryV2: React.FC = () => {
 
         {/* Footer Fast Pagination */}
         <div className="p-3 bg-gray-50/80 border-t border-gray-200 flex items-center justify-between text-xs text-gray-500 font-semibold">
-          <span>Showing {items.length} of {totalRecords} records</span>
+          <span>
+            {activeMainTab === 'regions' 
+              ? `Showing ${items.length} of ${totalRecords} records`
+              : `Showing ${totalRecords > 0 ? (page - 1) * limit + 1 : 0} to ${Math.min(page * limit, totalRecords)} of ${totalRecords} ${activeMainTab === 'customers' ? 'customers' : activeMainTab === 'vendors' ? 'suppliers' : activeMainTab === 'agents' ? 'agents' : activeMainTab === 'transporters' ? 'transporters' : 'cities'}`
+            }
+          </span>
           <div className="flex items-center gap-2">
             <button
               disabled={page <= 1}
@@ -1797,7 +1943,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                             type="button"
                             onClick={() => setForm(f => ({
                               ...f,
-                              contactPersons: f.contactPersons.filter((_, i) => i !== idx)
+                              contactPersons: f.contactPersons.filter((_: any, i: number) => i !== idx)
                             }))}
                             className="absolute right-2 top-2 text-gray-400 hover:text-rose-600 cursor-pointer"
                             title="Remove Contact"
@@ -2095,8 +2241,18 @@ export const BusinessDirectoryV2: React.FC = () => {
                         required
                         value={form.firmName}
                         onChange={e => setForm(f => ({ ...f, firmName: e.target.value }))}
-                        placeholder="e.g. VRL Logistics"
+                        placeholder="e.g. Garuda"
                         className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-100 bg-white shadow-2xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-700 font-semibold mb-1">Mobile Number</label>
+                      <input
+                        type="text"
+                        value={form.phone}
+                        onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                        placeholder="e.g. 9876543210"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -2151,7 +2307,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                             type="button"
                             onClick={() => setForm(f => ({
                               ...f,
-                              contactPersons: f.contactPersons.filter((_, i) => i !== idx)
+                              contactPersons: f.contactPersons.filter((_: any, i: number) => i !== idx)
                             }))}
                             className="absolute right-2 top-2 text-gray-400 hover:text-rose-600 cursor-pointer"
                             title="Remove Contact"
@@ -2353,68 +2509,275 @@ export const BusinessDirectoryV2: React.FC = () => {
               
               {/* Dynamic Real-Time Stats Cards */}
               {(() => {
-                const name = selectedDetails.firmName || selectedDetails.name || '';
+                const name = selectedDetails.firmName || selectedDetails.name || selectedDetails.contactName || '';
                 if (activeMainTab === 'regions') {
-                  const assignedCitiesCount = allCities.filter((c: any) => c.route === name).length;
-                  const assignedCustsCount = items.filter((c: any) => c.route === name).length;
+                  const rName = name.toLowerCase().trim();
+                  const rCode = (selectedDetails.code || '').toLowerCase().trim();
+                  const assignedCitiesCount = allCities.filter((c: any) => {
+                    const cRoute = (c.route || '').toLowerCase().trim();
+                    return cRoute && (cRoute === rName || (rCode && cRoute === rCode));
+                  }).length;
+                  const regionCityNames = new Set(
+                    allCities
+                      .filter((c: any) => {
+                        const cRoute = (c.route || '').toLowerCase().trim();
+                        return cRoute && (cRoute === rName || (rCode && cRoute === rCode));
+                      })
+                      .map((c: any) => (c.firmName || c.name || '').toLowerCase().trim())
+                  );
+                  const assignedCustsCount = allCustomers.filter((c: any) => {
+                    const cRoute = (c.route || '').toLowerCase().trim();
+                    if (cRoute && (cRoute === rName || (rCode && cRoute === rCode))) return true;
+                    const cCity = (c.city || '').toLowerCase().trim();
+                    if (cCity && regionCityNames.has(cCity)) return true;
+                    const cMarket = (c.assignedMarket || '').toLowerCase().trim();
+                    if (cMarket && regionCityNames.has(cMarket)) return true;
+                    return false;
+                  }).length;
                   return (
                     <div className="grid grid-cols-3 gap-3">
-                      <div className="bg-purple-50/60 border border-purple-100 p-3 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[10px] text-purple-700 font-bold uppercase tracking-wider">No of Cities</span>
+                      <div 
+                        onClick={() => {
+                          const regionCusts = allCustomers.filter((c: any) => {
+                            const cRoute = (c.route || '').toLowerCase().trim();
+                            if (cRoute && (cRoute === rName || (rCode && cRoute === rCode))) return true;
+                            const cCity = (c.city || '').toLowerCase().trim();
+                            if (cCity && regionCityNames.has(cCity)) return true;
+                            const cMarket = (c.assignedMarket || '').toLowerCase().trim();
+                            if (cMarket && regionCityNames.has(cMarket)) return true;
+                            return false;
+                          });
+                          setCardCustomersModal({
+                            title: `Customers in ${name} Region (${assignedCitiesCount} Cities)`,
+                            subtitle: `Region Code: ${selectedDetails.code || '—'} • ${regionCusts.length} Total Customers`,
+                            customers: regionCusts
+                          });
+                          setCardCustomerSearch('');
+                        }}
+                        className="bg-purple-50/60 hover:bg-purple-100/70 border border-purple-100 hover:border-purple-300 p-3 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.02] group"
+                        title="Click to view all customers in these cities"
+                      >
+                        <span className="block text-[10px] text-purple-700 font-bold uppercase tracking-wider group-hover:underline">No of Cities</span>
                         <span className="block text-xl font-black text-purple-900 mt-0.5">{assignedCitiesCount}</span>
+                        <span className="text-[9px] text-purple-600 font-medium block mt-0.5">Click to view all →</span>
                       </div>
-                      <div className="bg-blue-50/60 border border-blue-100 p-3 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[10px] text-blue-700 font-bold uppercase tracking-wider">Total Customers</span>
+                      <div 
+                        onClick={() => {
+                          const regionCusts = allCustomers.filter((c: any) => {
+                            const cRoute = (c.route || '').toLowerCase().trim();
+                            if (cRoute && (cRoute === rName || (rCode && cRoute === rCode))) return true;
+                            const cCity = (c.city || '').toLowerCase().trim();
+                            if (cCity && regionCityNames.has(cCity)) return true;
+                            const cMarket = (c.assignedMarket || '').toLowerCase().trim();
+                            if (cMarket && regionCityNames.has(cMarket)) return true;
+                            return false;
+                          });
+                          setCardCustomersModal({
+                            title: `All Customers in ${name} Region`,
+                            subtitle: `Region Code: ${selectedDetails.code || '—'} • ${regionCusts.length} Total Customers`,
+                            customers: regionCusts
+                          });
+                          setCardCustomerSearch('');
+                        }}
+                        className="bg-blue-50/60 hover:bg-blue-100/70 border border-blue-100 hover:border-blue-300 p-3 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.02] group"
+                        title="Click to view all customers in this region"
+                      >
+                        <span className="block text-[10px] text-blue-700 font-bold uppercase tracking-wider group-hover:underline">Total Customers</span>
                         <span className="block text-xl font-black text-blue-900 mt-0.5">{assignedCustsCount}</span>
+                        <span className="text-[9px] text-blue-500 font-medium block mt-0.5">Click to view all →</span>
                       </div>
-                      <div className="bg-indigo-50/60 border border-indigo-100 p-3 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[10px] text-indigo-700 font-bold uppercase tracking-wider">Assigned Agent</span>
-                        <span className="block text-xs font-bold text-indigo-900 mt-1.5 truncate" title={selectedDetails.agentAssigned || 'None'}>
-                          {selectedDetails.agentAssigned || 'None'}
+                      <div 
+                        onClick={() => {
+                          const agentName = (selectedDetails.agentAssigned || selectedDetails.assignedAgent || '').toLowerCase().trim();
+                          if (!agentName || agentName === 'none') {
+                            showToast('No agent assigned to this region', 'info');
+                            return;
+                          }
+                          const agentCusts = allCustomers.filter((c: any) => (c.agentAssigned || '').toLowerCase().trim() === agentName);
+                          setCardCustomersModal({
+                            title: `Customers for Agent: ${selectedDetails.agentAssigned || selectedDetails.assignedAgent}`,
+                            subtitle: `Region: ${name} • ${agentCusts.length} Assigned Customers`,
+                            customers: agentCusts
+                          });
+                          setCardCustomerSearch('');
+                        }}
+                        className="bg-indigo-50/60 hover:bg-indigo-100/70 border border-indigo-100 hover:border-indigo-300 p-3 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.02] group"
+                        title="Click to view customers assigned to this agent"
+                      >
+                        <span className="block text-[10px] text-indigo-700 font-bold uppercase tracking-wider group-hover:underline">Assigned Agent</span>
+                        <span className="block text-xs font-bold text-indigo-900 mt-1.5 truncate" title={selectedDetails.agentAssigned || selectedDetails.assignedAgent || 'None'}>
+                          {selectedDetails.agentAssigned || selectedDetails.assignedAgent || 'None'}
                         </span>
+                        <span className="text-[9px] text-indigo-600 font-medium block mt-0.5">Click to view all →</span>
                       </div>
                     </div>
                   );
                 }
                 if (activeMainTab === 'cities') {
-                  const assignedCustsCount = items.filter((c: any) => (c.city === name || c.assignedMarket === name)).length;
+                  const assignedCustsCount = allCustomers.filter((c: any) => (c.city === name || c.assignedMarket === name)).length;
                   return (
                     <div className="grid grid-cols-3 gap-3">
-                      <div className="bg-purple-50/60 border border-purple-100 p-3 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[10px] text-purple-700 font-bold uppercase tracking-wider">Parent Region</span>
+                      <div 
+                        onClick={() => {
+                          const parentRoute = (selectedDetails.route || '').toLowerCase().trim();
+                          const routeCusts = allCustomers.filter((c: any) => (c.route || '').toLowerCase().trim() === parentRoute);
+                          setCardCustomersModal({
+                            title: `Customers in Region: ${selectedDetails.route || 'Unassigned'}`,
+                            subtitle: `Parent Region of ${name} • ${routeCusts.length} Customers`,
+                            customers: routeCusts
+                          });
+                          setCardCustomerSearch('');
+                        }}
+                        className="bg-purple-50/60 hover:bg-purple-100/70 border border-purple-100 hover:border-purple-300 p-3 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.02] group"
+                        title="Click to view customers in parent region"
+                      >
+                        <span className="block text-[10px] text-purple-700 font-bold uppercase tracking-wider group-hover:underline">Parent Region</span>
                         <span className="block text-xs font-bold text-purple-900 mt-1.5 truncate" title={selectedDetails.route || 'None'}>
                           {selectedDetails.route || 'None'}
                         </span>
+                        <span className="text-[9px] text-purple-600 font-medium block mt-0.5">Click to view all →</span>
                       </div>
-                      <div className="bg-blue-50/60 border border-blue-100 p-3 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[10px] text-blue-700 font-bold uppercase tracking-wider">Customers</span>
+                      <div 
+                        onClick={() => {
+                          const matched = allCustomers.filter((c: any) => (c.city === name || c.assignedMarket === name));
+                          setCardCustomersModal({
+                            title: `Customers in ${name}`,
+                            subtitle: `Parent Region: ${selectedDetails.route || '—'} • ${matched.length} Total Customers`,
+                            customers: matched
+                          });
+                          setCardCustomerSearch('');
+                        }}
+                        className="bg-blue-50/60 hover:bg-blue-100/70 border border-blue-100 hover:border-blue-300 p-3 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.02] group"
+                        title="Click to view all customers in this city"
+                      >
+                        <span className="block text-[10px] text-blue-700 font-bold uppercase tracking-wider group-hover:underline">Customers</span>
                         <span className="block text-xl font-black text-blue-900 mt-0.5">{assignedCustsCount}</span>
+                        <span className="text-[9px] text-blue-500 font-medium block mt-0.5">Click to view all →</span>
                       </div>
-                      <div className="bg-indigo-50/60 border border-indigo-100 p-3 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[10px] text-indigo-700 font-bold uppercase tracking-wider">District</span>
+                      <div 
+                        onClick={() => {
+                          const dist = (selectedDetails.district || '').toLowerCase().trim();
+                          const distCusts = allCustomers.filter((c: any) => (c.district || '').toLowerCase().trim() === dist);
+                          setCardCustomersModal({
+                            title: `Customers in District: ${selectedDetails.district || 'Unassigned'}`,
+                            subtitle: `${distCusts.length} Customers in this district`,
+                            customers: distCusts
+                          });
+                          setCardCustomerSearch('');
+                        }}
+                        className="bg-indigo-50/60 hover:bg-indigo-100/70 border border-indigo-100 hover:border-indigo-300 p-3 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.02] group"
+                        title="Click to view customers in this district"
+                      >
+                        <span className="block text-[10px] text-indigo-700 font-bold uppercase tracking-wider group-hover:underline">District</span>
                         <span className="block text-xs font-bold text-indigo-900 mt-1.5 truncate" title={selectedDetails.district || '—'}>
                           {selectedDetails.district || '—'}
                         </span>
+                        <span className="text-[9px] text-indigo-600 font-medium block mt-0.5">Click to view all →</span>
                       </div>
                     </div>
                   );
                 }
                 if (activeMainTab === 'agents') {
-                  const assignedRoutesCount = allRoutes.filter((r: any) => r.assignedAgent === name).length;
-                  const assignedCitiesCount = allCities.filter((c: any) => c.agentAssigned === name).length;
+                  const agentName = name.toLowerCase().trim();
+                  const assignedRoutes = allRoutes.filter((r: any) => 
+                    (r.assignedAgent && r.assignedAgent.toLowerCase().trim() === agentName) ||
+                    (Array.isArray(selectedDetails.assignedRoutes) && selectedDetails.assignedRoutes.includes(r._id))
+                  );
+                  const assignedCities = allCities.filter((c: any) => (c.agentAssigned || '').toLowerCase().trim() === agentName);
+                  const assignedCusts = allCustomers.filter((c: any) => (c.agentAssigned || '').toLowerCase().trim() === agentName);
+                  return (
+                    <div className="grid grid-cols-3 gap-3">
+                      <div 
+                        onClick={() => {
+                          const routeNames = new Set(assignedRoutes.map((r: any) => (r.name || '').toLowerCase().trim()));
+                          const routeCodes = new Set(assignedRoutes.map((r: any) => (r.code || '').toLowerCase().trim()).filter(Boolean));
+                          const matched = allCustomers.filter((c: any) => {
+                            const r = (c.route || '').toLowerCase().trim();
+                            return r && (routeNames.has(r) || routeCodes.has(r));
+                          });
+                          setCardCustomersModal({
+                            title: `Customers in Routes assigned to ${name}`,
+                            subtitle: `${assignedRoutes.length} Routes • ${matched.length} Customers`,
+                            customers: matched
+                          });
+                          setCardCustomerSearch('');
+                        }}
+                        className="bg-purple-50/60 hover:bg-purple-100/70 border border-purple-100 hover:border-purple-300 p-3 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.02] group"
+                        title="Click to view all customers in assigned routes"
+                      >
+                        <span className="block text-[10px] text-purple-700 font-bold uppercase tracking-wider group-hover:underline">Assigned Routes</span>
+                        <span className="block text-xl font-black text-purple-900 mt-0.5">{assignedRoutes.length}</span>
+                        <span className="text-[9px] text-purple-600 font-medium block mt-0.5">Click to view all →</span>
+                      </div>
+                      <div 
+                        onClick={() => {
+                          const cityNames = new Set(assignedCities.map((c: any) => (c.firmName || c.name || '').toLowerCase().trim()));
+                          const matched = allCustomers.filter((c: any) => {
+                            const city = (c.city || '').toLowerCase().trim();
+                            const market = (c.assignedMarket || '').toLowerCase().trim();
+                            return (city && cityNames.has(city)) || (market && cityNames.has(market));
+                          });
+                          setCardCustomersModal({
+                            title: `Customers in Cities assigned to ${name}`,
+                            subtitle: `${assignedCities.length} Cities • ${matched.length} Customers`,
+                            customers: matched
+                          });
+                          setCardCustomerSearch('');
+                        }}
+                        className="bg-blue-50/60 hover:bg-blue-100/70 border border-blue-100 hover:border-blue-300 p-3 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.02] group"
+                        title="Click to view all customers in assigned cities"
+                      >
+                        <span className="block text-[10px] text-blue-700 font-bold uppercase tracking-wider group-hover:underline">Assigned Cities</span>
+                        <span className="block text-xl font-black text-blue-900 mt-0.5">{assignedCities.length}</span>
+                        <span className="text-[9px] text-blue-500 font-medium block mt-0.5">Click to view all →</span>
+                      </div>
+                      <div 
+                        onClick={() => {
+                          setCardCustomersModal({
+                            title: `Customers assigned to ${name}`,
+                            subtitle: `Agent • ${assignedCusts.length} Assigned Customers`,
+                            customers: assignedCusts
+                          });
+                          setCardCustomerSearch('');
+                        }}
+                        className="bg-emerald-50/60 hover:bg-emerald-100/70 border border-emerald-100 hover:border-emerald-300 p-3 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.02] group"
+                        title="Click to view all customers assigned to this agent"
+                      >
+                        <span className="block text-[10px] text-emerald-700 font-bold uppercase tracking-wider group-hover:underline">Customers</span>
+                        <span className="block text-xl font-black text-emerald-900 mt-0.5">{assignedCusts.length}</span>
+                        <span className="text-[9px] text-emerald-600 font-medium block mt-0.5">Click to view all →</span>
+                      </div>
+                    </div>
+                  );
+                }
+                if (activeMainTab === 'transporters') {
+                  const transName = name.toLowerCase().trim();
+                  const usingCusts = allCustomers.filter((c: any) => (c.preferredTransport || '').toLowerCase().trim() === transName);
                   return (
                     <div className="grid grid-cols-3 gap-3">
                       <div className="bg-purple-50/60 border border-purple-100 p-3 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[10px] text-purple-700 font-bold uppercase tracking-wider">Routes</span>
-                        <span className="block text-xl font-black text-purple-900 mt-0.5">{assignedRoutesCount}</span>
+                        <span className="block text-[10px] text-purple-700 font-bold uppercase tracking-wider">Transporter</span>
+                        <span className="block text-xs font-bold text-purple-900 mt-1.5 truncate" title={name}>{name}</span>
                       </div>
-                      <div className="bg-blue-50/60 border border-blue-100 p-3 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[10px] text-blue-700 font-bold uppercase tracking-wider">Cities</span>
-                        <span className="block text-xl font-black text-blue-900 mt-0.5">{assignedCitiesCount}</span>
+                      <div 
+                        onClick={() => {
+                          setCardCustomersModal({
+                            title: `Customers using ${name}`,
+                            subtitle: `Transporter • ${usingCusts.length} Customers Using`,
+                            customers: usingCusts
+                          });
+                          setCardCustomerSearch('');
+                        }}
+                        className="bg-blue-50/60 hover:bg-blue-100/70 border border-blue-100 hover:border-blue-300 p-3 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.02] group"
+                        title="Click to view all customers using this transporter"
+                      >
+                        <span className="block text-[10px] text-blue-700 font-bold uppercase tracking-wider group-hover:underline">Customers Using</span>
+                        <span className="block text-xl font-black text-blue-900 mt-0.5">{usingCusts.length}</span>
+                        <span className="text-[9px] text-blue-500 font-medium block mt-0.5">Click to view all →</span>
                       </div>
                       <div className="bg-emerald-50/60 border border-emerald-100 p-3 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[10px] text-emerald-700 font-bold uppercase tracking-wider">Phone</span>
-                        <span className="block text-xs font-mono font-bold text-emerald-900 mt-1.5 truncate">{selectedDetails.phone || '—'}</span>
+                        <span className="block text-[10px] text-emerald-700 font-bold uppercase tracking-wider">Mobile</span>
+                        <span className="block text-xs font-mono font-bold text-emerald-900 mt-1.5 truncate">{selectedDetails.phone || selectedDetails.contactPersons?.[0]?.phone || '—'}</span>
                       </div>
                     </div>
                   );
@@ -2473,7 +2836,12 @@ export const BusinessDirectoryV2: React.FC = () => {
                       <span>Cities in Region</span>
                     </h4>
                     <span className="px-2.5 py-0.5 bg-purple-100 text-purple-700 rounded-full font-extrabold text-[11px]">
-                      {allCities.filter((c: any) => c.route === (selectedDetails.firmName || selectedDetails.name)).length} Total
+                      {allCities.filter((c: any) => {
+                        const rName = (selectedDetails.firmName || selectedDetails.name || '').toLowerCase().trim();
+                        const rCode = (selectedDetails.code || '').toLowerCase().trim();
+                        const cRoute = (c.route || '').toLowerCase().trim();
+                        return cRoute && (cRoute === rName || (rCode && cRoute === rCode));
+                      }).length} Total
                     </span>
                   </div>
 
@@ -2500,8 +2868,12 @@ export const BusinessDirectoryV2: React.FC = () => {
 
                   {/* Small City Cards Grid (Matching Legacy Module 100%) */}
                   {(() => {
-                    const regionName = selectedDetails.firmName || selectedDetails.name;
-                    const regionCities = allCities.filter((c: any) => c.route === regionName);
+                    const rName = (selectedDetails.firmName || selectedDetails.name || '').toLowerCase().trim();
+                    const rCode = (selectedDetails.code || '').toLowerCase().trim();
+                    const regionCities = allCities.filter((c: any) => {
+                      const cRoute = (c.route || '').toLowerCase().trim();
+                      return cRoute && (cRoute === rName || (rCode && cRoute === rCode));
+                    });
                     const filteredCities = regionCities.filter((c: any) =>
                       (c.firmName || c.name || '').toLowerCase().includes(regionCitySearch.toLowerCase())
                     );
@@ -2517,14 +2889,33 @@ export const BusinessDirectoryV2: React.FC = () => {
                     return (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         {filteredCities.map((city: any) => {
-                          const custCount = items.filter((item: any) => (item.city === city.firmName || item.assignedMarket === city.firmName)).length;
+                          const cityName = (city.firmName || city.name || '').toLowerCase().trim();
+                          const custCount = allCustomers.filter((item: any) => {
+                            const cCity = (item.city || '').toLowerCase().trim();
+                            const cMarket = (item.assignedMarket || '').toLowerCase().trim();
+                            return cCity === cityName || cMarket === cityName;
+                          }).length;
                           return (
                             <div
                               key={city._id}
-                              className="p-3 border border-gray-200 rounded-xl bg-white hover:border-purple-300 hover:bg-purple-50/20 shadow-2xs transition-all duration-200 space-y-2 flex flex-col justify-between"
+                              onClick={() => {
+                                const matched = allCustomers.filter((item: any) => {
+                                  const cCity = (item.city || '').toLowerCase().trim();
+                                  const cMarket = (item.assignedMarket || '').toLowerCase().trim();
+                                  return cCity === cityName || cMarket === cityName;
+                                });
+                                setCardCustomersModal({
+                                  title: `Customers in ${city.firmName || city.name}`,
+                                  subtitle: `Region: ${selectedDetails.firmName || selectedDetails.name} • ${city.district ? `${city.district} District • ` : ''}${matched.length} Total Customers`,
+                                  customers: matched
+                                });
+                                setCardCustomerSearch('');
+                              }}
+                              className="p-3 border border-gray-200 hover:border-purple-400 rounded-xl bg-white hover:bg-purple-50/40 shadow-2xs hover:shadow-md transition-all duration-200 space-y-2 flex flex-col justify-between cursor-pointer group select-none"
+                              title={`Click to view all ${custCount} customers in ${city.firmName || city.name}`}
                             >
                               <div className="flex items-start justify-between gap-1">
-                                <span className="font-bold text-gray-900 text-xs block truncate" title={city.firmName || city.name}>
+                                <span className="font-bold text-gray-900 text-xs block truncate group-hover:text-purple-700 transition-colors" title={city.firmName || city.name}>
                                   {city.firmName || city.name}
                                 </span>
                                 <span className={`inline-flex px-1.5 py-0.5 text-[9px] font-extrabold uppercase rounded shrink-0 ${
@@ -2535,9 +2926,12 @@ export const BusinessDirectoryV2: React.FC = () => {
                               </div>
 
                               <div className="space-y-1 pt-1 border-t border-gray-100">
-                                <div className="flex items-center justify-between text-[11px] text-gray-500 font-semibold bg-slate-50 px-2.5 py-1 rounded-lg">
+                                <div className="flex items-center justify-between text-[11px] text-gray-500 font-semibold bg-slate-50 group-hover:bg-purple-100/60 px-2.5 py-1 rounded-lg transition-colors">
                                   <span>Customers</span>
-                                  <span className="text-purple-700 font-bold">{custCount}</span>
+                                  <span className="text-purple-700 font-bold flex items-center gap-1">
+                                    <span>{custCount}</span>
+                                    <span className="text-[10px] text-purple-400 group-hover:text-purple-700 transition-colors">→</span>
+                                  </span>
                                 </div>
                                 <div className="flex items-center justify-between text-[11px] text-gray-500 font-semibold bg-slate-50 px-2.5 py-1 rounded-lg">
                                   <span>District</span>
@@ -2547,6 +2941,113 @@ export const BusinessDirectoryV2: React.FC = () => {
                             </div>
                           );
                         })}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* AGENTS MODULE: ASSIGNED REGIONS IN PROFILE */}
+              {activeMainTab === 'agents' && (
+                <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
+                  <h4 className="font-bold text-purple-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <Briefcase className="w-4 h-4 text-purple-600" />
+                    <span>Assigned Regions</span>
+                  </h4>
+                  {(() => {
+                    const agentName = (selectedDetails.firmName || selectedDetails.contactName || selectedDetails.name || '').toLowerCase().trim();
+                    const assigned = allRoutes.filter((r: any) => 
+                      (r.assignedAgent && r.assignedAgent.toLowerCase().trim() === agentName) ||
+                      (Array.isArray(selectedDetails.assignedRoutes) && selectedDetails.assignedRoutes.includes(r._id))
+                    );
+                    if (assigned.length === 0) {
+                      return <p className="text-gray-400 italic text-center py-4">No regions assigned to this agent.</p>;
+                    }
+                    return (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {assigned.map((r: any) => {
+                          const rName = (r.name || '').toLowerCase().trim();
+                          const rCode = (r.code || '').toLowerCase().trim();
+                          const citiesCount = allCities.filter((c: any) => {
+                            const cRoute = (c.route || '').toLowerCase().trim();
+                            return cRoute && (cRoute === rName || (rCode && cRoute === rCode));
+                          }).length;
+                          const custCount = allCustomers.filter((c: any) => {
+                            const cRoute = (c.route || '').toLowerCase().trim();
+                            return cRoute && (cRoute === rName || (rCode && cRoute === rCode));
+                          }).length;
+                          return (
+                            <div 
+                              key={r._id} 
+                              onClick={() => {
+                                const rCusts = allCustomers.filter((c: any) => {
+                                  const cRoute = (c.route || '').toLowerCase().trim();
+                                  return cRoute && (cRoute === rName || (rCode && cRoute === rCode));
+                                });
+                                setCardCustomersModal({
+                                  title: `Customers in ${r.name} Route`,
+                                  subtitle: `Agent: ${selectedDetails.firmName || selectedDetails.contactName} • ${rCusts.length} Customers`,
+                                  customers: rCusts
+                                });
+                                setCardCustomerSearch('');
+                              }}
+                              className="p-3 border border-gray-200 hover:border-purple-400 rounded-xl bg-white hover:bg-purple-50/40 shadow-2xs hover:shadow-md transition-all space-y-2 cursor-pointer group select-none"
+                              title={`Click to view all ${custCount} customers in ${r.name}`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-gray-900 text-xs group-hover:text-purple-700 transition-colors">{r.name}</span>
+                                <span className="font-mono text-purple-700 font-extrabold text-xs">{r.code || '—'}</span>
+                              </div>
+                              <div className="flex items-center justify-between text-[11px] text-gray-500 bg-slate-50 group-hover:bg-purple-100/60 px-2 py-1 rounded-lg transition-colors">
+                                <span>{citiesCount} Cities</span>
+                                <span className="font-bold text-purple-700 flex items-center gap-1">
+                                  <span>{custCount} Customers</span>
+                                  <span className="text-[10px]">→</span>
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* TRANSPORTERS MODULE: CUSTOMERS USING THIS TRANSPORTER */}
+              {activeMainTab === 'transporters' && (
+                <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
+                  <h4 className="font-bold text-purple-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <Truck className="w-4 h-4 text-purple-600" />
+                    <span>Customers Using This Transporter</span>
+                  </h4>
+                  {(() => {
+                    const transName = (selectedDetails.firmName || selectedDetails.name || '').toLowerCase().trim();
+                    const usingCusts = allCustomers.filter((c: any) => (c.preferredTransport || '').toLowerCase().trim() === transName);
+                    if (usingCusts.length === 0) {
+                      return <p className="text-gray-400 italic text-center py-4">No customers currently mapped to this transporter.</p>;
+                    }
+                    return (
+                      <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                        {usingCusts.map((c: any) => (
+                          <div 
+                            key={c._id} 
+                            onClick={() => {
+                              setSelectedDetails(c);
+                            }}
+                            className="p-2.5 bg-white hover:bg-purple-50/40 border border-gray-200 hover:border-purple-300 rounded-xl flex items-center justify-between text-xs shadow-2xs cursor-pointer transition-all group"
+                            title="Click to view customer profile"
+                          >
+                            <div>
+                              <span className="font-bold text-gray-900 block group-hover:text-purple-700 transition-colors">{c.firmName}</span>
+                              <span className="text-[11px] text-gray-500">{[c.city, c.district].filter(Boolean).join(', ') || '—'}</span>
+                            </div>
+                            <span className="font-mono text-gray-700 font-semibold flex items-center gap-1">
+                              <span>{c.phone || '—'}</span>
+                              <span className="text-purple-600 font-bold opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                            </span>
+                          </div>
+                        ))}
                       </div>
                     );
                   })()}
@@ -2639,6 +3140,261 @@ export const BusinessDirectoryV2: React.FC = () => {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Dynamic Customer Data Modal (Triggered by clicking any card) */}
+      {cardCustomersModal && (
+        <div 
+          className="fixed inset-0 z-[95] bg-gray-950/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setCardCustomersModal(null);
+            }
+          }}
+        >
+          <div className="relative bg-white rounded-3xl shadow-2xl border border-gray-100 flex flex-col w-full max-w-5xl max-h-[92vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-gray-100 bg-linear-to-r from-purple-50/70 via-indigo-50/40 to-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-purple-600 text-white flex items-center justify-center shadow-md shadow-purple-500/20">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base sm:text-lg font-black text-gray-900 leading-tight">
+                      {cardCustomersModal.title}
+                    </h3>
+                    <span className="px-2 py-0.5 bg-purple-100 text-purple-700 font-extrabold text-[11px] rounded-full">
+                      {cardCustomersModal.customers.length} Customers
+                    </span>
+                  </div>
+                  {cardCustomersModal.subtitle && (
+                    <p className="text-xs text-gray-500 font-medium mt-0.5">
+                      {cardCustomersModal.subtitle}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setCardCustomersModal(null)}
+                className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100/80 hover:bg-rose-50 text-gray-400 hover:text-rose-600 transition-all cursor-pointer border border-transparent hover:border-rose-200"
+                title="Close dialog"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Filter & Summary Bar */}
+            <div className="px-6 py-3 bg-slate-50/80 border-b border-gray-200/70 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search customer by firm, contact, phone, city, GST..."
+                  value={cardCustomerSearch}
+                  onChange={(e) => setCardCustomerSearch(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 bg-white border border-gray-200 rounded-xl text-xs font-medium focus:outline-none focus:border-purple-600 shadow-2xs"
+                  autoFocus
+                />
+                {cardCustomerSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setCardCustomerSearch('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Quick aggregates */}
+              {(() => {
+                const totalOut = cardCustomersModal.customers.reduce((acc, c) => acc + (Number(c.outstandingBalance) || Number(c.outstanding) || 0), 0);
+                const activeCount = cardCustomersModal.customers.filter(c => (c.status || 'active') === 'active').length;
+                return (
+                  <div className="flex items-center gap-2 shrink-0 text-xs">
+                    <div className="px-3 py-1.5 rounded-xl bg-white border border-gray-200 shadow-2xs flex items-center gap-2">
+                      <span className="text-[10px] uppercase font-bold text-gray-400">Active</span>
+                      <span className="font-extrabold text-emerald-600">{activeCount}</span>
+                    </div>
+                    <div className="px-3 py-1.5 rounded-xl bg-white border border-gray-200 shadow-2xs flex items-center gap-2">
+                      <span className="text-[10px] uppercase font-bold text-gray-400">Total Outstanding</span>
+                      <span className="font-mono font-black text-rose-600">₹{totalOut.toLocaleString('en-IN')}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Customer List Content */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+              {(() => {
+                const query = cardCustomerSearch.toLowerCase().trim();
+                const filtered = cardCustomersModal.customers.filter((c: any) => {
+                  if (!query) return true;
+                  const firm = (c.firmName || c.name || '').toLowerCase();
+                  const contact = (c.contactName || c.ownerName || '').toLowerCase();
+                  const phone = (c.phone || c.whatsapp || '').toLowerCase();
+                  const city = (c.city || '').toLowerCase();
+                  const district = (c.district || '').toLowerCase();
+                  const agent = (c.agentAssigned || c.assignedAgent || '').toLowerCase();
+                  const gst = (c.gstNumber || '').toLowerCase();
+                  return (
+                    firm.includes(query) ||
+                    contact.includes(query) ||
+                    phone.includes(query) ||
+                    city.includes(query) ||
+                    district.includes(query) ||
+                    agent.includes(query) ||
+                    gst.includes(query)
+                  );
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="py-16 text-center">
+                      <div className="w-16 h-16 rounded-3xl bg-purple-50 text-purple-400 flex items-center justify-center mx-auto mb-3">
+                        <Users className="w-8 h-8" />
+                      </div>
+                      <h4 className="font-bold text-gray-800 text-sm">No customers found</h4>
+                      <p className="text-xs text-gray-400 mt-1 max-w-sm mx-auto">
+                        {cardCustomerSearch 
+                          ? `No matching customers found for "${cardCustomerSearch}". Try adjusting your search term.`
+                          : 'No customers are currently mapped to this selection.'}
+                      </p>
+                      {cardCustomerSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setCardCustomerSearch('')}
+                          className="mt-3 px-3 py-1.5 rounded-xl bg-purple-50 text-purple-700 font-bold text-xs hover:bg-purple-100 transition-colors"
+                        >
+                          Clear Search
+                        </button>
+                      )}
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-2xs bg-white">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs text-gray-600">
+                        <thead className="bg-slate-50 border-b border-gray-200 text-gray-400 font-bold text-[10px] uppercase tracking-wider select-none">
+                          <tr>
+                            <th className="py-3 px-4 w-12 text-center">#</th>
+                            <th className="py-3 px-4">Customer Firm</th>
+                            <th className="py-3 px-4">Contact Person</th>
+                            <th className="py-3 px-4">Phone / WhatsApp</th>
+                            <th className="py-3 px-4">City & Region</th>
+                            <th className="py-3 px-4">Agent</th>
+                            <th className="py-3 px-4 text-right">Outstanding</th>
+                            <th className="py-3 px-4 text-center">Status</th>
+                            <th className="py-3 px-4 text-right">Profile</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {filtered.map((cust: any, idx: number) => {
+                            const outBal = Number(cust.outstandingBalance) || Number(cust.outstanding) || 0;
+                            return (
+                              <tr
+                                key={cust._id || idx}
+                                onClick={() => {
+                                  setSelectedDetails(cust);
+                                }}
+                                className="hover:bg-purple-50/50 transition-colors cursor-pointer group"
+                                title="Click to view full customer details"
+                              >
+                                <td className="py-3 px-4 text-center font-bold text-gray-400 font-mono text-[11px]">
+                                  {idx + 1}
+                                </td>
+                                <td className="py-3 px-4">
+                                  <div className="font-bold text-gray-900 group-hover:text-purple-700 transition-colors text-xs">
+                                    {cust.firmName || cust.name || 'Unnamed Customer'}
+                                  </div>
+                                  {cust.gstNumber && (
+                                    <div className="font-mono text-[10px] text-gray-400">
+                                      GST: {cust.gstNumber}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="py-3 px-4">
+                                  <span className="font-medium text-gray-800">
+                                    {cust.contactName || cust.ownerName || '—'}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center gap-1.5 font-mono text-gray-700 font-medium">
+                                    <Phone className="w-3 h-3 text-gray-400 shrink-0" />
+                                    <span>{cust.phone || cust.whatsapp || '—'}</span>
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <div className="font-medium text-gray-800">
+                                    {cust.city || '—'}
+                                  </div>
+                                  <div className="text-[10px] text-gray-400">
+                                    {[cust.district, cust.route].filter(Boolean).join(' • ') || '—'}
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-semibold text-[10px]">
+                                    {cust.agentAssigned || cust.assignedAgent || 'Direct'}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4 text-right">
+                                  <span className={`font-mono font-bold text-xs ${outBal > 0 ? 'text-rose-600' : 'text-gray-700'}`}>
+                                    ₹{outBal.toLocaleString('en-IN')}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4 text-center">
+                                  <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase ${
+                                    (cust.status || 'active') === 'active' 
+                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                                      : 'bg-gray-100 text-gray-500'
+                                  }`}>
+                                    {cust.status || 'active'}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4 text-right">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedDetails(cust);
+                                    }}
+                                    className="px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-600 hover:text-white font-bold text-[10px] transition-all cursor-pointer"
+                                  >
+                                    View
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-3.5 bg-slate-50 border-t border-gray-100 flex items-center justify-between shrink-0 text-xs">
+              <span className="text-gray-500 font-medium">
+                Showing {cardCustomersModal.customers.length} total customer{cardCustomersModal.customers.length === 1 ? '' : 's'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setCardCustomersModal(null)}
+                className="px-4 py-2 bg-gray-200/80 hover:bg-gray-300 text-gray-700 font-bold rounded-xl transition-colors cursor-pointer text-xs"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Keyframe Animation */}

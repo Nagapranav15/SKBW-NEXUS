@@ -1,4 +1,6 @@
 const mongoose = require("mongoose");
+require("./inventoryLedgerModelV2");
+require("./purchaseInvoiceV2Model");
 
 const sequenceSchema = new mongoose.Schema({
   prefix: { type: String, required: true, unique: true },
