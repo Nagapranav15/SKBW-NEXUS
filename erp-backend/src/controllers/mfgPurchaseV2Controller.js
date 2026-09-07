@@ -731,7 +731,14 @@ exports.deletePurchaseInvoice = async (req, res, next) => {
     }
     const companyObjId = toObjectId(company);
 
-    const invoice = await PurchaseInvoiceV2.findOne({ _id: toObjectId(id), company: companyObjId });
+    let query = mongoose.Types.ObjectId.isValid(id) ? { _id: toObjectId(id) } : { invoiceNumber: id };
+    if (companyObjId) query.company = companyObjId;
+
+    let invoice = await PurchaseInvoiceV2.findOne(query);
+    if (!invoice && !mongoose.Types.ObjectId.isValid(id)) {
+      invoice = await PurchaseInvoiceV2.findOne({ invoiceNumber: id });
+    }
+
     if (!invoice) {
       return res.status(404).json({ msg: "Purchase Invoice not found" });
     }
@@ -741,7 +748,7 @@ exports.deletePurchaseInvoice = async (req, res, next) => {
       return res.status(400).json({ msg: "Cannot delete an invoice that has payments recorded. Please void the payments first." });
     }
 
-    const vendor = await Party.findOne({ _id: invoice.vendorId, company: companyObjId });
+    const vendor = await Party.findOne({ _id: invoice.vendorId, company: invoice.company });
     if (vendor) {
       const supplierPayable = invoice.subTotal || 0;
       vendor.outstanding = Math.max((vendor.outstanding || 0) - supplierPayable, 0);
@@ -749,16 +756,19 @@ exports.deletePurchaseInvoice = async (req, res, next) => {
       await vendor.save();
     }
 
+    const safeNum = (invoice.invoiceNumber || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
     // Delete financial Transaction
-    await Transaction.deleteOne({
-      company: companyObjId,
-      partyId: invoice.vendorId,
-      source_type: "PURCHASE",
-      description: { $regex: invoice.invoiceNumber }
-    });
+    if (safeNum) {
+      await Transaction.deleteOne({
+        source_type: "PURCHASE",
+        description: { $regex: safeNum, $options: 'i' }
+      });
+    }
 
     // Delete stock ledger entries
-    await InventoryLedger.deleteMany({ referenceType: "PurchaseInvoice", referenceId: invoice.invoiceNumber, company: companyObjId });
+    await InventoryLedger.deleteMany({ referenceType: "PurchaseInvoice", referenceId: invoice.invoiceNumber });
+    await InventoryLedger.deleteMany({ batchNumber: invoice.invoiceNumber });
 
     // Delete invoice document
     await PurchaseInvoiceV2.deleteOne({ _id: invoice._id });
@@ -769,7 +779,7 @@ exports.deletePurchaseInvoice = async (req, res, next) => {
       entityName: invoice.invoiceNumber,
       details: `Deleted Purchase Batch '${invoice.invoiceNumber}'.`,
       performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
-      company: companyObjId
+      company: invoice.company
     }).catch(e => console.error("ActivityLog error:", e));
 
     res.json({ msg: "Purchase invoice deleted successfully" });
@@ -782,7 +792,14 @@ exports.cancelPurchaseInvoice = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const invoice = await PurchaseInvoiceV2.findById(id);
+    let invoice = null;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      invoice = await PurchaseInvoiceV2.findById(id);
+    }
+    if (!invoice) {
+      invoice = await PurchaseInvoiceV2.findOne({ invoiceNumber: id });
+    }
+
     if (!invoice) {
       return res.status(404).json({ msg: "Purchase batch not found" });
     }
@@ -804,11 +821,15 @@ exports.cancelPurchaseInvoice = async (req, res, next) => {
       }
     }
 
+    const safeNum = (invoice.invoiceNumber || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
     // Delete financial Transaction
-    await Transaction.deleteOne({
-      source_type: "PURCHASE",
-      description: { $regex: invoice.invoiceNumber }
-    });
+    if (safeNum) {
+      await Transaction.deleteOne({
+        source_type: "PURCHASE",
+        description: { $regex: safeNum, $options: 'i' }
+      });
+    }
 
     // Delete stock ledger entries (removes stock balance from Stock and Stock Ledger modules)
     await InventoryLedger.deleteMany({ referenceType: "PurchaseInvoice", referenceId: invoice.invoiceNumber });

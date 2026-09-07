@@ -962,7 +962,8 @@ const PurchaseInvoicePage: React.FC = () => {
       return;
     }
     try {
-      await cancelPurchaseInvoiceV2(invoice._id || '', selectedCompany?._id || '');
+      const invId = invoice._id || invoice.invoiceNumber || '';
+      await cancelPurchaseInvoiceV2(invId, selectedCompany?._id || '');
       showToast(`Purchase batch ${invoice.invoiceNumber} cancelled successfully!`, 'success');
       createActivityLog({
         action: 'CANCEL',

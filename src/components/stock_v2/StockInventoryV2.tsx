@@ -33,7 +33,7 @@ import {
   WarehouseLocationV2
 } from '../../api/mfgApiV2';
 import { getParties } from '../../api/partyApi';
-import { createPurchaseInvoiceV2, updatePurchaseInvoiceV2, getPurchaseInvoicesV2 } from '../inventory_v2/purchases/purchaseService';
+import { createPurchaseInvoiceV2, updatePurchaseInvoiceV2, getPurchaseInvoicesV2, cancelPurchaseInvoiceV2 } from '../inventory_v2/purchases/purchaseService';
 
 export type StockTabType = 'batches' | 'manager' | 'ledger' | 'warehouse';
 
@@ -908,6 +908,36 @@ export const StockInventoryV2: React.FC = () => {
     }
   };
 
+  // Cancel Purchase Batch Handler
+  const handleCancelPurchaseBatch = async (item: any) => {
+    const rawInv = item.rawInvoice || item;
+    const invId = rawInv._id || item._id;
+    const invNum = item.batchNumber || rawInv.invoiceNumber || 'Batch';
+
+    if (item.status === 'Cancelled' || rawInv.status === 'Cancelled') {
+      showToast('This purchase batch is already cancelled.', 'warning');
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to cancel purchase batch '${invNum}'? This will mark it as Cancelled and remove its stock from Stock and Stock Ledger modules.`)) {
+      return;
+    }
+
+    try {
+      if (invId && typeof invId === 'string' && !invId.startsWith('bal-') && !invId.startsWith('mock-')) {
+        await cancelPurchaseInvoiceV2(invId, selectedCompany!._id);
+        showToast(`Purchase batch '${invNum}' cancelled successfully!`, 'success');
+      } else {
+        showToast(`Batch '${invNum}' has no saved invoice record to cancel.`, 'warning');
+      }
+      loadStockData();
+      loadAuxiliaryData(true);
+    } catch (err: any) {
+      console.error('Failed to cancel purchase batch:', err);
+      showToast(err.response?.data?.msg || err.message || 'Failed to cancel purchase batch', 'error');
+    }
+  };
+
   // Render Tree Node recursively
   // Cute & Minimal Level Badge Helper
   const getLevelChip = (level: string) => {
@@ -1567,13 +1597,23 @@ export const StockInventoryV2: React.FC = () => {
                             >
                               <Edit className="w-3.5 h-3.5" />
                             </button>
-                            <button
-                              onClick={() => handleDeleteLocation(item._id)}
-                              className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                              title="Delete Record"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {activeTab === 'batches' ? (
+                              <button
+                                onClick={() => handleCancelPurchaseBatch(item)}
+                                className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                title="Cancel Purchase Batch"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleDeleteLocation(item._id)}
+                                className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                title="Delete Record"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
