@@ -1408,6 +1408,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                 : 'bg-white hover:bg-purple-50/60 text-purple-600 border-gray-200 hover:border-purple-200'
             }`}
             title={`Filters ${activeFilterCount > 0 ? `(${activeFilterCount} active)` : ''}`}
+            aria-label={`Filters ${activeFilterCount > 0 ? `(${activeFilterCount} active)` : ''}`}
           >
             <Filter className="w-4 h-4" />
           </button>
@@ -1423,6 +1424,7 @@ export const BusinessDirectoryV2: React.FC = () => {
               }}
               className="p-2 rounded-xl bg-white hover:bg-purple-50/60 border border-gray-200 hover:border-purple-200 text-purple-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
               title="Sort Options"
+              aria-label="Sort Options"
             >
               <ArrowUpDown className="w-4 h-4" />
             </button>
@@ -1474,6 +1476,7 @@ export const BusinessDirectoryV2: React.FC = () => {
               }}
               className="p-2 rounded-xl bg-white hover:bg-purple-50/60 border border-gray-200 hover:border-purple-200 text-purple-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
               title="Visible Columns"
+              aria-label="Visible Columns"
             >
               <Columns className="w-4 h-4" />
             </button>
@@ -1513,6 +1516,7 @@ export const BusinessDirectoryV2: React.FC = () => {
               }}
               className="p-2 rounded-xl bg-white hover:bg-purple-50/60 border border-gray-200 hover:border-purple-200 text-purple-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
               title="Export Data (PDF / Excel)"
+              aria-label="Export Data (PDF / Excel)"
             >
               <Download className="w-4 h-4" />
             </button>
@@ -1542,6 +1546,7 @@ export const BusinessDirectoryV2: React.FC = () => {
             onClick={handleDownloadSampleCSV}
             className="p-2 rounded-xl bg-white hover:bg-purple-50/60 text-purple-600 border border-gray-200 hover:border-purple-200 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
             title="Download Sample CSV Template"
+            aria-label="Download Sample CSV Template"
           >
             <FileSpreadsheet className="w-4 h-4 text-purple-600" />
           </button>
@@ -1552,6 +1557,7 @@ export const BusinessDirectoryV2: React.FC = () => {
               isImporting ? 'bg-purple-100 border-purple-300 animate-pulse' : 'bg-white hover:bg-purple-50/60 border-gray-200 hover:border-purple-200'
             }`}
             title="Import CSV/Excel Data"
+            aria-label="Import CSV/Excel Data"
           >
             <Upload className={`w-4 h-4 text-purple-600 ${isImporting ? 'animate-bounce' : ''}`} />
             <input
@@ -1572,6 +1578,7 @@ export const BusinessDirectoryV2: React.FC = () => {
             }}
             className="p-2 rounded-xl bg-white hover:bg-purple-50/60 border border-gray-200 hover:border-purple-200 text-purple-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
             title="View Activity Logs"
+            aria-label="View Activity Logs"
           >
             <History className="w-4 h-4 text-purple-600" />
           </button>
@@ -1582,6 +1589,7 @@ export const BusinessDirectoryV2: React.FC = () => {
             onClick={() => openModal()}
             className="w-8 h-8 rounded-full border border-gray-200 bg-white hover:bg-purple-50 text-purple-600 flex items-center justify-center transition-all shadow-2xs cursor-pointer font-bold shrink-0"
             title={`Add New ${activeMainTab === 'customers' ? 'Customer' : activeMainTab === 'vendors' ? 'Supplier' : activeMainTab === 'agents' ? 'Agent' : activeMainTab === 'transporters' ? 'Transporter' : activeMainTab === 'regions' ? 'Region' : 'City'}`}
+            aria-label={`Add New ${activeMainTab === 'customers' ? 'Customer' : activeMainTab === 'vendors' ? 'Supplier' : activeMainTab === 'agents' ? 'Agent' : activeMainTab === 'transporters' ? 'Transporter' : activeMainTab === 'regions' ? 'Region' : 'City'}`}
           >
             <Plus className="w-4 h-4 text-purple-600 stroke-[2.5]" />
           </button>
