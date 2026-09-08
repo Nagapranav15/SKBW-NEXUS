@@ -1390,8 +1390,8 @@ export const BusinessDirectoryV2: React.FC = () => {
                 ? 'bg-purple-600 text-white border-purple-600 shadow-purple-100'
                 : 'bg-white hover:bg-purple-50/60 text-purple-600 border-gray-200 hover:border-purple-200'
             }`}
-            title={`Filters ${activeFilterCount > 0 ? `(${activeFilterCount} active)` : ''}`}
-            aria-label={`Filters ${activeFilterCount > 0 ? `(${activeFilterCount} active)` : ''}`}
+            title={`Filter Results ${activeFilterCount > 0 ? `(${activeFilterCount} active)` : ''}`}
+            aria-label={`Filter Results ${activeFilterCount > 0 ? `(${activeFilterCount} active)` : ''}`}
           >
             <Filter className="w-4 h-4" />
           </button>
@@ -1406,8 +1406,8 @@ export const BusinessDirectoryV2: React.FC = () => {
                 setShowExportMenu(false);
               }}
               className="p-2 rounded-xl bg-white hover:bg-purple-50/60 border border-gray-200 hover:border-purple-200 text-purple-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
-              title="Sort Options"
-              aria-label="Sort Options"
+              title="Sort Records"
+              aria-label="Sort Records"
             >
               <ArrowUpDown className="w-4 h-4" />
             </button>
@@ -1458,8 +1458,8 @@ export const BusinessDirectoryV2: React.FC = () => {
                 setShowExportMenu(false);
               }}
               className="p-2 rounded-xl bg-white hover:bg-purple-50/60 border border-gray-200 hover:border-purple-200 text-purple-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
-              title="Visible Columns"
-              aria-label="Visible Columns"
+              title="Toggle Columns"
+              aria-label="Toggle Columns"
             >
               <Columns className="w-4 h-4" />
             </button>
@@ -1528,8 +1528,8 @@ export const BusinessDirectoryV2: React.FC = () => {
             type="button"
             onClick={handleDownloadSampleCSV}
             className="p-2 rounded-xl bg-white hover:bg-purple-50/60 text-purple-600 border border-gray-200 hover:border-purple-200 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
-            title="Download Sample CSV Template"
-            aria-label="Download Sample CSV Template"
+            title="Download Sample CSV"
+            aria-label="Download Sample CSV"
           >
             <FileSpreadsheet className="w-4 h-4 text-purple-600" />
           </button>
@@ -1539,8 +1539,8 @@ export const BusinessDirectoryV2: React.FC = () => {
             className={`p-2 rounded-xl border text-purple-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
               isImporting ? 'bg-purple-100 border-purple-300 animate-pulse' : 'bg-white hover:bg-purple-50/60 border-gray-200 hover:border-purple-200'
             }`}
-            title="Import CSV/Excel Data"
-            aria-label="Import CSV/Excel Data"
+            title="Import CSV File"
+            aria-label="Import CSV File"
           >
             <Upload className={`w-4 h-4 text-purple-600 ${isImporting ? 'animate-bounce' : ''}`} />
             <input
@@ -1560,8 +1560,8 @@ export const BusinessDirectoryV2: React.FC = () => {
               setShowActivityLogModal(true);
             }}
             className="p-2 rounded-xl bg-white hover:bg-purple-50/60 border border-gray-200 hover:border-purple-200 text-purple-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
-            title="View Activity Logs"
-            aria-label="View Activity Logs"
+            title="Activity Logs"
+            aria-label="Activity Logs"
           >
             <History className="w-4 h-4 text-purple-600" />
           </button>
@@ -1732,27 +1732,27 @@ export const BusinessDirectoryV2: React.FC = () => {
 
                 {activeMainTab === 'customers' && (
                   <>
-                    <th className="py-3 px-3 whitespace-nowrap">CUSTOMER FIRM</th>
-                    <th className="py-3 px-3 whitespace-nowrap">MOBILE / WHATSAPP</th>
-                    <th className="py-3 px-3 whitespace-nowrap">CITY & DISTRICT</th>
-                    <th className="py-3 px-3 whitespace-nowrap">REGION & MARKET</th>
-                    <th className="py-3 px-3 whitespace-nowrap">ASSIGNED AGENT</th>
-                    <th className="py-3 px-3 whitespace-nowrap">CREDIT LIMIT & DAYS</th>
-                    <th className="py-3 px-3 whitespace-nowrap">OUTSTANDING</th>
-                    <th className="py-3 px-3 whitespace-nowrap">TAGS</th>
+                    {!hiddenColumns['firmName'] && <th className="py-3 px-3 whitespace-nowrap">CUSTOMER FIRM</th>}
+                    {!hiddenColumns['phone'] && <th className="py-3 px-3 whitespace-nowrap">MOBILE / WHATSAPP</th>}
+                    {!hiddenColumns['city'] && <th className="py-3 px-3 whitespace-nowrap">CITY & DISTRICT</th>}
+                    {!hiddenColumns['route'] && <th className="py-3 px-3 whitespace-nowrap">REGION & MARKET</th>}
+                    {!hiddenColumns['agent'] && <th className="py-3 px-3 whitespace-nowrap">ASSIGNED AGENT</th>}
+                    {!hiddenColumns['credit'] && <th className="py-3 px-3 whitespace-nowrap">CREDIT LIMIT & DAYS</th>}
+                    {!hiddenColumns['outstanding'] && <th className="py-3 px-3 whitespace-nowrap">OUTSTANDING</th>}
+                    {!hiddenColumns['tags'] && <th className="py-3 px-3 whitespace-nowrap">TAGS</th>}
                   </>
                 )}
 
                 {activeMainTab === 'vendors' && (
                   <>
-                    <th className="py-3 px-3 whitespace-nowrap">SUPPLIER NAME</th>
-                    <th className="py-3 px-3 whitespace-nowrap">VENDOR CATEGORY</th>
-                    <th className="py-3 px-3 whitespace-nowrap">CONTACT PERSON</th>
-                    <th className="py-3 px-3 whitespace-nowrap">MOBILE / CONTACT</th>
-                    <th className="py-3 px-3 whitespace-nowrap">CITY & STATE</th>
-                    <th className="py-3 px-3 whitespace-nowrap">CREDIT DAYS</th>
-                    <th className="py-3 px-3 whitespace-nowrap">OUTSTANDING</th>
-                    <th className="py-3 px-3 whitespace-nowrap">TAGS</th>
+                    {!hiddenColumns['firmName'] && <th className="py-3 px-3 whitespace-nowrap">SUPPLIER NAME</th>}
+                    {!hiddenColumns['vendorType'] && <th className="py-3 px-3 whitespace-nowrap">VENDOR CATEGORY</th>}
+                    {!hiddenColumns['contactName'] && <th className="py-3 px-3 whitespace-nowrap">CONTACT PERSON</th>}
+                    {!hiddenColumns['phone'] && <th className="py-3 px-3 whitespace-nowrap">MOBILE / CONTACT</th>}
+                    {!hiddenColumns['city'] && <th className="py-3 px-3 whitespace-nowrap">CITY & STATE</th>}
+                    {!hiddenColumns['credit'] && <th className="py-3 px-3 whitespace-nowrap">CREDIT DAYS</th>}
+                    {!hiddenColumns['outstanding'] && <th className="py-3 px-3 whitespace-nowrap">OUTSTANDING</th>}
+                    {!hiddenColumns['tags'] && <th className="py-3 px-3 whitespace-nowrap">TAGS</th>}
                   </>
                 )}
 
@@ -1871,58 +1871,74 @@ export const BusinessDirectoryV2: React.FC = () => {
                       {/* CUSTOMERS ROW */}
                       {activeMainTab === 'customers' && (
                         <>
-                          <td className="py-3 px-3 font-semibold text-gray-900">
-                            <div className="flex items-center gap-2">
-                              <Users className="w-4 h-4 text-purple-600 shrink-0" />
-                              <div className="flex flex-col">
-                                <span className="font-bold text-gray-900">{item.firmName}</span>
-                                {(item.contactName || item.ownerName || item.contactPersons?.[0]?.name) && (
-                                  <span className="text-[11px] text-gray-500 font-medium">{item.contactName || item.ownerName || item.contactPersons?.[0]?.name}</span>
+                          {!hiddenColumns['firmName'] && (
+                            <td className="py-3 px-3 font-semibold text-gray-900">
+                              <div className="flex items-center gap-2">
+                                <Users className="w-4 h-4 text-purple-600 shrink-0" />
+                                <div className="flex flex-col">
+                                  <span className="font-bold text-gray-900">{item.firmName}</span>
+                                  {(item.contactName || item.ownerName || item.contactPersons?.[0]?.name) && (
+                                    <span className="text-[11px] text-gray-500 font-medium">{item.contactName || item.ownerName || item.contactPersons?.[0]?.name}</span>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                          )}
+                          {!hiddenColumns['phone'] && (
+                            <td className="py-3 px-3 font-mono font-medium text-gray-700">
+                              <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                <span>{item.phone || '—'}</span>
+                                {item.phone && item.phone.length >= 10 && (
+                                  <a href={`https://wa.me/91${item.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="Chat on WhatsApp">
+                                    <WhatsAppIcon />
+                                  </a>
                                 )}
                               </div>
-                            </div>
-                          </td>
-                          <td className="py-3 px-3 font-mono font-medium text-gray-700">
-                            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                              <span>{item.phone || '—'}</span>
-                              {item.phone && item.phone.length >= 10 && (
-                                <a href={`https://wa.me/91${item.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="Chat on WhatsApp">
-                                  <WhatsAppIcon />
-                                </a>
+                            </td>
+                          )}
+                          {!hiddenColumns['city'] && (
+                            <td className="py-3 px-3 text-gray-600 font-medium">{[item.city, item.district].filter(Boolean).join(', ') || '—'}</td>
+                          )}
+                          {!hiddenColumns['route'] && (
+                            <td className="py-3 px-3 text-gray-600 font-medium">{[item.route, item.assignedMarket].filter(Boolean).join(' • ') || '—'}</td>
+                          )}
+                          {!hiddenColumns['agent'] && (
+                            <td className="py-3 px-3 text-gray-600 font-medium">{item.agentAssigned || '—'}</td>
+                          )}
+                          {!hiddenColumns['credit'] && (
+                            <td className="py-3 px-3 font-mono text-gray-700 font-semibold">
+                              ₹{(item.creditLimit || 50000).toLocaleString('en-IN')} ({item.creditDays || 30} days)
+                            </td>
+                          )}
+                          {!hiddenColumns['outstanding'] && (
+                            <td className="py-3 px-3">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                                bal > 0 ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'
+                              }`}>
+                                ₹{Math.abs(bal).toLocaleString('en-IN')}
+                              </span>
+                            </td>
+                          )}
+                          {!hiddenColumns['tags'] && (
+                            <td className="py-3 px-3">
+                              {Array.isArray(item.tags) && item.tags.length > 0 ? (
+                                <div className="flex items-center gap-1 whitespace-nowrap" title={item.tags.join(', ')}>
+                                  {item.tags.slice(0, 2).map((t: string, i: number) => (
+                                    <span key={i} className="px-2 py-0.5 bg-purple-50 text-purple-700 text-[10px] font-bold rounded-md border border-purple-200 uppercase shrink-0">
+                                      {t}
+                                    </span>
+                                  ))}
+                                  {item.tags.length > 2 && (
+                                    <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-[10px] font-extrabold rounded-md border border-gray-200 shrink-0">
+                                      +{item.tags.length - 2}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-gray-400 font-normal text-[11px]">—</span>
                               )}
-                            </div>
-                          </td>
-                          <td className="py-3 px-3 text-gray-600 font-medium">{[item.city, item.district].filter(Boolean).join(', ') || '—'}</td>
-                          <td className="py-3 px-3 text-gray-600 font-medium">{[item.route, item.assignedMarket].filter(Boolean).join(' • ') || '—'}</td>
-                          <td className="py-3 px-3 text-gray-600 font-medium">{item.agentAssigned || '—'}</td>
-                          <td className="py-3 px-3 font-mono text-gray-700 font-semibold">
-                            ₹{(item.creditLimit || 50000).toLocaleString('en-IN')} ({item.creditDays || 30} days)
-                          </td>
-                          <td className="py-3 px-3">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                              bal > 0 ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'
-                            }`}>
-                              ₹{Math.abs(bal).toLocaleString('en-IN')}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3">
-                            {Array.isArray(item.tags) && item.tags.length > 0 ? (
-                              <div className="flex items-center gap-1 whitespace-nowrap" title={item.tags.join(', ')}>
-                                {item.tags.slice(0, 2).map((t: string, i: number) => (
-                                  <span key={i} className="px-2 py-0.5 bg-purple-50 text-purple-700 text-[10px] font-bold rounded-md border border-purple-200 uppercase shrink-0">
-                                    {t}
-                                  </span>
-                                ))}
-                                {item.tags.length > 2 && (
-                                  <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-[10px] font-extrabold rounded-md border border-gray-200 shrink-0">
-                                    +{item.tags.length - 2}
-                                  </span>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-gray-400 font-normal text-[11px]">—</span>
-                            )}
-                          </td>
+                            </td>
+                          )}
                         </>
                       )}
 
