@@ -27,7 +27,16 @@ import {
   ShoppingCart,
   ExternalLink,
   Coins,
-  Percent
+  Percent,
+  Filter,
+  ArrowUpDown,
+  Columns,
+  Download,
+  Upload,
+  FileSpreadsheet,
+  RotateCcw,
+  Check,
+  FileCheck
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import Modal from '../ui/Modal';
@@ -36,7 +45,8 @@ import {
   getParties, 
   createParty, 
   updateParty, 
-  deleteParty as deletePartyApi
+  deleteParty as deletePartyApi,
+  importParties
 } from '../../api/partyApi';
 import { 
   getRoutes, 
@@ -44,6 +54,7 @@ import {
   updateRoute, 
   deleteRoute 
 } from '../../api/routeApi';
+import { getActivityLogs, createActivityLog } from '../../api/activityLogApi';
 
 interface TagInputProps {
   tags: string[];
@@ -204,6 +215,38 @@ export const BusinessDirectoryV2: React.FC = () => {
   } | null>(null);
   const [cardCustomerSearch, setCardCustomerSearch] = useState('');
 
+  // Accessibility & Action Toolbar Popover States
+  const [showFilterDrawer, setShowFilterDrawer] = useState(false);
+  const [showSortMenu, setShowSortMenu] = useState(false);
+  const [showColumnPicker, setShowColumnPicker] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showActivityLogModal, setShowActivityLogModal] = useState(false);
+
+  // Filter States
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterCity, setFilterCity] = useState<string>('all');
+  const [filterRoute, setFilterRoute] = useState<string>('all');
+  const [filterVendorType, setFilterVendorType] = useState<string>('all');
+  const [filterAgent, setFilterAgent] = useState<string>('all');
+  const [filterMinBal, setFilterMinBal] = useState<string>('');
+  const [filterMaxBal, setFilterMaxBal] = useState<string>('');
+  const [filterTag, setFilterTag] = useState<string>('');
+
+  // Sort State
+  const [sortField, setSortField] = useState<'firmName' | 'outstandingBalance' | 'city' | 'code' | 'created'>('firmName');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  // Dynamic Column Visibility State
+  const [hiddenColumns, setHiddenColumns] = useState<Record<string, boolean>>({});
+
+  // Activity Log State
+  const [activityLogs, setActivityLogs] = useState<any[]>([]);
+  const [activityLogLoading, setActivityLogLoading] = useState(false);
+  const [logSearch, setLogSearch] = useState('');
+
+  // CSV Import State
+  const [isImporting, setIsImporting] = useState(false);
+
   // Complete Form State matching the exact 3 screenshots
   const [form, setForm] = useState({
     firmName: '',
@@ -348,6 +391,612 @@ export const BusinessDirectoryV2: React.FC = () => {
       setLoading(false);
     }
   }, [selectedCompany?._id, activeMainTab, page, limit, debouncedSearch]);
+
+  // Derived Filtered & Sorted Items
+  const processedItems = React.useMemo(() => {
+    let result = [...items];
+
+    if (filterStatus !== 'all') {
+      result = result.filter(i => (i.status || 'active') === filterStatus);
+    }
+    if (filterCity !== 'all') {
+      result = result.filter(i => (i.city || i.assignedMarket) === filterCity);
+    }
+    if (filterRoute !== 'all') {
+      result = result.filter(i => (i.route || i.assignedRegion || i.name) === filterRoute);
+    }
+    if (filterVendorType !== 'all') {
+      result = result.filter(i => i.vendorType === filterVendorType);
+    }
+    if (filterAgent !== 'all') {
+      result = result.filter(i => i.agentAssigned === filterAgent || i.assignedAgent === filterAgent);
+    }
+    if (filterMinBal) {
+      const min = Number(filterMinBal);
+      if (!isNaN(min)) {
+        result = result.filter(i => (Number(i.outstandingBalance) || Number(i.outstanding) || 0) >= min);
+      }
+    }
+    if (filterMaxBal) {
+      const max = Number(filterMaxBal);
+      if (!isNaN(max)) {
+        result = result.filter(i => (Number(i.outstandingBalance) || Number(i.outstanding) || 0) <= max);
+      }
+    }
+    if (filterTag.trim()) {
+      const tLower = filterTag.toLowerCase().trim();
+      result = result.filter(i => Array.isArray(i.tags) && i.tags.some(t => t.toLowerCase().includes(tLower)));
+    }
+
+    result.sort((a, b) => {
+      let valA: any = '';
+      let valB: any = '';
+
+      if (sortField === 'firmName') {
+        valA = (a.firmName || a.name || '').toLowerCase();
+        valB = (b.firmName || b.name || '').toLowerCase();
+      } else if (sortField === 'outstandingBalance') {
+        valA = Number(a.outstandingBalance) || Number(a.outstanding) || 0;
+        valB = Number(b.outstandingBalance) || Number(b.outstanding) || 0;
+      } else if (sortField === 'city') {
+        valA = (a.city || a.assignedMarket || '').toLowerCase();
+        valB = (b.city || b.assignedMarket || '').toLowerCase();
+      } else if (sortField === 'code') {
+        valA = (a.code || '').toLowerCase();
+        valB = (b.code || '').toLowerCase();
+      } else if (sortField === 'created') {
+        valA = new Date(a.createdAt || 0).getTime();
+        valB = new Date(b.createdAt || 0).getTime();
+      }
+
+      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [items, filterStatus, filterCity, filterRoute, filterVendorType, filterAgent, filterMinBal, filterMaxBal, filterTag, sortField, sortOrder]);
+
+  const activeFilterCount = [
+    filterStatus !== 'all',
+    filterCity !== 'all',
+    filterRoute !== 'all',
+    filterVendorType !== 'all',
+    filterAgent !== 'all',
+    Boolean(filterMinBal),
+    Boolean(filterMaxBal),
+    Boolean(filterTag)
+  ].filter(Boolean).length;
+
+  const resetFilters = () => {
+    setFilterStatus('all');
+    setFilterCity('all');
+    setFilterRoute('all');
+    setFilterVendorType('all');
+    setFilterAgent('all');
+    setFilterMinBal('');
+    setFilterMaxBal('');
+    setFilterTag('');
+  };
+
+  const getColumnList = (tab: DirectoryTabType) => {
+    if (tab === 'customers') {
+      return [
+        { id: 'firmName', label: 'Customer Firm' },
+        { id: 'phone', label: 'Mobile / WhatsApp' },
+        { id: 'city', label: 'City & District' },
+        { id: 'route', label: 'Region & Market' },
+        { id: 'agent', label: 'Assigned Agent' },
+        { id: 'credit', label: 'Credit Limit & Days' },
+        { id: 'outstanding', label: 'Outstanding' },
+        { id: 'tags', label: 'Tags' }
+      ];
+    } else if (tab === 'vendors') {
+      return [
+        { id: 'firmName', label: 'Supplier Name' },
+        { id: 'vendorType', label: 'Vendor Type' },
+        { id: 'contactName', label: 'Contact Person' },
+        { id: 'phone', label: 'Phone / Email' },
+        { id: 'city', label: 'City & State' },
+        { id: 'credit', label: 'Payment Terms' },
+        { id: 'outstanding', label: 'Outstanding Payable' },
+        { id: 'tags', label: 'Tags' }
+      ];
+    } else if (tab === 'agents') {
+      return [
+        { id: 'firmName', label: 'Agent Name' },
+        { id: 'phone', label: 'Phone / WhatsApp' },
+        { id: 'regions', label: 'Assigned Regions' }
+      ];
+    } else if (tab === 'transporters') {
+      return [
+        { id: 'firmName', label: 'Transporter Name' },
+        { id: 'phone', label: 'Phone / WhatsApp' },
+        { id: 'customersCount', label: 'Linked Customers' }
+      ];
+    } else if (tab === 'regions') {
+      return [
+        { id: 'name', label: 'Region Name' },
+        { id: 'code', label: 'Region Code' },
+        { id: 'agent', label: 'Assigned Agent' },
+        { id: 'citiesCount', label: 'Cities Count' },
+        { id: 'customersCount', label: 'Customers Count' },
+        { id: 'outstanding', label: 'Total Outstanding' }
+      ];
+    } else {
+      return [
+        { id: 'name', label: 'City Name' },
+        { id: 'district', label: 'District' },
+        { id: 'state', label: 'State' },
+        { id: 'region', label: 'Region' },
+        { id: 'customersCount', label: 'Customers Count' },
+        { id: 'outstanding', label: 'Total Outstanding' }
+      ];
+    }
+  };
+
+  const handleDownloadSampleCSV = () => {
+    let headers: string[] = [];
+    let sampleRows: string[][] = [];
+
+    if (activeMainTab === 'customers') {
+      headers = [
+        'Firm Name', 'Owner Name', 'Contact Name', 'Phone', 'Alt Phone', 'WhatsApp', 'Email',
+        'GST Number', 'Aadhar Number', 'Door No', 'Street Name', 'Address Line', 'Area', 'Landmark',
+        'City', 'District', 'State', 'Pincode', 'GPS Location', 'Region', 'Agent Assigned',
+        'Preferred Transport', 'Credit Limit', 'Credit Days', 'Opening Balance', 'Outstanding Balance', 'Tags', 'Remarks', 'Status'
+      ];
+      sampleRows = [
+        [
+          'Charminar Notebook Publishers',
+          'Mohammad Ali',
+          'Mohammad Ali',
+          '9988776611',
+          '9848022334',
+          '9988776611',
+          'ali@charminar.com',
+          '37AAAAA1111A1Z1',
+          '123456789012',
+          '12-3-45',
+          'Main Market Road',
+          'Near Bus Stand',
+          'Auto Nagar',
+          'Opp. Water Tank',
+          'Vijayawada',
+          'Ntr',
+          'Andhra Pradesh',
+          '520003',
+          'https://maps.google.com/?q=16.5062,80.6480',
+          'Region 1',
+          'Venkatesh Rao',
+          'GARUDA',
+          '500000',
+          '30',
+          '0',
+          '0',
+          'vip, regular',
+          'Regular client since 2024',
+          'active'
+        ]
+      ];
+    } else if (activeMainTab === 'vendors') {
+      headers = [
+        'Firm Name', 'Owner Name', 'Contact Name', 'Phone', 'Alt Phone', 'WhatsApp', 'Email',
+        'GST Number', 'Aadhar Number', 'Door No', 'Street Name', 'Address Line', 'Area', 'Landmark',
+        'City', 'District', 'State', 'Pincode', 'GPS Location', 'Vendor Type', 'Credit Limit', 'Credit Days',
+        'Opening Balance', 'Outstanding Balance', 'Tags', 'Remarks', 'Status'
+      ];
+      sampleRows = [
+        [
+          'Paper Mills Supplier Ltd',
+          'Mohammad Ali',
+          'Mohammad Ali',
+          '9988776611',
+          '9848022334',
+          '9988776611',
+          'ali@charminar.com',
+          '37AAAAA1111A1Z1',
+          '123456789012',
+          '12-3-45',
+          'Main Market Road',
+          'Near Bus Stand',
+          'Auto Nagar',
+          'Opp. Water Tank',
+          'Tirupati',
+          'Tirupati',
+          'Andhra Pradesh',
+          '517501',
+          'https://maps.google.com/?q=13.6288,79.4192',
+          'PAPER SUPPLIER',
+          '500000',
+          '30',
+          '0',
+          '0',
+          'vip, regular',
+          'Primary raw material supplier',
+          'active'
+        ]
+      ];
+    } else if (activeMainTab === 'agents') {
+      headers = ['Agent Name', 'Mobile', 'Status'];
+      sampleRows = [
+        ['Venkatesh Rao', '9988776611', 'active'],
+        ['Ramesh Kumar', '9440212345', 'active']
+      ];
+    } else if (activeMainTab === 'transporters') {
+      headers = ['Transporter Name', 'Contact Person', 'Mobile', 'Email', 'City', 'Status'];
+      sampleRows = [
+        ['VRL Logistics', 'Suresh Kumar', '9876543210', 'info@vrl.com', 'Vijayawada', 'active']
+      ];
+    } else if (activeMainTab === 'regions') {
+      headers = ['Region Name', 'Assigned Agent', 'Status'];
+      sampleRows = [
+        ['Region 1', 'Venkatesh Rao', 'active'],
+        ['Region 2', 'Ramesh Kumar', 'active']
+      ];
+    } else if (activeMainTab === 'cities') {
+      headers = ['City Name', 'District', 'State', 'Region', 'Status'];
+      sampleRows = [
+        ['Vijayawada', 'Ntr', 'Andhra Pradesh', 'Region 1', 'active'],
+        ['Tirupati', 'Tirupati', 'Andhra Pradesh', 'Region 1', 'active']
+      ];
+    }
+
+    const csvContent = '\uFEFF' + [
+      headers.join(','),
+      ...sampleRows.map(row => row.map(val => {
+        const clean = String(val).replace(/"/g, '""');
+        return clean.includes(',') || clean.includes('\n') ? `"${clean}"` : clean;
+      }).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `sample_${activeMainTab}_import_template.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(`Downloaded sample CSV template for ${activeMainTab}`, 'success');
+  };
+
+  const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedCompany?._id) return;
+    setIsImporting(true);
+
+    try {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+      if (lines.length <= 1) {
+        showToast('CSV file is empty or missing data rows', 'error');
+        setIsImporting(false);
+        return;
+      }
+
+      const parseCSVLine = (line: string) => {
+        const values: string[] = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          if (char === '"') {
+            inQuotes = !inQuotes;
+          } else if (char === ',' && !inQuotes) {
+            values.push(current.trim());
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        values.push(current.trim());
+        return values.map(v => v.replace(/^"|"$/g, '').replace(/""/g, '"'));
+      };
+
+      const rawHeaders = parseCSVLine(lines[0]);
+      const headerMap: Record<string, number> = {};
+      rawHeaders.forEach((h, idx) => {
+        const cleanH = h.toLowerCase().replace(/[^a-z0-9]/g, '');
+        headerMap[cleanH] = idx;
+      });
+
+      const partiesToImport: any[] = [];
+      const partyType = activeMainTab === 'vendors' ? 'vendor' :
+                        activeMainTab === 'agents' ? 'agent' :
+                        activeMainTab === 'transporters' ? 'transporter' :
+                        activeMainTab === 'regions' ? 'route' :
+                        activeMainTab === 'cities' ? 'market' : 'customer';
+
+      for (let i = 1; i < lines.length; i++) {
+        const row = parseCSVLine(lines[i]);
+        if (row.length === 0 || !row.some(Boolean)) continue;
+
+        const getValue = (keyName: string) => {
+          const cleanK = keyName.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const idx = headerMap[cleanK];
+          return idx !== undefined && row[idx] !== undefined ? row[idx] : '';
+        };
+
+        const firmName = getValue('firmname') || getValue('customerfirm') || getValue('suppliername') || getValue('agentname') || getValue('transportername') || getValue('regionname') || getValue('cityname') || row[0];
+        if (!firmName) continue;
+
+        const recordObj: any = {
+          company: selectedCompany._id,
+          type: partyType,
+          firmName,
+          name: firmName,
+          ownerName: getValue('ownername') || getValue('contactperson') || getValue('contactname'),
+          contactName: getValue('contactname') || getValue('contactperson') || getValue('ownername'),
+          phone: getValue('phone') || getValue('mobile'),
+          altPhone: getValue('altphone'),
+          whatsapp: getValue('whatsapp') || getValue('phone'),
+          email: getValue('email'),
+          gstNumber: getValue('gstnumber') || getValue('gstin'),
+          aadharNumber: getValue('aadharnumber') || getValue('pan'),
+          doorNo: getValue('doorno'),
+          streetName: getValue('streetname'),
+          address1: getValue('addressline') || getValue('address'),
+          area: getValue('area'),
+          landmark: getValue('landmark'),
+          city: getValue('city'),
+          district: getValue('district'),
+          state: getValue('state') || 'Andhra Pradesh',
+          pincode: getValue('pincode'),
+          gpsLocation: getValue('gpslocation'),
+          route: getValue('region') || getValue('route'),
+          agentAssigned: getValue('agentassigned') || getValue('assignedagent'),
+          preferredTransport: getValue('preferredtransport'),
+          vendorType: getValue('vendortype') || 'BOARD SUPPLIER',
+          creditDays: Number(getValue('creditdays')) || 30,
+          creditLimit: Number(getValue('creditlimit')) || 100000,
+          openingBalance: Number(getValue('openingbalance')) || 0,
+          outstandingBalance: Number(getValue('outstandingbalance')) || Number(getValue('outstanding')) || 0,
+          status: (getValue('status') || 'active').toLowerCase(),
+          tags: getValue('tags') ? getValue('tags').split(',').map((t: string) => t.trim()).filter(Boolean) : [],
+          notes: getValue('remarks') || getValue('notes')
+        };
+
+        partiesToImport.push(recordObj);
+      }
+
+      if (partiesToImport.length === 0) {
+        showToast('No valid party records parsed from file', 'warning');
+        setIsImporting(false);
+        return;
+      }
+
+      await importParties(partiesToImport);
+
+      createActivityLog({
+        action: 'IMPORT',
+        entityType: activeMainTab.toUpperCase(),
+        entityName: `${partiesToImport.length} ${activeMainTab} imported`,
+        details: `Imported ${partiesToImport.length} ${activeMainTab} records directly into database via CSV import`,
+        company: selectedCompany._id
+      }).catch(() => {});
+
+      showToast(`Successfully imported ${partiesToImport.length} ${activeMainTab} into database!`, 'success');
+      await loadDirectoryData();
+      await loadAuxiliaryData();
+    } catch (err: any) {
+      console.error('Import failed:', err);
+      showToast(err?.response?.data?.msg || err.message || 'Failed to import CSV file', 'error');
+    } finally {
+      setIsImporting(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleExportExcel = () => {
+    if (processedItems.length === 0) {
+      showToast('No records available to export', 'info');
+      return;
+    }
+
+    let headers: string[] = [];
+    if (activeMainTab === 'customers') {
+      headers = ['Firm Name', 'Contact Person', 'Phone', 'City', 'District', 'Region', 'Assigned Agent', 'Credit Limit', 'Credit Days', 'Outstanding', 'Tags', 'Status'];
+    } else if (activeMainTab === 'vendors') {
+      headers = ['Supplier Name', 'Vendor Type', 'Contact Person', 'Phone', 'City', 'District', 'Credit Days', 'Outstanding Payable', 'Tags', 'Status'];
+    } else if (activeMainTab === 'agents') {
+      headers = ['Agent Name', 'Phone', 'Assigned Regions', 'Status'];
+    } else if (activeMainTab === 'transporters') {
+      headers = ['Transporter Name', 'Phone', 'Contact Person', 'City', 'Status'];
+    } else if (activeMainTab === 'regions') {
+      headers = ['Region Name', 'Code', 'Assigned Agent', 'Cities Count', 'Customers Count', 'Total Outstanding', 'Status'];
+    } else {
+      headers = ['City Name', 'District', 'State', 'Region', 'Customers Count', 'Total Outstanding', 'Status'];
+    }
+
+    const rows = processedItems.map(item => {
+      if (activeMainTab === 'customers') {
+        return [
+          item.firmName || item.name,
+          item.contactName || item.ownerName || '—',
+          item.phone || '—',
+          item.city || '—',
+          item.district || '—',
+          item.route || '—',
+          item.agentAssigned || '—',
+          item.creditLimit || 0,
+          item.creditDays || 30,
+          item.outstandingBalance || 0,
+          Array.isArray(item.tags) ? item.tags.join('; ') : '',
+          item.status || 'active'
+        ];
+      } else if (activeMainTab === 'vendors') {
+        return [
+          item.firmName || item.name,
+          item.vendorType || 'BOARD SUPPLIER',
+          item.contactName || item.ownerName || '—',
+          item.phone || '—',
+          item.city || '—',
+          item.district || '—',
+          item.creditDays || 30,
+          item.outstandingBalance || 0,
+          Array.isArray(item.tags) ? item.tags.join('; ') : '',
+          item.status || 'active'
+        ];
+      } else if (activeMainTab === 'agents') {
+        return [
+          item.firmName || item.contactName || item.name,
+          item.phone || '—',
+          Array.isArray(item.assignedRoutes) ? item.assignedRoutes.join('; ') : item.route || '—',
+          item.status || 'active'
+        ];
+      } else if (activeMainTab === 'transporters') {
+        return [
+          item.firmName || item.name,
+          item.phone || '—',
+          item.contactName || item.ownerName || '—',
+          item.city || '—',
+          item.status || 'active'
+        ];
+      } else if (activeMainTab === 'regions') {
+        return [
+          item.name || item.firmName,
+          item.code || '—',
+          item.assignedAgent || '—',
+          item.citiesCount || 0,
+          item.customersCount || 0,
+          item.outstandingBalance || 0,
+          item.status || 'active'
+        ];
+      } else {
+        return [
+          item.firmName || item.name,
+          item.district || '—',
+          item.state || 'Andhra Pradesh',
+          item.route || '—',
+          item.customersCount || 0,
+          item.outstandingBalance || 0,
+          item.status || 'active'
+        ];
+      }
+    });
+
+    const csvContent = '\uFEFF' + [
+      headers.join(','),
+      ...rows.map(row => row.map(val => {
+        const clean = String(val).replace(/"/g, '""');
+        return clean.includes(',') || clean.includes('\n') ? `"${clean}"` : clean;
+      }).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${activeMainTab}_export_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(`Exported ${processedItems.length} ${activeMainTab} to Excel/CSV`, 'success');
+  };
+
+  const handleExportPDF = () => {
+    if (processedItems.length === 0) {
+      showToast('No records available to print PDF', 'info');
+      return;
+    }
+
+    const printWin = window.open('', '_blank');
+    if (!printWin) {
+      showToast('Please allow popups to generate PDF', 'error');
+      return;
+    }
+
+    const title = `${activeMainTab.toUpperCase()} REPORT`;
+    const companyName = selectedCompany?.name || 'SKBW ERP';
+    const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+    let tableHeaders = '';
+    if (activeMainTab === 'customers') {
+      tableHeaders = `<th>#</th><th>Firm Name</th><th>Contact</th><th>Phone</th><th>City</th><th>Region</th><th>Agent</th><th>Outstanding</th>`;
+    } else if (activeMainTab === 'vendors') {
+      tableHeaders = `<th>#</th><th>Supplier Name</th><th>Type</th><th>Contact</th><th>Phone</th><th>City</th><th>Payable</th>`;
+    } else if (activeMainTab === 'agents') {
+      tableHeaders = `<th>#</th><th>Agent Name</th><th>Phone</th><th>Assigned Regions</th><th>Status</th>`;
+    } else if (activeMainTab === 'transporters') {
+      tableHeaders = `<th>#</th><th>Transporter</th><th>Phone</th><th>Contact</th><th>City</th>`;
+    } else if (activeMainTab === 'regions') {
+      tableHeaders = `<th>#</th><th>Region Name</th><th>Code</th><th>Agent</th><th>Cities</th><th>Customers</th><th>Outstanding</th>`;
+    } else {
+      tableHeaders = `<th>#</th><th>City Name</th><th>District</th><th>State</th><th>Region</th><th>Customers</th><th>Outstanding</th>`;
+    }
+
+    const tableRowsHtml = processedItems.map((item, idx) => {
+      let rowCols = '';
+      const outBal = Number(item.outstandingBalance) || Number(item.outstanding) || 0;
+      if (activeMainTab === 'customers') {
+        rowCols = `<td>${idx+1}</td><td><b>${item.firmName}</b></td><td>${item.contactName || item.ownerName || '—'}</td><td>${item.phone || '—'}</td><td>${item.city || '—'}</td><td>${item.route || '—'}</td><td>${item.agentAssigned || '—'}</td><td>₹${outBal.toLocaleString('en-IN')}</td>`;
+      } else if (activeMainTab === 'vendors') {
+        rowCols = `<td>${idx+1}</td><td><b>${item.firmName}</b></td><td>${item.vendorType || 'BOARD SUPPLIER'}</td><td>${item.contactName || item.ownerName || '—'}</td><td>${item.phone || '—'}</td><td>${item.city || '—'}</td><td>₹${outBal.toLocaleString('en-IN')}</td>`;
+      } else if (activeMainTab === 'agents') {
+        rowCols = `<td>${idx+1}</td><td><b>${item.firmName || item.contactName}</b></td><td>${item.phone || '—'}</td><td>${item.route || '—'}</td><td>${item.status || 'active'}</td>`;
+      } else if (activeMainTab === 'transporters') {
+        rowCols = `<td>${idx+1}</td><td><b>${item.firmName || item.name}</b></td><td>${item.phone || '—'}</td><td>${item.contactName || '—'}</td><td>${item.city || '—'}</td>`;
+      } else if (activeMainTab === 'regions') {
+        rowCols = `<td>${idx+1}</td><td><b>${item.name || item.firmName}</b></td><td>${item.code || '—'}</td><td>${item.assignedAgent || '—'}</td><td>${item.citiesCount || 0}</td><td>${item.customersCount || 0}</td><td>₹${outBal.toLocaleString('en-IN')}</td>`;
+      } else {
+        rowCols = `<td>${idx+1}</td><td><b>${item.firmName || item.name}</b></td><td>${item.district || '—'}</td><td>${item.state || 'Andhra Pradesh'}</td><td>${item.route || '—'}</td><td>${item.customersCount || 0}</td><td>₹${outBal.toLocaleString('en-IN')}</td>`;
+      }
+      return `<tr>${rowCols}</tr>`;
+    }).join('');
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${title} - ${companyName}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; color: #1e293b; }
+            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #6366f1; padding-bottom: 12px; margin-bottom: 20px; }
+            .title { font-size: 20px; font-weight: bold; color: #4338ca; text-transform: uppercase; }
+            .sub { font-size: 12px; color: #64748b; margin-top: 4px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+            th { background-color: #f1f5f9; color: #334155; text-align: left; padding: 8px 10px; border: 1px solid #cbd5e1; font-size: 11px; text-transform: uppercase; }
+            td { padding: 8px 10px; border: 1px solid #e2e8f0; }
+            tr:nth-child(even) { background-color: #f8fafc; }
+            .summary { margin-top: 20px; font-size: 12px; font-weight: bold; text-align: right; color: #334155; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <div class="title">${companyName} — ${title}</div>
+              <div class="sub">Generated on ${dateStr} • Total Records: ${processedItems.length}</div>
+            </div>
+          </div>
+          <table>
+            <thead><tr>${tableHeaders}</tr></thead>
+            <tbody>${tableRowsHtml}</tbody>
+          </table>
+          <div class="summary">Report Total Count: ${processedItems.length}</div>
+          <script>
+            window.onload = function() { window.print(); };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWin.document.write(htmlContent);
+    printWin.document.close();
+  };
+
+  const fetchActivityLogs = async () => {
+    if (!selectedCompany?._id) return;
+    setActivityLogLoading(true);
+    try {
+      const res = await getActivityLogs({ company: selectedCompany._id, limit: 100 });
+      setActivityLogs(res.data?.logs || res.data || []);
+    } catch (err) {
+      console.error('Failed to fetch activity logs:', err);
+    } finally {
+      setActivityLogLoading(false);
+    }
+  };
 
   useEffect(() => {
     loadDirectoryData();
@@ -742,6 +1391,328 @@ export const BusinessDirectoryV2: React.FC = () => {
         </div>
       </div>
 
+      {/* Action Toolbar: Filters, Sort, Columns, Export, Sample CSV, Import */}
+      <div className="bg-white border border-gray-200/90 rounded-2xl p-2.5 shadow-2xs flex flex-wrap items-center justify-between gap-2.5 text-xs select-none">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Filters Button */}
+          <button
+            type="button"
+            onClick={() => setShowFilterDrawer(!showFilterDrawer)}
+            className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+              activeFilterCount > 0
+                ? 'bg-purple-600 text-white border-purple-600 shadow-purple-100'
+                : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
+            }`}
+          >
+            <Filter className="w-3.5 h-3.5" />
+            <span>Filters</span>
+            {activeFilterCount > 0 && (
+              <span className="ml-0.5 px-1.5 py-0.2 bg-white text-purple-700 font-mono text-[10px] font-black rounded-full">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+
+          {/* Sort Button & Dropdown */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setShowSortMenu(!showSortMenu);
+                setShowColumnPicker(false);
+                setShowExportMenu(false);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <ArrowUpDown className="w-3.5 h-3.5 text-gray-500" />
+              <span>Sort</span>
+            </button>
+            {showSortMenu && (
+              <div className="absolute left-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs">
+                <div className="px-2 py-1 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Sort Options</div>
+                <button
+                  onClick={() => { setSortField('firmName'); setSortOrder('asc'); setShowSortMenu(false); }}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortField === 'firmName' && sortOrder === 'asc' ? 'bg-purple-50 text-purple-700 font-bold' : 'hover:bg-gray-50 text-gray-700'}`}
+                >
+                  <span>Firm Name (A to Z)</span>
+                </button>
+                <button
+                  onClick={() => { setSortField('firmName'); setSortOrder('desc'); setShowSortMenu(false); }}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortField === 'firmName' && sortOrder === 'desc' ? 'bg-purple-50 text-purple-700 font-bold' : 'hover:bg-gray-50 text-gray-700'}`}
+                >
+                  <span>Firm Name (Z to A)</span>
+                </button>
+                <button
+                  onClick={() => { setSortField('outstandingBalance'); setSortOrder('desc'); setShowSortMenu(false); }}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortField === 'outstandingBalance' && sortOrder === 'desc' ? 'bg-purple-50 text-purple-700 font-bold' : 'hover:bg-gray-50 text-gray-700'}`}
+                >
+                  <span>Outstanding (High to Low)</span>
+                </button>
+                <button
+                  onClick={() => { setSortField('outstandingBalance'); setSortOrder('asc'); setShowSortMenu(false); }}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortField === 'outstandingBalance' && sortOrder === 'asc' ? 'bg-purple-50 text-purple-700 font-bold' : 'hover:bg-gray-50 text-gray-700'}`}
+                >
+                  <span>Outstanding (Low to High)</span>
+                </button>
+                <button
+                  onClick={() => { setSortField('city'); setSortOrder('asc'); setShowSortMenu(false); }}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortField === 'city' ? 'bg-purple-50 text-purple-700 font-bold' : 'hover:bg-gray-50 text-gray-700'}`}
+                >
+                  <span>City (A to Z)</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Columns Button & Dropdown */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setShowColumnPicker(!showColumnPicker);
+                setShowSortMenu(false);
+                setShowExportMenu(false);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <Columns className="w-3.5 h-3.5 text-gray-500" />
+              <span>Columns</span>
+            </button>
+            {showColumnPicker && (
+              <div className="absolute left-0 mt-1.5 w-52 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2.5 space-y-2 text-xs">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
+                  <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Visible Columns</span>
+                  <button onClick={() => setHiddenColumns({})} className="text-[10px] text-purple-600 font-bold hover:underline">Reset</button>
+                </div>
+                <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                  {getColumnList(activeMainTab).map(col => (
+                    <label key={col.id} className="flex items-center gap-2 text-gray-700 font-semibold cursor-pointer hover:bg-gray-50 p-1 rounded-lg">
+                      <input
+                        type="checkbox"
+                        checked={!hiddenColumns[col.id]}
+                        onChange={(e) => {
+                          setHiddenColumns(prev => ({ ...prev, [col.id]: !e.target.checked }));
+                        }}
+                        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                      />
+                      <span>{col.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Export Button & Menu */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setShowExportMenu(!showExportMenu);
+                setShowSortMenu(false);
+                setShowColumnPicker(false);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <Download className="w-3.5 h-3.5 text-gray-500" />
+              <span>Export</span>
+            </button>
+            {showExportMenu && (
+              <div className="absolute right-0 mt-1.5 w-44 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs">
+                <button
+                  onClick={() => { handleExportExcel(); setShowExportMenu(false); }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-xl font-semibold hover:bg-purple-50 hover:text-purple-700 flex items-center gap-2 text-gray-700"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Export Excel (.csv)</span>
+                </button>
+                <button
+                  onClick={() => { handleExportPDF(); setShowExportMenu(false); }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-xl font-semibold hover:bg-purple-50 hover:text-purple-700 flex items-center gap-2 text-gray-700"
+                >
+                  <FileText className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Export PDF</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Sample CSV Button */}
+          <button
+            type="button"
+            onClick={handleDownloadSampleCSV}
+            className="px-3 py-1.5 rounded-xl bg-white hover:bg-purple-50 text-gray-700 hover:text-purple-700 border border-gray-200 hover:border-purple-200 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            title="Download Sample CSV for Import"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-purple-600" />
+            <span>Sample CSV</span>
+          </button>
+
+          {/* Import Button */}
+          <label className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+            isImporting ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200'
+          }`}>
+            <Upload className={`w-3.5 h-3.5 text-purple-600 ${isImporting ? 'animate-bounce' : ''}`} />
+            <span>{isImporting ? 'Importing...' : 'Import'}</span>
+            <input
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              disabled={isImporting}
+              onChange={handleImportCSV}
+              className="hidden"
+            />
+          </label>
+
+          {/* Activity Logs Button */}
+          <button
+            type="button"
+            onClick={() => {
+              fetchActivityLogs();
+              setShowActivityLogModal(true);
+            }}
+            className="px-3 py-1.5 rounded-xl bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            title="View Activity Logs"
+          >
+            <History className="w-3.5 h-3.5 text-gray-500" />
+            <span>Logs</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Expandable Filter Drawer Bar */}
+      {showFilterDrawer && (
+        <div className="bg-slate-50 border border-purple-100 rounded-2xl p-3.5 shadow-2xs space-y-3">
+          <div className="flex items-center justify-between border-b border-gray-200/60 pb-2">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-purple-600" />
+              <span className="font-extrabold text-gray-900 text-xs uppercase tracking-wider">Advanced Filters</span>
+            </div>
+            {activeFilterCount > 0 && (
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="text-xs text-rose-600 hover:text-rose-700 font-bold flex items-center gap-1 cursor-pointer"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Reset All Filters</span>
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 text-xs">
+            <div>
+              <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Status</label>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-purple-500"
+              >
+                <option value="all">All Statuses</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="on-hold">On Hold</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">City / Market</label>
+              <select
+                value={filterCity}
+                onChange={(e) => setFilterCity(e.target.value)}
+                className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-purple-500"
+              >
+                <option value="all">All Cities</option>
+                {allCities.map(c => (
+                  <option key={c._id} value={c.firmName || c.name}>{c.firmName || c.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Region / Line</label>
+              <select
+                value={filterRoute}
+                onChange={(e) => setFilterRoute(e.target.value)}
+                className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-purple-500"
+              >
+                <option value="all">All Regions</option>
+                {allRoutes.map(r => (
+                  <option key={r._id} value={r.name}>{r.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {activeMainTab === 'vendors' && (
+              <div>
+                <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Vendor Type</label>
+                <select
+                  value={filterVendorType}
+                  onChange={(e) => setFilterVendorType(e.target.value)}
+                  className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-purple-500"
+                >
+                  <option value="all">All Vendor Types</option>
+                  <option value="BOARD SUPPLIER">BOARD SUPPLIER</option>
+                  <option value="PAPER SUPPLIER">PAPER SUPPLIER</option>
+                  <option value="PRINTING VENDOR">PRINTING VENDOR</option>
+                  <option value="GENERAL VENDOR">GENERAL VENDOR</option>
+                </select>
+              </div>
+            )}
+
+            {activeMainTab === 'customers' && (
+              <div>
+                <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Assigned Agent</label>
+                <select
+                  value={filterAgent}
+                  onChange={(e) => setFilterAgent(e.target.value)}
+                  className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-purple-500"
+                >
+                  <option value="all">All Agents</option>
+                  {allAgents.map(a => (
+                    <option key={a._id} value={a.firmName || a.contactName}>{a.firmName || a.contactName}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Min Outstanding (₹)</label>
+              <input
+                type="number"
+                value={filterMinBal}
+                onChange={(e) => setFilterMinBal(e.target.value)}
+                placeholder="0"
+                className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-mono text-gray-800 focus:outline-none focus:border-purple-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Max Outstanding (₹)</label>
+              <input
+                type="number"
+                value={filterMaxBal}
+                onChange={(e) => setFilterMaxBal(e.target.value)}
+                placeholder="Unlimited"
+                className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-mono text-gray-800 focus:outline-none focus:border-purple-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Filter by Tag</label>
+              <input
+                type="text"
+                value={filterTag}
+                onChange={(e) => setFilterTag(e.target.value)}
+                placeholder="e.g. VIP, regular"
+                className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-purple-500"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 3. Directory Table */}
       <div className="bg-white border border-gray-200 rounded-2xl shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
@@ -870,7 +1841,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                items.map((item, index) => {
+                processedItems.map((item, index) => {
                   const isSelected = selectedIds.includes(item._id);
                   const bal = item.outstandingBalance || 0;
 
@@ -3816,6 +4787,82 @@ export const BusinessDirectoryV2: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 6. ACTIVITY LOGS MODAL */}
+      {showActivityLogModal && (
+        <Modal
+          isOpen={showActivityLogModal}
+          onClose={() => setShowActivityLogModal(false)}
+          title="Directory Activity & Audit Logs"
+          maxWidth="max-w-3xl"
+        >
+          <div className="space-y-3 p-1 text-xs">
+            <div className="flex items-center justify-between gap-3">
+              <input
+                type="text"
+                value={logSearch}
+                onChange={(e) => setLogSearch(e.target.value)}
+                placeholder="Search activity logs..."
+                className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs w-full focus:outline-none focus:border-purple-500 font-medium"
+              />
+              <button
+                type="button"
+                onClick={fetchActivityLogs}
+                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-gray-600 transition-colors cursor-pointer shrink-0"
+                title="Refresh Logs"
+              >
+                <RefreshCw className={`w-4 h-4 ${activityLogLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+
+            <div className="max-h-[55vh] overflow-y-auto divide-y divide-gray-100 border border-gray-200 rounded-2xl p-2 bg-slate-50/50 text-xs">
+              {activityLogLoading ? (
+                <div className="p-8 text-center text-gray-400 animate-pulse">Loading activity history...</div>
+              ) : activityLogs.length === 0 ? (
+                <div className="p-8 text-center text-gray-400 italic">No activity logs recorded yet</div>
+              ) : (
+                activityLogs
+                  .filter(log => !logSearch || JSON.stringify(log).toLowerCase().includes(logSearch.toLowerCase()))
+                  .map((log, idx) => (
+                    <div key={log._id || idx} className="py-2.5 px-3 flex items-start justify-between gap-3 hover:bg-white rounded-xl transition-colors">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-0.5 text-[9px] font-black rounded-full uppercase border ${
+                            log.action === 'CREATE' || log.action === 'IMPORT' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                            log.action === 'DELETE' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                            'bg-blue-50 text-blue-700 border-blue-200'
+                          }`}>
+                            {log.action || 'ACTIVITY'}
+                          </span>
+                          <span className="font-bold text-gray-900">{log.entityName || log.entityType || 'Directory Item'}</span>
+                        </div>
+                        <p className="text-gray-600 text-[11px]">{log.details || log.description || 'Record update performed'}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="block text-[10px] text-gray-400 font-mono">
+                          {log.createdAt ? new Date(log.createdAt).toLocaleString('en-IN') : 'Just now'}
+                        </span>
+                        {log.performedBy && (
+                          <span className="block text-[10px] text-purple-600 font-semibold">{log.performedBy}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setShowActivityLogModal(false)}
+                className="px-4 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* Keyframe Animation */}
