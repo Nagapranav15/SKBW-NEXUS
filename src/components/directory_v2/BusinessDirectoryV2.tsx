@@ -1263,7 +1263,7 @@ export const BusinessDirectoryV2: React.FC = () => {
   return (
     <div className="p-4 md:p-6 space-y-6 bg-slate-50/50 min-h-screen">
       
-      {/* 1. Header & Actions */}
+      {/* 1. Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs">
         <div className="flex items-center gap-3.5">
           <div className="p-3 bg-purple-100/80 text-purple-700 rounded-2xl shadow-2xs">
@@ -1280,23 +1280,6 @@ export const BusinessDirectoryV2: React.FC = () => {
               Unified master directory for Customers, Suppliers, Agents, Transporters, Regions & Cities.
             </p>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={() => openModal()}
-            className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all shadow-md hover:shadow-lg flex items-center gap-2 cursor-pointer"
-          >
-            <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span>Add New {activeMainTab === 'customers' ? 'Customer' : activeMainTab === 'vendors' ? 'Supplier' : activeMainTab === 'agents' ? 'Agent' : activeMainTab === 'transporters' ? 'Transporter' : activeMainTab === 'regions' ? 'Region' : 'City'}</span>
-          </button>
-          <button
-            onClick={loadDirectoryData}
-            className="p-2.5 text-gray-600 hover:bg-gray-100 rounded-xl border border-gray-200 transition-all cursor-pointer"
-            title="Refresh Data"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-purple-600' : ''}`} />
-          </button>
         </div>
       </div>
 
