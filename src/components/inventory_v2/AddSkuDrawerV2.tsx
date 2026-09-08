@@ -311,7 +311,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   }, [activeSection, defaultCategory]);
 
   const [categoriesList, setCategoriesList] = useState<string[]>(["Raw Material", "Semi Finished", "Finished Goods"]);
-  const [unitsList, setUnitsList] = useState<string[]>(["kg", "pcs", "Sheets", "Reels", "mtr"]);
+  const [unitsList, setUnitsList] = useState<string[]>(["kg", "pcs", "Sheets", "Reels", "mtr", "GBL", "Ream", "Gross", "Box", "Pkt"]);
   const [ruleTypesList, setRuleTypesList] = useState<string[]>(["Plain", "Single Line", "Double Line", "Square Ruled", "Four Line", "Unruled", "UR"]);
   const [groupsList, setGroupsList] = useState<string[]>(["132P Happy days (UR)", "220P Happy days (SR)"]);
   const [brandsList, setBrandsList] = useState<string[]>(["Happy Days", "Classmate", "Navneet"]);
@@ -386,7 +386,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
   // Category specific field visibility mapping
   const [categoryFieldsMap, setCategoryFieldsMap] = useState<Record<string, string[]>>({
-    "Raw Material": ["gsm", "brand", "title", "width", "length", "paperType", "altUnit"],
+    "Raw Material": ["gsm", "brand", "title", "width", "length", "paperType"],
     "Semi Finished": ["gsm", "brand", "width", "length", "ruleType", "altUnit", "group"],
     "Finished Goods": ["gsm", "brand", "width", "length", "ruleType", "pages", "altUnit"]
   });
@@ -434,8 +434,10 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
               if (!updated.includes('width')) updated.push('width');
               if (!updated.includes('length')) updated.push('length');
             }
-            // Guarantee altUnit field is present for standard categories
-            if (["Raw Material", "Semi Finished", "Finished Goods"].includes(cat)) {
+            // Guarantee altUnit is excluded for Raw Material and included for Semi Finished & Finished Goods
+            if (cat === "Raw Material") {
+              updated = updated.filter(f => f !== 'altUnit');
+            } else if (["Semi Finished", "Finished Goods"].includes(cat)) {
               if (!updated.includes('altUnit')) {
                 updated.push('altUnit');
               }
@@ -576,7 +578,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         status: editSku.status || 'Active'
       });
       setHasAltUnit(!!editSku.altUnit);
-      setIsNameManuallyEdited(true); // Edit SKU should keep its loaded name
+      setIsNameManuallyEdited(false); // Allow dynamic auto-update when fields like pages/brand are changed during edit
       if ((editSku as any).bomItems && Array.isArray((editSku as any).bomItems)) {
         setBomItems((editSku as any).bomItems);
       } else {
@@ -659,7 +661,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
     // Compile Sku Name dynamically from other inputs
     useEffect(() => {
-      if (!isNameManuallyEdited && !editSku) {
+      if (!isNameManuallyEdited) {
         if (form.category === 'Raw Material') {
           if (!form.brand && !form.title && !form.gsm && !form.width && !form.length) {
             setForm(prev => ({ ...prev, name: '' }));
@@ -947,13 +949,13 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                 <div className="col-span-2">
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-[11px] font-semibold text-gray-600">SKU NAME *</label>
-                    {!editSku && isNameManuallyEdited && (
+                    {isNameManuallyEdited && (
                       <button
                         type="button"
                         onClick={() => setIsNameManuallyEdited(false)}
-                        className="text-[10px] text-purple-600 font-bold hover:underline"
+                        className="text-[10px] text-purple-600 font-bold hover:underline flex items-center gap-1"
                       >
-                        Re-sync auto name
+                        ⚡ Re-sync auto name
                       </button>
                     )}
                   </div>
@@ -1273,6 +1275,47 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     </div>
                   )}
 
+                  {form.paperType === 'Sheets' && (
+                    <div className="col-span-2 space-y-1 bg-amber-50/50 p-2.5 rounded-xl border border-amber-200/60">
+                      <label className="block text-[10.5px] font-bold text-amber-900 flex items-center justify-between">
+                        <span>STANDARDIZED SHEET SIZES</span>
+                        <span className="text-[9.5px] font-semibold text-amber-700">Click to autofill dimensions & ream weight</span>
+                      </label>
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {[
+                          { name: '23×36" (Double Demy)', w: '58.4', l: '91.4' },
+                          { name: '20×30" (Crown)', w: '50.8', l: '76.2' },
+                          { name: '18×23" (Demy)', w: '45.7', l: '58.4' },
+                          { name: '25×36" (Royal)', w: '63.5', l: '91.4' },
+                          { name: '30×40" (Double Royal)', w: '76.2', l: '101.6' },
+                          { name: '46×57 CM', w: '46', l: '57' },
+                          { name: '58.5×91 CM', w: '58.5', l: '91' },
+                        ].map(preset => (
+                          <button
+                            key={preset.name}
+                            type="button"
+                            onClick={() => {
+                              const newW = preset.w;
+                              const newL = preset.l;
+                              let calcReam = form.reamWeight;
+                              if (form.gsm && Number(form.gsm) > 0) {
+                                calcReam = String(((Number(newW) * Number(newL) * Number(form.gsm)) / 20000).toFixed(2));
+                              }
+                              setForm(prev => ({ ...prev, width: newW, length: newL, reamWeight: calcReam }));
+                            }}
+                            className={`px-2 py-1 text-[10px] font-bold rounded-lg border transition-all cursor-pointer ${
+                              form.width === preset.w && form.length === preset.l
+                                ? 'bg-amber-600 text-white border-amber-700 shadow-2xs'
+                                : 'bg-white text-gray-700 border-amber-200 hover:bg-amber-100 hover:text-amber-900'
+                            }`}
+                          >
+                            {preset.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {activeFields.includes('width') && (
                     <div>
                       <label className="block text-[11px] font-semibold text-gray-600 mb-1">WIDTH (CM)</label>
@@ -1365,10 +1408,22 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           <select
                             value={form.altUnit}
                             onChange={e => {
-                              if (e.target.value === '__ADD_NEW__') {
+                              const val = e.target.value;
+                              if (val === '__ADD_NEW__') {
                                 handleAddNewOption('units');
                               } else {
-                                setForm({ ...form, altUnit: e.target.value });
+                                let defaultConversion = form.altUnitConversion;
+                                if (val.toUpperCase() === 'GBL') {
+                                  defaultConversion = '200';
+                                } else if (val.toUpperCase() === 'REAM') {
+                                  defaultConversion = '500';
+                                }
+                                setForm(prev => ({
+                                  ...prev,
+                                  altUnit: val,
+                                  altUnitConversion: defaultConversion,
+                                  booksGbl: val.toUpperCase() === 'GBL' ? '200' : prev.booksGbl
+                                }));
                               }
                             }}
                             className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800 cursor-pointer"

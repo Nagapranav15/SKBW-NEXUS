@@ -11,6 +11,7 @@ interface ModalProps {
   maxWidth?: string;
   className?: string;
   hideCloseButton?: boolean;
+  zIndex?: string;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -22,6 +23,7 @@ export const Modal: React.FC<ModalProps> = ({
   maxWidth,
   className = '',
   hideCloseButton = false,
+  zIndex = 'z-[90]',
 }) => {
   const modalSize = maxWidth || size || 'max-w-lg';
   useEffect(() => {
@@ -39,7 +41,7 @@ export const Modal: React.FC<ModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[70] overflow-y-auto flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs transition-all animate-fadeIn">
+    <div className={`fixed inset-0 ${zIndex} overflow-y-auto flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs transition-all animate-fadeIn`}>
       <div className={`relative bg-white rounded-2xl shadow-2xl shadow-slate-900/10 border border-slate-200/80 flex flex-col w-full ${modalSize} max-h-[92vh] overflow-hidden ${className}`}>
         {title && (
           <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/70 flex justify-between items-center shrink-0">

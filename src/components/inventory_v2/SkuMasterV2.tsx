@@ -26,7 +26,8 @@ import {
   Book,
   BookOpen,
   Scroll,
-  Copy
+  Copy,
+  Ruler
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { 
@@ -43,18 +44,7 @@ import AddSkuDrawerV2, { SearchableMaterialDropdown } from './AddSkuDrawerV2';
 import { showToast } from '../ui/Toast';
 import * as XLSX from 'xlsx';
 import Modal from '../ui/Modal';
-
-// Helper to format SKU Name
-export const formatSkuName = (name: string): string => {
-  if (!name) return '';
-  return name
-    .replace(/(\d+)\s*GSM/gi, '$1 GSM')
-    .replace(/(\d+(?:\.\d+)?)\s*[xX\*]\s*(\d+(?:\.\d+)?)\s*CM/gi, '$1 x $2 CM')
-    .replace(/(\d+(?:\.\d+)?)\s*[xX\*]\s*(\d+(?:\.\d+)?)(?!\s*CM)/gi, '$1 x $2')
-    .replace(/(\d+(?:\.\d+)?)\s*CM(?!\w)/gi, '$1 CM')
-    .replace(/\s+/g, ' ')
-    .trim();
-};
+import { formatSkuName } from '../../utils/skuUtils';
 
 // Helper to format Size
 const formatSize = (s: SkuV2) => {
@@ -1977,8 +1967,7 @@ const SkuMasterV2: React.FC = () => {
                       <tr 
                         key={sku._id || index}
                         onClick={() => {
-                          setEditSku(sku);
-                          setShowAddDrawer(true);
+                          setSelectedSkuDetails(sku);
                         }}
                         style={{
                           animation: 'slideDownFade 0.35s ease-out forwards',
@@ -2692,19 +2681,33 @@ const SkuMasterV2: React.FC = () => {
                   </div>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  const itemToEdit = selectedSkuDetails;
-                  setSelectedSkuDetails(null);
-                  setEditSku(itemToEdit);
-                  setShowAddDrawer(true);
-                }}
-                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
-              >
-                <Edit className="w-3.5 h-3.5" />
-                <span>Edit Full Item</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const itemToEdit = selectedSkuDetails;
+                    setSelectedSkuDetails(null);
+                    setEditSku(itemToEdit);
+                    setShowAddDrawer(true);
+                  }}
+                  className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                >
+                  <Edit className="w-3.5 h-3.5" />
+                  <span>Edit Item</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const itemToDelete = selectedSkuDetails;
+                    setSelectedSkuDetails(null);
+                    setDeleteConfirmSku(itemToDelete);
+                  }}
+                  className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold border border-rose-200 rounded-xl text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Delete</span>
+                </button>
+              </div>
             </div>
           }
         >
@@ -2716,7 +2719,7 @@ const SkuMasterV2: React.FC = () => {
                 onClick={() => setDetailsSubTab('details')}
                 className={`pb-2 transition-all cursor-pointer ${detailsSubTab === 'details' ? 'text-purple-700 border-b-2 border-purple-600 font-bold' : 'hover:text-gray-800'}`}
               >
-                Details
+                Details & Categories
               </button>
               <button
                 onClick={() => setDetailsSubTab('work-orders')}
@@ -2744,166 +2747,171 @@ const SkuMasterV2: React.FC = () => {
               </button>
             </div>
 
-            {/* TAB CONTENT: Details */}
+            {/* TAB CONTENT: Details & Categories arranged in Neat Cards */}
             {detailsSubTab === 'details' && (
-              <div className="space-y-6">
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-                {/* Read-Only Warehouse Storage Location */}
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold text-gray-700 flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-purple-600" />
-                      <span>Warehouse Storage Location</span>
-                    </div>
-                    <span className="text-[10px] font-semibold text-gray-400 flex items-center gap-1">
-                      <Lock className="w-3 h-3 text-gray-400" />
-                      Read-Only
-                    </span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      readOnly
-                      disabled
-                      value={modalDynamicLocation || 'Unassigned (No warehouse stock entry)'}
-                      className="w-full pl-3 pr-24 py-2 bg-gray-50/80 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 font-mono cursor-not-allowed select-none"
-                    />
-                    <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
-                      <span className="text-[9.5px] font-bold text-purple-600 bg-purple-50 border border-purple-100 px-2 py-0.5 rounded-md uppercase tracking-wider">
-                        System Tracked
+                  {/* CARD 1: 🏷️ General & Classification */}
+                  <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-2xs space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
+                          <Tag className="w-4 h-4" />
+                        </div>
+                        <h4 className="font-bold text-gray-900 text-xs">General & Classification</h4>
+                      </div>
+                      <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                        (selectedSkuDetails.status || 'Active') === 'Active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {selectedSkuDetails.status || 'Active'}
                       </span>
                     </div>
-                  </div>
-                </div>
-                
-                {/* 1. Item Attributes */}
-                <div className="space-y-3">
-                  <h3 className="font-bold text-gray-900 text-xs">Item Attributes</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">Paper Grade & GSM</label>
-                      <input
-                        type="text"
-                        value={itemAttributes.fabricGsm}
-                        onChange={(e) => setItemAttributes(prev => ({ ...prev, fabricGsm: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-purple-500 font-semibold"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">Trimmed Size</label>
-                      <input
-                        type="text"
-                        value={itemAttributes.size}
-                        onChange={(e) => setItemAttributes(prev => ({ ...prev, size: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-purple-500 font-semibold"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">Ruling & Printing Spec</label>
-                      <input
-                        type="text"
-                        value={itemAttributes.color}
-                        onChange={(e) => setItemAttributes(prev => ({ ...prev, color: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-purple-500 font-semibold"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 pt-1">
-                    <button
-                      onClick={async () => {
-                        if (!selectedSkuDetails?._id) return;
-                        try {
-                          await updateSkuV2(selectedSkuDetails._id, {
-                            ruleType: itemAttributes.color,
-                            company: selectedCompany?._id
-                          });
-                          setSelectedSkuDetails(prev => prev ? { ...prev, ruleType: itemAttributes.color } : null);
-                          showToast('Item Attributes updated successfully!', 'success');
-                          loadSkus(false);
-                        } catch (err: any) {
-                          showToast(err.message || 'Failed to update attributes', 'error');
-                        }
-                      }}
-                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold text-xs shadow-2xs cursor-pointer"
-                    >
-                      Save Attributes
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (selectedSkuDetails) {
-                          const pType = selectedSkuDetails.paperType && selectedSkuDetails.paperType !== 'None' ? selectedSkuDetails.paperType : '';
-                          const gsmStr = selectedSkuDetails.gsm ? `${selectedSkuDetails.gsm} GSM` : '';
-                          setItemAttributes({
-                            fabricGsm: [pType, gsmStr].filter(Boolean).join(' ') || 'Standard Paper',
-                            size: formatSize(selectedSkuDetails),
-                            color: selectedSkuDetails.ruleType || 'Single Line Ruled'
-                          });
-                        }
-                      }}
-                      className="px-4 py-2 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl font-semibold text-xs shadow-2xs cursor-pointer"
-                    >
-                      Reset
-                    </button>
-                  </div>
-                </div>
 
-                {/* 2. Stock Levels */}
-                <div className="space-y-3 border-t border-gray-100 pt-4">
-                  <h3 className="font-bold text-gray-900 text-xs">Stock Levels</h3>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-semibold text-gray-600 mb-1 flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3 text-amber-500" />
-                        <span>Min Stock Level</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={stockLevels.minLevel}
-                        onChange={(e) => setStockLevels(prev => ({ ...prev, minLevel: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-purple-500 font-semibold"
-                      />
-                      <p className="text-[10px] text-gray-400 mt-1">Alert when stock falls at or below this level</p>
+                    <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs">
+                      <div>
+                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">CATEGORY</span>
+                        <span className="font-bold text-gray-900 text-xs">
+                          {selectedSkuDetails.category || (
+                            (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('RM') ? 'Raw Material' :
+                            (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SEM') ? 'Semi Finished' : 'Finished Goods'
+                          )}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">SKU CODE</span>
+                        <span className="font-mono font-bold text-purple-600 text-xs">{selectedSkuDetails.skuCode}</span>
+                      </div>
+                      <div>
+                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">BRAND</span>
+                        <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.brand || 'Bestfriend'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">GROUP</span>
+                        <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.group || 'General Product'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* CARD 2: 📐 Specifications & Paper Format */}
+                  <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-2xs space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                          <Ruler className="w-4 h-4" />
+                        </div>
+                        <h4 className="font-bold text-gray-900 text-xs">Specifications & Paper Format</h4>
+                      </div>
+                      {selectedSkuDetails.paperType && selectedSkuDetails.paperType !== 'None' && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                          {selectedSkuDetails.paperType}
+                        </span>
+                      )}
                     </div>
 
-                    <div>
-                      <label className="block text-[11px] font-semibold text-gray-600 mb-1 flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3 text-amber-500" />
-                        <span>Reorder Level</span>
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. 20"
-                        value={stockLevels.reorderLevel}
-                        onChange={(e) => setStockLevels(prev => ({ ...prev, reorderLevel: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-purple-500 font-semibold"
-                      />
-                      <p className="text-[10px] text-gray-400 mt-1">Reorder when stock reaches this level</p>
+                    <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs">
+                      <div>
+                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">GSM</span>
+                        <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.gsm ? `${selectedSkuDetails.gsm} GSM` : '12 GSM'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">TRIMMED SIZE</span>
+                        <span className="font-bold text-gray-900 text-xs">{formatSize(selectedSkuDetails) !== '-' ? formatSize(selectedSkuDetails) : '32 × 122 CM'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">RULING SPEC</span>
+                        <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.ruleType || '(SR)'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PAGES / SHEETS PER REAM</span>
+                        <span className="font-bold text-gray-900 text-xs">
+                          {selectedSkuDetails.pages ? `${selectedSkuDetails.pages} ${selectedSkuDetails.paperType === 'Sheets' ? 'Sheets' : 'Pages'}` : '122 Pages'}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                  <button
-                    onClick={async () => {
-                      if (!selectedSkuDetails?._id) return;
-                      try {
-                        await updateSkuV2(selectedSkuDetails._id, {
-                          minStockLevel: Number(stockLevels.minLevel) || 0,
-                          reorderLevel: Number(stockLevels.reorderLevel) || 0,
-                          company: selectedCompany?._id
-                        });
-                        setSelectedSkuDetails(prev => prev ? {
-                          ...prev,
-                          minStockLevel: Number(stockLevels.minLevel) || 0,
-                          reorderLevel: Number(stockLevels.reorderLevel) || 0
-                        } : null);
-                        showToast('Stock levels saved successfully!', 'success');
-                        loadSkus(false);
-                      } catch (err: any) {
-                        showToast(err.message || 'Failed to save stock levels', 'error');
-                      }
-                    }}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold text-xs shadow-2xs cursor-pointer mt-1"
-                  >
-                    Save levels
-                  </button>
+
+                  {/* CARD 3: 🔄 Units & Conversion Logic */}
+                  <div className="bg-white p-4 rounded-2xl border border-amber-200/70 shadow-2xs space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
+                          <RefreshCw className="w-4 h-4" />
+                        </div>
+                        <h4 className="font-bold text-gray-900 text-xs">Units & Conversion Logic</h4>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs">
+                      <div>
+                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PRIMARY STOCKING UNIT</span>
+                        <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.unit || (getItemType(selectedSkuDetails) === 'materials' ? 'Kg' : 'GBL')}</span>
+                      </div>
+                      <div>
+                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">ALTERNATE UNIT</span>
+                        <span className="font-bold text-gray-900 text-xs">
+                          {getItemType(selectedSkuDetails) === 'materials' || selectedSkuDetails.category === 'Raw Material' ? 'None (Raw Material)' : (selectedSkuDetails.altUnit || selectedSkuDetails.unit || 'GBL')}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="bg-[#faf5ff] p-3 rounded-xl border border-[#f3e8ff] text-center space-y-0.5">
+                      <div className="text-[10px] font-black text-purple-600 uppercase tracking-wider">CONVERSION FORMULA</div>
+                      <div className="font-extrabold text-xs text-purple-950">
+                        {getItemType(selectedSkuDetails) === 'materials' || selectedSkuDetails.category === 'Raw Material' ? (
+                          `Direct Unit Tracking (${selectedSkuDetails.unit || 'Kg'}) • No AUOM Conversion`
+                        ) : selectedSkuDetails.altUnit && selectedSkuDetails.altUnitConversion ? (
+                          `Formula: 1 ${selectedSkuDetails.altUnit} = ${selectedSkuDetails.altUnitConversion} ${selectedSkuDetails.unit || 'Pcs'}`
+                        ) : selectedSkuDetails.paperType === 'Sheets' ? (
+                          `Formula: 1 Ream = ${selectedSkuDetails.pages || 500} Sheets`
+                        ) : (
+                          `Formula: 1 ${selectedSkuDetails.altUnit || 'GBL'} = ${selectedSkuDetails.booksGbl || 200} Pcs`
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* CARD 4: 📦 Stock & Warehouse Location */}
+                  <div className="bg-white p-4 rounded-2xl border border-emerald-200/70 shadow-2xs space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                          <Package className="w-4 h-4" />
+                        </div>
+                        <h4 className="font-bold text-gray-900 text-xs">Stock & Warehouse Location</h4>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs">
+                      <div>
+                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">OPENING BALANCE</span>
+                        <span className="font-mono font-bold text-gray-900 text-xs">{selectedSkuDetails.openingStock || 0} {selectedSkuDetails.unit || 'GBL'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PRESENT LIVE STOCK</span>
+                        <span className="font-mono font-extrabold text-emerald-600 text-xs">
+                          {(selectedSkuDetails as any).presentStock ?? selectedSkuDetails.openingStock ?? 0} {selectedSkuDetails.unit || 'GBL'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">MIN STOCK THRESHOLD</span>
+                        <span className="font-mono font-bold text-amber-600 text-xs">{(selectedSkuDetails as any).minStockLevel || 500} {selectedSkuDetails.unit || 'GBL'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">REORDER LEVEL</span>
+                        <span className="font-mono font-bold text-blue-600 text-xs">{(selectedSkuDetails as any).reorderLevel || '—'}</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-2.5 border-t border-gray-100">
+                      <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1 mb-0.5">
+                        <MapPin className="w-3 h-3 text-purple-600" />
+                        STORAGE LOCATION
+                      </div>
+                      <div className="font-bold text-xs text-gray-800">{modalDynamicLocation || 'Not assigned to any location'}</div>
+                    </div>
+                  </div>
+
                 </div>
 
                 {/* 3. Bill of Materials (BOM) - Shown for Finished Goods & Semi-Finished Materials! */}

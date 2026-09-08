@@ -953,14 +953,19 @@ const PurchaseInvoicePage: React.FC = () => {
     }
   };
 
-  const handleCancelInvoice = async (invoice: PurchaseInvoiceV2) => {
+  const [cancelConfirmInvoice, setCancelConfirmInvoice] = useState<PurchaseInvoiceV2 | null>(null);
+
+  const handleCancelInvoice = (invoice: PurchaseInvoiceV2) => {
     if (invoice.status === 'Cancelled') {
       showToast('This purchase batch is already cancelled.', 'warning');
       return;
     }
-    if (!window.confirm(`Are you sure you want to cancel purchase batch ${invoice.invoiceNumber}? This will mark the batch as Cancelled and remove its stock from Stock and Stock Ledger modules.`)) {
-      return;
-    }
+    setCancelConfirmInvoice(invoice);
+  };
+
+  const executeCancelInvoice = async () => {
+    if (!cancelConfirmInvoice) return;
+    const invoice = cancelConfirmInvoice;
     try {
       const invId = invoice._id || invoice.invoiceNumber || '';
       await cancelPurchaseInvoiceV2(invId, selectedCompany?._id || '');
@@ -976,6 +981,8 @@ const PurchaseInvoicePage: React.FC = () => {
     } catch (e: any) {
       console.error(e);
       showToast(e.response?.data?.msg || 'Failed to cancel purchase batch', 'error');
+    } finally {
+      setCancelConfirmInvoice(null);
     }
   };
 
@@ -3302,6 +3309,52 @@ const PurchaseInvoicePage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+      {/* CUSTOM CONFIRMATION DIALOG MODAL */}
+      {cancelConfirmInvoice && (
+        <Modal
+          isOpen={!!cancelConfirmInvoice}
+          onClose={() => setCancelConfirmInvoice(null)}
+          maxWidth="max-w-md"
+          hideCloseButton
+        >
+          <div className="p-2 space-y-4 text-center">
+            <div className="mx-auto w-12 h-12 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 flex items-center justify-center shadow-2xs">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+
+            <div>
+              <h3 className="text-base font-black text-slate-900 tracking-tight">
+                Cancel Purchase Batch
+              </h3>
+              <span className="inline-block mt-1 text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
+                {cancelConfirmInvoice.invoiceNumber}
+              </span>
+            </div>
+
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 text-xs text-slate-600 leading-relaxed font-medium">
+              Are you sure you want to cancel purchase batch '{cancelConfirmInvoice.invoiceNumber}'? This will mark the batch as Cancelled and remove its stock from Stock and Stock Ledger modules.
+            </div>
+
+            <div className="pt-2 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setCancelConfirmInvoice(null)}
+                className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-50 transition-all cursor-pointer"
+              >
+                No, Keep it
+              </button>
+              <button
+                type="button"
+                onClick={executeCancelInvoice}
+                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-md shadow-rose-600/20 flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Ban className="w-3.5 h-3.5" />
+                <span>Yes, Cancel Batch</span>
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

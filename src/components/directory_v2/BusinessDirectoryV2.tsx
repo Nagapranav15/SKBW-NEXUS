@@ -14,7 +14,20 @@ import {
   RefreshCw, 
   Phone, 
   ChevronLeft, 
-  ChevronRight 
+  ChevronRight,
+  MapPin,
+  CreditCard,
+  Tag,
+  Building2,
+  Mail,
+  FileText,
+  User,
+  History,
+  BookOpen,
+  ShoppingCart,
+  ExternalLink,
+  Coins,
+  Percent
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import Modal from '../ui/Modal';
@@ -552,9 +565,40 @@ export const BusinessDirectoryV2: React.FC = () => {
     }
   };
 
+  // Dynamic Effective Sub-Module Tab Resolver for Selected Details
+  const getEffectiveTab = (item: any, currentTab: DirectoryTabType): DirectoryTabType => {
+    if (!item) return currentTab;
+
+    // 1. Check type / partyType property from backend model
+    const pType = (item.partyType || item.type || '').toLowerCase().trim();
+    if (pType === 'customer') return 'customers';
+    if (pType === 'vendor' || pType === 'supplier') return 'vendors';
+    if (pType === 'agent') return 'agents';
+    if (pType === 'transporter') return 'transporters';
+    if (pType === 'route' || pType === 'region') return 'regions';
+    if (pType === 'market' || pType === 'city') return 'cities';
+
+    // 2. Check loaded sub-module lists by ID
+    if (allCustomers.some((c: any) => c._id === item._id)) return 'customers';
+    if (allVendors.some((v: any) => v._id === item._id)) return 'vendors';
+    if (allAgents.some((a: any) => a._id === item._id)) return 'agents';
+    if (allTransporters.some((t: any) => t._id === item._id)) return 'transporters';
+    if (allRoutes.some((r: any) => r._id === item._id)) return 'regions';
+    if (allCities.some((c: any) => c._id === item._id)) return 'cities';
+
+    // 3. Fallback attribute checks (ignore empty default strings)
+    if (item.vendorType && String(item.vendorType).trim() !== '') return 'vendors';
+    if (item.commissionRate !== undefined && item.commissionRate !== null) return 'agents';
+    if (item.vehicleNo !== undefined || item.transporterCode !== undefined) return 'transporters';
+
+    // Default fallback to active main tab
+    return currentTab;
+  };
+
   // Lucide Icon helper
-  const getItemIcon = () => {
-    switch (activeMainTab) {
+  const getItemIcon = (tab?: DirectoryTabType) => {
+    const targetTab = tab || activeMainTab;
+    switch (targetTab) {
       case 'customers': return <Users className="w-4 h-4 text-purple-600 shrink-0" />;
       case 'vendors': return <Factory className="w-4 h-4 text-purple-600 shrink-0" />;
       case 'agents': return <Briefcase className="w-4 h-4 text-purple-600 shrink-0" />;
@@ -720,7 +764,6 @@ export const BusinessDirectoryV2: React.FC = () => {
                 {activeMainTab === 'customers' && (
                   <>
                     <th className="py-3 px-3 whitespace-nowrap">CUSTOMER FIRM</th>
-                    <th className="py-3 px-3 whitespace-nowrap">CONTACT PERSON</th>
                     <th className="py-3 px-3 whitespace-nowrap">MOBILE / WHATSAPP</th>
                     <th className="py-3 px-3 whitespace-nowrap">CITY & DISTRICT</th>
                     <th className="py-3 px-3 whitespace-nowrap">REGION & MARKET</th>
@@ -862,10 +905,14 @@ export const BusinessDirectoryV2: React.FC = () => {
                           <td className="py-3 px-3 font-semibold text-gray-900">
                             <div className="flex items-center gap-2">
                               <Users className="w-4 h-4 text-purple-600 shrink-0" />
-                              <span className="font-bold text-gray-900">{item.firmName}</span>
+                              <div className="flex flex-col">
+                                <span className="font-bold text-gray-900">{item.firmName}</span>
+                                {(item.contactName || item.ownerName || item.contactPersons?.[0]?.name) && (
+                                  <span className="text-[11px] text-gray-500 font-medium">{item.contactName || item.ownerName || item.contactPersons?.[0]?.name}</span>
+                                )}
+                              </div>
                             </div>
                           </td>
-                          <td className="py-3 px-3 text-gray-600 font-medium">{item.contactName || item.ownerName || '—'}</td>
                           <td className="py-3 px-3 font-mono font-medium text-gray-700">
                             <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                               <span>{item.phone || '—'}</span>
@@ -2426,29 +2473,31 @@ export const BusinessDirectoryV2: React.FC = () => {
       )}
 
       {/* 5. POP-UP DIALOGUE BOX MODAL FOR RECORD DETAILS */}
-      {selectedDetails && (
+      {selectedDetails && (() => {
+        const effectiveTab = getEffectiveTab(selectedDetails, activeMainTab);
+        return (
         <Modal
           isOpen={!!selectedDetails}
           onClose={() => {
             setSelectedDetails(null);
             setRegionCitySearch('');
           }}
-          maxWidth="max-w-3xl"
+          maxWidth="max-w-4xl"
           hideCloseButton
         >
-          <div className="space-y-4 p-1">
+          <div className="space-y-3.5 p-0.5">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-purple-100 text-purple-700 rounded-xl">
-                  {getItemIcon()}
+                <div className="p-2.5 bg-purple-100 text-purple-700 rounded-2xl border border-purple-200/60 shadow-2xs">
+                  {getItemIcon(effectiveTab)}
                 </div>
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-base font-bold text-gray-900 tracking-tight">
+                    <h3 className="text-base sm:text-lg font-black text-gray-900 tracking-tight">
                       {selectedDetails.firmName || selectedDetails.name || selectedDetails.contactName}
                     </h3>
-                    <span className={`px-2 py-0.5 text-[10px] font-extrabold uppercase rounded-full border ${
+                    <span className={`px-2.5 py-0.5 text-[10px] font-extrabold uppercase rounded-full border ${
                       selectedDetails.status === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                       selectedDetails.status === 'inactive' ? 'bg-rose-50 text-rose-700 border-rose-200' :
                       'bg-amber-50 text-amber-700 border-amber-200'
@@ -2456,8 +2505,14 @@ export const BusinessDirectoryV2: React.FC = () => {
                       {selectedDetails.status || 'active'}
                     </span>
                   </div>
+                  {(selectedDetails.contactName || selectedDetails.ownerName || selectedDetails.contactPersons?.[0]?.name) && (
+                    <div className="text-xs text-gray-600 font-medium mt-0.5 flex items-center gap-1">
+                      <span className="text-gray-400 font-normal">Contact Person:</span>
+                      <span className="text-purple-700 font-bold">{selectedDetails.contactName || selectedDetails.ownerName || selectedDetails.contactPersons?.[0]?.name}</span>
+                    </div>
+                  )}
                   <p className="text-[11px] text-gray-400 font-mono mt-0.5">
-                    {activeMainTab.toUpperCase()} CODE: <span className="font-bold text-purple-600">{selectedDetails.code || selectedDetails._id?.slice(-6).toUpperCase()}</span>
+                    {effectiveTab.toUpperCase()} CODE: <span className="font-extrabold text-purple-600">{selectedDetails.code || selectedDetails._id?.slice(-6).toUpperCase()}</span>
                   </p>
                 </div>
               </div>
@@ -2467,15 +2522,18 @@ export const BusinessDirectoryV2: React.FC = () => {
                   setSelectedDetails(null);
                   setRegionCitySearch('');
                 }}
-                className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Quick Actions Bar */}
-            <div className="flex items-center justify-between gap-2 bg-slate-50 p-2.5 rounded-xl border border-gray-200/80">
-              <div className="flex items-center gap-2">
+            {/* Actions Grid Toolbar */}
+            <div className="space-y-1 bg-slate-50/80 p-2.5 rounded-2xl border border-gray-200/80">
+              <div className="flex items-center justify-between px-0.5 mb-1">
+                <span className="text-[9.5px] font-black text-gray-400 uppercase tracking-wider">ACTIONS</span>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <button
                   type="button"
                   onClick={() => {
@@ -2483,10 +2541,11 @@ export const BusinessDirectoryV2: React.FC = () => {
                     setSelectedDetails(null);
                     openModal(target);
                   }}
-                  className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
                 >
                   <Edit className="w-3.5 h-3.5" />
                   <span>Edit Profile</span>
+                  <span className="text-[9px] bg-blue-700/60 text-blue-100 font-mono px-1 rounded hidden sm:inline">Alt+E</span>
                 </button>
                 <button
                   type="button"
@@ -2495,83 +2554,727 @@ export const BusinessDirectoryV2: React.FC = () => {
                     setSelectedDetails(null);
                     handleDeleteItem(id);
                   }}
-                  className="px-3 py-1.5 bg-white hover:bg-rose-50 text-rose-600 hover:text-rose-700 rounded-lg text-xs font-bold transition-all border border-gray-200 hover:border-rose-200 flex items-center gap-1.5 cursor-pointer"
+                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>Delete</span>
+                  <span className="text-[9px] bg-rose-700/60 text-rose-100 font-mono px-1 rounded hidden sm:inline">Alt+D</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => showToast(`History & Visit records for ${selectedDetails.firmName || selectedDetails.name}`, 'info')}
+                  className="px-3 py-1.5 bg-white hover:bg-gray-100 text-gray-700 font-bold rounded-xl border border-gray-200 text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <History className="w-3.5 h-3.5 text-gray-500" />
+                  <span>History / Visit</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => showToast(`Opening Ledger for ${selectedDetails.firmName || selectedDetails.name}...`, 'info')}
+                  className="px-3 py-1.5 bg-white hover:bg-gray-100 text-gray-700 font-bold rounded-xl border border-gray-200 text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <BookOpen className="w-3.5 h-3.5 text-gray-500" />
+                  <span>Ledger</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => showToast(`Record Payment for ${selectedDetails.firmName || selectedDetails.name}`, 'info')}
+                  className="px-3 py-1.5 bg-white hover:bg-gray-100 text-gray-700 font-bold rounded-xl border border-gray-200 text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <CreditCard className="w-3.5 h-3.5 text-gray-500" />
+                  <span>Payment</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => showToast(`Create Quotation for ${selectedDetails.firmName || selectedDetails.name}`, 'info')}
+                  className="px-3 py-1.5 bg-white hover:bg-gray-100 text-gray-700 font-bold rounded-xl border border-gray-200 text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <FileText className="w-3.5 h-3.5 text-gray-500" />
+                  <span>Quotation</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => showToast(`Create Sale Order for ${selectedDetails.firmName || selectedDetails.name}`, 'info')}
+                  className="px-3 py-1.5 bg-white hover:bg-gray-100 text-gray-700 font-bold rounded-xl border border-gray-200 text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <ShoppingCart className="w-3.5 h-3.5 text-gray-500" />
+                  <span>Sale Order</span>
                 </button>
               </div>
-              <span className="text-[11px] text-gray-400 font-medium hidden sm:inline">Press Esc or click X to close</span>
             </div>
 
-            {/* Modal Body Scroll Container */}
-            <div className="max-h-[65vh] overflow-y-auto pr-1 space-y-4 text-xs">
-              
-              {/* Dynamic Real-Time Stats Cards */}
-              {(() => {
-                const name = selectedDetails.firmName || selectedDetails.name || selectedDetails.contactName || '';
-                if (activeMainTab === 'regions') {
-                  const rName = name.toLowerCase().trim();
-                  const rCode = (selectedDetails.code || '').toLowerCase().trim();
-                  const assignedCitiesCount = allCities.filter((c: any) => {
-                    const cRoute = (c.route || '').toLowerCase().trim();
-                    return cRoute && (cRoute === rName || (rCode && cRoute === rCode));
-                  }).length;
-                  const regionCityNames = new Set(
-                    allCities
-                      .filter((c: any) => {
-                        const cRoute = (c.route || '').toLowerCase().trim();
-                        return cRoute && (cRoute === rName || (rCode && cRoute === rCode));
-                      })
-                      .map((c: any) => (c.firmName || c.name || '').toLowerCase().trim())
-                  );
-                  const assignedCustsCount = allCustomers.filter((c: any) => {
-                    const cRoute = (c.route || '').toLowerCase().trim();
-                    if (cRoute && (cRoute === rName || (rCode && cRoute === rCode))) return true;
-                    const cCity = (c.city || '').toLowerCase().trim();
-                    if (cCity && regionCityNames.has(cCity)) return true;
-                    const cMarket = (c.assignedMarket || '').toLowerCase().trim();
-                    if (cMarket && regionCityNames.has(cMarket)) return true;
-                    return false;
-                  }).length;
-                  return (
-                    <div className="grid grid-cols-3 gap-3">
+            {/* Dynamic Modal Content by Active Sub-Module */}
+            {(() => {
+              const name = selectedDetails.firmName || selectedDetails.name || selectedDetails.contactName || '';
+              const code = selectedDetails.code || selectedDetails._id?.slice(-6).toUpperCase();
+
+              // Helper for Google Maps Link
+              const fullAddr = [
+                selectedDetails.doorNo,
+                selectedDetails.streetName,
+                selectedDetails.address1 || selectedDetails.address,
+                selectedDetails.area,
+                selectedDetails.city || selectedDetails.assignedMarket,
+                selectedDetails.district,
+                selectedDetails.state,
+                selectedDetails.pincode
+              ].filter(Boolean).join(', ') || `${name}, Bhavanipuram, Krishna, Andhra Pradesh`;
+              const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddr)}`;
+
+              // -------------------------------------------------------------
+              // 1. CUSTOMERS SUB-MODULE
+              // -------------------------------------------------------------
+              if (effectiveTab === 'customers') {
+                const bal = Number(selectedDetails.outstandingBalance) || Number(selectedDetails.outstanding) || 0;
+                return (
+                  <>
+                    <div className="grid grid-cols-3 gap-2.5">
+                      <div className="bg-blue-50/60 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs">
+                        <span className="block text-[9px] text-blue-700 font-extrabold uppercase tracking-wider">ASSIGNED REGION</span>
+                        <span className="block text-xs font-extrabold text-blue-950 mt-0.5 truncate" title={selectedDetails.route || selectedDetails.assignedRegion || 'Unassigned'}>
+                          {selectedDetails.route || selectedDetails.assignedRegion || 'Unassigned'}
+                        </span>
+                      </div>
+                      <div className="bg-purple-50/60 border border-purple-100 p-2.5 rounded-2xl text-center shadow-2xs">
+                        <span className="block text-[9px] text-purple-700 font-extrabold uppercase tracking-wider">ASSIGNED CITY</span>
+                        <span className="block text-xs font-extrabold text-purple-950 mt-0.5 truncate" title={selectedDetails.city || selectedDetails.assignedMarket || 'Unassigned'}>
+                          {selectedDetails.city || selectedDetails.assignedMarket || 'Unassigned'}
+                        </span>
+                      </div>
+                      <div className="bg-rose-50/60 border border-rose-100 p-2.5 rounded-2xl text-center shadow-2xs">
+                        <span className="block text-[9px] text-rose-700 font-extrabold uppercase tracking-wider">OUTSTANDING BALANCE</span>
+                        <span className={`block text-xs font-mono font-black mt-0.5 ${bal > 0 ? 'text-rose-950' : bal < 0 ? 'text-emerald-950' : 'text-gray-900'}`}>
+                          ₹{Math.abs(bal).toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="max-h-[60vh] overflow-y-auto pr-1 space-y-3.5 text-xs">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                        <div className="space-y-3.5">
+                          {/* CARD 1: BASIC INFO */}
+                          <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-2.5">
+                            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                                  <User className="w-3.5 h-3.5" />
+                                </div>
+                                <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">BASIC INFORMATION</h4>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs">
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Contact Person</span>
+                                <span className="font-bold text-gray-900 text-xs block truncate">{selectedDetails.contactName || selectedDetails.ownerName || selectedDetails.contactPersons?.[0]?.name || '—'}</span>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Mobile Number</span>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-mono font-bold text-blue-600 text-xs">{selectedDetails.phone || selectedDetails.mobile || '—'}</span>
+                                  {selectedDetails.phone && (
+                                    <a href={`https://wa.me/91${selectedDetails.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="WhatsApp">
+                                      <WhatsAppIcon />
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">WhatsApp Number</span>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-mono font-bold text-blue-600 text-xs">{selectedDetails.whatsapp || selectedDetails.phone || '—'}</span>
+                                  {(selectedDetails.whatsapp || selectedDetails.phone) && (
+                                    <a href={`https://wa.me/91${(selectedDetails.whatsapp || selectedDetails.phone).replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="WhatsApp">
+                                      <WhatsAppIcon />
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Alt Mobile</span>
+                                <span className="font-mono font-semibold text-gray-800 text-xs">{selectedDetails.altPhone || selectedDetails.altMobile || '—'}</span>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Email ID</span>
+                                <span className="font-semibold text-gray-800 text-xs truncate block">{selectedDetails.email || '—'}</span>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">GST Number</span>
+                                <span className="font-mono font-bold text-purple-600 text-xs">{selectedDetails.gstNumber || selectedDetails.gstin || '—'}</span>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Aadhar / PAN</span>
+                                <span className="font-mono font-semibold text-gray-800 text-xs">{selectedDetails.aadharNumber || selectedDetails.pan || '—'}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* CARD 2: BUSINESS DETAILS */}
+                          <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-2.5">
+                            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
+                                  <Building2 className="w-3.5 h-3.5" />
+                                </div>
+                                <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">BUSINESS & CREDIT DETAILS</h4>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs">
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Assigned Region</span>
+                                <span className="inline-block px-2 py-0.5 bg-purple-50 text-purple-700 font-bold rounded-md border border-purple-200 text-xs">
+                                  {selectedDetails.route || selectedDetails.assignedRegion || 'Unassigned'}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Assigned City</span>
+                                <span className="inline-block px-2 py-0.5 bg-blue-50 text-blue-700 font-bold rounded-md border border-blue-200 text-xs">
+                                  {selectedDetails.city || selectedDetails.assignedMarket || 'Unassigned'}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Credit Limit</span>
+                                <span className="font-mono font-bold text-purple-700 text-xs">
+                                  {selectedDetails.creditLimit ? `₹${Number(selectedDetails.creditLimit).toLocaleString('en-IN')} (${selectedDetails.creditDays || 30} days)` : '—'}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Opening Balance</span>
+                                <span className="font-mono font-bold text-gray-900 text-xs">₹{(selectedDetails.openingBalance || 0).toLocaleString('en-IN')}</span>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Preferred Transport</span>
+                                <span className="font-bold text-gray-900 text-xs">{selectedDetails.preferredTransport || '—'}</span>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Assigned Agent</span>
+                                <span className="font-bold text-indigo-700 text-xs">{selectedDetails.agentAssigned || selectedDetails.assignedAgent || 'Direct'}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* RIGHT COLUMN: ADDRESS INFO */}
+                        <div className="space-y-3.5">
+                          <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-3 h-full flex flex-col justify-between">
+                            <div className="space-y-2.5">
+                              <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-6 h-6 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                                    <MapPin className="w-3.5 h-3.5" />
+                                  </div>
+                                  <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">ADDRESS INFORMATION</h4>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs">
+                                <div>
+                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Door / Flat No.</span>
+                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.doorNo || selectedDetails.flatNo || '—'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Street Name</span>
+                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.streetName || selectedDetails.street || '—'}</span>
+                                </div>
+                                <div className="col-span-2">
+                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Address Line 1</span>
+                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.address1 || selectedDetails.address || '—'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">City / Town</span>
+                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.city || selectedDetails.assignedMarket || '—'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">District</span>
+                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.district || '—'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">State</span>
+                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.state || 'Andhra Pradesh'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Pincode</span>
+                                  <span className="font-mono font-bold text-gray-900 text-xs">{selectedDetails.pincode || selectedDetails.pinCode || '—'}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="pt-2 border-t border-gray-100 mt-2">
+                              <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="w-full py-2 px-3.5 bg-slate-50 hover:bg-purple-50 text-purple-700 font-bold rounded-xl border border-gray-200 hover:border-purple-300 transition-all flex items-center justify-center gap-2 text-xs shadow-2xs group cursor-pointer">
+                                <MapPin className="w-3.5 h-3.5 text-purple-600 group-hover:scale-110 transition-transform" />
+                                <span>Search Address on Google Maps</span>
+                                <ExternalLink className="w-3 h-3 text-purple-400 group-hover:text-purple-600 ml-auto" />
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                );
+              }
+
+              // -------------------------------------------------------------
+              // 2. VENDORS / SUPPLIERS SUB-MODULE
+              // -------------------------------------------------------------
+              if (effectiveTab === 'vendors') {
+                const bal = Number(selectedDetails.outstandingBalance) || Number(selectedDetails.outstanding) || 0;
+                const contactPersons = (selectedDetails as any).contactPersons || [];
+
+                return (
+                  <>
+                    <div className="grid grid-cols-3 gap-2.5">
+                      <div className="bg-indigo-50/60 border border-indigo-100 p-2.5 rounded-2xl text-center shadow-2xs">
+                        <span className="block text-[9px] text-indigo-700 font-extrabold uppercase tracking-wider">VENDOR TYPE</span>
+                        <span className="block text-xs font-extrabold text-indigo-950 mt-0.5 truncate" title={selectedDetails.vendorType || 'General Supplier'}>
+                          {selectedDetails.vendorType || 'General Supplier'}
+                        </span>
+                      </div>
+                      <div className="bg-purple-50/60 border border-purple-100 p-2.5 rounded-2xl text-center shadow-2xs">
+                        <span className="block text-[9px] text-purple-700 font-extrabold uppercase tracking-wider">PAYMENT TERMS</span>
+                        <span className="block text-xs font-bold font-mono text-purple-950 mt-0.5">
+                          {selectedDetails.creditDays || 30} Days
+                        </span>
+                      </div>
+                      <div className="bg-rose-50/60 border border-rose-100 p-2.5 rounded-2xl text-center shadow-2xs">
+                        <span className="block text-[9px] text-rose-700 font-extrabold uppercase tracking-wider">OUTSTANDING PAYABLE</span>
+                        <span className="block text-xs font-mono font-black text-rose-950 mt-0.5">
+                          ₹{Math.abs(bal).toLocaleString('en-IN')} (To Pay)
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="max-h-[60vh] overflow-y-auto pr-1 space-y-3.5 text-xs">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                        <div className="space-y-3.5">
+                          {/* SUPPLIER OVERVIEW */}
+                          <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-2.5">
+                            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
+                                  <Factory className="w-3.5 h-3.5" />
+                                </div>
+                                <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">SUPPLIER OVERVIEW</h4>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs">
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Firm Name</span>
+                                <span className="font-bold text-gray-900 text-xs block truncate">{name}</span>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Contact Person / Owner</span>
+                                <span className="font-bold text-gray-900 text-xs block truncate">{selectedDetails.ownerName || selectedDetails.contactName || '—'}</span>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Phone / Mobile</span>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-mono font-bold text-blue-600 text-xs">{selectedDetails.phone || '—'}</span>
+                                  {selectedDetails.phone && (
+                                    <a href={`https://wa.me/91${selectedDetails.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="WhatsApp">
+                                      <WhatsAppIcon />
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Email ID</span>
+                                <span className="font-semibold text-gray-800 text-xs block truncate">{selectedDetails.email || '—'}</span>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">GSTIN / Tax ID</span>
+                                <span className="font-mono font-bold text-purple-600 text-xs">{selectedDetails.gstNumber || selectedDetails.gstin || '—'}</span>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Aadhar / PAN</span>
+                                <span className="font-mono font-semibold text-gray-800 text-xs">{selectedDetails.aadharNumber || selectedDetails.pan || '—'}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* FINANCIAL & PAYMENT TERMS */}
+                          <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-2.5">
+                            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
+                                  <CreditCard className="w-3.5 h-3.5" />
+                                </div>
+                                <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">FINANCIAL TERMS</h4>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs">
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Credit Period</span>
+                                <span className="font-mono font-bold text-gray-900 text-xs">{selectedDetails.creditDays || 30} Days</span>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Credit Limit</span>
+                                <span className="font-mono font-bold text-purple-700 text-xs">
+                                  {selectedDetails.creditLimit ? `₹${Number(selectedDetails.creditLimit).toLocaleString('en-IN')}` : '—'}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Opening Balance</span>
+                                <span className="font-mono font-bold text-gray-900 text-xs">₹{(selectedDetails.openingBalance || 0).toLocaleString('en-IN')}</span>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Net Payable</span>
+                                <span className="font-mono font-black text-rose-600 text-xs">₹{Math.abs(bal).toLocaleString('en-IN')}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* RIGHT COLUMN: BANK & LOCATION & CONTACT PERSONS */}
+                        <div className="space-y-3.5">
+                          {(selectedDetails.bankName || selectedDetails.accountNo || selectedDetails.accountNumber) && (
+                            <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-2.5">
+                              <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-6 h-6 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                                    <Coins className="w-3.5 h-3.5" />
+                                  </div>
+                                  <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">BANK ACCOUNT DETAILS</h4>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs">
+                                <div>
+                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Bank Name</span>
+                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.bankName || '—'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Branch</span>
+                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.branchName || selectedDetails.branch || '—'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Account Number</span>
+                                  <span className="font-mono font-bold text-purple-700 text-xs">{selectedDetails.accountNo || selectedDetails.accountNumber || '—'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">IFSC Code</span>
+                                  <span className="font-mono font-bold text-gray-900 text-xs">{selectedDetails.ifscCode || selectedDetails.ifsc || '—'}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {(selectedDetails.address1 || selectedDetails.address || selectedDetails.city || selectedDetails.district) && (
+                            <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-3">
+                              <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                                    <MapPin className="w-3.5 h-3.5" />
+                                  </div>
+                                  <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">LOCATION / ADDRESS</h4>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs">
+                                <div className="col-span-2">
+                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Factory / Office Address</span>
+                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.address1 || selectedDetails.address || '—'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">City</span>
+                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.city || '—'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">District</span>
+                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.district || '—'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">State</span>
+                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.state || 'Andhra Pradesh'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Pincode</span>
+                                  <span className="font-mono font-bold text-gray-900 text-xs">{selectedDetails.pincode || '—'}</span>
+                                </div>
+                              </div>
+                              <div className="pt-2 border-t border-gray-100">
+                                <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="w-full py-2 px-3.5 bg-slate-50 hover:bg-indigo-50 text-indigo-700 font-bold rounded-xl border border-gray-200 hover:border-indigo-300 transition-all flex items-center justify-center gap-2 text-xs shadow-2xs group cursor-pointer">
+                                  <MapPin className="w-3.5 h-3.5 text-indigo-600 group-hover:scale-110 transition-transform" />
+                                  <span>Search Location on Google Maps</span>
+                                  <ExternalLink className="w-3 h-3 text-indigo-400 group-hover:text-indigo-600 ml-auto" />
+                                </a>
+                              </div>
+                            </div>
+                          )}
+
+                          {contactPersons.length > 0 && (
+                            <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-2.5">
+                              <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
+                                <div className="w-6 h-6 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
+                                  <Users className="w-3.5 h-3.5" />
+                                </div>
+                                <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">CONTACT PERSONS</h4>
+                              </div>
+                              <div className="space-y-2">
+                                {contactPersons.map((cp: any, idx: number) => (
+                                  <div key={idx} className="p-2.5 bg-slate-50 rounded-xl border border-gray-100 space-y-1">
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-extrabold text-gray-900 text-xs">{cp.name || '—'}</span>
+                                      {cp.designation && <span className="text-[10px] bg-purple-50 text-purple-700 font-bold px-2 py-0.5 rounded-md">{cp.designation}</span>}
+                                    </div>
+                                    <div className="flex items-center gap-3 text-[11px] text-gray-600">
+                                      {cp.phone && <span className="font-mono font-semibold">{cp.phone}</span>}
+                                      {cp.email && <span className="text-gray-500 truncate">{cp.email}</span>}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                );
+              }
+
+              // -------------------------------------------------------------
+              // 3. AGENTS SUB-MODULE
+              // -------------------------------------------------------------
+              if (effectiveTab === 'agents') {
+                const agentName = (name || '').toLowerCase().trim();
+                const assignedRoutes = allRoutes.filter((r: any) => (r.assignedAgent || '').toLowerCase().trim() === agentName);
+                const agentCusts = allCustomers.filter((c: any) => (c.agentAssigned || '').toLowerCase().trim() === agentName);
+
+                return (
+                  <>
+                    <div className="grid grid-cols-3 gap-2.5">
+                      <div className="bg-blue-50/60 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs">
+                        <span className="block text-[9px] text-blue-700 font-extrabold uppercase tracking-wider">COMMISSION RATE</span>
+                        <span className="block text-xs font-black text-blue-950 mt-0.5">
+                          {selectedDetails.commissionRate || 0}%
+                        </span>
+                      </div>
+                      <div className="bg-purple-50/60 border border-purple-100 p-2.5 rounded-2xl text-center shadow-2xs">
+                        <span className="block text-[9px] text-purple-700 font-extrabold uppercase tracking-wider">ASSIGNED REGIONS</span>
+                        <span className="block text-xs font-bold text-purple-950 mt-0.5">
+                          {assignedRoutes.length} Regions
+                        </span>
+                      </div>
                       <div 
                         onClick={() => {
-                          const regionCusts = allCustomers.filter((c: any) => {
-                            const cRoute = (c.route || '').toLowerCase().trim();
-                            if (cRoute && (cRoute === rName || (rCode && cRoute === rCode))) return true;
-                            const cCity = (c.city || '').toLowerCase().trim();
-                            if (cCity && regionCityNames.has(cCity)) return true;
-                            const cMarket = (c.assignedMarket || '').toLowerCase().trim();
-                            if (cMarket && regionCityNames.has(cMarket)) return true;
-                            return false;
-                          });
+                          setSelectedDetails(null);
                           setCardCustomersModal({
-                            title: `Customers in ${name} Region (${assignedCitiesCount} Cities)`,
+                            title: `Customers Handled by Agent: ${name}`,
+                            subtitle: `Total ${agentCusts.length} Assigned Customer Accounts`,
+                            customers: agentCusts
+                          });
+                          setCardCustomerSearch('');
+                        }}
+                        className="bg-emerald-50/60 hover:bg-emerald-100/70 border border-emerald-100 p-2.5 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.01] group"
+                      >
+                        <span className="block text-[9px] text-emerald-700 font-extrabold uppercase tracking-wider group-hover:underline">TOTAL CUSTOMERS</span>
+                        <span className="block text-xs font-black text-emerald-950 mt-0.5">
+                          {agentCusts.length} Customers ↗
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="max-h-[60vh] overflow-y-auto pr-1 space-y-3.5 text-xs">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                        {/* AGENT PROFILE */}
+                        <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-2.5">
+                          <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                                <Briefcase className="w-3.5 h-3.5" />
+                              </div>
+                              <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">AGENT PROFILE</h4>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs">
+                            <div>
+                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Agent Name</span>
+                              <span className="font-bold text-gray-900 text-xs block truncate">{name}</span>
+                            </div>
+                            <div>
+                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Agent Code</span>
+                              <span className="font-mono font-bold text-purple-600 text-xs">{code}</span>
+                            </div>
+                            <div>
+                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Mobile Number</span>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-mono font-bold text-blue-600 text-xs">{selectedDetails.phone || '—'}</span>
+                                {selectedDetails.phone && (
+                                  <a href={`https://wa.me/91${selectedDetails.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="WhatsApp">
+                                    <WhatsAppIcon />
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                            <div>
+                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Email ID</span>
+                              <span className="font-semibold text-gray-800 text-xs block truncate">{selectedDetails.email || '—'}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* COMMISSION & COVERAGE */}
+                        <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-2.5">
+                          <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
+                                <Percent className="w-3.5 h-3.5" />
+                              </div>
+                              <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">COMMISSION & COVERAGE</h4>
+                            </div>
+                          </div>
+                          <div className="space-y-2 text-xs">
+                            <div>
+                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Assigned Regions / Routes</span>
+                              <div className="flex flex-wrap gap-1.5">
+                                {assignedRoutes.length > 0 ? assignedRoutes.map((r: any) => (
+                                  <span key={r._id} className="px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 font-bold rounded-md text-[11px]">
+                                    {r.name} ({r.code})
+                                  </span>
+                                )) : <span className="text-gray-400 italic text-xs">No regions assigned</span>}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                );
+              }
+
+              // -------------------------------------------------------------
+              // 4. TRANSPORTERS SUB-MODULE
+              // -------------------------------------------------------------
+              if (effectiveTab === 'transporters') {
+                const transName = (name || '').toLowerCase().trim();
+                const transCusts = allCustomers.filter((c: any) => (c.preferredTransport || '').toLowerCase().trim() === transName);
+
+                return (
+                  <>
+                    <div className="grid grid-cols-3 gap-2.5">
+                      <div className="bg-amber-50/60 border border-amber-100 p-2.5 rounded-2xl text-center shadow-2xs">
+                        <span className="block text-[9px] text-amber-700 font-extrabold uppercase tracking-wider">FLEET TYPES</span>
+                        <span className="block text-xs font-bold text-amber-950 mt-0.5 truncate" title={selectedDetails.vehicleTypes || 'Standard Truck'}>
+                          {selectedDetails.vehicleTypes || 'Standard Truck'}
+                        </span>
+                      </div>
+                      <div 
+                        onClick={() => {
+                          setSelectedDetails(null);
+                          setCardCustomersModal({
+                            title: `Customers Using Transporter: ${name}`,
+                            subtitle: `Total ${transCusts.length} Active Accounts`,
+                            customers: transCusts
+                          });
+                          setCardCustomerSearch('');
+                        }}
+                        className="bg-blue-50/60 hover:bg-blue-100/70 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.01] group"
+                      >
+                        <span className="block text-[9px] text-blue-700 font-extrabold uppercase tracking-wider group-hover:underline">SERVICED CUSTOMERS</span>
+                        <span className="block text-xs font-black text-blue-950 mt-0.5">
+                          {transCusts.length} Customers ↗
+                        </span>
+                      </div>
+                      <div className="bg-emerald-50/60 border border-emerald-100 p-2.5 rounded-2xl text-center shadow-2xs">
+                        <span className="block text-[9px] text-emerald-700 font-extrabold uppercase tracking-wider">STATUS</span>
+                        <span className="block text-xs font-extrabold text-emerald-950 mt-0.5 uppercase">
+                          {selectedDetails.status || 'Active'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="max-h-[60vh] overflow-y-auto pr-1 space-y-3.5 text-xs">
+                      <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-2.5">
+                        <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
+                              <Truck className="w-3.5 h-3.5" />
+                            </div>
+                            <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">TRANSPORTER PROFILE</h4>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs">
+                          <div>
+                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Firm Name</span>
+                            <span className="font-bold text-gray-900 text-xs block truncate">{name}</span>
+                          </div>
+                          <div>
+                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Contact Person</span>
+                            <span className="font-bold text-gray-900 text-xs block truncate">{selectedDetails.contactName || selectedDetails.contactPersons?.[0]?.name || '—'}</span>
+                          </div>
+                          <div>
+                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Mobile Number</span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-mono font-bold text-blue-600 text-xs">{selectedDetails.phone || selectedDetails.contactPersons?.[0]?.phone || '—'}</span>
+                              {(selectedDetails.phone || selectedDetails.contactPersons?.[0]?.phone) && (
+                                <a href={`https://wa.me/91${(selectedDetails.phone || selectedDetails.contactPersons?.[0]?.phone).replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="WhatsApp">
+                                  <WhatsAppIcon />
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">GSTIN Number</span>
+                            <span className="font-mono font-bold text-purple-600 text-xs">{selectedDetails.gstNumber || selectedDetails.gstin || '—'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                );
+              }
+
+              // -------------------------------------------------------------
+              // 5. REGIONS / ROUTES SUB-MODULE
+              // -------------------------------------------------------------
+              if (effectiveTab === 'regions') {
+                const rName = name.toLowerCase().trim();
+                const rCode = (selectedDetails.code || '').toLowerCase().trim();
+
+                const citiesInRegion = allCities.filter((c: any) => {
+                  const cRoute = (c.route || '').toLowerCase().trim();
+                  return cRoute && (cRoute === rName || (rCode && cRoute === rCode));
+                });
+
+                const filteredRegionCities = citiesInRegion.filter((c: any) =>
+                  (c.firmName || c.name || '').toLowerCase().includes(regionCitySearch.toLowerCase().trim())
+                );
+
+                const regionCityNames = new Set(
+                  citiesInRegion.map((c: any) => (c.firmName || c.name || '').toLowerCase().trim())
+                );
+
+                const regionCusts = allCustomers.filter((c: any) => {
+                  const cRoute = (c.route || '').toLowerCase().trim();
+                  if (cRoute && (cRoute === rName || (rCode && cRoute === rCode))) return true;
+                  const cCity = (c.city || '').toLowerCase().trim();
+                  if (cCity && regionCityNames.has(cCity)) return true;
+                  const cMarket = (c.assignedMarket || '').toLowerCase().trim();
+                  if (cMarket && regionCityNames.has(cMarket)) return true;
+                  return false;
+                });
+
+                return (
+                  <>
+                    <div className="grid grid-cols-3 gap-2.5">
+                      <div 
+                        onClick={() => {
+                          setSelectedDetails(null);
+                          setCardCustomersModal({
+                            title: `Customers in ${name} Region (${citiesInRegion.length} Cities)`,
                             subtitle: `Region Code: ${selectedDetails.code || '—'} • ${regionCusts.length} Total Customers`,
                             customers: regionCusts
                           });
                           setCardCustomerSearch('');
                         }}
-                        className="bg-purple-50/60 hover:bg-purple-100/70 border border-purple-100 hover:border-purple-300 p-3 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.02] group"
-                        title="Click to view all customers in these cities"
+                        className="bg-purple-50/60 hover:bg-purple-100/70 border border-purple-100 p-2.5 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.01] group"
                       >
-                        <span className="block text-[10px] text-purple-700 font-bold uppercase tracking-wider group-hover:underline">No of Cities</span>
-                        <span className="block text-xl font-black text-purple-900 mt-0.5">{assignedCitiesCount}</span>
-                        <span className="text-[9px] text-purple-600 font-medium block mt-0.5">Click to view all →</span>
+                        <span className="block text-[9.5px] text-purple-700 font-bold uppercase tracking-wider group-hover:underline">NO OF CITIES</span>
+                        <span className="block text-lg font-black text-purple-900 mt-0.5">{citiesInRegion.length} Cities ↗</span>
                       </div>
                       <div 
                         onClick={() => {
-                          const regionCusts = allCustomers.filter((c: any) => {
-                            const cRoute = (c.route || '').toLowerCase().trim();
-                            if (cRoute && (cRoute === rName || (rCode && cRoute === rCode))) return true;
-                            const cCity = (c.city || '').toLowerCase().trim();
-                            if (cCity && regionCityNames.has(cCity)) return true;
-                            const cMarket = (c.assignedMarket || '').toLowerCase().trim();
-                            if (cMarket && regionCityNames.has(cMarket)) return true;
-                            return false;
-                          });
+                          setSelectedDetails(null);
                           setCardCustomersModal({
                             title: `All Customers in ${name} Region`,
                             subtitle: `Region Code: ${selectedDetails.code || '—'} • ${regionCusts.length} Total Customers`,
@@ -2579,12 +3282,10 @@ export const BusinessDirectoryV2: React.FC = () => {
                           });
                           setCardCustomerSearch('');
                         }}
-                        className="bg-blue-50/60 hover:bg-blue-100/70 border border-blue-100 hover:border-blue-300 p-3 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.02] group"
-                        title="Click to view all customers in this region"
+                        className="bg-blue-50/60 hover:bg-blue-100/70 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.01] group"
                       >
-                        <span className="block text-[10px] text-blue-700 font-bold uppercase tracking-wider group-hover:underline">Total Customers</span>
-                        <span className="block text-xl font-black text-blue-900 mt-0.5">{assignedCustsCount}</span>
-                        <span className="text-[9px] text-blue-500 font-medium block mt-0.5">Click to view all →</span>
+                        <span className="block text-[9.5px] text-blue-700 font-bold uppercase tracking-wider group-hover:underline">TOTAL CUSTOMERS</span>
+                        <span className="block text-lg font-black text-blue-900 mt-0.5">{regionCusts.length} Customers ↗</span>
                       </div>
                       <div 
                         onClick={() => {
@@ -2594,6 +3295,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                             return;
                           }
                           const agentCusts = allCustomers.filter((c: any) => (c.agentAssigned || '').toLowerCase().trim() === agentName);
+                          setSelectedDetails(null);
                           setCardCustomersModal({
                             title: `Customers for Agent: ${selectedDetails.agentAssigned || selectedDetails.assignedAgent}`,
                             subtitle: `Region: ${name} • ${agentCusts.length} Assigned Customers`,
@@ -2601,551 +3303,269 @@ export const BusinessDirectoryV2: React.FC = () => {
                           });
                           setCardCustomerSearch('');
                         }}
-                        className="bg-indigo-50/60 hover:bg-indigo-100/70 border border-indigo-100 hover:border-indigo-300 p-3 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.02] group"
-                        title="Click to view customers assigned to this agent"
+                        className="bg-indigo-50/60 hover:bg-indigo-100/70 border border-indigo-100 p-2.5 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.01] group"
                       >
-                        <span className="block text-[10px] text-indigo-700 font-bold uppercase tracking-wider group-hover:underline">Assigned Agent</span>
-                        <span className="block text-xs font-bold text-indigo-900 mt-1.5 truncate" title={selectedDetails.agentAssigned || selectedDetails.assignedAgent || 'None'}>
-                          {selectedDetails.agentAssigned || selectedDetails.assignedAgent || 'None'}
+                        <span className="block text-[9.5px] text-indigo-700 font-bold uppercase tracking-wider group-hover:underline">ASSIGNED AGENT</span>
+                        <span className="block text-xs font-bold text-indigo-900 mt-1 truncate">
+                          {selectedDetails.agentAssigned || selectedDetails.assignedAgent || 'None'} ↗
                         </span>
-                        <span className="text-[9px] text-indigo-600 font-medium block mt-0.5">Click to view all →</span>
                       </div>
                     </div>
-                  );
-                }
-                if (activeMainTab === 'cities') {
-                  const assignedCustsCount = allCustomers.filter((c: any) => (c.city === name || c.assignedMarket === name)).length;
-                  return (
-                    <div className="grid grid-cols-3 gap-3">
-                      <div 
-                        onClick={() => {
-                          const parentRoute = (selectedDetails.route || '').toLowerCase().trim();
-                          const routeCusts = allCustomers.filter((c: any) => (c.route || '').toLowerCase().trim() === parentRoute);
-                          setCardCustomersModal({
-                            title: `Customers in Region: ${selectedDetails.route || 'Unassigned'}`,
-                            subtitle: `Parent Region of ${name} • ${routeCusts.length} Customers`,
-                            customers: routeCusts
-                          });
-                          setCardCustomerSearch('');
-                        }}
-                        className="bg-purple-50/60 hover:bg-purple-100/70 border border-purple-100 hover:border-purple-300 p-3 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.02] group"
-                        title="Click to view customers in parent region"
-                      >
-                        <span className="block text-[10px] text-purple-700 font-bold uppercase tracking-wider group-hover:underline">Parent Region</span>
-                        <span className="block text-xs font-bold text-purple-900 mt-1.5 truncate" title={selectedDetails.route || 'None'}>
-                          {selectedDetails.route || 'None'}
+
+                    <div className="max-h-[65vh] overflow-y-auto pr-1 space-y-3.5 text-xs">
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 items-start">
+                        {/* LEFT COLUMN: REGION PROFILE SUMMARY (col-span-1) */}
+                        <div className="lg:col-span-1 bg-white p-4 rounded-2xl border border-gray-200/80 shadow-2xs space-y-3">
+                          <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
+                            <div className="w-6 h-6 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                              <Map className="w-3.5 h-3.5" />
+                            </div>
+                            <h4 className="font-extrabold text-gray-800 text-xs tracking-wider uppercase">REGION PROFILE</h4>
+                          </div>
+                          <div className="space-y-3 text-xs">
+                            <div>
+                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Region Name</span>
+                              <span className="font-extrabold text-gray-900 text-sm block truncate">{name}</span>
+                            </div>
+                            <div>
+                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Region Code</span>
+                              <span className="font-mono font-extrabold text-purple-600 text-xs">{code}</span>
+                            </div>
+                            <div>
+                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Assigned Agent</span>
+                              <span className="font-bold text-indigo-700 text-xs block">{selectedDetails.agentAssigned || selectedDetails.assignedAgent || 'Unassigned'}</span>
+                            </div>
+                            <div>
+                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Total Outlets</span>
+                              <span className="font-extrabold text-gray-900 text-xs block">{regionCusts.length} Outlets</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* RIGHT COLUMN: CITIES IN REGION (col-span-2) - MATCHING IMAGE 2 EXACTLY */}
+                        <div className="lg:col-span-2 bg-white p-4 rounded-2xl border border-gray-200/80 shadow-2xs space-y-3.5">
+                          {/* CARD HEADER */}
+                          <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600">
+                                <Building className="w-4 h-4" />
+                              </div>
+                              <h4 className="font-extrabold text-gray-800 text-xs tracking-wider uppercase">CITIES IN REGION</h4>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedDetails(null);
+                                  openModal({ partyType: 'market', route: selectedDetails.firmName || selectedDetails.name });
+                                }}
+                                className="px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 font-bold rounded-lg text-xs transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>Add City</span>
+                              </button>
+                              <span className="px-3 py-1 bg-slate-100 text-slate-700 font-bold rounded-lg text-xs">
+                                {citiesInRegion.length} Total
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* SEARCH INPUT */}
+                          <div className="relative">
+                            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="text"
+                              value={regionCitySearch}
+                              onChange={(e) => setRegionCitySearch(e.target.value)}
+                              placeholder="Search cities in this region..."
+                              className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all placeholder:text-gray-400"
+                            />
+                          </div>
+
+                          {/* CITIES GRID */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                            {filteredRegionCities.length > 0 ? (
+                              filteredRegionCities.map((c: any) => {
+                                const cityName = c.firmName || c.name || '';
+                                const cNameLower = cityName.toLowerCase().trim();
+                                const cityCusts = allCustomers.filter((cust: any) => {
+                                  const custCity = (cust.city || cust.assignedMarket || '').toLowerCase().trim();
+                                  return custCity && custCity === cNameLower;
+                                });
+                                const cityOut = cityCusts.reduce((sum: number, cust: any) => sum + (Number(cust.outstandingBalance) || Number(cust.outstanding) || 0), 0);
+
+                                return (
+                                  <div
+                                    key={c._id}
+                                    title={`Click to view customers in ${cityName}`}
+                                    onClick={() => {
+                                      setSelectedDetails(null);
+                                      setCardCustomersModal({
+                                        title: `Customers in ${cityName} (${name} Region)`,
+                                        subtitle: `City Code: ${c.code || '—'} • ${cityCusts.length} Active Accounts`,
+                                        customers: cityCusts
+                                      });
+                                      setCardCustomerSearch('');
+                                    }}
+                                    className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs hover:border-blue-500 hover:ring-1 hover:ring-blue-500 transition-all cursor-pointer group space-y-2.5"
+                                  >
+                                    {/* City Header */}
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-extrabold text-gray-900 text-sm group-hover:text-blue-600 transition-colors truncate" title={cityName}>
+                                        {cityName}
+                                      </span>
+                                      <span className="px-2 py-0.5 text-[9.5px] font-extrabold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md">
+                                        {c.status || 'ACTIVE'}
+                                      </span>
+                                    </div>
+
+                                    {/* Sub-rows inside city card */}
+                                    <div className="bg-slate-50/80 p-2.5 rounded-xl space-y-1.5 border border-slate-100 text-xs">
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-gray-500 text-[11px] font-semibold">Customers</span>
+                                        <span className="font-extrabold text-gray-900 font-mono text-xs">{cityCusts.length}</span>
+                                      </div>
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-gray-500 text-[11px] font-semibold">Outstanding</span>
+                                        <span className={`font-extrabold font-mono text-xs ${cityOut >= 100000 ? 'text-rose-600' : cityOut > 0 ? 'text-emerald-600' : 'text-gray-700'}`}>
+                                          ₹{cityOut.toLocaleString('en-IN')}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <div className="col-span-2 py-8 text-center bg-slate-50/50 rounded-2xl border border-dashed border-gray-200">
+                                <p className="text-gray-400 font-medium text-xs">No cities found matching "{regionCitySearch}"</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                );
+              }
+
+              // -------------------------------------------------------------
+              // 6. CITIES / MARKETS SUB-MODULE
+              // -------------------------------------------------------------
+              if (effectiveTab === 'cities') {
+                const cName = (name || '').toLowerCase().trim();
+                const cityCusts = allCustomers.filter((c: any) => (c.city || c.assignedMarket || '').toLowerCase().trim() === cName);
+
+                return (
+                  <>
+                    <div className="grid grid-cols-3 gap-2.5">
+                      <div className="bg-cyan-50/60 border border-cyan-100 p-2.5 rounded-2xl text-center shadow-2xs">
+                        <span className="block text-[9px] text-cyan-700 font-extrabold uppercase tracking-wider">PARENT REGION</span>
+                        <span className="block text-xs font-bold text-cyan-950 mt-0.5 truncate">
+                          {selectedDetails.route || selectedDetails.assignedRegion || 'Unassigned'}
                         </span>
-                        <span className="text-[9px] text-purple-600 font-medium block mt-0.5">Click to view all →</span>
                       </div>
                       <div 
                         onClick={() => {
-                          const matched = allCustomers.filter((c: any) => (c.city === name || c.assignedMarket === name));
+                          setSelectedDetails(null);
                           setCardCustomersModal({
-                            title: `Customers in ${name}`,
-                            subtitle: `Parent Region: ${selectedDetails.route || '—'} • ${matched.length} Total Customers`,
-                            customers: matched
+                            title: `Customers in Market / City: ${name}`,
+                            subtitle: `Parent Route: ${selectedDetails.route || 'Unassigned'} • ${cityCusts.length} Total Customers`,
+                            customers: cityCusts
                           });
                           setCardCustomerSearch('');
                         }}
-                        className="bg-blue-50/60 hover:bg-blue-100/70 border border-blue-100 hover:border-blue-300 p-3 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.02] group"
-                        title="Click to view all customers in this city"
+                        className="bg-blue-50/60 hover:bg-blue-100/70 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.01] group"
                       >
-                        <span className="block text-[10px] text-blue-700 font-bold uppercase tracking-wider group-hover:underline">Customers</span>
-                        <span className="block text-xl font-black text-blue-900 mt-0.5">{assignedCustsCount}</span>
-                        <span className="text-[9px] text-blue-500 font-medium block mt-0.5">Click to view all →</span>
+                        <span className="block text-[9px] text-blue-700 font-extrabold uppercase tracking-wider group-hover:underline">TOTAL CUSTOMERS</span>
+                        <span className="block text-xs font-black text-blue-950 mt-0.5">
+                          {cityCusts.length} Customers ↗
+                        </span>
                       </div>
-                      <div 
-                        onClick={() => {
-                          const dist = (selectedDetails.district || '').toLowerCase().trim();
-                          const distCusts = allCustomers.filter((c: any) => (c.district || '').toLowerCase().trim() === dist);
-                          setCardCustomersModal({
-                            title: `Customers in District: ${selectedDetails.district || 'Unassigned'}`,
-                            subtitle: `${distCusts.length} Customers in this district`,
-                            customers: distCusts
-                          });
-                          setCardCustomerSearch('');
-                        }}
-                        className="bg-indigo-50/60 hover:bg-indigo-100/70 border border-indigo-100 hover:border-indigo-300 p-3 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.02] group"
-                        title="Click to view customers in this district"
-                      >
-                        <span className="block text-[10px] text-indigo-700 font-bold uppercase tracking-wider group-hover:underline">District</span>
-                        <span className="block text-xs font-bold text-indigo-900 mt-1.5 truncate" title={selectedDetails.district || '—'}>
+                      <div className="bg-purple-50/60 border border-purple-100 p-2.5 rounded-2xl text-center shadow-2xs">
+                        <span className="block text-[9px] text-purple-700 font-extrabold uppercase tracking-wider">DISTRICT</span>
+                        <span className="block text-xs font-extrabold text-purple-950 mt-0.5 truncate">
                           {selectedDetails.district || '—'}
                         </span>
-                        <span className="text-[9px] text-indigo-600 font-medium block mt-0.5">Click to view all →</span>
                       </div>
                     </div>
-                  );
-                }
-                if (activeMainTab === 'agents') {
-                  const agentName = name.toLowerCase().trim();
-                  const assignedRoutes = allRoutes.filter((r: any) => 
-                    (r.assignedAgent && r.assignedAgent.toLowerCase().trim() === agentName) ||
-                    (Array.isArray(selectedDetails.assignedRoutes) && selectedDetails.assignedRoutes.includes(r._id))
-                  );
-                  const assignedCities = allCities.filter((c: any) => (c.agentAssigned || '').toLowerCase().trim() === agentName);
-                  const assignedCusts = allCustomers.filter((c: any) => (c.agentAssigned || '').toLowerCase().trim() === agentName);
-                  return (
-                    <div className="grid grid-cols-3 gap-3">
-                      <div 
-                        onClick={() => {
-                          const routeNames = new Set(assignedRoutes.map((r: any) => (r.name || '').toLowerCase().trim()));
-                          const routeCodes = new Set(assignedRoutes.map((r: any) => (r.code || '').toLowerCase().trim()).filter(Boolean));
-                          const matched = allCustomers.filter((c: any) => {
-                            const r = (c.route || '').toLowerCase().trim();
-                            return r && (routeNames.has(r) || routeCodes.has(r));
-                          });
-                          setCardCustomersModal({
-                            title: `Customers in Routes assigned to ${name}`,
-                            subtitle: `${assignedRoutes.length} Routes • ${matched.length} Customers`,
-                            customers: matched
-                          });
-                          setCardCustomerSearch('');
-                        }}
-                        className="bg-purple-50/60 hover:bg-purple-100/70 border border-purple-100 hover:border-purple-300 p-3 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.02] group"
-                        title="Click to view all customers in assigned routes"
-                      >
-                        <span className="block text-[10px] text-purple-700 font-bold uppercase tracking-wider group-hover:underline">Assigned Routes</span>
-                        <span className="block text-xl font-black text-purple-900 mt-0.5">{assignedRoutes.length}</span>
-                        <span className="text-[9px] text-purple-600 font-medium block mt-0.5">Click to view all →</span>
-                      </div>
-                      <div 
-                        onClick={() => {
-                          const cityNames = new Set(assignedCities.map((c: any) => (c.firmName || c.name || '').toLowerCase().trim()));
-                          const matched = allCustomers.filter((c: any) => {
-                            const city = (c.city || '').toLowerCase().trim();
-                            const market = (c.assignedMarket || '').toLowerCase().trim();
-                            return (city && cityNames.has(city)) || (market && cityNames.has(market));
-                          });
-                          setCardCustomersModal({
-                            title: `Customers in Cities assigned to ${name}`,
-                            subtitle: `${assignedCities.length} Cities • ${matched.length} Customers`,
-                            customers: matched
-                          });
-                          setCardCustomerSearch('');
-                        }}
-                        className="bg-blue-50/60 hover:bg-blue-100/70 border border-blue-100 hover:border-blue-300 p-3 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.02] group"
-                        title="Click to view all customers in assigned cities"
-                      >
-                        <span className="block text-[10px] text-blue-700 font-bold uppercase tracking-wider group-hover:underline">Assigned Cities</span>
-                        <span className="block text-xl font-black text-blue-900 mt-0.5">{assignedCities.length}</span>
-                        <span className="text-[9px] text-blue-500 font-medium block mt-0.5">Click to view all →</span>
-                      </div>
-                      <div 
-                        onClick={() => {
-                          setCardCustomersModal({
-                            title: `Customers assigned to ${name}`,
-                            subtitle: `Agent • ${assignedCusts.length} Assigned Customers`,
-                            customers: assignedCusts
-                          });
-                          setCardCustomerSearch('');
-                        }}
-                        className="bg-emerald-50/60 hover:bg-emerald-100/70 border border-emerald-100 hover:border-emerald-300 p-3 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.02] group"
-                        title="Click to view all customers assigned to this agent"
-                      >
-                        <span className="block text-[10px] text-emerald-700 font-bold uppercase tracking-wider group-hover:underline">Customers</span>
-                        <span className="block text-xl font-black text-emerald-900 mt-0.5">{assignedCusts.length}</span>
-                        <span className="text-[9px] text-emerald-600 font-medium block mt-0.5">Click to view all →</span>
-                      </div>
-                    </div>
-                  );
-                }
-                if (activeMainTab === 'transporters') {
-                  const transName = name.toLowerCase().trim();
-                  const usingCusts = allCustomers.filter((c: any) => (c.preferredTransport || '').toLowerCase().trim() === transName);
-                  return (
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="bg-purple-50/60 border border-purple-100 p-3 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[10px] text-purple-700 font-bold uppercase tracking-wider">Transporter</span>
-                        <span className="block text-xs font-bold text-purple-900 mt-1.5 truncate" title={name}>{name}</span>
-                      </div>
-                      <div 
-                        onClick={() => {
-                          setCardCustomersModal({
-                            title: `Customers using ${name}`,
-                            subtitle: `Transporter • ${usingCusts.length} Customers Using`,
-                            customers: usingCusts
-                          });
-                          setCardCustomerSearch('');
-                        }}
-                        className="bg-blue-50/60 hover:bg-blue-100/70 border border-blue-100 hover:border-blue-300 p-3 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.02] group"
-                        title="Click to view all customers using this transporter"
-                      >
-                        <span className="block text-[10px] text-blue-700 font-bold uppercase tracking-wider group-hover:underline">Customers Using</span>
-                        <span className="block text-xl font-black text-blue-900 mt-0.5">{usingCusts.length}</span>
-                        <span className="text-[9px] text-blue-500 font-medium block mt-0.5">Click to view all →</span>
-                      </div>
-                      <div className="bg-emerald-50/60 border border-emerald-100 p-3 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[10px] text-emerald-700 font-bold uppercase tracking-wider">Mobile</span>
-                        <span className="block text-xs font-mono font-bold text-emerald-900 mt-1.5 truncate">{selectedDetails.phone || selectedDetails.contactPersons?.[0]?.phone || '—'}</span>
-                      </div>
-                    </div>
-                  );
-                }
-                if (activeMainTab === 'vendors') {
-                  const bal = selectedDetails.outstandingBalance || 0;
-                  return (
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="bg-purple-50/60 border border-purple-100 p-3 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[10px] text-purple-700 font-bold uppercase tracking-wider">Category</span>
-                        <span className="block text-xs font-bold text-purple-900 mt-1.5 truncate">{selectedDetails.vendorType || 'Paper Mill'}</span>
-                      </div>
-                      <div className="bg-blue-50/60 border border-blue-100 p-3 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[10px] text-blue-700 font-bold uppercase tracking-wider">Credit Days</span>
-                        <span className="block text-xl font-black text-blue-900 mt-0.5">{selectedDetails.creditDays || 30}</span>
-                      </div>
-                      <div className={`${bal > 0 ? 'bg-rose-50/60 border-rose-100' : 'bg-emerald-50/60 border-emerald-100'} border p-3 rounded-2xl text-center shadow-2xs`}>
-                        <span className={`block text-[10px] ${bal > 0 ? 'text-rose-700' : 'text-emerald-700'} font-bold uppercase tracking-wider`}>Outstanding</span>
-                        <span className={`block text-xs font-mono font-black ${bal > 0 ? 'text-rose-900' : 'text-emerald-900'} mt-1.5`}>
-                          ₹{Math.abs(bal).toLocaleString('en-IN')}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                }
-                if (activeMainTab === 'customers') {
-                  const bal = selectedDetails.outstandingBalance || 0;
-                  return (
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="bg-purple-50/60 border border-purple-100 p-3 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[10px] text-purple-700 font-bold uppercase tracking-wider">Credit Limit</span>
-                        <span className="block text-xs font-mono font-bold text-purple-900 mt-1.5">₹{(selectedDetails.creditLimit || 50000).toLocaleString('en-IN')}</span>
-                      </div>
-                      <div className="bg-blue-50/60 border border-blue-100 p-3 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[10px] text-blue-700 font-bold uppercase tracking-wider">Credit Days</span>
-                        <span className="block text-xl font-black text-blue-900 mt-0.5">{selectedDetails.creditDays || 30}</span>
-                      </div>
-                      <div className={`${bal > 0 ? 'bg-rose-50/60 border-rose-100' : 'bg-emerald-50/60 border-emerald-100'} border p-3 rounded-2xl text-center shadow-2xs`}>
-                        <span className={`block text-[10px] ${bal > 0 ? 'text-rose-700' : 'text-emerald-700'} font-bold uppercase tracking-wider`}>Outstanding</span>
-                        <span className={`block text-xs font-mono font-black ${bal > 0 ? 'text-rose-900' : 'text-emerald-900'} mt-1.5`}>
-                          ₹{Math.abs(bal).toLocaleString('en-IN')}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
 
-              {/* REGION MODULE: CITIES IN REGION AS SMALL CARDS (Exact Replica of Region Module!) */}
-              {activeMainTab === 'regions' && (
-                <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-purple-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                      <Building className="w-4 h-4 text-purple-600" />
-                      <span>Cities in Region</span>
-                    </h4>
-                    <span className="px-2.5 py-0.5 bg-purple-100 text-purple-700 rounded-full font-extrabold text-[11px]">
-                      {allCities.filter((c: any) => {
-                        const rName = (selectedDetails.firmName || selectedDetails.name || '').toLowerCase().trim();
-                        const rCode = (selectedDetails.code || '').toLowerCase().trim();
-                        const cRoute = (c.route || '').toLowerCase().trim();
-                        return cRoute && (cRoute === rName || (rCode && cRoute === rCode));
-                      }).length} Total
-                    </span>
-                  </div>
-
-                  {/* Search Input for Cities in Region */}
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-3.5 h-3.5" />
-                    <input
-                      type="text"
-                      placeholder="Search cities in this region..."
-                      value={regionCitySearch}
-                      onChange={e => setRegionCitySearch(e.target.value)}
-                      className="w-full pl-9 pr-8 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-purple-600 bg-white shadow-2xs font-medium"
-                    />
-                    {regionCitySearch && (
-                      <button
-                        type="button"
-                        onClick={() => setRegionCitySearch('')}
-                        className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Small City Cards Grid (Matching Legacy Module 100%) */}
-                  {(() => {
-                    const rName = (selectedDetails.firmName || selectedDetails.name || '').toLowerCase().trim();
-                    const rCode = (selectedDetails.code || '').toLowerCase().trim();
-                    const regionCities = allCities.filter((c: any) => {
-                      const cRoute = (c.route || '').toLowerCase().trim();
-                      return cRoute && (cRoute === rName || (rCode && cRoute === rCode));
-                    });
-                    const filteredCities = regionCities.filter((c: any) =>
-                      (c.firmName || c.name || '').toLowerCase().includes(regionCitySearch.toLowerCase())
-                    );
-
-                    if (regionCities.length === 0) {
-                      return <p className="text-gray-400 italic text-center py-6">No cities mapped to this region yet.</p>;
-                    }
-
-                    if (filteredCities.length === 0) {
-                      return <p className="text-gray-400 italic text-center py-6">No matching cities found for "{regionCitySearch}".</p>;
-                    }
-
-                    return (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        {filteredCities.map((city: any) => {
-                          const cityName = (city.firmName || city.name || '').toLowerCase().trim();
-                          const custCount = allCustomers.filter((item: any) => {
-                            const cCity = (item.city || '').toLowerCase().trim();
-                            const cMarket = (item.assignedMarket || '').toLowerCase().trim();
-                            return cCity === cityName || cMarket === cityName;
-                          }).length;
-                          return (
-                            <div
-                              key={city._id}
-                              onClick={() => {
-                                const matched = allCustomers.filter((item: any) => {
-                                  const cCity = (item.city || '').toLowerCase().trim();
-                                  const cMarket = (item.assignedMarket || '').toLowerCase().trim();
-                                  return cCity === cityName || cMarket === cityName;
-                                });
-                                setCardCustomersModal({
-                                  title: `Customers in ${city.firmName || city.name}`,
-                                  subtitle: `Region: ${selectedDetails.firmName || selectedDetails.name} • ${city.district ? `${city.district} District • ` : ''}${matched.length} Total Customers`,
-                                  customers: matched
-                                });
-                                setCardCustomerSearch('');
-                              }}
-                              className="p-3 border border-gray-200 hover:border-purple-400 rounded-xl bg-white hover:bg-purple-50/40 shadow-2xs hover:shadow-md transition-all duration-200 space-y-2 flex flex-col justify-between cursor-pointer group select-none"
-                              title={`Click to view all ${custCount} customers in ${city.firmName || city.name}`}
-                            >
-                              <div className="flex items-start justify-between gap-1">
-                                <span className="font-bold text-gray-900 text-xs block truncate group-hover:text-purple-700 transition-colors" title={city.firmName || city.name}>
-                                  {city.firmName || city.name}
-                                </span>
-                                <span className={`inline-flex px-1.5 py-0.5 text-[9px] font-extrabold uppercase rounded shrink-0 ${
-                                  city.status === 'active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-500'
-                                }`}>
-                                  {city.status || 'active'}
-                                </span>
-                              </div>
-
-                              <div className="space-y-1 pt-1 border-t border-gray-100">
-                                <div className="flex items-center justify-between text-[11px] text-gray-500 font-semibold bg-slate-50 group-hover:bg-purple-100/60 px-2.5 py-1 rounded-lg transition-colors">
-                                  <span>Customers</span>
-                                  <span className="text-purple-700 font-bold flex items-center gap-1">
-                                    <span>{custCount}</span>
-                                    <span className="text-[10px] text-purple-400 group-hover:text-purple-700 transition-colors">→</span>
-                                  </span>
+                    <div className="max-h-[60vh] overflow-y-auto pr-1 space-y-3.5 text-xs">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                        <div className="space-y-3.5">
+                          <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-2.5">
+                            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-lg bg-cyan-50 flex items-center justify-center text-cyan-600">
+                                  <Building className="w-3.5 h-3.5" />
                                 </div>
-                                <div className="flex items-center justify-between text-[11px] text-gray-500 font-semibold bg-slate-50 px-2.5 py-1 rounded-lg">
-                                  <span>District</span>
-                                  <span className="text-gray-800 font-semibold truncate max-w-[100px]">{city.district || '—'}</span>
-                                </div>
+                                <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">CITY / MARKET PROFILE</h4>
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-
-              {/* AGENTS MODULE: ASSIGNED REGIONS IN PROFILE */}
-              {activeMainTab === 'agents' && (
-                <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
-                  <h4 className="font-bold text-purple-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                    <Briefcase className="w-4 h-4 text-purple-600" />
-                    <span>Assigned Regions</span>
-                  </h4>
-                  {(() => {
-                    const agentName = (selectedDetails.firmName || selectedDetails.contactName || selectedDetails.name || '').toLowerCase().trim();
-                    const assigned = allRoutes.filter((r: any) => 
-                      (r.assignedAgent && r.assignedAgent.toLowerCase().trim() === agentName) ||
-                      (Array.isArray(selectedDetails.assignedRoutes) && selectedDetails.assignedRoutes.includes(r._id))
-                    );
-                    if (assigned.length === 0) {
-                      return <p className="text-gray-400 italic text-center py-4">No regions assigned to this agent.</p>;
-                    }
-                    return (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        {assigned.map((r: any) => {
-                          const rName = (r.name || '').toLowerCase().trim();
-                          const rCode = (r.code || '').toLowerCase().trim();
-                          const citiesCount = allCities.filter((c: any) => {
-                            const cRoute = (c.route || '').toLowerCase().trim();
-                            return cRoute && (cRoute === rName || (rCode && cRoute === rCode));
-                          }).length;
-                          const custCount = allCustomers.filter((c: any) => {
-                            const cRoute = (c.route || '').toLowerCase().trim();
-                            return cRoute && (cRoute === rName || (rCode && cRoute === rCode));
-                          }).length;
-                          return (
-                            <div 
-                              key={r._id} 
-                              onClick={() => {
-                                const rCusts = allCustomers.filter((c: any) => {
-                                  const cRoute = (c.route || '').toLowerCase().trim();
-                                  return cRoute && (cRoute === rName || (rCode && cRoute === rCode));
-                                });
-                                setCardCustomersModal({
-                                  title: `Customers in ${r.name} Route`,
-                                  subtitle: `Agent: ${selectedDetails.firmName || selectedDetails.contactName} • ${rCusts.length} Customers`,
-                                  customers: rCusts
-                                });
-                                setCardCustomerSearch('');
-                              }}
-                              className="p-3 border border-gray-200 hover:border-purple-400 rounded-xl bg-white hover:bg-purple-50/40 shadow-2xs hover:shadow-md transition-all space-y-2 cursor-pointer group select-none"
-                              title={`Click to view all ${custCount} customers in ${r.name}`}
-                            >
-                              <div className="flex items-center justify-between">
-                                <span className="font-bold text-gray-900 text-xs group-hover:text-purple-700 transition-colors">{r.name}</span>
-                                <span className="font-mono text-purple-700 font-extrabold text-xs">{r.code || '—'}</span>
+                            <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs">
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">City Name</span>
+                                <span className="font-bold text-gray-900 text-xs block truncate">{name}</span>
                               </div>
-                              <div className="flex items-center justify-between text-[11px] text-gray-500 bg-slate-50 group-hover:bg-purple-100/60 px-2 py-1 rounded-lg transition-colors">
-                                <span>{citiesCount} Cities</span>
-                                <span className="font-bold text-purple-700 flex items-center gap-1">
-                                  <span>{custCount} Customers</span>
-                                  <span className="text-[10px]">→</span>
-                                </span>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Parent Route</span>
+                                <span className="font-bold text-purple-700 text-xs">{selectedDetails.route || selectedDetails.assignedRegion || 'Unassigned'}</span>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">District</span>
+                                <span className="font-bold text-gray-900 text-xs">{selectedDetails.district || '—'}</span>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">State</span>
+                                <span className="font-bold text-gray-900 text-xs">{selectedDetails.state || 'Andhra Pradesh'}</span>
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-
-              {/* TRANSPORTERS MODULE: CUSTOMERS USING THIS TRANSPORTER */}
-              {activeMainTab === 'transporters' && (
-                <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
-                  <h4 className="font-bold text-purple-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                    <Truck className="w-4 h-4 text-purple-600" />
-                    <span>Customers Using This Transporter</span>
-                  </h4>
-                  {(() => {
-                    const transName = (selectedDetails.firmName || selectedDetails.name || '').toLowerCase().trim();
-                    const usingCusts = allCustomers.filter((c: any) => (c.preferredTransport || '').toLowerCase().trim() === transName);
-                    if (usingCusts.length === 0) {
-                      return <p className="text-gray-400 italic text-center py-4">No customers currently mapped to this transporter.</p>;
-                    }
-                    return (
-                      <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-                        {usingCusts.map((c: any) => (
-                          <div 
-                            key={c._id} 
-                            onClick={() => {
-                              setSelectedDetails(c);
-                            }}
-                            className="p-2.5 bg-white hover:bg-purple-50/40 border border-gray-200 hover:border-purple-300 rounded-xl flex items-center justify-between text-xs shadow-2xs cursor-pointer transition-all group"
-                            title="Click to view customer profile"
-                          >
-                            <div>
-                              <span className="font-bold text-gray-900 block group-hover:text-purple-700 transition-colors">{c.firmName}</span>
-                              <span className="text-[11px] text-gray-500">{[c.city, c.district].filter(Boolean).join(', ') || '—'}</span>
-                            </div>
-                            <span className="font-mono text-gray-700 font-semibold flex items-center gap-1">
-                              <span>{c.phone || '—'}</span>
-                              <span className="text-purple-600 font-bold opacity-0 group-hover:opacity-100 transition-opacity">→</span>
-                            </span>
                           </div>
-                        ))}
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-
-              {/* General Information Card */}
-              <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
-                <h4 className="font-bold text-purple-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
-                  <span>Overview & Details</span>
-                </h4>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  {selectedDetails.contactName && (
-                    <div>
-                      <span className="block text-gray-400 text-[10px] font-semibold uppercase">Contact Person</span>
-                      <span className="font-bold text-gray-800">{selectedDetails.contactName}</span>
-                    </div>
-                  )}
-                  {selectedDetails.ownerName && (
-                    <div>
-                      <span className="block text-gray-400 text-[10px] font-semibold uppercase">Owner Name</span>
-                      <span className="font-bold text-gray-800">{selectedDetails.ownerName}</span>
-                    </div>
-                  )}
-                  {selectedDetails.phone && (
-                    <div>
-                      <span className="block text-gray-400 text-[10px] font-semibold uppercase">Mobile Phone</span>
-                      <span className="font-mono font-bold text-gray-800">{selectedDetails.phone}</span>
-                    </div>
-                  )}
-                  {selectedDetails.email && (
-                    <div>
-                      <span className="block text-gray-400 text-[10px] font-semibold uppercase">Email Address</span>
-                      <span className="font-semibold text-gray-800 truncate block">{selectedDetails.email}</span>
-                    </div>
-                  )}
-                  {selectedDetails.city && (
-                    <div>
-                      <span className="block text-gray-400 text-[10px] font-semibold uppercase">City / Location</span>
-                      <span className="font-bold text-gray-800">{selectedDetails.city}</span>
-                    </div>
-                  )}
-                  {selectedDetails.district && (
-                    <div>
-                      <span className="block text-gray-400 text-[10px] font-semibold uppercase">District</span>
-                      <span className="font-bold text-gray-800">{selectedDetails.district}</span>
-                    </div>
-                  )}
-                  {selectedDetails.gstNumber && (
-                    <div>
-                      <span className="block text-gray-400 text-[10px] font-semibold uppercase">GSTIN</span>
-                      <span className="font-mono font-bold text-purple-700">{selectedDetails.gstNumber}</span>
-                    </div>
-                  )}
-                </div>
-
-                {selectedDetails.notes && (
-                  <div className="pt-2 border-t border-gray-200/60">
-                    <span className="block text-gray-400 text-[10px] font-semibold uppercase mb-1">Remarks / Description</span>
-                    <p className="text-gray-700 font-medium leading-relaxed bg-white p-3 rounded-xl border border-gray-200/80">{selectedDetails.notes}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Contact Persons Section */}
-              {Array.isArray(selectedDetails.contactPersons) && selectedDetails.contactPersons.length > 0 && (
-                <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
-                  <h4 className="font-bold text-purple-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
-                    <span>Contact Persons ({selectedDetails.contactPersons.length})</span>
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {selectedDetails.contactPersons.map((cp: any, idx: number) => (
-                      <div key={idx} className="p-3 bg-white border border-gray-200 rounded-xl space-y-1 shadow-2xs">
-                        <div className="flex items-center justify-between font-bold text-gray-900">
-                          <span>{cp.name || 'Unnamed Representative'}</span>
-                          <span className="text-[10px] text-purple-600 font-semibold bg-purple-50 px-2 py-0.5 rounded-md">{cp.designation || 'Contact'}</span>
                         </div>
-                        <div className="space-y-0.5 text-[11px] font-mono text-gray-600 pt-1 border-t border-gray-100">
-                          {cp.phone && <div>📞 {cp.phone}</div>}
-                          {cp.email && <div className="truncate">✉️ {cp.email}</div>}
+
+                        <div className="space-y-3.5">
+                          <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-2.5">
+                            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                                  <Users className="w-3.5 h-3.5" />
+                                </div>
+                                <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">CUSTOMERS IN THIS CITY</h4>
+                              </div>
+                            </div>
+                            <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                              {cityCusts.length > 0 ? cityCusts.map((c: any) => (
+                                <div key={c._id} className="p-2 bg-slate-50 border border-gray-200 rounded-xl flex items-center justify-between">
+                                  <div>
+                                    <span className="font-bold text-gray-900 block text-xs">{c.firmName}</span>
+                                    <span className="text-[10px] text-gray-500">{c.contactName || c.phone}</span>
+                                  </div>
+                                  {c.phone && (
+                                    <a href={`https://wa.me/91${c.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="WhatsApp">
+                                      <WhatsAppIcon />
+                                    </a>
+                                  )}
+                                </div>
+                              )) : <span className="text-gray-400 italic text-xs">No customers recorded in this city</span>}
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                    </div>
+                  </>
+                );
+              }
 
-            </div>
+              return null;
+            })()}
           </div>
         </Modal>
-      )}
+        );
+      })()}
 
       {/* Dynamic Customer Data Modal (Triggered by clicking any card) */}
       {cardCustomersModal && (
         <div 
-          className="fixed inset-0 z-[95] bg-gray-950/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-150"
+          className="fixed inset-0 z-[80] bg-gray-950/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-150"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setCardCustomersModal(null);
@@ -3285,7 +3705,6 @@ export const BusinessDirectoryV2: React.FC = () => {
                           <tr>
                             <th className="py-3 px-4 w-12 text-center">#</th>
                             <th className="py-3 px-4">Customer Firm</th>
-                            <th className="py-3 px-4">Contact Person</th>
                             <th className="py-3 px-4">Phone / WhatsApp</th>
                             <th className="py-3 px-4">City & Region</th>
                             <th className="py-3 px-4">Agent</th>
@@ -3301,6 +3720,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                               <tr
                                 key={cust._id || idx}
                                 onClick={() => {
+                                  setCardCustomersModal(null);
                                   setSelectedDetails(cust);
                                 }}
                                 className="hover:bg-purple-50/50 transition-colors cursor-pointer group"
@@ -3313,16 +3733,16 @@ export const BusinessDirectoryV2: React.FC = () => {
                                   <div className="font-bold text-gray-900 group-hover:text-purple-700 transition-colors text-xs">
                                     {cust.firmName || cust.name || 'Unnamed Customer'}
                                   </div>
+                                  {(cust.contactName || cust.ownerName || cust.contactPersons?.[0]?.name) && (
+                                    <div className="text-[11px] text-gray-500 font-medium mt-0.5">
+                                      {cust.contactName || cust.ownerName || cust.contactPersons?.[0]?.name}
+                                    </div>
+                                  )}
                                   {cust.gstNumber && (
                                     <div className="font-mono text-[10px] text-gray-400">
                                       GST: {cust.gstNumber}
                                     </div>
                                   )}
-                                </td>
-                                <td className="py-3 px-4">
-                                  <span className="font-medium text-gray-800">
-                                    {cust.contactName || cust.ownerName || '—'}
-                                  </span>
                                 </td>
                                 <td className="py-3 px-4">
                                   <div className="flex items-center gap-1.5 font-mono text-gray-700 font-medium">
@@ -3362,6 +3782,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
+                                      setCardCustomersModal(null);
                                       setSelectedDetails(cust);
                                     }}
                                     className="px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-600 hover:text-white font-bold text-[10px] transition-all cursor-pointer"

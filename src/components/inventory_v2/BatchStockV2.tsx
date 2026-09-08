@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { getBalancesV2, getWarehouseHierarchyV2, getLedgerV2, recordTransferV2, WarehouseLocationV2, LedgerEntryV2 } from '../../api/mfgApiV2';
 import { getPurchaseInvoicesV2, PurchaseInvoiceV2 } from './purchases/purchaseService';
 import { showToast } from '../ui/Toast';
-import { formatSkuName } from './SkuMasterV2';
+import { formatSkuName } from '../../utils/skuUtils';
 import Drawer from '../ui/Drawer';
 
 const BatchStockV2: React.FC = () => {

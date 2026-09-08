@@ -14,7 +14,8 @@ import {
   CheckCircle2,
   Warehouse,
   BarChart3,
-  FileText
+  FileText,
+  AlertTriangle
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import Modal from '../ui/Modal';
@@ -124,6 +125,25 @@ export const StockInventoryV2: React.FC = () => {
   const [allSkus, setAllSkus] = useState<SkuV2[]>([]);
   const [allLocations, setAllLocations] = useState<WarehouseLocationV2[]>([]);
   const [auxLoaded, setAuxLoaded] = useState(false);
+
+  // Custom Confirmation Dialog Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    type: 'cancel_batch' | 'delete_location' | null;
+    item: any;
+    title: string;
+    message: string;
+    confirmText: string;
+    onConfirm: () => Promise<void>;
+  }>({
+    isOpen: false,
+    type: null,
+    item: null,
+    title: '',
+    message: '',
+    confirmText: '',
+    onConfirm: async () => {}
+  });
 
   // Warehouse Hierarchy Specific States
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
@@ -896,20 +916,34 @@ export const StockInventoryV2: React.FC = () => {
   };
 
   // Delete Node / Location Handler
-  const handleDeleteLocation = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this location node?')) return;
-    try {
-      await deleteWarehouseLocationV2(id, selectedCompany!._id);
-      showToast('Location deleted successfully', 'success');
-      if (selectedNode?._id === id) setSelectedNode(null);
-      loadStockData();
-    } catch (err: any) {
-      showToast(err.message || 'Failed to delete location', 'error');
-    }
+  const handleDeleteLocation = (id: string) => {
+    const targetLoc = allLocations.find(l => l._id === id);
+    const locName = targetLoc?.name || 'location node';
+
+    setConfirmModal({
+      isOpen: true,
+      type: 'delete_location',
+      item: id,
+      title: 'Delete Warehouse Location',
+      message: `Are you sure you want to delete '${locName}'? This action cannot be undone.`,
+      confirmText: 'Yes, Delete Location',
+      onConfirm: async () => {
+        try {
+          await deleteWarehouseLocationV2(id, selectedCompany!._id);
+          showToast('Location deleted successfully', 'success');
+          if (selectedNode?._id === id) setSelectedNode(null);
+          loadStockData();
+        } catch (err: any) {
+          showToast(err.message || 'Failed to delete location', 'error');
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
   };
 
   // Cancel Purchase Batch Handler
-  const handleCancelPurchaseBatch = async (item: any) => {
+  const handleCancelPurchaseBatch = (item: any) => {
     const rawInv = item.rawInvoice || item;
     const invId = rawInv._id || item._id;
     const invNum = item.batchNumber || rawInv.invoiceNumber || 'Batch';
@@ -919,23 +953,31 @@ export const StockInventoryV2: React.FC = () => {
       return;
     }
 
-    if (!window.confirm(`Are you sure you want to cancel purchase batch '${invNum}'? This will mark it as Cancelled and remove its stock from Stock and Stock Ledger modules.`)) {
-      return;
-    }
-
-    try {
-      if (invId && typeof invId === 'string' && !invId.startsWith('bal-') && !invId.startsWith('mock-')) {
-        await cancelPurchaseInvoiceV2(invId, selectedCompany!._id);
-        showToast(`Purchase batch '${invNum}' cancelled successfully!`, 'success');
-      } else {
-        showToast(`Batch '${invNum}' has no saved invoice record to cancel.`, 'warning');
+    setConfirmModal({
+      isOpen: true,
+      type: 'cancel_batch',
+      item,
+      title: 'Cancel Purchase Batch',
+      message: `Are you sure you want to cancel purchase batch '${invNum}'? This will mark the batch as Cancelled and remove its stock from Stock and Stock Ledger modules.`,
+      confirmText: 'Yes, Cancel Batch',
+      onConfirm: async () => {
+        try {
+          if (invId && typeof invId === 'string' && !invId.startsWith('bal-') && !invId.startsWith('mock-')) {
+            await cancelPurchaseInvoiceV2(invId, selectedCompany!._id);
+            showToast(`Purchase batch '${invNum}' cancelled successfully!`, 'success');
+          } else {
+            showToast(`Batch '${invNum}' has no saved invoice record to cancel.`, 'warning');
+          }
+          loadStockData();
+          loadAuxiliaryData(true);
+        } catch (err: any) {
+          console.error('Failed to cancel purchase batch:', err);
+          showToast(err.response?.data?.msg || err.message || 'Failed to cancel purchase batch', 'error');
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
       }
-      loadStockData();
-      loadAuxiliaryData(true);
-    } catch (err: any) {
-      console.error('Failed to cancel purchase batch:', err);
-      showToast(err.response?.data?.msg || err.message || 'Failed to cancel purchase batch', 'error');
-    }
+    });
   };
 
   // Render Tree Node recursively
@@ -2525,6 +2567,59 @@ export const StockInventoryV2: React.FC = () => {
               </div>
             </form>
           )}
+        </Modal>
+      )}
+
+      {/* 6. CUSTOM CONFIRMATION DIALOG MODAL */}
+      {confirmModal.isOpen && (
+        <Modal
+          isOpen={confirmModal.isOpen}
+          onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+          maxWidth="max-w-md"
+          hideCloseButton
+        >
+          <div className="p-2 space-y-4 text-center">
+            {/* Warning Icon Badge */}
+            <div className="mx-auto w-12 h-12 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 flex items-center justify-center shadow-2xs">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+
+            {/* Header */}
+            <div>
+              <h3 className="text-base font-black text-slate-900 tracking-tight">
+                {confirmModal.title}
+              </h3>
+              {(confirmModal.item?.batchNumber || confirmModal.item?.rawInvoice?.invoiceNumber) && (
+                <span className="inline-block mt-1 text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
+                  {confirmModal.item.batchNumber || confirmModal.item.rawInvoice?.invoiceNumber}
+                </span>
+              )}
+            </div>
+
+            {/* Content Message */}
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 text-xs text-slate-600 leading-relaxed font-medium">
+              {confirmModal.message}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="pt-2 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-50 transition-all cursor-pointer"
+              >
+                No, Keep it
+              </button>
+              <button
+                type="button"
+                onClick={() => confirmModal.onConfirm()}
+                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-md shadow-rose-600/20 flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{confirmModal.confirmText || 'Confirm'}</span>
+              </button>
+            </div>
+          </div>
         </Modal>
       )}
 
