@@ -1376,8 +1376,9 @@ export const BusinessDirectoryV2: React.FC = () => {
           </button>
         </div>
 
-        {/* Global Search Box */}
-        <div className="py-2 flex items-center gap-2">
+        {/* Right Action Bar (Search + Icon-Only Action Tools + Add Item Button matching SkuMasterV2) */}
+        <div className="py-2 flex items-center gap-2 flex-wrap">
+          {/* Global Search Box */}
           <div className="relative">
             <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
             <input
@@ -1385,35 +1386,33 @@ export const BusinessDirectoryV2: React.FC = () => {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={`Search ${activeMainTab}...`}
-              className="pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl w-44 md:w-56 focus:outline-none focus:border-purple-500 shadow-2xs font-medium"
+              className="pl-8 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl w-40 md:w-52 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-100 shadow-2xs font-medium"
             />
+            {search && (
+              <button 
+                onClick={() => setSearch('')}
+                className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
-        </div>
-      </div>
 
-      {/* Action Toolbar: Filters, Sort, Columns, Export, Sample CSV, Import */}
-      <div className="bg-white border border-gray-200/90 rounded-2xl p-2.5 shadow-2xs flex flex-wrap items-center justify-between gap-2.5 text-xs select-none">
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Filters Button */}
+          {/* 1. Filters Icon Button */}
           <button
             type="button"
             onClick={() => setShowFilterDrawer(!showFilterDrawer)}
-            className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+            className={`p-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
               activeFilterCount > 0
                 ? 'bg-purple-600 text-white border-purple-600 shadow-purple-100'
-                : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
+                : 'bg-white hover:bg-purple-50/60 text-purple-600 border-gray-200 hover:border-purple-200'
             }`}
+            title={`Filters ${activeFilterCount > 0 ? `(${activeFilterCount} active)` : ''}`}
           >
-            <Filter className="w-3.5 h-3.5" />
-            <span>Filters</span>
-            {activeFilterCount > 0 && (
-              <span className="ml-0.5 px-1.5 py-0.2 bg-white text-purple-700 font-mono text-[10px] font-black rounded-full">
-                {activeFilterCount}
-              </span>
-            )}
+            <Filter className="w-4 h-4" />
           </button>
 
-          {/* Sort Button & Dropdown */}
+          {/* 2. Sort Icon Button & Dropdown */}
           <div className="relative">
             <button
               type="button"
@@ -1422,13 +1421,13 @@ export const BusinessDirectoryV2: React.FC = () => {
                 setShowColumnPicker(false);
                 setShowExportMenu(false);
               }}
-              className="px-3 py-1.5 rounded-xl bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              className="p-2 rounded-xl bg-white hover:bg-purple-50/60 border border-gray-200 hover:border-purple-200 text-purple-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              title="Sort Options"
             >
-              <ArrowUpDown className="w-3.5 h-3.5 text-gray-500" />
-              <span>Sort</span>
+              <ArrowUpDown className="w-4 h-4" />
             </button>
             {showSortMenu && (
-              <div className="absolute left-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs">
+              <div className="absolute right-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs">
                 <div className="px-2 py-1 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Sort Options</div>
                 <button
                   onClick={() => { setSortField('firmName'); setSortOrder('asc'); setShowSortMenu(false); }}
@@ -1464,7 +1463,7 @@ export const BusinessDirectoryV2: React.FC = () => {
             )}
           </div>
 
-          {/* Columns Button & Dropdown */}
+          {/* 3. Columns Icon Button & Dropdown */}
           <div className="relative">
             <button
               type="button"
@@ -1473,13 +1472,13 @@ export const BusinessDirectoryV2: React.FC = () => {
                 setShowSortMenu(false);
                 setShowExportMenu(false);
               }}
-              className="px-3 py-1.5 rounded-xl bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              className="p-2 rounded-xl bg-white hover:bg-purple-50/60 border border-gray-200 hover:border-purple-200 text-purple-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              title="Visible Columns"
             >
-              <Columns className="w-3.5 h-3.5 text-gray-500" />
-              <span>Columns</span>
+              <Columns className="w-4 h-4" />
             </button>
             {showColumnPicker && (
-              <div className="absolute left-0 mt-1.5 w-52 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2.5 space-y-2 text-xs">
+              <div className="absolute right-0 mt-1.5 w-52 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2.5 space-y-2 text-xs">
                 <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
                   <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Visible Columns</span>
                   <button onClick={() => setHiddenColumns({})} className="text-[10px] text-purple-600 font-bold hover:underline">Reset</button>
@@ -1502,10 +1501,8 @@ export const BusinessDirectoryV2: React.FC = () => {
               </div>
             )}
           </div>
-        </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Export Button & Menu */}
+          {/* 4. Export Icon Button & Dropdown */}
           <div className="relative">
             <button
               type="button"
@@ -1514,10 +1511,10 @@ export const BusinessDirectoryV2: React.FC = () => {
                 setShowSortMenu(false);
                 setShowColumnPicker(false);
               }}
-              className="px-3 py-1.5 rounded-xl bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              className="p-2 rounded-xl bg-white hover:bg-purple-50/60 border border-gray-200 hover:border-purple-200 text-purple-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              title="Export Data (PDF / Excel)"
             >
-              <Download className="w-3.5 h-3.5 text-gray-500" />
-              <span>Export</span>
+              <Download className="w-4 h-4" />
             </button>
             {showExportMenu && (
               <div className="absolute right-0 mt-1.5 w-44 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs">
@@ -1539,23 +1536,24 @@ export const BusinessDirectoryV2: React.FC = () => {
             )}
           </div>
 
-          {/* Sample CSV Button */}
+          {/* 5. Sample CSV Icon Button */}
           <button
             type="button"
             onClick={handleDownloadSampleCSV}
-            className="px-3 py-1.5 rounded-xl bg-white hover:bg-purple-50 text-gray-700 hover:text-purple-700 border border-gray-200 hover:border-purple-200 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
-            title="Download Sample CSV for Import"
+            className="p-2 rounded-xl bg-white hover:bg-purple-50/60 text-purple-600 border border-gray-200 hover:border-purple-200 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+            title="Download Sample CSV Template"
           >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-purple-600" />
-            <span>Sample CSV</span>
+            <FileSpreadsheet className="w-4 h-4 text-purple-600" />
           </button>
 
-          {/* Import Button */}
-          <label className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
-            isImporting ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200'
-          }`}>
-            <Upload className={`w-3.5 h-3.5 text-purple-600 ${isImporting ? 'animate-bounce' : ''}`} />
-            <span>{isImporting ? 'Importing...' : 'Import'}</span>
+          {/* 6. Import CSV Icon Button */}
+          <label
+            className={`p-2 rounded-xl border text-purple-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
+              isImporting ? 'bg-purple-100 border-purple-300 animate-pulse' : 'bg-white hover:bg-purple-50/60 border-gray-200 hover:border-purple-200'
+            }`}
+            title="Import CSV/Excel Data"
+          >
+            <Upload className={`w-4 h-4 text-purple-600 ${isImporting ? 'animate-bounce' : ''}`} />
             <input
               type="file"
               accept=".csv,.xlsx,.xls"
@@ -1565,18 +1563,27 @@ export const BusinessDirectoryV2: React.FC = () => {
             />
           </label>
 
-          {/* Activity Logs Button */}
+          {/* 7. Activity Logs Icon Button */}
           <button
             type="button"
             onClick={() => {
               fetchActivityLogs();
               setShowActivityLogModal(true);
             }}
-            className="px-3 py-1.5 rounded-xl bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            className="p-2 rounded-xl bg-white hover:bg-purple-50/60 border border-gray-200 hover:border-purple-200 text-purple-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
             title="View Activity Logs"
           >
-            <History className="w-3.5 h-3.5 text-gray-500" />
-            <span>Logs</span>
+            <History className="w-4 h-4 text-purple-600" />
+          </button>
+
+          {/* 8. Add New Item Icon Button (Circular + Button matching Item Master SkuMasterV2.tsx!) */}
+          <button
+            type="button"
+            onClick={() => openModal()}
+            className="w-8 h-8 rounded-full border border-gray-200 bg-white hover:bg-purple-50 text-purple-600 flex items-center justify-center transition-all shadow-2xs cursor-pointer font-bold shrink-0"
+            title={`Add New ${activeMainTab === 'customers' ? 'Customer' : activeMainTab === 'vendors' ? 'Supplier' : activeMainTab === 'agents' ? 'Agent' : activeMainTab === 'transporters' ? 'Transporter' : activeMainTab === 'regions' ? 'Region' : 'City'}`}
+          >
+            <Plus className="w-4 h-4 text-purple-600 stroke-[2.5]" />
           </button>
         </div>
       </div>
