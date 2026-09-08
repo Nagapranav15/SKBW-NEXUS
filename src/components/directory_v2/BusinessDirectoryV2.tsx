@@ -1284,8 +1284,21 @@ export const BusinessDirectoryV2: React.FC = () => {
       </div>
 
       {/* 2. Top Navigation Tabs Bar */}
-      <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 rounded-2xl shadow-2xs overflow-x-auto">
-        <div className="flex items-center gap-1">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 bg-white px-4 rounded-2xl shadow-2xs relative">
+        {/* Backdrop overlay to close open popovers on outside click */}
+        {(showSortMenu || showColumnPicker || showExportMenu) && (
+          <div
+            className="fixed inset-0 z-40 bg-transparent"
+            onClick={() => {
+              setShowSortMenu(false);
+              setShowColumnPicker(false);
+              setShowExportMenu(false);
+            }}
+          />
+        )}
+
+        {/* Tab Selection (Scrollable on small screens) */}
+        <div className="flex items-center gap-1 overflow-x-auto py-1 max-w-full">
           <button
             onClick={() => handleTabChange('customers')}
             className={`px-4 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap ${
@@ -1359,8 +1372,8 @@ export const BusinessDirectoryV2: React.FC = () => {
           </button>
         </div>
 
-        {/* Right Action Bar (Search + Icon-Only Action Tools + Add Item Button matching SkuMasterV2) */}
-        <div className="py-2 flex items-center gap-2 flex-wrap">
+        {/* Right Action Bar (Search + Icon-Only Action Tools + Add Item Button) */}
+        <div className="py-2 flex items-center gap-2 flex-wrap shrink-0 relative z-40">
           {/* Global Search Box */}
           <div className="relative">
             <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
@@ -1382,22 +1395,27 @@ export const BusinessDirectoryV2: React.FC = () => {
           </div>
 
           {/* 1. Filters Icon Button */}
-          <button
-            type="button"
-            onClick={() => setShowFilterDrawer(!showFilterDrawer)}
-            className={`p-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
-              activeFilterCount > 0
-                ? 'bg-purple-600 text-white border-purple-600 shadow-purple-100'
-                : 'bg-white hover:bg-purple-50/60 text-purple-600 border-gray-200 hover:border-purple-200'
-            }`}
-            title={`Filter Results ${activeFilterCount > 0 ? `(${activeFilterCount} active)` : ''}`}
-            aria-label={`Filter Results ${activeFilterCount > 0 ? `(${activeFilterCount} active)` : ''}`}
-          >
-            <Filter className="w-4 h-4" />
-          </button>
+          <div className="relative group">
+            <button
+              type="button"
+              onClick={() => setShowFilterDrawer(!showFilterDrawer)}
+              className={`p-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
+                activeFilterCount > 0
+                  ? 'bg-purple-600 text-white border-purple-600 shadow-purple-100'
+                  : 'bg-white hover:bg-purple-50/60 text-purple-600 border-gray-200 hover:border-purple-200'
+              }`}
+              title={`Filter Results ${activeFilterCount > 0 ? `(${activeFilterCount} active)` : ''}`}
+              aria-label={`Filter Results ${activeFilterCount > 0 ? `(${activeFilterCount} active)` : ''}`}
+            >
+              <Filter className="w-4 h-4" />
+            </button>
+            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+              Filters {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}
+            </div>
+          </div>
 
           {/* 2. Sort Icon Button & Dropdown */}
-          <div className="relative">
+          <div className="relative group">
             <button
               type="button"
               onClick={() => {
@@ -1411,6 +1429,11 @@ export const BusinessDirectoryV2: React.FC = () => {
             >
               <ArrowUpDown className="w-4 h-4" />
             </button>
+            {!showSortMenu && (
+              <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                Sort Options
+              </div>
+            )}
             {showSortMenu && (
               <div className="absolute right-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs">
                 <div className="px-2 py-1 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Sort Options</div>
@@ -1449,7 +1472,7 @@ export const BusinessDirectoryV2: React.FC = () => {
           </div>
 
           {/* 3. Columns Icon Button & Dropdown */}
-          <div className="relative">
+          <div className="relative group">
             <button
               type="button"
               onClick={() => {
@@ -1463,6 +1486,11 @@ export const BusinessDirectoryV2: React.FC = () => {
             >
               <Columns className="w-4 h-4" />
             </button>
+            {!showColumnPicker && (
+              <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                Column Visibility
+              </div>
+            )}
             {showColumnPicker && (
               <div className="absolute right-0 mt-1.5 w-52 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2.5 space-y-2 text-xs">
                 <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
@@ -1489,7 +1517,7 @@ export const BusinessDirectoryV2: React.FC = () => {
           </div>
 
           {/* 4. Export Icon Button & Dropdown */}
-          <div className="relative">
+          <div className="relative group">
             <button
               type="button"
               onClick={() => {
@@ -1503,6 +1531,11 @@ export const BusinessDirectoryV2: React.FC = () => {
             >
               <Download className="w-4 h-4" />
             </button>
+            {!showExportMenu && (
+              <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                Export Data
+              </div>
+            )}
             {showExportMenu && (
               <div className="absolute right-0 mt-1.5 w-44 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs">
                 <button
@@ -1524,58 +1557,78 @@ export const BusinessDirectoryV2: React.FC = () => {
           </div>
 
           {/* 5. Sample CSV Icon Button */}
-          <button
-            type="button"
-            onClick={handleDownloadSampleCSV}
-            className="p-2 rounded-xl bg-white hover:bg-purple-50/60 text-purple-600 border border-gray-200 hover:border-purple-200 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
-            title="Download Sample CSV"
-            aria-label="Download Sample CSV"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-purple-600" />
-          </button>
+          <div className="relative group">
+            <button
+              type="button"
+              onClick={handleDownloadSampleCSV}
+              className="p-2 rounded-xl bg-white hover:bg-purple-50/60 text-purple-600 border border-gray-200 hover:border-purple-200 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              title="Download Sample CSV"
+              aria-label="Download Sample CSV"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-purple-600" />
+            </button>
+            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+              Sample CSV
+            </div>
+          </div>
 
           {/* 6. Import CSV Icon Button */}
-          <label
-            className={`p-2 rounded-xl border text-purple-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
-              isImporting ? 'bg-purple-100 border-purple-300 animate-pulse' : 'bg-white hover:bg-purple-50/60 border-gray-200 hover:border-purple-200'
-            }`}
-            title="Import CSV File"
-            aria-label="Import CSV File"
-          >
-            <Upload className={`w-4 h-4 text-purple-600 ${isImporting ? 'animate-bounce' : ''}`} />
-            <input
-              type="file"
-              accept=".csv,.xlsx,.xls"
-              disabled={isImporting}
-              onChange={handleImportCSV}
-              className="hidden"
-            />
-          </label>
+          <div className="relative group">
+            <label
+              className={`p-2 rounded-xl border text-purple-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
+                isImporting ? 'bg-purple-100 border-purple-300 animate-pulse' : 'bg-white hover:bg-purple-50/60 border-gray-200 hover:border-purple-200'
+              }`}
+              title="Import CSV File"
+              aria-label="Import CSV File"
+            >
+              <Upload className={`w-4 h-4 text-purple-600 ${isImporting ? 'animate-bounce' : ''}`} />
+              <input
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                disabled={isImporting}
+                onChange={handleImportCSV}
+                className="hidden"
+              />
+            </label>
+            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+              Import Excel/CSV
+            </div>
+          </div>
 
           {/* 7. Activity Logs Icon Button */}
-          <button
-            type="button"
-            onClick={() => {
-              fetchActivityLogs();
-              setShowActivityLogModal(true);
-            }}
-            className="p-2 rounded-xl bg-white hover:bg-purple-50/60 border border-gray-200 hover:border-purple-200 text-purple-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
-            title="Activity Logs"
-            aria-label="Activity Logs"
-          >
-            <History className="w-4 h-4 text-purple-600" />
-          </button>
+          <div className="relative group">
+            <button
+              type="button"
+              onClick={() => {
+                fetchActivityLogs();
+                setShowActivityLogModal(true);
+              }}
+              className="p-2 rounded-xl bg-white hover:bg-purple-50/60 border border-gray-200 hover:border-purple-200 text-purple-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              title="Activity Logs"
+              aria-label="Activity Logs"
+            >
+              <History className="w-4 h-4 text-purple-600" />
+            </button>
+            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+              Activity Logs
+            </div>
+          </div>
 
-          {/* 8. Add New Item Icon Button (Circular + Button matching Item Master SkuMasterV2.tsx!) */}
-          <button
-            type="button"
-            onClick={() => openModal()}
-            className="w-8 h-8 rounded-full border border-gray-200 bg-white hover:bg-purple-50 text-purple-600 flex items-center justify-center transition-all shadow-2xs cursor-pointer font-bold shrink-0"
-            title={`Add New ${activeMainTab === 'customers' ? 'Customer' : activeMainTab === 'vendors' ? 'Supplier' : activeMainTab === 'agents' ? 'Agent' : activeMainTab === 'transporters' ? 'Transporter' : activeMainTab === 'regions' ? 'Region' : 'City'}`}
-            aria-label={`Add New ${activeMainTab === 'customers' ? 'Customer' : activeMainTab === 'vendors' ? 'Supplier' : activeMainTab === 'agents' ? 'Agent' : activeMainTab === 'transporters' ? 'Transporter' : activeMainTab === 'regions' ? 'Region' : 'City'}`}
-          >
-            <Plus className="w-4 h-4 text-purple-600 stroke-[2.5]" />
-          </button>
+          {/* 8. Add New Item Icon Button (Circular + Button matching SkuMasterV2) */}
+          <div className="relative group">
+            <button
+              type="button"
+              onClick={() => openModal()}
+              className="w-8 h-8 rounded-full border border-gray-200 bg-white hover:bg-purple-50 text-purple-600 flex items-center justify-center transition-all shadow-2xs cursor-pointer font-bold shrink-0"
+              title={`Add New ${activeMainTab === 'customers' ? 'Customer' : activeMainTab === 'vendors' ? 'Supplier' : activeMainTab === 'agents' ? 'Agent' : activeMainTab === 'transporters' ? 'Transporter' : activeMainTab === 'regions' ? 'Region' : 'City'}`}
+              aria-label={`Add New ${activeMainTab === 'customers' ? 'Customer' : activeMainTab === 'vendors' ? 'Supplier' : activeMainTab === 'agents' ? 'Agent' : activeMainTab === 'transporters' ? 'Transporter' : activeMainTab === 'regions' ? 'Region' : 'City'}`}
+            >
+              <Plus className="w-4 h-4 text-purple-600 stroke-[2.5]" />
+            </button>
+            <div className="absolute top-full mt-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+              Add {activeMainTab === 'customers' ? 'Customer' : activeMainTab === 'vendors' ? 'Supplier' : activeMainTab === 'agents' ? 'Agent' : activeMainTab === 'transporters' ? 'Transporter' : activeMainTab === 'regions' ? 'Region' : 'City'}
+            </div>
+          </div>
         </div>
       </div>
 
