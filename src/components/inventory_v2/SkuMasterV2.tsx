@@ -502,7 +502,8 @@ const SkuMasterV2: React.FC = () => {
   const [catalogSearch, setCatalogSearch] = useState('');
   const [isSavingBuildBom, setIsSavingBuildBom] = useState(false);
 
-  const [modalDynamicLocation, setModalDynamicLocation] = useState<string>('Loading location...');
+  const [modalInitialLocationText, setModalInitialLocationText] = useState<string>('Loading...');
+  const [modalDynamicLocationsText, setModalDynamicLocationsText] = useState<string>('Loading...');
   const [modalDynamicLiveStock, setModalDynamicLiveStock] = useState<number | null>(null);
 
   // Helper to build parent-to-child location path (Factory ➔ Zone ➔ Storage Location)
@@ -552,9 +553,26 @@ const SkuMasterV2: React.FC = () => {
       try {
         const hierarchy = currentCompanyId ? await getWarehouseHierarchyV2(currentCompanyId).catch(() => []) : [];
         
-        let resolvedLocation = '';
+        let initialLocStr = 'Not assigned';
+        let dynamicLocsStr = 'No live stock entries assigned';
         let resolvedLiveStock: number | null = null;
 
+        // 1. Resolve Initial Assigned Location
+        const directLoc = (selectedSkuDetails as any)?.initialLocationId || 
+                         (selectedSkuDetails as any)?.initialLocation || 
+                         (selectedSkuDetails as any)?.locationId || 
+                         (selectedSkuDetails as any)?.warehouseLocation || 
+                         (selectedSkuDetails as any)?.location || 
+                         (selectedSkuDetails as any)?.locationName || 
+                         (selectedSkuDetails as any)?.defaultLocation;
+        if (directLoc) {
+          const locPath = buildModalLocationPath(directLoc, hierarchy);
+          if (locPath) {
+            initialLocStr = locPath;
+          }
+        }
+
+        // 2. Resolve Dynamic Live Stock & Locations from Balances
         if (selectedSkuDetails._id && currentCompanyId) {
           const balances = await getBalancesV2(currentCompanyId, undefined, undefined, selectedSkuDetails._id).catch(() => []);
           
@@ -575,35 +593,21 @@ const SkuMasterV2: React.FC = () => {
               }
             }
             if (locPaths.length > 0) {
-              resolvedLocation = Array.from(new Set(locPaths)).join(' • ');
-            }
-          }
-        }
-
-        if (!resolvedLocation) {
-          const directLoc = (selectedSkuDetails as any)?.initialLocationId || 
-                           (selectedSkuDetails as any)?.initialLocation || 
-                           (selectedSkuDetails as any)?.locationId || 
-                           (selectedSkuDetails as any)?.warehouseLocation || 
-                           (selectedSkuDetails as any)?.location || 
-                           (selectedSkuDetails as any)?.locationName || 
-                           (selectedSkuDetails as any)?.defaultLocation;
-          if (directLoc) {
-            const locPath = buildModalLocationPath(directLoc, hierarchy);
-            if (locPath) {
-              resolvedLocation = locPath;
+              dynamicLocsStr = Array.from(new Set(locPaths)).join(' • ');
             }
           }
         }
 
         if (isMounted) {
+          setModalInitialLocationText(initialLocStr);
+          setModalDynamicLocationsText(dynamicLocsStr);
           setModalDynamicLiveStock(resolvedLiveStock);
-          setModalDynamicLocation(resolvedLocation || 'Not assigned to any location');
         }
       } catch (err) {
         if (isMounted) {
+          setModalInitialLocationText('Not assigned');
+          setModalDynamicLocationsText('No live stock entries assigned');
           setModalDynamicLiveStock(null);
-          setModalDynamicLocation('Not assigned to any location');
         }
       }
     };
@@ -2971,7 +2975,8 @@ const SkuMasterV2: React.FC = () => {
                           </span>
                         </div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-y-3.5 gap-x-4 text-xs">
+                        {/* Top Stock Metrics Grid */}
+                        <div className="grid grid-cols-3 gap-3 bg-slate-50/80 p-3 rounded-xl border border-slate-100 text-xs">
                           <div>
                             <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">OPENING BALANCE</span>
                             <span className="font-mono font-bold text-gray-900 text-xs">{openingQty.toLocaleString('en-IN')} {stockUnit}</span>
@@ -2988,6 +2993,10 @@ const SkuMasterV2: React.FC = () => {
                               ₹{totalEstVal.toLocaleString('en-IN')}
                             </span>
                           </div>
+                        </div>
+
+                        {/* Dynamic Stock Thresholds */}
+                        <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50/50 p-2.5 rounded-xl border border-slate-100">
                           <div>
                             <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">MIN STOCK THRESHOLD</span>
                             <span className="font-mono font-bold text-amber-600 text-xs">
@@ -3002,14 +3011,30 @@ const SkuMasterV2: React.FC = () => {
                           </div>
                         </div>
 
-                        <div className="pt-3 border-t border-gray-100">
-                          <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1 mb-1">
-                            <MapPin className="w-3.5 h-3.5 text-blue-600" />
-                            <span>STORAGE LOCATION / GODOWN</span>
+                        {/* Separated Location Blocks: Initial Assigned & Current Dynamic */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2.5 border-t border-gray-100">
+                          {/* Initial Location */}
+                          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 space-y-1">
+                            <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                              <MapPin className="w-3.5 h-3.5 text-indigo-500" />
+                              <span>INITIAL ASSIGNED LOCATION</span>
+                            </div>
+                            <div className="font-bold text-xs text-gray-800 flex items-center gap-2 pt-0.5">
+                              <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0"></span>
+                              <span className="truncate">{modalInitialLocationText || 'Not assigned'}</span>
+                            </div>
                           </div>
-                          <div className="font-bold text-xs text-gray-800 bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0"></span>
-                            <span>{modalDynamicLocation || 'Not assigned to any location'}</span>
+
+                          {/* Dynamic Location */}
+                          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 space-y-1">
+                            <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                              <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>CURRENT DYNAMIC LOCATION(S)</span>
+                            </div>
+                            <div className="font-bold text-xs text-gray-800 flex items-center gap-2 pt-0.5">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                              <span className="truncate">{modalDynamicLocationsText || 'No live stock entries assigned'}</span>
+                            </div>
                           </div>
                         </div>
                       </div>
