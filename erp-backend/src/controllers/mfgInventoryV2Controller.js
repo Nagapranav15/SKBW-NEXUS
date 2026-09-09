@@ -82,7 +82,7 @@ exports.getSkus = async (req, res, next) => {
 
 exports.createSku = async (req, res, next) => {
   try {
-    const { skuCode, name, category, unit, altUnit, altUnitConversion, paperType, gsm, width, length, brand, title, group, ruleType, pages, booksGbl, openingStock, status, company } = req.body;
+    const { skuCode, name, category, unit, altUnit, altUnitConversion, paperType, gsm, width, length, brand, title, group, ruleType, pages, booksGbl, openingStock, minStockLevel, reorderLevel, initialLocationId, defaultLocation, status, company } = req.body;
     if (!company) {
       return res.status(400).json({ msg: "company is required" });
     }
@@ -91,6 +91,8 @@ exports.createSku = async (req, res, next) => {
     if (exists) {
       return res.status(400).json({ msg: `SKU Code '${skuCode}' already exists for this company` });
     }
+
+    const assignedLocation = initialLocationId || req.body.initialLocation || defaultLocation || "Main Warehouse - Bay A1";
 
     const newSku = new SkuV2({
       skuCode,
@@ -110,16 +112,17 @@ exports.createSku = async (req, res, next) => {
       pages: pages ? Number(pages) : undefined,
       booksGbl: booksGbl ? Number(booksGbl) : undefined,
       openingStock: openingStock ? Number(openingStock) : 0,
+      minStockLevel: minStockLevel !== undefined && minStockLevel !== null && minStockLevel !== '' ? Number(minStockLevel) : undefined,
+      reorderLevel: reorderLevel !== undefined && reorderLevel !== null && reorderLevel !== '' ? Number(reorderLevel) : undefined,
+      initialLocationId: typeof assignedLocation === 'object' ? (assignedLocation._id || assignedLocation.name) : String(assignedLocation),
+      initialLocation: assignedLocation,
+      defaultLocation: typeof assignedLocation === 'object' ? (assignedLocation.name || assignedLocation._id) : String(assignedLocation),
       status: status || "Active",
       bomItems: req.body.bomItems || [],
       processSteps: req.body.processSteps || [],
       company: toObjectId(company),
       createdBy: req.user?.id ? toObjectId(req.user.id) : undefined
     });
-
-    if (req.body.initialLocationId) {
-      newSku.initialLocation = toObjectId(req.body.initialLocationId);
-    }
 
     await newSku.save();
 
@@ -228,6 +231,16 @@ exports.updateSku = async (req, res, next) => {
     if (req.body.pages !== undefined) sku.pages = req.body.pages ? Number(req.body.pages) : undefined;
     if (req.body.booksGbl !== undefined) sku.booksGbl = req.body.booksGbl ? Number(req.body.booksGbl) : undefined;
     if (req.body.openingStock !== undefined) sku.openingStock = req.body.openingStock !== undefined ? Number(req.body.openingStock) : sku.openingStock;
+    if (req.body.minStockLevel !== undefined) sku.minStockLevel = req.body.minStockLevel !== '' && req.body.minStockLevel !== null ? Number(req.body.minStockLevel) : undefined;
+    if (req.body.reorderLevel !== undefined) sku.reorderLevel = req.body.reorderLevel !== '' && req.body.reorderLevel !== null ? Number(req.body.reorderLevel) : undefined;
+    if (req.body.initialLocationId !== undefined) {
+      sku.initialLocationId = req.body.initialLocationId;
+      sku.initialLocation = req.body.initialLocationId;
+    }
+    if (req.body.initialLocation !== undefined) {
+      sku.initialLocation = req.body.initialLocation;
+    }
+    if (req.body.defaultLocation !== undefined) sku.defaultLocation = req.body.defaultLocation;
     if (req.body.status !== undefined) sku.status = req.body.status || "Active";
     if (req.body.bomItems !== undefined) sku.bomItems = req.body.bomItems;
     if (req.body.processSteps !== undefined) sku.processSteps = req.body.processSteps;

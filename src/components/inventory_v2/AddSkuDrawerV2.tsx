@@ -1736,6 +1736,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     {availableLocations.map(loc => (
                       <option key={loc.id} value={loc.id}>{loc.name}</option>
                     ))}
+                    {form.initialLocationId && !availableLocations.some(l => l.id === form.initialLocationId || l.name === form.initialLocationId) && (
+                      <option value={form.initialLocationId}>{form.initialLocationId}</option>
+                    )}
                   </select>
                   <span className="block text-[10px] text-gray-400 mt-1 font-medium leading-tight">
                     Target godown for opening balance
