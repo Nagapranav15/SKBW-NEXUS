@@ -506,6 +506,11 @@ const SkuMasterV2: React.FC = () => {
   const [modalDynamicLocationsText, setModalDynamicLocationsText] = useState<string>('Loading...');
   const [modalDynamicLiveStock, setModalDynamicLiveStock] = useState<number | null>(null);
 
+  const [isEditingThresholds, setIsEditingThresholds] = useState<boolean>(false);
+  const [tempMinStock, setTempMinStock] = useState<string>('');
+  const [tempReorder, setTempReorder] = useState<string>('');
+  const [isSavingThresholds, setIsSavingThresholds] = useState<boolean>(false);
+
   // Helper to build parent-to-child location path (Factory ➔ Zone ➔ Storage Location)
   const buildModalLocationPath = (locIdOrObj: any, allLocations: WarehouseLocationV2[]): string => {
     if (!locIdOrObj) return '';
@@ -542,6 +547,33 @@ const SkuMasterV2: React.FC = () => {
     }
 
     return path.join(' ➔ ');
+  };
+
+  const handleSaveThresholds = async () => {
+    if (!selectedSkuDetails?._id) return;
+    setIsSavingThresholds(true);
+    try {
+      const minVal = Number(tempMinStock) || 0;
+      const reorderVal = Number(tempReorder) || 0;
+      await updateSkuV2(selectedSkuDetails._id, {
+        minStockLevel: minVal,
+        reorderLevel: reorderVal,
+        company: currentCompanyId
+      });
+      setSelectedSkuDetails(prev => prev ? ({
+        ...prev,
+        minStockLevel: minVal,
+        reorderLevel: reorderVal
+      }) : null);
+      showToast('Stock threshold levels updated successfully!', 'success');
+      loadSkus(false);
+      setIsEditingThresholds(false);
+    } catch (err: any) {
+      console.error('Failed to save stock thresholds:', err);
+      showToast(err.message || 'Failed to update stock thresholds', 'error');
+    } finally {
+      setIsSavingThresholds(false);
+    }
   };
 
   // Sync saved SKU attributes, stock levels, BOM items & yield quantity when viewing item details
@@ -2953,13 +2985,15 @@ const SkuMasterV2: React.FC = () => {
                       ? modalDynamicLiveStock 
                       : Number((selectedSkuDetails as any).presentStock ?? selectedSkuDetails.openingStock ?? 0);
 
-                    const minStockNum = (selectedSkuDetails as any).minStockLevel !== undefined && (selectedSkuDetails as any).minStockLevel !== null && (selectedSkuDetails as any).minStockLevel !== ''
-                      ? Number((selectedSkuDetails as any).minStockLevel)
-                      : ((selectedSkuDetails as any).minStock !== undefined ? Number((selectedSkuDetails as any).minStock) : 0);
+                    const minStockRaw = (selectedSkuDetails as any).minStockLevel ?? (selectedSkuDetails as any).minStock;
+                    const minStockNum = minStockRaw !== undefined && minStockRaw !== null && minStockRaw !== '' && !isNaN(Number(minStockRaw)) && Number(minStockRaw) > 0
+                      ? Number(minStockRaw)
+                      : (getItemType(selectedSkuDetails) === 'materials' ? 500 : 100);
 
-                    const reorderNum = (selectedSkuDetails as any).reorderLevel !== undefined && (selectedSkuDetails as any).reorderLevel !== null && (selectedSkuDetails as any).reorderLevel !== ''
-                      ? Number((selectedSkuDetails as any).reorderLevel)
-                      : ((selectedSkuDetails as any).reorderQty !== undefined ? Number((selectedSkuDetails as any).reorderQty) : 0);
+                    const reorderRaw = (selectedSkuDetails as any).reorderLevel ?? (selectedSkuDetails as any).reorderQty;
+                    const reorderNum = reorderRaw !== undefined && reorderRaw !== null && reorderRaw !== '' && !isNaN(Number(reorderRaw)) && Number(reorderRaw) > 0
+                      ? Number(reorderRaw)
+                      : (getItemType(selectedSkuDetails) === 'materials' ? 100 : 50);
 
                     const unitRate = Number((selectedSkuDetails as any).purchasePrice || (selectedSkuDetails as any).ratePerKg || (selectedSkuDetails as any).cost || 45);
                     const totalEstVal = liveStockQty * unitRate;
@@ -2982,10 +3016,62 @@ const SkuMasterV2: React.FC = () => {
                             </div>
                             <h4 className="font-bold text-gray-900 text-xs">Stock & Warehouse Location</h4>
                           </div>
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${statusBadge.bg}`}>
-                            {statusBadge.label}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                setTempMinStock(String(minStockNum));
+                                setTempReorder(String(reorderNum));
+                                setIsEditingThresholds(!isEditingThresholds);
+                              }}
+                              className="text-[10px] font-bold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-lg border border-amber-200/80 flex items-center gap-1 cursor-pointer"
+                            >
+                              <Edit className="w-3 h-3" />
+                              {isEditingThresholds ? 'Cancel' : 'Edit Levels'}
+                            </button>
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${statusBadge.bg}`}>
+                              {statusBadge.label}
+                            </span>
+                          </div>
                         </div>
+
+                        {isEditingThresholds && (
+                          <div className="bg-amber-50/70 p-3 rounded-xl border border-amber-200/80 space-y-2.5">
+                            <div className="text-[11px] font-bold text-amber-900 flex items-center justify-between">
+                              <span>Set Stock Level Thresholds ({stockUnit})</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3 text-xs">
+                              <div>
+                                <label className="block text-[10px] font-bold text-gray-600 mb-1">MIN STOCK THRESHOLD</label>
+                                <input
+                                  type="number"
+                                  value={tempMinStock}
+                                  onChange={(e) => setTempMinStock(e.target.value)}
+                                  className="w-full px-2.5 py-1.5 border border-amber-300 rounded-lg text-xs font-bold text-gray-900 bg-white"
+                                  placeholder="500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-gray-600 mb-1">REORDER LEVEL</label>
+                                <input
+                                  type="number"
+                                  value={tempReorder}
+                                  onChange={(e) => setTempReorder(e.target.value)}
+                                  className="w-full px-2.5 py-1.5 border border-amber-300 rounded-lg text-xs font-bold text-gray-900 bg-white"
+                                  placeholder="100"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-1">
+                              <button
+                                onClick={handleSaveThresholds}
+                                disabled={isSavingThresholds}
+                                className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold shadow-2xs cursor-pointer flex items-center gap-1"
+                              >
+                                {isSavingThresholds ? 'Saving...' : 'Save Thresholds'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
 
                         {/* Top Stock Metrics Grid */}
                         <div className="grid grid-cols-3 gap-3 bg-slate-50/80 p-3 rounded-xl border border-slate-100 text-xs">
