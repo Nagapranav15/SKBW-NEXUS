@@ -394,6 +394,7 @@ const SkuMasterV2: React.FC = () => {
     { id: 'altUnitConversion', label: 'Con Rate', visible: true },
     { id: 'gsm', label: 'GSM', visible: true },
     { id: 'size', label: 'Size', visible: true },
+    { id: 'pages', label: 'Sheets per Ream', visible: true },
     { id: 'openingStock', label: 'Stock', visible: true },
     { id: 'workOrders', label: 'Work Orders', visible: true },
     { id: 'dispatchOrders', label: 'Dispatch Orders', visible: true }
@@ -487,9 +488,6 @@ const SkuMasterV2: React.FC = () => {
   const visibleColumns = useMemo(() => {
     return columnsConfig.filter(col => {
       if (col.id === 'bom' && activeMainTab !== 'products' && activeMainTab !== 'semi') {
-        return false;
-      }
-      if (col.id === 'pages' && activeMainTab === 'materials') {
         return false;
       }
       return col.visible;
@@ -2002,11 +2000,17 @@ const SkuMasterV2: React.FC = () => {
                               } else if ((sku.name || '').toLowerCase().includes('diary')) {
                                 itemDomainIcon = '📚';
                               }
+                              const isSheetItemBadge = sku.paperType === 'Sheets' || (sku.name || '').toLowerCase().includes('sheet');
                               return (
                                 <td key="name" className="py-3 px-3 font-medium text-gray-900 whitespace-nowrap">
                                   <div className="flex items-center gap-2">
                                     <span className="text-base">{itemDomainIcon}</span>
                                     <span className="font-semibold text-gray-900">{sku.name}</span>
+                                    {isSheetItemBadge && (
+                                      <span className="px-1.5 py-0.5 rounded text-[9.5px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200/80">
+                                        {sku.pages || 500} Sheets/Ream
+                                      </span>
+                                    )}
                                   </div>
                                 </td>
                               );
@@ -2052,7 +2056,14 @@ const SkuMasterV2: React.FC = () => {
                               );
                             case 'pages':
                               const pageMatch = sku.name.match(/(\d+)P/i);
-                              const pagesStr = sku.pages ? `${sku.pages} P` : pageMatch ? `${pageMatch[1]} P` : (activeMainTab === 'products' ? '132 P' : '—');
+                              const isSheetItemCol = sku.paperType === 'Sheets' || (sku.name || '').toLowerCase().includes('sheet');
+                              const pagesStr = sku.pages
+                                ? `${sku.pages} ${isSheetItemCol ? 'Sheets/Ream' : 'P'}`
+                                : isSheetItemCol
+                                  ? '500 Sheets/Ream'
+                                  : pageMatch
+                                    ? `${pageMatch[1]} P`
+                                    : (activeMainTab === 'products' ? '132 P' : '—');
                               return (
                                 <td key="pages" className="py-3 px-3 text-gray-600 font-medium whitespace-nowrap">
                                   {pagesStr}

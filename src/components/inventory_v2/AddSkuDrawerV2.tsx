@@ -643,6 +643,10 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   }, [companyId]);
 
   const activeFields = [...(categoryFieldsMap[form.category] || ['gsm', 'width', 'length'])];
+  if (form.paperType === 'Sheets') {
+    if (!activeFields.includes('pages')) activeFields.push('pages');
+    if (!activeFields.includes('reamWeight')) activeFields.push('reamWeight');
+  }
 
   // Auto-generate SKU Code
   useEffect(() => {
@@ -776,7 +780,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           title: form.title.trim() || undefined,
           group: form.group.trim() || undefined,
           ruleType: form.ruleType || undefined,
-          pages: form.pages ? Number(form.pages) : undefined,
+          pages: form.pages ? Number(form.pages) : (form.paperType === 'Sheets' ? 500 : undefined),
           reamWeight: form.reamWeight ? Number(form.reamWeight) : undefined,
           booksGbl: form.booksGbl ? Number(form.booksGbl) : undefined,
           openingStock: form.openingStock ? Number(form.openingStock) : 0,

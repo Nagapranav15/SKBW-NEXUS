@@ -2159,16 +2159,17 @@ export const StockInventoryV2: React.FC = () => {
 
                   <div className="grid grid-cols-2 gap-3.5">
                     <div>
-                      <label className="block text-slate-600 font-bold mb-1 uppercase text-[10px]">BATCH NO. *</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-slate-600 font-bold uppercase text-[10px]">BATCH NO.</label>
+                        <span className="text-[9.5px] text-slate-400 font-medium">(Auto-generated if empty)</span>
+                      </div>
                       <input
                         type="text"
-                        required
                         value={batchForm.batchNumber}
                         onChange={e => setBatchForm(f => ({ ...f, batchNumber: e.target.value }))}
                         placeholder="e.g. PB-SEP-001"
                         className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-3xs transition-all"
                       />
-                      <span className="text-[10px] text-slate-400 mt-1 block font-medium">Auto-generated if left empty</span>
                     </div>
 
                     <div>
@@ -2212,7 +2213,7 @@ export const StockInventoryV2: React.FC = () => {
                             if (!lot.skuId) {
                               return {
                                 ...lot,
-                                paperType: newType === 'Semi' ? 'Sheet' : newType === 'Products' ? 'General' : 'Reel'
+                                paperType: newType === 'Semi' ? 'Sheet' : 'Reel'
                               };
                             }
                             const curSku = allSkus.find(s => s._id === lot.skuId);
@@ -2229,7 +2230,7 @@ export const StockInventoryV2: React.FC = () => {
                                   skuName: '',
                                   brand: '',
                                   gsm: '',
-                                  paperType: newType === 'Semi' ? 'Sheet' : newType === 'Products' ? 'General' : 'Reel',
+                                  paperType: newType === 'Semi' ? 'Sheet' : 'Reel',
                                   totalKg: 0,
                                   ratePerKg: 0,
                                   reels: []
@@ -2310,17 +2311,6 @@ export const StockInventoryV2: React.FC = () => {
                                 }`}
                               >
                                 📄 Sheet / Board
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => updateLotField(lot.id, 'paperType', 'General')}
-                                className={`px-2.5 py-0.5 rounded-md transition-all cursor-pointer ${
-                                  !lot.paperType || lot.paperType === 'General'
-                                    ? 'bg-emerald-600 text-white shadow-xs font-black'
-                                    : 'text-gray-600 hover:text-gray-900'
-                                }`}
-                              >
-                                📦 General Material
                               </button>
                             </div>
                           </div>
@@ -2861,9 +2851,11 @@ export const StockInventoryV2: React.FC = () => {
 
                   {/* Summary Breakdown Card */}
                   <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 text-white p-4.5 rounded-2xl shadow-md border border-slate-700/50 space-y-3 text-xs">
-                    <div className="flex justify-between font-bold text-slate-300 uppercase text-[11px] tracking-wider border-b border-slate-700/60 pb-2">
-                      <span className="flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-blue-400" /> BATCH SUMMARY</span>
-                      <span className="text-blue-300 font-extrabold">{lots.length} Lots</span>
+                    <div className="flex items-center justify-between font-bold text-slate-300 uppercase text-[11px] tracking-wider border-b border-slate-700/60 pb-2.5">
+                      <span className="flex items-center gap-1.5"><FileText className="w-4 h-4 text-blue-400" /> BATCH SUMMARY</span>
+                      <span className="px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-extrabold text-[10px] border border-blue-400/30">
+                        {lots.length} {lots.length === 1 ? 'LOT' : 'LOTS'}
+                      </span>
                     </div>
 
                     {lots.some(l => l.paperType === 'Reel') ? (
