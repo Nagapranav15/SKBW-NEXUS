@@ -1954,7 +1954,22 @@ export const BusinessDirectoryV2: React.FC = () => {
                             <td className="py-3 px-3 text-gray-600 font-medium">{[item.city, item.district].filter(Boolean).join(', ') || '—'}</td>
                           )}
                           {!hiddenColumns['route'] && (
-                            <td className="py-3 px-3 text-gray-600 font-medium">{[item.route, item.assignedMarket].filter(Boolean).join(' • ') || '—'}</td>
+                            <td className="py-3 px-3">
+                              {item.route || item.assignedMarket ? (
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  {[item.route, item.assignedMarket].filter(Boolean).map((reg: string, idx: number) => (
+                                    <span
+                                      key={idx}
+                                      className="px-2.5 py-0.5 rounded-full bg-white text-blue-700 border border-blue-300 font-extrabold text-xs tracking-wide shadow-2xs inline-block"
+                                    >
+                                      {reg}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-gray-400 font-normal text-xs">—</span>
+                              )}
+                            </td>
                           )}
                           {!hiddenColumns['agent'] && (
                             <td className="py-3 px-3 text-gray-600 font-medium">{item.agentAssigned || '—'}</td>
@@ -2244,7 +2259,15 @@ export const BusinessDirectoryV2: React.FC = () => {
                               <span className="font-bold text-gray-900">{item.firmName || item.name}</span>
                             </div>
                           </td>
-                          <td className="py-3 px-3 text-blue-700 font-bold">{item.route || '—'}</td>
+                          <td className="py-3 px-3">
+                            {item.route ? (
+                              <span className="px-2.5 py-0.5 rounded-full bg-white text-blue-700 font-extrabold text-xs border border-blue-300 tracking-wide shadow-2xs inline-block">
+                                {item.route}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 font-normal text-xs">—</span>
+                            )}
+                          </td>
                           <td className="py-3 px-3 text-gray-600 font-medium">{[item.district, item.state].filter(Boolean).join(', ') || '—'}</td>
                           <td className="py-3 px-3 text-gray-600 font-medium">{item.agentAssigned || '—'}</td>
                         </>
@@ -2263,7 +2286,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         </span>
                       </td>
 
-                      {/* ACTIONS (Icon Only with Instant Hover Tooltips) */}
+                      {/* ACTIONS (Matches User Screenshot 2 100%) */}
                       <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1.5">
                           {/* 1. View Profile */}
@@ -2271,7 +2294,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => setSelectedDetails(item)}
-                              className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/80 rounded-lg transition-all cursor-pointer shadow-2xs flex items-center justify-center"
+                              className="p-1.5 bg-white hover:bg-blue-50/60 text-blue-600 border border-blue-200 rounded-xl transition-all cursor-pointer shadow-2xs flex items-center justify-center"
                               title="View Profile"
                               aria-label="View Profile"
                             >
@@ -2287,11 +2310,11 @@ export const BusinessDirectoryV2: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => openModal(item)}
-                              className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/80 rounded-lg transition-all cursor-pointer shadow-2xs flex items-center justify-center"
+                              className="p-1.5 bg-white hover:bg-blue-50/60 text-blue-600 border border-blue-200 rounded-xl transition-all cursor-pointer shadow-2xs flex items-center justify-center"
                               title="Edit Record"
                               aria-label="Edit Record"
                             >
-                              <Edit className="w-3.5 h-3.5 text-blue-700" />
+                              <Edit className="w-3.5 h-3.5" />
                             </button>
                             <div className="absolute bottom-full mb-1.5 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
                               Edit Record
@@ -2303,11 +2326,11 @@ export const BusinessDirectoryV2: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => handleDeleteItem(item._id)}
-                              className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200/80 rounded-lg transition-all cursor-pointer shadow-2xs flex items-center justify-center"
+                              className="p-1.5 bg-white hover:bg-rose-50/60 text-rose-600 border border-rose-200 rounded-xl transition-all cursor-pointer shadow-2xs flex items-center justify-center"
                               title="Delete Record"
                               aria-label="Delete Record"
                             >
-                              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                             <div className="absolute bottom-full mb-1.5 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
                               Delete Record
