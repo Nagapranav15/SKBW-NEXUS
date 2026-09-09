@@ -480,15 +480,37 @@ export const BusinessDirectoryV2: React.FC = () => {
     setFilterTag('');
   };
 
+  const getRegionShortCode = useCallback((val: string): string => {
+    if (!val) return '—';
+    const cleanVal = val.trim().toLowerCase();
+    
+    const matched = allRoutes.find((r: any) =>
+      (r.code && r.code.toLowerCase().trim() === cleanVal) ||
+      (r.name && r.name.toLowerCase().trim() === cleanVal) ||
+      (r.firmName && r.firmName.toLowerCase().trim() === cleanVal)
+    );
+
+    if (matched && matched.code) {
+      return matched.code.toUpperCase();
+    }
+
+    if (val.length <= 6) {
+      return val.toUpperCase();
+    }
+
+    return val.slice(0, 3).toUpperCase();
+  }, [allRoutes]);
+
   const getColumnList = (tab: DirectoryTabType) => {
     if (tab === 'customers') {
       return [
         { id: 'firmName', label: 'Customer Firm' },
         { id: 'phone', label: 'Mobile / WhatsApp' },
         { id: 'city', label: 'City & District' },
-        { id: 'route', label: 'Region & Market' },
+        { id: 'route', label: 'Region' },
         { id: 'agent', label: 'Assigned Agent' },
-        { id: 'credit', label: 'Credit Limit & Days' },
+        { id: 'creditLimit', label: 'Credit Limit' },
+        { id: 'creditDays', label: 'Credit Days' },
         { id: 'outstanding', label: 'Outstanding' },
         { id: 'tags', label: 'Tags' }
       ];
@@ -1789,9 +1811,10 @@ export const BusinessDirectoryV2: React.FC = () => {
                     {!hiddenColumns['firmName'] && <th className="py-3 px-3 whitespace-nowrap">CUSTOMER FIRM</th>}
                     {!hiddenColumns['phone'] && <th className="py-3 px-3 whitespace-nowrap">MOBILE / WHATSAPP</th>}
                     {!hiddenColumns['city'] && <th className="py-3 px-3 whitespace-nowrap">CITY & DISTRICT</th>}
-                    {!hiddenColumns['route'] && <th className="py-3 px-3 whitespace-nowrap">REGION & MARKET</th>}
+                    {!hiddenColumns['route'] && <th className="py-3 px-3 whitespace-nowrap">REGION</th>}
                     {!hiddenColumns['agent'] && <th className="py-3 px-3 whitespace-nowrap">ASSIGNED AGENT</th>}
-                    {!hiddenColumns['credit'] && <th className="py-3 px-3 whitespace-nowrap">CREDIT LIMIT & DAYS</th>}
+                    {!hiddenColumns['creditLimit'] && <th className="py-3 px-3 whitespace-nowrap">CREDIT LIMIT</th>}
+                    {!hiddenColumns['creditDays'] && <th className="py-3 px-3 whitespace-nowrap">CREDIT DAYS</th>}
                     {!hiddenColumns['outstanding'] && <th className="py-3 px-3 whitespace-nowrap">OUTSTANDING</th>}
                     {!hiddenColumns['tags'] && <th className="py-3 px-3 whitespace-nowrap">TAGS</th>}
                   </>
@@ -1955,17 +1978,13 @@ export const BusinessDirectoryV2: React.FC = () => {
                           )}
                           {!hiddenColumns['route'] && (
                             <td className="py-3 px-3">
-                              {item.route || item.assignedMarket ? (
-                                <div className="flex items-center gap-1 flex-wrap">
-                                  {[item.route, item.assignedMarket].filter(Boolean).map((reg: string, idx: number) => (
-                                    <span
-                                      key={idx}
-                                      className="px-2.5 py-0.5 rounded-full bg-white text-blue-700 border border-blue-300 font-extrabold text-xs tracking-wide shadow-2xs inline-block"
-                                    >
-                                      {reg}
-                                    </span>
-                                  ))}
-                                </div>
+                              {item.route ? (
+                                <span
+                                  className="px-2.5 py-0.5 rounded-full bg-white text-blue-700 border border-blue-300 font-extrabold text-xs tracking-wide shadow-2xs inline-block"
+                                  title={item.route}
+                                >
+                                  {getRegionShortCode(item.route)}
+                                </span>
                               ) : (
                                 <span className="text-gray-400 font-normal text-xs">—</span>
                               )}
@@ -1974,9 +1993,14 @@ export const BusinessDirectoryV2: React.FC = () => {
                           {!hiddenColumns['agent'] && (
                             <td className="py-3 px-3 text-gray-600 font-medium">{item.agentAssigned || '—'}</td>
                           )}
-                          {!hiddenColumns['credit'] && (
+                          {!hiddenColumns['creditLimit'] && (
                             <td className="py-3 px-3 font-mono text-gray-700 font-semibold">
-                              ₹{(item.creditLimit || 50000).toLocaleString('en-IN')} ({item.creditDays || 30} days)
+                              ₹{Number(item.creditLimit || 50000).toLocaleString('en-IN')}
+                            </td>
+                          )}
+                          {!hiddenColumns['creditDays'] && (
+                            <td className="py-3 px-3 font-mono text-gray-700 font-semibold">
+                              {item.creditDays || 30} Days
                             </td>
                           )}
                           {!hiddenColumns['outstanding'] && (
