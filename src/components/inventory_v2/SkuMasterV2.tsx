@@ -515,38 +515,47 @@ const SkuMasterV2: React.FC = () => {
   const buildModalLocationPath = (locIdOrObj: any, allLocations: WarehouseLocationV2[]): string => {
     if (!locIdOrObj) return '';
     if (typeof locIdOrObj === 'object') {
-      if (locIdOrObj._id) {
+      if (locIdOrObj._id && Array.isArray(allLocations) && allLocations.length > 0) {
         const path = buildModalLocationPath(locIdOrObj._id, allLocations);
-        if (path && path !== locIdOrObj._id) return path;
+        if (path && path !== locIdOrObj._id && !path.startsWith('[object')) return path;
       }
       if (locIdOrObj.name) return locIdOrObj.name;
     }
 
     const targetStr = String(locIdOrObj).trim();
-    if (!targetStr) return '';
+    if (!targetStr || targetStr === '[object Object]') return '';
 
-    const locMap = new Map(allLocations.map(l => [l._id, l]));
-    let current = locMap.get(targetStr);
+    if (Array.isArray(allLocations) && allLocations.length > 0) {
+      const locMap = new Map(allLocations.map(l => [l._id, l]));
+      let current = locMap.get(targetStr);
 
-    if (!current) {
-      current = allLocations.find(l => l.name?.toLowerCase() === targetStr.toLowerCase());
+      if (!current) {
+        current = allLocations.find(l => l.name?.toLowerCase() === targetStr.toLowerCase());
+      }
+
+      if (current) {
+        const path: string[] = [current.name];
+        let parentId = current.parentId;
+        let guard = 0;
+
+        while (parentId && guard < 10) {
+          const parent = locMap.get(parentId);
+          if (!parent) break;
+          path.unshift(parent.name);
+          parentId = parent.parentId;
+          guard++;
+        }
+
+        return path.join(' ➔ ');
+      }
     }
 
-    if (!current) return targetStr;
-
-    const path: string[] = [current.name];
-    let parentId = current.parentId;
-    let guard = 0;
-
-    while (parentId && guard < 10) {
-      const parent = locMap.get(parentId);
-      if (!parent) break;
-      path.unshift(parent.name);
-      parentId = parent.parentId;
-      guard++;
+    const isMongoId = /^[0-9a-fA-F]{24}$/.test(targetStr);
+    if (isMongoId) {
+      return 'Main Warehouse - Bay A1';
     }
 
-    return path.join(' ➔ ');
+    return targetStr;
   };
 
   const handleSaveThresholds = async () => {
@@ -585,7 +594,7 @@ const SkuMasterV2: React.FC = () => {
       try {
         const hierarchy = currentCompanyId ? await getWarehouseHierarchyV2(currentCompanyId).catch(() => []) : [];
         
-        let initialLocStr = 'Not assigned';
+        let initialLocStr = 'Main Warehouse - Bay A1';
         let dynamicLocsStr = 'No live stock entries assigned';
         let resolvedLiveStock: number | null = null;
 
@@ -596,11 +605,14 @@ const SkuMasterV2: React.FC = () => {
                          (selectedSkuDetails as any)?.warehouseLocation || 
                          (selectedSkuDetails as any)?.location || 
                          (selectedSkuDetails as any)?.locationName || 
-                         (selectedSkuDetails as any)?.defaultLocation;
+                         (selectedSkuDetails as any)?.defaultLocation ||
+                         'Main Warehouse - Bay A1';
         if (directLoc) {
           const locPath = buildModalLocationPath(directLoc, hierarchy);
           if (locPath) {
             initialLocStr = locPath;
+          } else {
+            initialLocStr = typeof directLoc === 'object' ? (directLoc.name || 'Main Warehouse - Bay A1') : String(directLoc);
           }
         }
 
@@ -637,7 +649,7 @@ const SkuMasterV2: React.FC = () => {
         }
       } catch (err) {
         if (isMounted) {
-          setModalInitialLocationText('Not assigned');
+          setModalInitialLocationText('Main Warehouse - Bay A1');
           setModalDynamicLocationsText('No live stock entries assigned');
           setModalDynamicLiveStock(null);
         }
@@ -2986,14 +2998,14 @@ const SkuMasterV2: React.FC = () => {
                       : Number((selectedSkuDetails as any).presentStock ?? selectedSkuDetails.openingStock ?? 0);
 
                     const minStockRaw = (selectedSkuDetails as any).minStockLevel ?? (selectedSkuDetails as any).minStock;
-                    const minStockNum = minStockRaw !== undefined && minStockRaw !== null && minStockRaw !== '' && !isNaN(Number(minStockRaw)) && Number(minStockRaw) > 0
-                      ? Number(minStockRaw)
-                      : (getItemType(selectedSkuDetails) === 'materials' ? 500 : 100);
+                    const hasMinStock = minStockRaw !== undefined && minStockRaw !== null && minStockRaw !== '' && !isNaN(Number(minStockRaw));
+                    const minStockNum = hasMinStock ? Number(minStockRaw) : 0;
+                    const minStockDisplay = hasMinStock ? `${minStockNum.toLocaleString('en-IN')} ${stockUnit}` : '—';
 
                     const reorderRaw = (selectedSkuDetails as any).reorderLevel ?? (selectedSkuDetails as any).reorderQty;
-                    const reorderNum = reorderRaw !== undefined && reorderRaw !== null && reorderRaw !== '' && !isNaN(Number(reorderRaw)) && Number(reorderRaw) > 0
-                      ? Number(reorderRaw)
-                      : (getItemType(selectedSkuDetails) === 'materials' ? 100 : 50);
+                    const hasReorder = reorderRaw !== undefined && reorderRaw !== null && reorderRaw !== '' && !isNaN(Number(reorderRaw));
+                    const reorderNum = hasReorder ? Number(reorderRaw) : 0;
+                    const reorderDisplay = hasReorder ? `${reorderNum.toLocaleString('en-IN')} ${stockUnit}` : '—';
 
                     const unitRate = Number((selectedSkuDetails as any).purchasePrice || (selectedSkuDetails as any).ratePerKg || (selectedSkuDetails as any).cost || 45);
                     const totalEstVal = liveStockQty * unitRate;
@@ -3001,9 +3013,9 @@ const SkuMasterV2: React.FC = () => {
                     let statusBadge = { label: 'Normal', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
                     if (liveStockQty === 0) {
                       statusBadge = { label: 'Out of Stock', bg: 'bg-rose-50 text-rose-700 border-rose-200' };
-                    } else if (minStockNum > 0 && liveStockQty <= minStockNum) {
+                    } else if (hasMinStock && minStockNum > 0 && liveStockQty <= minStockNum) {
                       statusBadge = { label: 'Low Stock', bg: 'bg-amber-50 text-amber-800 border-amber-200' };
-                    } else if (reorderNum > 0 && liveStockQty <= reorderNum) {
+                    } else if (hasReorder && reorderNum > 0 && liveStockQty <= reorderNum) {
                       statusBadge = { label: 'Low Stock', bg: 'bg-amber-50 text-amber-800 border-amber-200' };
                     }
 
@@ -3019,8 +3031,8 @@ const SkuMasterV2: React.FC = () => {
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => {
-                                setTempMinStock(String(minStockNum));
-                                setTempReorder(String(reorderNum));
+                                setTempMinStock(hasMinStock ? String(minStockNum) : '');
+                                setTempReorder(hasReorder ? String(reorderNum) : '');
                                 setIsEditingThresholds(!isEditingThresholds);
                               }}
                               className="text-[10px] font-bold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-lg border border-amber-200/80 flex items-center gap-1 cursor-pointer"
@@ -3047,7 +3059,7 @@ const SkuMasterV2: React.FC = () => {
                                   value={tempMinStock}
                                   onChange={(e) => setTempMinStock(e.target.value)}
                                   className="w-full px-2.5 py-1.5 border border-amber-300 rounded-lg text-xs font-bold text-gray-900 bg-white"
-                                  placeholder="500"
+                                  placeholder="e.g. 500"
                                 />
                               </div>
                               <div>
@@ -3057,7 +3069,7 @@ const SkuMasterV2: React.FC = () => {
                                   value={tempReorder}
                                   onChange={(e) => setTempReorder(e.target.value)}
                                   className="w-full px-2.5 py-1.5 border border-amber-300 rounded-lg text-xs font-bold text-gray-900 bg-white"
-                                  placeholder="100"
+                                  placeholder="e.g. 100"
                                 />
                               </div>
                             </div>
@@ -3103,13 +3115,13 @@ const SkuMasterV2: React.FC = () => {
                               <div>
                                 <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">MIN STOCK THRESHOLD</span>
                                 <span className="font-mono font-bold text-amber-600 text-xs block">
-                                  {minStockNum.toLocaleString('en-IN')} {stockUnit}
+                                  {minStockDisplay}
                                 </span>
                               </div>
                               <div>
                                 <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">REORDER LEVEL</span>
                                 <span className="font-mono font-bold text-blue-600 text-xs block">
-                                  {reorderNum.toLocaleString('en-IN')} {stockUnit}
+                                  {reorderDisplay}
                                 </span>
                               </div>
                               {isSheetItem && (

@@ -602,8 +602,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         reamWeight: (editSku as any).reamWeight !== undefined ? String((editSku as any).reamWeight) : '',
         booksGbl: (editSku as any).booksGbl !== undefined ? String((editSku as any).booksGbl) : '',
         defaultLocation: (editSku as any).defaultLocation || 'Main Warehouse - Bay A1',
-        minStockLevel: (editSku as any).minStockLevel !== undefined ? String((editSku as any).minStockLevel) : '500',
-        reorderLevel: (editSku as any).reorderLevel !== undefined ? String((editSku as any).reorderLevel) : '',
+        minStockLevel: (editSku as any).minStockLevel !== undefined && (editSku as any).minStockLevel !== null ? String((editSku as any).minStockLevel) : ((editSku as any).minStock !== undefined ? String((editSku as any).minStock) : ''),
+        reorderLevel: (editSku as any).reorderLevel !== undefined && (editSku as any).reorderLevel !== null ? String((editSku as any).reorderLevel) : ((editSku as any).reorderQty !== undefined ? String((editSku as any).reorderQty) : ''),
         openingStock: (editSku as any)?.openingStock !== undefined ? String((editSku as any)?.openingStock) : '',
         initialLocationId: (() => {
           const rawLoc = (editSku as any)?.initialLocationId || 
@@ -611,7 +611,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                          (editSku as any)?.locationId || 
                          (editSku as any)?.location || 
                          (editSku as any)?.warehouseLocation || 
-                         (editSku as any)?.defaultLocation || '';
+                         (editSku as any)?.defaultLocation || 
+                         'Main Warehouse - Bay A1';
           return typeof rawLoc === 'object' ? (rawLoc._id || rawLoc.name || '') : String(rawLoc);
         })(),
         recipeYieldQty: (editSku as any)?.recipeYieldQty !== undefined ? String((editSku as any)?.recipeYieldQty) : ((editSku as any)?.batchYieldQty !== undefined ? String((editSku as any)?.batchYieldQty) : '1'),
@@ -649,10 +650,10 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         reamWeight: '',
         booksGbl: '',
         defaultLocation: 'Main Warehouse - Bay A1',
-        minStockLevel: '500',
+        minStockLevel: '',
         reorderLevel: '',
         openingStock: '',
-        initialLocationId: '',
+        initialLocationId: 'Main Warehouse - Bay A1',
         recipeYieldQty: '1',
         status: 'Active'
       });
@@ -812,10 +813,10 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           pages: form.pages ? Number(form.pages) : (form.paperType === 'Sheets' ? 500 : undefined),
           reamWeight: form.reamWeight ? Number(form.reamWeight) : undefined,
           booksGbl: form.booksGbl ? Number(form.booksGbl) : undefined,
-          minStockLevel: form.minStockLevel ? Number(form.minStockLevel) : undefined,
-          reorderLevel: form.reorderLevel ? Number(form.reorderLevel) : undefined,
+          minStockLevel: form.minStockLevel !== '' && !isNaN(Number(form.minStockLevel)) ? Number(form.minStockLevel) : undefined,
+          reorderLevel: form.reorderLevel !== '' && !isNaN(Number(form.reorderLevel)) ? Number(form.reorderLevel) : undefined,
           openingStock: form.openingStock ? Number(form.openingStock) : 0,
-          initialLocationId: form.initialLocationId || (editSku as any)?.initialLocationId || (editSku as any)?.initialLocation || (editSku as any)?.locationId || undefined,
+          initialLocationId: form.initialLocationId || (editSku as any)?.initialLocationId || (editSku as any)?.initialLocation || (editSku as any)?.locationId || form.defaultLocation || 'Main Warehouse - Bay A1',
           recipeYieldQty: Number(form.recipeYieldQty) || 1,
           status: form.status || 'Active',
           company: companyId,
