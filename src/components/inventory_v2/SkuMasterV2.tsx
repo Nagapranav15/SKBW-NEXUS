@@ -2902,7 +2902,7 @@ const SkuMasterV2: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-3 gap-x-4 text-xs">
                       <div>
                         <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PRIMARY STOCKING UNIT</span>
                         <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.unit || (getItemType(selectedSkuDetails) === 'materials' ? 'Kg' : 'GBL')}</span>
@@ -2910,7 +2910,13 @@ const SkuMasterV2: React.FC = () => {
                       <div>
                         <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">ALTERNATE UNIT</span>
                         <span className="font-bold text-gray-900 text-xs">
-                          {getItemType(selectedSkuDetails) === 'materials' || selectedSkuDetails.category === 'Raw Material' ? 'None (Raw Material)' : (selectedSkuDetails.altUnit || selectedSkuDetails.unit || 'GBL')}
+                          {getItemType(selectedSkuDetails) === 'materials' || selectedSkuDetails.category === 'Raw Material' ? 'None (Raw Material)' : (selectedSkuDetails.altUnit || 'PCS')}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">STD. SHEETS / PAGES</span>
+                        <span className="font-bold text-indigo-700 text-xs">
+                          {selectedSkuDetails.pages || selectedSkuDetails.booksGbl ? `${selectedSkuDetails.pages || selectedSkuDetails.booksGbl} ${selectedSkuDetails.paperType === 'Sheets' ? 'Sheets' : 'Pages'}` : (selectedSkuDetails.paperType === 'Sheets' ? '500 Sheets' : '—')}
                         </span>
                       </div>
                     </div>
@@ -2919,7 +2925,11 @@ const SkuMasterV2: React.FC = () => {
                       <div className="text-[10px] font-black text-blue-600 uppercase tracking-wider">CONVERSION FORMULA</div>
                       <div className="font-extrabold text-xs text-blue-950">
                         {getItemType(selectedSkuDetails) === 'materials' || selectedSkuDetails.category === 'Raw Material' ? (
-                          `Direct Unit Tracking (${selectedSkuDetails.unit || 'Kg'}) • No AUOM Conversion`
+                          selectedSkuDetails.paperType === 'Sheets' ? (
+                            `Formula: 1 Ream = ${selectedSkuDetails.pages || 500} Sheets`
+                          ) : (
+                            `Direct Unit Tracking (${selectedSkuDetails.unit || 'Kg'}) • No AUOM Conversion`
+                          )
                         ) : selectedSkuDetails.altUnit && selectedSkuDetails.altUnitConversion ? (() => {
                           const isAltPcs = (selectedSkuDetails.altUnit || '').toLowerCase().includes('pc');
                           const isPrimaryPcs = (selectedSkuDetails.unit || '').toLowerCase().includes('pc');
@@ -2929,7 +2939,7 @@ const SkuMasterV2: React.FC = () => {
                         })() : selectedSkuDetails.paperType === 'Sheets' ? (
                           `Formula: 1 Ream = ${selectedSkuDetails.pages || 500} Sheets`
                         ) : (
-                          `Formula: 1 ${selectedSkuDetails.altUnit || 'GBL'} = ${selectedSkuDetails.booksGbl || 200} Pcs`
+                          `Formula: 1 ${selectedSkuDetails.unit || 'GBL'} = ${selectedSkuDetails.pages || selectedSkuDetails.booksGbl || 122} PCS`
                         )}
                       </div>
                     </div>
@@ -2943,11 +2953,13 @@ const SkuMasterV2: React.FC = () => {
                       ? modalDynamicLiveStock 
                       : Number((selectedSkuDetails as any).presentStock ?? selectedSkuDetails.openingStock ?? 0);
 
-                    const minStockVal = (selectedSkuDetails as any).minStockLevel ?? (selectedSkuDetails as any).minStock;
-                    const hasMinStock = minStockVal !== undefined && minStockVal !== null && minStockVal !== '' && !isNaN(Number(minStockVal)) && Number(minStockVal) > 0;
+                    const minStockNum = (selectedSkuDetails as any).minStockLevel !== undefined && (selectedSkuDetails as any).minStockLevel !== null && (selectedSkuDetails as any).minStockLevel !== ''
+                      ? Number((selectedSkuDetails as any).minStockLevel)
+                      : ((selectedSkuDetails as any).minStock !== undefined ? Number((selectedSkuDetails as any).minStock) : 0);
 
-                    const reorderVal = (selectedSkuDetails as any).reorderLevel ?? (selectedSkuDetails as any).reorderQty;
-                    const hasReorder = reorderVal !== undefined && reorderVal !== null && reorderVal !== '' && !isNaN(Number(reorderVal)) && Number(reorderVal) > 0;
+                    const reorderNum = (selectedSkuDetails as any).reorderLevel !== undefined && (selectedSkuDetails as any).reorderLevel !== null && (selectedSkuDetails as any).reorderLevel !== ''
+                      ? Number((selectedSkuDetails as any).reorderLevel)
+                      : ((selectedSkuDetails as any).reorderQty !== undefined ? Number((selectedSkuDetails as any).reorderQty) : 0);
 
                     const unitRate = Number((selectedSkuDetails as any).purchasePrice || (selectedSkuDetails as any).ratePerKg || (selectedSkuDetails as any).cost || 45);
                     const totalEstVal = liveStockQty * unitRate;
@@ -2955,9 +2967,9 @@ const SkuMasterV2: React.FC = () => {
                     let statusBadge = { label: 'Normal', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
                     if (liveStockQty === 0) {
                       statusBadge = { label: 'Out of Stock', bg: 'bg-rose-50 text-rose-700 border-rose-200' };
-                    } else if (hasMinStock && liveStockQty <= Number(minStockVal)) {
+                    } else if (minStockNum > 0 && liveStockQty <= minStockNum) {
                       statusBadge = { label: 'Low Stock', bg: 'bg-amber-50 text-amber-800 border-amber-200' };
-                    } else if (hasReorder && liveStockQty <= Number(reorderVal)) {
+                    } else if (reorderNum > 0 && liveStockQty <= reorderNum) {
                       statusBadge = { label: 'Low Stock', bg: 'bg-amber-50 text-amber-800 border-amber-200' };
                     }
 
@@ -3005,21 +3017,13 @@ const SkuMasterV2: React.FC = () => {
                               <div>
                                 <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">MIN STOCK THRESHOLD</span>
                                 <span className="font-mono font-bold text-amber-600 text-xs block">
-                                  {hasMinStock ? (
-                                    `${Number(minStockVal).toLocaleString('en-IN')} ${stockUnit}`
-                                  ) : (
-                                    <span className="inline-block w-4 h-1 bg-amber-500 rounded-full my-1" title="Unconfigured"></span>
-                                  )}
+                                  {minStockNum.toLocaleString('en-IN')} {stockUnit}
                                 </span>
                               </div>
                               <div>
                                 <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">REORDER LEVEL</span>
                                 <span className="font-mono font-bold text-blue-600 text-xs block">
-                                  {hasReorder ? (
-                                    `${Number(reorderVal).toLocaleString('en-IN')} ${stockUnit}`
-                                  ) : (
-                                    <span className="inline-block w-4 h-1 bg-blue-500 rounded-full my-1" title="Unconfigured"></span>
-                                  )}
+                                  {reorderNum.toLocaleString('en-IN')} {stockUnit}
                                 </span>
                               </div>
                               {isSheetItem && (
