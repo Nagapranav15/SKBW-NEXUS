@@ -339,6 +339,7 @@ export const StockInventoryV2: React.FC = () => {
     if (!selectedCompany?._id) return;
     setLoading(true);
     try {
+      loadAuxiliaryData(true);
       const validSkuMap = new Map(allSkus.map(s => [String(s._id), s]));
       const validSkuCodeSet = new Set(allSkus.map(s => (s.skuCode || '').toUpperCase().trim()));
 
@@ -582,7 +583,8 @@ export const StockInventoryV2: React.FC = () => {
     const needsReorder = stockAlertsData.filter(d => d.status === 'Low Stock').length;
     const outOfStock = stockAlertsData.filter(d => d.status === 'Out of Stock').length;
     const overstock = stockAlertsData.filter(d => d.status === 'Overstock').length;
-    return { needsReorder, outOfStock, overstock };
+    const totalAlerts = needsReorder + outOfStock;
+    return { needsReorder, outOfStock, overstock, totalAlerts };
   }, [stockAlertsData]);
 
   const filteredAlerts = useMemo(() => {
@@ -1346,17 +1348,9 @@ export const StockInventoryV2: React.FC = () => {
           >
             <AlertTriangle className={`w-4 h-4 ${activeTab === 'alerts' ? 'text-teal-700' : 'text-slate-400'}`} />
             <span>Stock Alerts</span>
-            {allSkus.filter(s => {
-              const cur = s.presentStock || 0;
-              const min = s.minStockLevel ? Number(s.minStockLevel) : 0;
-              return cur === 0 || (min > 0 && cur <= min);
-            }).length > 0 && (
-              <span className="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-1.5 py-0.2 rounded-full border border-amber-200">
-                {allSkus.filter(s => {
-                  const cur = s.presentStock || 0;
-                  const min = s.minStockLevel ? Number(s.minStockLevel) : 0;
-                  return cur === 0 || (min > 0 && cur <= min);
-                }).length}
+            {alertsSummary.totalAlerts > 0 && (
+              <span className="bg-amber-100 text-amber-800 text-[10.5px] font-black px-2 py-0.5 rounded-full border border-amber-200">
+                {alertsSummary.totalAlerts}
               </span>
             )}
           </button>
