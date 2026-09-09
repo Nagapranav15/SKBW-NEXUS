@@ -552,39 +552,35 @@ const SkuMasterV2: React.FC = () => {
       try {
         const hierarchy = currentCompanyId ? await getWarehouseHierarchyV2(currentCompanyId).catch(() => []) : [];
         
+        let resolvedLocation = '';
+        let resolvedLiveStock: number | null = null;
+
         if (selectedSkuDetails._id && currentCompanyId) {
           const balances = await getBalancesV2(currentCompanyId, undefined, undefined, selectedSkuDetails._id).catch(() => []);
           
           if (balances && balances.length > 0) {
             const sumOnHand = balances.reduce((s: number, b: any) => s + Number(b.onHand ?? b.quantity ?? 0), 0);
-            if (isMounted) setModalDynamicLiveStock(sumOnHand);
+            resolvedLiveStock = sumOnHand;
 
             const locPaths: string[] = [];
             for (const b of balances) {
               const locObj = b.locationId || b.location;
               if (locObj) {
                 const stockUnit = selectedSkuDetails.unit || (getItemType(selectedSkuDetails) === 'materials' ? 'KG' : 'Pcs');
-                if (typeof locObj === 'object' && locObj._id) {
-                  const p = buildModalLocationPath(locObj._id, hierarchy);
+                const p = buildModalLocationPath(locObj, hierarchy);
+                if (p) {
                   const qtyText = b.onHand !== undefined ? ` (${b.onHand} ${stockUnit})` : '';
                   locPaths.push(`${p}${qtyText}`);
-                } else if (typeof locObj === 'object' && locObj.name) {
-                  locPaths.push(locObj.name);
-                } else if (typeof locObj === 'string') {
-                  const p = buildModalLocationPath(locObj, hierarchy);
-                  locPaths.push(p);
                 }
               }
             }
             if (locPaths.length > 0) {
-              const unique = Array.from(new Set(locPaths));
-              if (isMounted) setModalDynamicLocation(unique.join(' • '));
-              return;
+              resolvedLocation = Array.from(new Set(locPaths)).join(' • ');
             }
-          } else {
-            if (isMounted) setModalDynamicLiveStock(null);
           }
+        }
 
+        if (!resolvedLocation) {
           const directLoc = (selectedSkuDetails as any)?.initialLocationId || 
                            (selectedSkuDetails as any)?.initialLocation || 
                            (selectedSkuDetails as any)?.locationId || 
@@ -594,21 +590,20 @@ const SkuMasterV2: React.FC = () => {
                            (selectedSkuDetails as any)?.defaultLocation;
           if (directLoc) {
             const locPath = buildModalLocationPath(directLoc, hierarchy);
-            if (locPath && isMounted) {
-              setModalDynamicLocation(locPath);
-              return;
+            if (locPath) {
+              resolvedLocation = locPath;
             }
           }
         }
 
         if (isMounted) {
-          setModalDynamicLocation('Not assigned to any location');
-          setModalDynamicLiveStock(null);
+          setModalDynamicLiveStock(resolvedLiveStock);
+          setModalDynamicLocation(resolvedLocation || 'Not assigned to any location');
         }
       } catch (err) {
         if (isMounted) {
-          setModalDynamicLocation('Not assigned to any location');
           setModalDynamicLiveStock(null);
+          setModalDynamicLocation('Not assigned to any location');
         }
       }
     };
@@ -2944,12 +2939,11 @@ const SkuMasterV2: React.FC = () => {
                       ? modalDynamicLiveStock 
                       : Number((selectedSkuDetails as any).presentStock ?? selectedSkuDetails.openingStock ?? 0);
 
-                    const minStockVal = (selectedSkuDetails as any).minStockLevel;
-                    const hasMinStock = minStockVal !== undefined && minStockVal !== null && minStockVal !== '' && Number(minStockVal) > 0;
-                    const reorderVal = (selectedSkuDetails as any).reorderLevel;
-                    const hasReorder = reorderVal !== undefined && reorderVal !== null && reorderVal !== '' && Number(reorderVal) > 0;
-                    const maxStockVal = (selectedSkuDetails as any).maxStockLevel;
-                    const hasMaxStock = maxStockVal !== undefined && maxStockVal !== null && maxStockVal !== '' && Number(maxStockVal) > 0;
+                    const minStockVal = (selectedSkuDetails as any).minStockLevel ?? (selectedSkuDetails as any).minStock;
+                    const hasMinStock = minStockVal !== undefined && minStockVal !== null && minStockVal !== '' && !isNaN(Number(minStockVal)) && Number(minStockVal) > 0;
+
+                    const reorderVal = (selectedSkuDetails as any).reorderLevel ?? (selectedSkuDetails as any).reorderQty;
+                    const hasReorder = reorderVal !== undefined && reorderVal !== null && reorderVal !== '' && !isNaN(Number(reorderVal)) && Number(reorderVal) > 0;
 
                     const unitRate = Number((selectedSkuDetails as any).purchasePrice || (selectedSkuDetails as any).ratePerKg || (selectedSkuDetails as any).cost || 45);
                     const totalEstVal = liveStockQty * unitRate;
@@ -2961,8 +2955,6 @@ const SkuMasterV2: React.FC = () => {
                       statusBadge = { label: 'Low Stock', bg: 'bg-amber-50 text-amber-800 border-amber-200' };
                     } else if (hasReorder && liveStockQty <= Number(reorderVal)) {
                       statusBadge = { label: 'Low Stock', bg: 'bg-amber-50 text-amber-800 border-amber-200' };
-                    } else if (hasMaxStock && liveStockQty > Number(maxStockVal)) {
-                      statusBadge = { label: 'Overstock', bg: 'bg-purple-50 text-purple-700 border-purple-200' };
                     }
 
                     return (
@@ -3006,12 +2998,6 @@ const SkuMasterV2: React.FC = () => {
                             <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">REORDER LEVEL</span>
                             <span className="font-mono font-bold text-blue-600 text-xs">
                               {hasReorder ? `${Number(reorderVal).toLocaleString('en-IN')} ${stockUnit}` : '—'}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">MAX STOCK LEVEL</span>
-                            <span className="font-mono font-bold text-purple-600 text-xs">
-                              {hasMaxStock ? `${Number(maxStockVal).toLocaleString('en-IN')} ${stockUnit}` : '—'}
                             </span>
                           </div>
                         </div>
