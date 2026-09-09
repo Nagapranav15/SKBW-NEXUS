@@ -1181,11 +1181,17 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                             </div>
                           </div>
                         </div>
-                        {form.altUnit && form.altUnitConversion && (
-                          <div className="col-span-2 text-center bg-blue-50/70 py-1.5 px-3 rounded-lg border border-blue-100 text-[10.5px] font-medium text-blue-900">
-                            Formula: <span className="font-extrabold text-slate-900">1 {form.altUnit}</span> = <span className="font-extrabold text-blue-700 font-mono text-xs">{form.altUnitConversion}</span> <span className="font-extrabold text-slate-900">{form.unit}</span>
-                          </div>
-                        )}
+                        {form.altUnit && form.altUnitConversion && (() => {
+                          const isAltPcs = (form.altUnit || '').toLowerCase().includes('pc');
+                          const isPrimaryPcs = (form.unit || '').toLowerCase().includes('pc');
+                          const outerUnit = (isAltPcs && !isPrimaryPcs) ? form.unit : form.altUnit;
+                          const innerUnit = (isAltPcs && !isPrimaryPcs) ? form.altUnit : form.unit;
+                          return (
+                            <div className="col-span-2 text-center bg-blue-50/70 py-1.5 px-3 rounded-lg border border-blue-100 text-[10.5px] font-medium text-blue-900">
+                              Formula: <span className="font-extrabold text-slate-900">1 {outerUnit}</span> = <span className="font-extrabold text-blue-700 font-mono text-xs">{form.altUnitConversion}</span> <span className="font-extrabold text-slate-900">{innerUnit}</span>
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
                   </>
@@ -1467,11 +1473,17 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                             </div>
                           </div>
                         </div>
-                        {form.altUnit && form.altUnitConversion && (
-                          <div className="col-span-2 text-center bg-blue-50/70 py-1.5 px-3 rounded-lg border border-blue-100 text-[10.5px] font-medium text-blue-900">
-                            Formula: <span className="font-extrabold text-slate-900">1 {form.altUnit}</span> = <span className="font-extrabold text-blue-700 font-mono text-xs">{form.altUnitConversion}</span> <span className="font-extrabold text-slate-900">{form.unit}</span>
-                          </div>
-                        )}
+                        {form.altUnit && form.altUnitConversion && (() => {
+                          const isAltPcs = (form.altUnit || '').toLowerCase().includes('pc');
+                          const isPrimaryPcs = (form.unit || '').toLowerCase().includes('pc');
+                          const outerUnit = (isAltPcs && !isPrimaryPcs) ? form.unit : form.altUnit;
+                          const innerUnit = (isAltPcs && !isPrimaryPcs) ? form.altUnit : form.unit;
+                          return (
+                            <div className="col-span-2 text-center bg-blue-50/70 py-1.5 px-3 rounded-lg border border-blue-100 text-[10.5px] font-medium text-blue-900">
+                              Formula: <span className="font-extrabold text-slate-900">1 {outerUnit}</span> = <span className="font-extrabold text-blue-700 font-mono text-xs">{form.altUnitConversion}</span> <span className="font-extrabold text-slate-900">{innerUnit}</span>
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
                   </>

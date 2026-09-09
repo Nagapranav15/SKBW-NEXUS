@@ -2037,9 +2037,13 @@ const SkuMasterV2: React.FC = () => {
                                 </td>
                               );
                             case 'altUnitConversion':
+                              const isAltPcs = (sku.altUnit || '').toLowerCase().includes('pc');
+                              const isPrimaryPcs = (sku.unit || '').toLowerCase().includes('pc');
+                              const outerUnit = (isAltPcs && !isPrimaryPcs) ? sku.unit : sku.altUnit;
+                              const innerUnit = (isAltPcs && !isPrimaryPcs) ? sku.altUnit : (sku.unit || 'Pcs');
                               return (
                                 <td key="altUnitConversion" className="py-3 px-3 text-gray-700 font-mono text-[11px] font-semibold whitespace-nowrap">
-                                  {sku.altUnit && sku.altUnitConversion ? `1 ${sku.altUnit} = ${sku.altUnitConversion} ${sku.unit || 'Pcs'}` : '-'}
+                                  {sku.altUnit && sku.altUnitConversion ? `1 ${outerUnit} = ${sku.altUnitConversion} ${innerUnit}` : '-'}
                                 </td>
                               );
                             case 'gsm':
@@ -2871,9 +2875,13 @@ const SkuMasterV2: React.FC = () => {
                       <div className="font-extrabold text-xs text-blue-950">
                         {getItemType(selectedSkuDetails) === 'materials' || selectedSkuDetails.category === 'Raw Material' ? (
                           `Direct Unit Tracking (${selectedSkuDetails.unit || 'Kg'}) • No AUOM Conversion`
-                        ) : selectedSkuDetails.altUnit && selectedSkuDetails.altUnitConversion ? (
-                          `Formula: 1 ${selectedSkuDetails.altUnit} = ${selectedSkuDetails.altUnitConversion} ${selectedSkuDetails.unit || 'Pcs'}`
-                        ) : selectedSkuDetails.paperType === 'Sheets' ? (
+                        ) : selectedSkuDetails.altUnit && selectedSkuDetails.altUnitConversion ? (() => {
+                          const isAltPcs = (selectedSkuDetails.altUnit || '').toLowerCase().includes('pc');
+                          const isPrimaryPcs = (selectedSkuDetails.unit || '').toLowerCase().includes('pc');
+                          const outerUnit = (isAltPcs && !isPrimaryPcs) ? selectedSkuDetails.unit : selectedSkuDetails.altUnit;
+                          const innerUnit = (isAltPcs && !isPrimaryPcs) ? selectedSkuDetails.altUnit : (selectedSkuDetails.unit || 'Pcs');
+                          return `Formula: 1 ${outerUnit} = ${selectedSkuDetails.altUnitConversion} ${innerUnit}`;
+                        })() : selectedSkuDetails.paperType === 'Sheets' ? (
                           `Formula: 1 Ream = ${selectedSkuDetails.pages || 500} Sheets`
                         ) : (
                           `Formula: 1 ${selectedSkuDetails.altUnit || 'GBL'} = ${selectedSkuDetails.booksGbl || 200} Pcs`
