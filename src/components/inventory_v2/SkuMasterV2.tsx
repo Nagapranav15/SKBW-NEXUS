@@ -1364,9 +1364,9 @@ const SkuMasterV2: React.FC = () => {
         {/* Tab 1: Products (All Finished Products) */}
         <button
           onClick={() => setActiveMainTab('products')}
-          className={`flex items-center gap-2 px-4 py-3 text-xs md:text-sm font-extrabold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
+          className={`flex items-center gap-2 px-4 py-3 text-xs md:text-sm font-bold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
             activeMainTab === 'products'
-              ? 'text-slate-900 border-teal-700 bg-transparent'
+              ? 'text-teal-700 border-teal-700 bg-transparent'
               : 'text-slate-500 hover:text-slate-800 border-transparent hover:border-slate-300 bg-transparent'
           }`}
         >
@@ -1377,9 +1377,9 @@ const SkuMasterV2: React.FC = () => {
         {/* Tab 2: Materials (All Raw Materials) */}
         <button
           onClick={() => setActiveMainTab('materials')}
-          className={`flex items-center gap-2 px-4 py-3 text-xs md:text-sm font-extrabold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
+          className={`flex items-center gap-2 px-4 py-3 text-xs md:text-sm font-bold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
             activeMainTab === 'materials'
-              ? 'text-slate-900 border-teal-700 bg-transparent'
+              ? 'text-teal-700 border-teal-700 bg-transparent'
               : 'text-slate-500 hover:text-slate-800 border-transparent hover:border-slate-300 bg-transparent'
           }`}
         >
@@ -1390,9 +1390,9 @@ const SkuMasterV2: React.FC = () => {
         {/* Tab 3: Semi (Only Semi Finished Materials) */}
         <button
           onClick={() => setActiveMainTab('semi')}
-          className={`flex items-center gap-2 px-4 py-3 text-xs md:text-sm font-extrabold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
+          className={`flex items-center gap-2 px-4 py-3 text-xs md:text-sm font-bold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
             activeMainTab === 'semi'
-              ? 'text-slate-900 border-teal-700 bg-transparent'
+              ? 'text-teal-700 border-teal-700 bg-transparent'
               : 'text-slate-500 hover:text-slate-800 border-transparent hover:border-slate-300 bg-transparent'
           }`}
         >
@@ -1403,9 +1403,9 @@ const SkuMasterV2: React.FC = () => {
         {/* Tab 4: Categories */}
         <button
           onClick={() => setActiveMainTab('categories')}
-          className={`flex items-center gap-2 px-4 py-3 text-xs md:text-sm font-extrabold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
+          className={`flex items-center gap-2 px-4 py-3 text-xs md:text-sm font-bold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
             activeMainTab === 'categories'
-              ? 'text-slate-900 border-teal-700 bg-transparent'
+              ? 'text-teal-700 border-teal-700 bg-transparent'
               : 'text-slate-500 hover:text-slate-800 border-transparent hover:border-slate-300 bg-transparent'
           }`}
         >

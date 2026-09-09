@@ -266,6 +266,10 @@ export const StockInventoryV2: React.FC = () => {
         });
       }
 
+      // Filter balances to ONLY include items present in Item Master
+      const validSkuMap = new Map((skusRes || []).map((s: SkuV2) => [String(s._id), s]));
+      const validSkuCodeSet = new Set((skusRes || []).map((s: SkuV2) => (s.skuCode || '').toUpperCase().trim()));
+
       const formattedSkus: SkuV2[] = (skusRes || []).map((s: SkuV2) => {
         const sId = String(s._id);
         const hasBalance = balanceMap.has(sId);
@@ -303,6 +307,9 @@ export const StockInventoryV2: React.FC = () => {
     if (!selectedCompany?._id) return;
     setLoading(true);
     try {
+      const validSkuMap = new Map(allSkus.map(s => [String(s._id), s]));
+      const validSkuCodeSet = new Set(allSkus.map(s => (s.skuCode || '').toUpperCase().trim()));
+
       if (activeTab === 'batches') {
         const [invoicesRes, balances] = await Promise.all([
           getPurchaseInvoicesV2({ companyId: selectedCompany._id, limit: 100 }).catch(() => ({ invoices: [], total: 0, page: 1, limit: 100 })),
@@ -340,9 +347,9 @@ export const StockInventoryV2: React.FC = () => {
           const qty = Number(b.onHand ?? b.quantity ?? b.balance ?? 0);
           return {
             _id: b._id || `bal-${idx}`,
-            batchNumber: b.batchNumber || b.batchNo || `PB-SEP-${100 + idx}`,
-            skuCode: b.skuCode || b.sku?.skuCode || 'RM-75552',
-            skuName: b.skuName || b.sku?.name || b.name || 'Raw Paper Board Sheet',
+            batchNumber: b.batchNumber || b.batchNo || `PB-${100 + idx}`,
+            skuCode: b.skuCode || b.sku?.skuCode || '',
+            skuName: b.skuName || b.sku?.name || b.name || '',
             category: b.category || b.sku?.category || 'Raw Material',
             locationName: b.locationName || b.location?.name || 'Main Warehouse',
             quantity: qty,
@@ -361,8 +368,21 @@ export const StockInventoryV2: React.FC = () => {
           }
         }
 
-        setItems(combined);
-        setTotalRecords(combined.length);
+        // Clean inventory: ONLY include items present in Item Master
+        const cleanedCombined = validSkuMap.size > 0 
+          ? combined.filter(item => {
+              if (!item.skuCode && !item.skuName) return true;
+              const code = (item.skuCode || '').toUpperCase().trim();
+              return validSkuCodeSet.has(code) || (item.rawInvoice && item.rawInvoice.items?.some((it: any) => {
+                const itCode = (it.skuCode || '').toUpperCase().trim();
+                const itId = String(it.skuId?._id || it.skuId || '');
+                return validSkuCodeSet.has(itCode) || validSkuMap.has(itId);
+              }));
+            })
+          : combined;
+
+        setItems(cleanedCombined);
+        setTotalRecords(cleanedCombined.length);
       } else if (activeTab === 'manager') {
         const balances = await getBalancesV2(selectedCompany._id);
         const formatted = (balances || []).map((b: any, idx: number) => {
@@ -375,8 +395,9 @@ export const StockInventoryV2: React.FC = () => {
 
           return {
             _id: b._id || `bal-${idx}`,
-            skuCode: b.sku?.skuCode || 'RM-75552',
-            name: b.sku?.name || 'Item Name',
+            skuId: b.sku?._id,
+            skuCode: b.sku?.skuCode || '',
+            name: b.sku?.name || '',
             category: b.sku?.category || 'Raw Material',
             locationName: b.location?.name || 'Main Warehouse',
             unit: b.sku?.unit || 'Kg',
@@ -388,16 +409,27 @@ export const StockInventoryV2: React.FC = () => {
             status: onHand <= 0 ? 'Out of Stock' : onHand <= minStock ? 'Low Stock' : 'Normal'
           };
         });
-        setItems(formatted);
-        setTotalRecords(formatted.length);
+
+        // Clean inventory: ONLY include items present in Item Master
+        const cleanedManager = validSkuMap.size > 0
+          ? formatted.filter(b => {
+              const bId = String(b.skuId || '');
+              const bCode = (b.skuCode || '').toUpperCase().trim();
+              return validSkuMap.has(bId) || validSkuCodeSet.has(bCode);
+            })
+          : formatted;
+
+        setItems(cleanedManager);
+        setTotalRecords(cleanedManager.length);
       } else if (activeTab === 'ledger') {
         const ledgerRes = await getLedgerV2({ companyId: selectedCompany._id });
         const formatted = (ledgerRes || []).map((l: LedgerEntryV2) => ({
           _id: l._id,
           timestamp: l.timestamp || l.createdAt || new Date().toISOString(),
           transactionType: l.transactionType || 'PURCHASE_RECEIPT',
-          skuName: l.skuId?.name || 'Raw Material Item',
-          skuCode: l.skuId?.skuCode || 'RM-1001',
+          skuId: l.skuId?._id,
+          skuName: l.skuId?.name || '',
+          skuCode: l.skuId?.skuCode || '',
           locationName: l.locationId?.name || 'Main Warehouse',
           qtyIn: l.qtyIn || 0,
           qtyOut: l.qtyOut || 0,
@@ -405,8 +437,18 @@ export const StockInventoryV2: React.FC = () => {
           batchNumber: l.batchNumber || '—',
           remarks: l.remarks || 'Stock movement recorded'
         }));
-        setItems(formatted);
-        setTotalRecords(formatted.length);
+
+        // Clean inventory: ONLY include items present in Item Master
+        const cleanedLedger = validSkuMap.size > 0
+          ? formatted.filter(l => {
+              const lId = String(l.skuId || '');
+              const lCode = (l.skuCode || '').toUpperCase().trim();
+              return validSkuMap.has(lId) || validSkuCodeSet.has(lCode);
+            })
+          : formatted;
+
+        setItems(cleanedLedger);
+        setTotalRecords(cleanedLedger.length);
       } else {
         // Warehouse Setup / Hierarchy Data
         const locsRes = await getWarehouseHierarchyV2(selectedCompany._id);
@@ -1208,11 +1250,12 @@ export const StockInventoryV2: React.FC = () => {
       {/* 2. Top Navigation Tabs Bar */}
       <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 rounded-2xl shadow-2xs overflow-x-auto">
         <div className="flex items-center gap-1">
+          {/* Tab 1: Purchase Batches */}
           <button
             onClick={() => handleTabChange('batches')}
-            className={`px-4 py-3.5 text-xs md:text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
               activeTab === 'batches'
-                ? 'border-teal-700 text-slate-900 bg-transparent'
+                ? 'border-teal-700 text-teal-700 bg-transparent'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
@@ -1220,11 +1263,51 @@ export const StockInventoryV2: React.FC = () => {
             <span>Purchase Batches</span>
           </button>
 
+          {/* Tab 2: Stock Manager */}
+          <button
+            onClick={() => handleTabChange('manager')}
+            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+              activeTab === 'manager'
+                ? 'border-teal-700 text-teal-700 bg-transparent'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
+            }`}
+          >
+            <BarChart3 className={`w-4 h-4 ${activeTab === 'manager' ? 'text-teal-700' : 'text-slate-400'}`} />
+            <span>Stock Manager</span>
+          </button>
+
+          {/* Tab 3: Stock Ledger */}
+          <button
+            onClick={() => handleTabChange('ledger')}
+            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+              activeTab === 'ledger'
+                ? 'border-teal-700 text-teal-700 bg-transparent'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
+            }`}
+          >
+            <FileText className={`w-4 h-4 ${activeTab === 'ledger' ? 'text-teal-700' : 'text-slate-400'}`} />
+            <span>Stock Ledger</span>
+          </button>
+
+          {/* Tab 4: Warehouse Setup */}
+          <button
+            onClick={() => handleTabChange('warehouse')}
+            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+              activeTab === 'warehouse'
+                ? 'border-teal-700 text-teal-700 bg-transparent'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
+            }`}
+          >
+            <Warehouse className={`w-4 h-4 ${activeTab === 'warehouse' ? 'text-teal-700' : 'text-slate-400'}`} />
+            <span>Warehouse Setup</span>
+          </button>
+
+          {/* Tab 5: Stock Alerts (MOVED TO END OF ALL MODULE TABS AS INSTRUCTED!) */}
           <button
             onClick={() => handleTabChange('alerts')}
-            className={`px-4 py-3.5 text-xs md:text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
               activeTab === 'alerts'
-                ? 'border-teal-700 text-slate-900 bg-transparent'
+                ? 'border-teal-700 text-teal-700 bg-transparent'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
@@ -1243,42 +1326,6 @@ export const StockInventoryV2: React.FC = () => {
                 }).length}
               </span>
             )}
-          </button>
-
-          <button
-            onClick={() => handleTabChange('manager')}
-            className={`px-4 py-3.5 text-xs md:text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
-              activeTab === 'manager'
-                ? 'border-teal-700 text-slate-900 bg-transparent'
-                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
-            }`}
-          >
-            <BarChart3 className={`w-4 h-4 ${activeTab === 'manager' ? 'text-teal-700' : 'text-slate-400'}`} />
-            <span>Stock Manager</span>
-          </button>
-
-          <button
-            onClick={() => handleTabChange('ledger')}
-            className={`px-4 py-3.5 text-xs md:text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
-              activeTab === 'ledger'
-                ? 'border-teal-700 text-slate-900 bg-transparent'
-                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
-            }`}
-          >
-            <FileText className={`w-4 h-4 ${activeTab === 'ledger' ? 'text-teal-700' : 'text-slate-400'}`} />
-            <span>Stock Ledger</span>
-          </button>
-
-          <button
-            onClick={() => handleTabChange('warehouse')}
-            className={`px-4 py-3.5 text-xs md:text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
-              activeTab === 'warehouse'
-                ? 'border-teal-700 text-slate-900 bg-transparent'
-                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
-            }`}
-          >
-            <Warehouse className={`w-4 h-4 ${activeTab === 'warehouse' ? 'text-teal-700' : 'text-slate-400'}`} />
-            <span>Warehouse Setup</span>
           </button>
         </div>
 
@@ -1369,16 +1416,14 @@ export const StockInventoryV2: React.FC = () => {
                   <Download className="w-4 h-4 text-gray-500" />
                 </button>
 
+                {/* Replace plus button with ++ dashed circular button from image 2 */}
                 <button
                   type="button"
-                  onClick={() => {
-                    setEditingSku(null);
-                    setIsAddSkuOpen(true);
-                  }}
-                  className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-2xs transition-all cursor-pointer"
-                  title="Add Item"
+                  onClick={() => openModal()}
+                  className="w-8 h-8 rounded-full border border-dashed border-teal-700 hover:border-teal-800 hover:bg-teal-50 text-teal-700 font-extrabold text-xs flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+                  title="Create New Purchase Batch to Refill Stock from Vendor"
                 >
-                  <Plus className="w-4 h-4" />
+                  ++
                 </button>
               </div>
             </div>
@@ -1467,16 +1512,26 @@ export const StockInventoryV2: React.FC = () => {
                           </span>
                         </td>
                         <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={() => {
-                              setEditingSku(row.sku);
-                              setIsAddSkuOpen(true);
-                            }}
-                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                            title="Edit Stock Levels"
-                          >
-                            <Edit className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => openModal()}
+                              className="px-2 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 rounded-lg text-[10.5px] font-bold transition-all flex items-center gap-1 cursor-pointer"
+                              title="Refill item stock by creating a Purchase Batch from vendor"
+                            >
+                              <Plus className="w-3 h-3" />
+                              <span>Refill</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingSku(row.sku);
+                                setIsAddSkuOpen(true);
+                              }}
+                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                              title="Edit Stock Levels"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))

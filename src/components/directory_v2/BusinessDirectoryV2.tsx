@@ -1324,9 +1324,9 @@ export const BusinessDirectoryV2: React.FC = () => {
         <div className="flex items-center gap-1 overflow-x-auto py-1 max-w-full">
           <button
             onClick={() => handleTabChange('customers')}
-            className={`px-4 py-3.5 text-xs md:text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
               activeMainTab === 'customers'
-                ? 'border-teal-700 text-slate-900 bg-transparent'
+                ? 'border-teal-700 text-teal-700 bg-transparent'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
@@ -1336,9 +1336,9 @@ export const BusinessDirectoryV2: React.FC = () => {
 
           <button
             onClick={() => handleTabChange('vendors')}
-            className={`px-4 py-3.5 text-xs md:text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
               activeMainTab === 'vendors'
-                ? 'border-teal-700 text-slate-900 bg-transparent'
+                ? 'border-teal-700 text-teal-700 bg-transparent'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
@@ -1348,9 +1348,9 @@ export const BusinessDirectoryV2: React.FC = () => {
 
           <button
             onClick={() => handleTabChange('agents')}
-            className={`px-4 py-3.5 text-xs md:text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
               activeMainTab === 'agents'
-                ? 'border-teal-700 text-slate-900 bg-transparent'
+                ? 'border-teal-700 text-teal-700 bg-transparent'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
@@ -1360,9 +1360,9 @@ export const BusinessDirectoryV2: React.FC = () => {
 
           <button
             onClick={() => handleTabChange('transporters')}
-            className={`px-4 py-3.5 text-xs md:text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
               activeMainTab === 'transporters'
-                ? 'border-teal-700 text-slate-900 bg-transparent'
+                ? 'border-teal-700 text-teal-700 bg-transparent'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
@@ -1372,9 +1372,9 @@ export const BusinessDirectoryV2: React.FC = () => {
 
           <button
             onClick={() => handleTabChange('regions')}
-            className={`px-4 py-3.5 text-xs md:text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
               activeMainTab === 'regions'
-                ? 'border-teal-700 text-slate-900 bg-transparent'
+                ? 'border-teal-700 text-teal-700 bg-transparent'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
@@ -1384,9 +1384,9 @@ export const BusinessDirectoryV2: React.FC = () => {
 
           <button
             onClick={() => handleTabChange('cities')}
-            className={`px-4 py-3.5 text-xs md:text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
               activeMainTab === 'cities'
-                ? 'border-teal-700 text-slate-900 bg-transparent'
+                ? 'border-teal-700 text-teal-700 bg-transparent'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
