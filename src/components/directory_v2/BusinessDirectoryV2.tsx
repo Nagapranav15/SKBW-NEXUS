@@ -36,7 +36,8 @@ import {
   FileSpreadsheet,
   RotateCcw,
   Check,
-  FileCheck
+  FileCheck,
+  Eye
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import Modal from '../ui/Modal';
@@ -2262,35 +2263,56 @@ export const BusinessDirectoryV2: React.FC = () => {
                         </span>
                       </td>
 
-                      {/* ACTIONS (Matches User Screenshot 100%) */}
+                      {/* ACTIONS (Icon Only with Instant Hover Tooltips) */}
                       <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedDetails(item)}
-                            className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/80 rounded-md font-bold text-xs transition-all cursor-pointer"
-                            title="View Profile"
-                          >
-                            Profile
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openModal(item)}
-                            className="px-2.5 py-1 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-md font-bold text-xs flex items-center gap-1 transition-all cursor-pointer"
-                            title="Edit Record"
-                          >
-                            <Edit className="w-3 h-3" />
-                            <span>Edit</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteItem(item._id)}
-                            className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-md font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
-                            title="Delete Record"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                            <span>Delete</span>
-                          </button>
+                          {/* 1. View Profile */}
+                          <div className="relative group">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedDetails(item)}
+                              className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/80 rounded-lg transition-all cursor-pointer shadow-2xs flex items-center justify-center"
+                              title="View Profile"
+                              aria-label="View Profile"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                            <div className="absolute bottom-full mb-1.5 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                              View Profile
+                            </div>
+                          </div>
+
+                          {/* 2. Edit Record */}
+                          <div className="relative group">
+                            <button
+                              type="button"
+                              onClick={() => openModal(item)}
+                              className="p-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200/80 rounded-lg transition-all cursor-pointer shadow-2xs flex items-center justify-center"
+                              title="Edit Record"
+                              aria-label="Edit Record"
+                            >
+                              <Edit className="w-3.5 h-3.5 text-purple-700" />
+                            </button>
+                            <div className="absolute bottom-full mb-1.5 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                              Edit Record
+                            </div>
+                          </div>
+
+                          {/* 3. Delete Record */}
+                          <div className="relative group">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteItem(item._id)}
+                              className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200/80 rounded-lg transition-all cursor-pointer shadow-2xs flex items-center justify-center"
+                              title="Delete Record"
+                              aria-label="Delete Record"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                            </button>
+                            <div className="absolute bottom-full mb-1.5 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                              Delete Record
+                            </div>
+                          </div>
                         </div>
                       </td>
                     </tr>
