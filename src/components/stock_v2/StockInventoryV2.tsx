@@ -1349,7 +1349,10 @@ export const StockInventoryV2: React.FC = () => {
         <div key={animationKey} className="space-y-4">
           <div className="bg-white border border-gray-200/90 rounded-2xl p-4 shadow-2xs space-y-4">
             {/* Top Toolbar & Summary Header */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-gray-100 pb-3">
+            <div 
+              style={{ animation: 'slideDownFade 0.35s ease-out forwards', animationDelay: '0ms' }}
+              className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-gray-100 pb-3 opacity-0"
+            >
               {/* Counter Summary Pills */}
               <div className="flex items-center gap-6 text-xs font-semibold text-gray-700">
                 <div className="flex items-center gap-1.5">
@@ -1453,10 +1456,14 @@ export const StockInventoryV2: React.FC = () => {
                       </td>
                     </tr>
                   ) : (
-                    filteredAlerts.map((row) => (
+                    filteredAlerts.map((row, index) => (
                       <tr
                         key={row.id}
-                        className="hover:bg-blue-50/20 transition-colors cursor-pointer"
+                        style={{
+                          animation: 'slideDownFade 0.35s ease-out forwards',
+                          animationDelay: `${index * 35}ms`
+                        }}
+                        className="hover:bg-blue-50/20 transition-all cursor-pointer opacity-0"
                         onClick={() => {
                           setEditingSku(row.sku);
                           setIsAddSkuOpen(true);
