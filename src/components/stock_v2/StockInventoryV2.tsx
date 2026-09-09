@@ -15,11 +15,17 @@ import {
   Warehouse,
   BarChart3,
   FileText,
-  AlertTriangle
+  FileText,
+  AlertTriangle,
+  Upload,
+  Download,
+  History,
+  Filter
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import Modal from '../ui/Modal';
 import { showToast } from '../ui/Toast';
+import AddSkuDrawerV2 from '../inventory_v2/AddSkuDrawerV2';
 import { 
   getSkusV2, 
   getLedgerV2, 
@@ -36,7 +42,7 @@ import {
 import { getParties } from '../../api/partyApi';
 import { createPurchaseInvoiceV2, updatePurchaseInvoiceV2, getPurchaseInvoicesV2, cancelPurchaseInvoiceV2 } from '../inventory_v2/purchases/purchaseService';
 
-export type StockTabType = 'batches' | 'manager' | 'ledger' | 'warehouse';
+export type StockTabType = 'batches' | 'alerts' | 'manager' | 'ledger' | 'warehouse';
 
 interface MaterialLotItem {
   id: string;
@@ -125,6 +131,10 @@ export const StockInventoryV2: React.FC = () => {
   const [allSkus, setAllSkus] = useState<SkuV2[]>([]);
   const [allLocations, setAllLocations] = useState<WarehouseLocationV2[]>([]);
   const [auxLoaded, setAuxLoaded] = useState(false);
+
+  // Add SKU / Edit SKU Drawer State
+  const [isAddSkuOpen, setIsAddSkuOpen] = useState(false);
+  const [editingSku, setEditingSku] = useState<SkuV2 | null>(null);
 
   // Custom Confirmation Dialog Modal State
   const [confirmModal, setConfirmModal] = useState<{
@@ -448,6 +458,70 @@ export const StockInventoryV2: React.FC = () => {
     const start = (page - 1) * limit;
     return filteredItems.slice(start, start + limit);
   }, [filteredItems, page, limit]);
+
+  // Stock Alerts Module Dynamic Computations
+  const stockAlertsData = useMemo(() => {
+    return allSkus.map(sku => {
+      const currentQty = sku.presentStock || 0;
+      const minQty = sku.minStockLevel ? Number(sku.minStockLevel) : 0;
+      const reorderQty = sku.reorderLevel ? Number(sku.reorderLevel) : 0;
+      const maxQty = (sku as any).maxStockLevel ? Number((sku as any).maxStockLevel) : 0;
+
+      let status: 'Out of Stock' | 'Low Stock' | 'Overstock' | 'Normal' = 'Normal';
+      if (currentQty === 0) {
+        status = 'Out of Stock';
+      } else if (minQty > 0 && currentQty <= minQty) {
+        status = 'Low Stock';
+      } else if (reorderQty > 0 && currentQty <= reorderQty) {
+        status = 'Low Stock';
+      } else if (maxQty > 0 && currentQty > maxQty) {
+        status = 'Overstock';
+      }
+
+      let toOrder = 0;
+      if (status === 'Out of Stock' || status === 'Low Stock') {
+        const targetLevel = minQty || reorderQty || 100;
+        toOrder = Math.max(0, targetLevel - currentQty);
+      }
+
+      const cat = (sku.category || '').toLowerCase();
+      const typeLabel = cat.includes('goods') || cat.includes('product') ? 'Product' : cat.includes('semi') ? 'Semi' : 'Material';
+
+      return {
+        sku,
+        id: sku._id || sku.skuCode,
+        name: sku.name,
+        skuCode: sku.skuCode,
+        category: sku.category,
+        typeLabel,
+        uom: sku.unit || 'Pcs',
+        currentQty,
+        minQty,
+        reorderQty,
+        maxQty,
+        toOrder,
+        status
+      };
+    });
+  }, [allSkus]);
+
+  const alertsSummary = useMemo(() => {
+    const needsReorder = stockAlertsData.filter(d => d.status === 'Low Stock').length;
+    const outOfStock = stockAlertsData.filter(d => d.status === 'Out of Stock').length;
+    const overstock = stockAlertsData.filter(d => d.status === 'Overstock').length;
+    return { needsReorder, outOfStock, overstock };
+  }, [stockAlertsData]);
+
+  const filteredAlerts = useMemo(() => {
+    const q = debouncedSearch.toLowerCase();
+    if (!q) return stockAlertsData;
+    return stockAlertsData.filter(d =>
+      (d.name || '').toLowerCase().includes(q) ||
+      (d.skuCode || '').toLowerCase().includes(q) ||
+      (d.category || '').toLowerCase().includes(q) ||
+      (d.typeLabel || '').toLowerCase().includes(q)
+    );
+  }, [stockAlertsData, debouncedSearch]);
 
   // Warehouse Hierarchy Calculations (Matching Screenshot)
   const totalLocationsCount = allLocations.length;
@@ -1148,6 +1222,31 @@ export const StockInventoryV2: React.FC = () => {
           </button>
 
           <button
+            onClick={() => handleTabChange('alerts')}
+            className={`px-4 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+              activeTab === 'alerts'
+                ? 'border-amber-600 text-amber-700 bg-amber-50/50'
+                : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+            }`}
+          >
+            <AlertTriangle className={`w-4 h-4 ${activeTab === 'alerts' ? 'text-amber-600' : 'text-amber-500'}`} />
+            <span>Stock Alerts</span>
+            {allSkus.filter(s => {
+              const cur = s.presentStock || 0;
+              const min = s.minStockLevel ? Number(s.minStockLevel) : 0;
+              return cur === 0 || (min > 0 && cur <= min);
+            }).length > 0 && (
+              <span className="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-1.5 py-0.2 rounded-full border border-amber-200">
+                {allSkus.filter(s => {
+                  const cur = s.presentStock || 0;
+                  const min = s.minStockLevel ? Number(s.minStockLevel) : 0;
+                  return cur === 0 || (min > 0 && cur <= min);
+                }).length}
+              </span>
+            )}
+          </button>
+
+          <button
             onClick={() => handleTabChange('manager')}
             className={`px-4 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap ${
               activeTab === 'manager'
@@ -1199,8 +1298,196 @@ export const StockInventoryV2: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. WAREHOUSE SETUP / HIERARCHY TREE VIEW (Fully Responsive & Animated!) */}
-      {activeTab === 'warehouse' ? (
+      {/* 3. STOCK ALERTS MODULE VIEW (Dynamic, 100% screenshot match!) */}
+      {activeTab === 'alerts' ? (
+        <div key={animationKey} className="space-y-4">
+          <div className="bg-white border border-gray-200/90 rounded-2xl p-4 shadow-2xs space-y-4">
+            {/* Top Toolbar & Summary Header */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-gray-100 pb-3">
+              {/* Counter Summary Pills */}
+              <div className="flex items-center gap-6 text-xs font-semibold text-gray-700">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-gray-500 font-medium">Needs Reorder:</span>
+                  <span className="font-extrabold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                    {alertsSummary.needsReorder}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-gray-500 font-medium">Out of Stock:</span>
+                  <span className="font-extrabold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                    {alertsSummary.outOfStock}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-gray-500 font-medium">Overstock:</span>
+                  <span className="font-extrabold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-md border border-gray-200">
+                    {alertsSummary.overstock}
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Toolbar Icons & Search */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  title="Filter"
+                  className="p-2 border border-gray-200 hover:bg-gray-50 rounded-xl text-gray-600 transition-colors cursor-pointer"
+                >
+                  <Filter className="w-4 h-4 text-emerald-600" />
+                </button>
+                <button
+                  type="button"
+                  title="Export"
+                  className="p-2 border border-gray-200 hover:bg-gray-50 rounded-xl text-gray-600 transition-colors cursor-pointer"
+                >
+                  <Upload className="w-4 h-4 text-blue-600" />
+                </button>
+                <button
+                  type="button"
+                  title="History"
+                  className="p-2 border border-gray-200 hover:bg-gray-50 rounded-xl text-gray-600 transition-colors cursor-pointer"
+                >
+                  <History className="w-4 h-4 text-gray-500" />
+                </button>
+
+                {/* Search box */}
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search name, party, bat..."
+                    className="pl-8 pr-3 py-1.5 text-xs bg-gray-50/80 border border-gray-200 rounded-xl w-48 md:w-60 focus:outline-none focus:border-blue-500 font-medium"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  title="Import"
+                  className="p-2 border border-gray-200 hover:bg-gray-50 rounded-xl text-gray-600 transition-colors cursor-pointer"
+                >
+                  <Download className="w-4 h-4 text-gray-500" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingSku(null);
+                    setIsAddSkuOpen(true);
+                  }}
+                  className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-2xs transition-all cursor-pointer"
+                  title="Add Item"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Stock Alerts Table */}
+            <div className="overflow-x-auto rounded-xl border border-gray-200/80">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                    <th className="py-3 px-4">NAME</th>
+                    <th className="py-3 px-3">TYPE</th>
+                    <th className="py-3 px-3">UOM</th>
+                    <th className="py-3 px-3 text-right">CURRENT QTY</th>
+                    <th className="py-3 px-3 text-right">MIN</th>
+                    <th className="py-3 px-3 text-right">REORDER AT</th>
+                    <th className="py-3 px-3 text-right">MAX</th>
+                    <th className="py-3 px-3 text-right">TO ORDER</th>
+                    <th className="py-3 px-3 text-center">STATUS</th>
+                    <th className="py-3 px-3 text-right">ACTIONS</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 font-medium text-gray-800">
+                  {filteredAlerts.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="py-12 text-center text-gray-400 italic">
+                        No stock alert records found matching criteria.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredAlerts.map((row) => (
+                      <tr
+                        key={row.id}
+                        className="hover:bg-blue-50/20 transition-colors cursor-pointer"
+                        onClick={() => {
+                          setEditingSku(row.sku);
+                          setIsAddSkuOpen(true);
+                        }}
+                      >
+                        <td className="py-3 px-4 font-bold text-gray-900 flex items-center gap-2">
+                          <span className="text-gray-400">
+                            {row.typeLabel === 'Product' ? '📦' : '🧵'}
+                          </span>
+                          <span className="truncate max-w-xs">{row.name}</span>
+                          {row.currentQty === 0 && (
+                            <span className="text-[10px] bg-gray-100 text-gray-500 border border-gray-200 px-1.5 py-0.2 rounded font-semibold">
+                              Not stocked
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                            row.typeLabel === 'Product'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-amber-50 text-amber-800 border-amber-200'
+                          }`}>
+                            {row.typeLabel}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-gray-600 font-medium">{row.uom}</td>
+                        <td className="py-3 px-3 text-right font-mono font-extrabold text-gray-900">
+                          {row.currentQty.toLocaleString('en-IN')}
+                        </td>
+                        <td className="py-3 px-3 text-right font-mono text-gray-600">
+                          {row.minQty ? row.minQty.toLocaleString('en-IN') : '—'}
+                        </td>
+                        <td className="py-3 px-3 text-right font-mono text-gray-600">
+                          {row.reorderQty ? row.reorderQty.toLocaleString('en-IN') : '—'}
+                        </td>
+                        <td className="py-3 px-3 text-right font-mono text-gray-600">
+                          {row.maxQty ? row.maxQty.toLocaleString('en-IN') : '—'}
+                        </td>
+                        <td className="py-3 px-3 text-right font-mono font-black text-gray-900">
+                          {row.toOrder > 0 ? row.toOrder.toLocaleString('en-IN') : '—'}
+                        </td>
+                        <td className="py-3 px-3 text-center">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10.5px] font-extrabold border ${
+                            row.status === 'Out of Stock'
+                              ? 'bg-rose-50 text-rose-700 border-rose-200'
+                              : row.status === 'Low Stock'
+                              ? 'bg-amber-50 text-amber-800 border-amber-200'
+                              : row.status === 'Overstock'
+                              ? 'bg-purple-50 text-purple-700 border-purple-200'
+                              : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          }`}>
+                            {row.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => {
+                              setEditingSku(row.sku);
+                              setIsAddSkuOpen(true);
+                            }}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                            title="Edit Stock Levels"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : activeTab === 'warehouse' ? (
         <div key={animationKey} className="space-y-5">
           {/* Cute & Responsive Metrics Pills Bar with slideDownFade */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
@@ -2621,6 +2908,25 @@ export const StockInventoryV2: React.FC = () => {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* 7. ADD SKU / EDIT SKU DRAWER */}
+      {isAddSkuOpen && selectedCompany?._id && (
+        <AddSkuDrawerV2
+          isOpen={isAddSkuOpen}
+          companyId={selectedCompany._id}
+          editSku={editingSku}
+          onClose={() => {
+            setIsAddSkuOpen(false);
+            setEditingSku(null);
+          }}
+          onSaveSuccess={() => {
+            setIsAddSkuOpen(false);
+            setEditingSku(null);
+            loadAuxiliaryData(true);
+            loadStockData();
+          }}
+        />
       )}
 
       {/* Keyframe Animation */}

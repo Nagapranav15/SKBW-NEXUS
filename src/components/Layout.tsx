@@ -3,42 +3,40 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { 
   Menu, 
   X, 
-  Home, 
+  LayoutDashboard, 
   Users, 
   Package, 
-  ShoppingCart, 
   LogOut, 
   Building2,
-  ChevronDown,
-  LayoutGrid,
   FileText,
   RefreshCw,
-  Settings
+  Settings,
+  Layers,
+  BookOpen,
+  ClipboardList,
+  Truck,
+  UserCheck,
+  Factory,
+  Briefcase,
+  Map,
+  Building,
+  Receipt,
+  ShoppingBag,
+  Clock,
+  FileCheck,
+  BarChart2,
+  LineChart,
+  CreditCard,
+  Database,
+  ChevronLeft,
+  ChevronRight,
+  Boxes
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DataManager from './DataManager';
 
 const Layout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
-  const [mastersOpen, setMastersOpen] = useState(() => 
-    ['/inventory-v2/skus', '/party/customers', '/party/agents', '/party/routes', '/party/markets', '/party/transporters'].includes(window.location.pathname)
-  );
-  const [purchaseOpen, setPurchaseOpen] = useState(() => 
-    ['/inventory-v2/purchases', '/party/vendors'].includes(window.location.pathname)
-  );
-  const [inventoryOpen, setInventoryOpen] = useState(() => 
-    ['/inventory-v2/batch-stock', '/inventory-v2/warehouse', '/inventory-v2/ledger'].includes(window.location.pathname)
-  );
-  const [conversionsOpen, setConversionsOpen] = useState(() => 
-    ['/inventory-v2/testing-transactions'].includes(window.location.pathname)
-  );
-  const [salesOpen, setSalesOpen] = useState(() => 
-    window.location.pathname.startsWith('/sales') && window.location.pathname !== '/sales/reports'
-  );
-  const [reportsOpen, setReportsOpen] = useState(() => 
-    ['/sales/reports', '/analyzer', '/transactions'].includes(window.location.pathname)
-  );
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [showDataManager, setShowDataManager] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const navigate = useNavigate();
@@ -47,7 +45,6 @@ const Layout: React.FC = () => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore shortcut triggering if user is actively typing in text field
       const activeEl = document.activeElement;
       if (
         activeEl && (
@@ -116,24 +113,6 @@ const Layout: React.FC = () => {
             e.preventDefault();
             handleNavigate('/company-selection');
             break;
-          case '1':
-            if (isAltPressed) { e.preventDefault(); handleNavigate('/party/customers'); }
-            break;
-          case '2':
-            if (isAltPressed) { e.preventDefault(); handleNavigate('/party/vendors'); }
-            break;
-          case '3':
-            if (isAltPressed) { e.preventDefault(); handleNavigate('/party/agents'); }
-            break;
-          case '4':
-            if (isAltPressed) { e.preventDefault(); handleNavigate('/party/routes'); }
-            break;
-          case '5':
-            if (isAltPressed) { e.preventDefault(); handleNavigate('/party/markets'); }
-            break;
-          case '6':
-            if (isAltPressed) { e.preventDefault(); handleNavigate('/party/transporters'); }
-            break;
           default:
             break;
         }
@@ -151,10 +130,6 @@ const Layout: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
-    setShowLogoutConfirm(true);
-  };
-
   const isActive = (path: string) => {
     if (path.includes('?')) {
       const [pathName, searchPart] = path.split('?');
@@ -163,100 +138,89 @@ const Layout: React.FC = () => {
     return location.pathname === path;
   };
 
-  // Masters
-  const mastersItems = [
-    { label: 'Item Master', path: '/inventory-v2/skus', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
-    { label: 'Business Directory', path: '/directory', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
-    { label: 'Stock & Inventory', path: '/stock-inventory', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
-    { label: 'Customers', path: '/party/customers', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
-    { label: 'Suppliers', path: '/party/vendors', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
-    { label: 'Agents', path: '/party/agents', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
-    { label: 'Regions', path: '/party/routes', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
-    { label: 'Cities', path: '/party/markets', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
-    { label: 'Transporters', path: '/party/transporters', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
-  ];
-  const visibleMastersItems = mastersItems.filter(item => hasPermission(item.permission));
-  const hasMastersAccess = visibleMastersItems.length > 0;
-  const isMastersActive = () => ['/inventory-v2/skus', '/party/customers', '/party/vendors', '/party/agents', '/party/routes', '/party/markets', '/party/transporters', '/party/directory'].includes(location.pathname);
-
-  // Purchase
-  const purchaseItems = [
-    { label: 'Purchase Batches', path: '/inventory-v2/purchases', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
-    { label: 'Suppliers', path: '/party/vendors', permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
-  ];
-  const visiblePurchaseItems = purchaseItems.filter(item => hasPermission(item.permission));
-  const hasPurchaseAccess = visiblePurchaseItems.length > 0;
-  const isPurchaseActive = () => ['/inventory-v2/purchases', '/party/vendors'].includes(location.pathname);
-
-  // Inventory
-  const inventoryV2Items = [
-    { label: 'Stock', path: '/inventory-v2/batch-stock', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
-    { label: 'Stock Ledger', path: '/inventory-v2/ledger?mode=stock', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
-    { label: 'Warehouse Setup', path: '/inventory-v2/warehouse', permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
-  ];
-  const visibleInventoryV2Items = inventoryV2Items.filter(item => hasPermission(item.permission));
-  const hasInventoryV2Access = visibleInventoryV2Items.length > 0;
-  const isInventoryV2Active = () => ['/inventory-v2/batch-stock', '/inventory-v2/warehouse'].includes(location.pathname) || (location.pathname === '/inventory-v2/ledger' && location.search.includes('mode=stock'));
-
-  // Conversions
-  const conversionsItems = [
-    { label: 'BOM / Recipes', path: '/inventory-v2/conversions/bom', permission: ['MANAGE_INVENTORY', 'MANAGE_ITEMS'] },
-    { label: 'Stock Transfers', path: '/inventory-v2/conversions/transfer', permission: ['MANAGE_INVENTORY', 'MANAGE_ITEMS'] },
-  ];
-  const visibleConversionsItems = conversionsItems.filter(item => hasPermission(item.permission));
-  const hasConversionsAccess = visibleConversionsItems.length > 0;
-  const isConversionsActive = () => location.pathname.startsWith('/inventory-v2/conversions');
-
-  // Sales
-  const salesItems = [
-    { label: 'Quotes', path: '/sales/quotes', permission: ['MANAGE_QUOTES', 'VIEW_QUOTES', 'CREATE_QUOTES'] },
-    { label: 'Sale Orders', path: '/sales/orders', permission: ['MANAGE_ORDERS', 'VIEW_ORDERS', 'CREATE_ORDERS'] },
-    { label: 'Pending Orders', path: '/sales/pending', permission: ['MANAGE_ORDERS', 'VIEW_ORDERS'] },
-    { label: 'Delivery Challan', path: '/sales/delivery-challan', permission: ['MANAGE_DELIVERY', 'VIEW_DELIVERY'] },
-    { label: 'Digital Dispatch', path: '/sales/digital-dispatch', permission: 'MANAGE_DISPATCH' },
-  ];
-  const visibleSalesItems = salesItems.filter(item => hasPermission(item.permission));
-  const hasSalesAccess = visibleSalesItems.length > 0;
-  const isSalesActive = () => location.pathname.startsWith('/sales') && location.pathname !== '/sales/reports';
-
-  // Reports
-  const reportsItems = [
-    { label: 'Sales Reports', path: '/sales/reports', permission: ['MANAGE_REPORTS', 'VIEW_REPORTS'] },
-    { label: 'Analyzer', path: '/analyzer', permission: ['MANAGE_REPORTS', 'VIEW_REPORTS'] },
-    { label: 'Transactions', path: '/transactions', permission: ['MANAGE_REPORTS', 'VIEW_REPORTS', 'VIEW_TRANSACTIONS'] },
-  ];
-  const visibleReportsItems = reportsItems.filter(item => hasPermission(item.permission));
-  const hasReportsAccess = visibleReportsItems.length > 0;
-  const isReportsActive = () => ['/sales/reports', '/analyzer', '/transactions'].includes(location.pathname);
-
-  const getPrimaryClass = (path: string) => {
-    const active = isActive(path);
-    return `w-full flex items-center space-x-3 px-3 py-2.5 transition-all duration-150 rounded-lg text-sm font-semibold ${
-      active
-        ? 'bg-blue-50/70 text-blue-600'
-        : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-    }`;
+  const handleLogout = () => {
+    setShowLogoutConfirm(true);
   };
 
-  const getDropdownPrimaryClass = (activeCondition: boolean) => {
-    return `w-full flex items-center justify-between px-3 py-2.5 transition-all duration-150 rounded-lg text-sm font-semibold ${
-      activeCondition
-        ? 'bg-blue-50/70 text-blue-600'
-        : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-    }`;
-  };
+  // Grouped Navigation Items (Matching Makoro layout & section header vibe!)
+  const navSections = [
+    {
+      title: 'OPERATIONS',
+      items: [
+        { label: 'Item Master', path: '/inventory-v2/skus', icon: Package, permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
+        { label: 'Stock & Inventory', path: '/stock-inventory', icon: Layers, permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
+        { label: 'Batch Stock', path: '/inventory-v2/batch-stock', icon: Boxes, permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
+        { label: 'Stock Ledger', path: '/inventory-v2/ledger?mode=stock', icon: BookOpen, permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
+        { label: 'Warehouse Setup', path: '/inventory-v2/warehouse', icon: Building2, permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
+        { label: 'BOM / Recipes', path: '/inventory-v2/conversions/bom', icon: ClipboardList, permission: ['MANAGE_INVENTORY', 'MANAGE_ITEMS'] },
+        { label: 'Stock Transfers', path: '/inventory-v2/conversions/transfer', icon: RefreshCw, permission: ['MANAGE_INVENTORY', 'MANAGE_ITEMS'] },
+        { label: 'Digital Dispatch', path: '/sales/digital-dispatch', icon: Truck, permission: 'MANAGE_DISPATCH' },
+      ]
+    },
+    {
+      title: 'PARTNERS & DIRECTORY',
+      items: [
+        { label: 'Business Directory', path: '/directory', icon: Users, permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
+        { label: 'Customers', path: '/party/customers', icon: UserCheck, permission: ['MANAGE_PARTIES', 'VIEW_PARTIES'] },
+        { label: 'Suppliers', path: '/party/vendors', icon: Factory, permission: ['MANAGE_PARTIES', 'VIEW_PARTIES'] },
+        { label: 'Agents', path: '/party/agents', icon: Briefcase, permission: ['MANAGE_PARTIES', 'VIEW_PARTIES'] },
+        { label: 'Regions', path: '/party/routes', icon: Map, permission: ['MANAGE_PARTIES', 'VIEW_PARTIES'] },
+        { label: 'Cities', path: '/party/markets', icon: Building, permission: ['MANAGE_PARTIES', 'VIEW_PARTIES'] },
+        { label: 'Transporters', path: '/party/transporters', icon: Truck, permission: ['MANAGE_PARTIES', 'VIEW_PARTIES'] },
+      ]
+    },
+    {
+      title: 'FINANCE & SALES',
+      items: [
+        { label: 'Purchase Batches', path: '/inventory-v2/purchases', icon: Receipt, permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
+        { label: 'Quotations', path: '/sales/quotes', icon: FileText, permission: ['MANAGE_QUOTES', 'VIEW_QUOTES'] },
+        { label: 'Sale Orders', path: '/sales/orders', icon: ShoppingBag, permission: ['MANAGE_ORDERS', 'VIEW_ORDERS'] },
+        { label: 'Pending Orders', path: '/sales/pending', icon: Clock, permission: ['MANAGE_ORDERS', 'VIEW_ORDERS'] },
+        { label: 'Delivery Challan', path: '/sales/delivery-challan', icon: FileCheck, permission: ['MANAGE_DELIVERY', 'VIEW_DELIVERY'] },
+      ]
+    },
+    {
+      title: 'INSIGHTS',
+      items: [
+        { label: 'Business Intelligence', path: '/analyzer', icon: BarChart2, permission: ['MANAGE_REPORTS', 'VIEW_REPORTS'] },
+        { label: 'Sales Reports', path: '/sales/reports', icon: LineChart, permission: ['MANAGE_REPORTS', 'VIEW_REPORTS'] },
+        { label: 'Transactions', path: '/transactions', icon: CreditCard, permission: ['MANAGE_REPORTS', 'VIEW_REPORTS', 'VIEW_TRANSACTIONS'] },
+      ]
+    }
+  ];
 
-  const getSubItemClass = (path: string) => {
-    const active = isActive(path);
-    return `w-full text-left px-4 py-2 transition-all duration-150 text-[13px] rounded-md font-semibold ${
-      active
-        ? 'bg-blue-50/70 text-blue-600'
-        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-    }`;
+  const renderNavItem = (item: { label: string; path?: string; icon: any; permission?: any; action?: () => void }) => {
+    if (item.permission && !hasPermission(item.permission)) return null;
+    const active = item.path ? isActive(item.path) : false;
+
+    return (
+      <button
+        key={item.label}
+        onClick={() => {
+          if (item.action) item.action();
+          else if (item.path) handleNavigate(item.path);
+        }}
+        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-all duration-150 relative group cursor-pointer ${
+          active
+            ? 'bg-blue-50/80 text-blue-700 font-extrabold shadow-2xs'
+            : 'text-gray-600 hover:bg-gray-50/80 hover:text-gray-900 font-bold'
+        }`}
+        title={!sidebarOpen ? item.label : undefined}
+      >
+        {/* Left active border line accent matching Makoro screenshot */}
+        {active && (
+          <div className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-blue-600 rounded-r-full" />
+        )}
+        <div className={`flex items-center space-x-3 ${!sidebarOpen ? 'mx-auto' : ''}`}>
+          <item.icon className={`w-4 h-4 shrink-0 ${active ? 'text-blue-600 stroke-[2.2]' : 'text-gray-400 group-hover:text-gray-600'}`} />
+          {sidebarOpen && <span className="truncate">{item.label}</span>}
+        </div>
+      </button>
+    );
   };
 
   return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden">
+    <div className="flex h-screen bg-gray-100 overflow-hidden font-sans">
       {/* Sidebar Overlay for Mobile */}
       {sidebarOpen && (
         <div 
@@ -265,311 +229,131 @@ const Layout: React.FC = () => {
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar (Makoro Minimalist Vibe with Electric Blue Accents) */}
       <div className={`
         fixed inset-y-0 left-0 z-50 md:relative md:z-0
         ${sidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64 md:translate-x-0 md:w-16'}
-        bg-white shadow-lg transition-all duration-300 flex flex-col h-full overflow-hidden
+        bg-white border-r border-gray-200/80 shadow-xs transition-all duration-300 flex flex-col h-full overflow-hidden
       `}>
-        {/* Header */}
-        <div className="p-4 border-b border-gray-200">
-          <div className="flex items-center justify-between">
+        {/* Brand Header */}
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between shrink-0">
+          <div className="flex items-center space-x-3 overflow-hidden">
+            {/* Logo Avatar Badge */}
+            <div className="w-9 h-9 rounded-full border border-gray-200 bg-white flex items-center justify-center font-bold text-gray-900 shrink-0 shadow-2xs">
+              {selectedCompany?.logo ? (
+                <img src={selectedCompany.logo} alt={selectedCompany.name} className="w-full h-full object-cover rounded-full" />
+              ) : (
+                <span className="text-sm font-black text-blue-600">M</span>
+              )}
+            </div>
             {sidebarOpen && (
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-xl overflow-hidden bg-blue-500/10 flex items-center justify-center text-blue-600 shrink-0 shadow-sm border border-blue-500/20">
-                  {selectedCompany?.logo ? (
-                    <img src={selectedCompany.logo} alt={selectedCompany.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <Building2 className="w-6 h-6" />
-                  )}
-                </div>
-                <div>
-                  <h2 className="font-bold text-gray-900 text-sm leading-tight">SKBW CORE</h2>
-                  <p className="text-[11px] text-gray-500 font-medium leading-tight">Sri Krishna Binding Works</p>
-                </div>
+              <div className="truncate">
+                <h2 className="font-extrabold text-gray-900 text-xs tracking-wider uppercase truncate">
+                  {selectedCompany?.name || 'SKBW CORE'}
+                </h2>
+                <p className="text-[10px] text-gray-400 font-semibold truncate">ERP Management System</p>
               </div>
             )}
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
-            >
-              {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
           </div>
+
+          {/* Collapse / Expand Toggle Button */}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="w-7 h-7 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-500 transition-all cursor-pointer shrink-0"
+            title={sidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}
+          >
+            {sidebarOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          </button>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
-          {/* Dashboard */}
-          <button
-            onClick={() => handleNavigate('/dashboard')}
-            className={`${getPrimaryClass('/dashboard')} flex items-center justify-between`}
-          >
-            <div className="flex items-center space-x-3">
-              <Home className={`w-5 h-5 ${isActive('/dashboard') ? 'text-blue-600' : 'text-gray-500'}`} />
-              {sidebarOpen && <span className={isActive('/dashboard') ? 'text-blue-700 font-bold' : 'text-gray-700'}>Dashboard</span>}
-            </div>
-          </button>
+        {/* Navigation Sections Scroll area */}
+        <nav className="flex-1 p-3 space-y-1.5 overflow-y-auto custom-scrollbar">
+          {/* Top Standalone Dashboard Item */}
+          {renderNavItem({
+            label: 'Dashboard',
+            path: '/dashboard',
+            icon: LayoutDashboard
+          })}
 
-          {/* Masters Dropdown */}
-          {hasMastersAccess && (
-            <div>
-              <button
-                onClick={() => setMastersOpen(!mastersOpen)}
-                className={getDropdownPrimaryClass(isMastersActive() || mastersOpen)}
-              >
-                <div className="flex items-center space-x-3">
-                  <Package className={`w-5 h-5 ${(isMastersActive() || mastersOpen) ? 'text-blue-600' : 'text-gray-500'}`} />
-                  {sidebarOpen && <span className={(isMastersActive() || mastersOpen) ? 'text-blue-700 font-bold' : 'text-gray-700'}>Masters</span>}
-                </div>
-                {sidebarOpen && (
-                  <ChevronDown className={`w-4 h-4 transition-transform ${mastersOpen ? 'rotate-180 text-blue-600' : 'text-gray-400'}`} />
+          {/* Categorized Sections */}
+          {navSections.map((section, idx) => {
+            const visibleItems = section.items.filter(item => !item.permission || hasPermission(item.permission));
+            if (visibleItems.length === 0) return null;
+
+            return (
+              <div key={idx} className="pt-2">
+                {sidebarOpen ? (
+                  <div className="px-3 pt-2 pb-1 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                    {section.title}
+                  </div>
+                ) : (
+                  <div className="my-2 border-t border-gray-100" />
                 )}
-              </button>
-              
-              {mastersOpen && sidebarOpen && (
-                <div className="mt-1 ml-4 pl-2 border-l border-gray-150 space-y-0.5 animate-in fade-in duration-100">
-                  {visibleMastersItems.map((item) => (
-                    <button
-                      key={item.path}
-                      onClick={() => handleNavigate(item.path)}
-                      className={getSubItemClass(item.path)}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
+                <div className="space-y-0.5">
+                  {visibleItems.map(item => renderNavItem(item))}
                 </div>
-              )}
-            </div>
-          )}
-
-          {/* Purchase Dropdown */}
-          {hasPurchaseAccess && (
-            <div>
-              <button
-                onClick={() => setPurchaseOpen(!purchaseOpen)}
-                className={getDropdownPrimaryClass(isPurchaseActive() || purchaseOpen)}
-              >
-                <div className="flex items-center space-x-3">
-                  <LayoutGrid className={`w-5 h-5 ${(isPurchaseActive() || purchaseOpen) ? 'text-blue-600' : 'text-gray-500'}`} />
-                  {sidebarOpen && <span className={(isPurchaseActive() || purchaseOpen) ? 'text-blue-700 font-bold' : 'text-gray-700'}>Purchase</span>}
-                </div>
-                {sidebarOpen && (
-                  <ChevronDown className={`w-4 h-4 transition-transform ${purchaseOpen ? 'rotate-180 text-blue-600' : 'text-gray-400'}`} />
-                )}
-              </button>
-              
-              {purchaseOpen && sidebarOpen && (
-                <div className="mt-1 ml-4 pl-2 border-l border-gray-150 space-y-0.5 animate-in fade-in duration-100">
-                  {visiblePurchaseItems.map((item) => (
-                    <button
-                      key={item.path}
-                      onClick={() => handleNavigate(item.path)}
-                      className={getSubItemClass(item.path)}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Inventory Dropdown */}
-          {hasInventoryV2Access && (
-            <div>
-              <button
-                onClick={() => setInventoryOpen(!inventoryOpen)}
-                className={getDropdownPrimaryClass(isInventoryV2Active() || inventoryOpen)}
-              >
-                <div className="flex items-center space-x-3">
-                  <Users className={`w-5 h-5 ${(isInventoryV2Active() || inventoryOpen) ? 'text-blue-600' : 'text-gray-500'}`} />
-                  {sidebarOpen && <span className={(isInventoryV2Active() || inventoryOpen) ? 'text-blue-700 font-bold' : 'text-gray-700'}>Inventory</span>}
-                </div>
-                {sidebarOpen && (
-                  <ChevronDown className={`w-4 h-4 transition-transform ${inventoryOpen ? 'rotate-180 text-blue-600' : 'text-gray-400'}`} />
-                )}
-              </button>
-              
-              {inventoryOpen && sidebarOpen && (
-                <div className="mt-1 ml-4 pl-2 border-l border-gray-150 space-y-0.5 animate-in fade-in duration-100">
-                  {visibleInventoryV2Items.map((item) => (
-                    <button
-                      key={item.path}
-                      onClick={() => handleNavigate(item.path)}
-                      className={getSubItemClass(item.path)}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Conversions Dropdown */}
-          {hasConversionsAccess && (
-            <div>
-              <button
-                onClick={() => setConversionsOpen(!conversionsOpen)}
-                className={getDropdownPrimaryClass(isConversionsActive() || conversionsOpen)}
-              >
-                <div className="flex items-center space-x-3">
-                  <RefreshCw className={`w-5 h-5 ${(isConversionsActive() || conversionsOpen) ? 'text-blue-600' : 'text-gray-500'}`} />
-                  {sidebarOpen && <span className={(isConversionsActive() || conversionsOpen) ? 'text-blue-700 font-bold' : 'text-gray-700'}>Conversions</span>}
-                </div>
-                {sidebarOpen && (
-                  <ChevronDown className={`w-4 h-4 transition-transform ${conversionsOpen ? 'rotate-180 text-blue-600' : 'text-gray-400'}`} />
-                )}
-              </button>
-              
-              {conversionsOpen && sidebarOpen && (
-                <div className="mt-1 ml-4 pl-2 border-l border-gray-150 space-y-0.5 animate-in fade-in duration-100">
-                  {visibleConversionsItems.map((item) => (
-                    <button
-                      key={item.path}
-                      onClick={() => handleNavigate(item.path)}
-                      className={getSubItemClass(item.path)}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-
-          {/* Sales Dropdown */}
-          {hasSalesAccess && (
-            <div>
-              <button
-                onClick={() => setSalesOpen(!salesOpen)}
-                className={getDropdownPrimaryClass(isSalesActive() || salesOpen)}
-              >
-                <div className="flex items-center space-x-3">
-                  <ShoppingCart className={`w-5 h-5 ${(isSalesActive() || salesOpen) ? 'text-blue-600' : 'text-gray-500'}`} />
-                  {sidebarOpen && <span className={(isSalesActive() || salesOpen) ? 'text-blue-700 font-bold' : 'text-gray-700'}>Sales</span>}
-                </div>
-                {sidebarOpen && (
-                  <ChevronDown className={`w-4 h-4 transition-transform ${salesOpen ? 'rotate-180 text-blue-600' : 'text-gray-400'}`} />
-                )}
-              </button>
-
-              {salesOpen && sidebarOpen && (
-                <div className="mt-1 ml-4 pl-2 border-l border-gray-150 space-y-0.5 animate-in fade-in duration-100">
-                  {visibleSalesItems.map((item) => (
-                    <button
-                      key={item.path}
-                      onClick={() => handleNavigate(item.path)}
-                      className={getSubItemClass(item.path)}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Reports Dropdown */}
-          {hasReportsAccess && (
-            <div>
-              <button
-                onClick={() => setReportsOpen(!reportsOpen)}
-                className={getDropdownPrimaryClass(isReportsActive() || reportsOpen)}
-              >
-                <div className="flex items-center space-x-3">
-                  <FileText className={`w-5 h-5 ${(isReportsActive() || reportsOpen) ? 'text-blue-600' : 'text-gray-500'}`} />
-                  {sidebarOpen && <span className={(isReportsActive() || reportsOpen) ? 'text-blue-700 font-bold' : 'text-gray-700'}>Reports</span>}
-                </div>
-                {sidebarOpen && (
-                  <ChevronDown className={`w-4 h-4 transition-transform ${reportsOpen ? 'rotate-180 text-blue-600' : 'text-gray-400'}`} />
-                )}
-              </button>
-
-              {reportsOpen && sidebarOpen && (
-                <div className="mt-1 ml-4 pl-2 border-l border-gray-150 space-y-0.5 animate-in fade-in duration-100">
-                  {visibleReportsItems.map((item) => (
-                    <button
-                      key={item.path}
-                      onClick={() => handleNavigate(item.path)}
-                      className={getSubItemClass(item.path)}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Settings Dropdown */}
-          <div>
-            <button
-              onClick={() => setSettingsOpen(!settingsOpen)}
-              className={getDropdownPrimaryClass(settingsOpen)}
-            >
-              <div className="flex items-center space-x-3">
-                <Settings className={`w-5 h-5 ${settingsOpen ? 'text-blue-600' : 'text-gray-500'}`} />
-                {sidebarOpen && <span className={settingsOpen ? 'text-blue-700 font-bold' : 'text-gray-700'}>Settings</span>}
               </div>
-              {sidebarOpen && (
-                <ChevronDown className={`w-4 h-4 transition-transform ${settingsOpen ? 'rotate-180 text-blue-600' : 'text-gray-400'}`} />
-              )}
-            </button>
+            );
+          })}
 
-            {settingsOpen && sidebarOpen && (
-              <div className="mt-1 ml-4 pl-2 border-l border-gray-150 space-y-0.5 animate-in fade-in duration-100">
-                {hasRole('admin') && (
-                  <button
-                    onClick={() => setShowDataManager(true)}
-                    className={getSubItemClass('/data-manager')}
-                  >
-                    Data Manager
-                  </button>
-                )}
-                <button
-                  onClick={() => handleNavigate('/company-selection')}
-                  className={getSubItemClass('/company-selection')}
-                >
-                  Switch Company
-                </button>
-                <button
-                  onClick={() => handleNavigate('/inventory-v2/settings')}
-                  className={getSubItemClass('/inventory-v2/settings')}
-                >
-                  Custom Options
-                </button>
+          {/* System Settings & Utilities */}
+          <div className="pt-2">
+            {sidebarOpen ? (
+              <div className="px-3 pt-2 pb-1 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                SYSTEM
               </div>
+            ) : (
+              <div className="my-2 border-t border-gray-100" />
             )}
+            <div className="space-y-0.5">
+              {hasRole('admin') && renderNavItem({
+                label: 'Data Manager',
+                icon: Database,
+                action: () => setShowDataManager(true)
+              })}
+              {renderNavItem({
+                label: 'Switch Company',
+                path: '/company-selection',
+                icon: Building2
+              })}
+              {renderNavItem({
+                label: 'Settings',
+                path: '/inventory-v2/settings',
+                icon: Settings
+              })}
+            </div>
           </div>
         </nav>
 
-        {/* Logout */}
-        <div className="p-4 border-t border-gray-200">
+        {/* Footer Logout Button */}
+        <div className="p-3 border-t border-gray-100 shrink-0">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center space-x-3 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 transition-all cursor-pointer ${
+              !sidebarOpen ? 'justify-center' : ''
+            }`}
+            title={!sidebarOpen ? "Logout" : undefined}
           >
-            <LogOut className="w-5 h-5" />
-            {sidebarOpen && <span>Logout</span>}
+            <div className="flex items-center space-x-3">
+              <LogOut className="w-4 h-4 shrink-0 text-rose-600" />
+              {sidebarOpen && <span>Logout</span>}
+            </div>
           </button>
         </div>
       </div>
 
-      {/* Main Content */}
+      {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden relative">
         {/* Mobile Navbar trigger */}
         <div className="md:hidden flex items-center bg-white border-b border-gray-200 px-4 py-2.5 shrink-0 justify-between">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="p-1 rounded-lg hover:bg-gray-150 text-gray-700 transition-colors"
+            className="p-1.5 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-700 transition-colors"
           >
-            <Menu className="w-6 h-6" />
+            <Menu className="w-5 h-5" />
           </button>
-          <span className="font-bold text-gray-900 text-sm truncate max-w-[200px]">{selectedCompany?.name || 'SKBW ERP'}</span>
-          <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs uppercase shrink-0">
+          <span className="font-extrabold text-gray-900 text-xs tracking-wide truncate max-w-[200px]">{selectedCompany?.name || 'SKBW ERP'}</span>
+          <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs uppercase shrink-0 border border-blue-200">
             {user?.fullName?.charAt(0) || 'A'}
           </div>
         </div>
@@ -584,7 +368,7 @@ const Layout: React.FC = () => {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-[100] animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl border border-gray-150 animate-in zoom-in-95 duration-200">
             <div className="flex items-center gap-3.5 mb-4">
-              <div className="p-3 bg-red-50 text-red-600 rounded-xl">
+              <div className="p-3 bg-rose-50 text-rose-600 rounded-xl">
                 <LogOut className="w-5 h-5" />
               </div>
               <div>
@@ -605,7 +389,7 @@ const Layout: React.FC = () => {
                   logout();
                   navigate('/login');
                 }}
-                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-md shadow-red-200 cursor-pointer"
+                className="flex-1 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-md shadow-rose-200 cursor-pointer"
               >
                 Logout
               </button>

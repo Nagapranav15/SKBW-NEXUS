@@ -185,6 +185,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     minStockLevel: '500',
     reorderLevel: '',
     openingStock: '',
+    initialLocationId: '',
     recipeYieldQty: '1',
     status: 'Active' as 'Active' | 'Inactive'
   });
@@ -192,6 +193,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   const [rawMaterialsList, setRawMaterialsList] = useState<SkuV2[]>([]);
   const [formCustomValues, setFormCustomValues] = useState<{ [colName: string]: any }>({});
   const [dynamicLocationText, setDynamicLocationText] = useState<string>('Loading location...');
+  const [availableLocations, setAvailableLocations] = useState<{ id: string; name: string }[]>([]);
 
   // Helper to build parent-to-child location path (Factory ➔ Zone ➔ Storage Location)
   const buildLocationPath = (locId: string, allLocations: WarehouseLocationV2[]): string => {
@@ -221,6 +223,14 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     const fetchLocationData = async () => {
       try {
         const hierarchy = await getWarehouseHierarchyV2(companyId).catch(() => []);
+        
+        if (hierarchy && hierarchy.length > 0) {
+          const locOptions = hierarchy.map(loc => ({
+            id: loc._id,
+            name: buildLocationPath(loc._id, hierarchy)
+          }));
+          if (isMounted) setAvailableLocations(locOptions);
+        }
         
         if (editSku?._id) {
           const balances = await getBalancesV2(companyId, undefined, undefined, editSku._id).catch(() => []);
@@ -573,8 +583,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         defaultLocation: (editSku as any).defaultLocation || 'Main Warehouse - Bay A1',
         minStockLevel: (editSku as any).minStockLevel !== undefined ? String((editSku as any).minStockLevel) : '500',
         reorderLevel: (editSku as any).reorderLevel !== undefined ? String((editSku as any).reorderLevel) : '',
-        openingStock: (editSku as any).openingStock !== undefined ? String((editSku as any).openingStock) : '',
-        recipeYieldQty: (editSku as any).recipeYieldQty !== undefined ? String((editSku as any).recipeYieldQty) : ((editSku as any).batchYieldQty !== undefined ? String((editSku as any).batchYieldQty) : '1'),
+        openingStock: (editSku as any)?.openingStock !== undefined ? String((editSku as any)?.openingStock) : '',
+        initialLocationId: (editSku as any)?.initialLocation || (editSku as any)?.locationId || '',
+        recipeYieldQty: (editSku as any)?.recipeYieldQty !== undefined ? String((editSku as any)?.recipeYieldQty) : ((editSku as any)?.batchYieldQty !== undefined ? String((editSku as any)?.batchYieldQty) : '1'),
         status: editSku.status || 'Active'
       });
       setHasAltUnit(!!editSku.altUnit);
@@ -612,6 +623,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         minStockLevel: '500',
         reorderLevel: '',
         openingStock: '',
+        initialLocationId: '',
         recipeYieldQty: '1',
         status: 'Active'
       });
@@ -768,6 +780,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           reamWeight: form.reamWeight ? Number(form.reamWeight) : undefined,
           booksGbl: form.booksGbl ? Number(form.booksGbl) : undefined,
           openingStock: form.openingStock ? Number(form.openingStock) : 0,
+          initialLocationId: form.initialLocationId || undefined,
           recipeYieldQty: Number(form.recipeYieldQty) || 1,
           status: form.status || 'Active',
           company: companyId,
@@ -1639,6 +1652,45 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                   />
                   <span className="block text-[10px] text-gray-400 mt-1 font-medium leading-tight">
                     Reorder when stock reaches this level
+                  </span>
+                </div>
+
+                {/* 3. Opening Stock Quantity */}
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 mb-1 flex items-center gap-1">
+                    <Layers className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Opening Stock Qty</span>
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 1000"
+                    value={form.openingStock || ''}
+                    onChange={(e) => setForm({ ...form, openingStock: e.target.value })}
+                    className="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 bg-white"
+                  />
+                  <span className="block text-[10px] text-gray-400 mt-1 font-medium leading-tight">
+                    Initial stock balance on creation
+                  </span>
+                </div>
+
+                {/* 4. Initial Storage Location / Godown */}
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 mb-1 flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Initial Location / Godown</span>
+                  </label>
+                  <select
+                    value={form.initialLocationId || ''}
+                    onChange={(e) => setForm({ ...form, initialLocationId: e.target.value })}
+                    className="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer"
+                  >
+                    <option value="">-- Select Location / Godown --</option>
+                    {availableLocations.map(loc => (
+                      <option key={loc.id} value={loc.id}>{loc.name}</option>
+                    ))}
+                  </select>
+                  <span className="block text-[10px] text-gray-400 mt-1 font-medium leading-tight">
+                    Target godown for opening balance
                   </span>
                 </div>
               </div>

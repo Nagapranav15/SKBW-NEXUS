@@ -117,7 +117,51 @@ exports.createSku = async (req, res, next) => {
       createdBy: req.user?.id ? toObjectId(req.user.id) : undefined
     });
 
+    if (req.body.initialLocationId) {
+      newSku.initialLocation = toObjectId(req.body.initialLocationId);
+    }
+
     await newSku.save();
+
+    if (newSku.openingStock > 0 && req.body.initialLocationId) {
+      try {
+        const targetLoc = await WarehouseLocationV2.findById(toObjectId(req.body.initialLocationId));
+        if (targetLoc) {
+          await InventoryLedger.create({
+            transactionNumber: `IL-OPEN-${Date.now()}`,
+            transactionType: "Opening Stock",
+            skuId: newSku._id,
+            quantity: newSku.openingStock,
+            unit: newSku.unit || "kg",
+            direction: "IN",
+            referenceType: "OpeningStock",
+            referenceId: `OPEN-${newSku.skuCode}`,
+            batchNumber: `OPEN-${newSku.skuCode}`,
+            locationId: targetLoc._id,
+            remarks: "Initial opening stock assigned during item creation",
+            company: toObjectId(company),
+            status: "Posted"
+          });
+
+          await InventoryLedgerV2.create({
+            timestamp: new Date(),
+            transactionType: "OPENING_BALANCE",
+            referenceId: `OPEN-${newSku.skuCode}`,
+            skuId: newSku._id,
+            locationId: targetLoc._id,
+            qtyIn: newSku.openingStock,
+            qtyOut: 0,
+            balanceAfter: newSku.openingStock,
+            remarks: "Initial opening stock assigned during item creation",
+            company: toObjectId(company),
+            userId: req.user?.id ? toObjectId(req.user.id) : undefined
+          });
+        }
+      } catch (e) {
+        console.error("Error creating opening stock ledger entry:", e);
+      }
+    }
+
     ActivityLog.create({
       action: "CREATE",
       entityType: "SkuV2",
