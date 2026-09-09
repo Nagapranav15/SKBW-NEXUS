@@ -2707,38 +2707,41 @@ export const StockInventoryV2: React.FC = () => {
                   </div>
 
                   {/* Clean Batch Summary */}
-                  <div className="bg-white p-4.5 rounded-2xl border border-blue-200 shadow-2xs space-y-3 text-xs">
-                    <div className="flex items-center justify-between font-bold text-gray-900 uppercase text-[11px] tracking-wider border-b border-blue-100 pb-2.5">
-                      <span className="flex items-center gap-2 text-blue-700">
+                  <div className="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-4 text-xs">
+                    <div className="flex items-center justify-between font-bold text-gray-900 uppercase text-[11px] tracking-wider border-b border-gray-100 pb-3">
+                      <span className="flex items-center gap-2 text-blue-600">
                         <FileText className="w-4 h-4 text-blue-600" /> BATCH SUMMARY
                       </span>
-                      <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-extrabold text-[10px] border border-blue-200">
+                      <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 font-extrabold text-[10px] border border-blue-200">
                         {lots.length} {lots.length === 1 ? 'LOT' : 'LOTS'}
                       </span>
                     </div>
 
                     {lots.some(l => l.paperType === 'Reel') ? (
-                      <div className="grid grid-cols-2 gap-2 text-gray-600 text-[11px] font-semibold">
-                        <div>TOTAL REELS: <strong className="text-gray-900 font-mono">{lots.reduce((acc, l) => acc + (Number(l.reelsCount) || 0), 0)}</strong></div>
-                        <div className="text-right">TOTAL REEL WEIGHT: <strong className="text-gray-900 font-mono">{lotCalculations.totalQty.toLocaleString('en-IN')} KG</strong></div>
+                      <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-100 grid grid-cols-2 gap-4 text-gray-600 text-xs font-medium">
+                        <div>TOTAL REELS: <strong className="text-gray-900 font-mono font-bold">{lots.reduce((acc, l) => acc + (Number(l.reelsCount) || 0), 0)}</strong></div>
+                        <div className="text-right">TOTAL REEL WEIGHT: <strong className="text-gray-900 font-mono font-bold">{lotCalculations.totalQty.toLocaleString('en-IN')} KG</strong></div>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-2 gap-2 text-gray-600 text-[11px] font-semibold">
-                        <div>TOTAL REAMS: <strong className="text-gray-900 font-mono">{lots.reduce((acc, l) => acc + (Number(l.reamsCount) || 0), 0)}</strong></div>
-                        <div className="text-right">TOTAL SHEETS: <strong className="text-gray-900 font-mono">{(lots.reduce((acc, l) => acc + (Number(l.reamsCount) || 0), 0) * 500).toLocaleString('en-IN')}</strong></div>
+                      <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-100 grid grid-cols-2 gap-4 text-gray-600 text-xs font-medium">
+                        <div>TOTAL REAMS: <strong className="text-gray-900 font-mono font-bold">{lots.reduce((acc, l) => acc + (Number(l.reamsCount) || 0), 0)}</strong></div>
+                        <div className="text-right">TOTAL SHEETS: <strong className="text-gray-900 font-mono font-bold">{(lots.reduce((acc, l) => acc + (Number(l.reamsCount) || 0), 0) * 500).toLocaleString('en-IN')}</strong></div>
                       </div>
                     )}
 
-                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-semibold">
-                      <span className="text-gray-600">Material Subtotal:</span>
-                      <span className="font-mono font-bold text-gray-900">₹{lotCalculations.materialTotal.toLocaleString('en-IN')}</span>
+                    <div className="space-y-2.5 pt-1">
+                      <div className="flex items-center justify-between text-xs font-medium text-gray-600">
+                        <span>Material Subtotal:</span>
+                        <span className="font-mono font-bold text-gray-900 text-xs">₹{lotCalculations.materialTotal.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs font-medium text-gray-600">
+                        <span>Other Charges Subtotal:</span>
+                        <span className="font-mono font-bold text-gray-900 text-xs">₹{lotCalculations.otherChargesTotal.toLocaleString('en-IN')}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between text-xs font-semibold">
-                      <span className="text-gray-600">Other Charges Subtotal:</span>
-                      <span className="font-mono font-bold text-gray-900">₹{lotCalculations.otherChargesTotal.toLocaleString('en-IN')}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm font-black text-gray-900 border-t border-blue-100 pt-2.5">
-                      <span>GRAND TOTAL:</span>
+
+                    <div className="flex items-center justify-between text-sm font-black text-gray-900 border-t border-gray-100 pt-3.5">
+                      <span className="text-xs uppercase tracking-wider text-gray-800 font-bold">GRAND TOTAL:</span>
                       <span className="font-mono text-xl text-blue-600 font-black">₹{lotCalculations.grandTotal.toLocaleString('en-IN')}</span>
                     </div>
                   </div>
