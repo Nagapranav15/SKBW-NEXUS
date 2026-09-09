@@ -1324,73 +1324,73 @@ export const BusinessDirectoryV2: React.FC = () => {
         <div className="flex items-center gap-1 overflow-x-auto py-1 max-w-full">
           <button
             onClick={() => handleTabChange('customers')}
-            className={`px-4 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            className={`px-4 py-3.5 text-xs md:text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
               activeMainTab === 'customers'
-                ? 'border-blue-600 text-blue-700 bg-blue-50/50'
-                : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                ? 'border-teal-700 text-slate-900 bg-transparent'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
-            <Users className={`w-4 h-4 ${activeMainTab === 'customers' ? 'text-blue-600' : 'text-gray-400'}`} />
+            <Users className={`w-4 h-4 ${activeMainTab === 'customers' ? 'text-teal-700' : 'text-slate-400'}`} />
             <span>Customers</span>
           </button>
 
           <button
             onClick={() => handleTabChange('vendors')}
-            className={`px-4 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            className={`px-4 py-3.5 text-xs md:text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
               activeMainTab === 'vendors'
-                ? 'border-blue-600 text-blue-700 bg-blue-50/50'
-                : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                ? 'border-teal-700 text-slate-900 bg-transparent'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
-            <Factory className={`w-4 h-4 ${activeMainTab === 'vendors' ? 'text-blue-600' : 'text-gray-400'}`} />
+            <Factory className={`w-4 h-4 ${activeMainTab === 'vendors' ? 'text-teal-700' : 'text-slate-400'}`} />
             <span>Suppliers</span>
           </button>
 
           <button
             onClick={() => handleTabChange('agents')}
-            className={`px-4 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            className={`px-4 py-3.5 text-xs md:text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
               activeMainTab === 'agents'
-                ? 'border-blue-600 text-blue-700 bg-blue-50/50'
-                : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                ? 'border-teal-700 text-slate-900 bg-transparent'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
-            <Briefcase className={`w-4 h-4 ${activeMainTab === 'agents' ? 'text-blue-600' : 'text-gray-400'}`} />
+            <Briefcase className={`w-4 h-4 ${activeMainTab === 'agents' ? 'text-teal-700' : 'text-slate-400'}`} />
             <span>Agents</span>
           </button>
 
           <button
             onClick={() => handleTabChange('transporters')}
-            className={`px-4 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            className={`px-4 py-3.5 text-xs md:text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
               activeMainTab === 'transporters'
-                ? 'border-blue-600 text-blue-700 bg-blue-50/50'
-                : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                ? 'border-teal-700 text-slate-900 bg-transparent'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
-            <Truck className={`w-4 h-4 ${activeMainTab === 'transporters' ? 'text-blue-600' : 'text-gray-400'}`} />
+            <Truck className={`w-4 h-4 ${activeMainTab === 'transporters' ? 'text-teal-700' : 'text-slate-400'}`} />
             <span>Transporters</span>
           </button>
 
           <button
             onClick={() => handleTabChange('regions')}
-            className={`px-4 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            className={`px-4 py-3.5 text-xs md:text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
               activeMainTab === 'regions'
-                ? 'border-blue-600 text-blue-700 bg-blue-50/50'
-                : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                ? 'border-teal-700 text-slate-900 bg-transparent'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
-            <Map className={`w-4 h-4 ${activeMainTab === 'regions' ? 'text-blue-600' : 'text-gray-400'}`} />
+            <Map className={`w-4 h-4 ${activeMainTab === 'regions' ? 'text-teal-700' : 'text-slate-400'}`} />
             <span>Regions</span>
           </button>
 
           <button
             onClick={() => handleTabChange('cities')}
-            className={`px-4 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            className={`px-4 py-3.5 text-xs md:text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
               activeMainTab === 'cities'
-                ? 'border-blue-600 text-blue-700 bg-blue-50/50'
-                : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                ? 'border-teal-700 text-slate-900 bg-transparent'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
-            <Building className={`w-4 h-4 ${activeMainTab === 'cities' ? 'text-blue-600' : 'text-gray-400'}`} />
+            <Building className={`w-4 h-4 ${activeMainTab === 'cities' ? 'text-teal-700' : 'text-slate-400'}`} />
             <span>Cities</span>
           </button>
         </div>

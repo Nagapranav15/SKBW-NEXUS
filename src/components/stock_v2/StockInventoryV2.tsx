@@ -15,7 +15,6 @@ import {
   Warehouse,
   BarChart3,
   FileText,
-  FileText,
   AlertTriangle,
   Upload,
   Download,
@@ -1211,25 +1210,25 @@ export const StockInventoryV2: React.FC = () => {
         <div className="flex items-center gap-1">
           <button
             onClick={() => handleTabChange('batches')}
-            className={`px-4 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            className={`px-4 py-3.5 text-xs md:text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
               activeTab === 'batches'
-                ? 'border-blue-600 text-blue-700 bg-blue-50/50'
-                : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                ? 'border-teal-700 text-slate-900 bg-transparent'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
-            <Package className={`w-4 h-4 ${activeTab === 'batches' ? 'text-blue-600' : 'text-gray-400'}`} />
+            <Package className={`w-4 h-4 ${activeTab === 'batches' ? 'text-teal-700' : 'text-slate-400'}`} />
             <span>Purchase Batches</span>
           </button>
 
           <button
             onClick={() => handleTabChange('alerts')}
-            className={`px-4 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            className={`px-4 py-3.5 text-xs md:text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
               activeTab === 'alerts'
-                ? 'border-amber-600 text-amber-700 bg-amber-50/50'
-                : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                ? 'border-teal-700 text-slate-900 bg-transparent'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
-            <AlertTriangle className={`w-4 h-4 ${activeTab === 'alerts' ? 'text-amber-600' : 'text-amber-500'}`} />
+            <AlertTriangle className={`w-4 h-4 ${activeTab === 'alerts' ? 'text-teal-700' : 'text-slate-400'}`} />
             <span>Stock Alerts</span>
             {allSkus.filter(s => {
               const cur = s.presentStock || 0;
@@ -1248,37 +1247,37 @@ export const StockInventoryV2: React.FC = () => {
 
           <button
             onClick={() => handleTabChange('manager')}
-            className={`px-4 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            className={`px-4 py-3.5 text-xs md:text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
               activeTab === 'manager'
-                ? 'border-blue-600 text-blue-700 bg-blue-50/50'
-                : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                ? 'border-teal-700 text-slate-900 bg-transparent'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
-            <BarChart3 className={`w-4 h-4 ${activeTab === 'manager' ? 'text-blue-600' : 'text-gray-400'}`} />
+            <BarChart3 className={`w-4 h-4 ${activeTab === 'manager' ? 'text-teal-700' : 'text-slate-400'}`} />
             <span>Stock Manager</span>
           </button>
 
           <button
             onClick={() => handleTabChange('ledger')}
-            className={`px-4 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            className={`px-4 py-3.5 text-xs md:text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
               activeTab === 'ledger'
-                ? 'border-blue-600 text-blue-700 bg-blue-50/50'
-                : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                ? 'border-teal-700 text-slate-900 bg-transparent'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
-            <FileText className={`w-4 h-4 ${activeTab === 'ledger' ? 'text-blue-600' : 'text-gray-400'}`} />
+            <FileText className={`w-4 h-4 ${activeTab === 'ledger' ? 'text-teal-700' : 'text-slate-400'}`} />
             <span>Stock Ledger</span>
           </button>
 
           <button
             onClick={() => handleTabChange('warehouse')}
-            className={`px-4 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            className={`px-4 py-3.5 text-xs md:text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
               activeTab === 'warehouse'
-                ? 'border-blue-600 text-blue-700 bg-blue-50/50'
-                : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                ? 'border-teal-700 text-slate-900 bg-transparent'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
-            <Warehouse className={`w-4 h-4 ${activeTab === 'warehouse' ? 'text-blue-600' : 'text-gray-400'}`} />
+            <Warehouse className={`w-4 h-4 ${activeTab === 'warehouse' ? 'text-teal-700' : 'text-slate-400'}`} />
             <span>Warehouse Setup</span>
           </button>
         </div>

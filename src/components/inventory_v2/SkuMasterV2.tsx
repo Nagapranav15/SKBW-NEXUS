@@ -1364,52 +1364,52 @@ const SkuMasterV2: React.FC = () => {
         {/* Tab 1: Products (All Finished Products) */}
         <button
           onClick={() => setActiveMainTab('products')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs md:text-sm font-semibold rounded-t-xl transition-all cursor-pointer whitespace-nowrap ${
+          className={`flex items-center gap-2 px-4 py-3 text-xs md:text-sm font-extrabold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
             activeMainTab === 'products'
-              ? 'text-blue-700 border-b-2 border-blue-600 bg-blue-50/40'
-              : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100/50'
+              ? 'text-slate-900 border-teal-700 bg-transparent'
+              : 'text-slate-500 hover:text-slate-800 border-transparent hover:border-slate-300 bg-transparent'
           }`}
         >
-          <BookOpen className={`w-4 h-4 ${activeMainTab === 'products' ? 'text-blue-600' : 'text-gray-400'}`} />
+          <BookOpen className={`w-4 h-4 ${activeMainTab === 'products' ? 'text-teal-700' : 'text-slate-400'}`} />
           <span>Products</span>
         </button>
 
         {/* Tab 2: Materials (All Raw Materials) */}
         <button
           onClick={() => setActiveMainTab('materials')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs md:text-sm font-semibold rounded-t-xl transition-all cursor-pointer whitespace-nowrap ${
+          className={`flex items-center gap-2 px-4 py-3 text-xs md:text-sm font-extrabold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
             activeMainTab === 'materials'
-              ? 'text-blue-700 border-b-2 border-blue-600 bg-blue-50/40'
-              : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100/50'
+              ? 'text-slate-900 border-teal-700 bg-transparent'
+              : 'text-slate-500 hover:text-slate-800 border-transparent hover:border-slate-300 bg-transparent'
           }`}
         >
-          <Scroll className={`w-4 h-4 ${activeMainTab === 'materials' ? 'text-blue-600' : 'text-gray-400'}`} />
+          <Scroll className={`w-4 h-4 ${activeMainTab === 'materials' ? 'text-teal-700' : 'text-slate-400'}`} />
           <span>Materials</span>
         </button>
 
         {/* Tab 3: Semi (Only Semi Finished Materials) */}
         <button
           onClick={() => setActiveMainTab('semi')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs md:text-sm font-semibold rounded-t-xl transition-all cursor-pointer whitespace-nowrap ${
+          className={`flex items-center gap-2 px-4 py-3 text-xs md:text-sm font-extrabold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
             activeMainTab === 'semi'
-              ? 'text-blue-700 border-b-2 border-blue-600 bg-blue-50/40'
-              : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100/50'
+              ? 'text-slate-900 border-teal-700 bg-transparent'
+              : 'text-slate-500 hover:text-slate-800 border-transparent hover:border-slate-300 bg-transparent'
           }`}
         >
-          <Copy className={`w-4 h-4 ${activeMainTab === 'semi' ? 'text-blue-600' : 'text-gray-400'}`} />
+          <Copy className={`w-4 h-4 ${activeMainTab === 'semi' ? 'text-teal-700' : 'text-slate-400'}`} />
           <span>Semi</span>
         </button>
 
         {/* Tab 4: Categories */}
         <button
           onClick={() => setActiveMainTab('categories')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs md:text-sm font-semibold rounded-t-xl transition-all cursor-pointer whitespace-nowrap ${
+          className={`flex items-center gap-2 px-4 py-3 text-xs md:text-sm font-extrabold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
             activeMainTab === 'categories'
-              ? 'text-blue-700 border-b-2 border-blue-600 bg-blue-50/40'
-              : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100/50'
+              ? 'text-slate-900 border-teal-700 bg-transparent'
+              : 'text-slate-500 hover:text-slate-800 border-transparent hover:border-slate-300 bg-transparent'
           }`}
         >
-          <Folder className={`w-4 h-4 ${activeMainTab === 'categories' ? 'text-blue-600' : 'text-gray-400'}`} />
+          <Folder className={`w-4 h-4 ${activeMainTab === 'categories' ? 'text-teal-700' : 'text-slate-400'}`} />
           <span>Categories</span>
         </button>
       </div>
