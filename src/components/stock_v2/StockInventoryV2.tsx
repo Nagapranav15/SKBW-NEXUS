@@ -506,6 +506,22 @@ export const StockInventoryV2: React.FC = () => {
     loadStockData();
   }, [loadStockData]);
 
+  // Listen to AI Copilot actions
+  useEffect(() => {
+    const handleAiAction = (e: any) => {
+      const action = e.detail?.action;
+      if (action === 'select-tab-alerts') {
+        setActiveTab('alerts');
+      } else if (action === 'select-tab-warehouse') {
+        setActiveTab('warehouse');
+      } else if (action === 'open-purchase-batch') {
+        openModal();
+      }
+    };
+    window.addEventListener('erp-ai-action', handleAiAction);
+    return () => window.removeEventListener('erp-ai-action', handleAiAction);
+  }, [openModal]);
+
   // Tab Switch Handler
   const handleTabChange = (tab: StockTabType) => {
     setActiveTab(tab);

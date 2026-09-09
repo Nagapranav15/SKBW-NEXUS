@@ -998,6 +998,18 @@ const SkuMasterV2: React.FC = () => {
     return true;
   };
 
+  // Listen to AI Copilot action to open Add SKU drawer
+  useEffect(() => {
+    const handleAiAction = (e: any) => {
+      if (e.detail?.action === 'open-add-sku') {
+        setEditSku(null);
+        setShowAddDrawer(true);
+      }
+    };
+    window.addEventListener('erp-ai-action', handleAiAction);
+    return () => window.removeEventListener('erp-ai-action', handleAiAction);
+  }, []);
+
   const bomProductSkus = useMemo(() => {
     return skus.filter(isBomProductItem);
   }, [skus]);

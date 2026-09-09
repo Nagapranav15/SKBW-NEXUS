@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DataManager from './DataManager';
+import AiCopilotWidget from './ai/AiCopilotWidget';
 
 const Layout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
@@ -403,6 +404,9 @@ const Layout: React.FC = () => {
         isOpen={showDataManager} 
         onClose={() => setShowDataManager(false)} 
       />
+
+      {/* Global Bottom-Right AI Assistant Widget */}
+      <AiCopilotWidget />
     </div>
   );
 };
