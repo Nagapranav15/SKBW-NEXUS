@@ -129,47 +129,163 @@ export const AiCopilotWidget: React.FC = () => {
     }
   };
 
-  // Process Natural Language Commands & Execute System Actions
+  // Process Natural Language Commands & Execute System Actions across the entire ERP System
   const processAICommand = (userInput: string) => {
     const text = userInput.toLowerCase().trim();
     let reply = '';
     let actionTag: string | undefined = undefined;
 
-    // 1. STOCK ALERTS
-    if (text.includes('alert') || text.includes('low stock') || text.includes('out of stock') || text.includes('reorder')) {
-      reply = 'Navigating to Stock Alerts! I am taking you to the low stock and reorder requirements list.';
+    const isCreate = text.includes('create') || text.includes('new') || text.includes('add') || text.includes('record');
+
+    // 1. BUSINESS DIRECTORY / PARTIES (AGENTS, VENDORS, CUSTOMERS, ROUTES, CITIES, TRANSPORTERS)
+    if (
+      text.includes('directory') ||
+      text.includes('party') ||
+      text.includes('agent') ||
+      text.includes('vendor') ||
+      text.includes('supplier') ||
+      text.includes('customer') ||
+      text.includes('transporter') ||
+      text.includes('route') ||
+      text.includes('region') ||
+      text.includes('city') ||
+      text.includes('market')
+    ) {
+      if (text.includes('agent')) {
+        navigate('/party/directory');
+        if (isCreate) {
+          reply = 'Opening Business Directory and launching the Create New Agent form for you!';
+          actionTag = '⚡ Executing: Create New Agent in Business Directory';
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'open-add-agent' } }));
+          }, 250);
+        } else {
+          reply = 'Navigating to Business Directory - Agents tab.';
+          actionTag = '⚡ Executing: Navigating to Agents Directory';
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'select-tab-agents' } }));
+          }, 150);
+        }
+      } else if (text.includes('vendor') || text.includes('supplier')) {
+        navigate('/party/vendors');
+        if (isCreate) {
+          reply = 'Opening Business Directory and launching the Create New Vendor / Supplier form.';
+          actionTag = '⚡ Executing: Create New Vendor in Business Directory';
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'open-add-vendor' } }));
+          }, 250);
+        } else {
+          reply = 'Navigating to Vendor & Supplier Directory.';
+          actionTag = '⚡ Executing: Navigating to Vendors Directory';
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'select-tab-vendors' } }));
+          }, 150);
+        }
+      } else if (text.includes('customer')) {
+        navigate('/party/customers');
+        if (isCreate) {
+          reply = 'Opening Business Directory and launching the Create New Customer form.';
+          actionTag = '⚡ Executing: Create New Customer in Business Directory';
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'open-add-customer' } }));
+          }, 250);
+        } else {
+          reply = 'Navigating to Customer Directory.';
+          actionTag = '⚡ Executing: Navigating to Customers Directory';
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'select-tab-customers' } }));
+          }, 150);
+        }
+      } else if (text.includes('transporter')) {
+        navigate('/party/transporters');
+        if (isCreate) {
+          reply = 'Opening Transporters Directory and launching New Transporter creation form.';
+          actionTag = '⚡ Executing: Create New Transporter';
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'open-add-transporter' } }));
+          }, 250);
+        } else {
+          reply = 'Navigating to Transporters Directory.';
+          actionTag = '⚡ Executing: Navigating to Transporters';
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'select-tab-transporters' } }));
+          }, 150);
+        }
+      } else if (text.includes('route') || text.includes('region')) {
+        navigate('/party/routes');
+        if (isCreate) {
+          reply = 'Opening Region & Route Master and launching New Route creation form.';
+          actionTag = '⚡ Executing: Create New Region / Route';
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'open-add-region' } }));
+          }, 250);
+        } else {
+          reply = 'Navigating to Region & Route Directory.';
+          actionTag = '⚡ Executing: Navigating to Regions & Routes';
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'select-tab-regions' } }));
+          }, 150);
+        }
+      } else if (text.includes('city') || text.includes('market')) {
+        navigate('/party/markets');
+        if (isCreate) {
+          reply = 'Opening Market & City Master and launching New City creation form.';
+          actionTag = '⚡ Executing: Create New Market / City';
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'open-add-city' } }));
+          }, 250);
+        } else {
+          reply = 'Navigating to Market & City Directory.';
+          actionTag = '⚡ Executing: Navigating to Markets & Cities';
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'select-tab-cities' } }));
+          }, 150);
+        }
+      } else {
+        navigate('/party/directory');
+        reply = 'Opening Business Directory & Party Management.';
+        actionTag = '⚡ Executing: Navigating to Business Directory';
+      }
+    }
+    // 2. PURCHASE BATCH & MATERIAL LOTS
+    else if (text.includes('purchase batch') || text.includes('batch') || text.includes('lot delivery') || text.includes('grn')) {
+      navigate('/stock-inventory');
+      if (isCreate || text.includes('record')) {
+        reply = 'Opening the New Purchase Batch form for you right away!';
+        actionTag = '⚡ Executing: Opening New Purchase Batch Window';
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'open-purchase-batch' } }));
+        }, 250);
+      } else {
+        reply = 'Navigating to Purchase Batches & Material Delivery Lot Register.';
+        actionTag = '⚡ Executing: Opening Purchase Batches';
+      }
+    }
+    // 3. STOCK ALERTS & LOW STOCK
+    else if (text.includes('alert') || text.includes('low stock') || text.includes('out of stock') || text.includes('reorder')) {
+      reply = 'Navigating to Stock Alerts! Showing all items needing reordering.';
       actionTag = '⚡ Executing: Navigating to Stock Alerts';
       navigate('/stock-inventory');
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'select-tab-alerts' } }));
       }, 150);
     }
-    // 2. PURCHASE BATCH
-    else if (text.includes('purchase batch') || text.includes('new batch') || text.includes('record batch') || text.includes('add batch')) {
-      reply = 'Opening the New Purchase Batch form for you right away!';
-      actionTag = '⚡ Executing: Opening New Purchase Batch Window';
-      navigate('/stock-inventory');
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'open-purchase-batch' } }));
-      }, 250);
-    }
-    // 3. ITEM MASTER / ADD SKU
-    else if (text.includes('item master') || text.includes('sku') || text.includes('add item') || text.includes('new item') || text.includes('add sku')) {
-      if (text.includes('add') || text.includes('new') || text.includes('create')) {
+    // 4. ITEM MASTER & SKU MANAGEMENT
+    else if (text.includes('item master') || text.includes('sku') || text.includes('item') || text.includes('product') || text.includes('raw material')) {
+      navigate('/inventory-v2/skus');
+      if (isCreate) {
         reply = 'Opening the Add SKU / Item drawer in Item Master.';
         actionTag = '⚡ Executing: Opening Add SKU Drawer';
-        navigate('/inventory-v2/skus');
         setTimeout(() => {
           window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'open-add-sku' } }));
         }, 250);
       } else {
-        reply = 'Navigating to Item Master.';
+        reply = 'Navigating to Item Master & SKU Register.';
         actionTag = '⚡ Executing: Navigating to Item Master';
-        navigate('/inventory-v2/skus');
       }
     }
-    // 4. WAREHOUSE SETUP / LOCATIONS
-    else if (text.includes('warehouse') || text.includes('location') || text.includes('storage') || text.includes('bin') || text.includes('zone')) {
+    // 5. WAREHOUSE SETUP & STORAGE LOCATIONS
+    else if (text.includes('warehouse') || text.includes('location') || text.includes('storage') || text.includes('bin') || text.includes('zone') || text.includes('factory')) {
       reply = 'Navigating to Warehouse Hierarchy & Storage Locations.';
       actionTag = '⚡ Executing: Opening Warehouse Setup';
       navigate('/stock-inventory');
@@ -177,37 +293,75 @@ export const AiCopilotWidget: React.FC = () => {
         window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'select-tab-warehouse' } }));
       }, 150);
     }
-    // 5. BUSINESS DIRECTORY / VENDORS / CUSTOMERS
-    else if (text.includes('vendor') || text.includes('supplier') || text.includes('customer') || text.includes('directory') || text.includes('party')) {
-      reply = 'Opening Business Directory & Party Management.';
-      actionTag = '⚡ Executing: Navigating to Business Directory';
-      navigate('/party/vendors');
-    }
-    // 6. SALES ORDERS & QUOTES
-    else if (text.includes('quote') || text.includes('sales quote')) {
+    // 6. SALES QUOTES, ORDERS & DIGITAL DISPATCH
+    else if (text.includes('quote') || text.includes('quotation')) {
       reply = 'Navigating to Sales Quotations.';
       actionTag = '⚡ Executing: Navigating to Sales Quotes';
       navigate('/sales/quotes');
-    } else if (text.includes('order') || text.includes('sales order')) {
-      reply = 'Navigating to Sales Orders.';
-      actionTag = '⚡ Executing: Navigating to Sales Orders';
-      navigate('/sales/orders');
+    } else if (text.includes('order') || text.includes('sales order') || text.includes('pending')) {
+      if (text.includes('pending')) {
+        reply = 'Navigating to Pending Orders.';
+        actionTag = '⚡ Executing: Navigating to Pending Orders';
+        navigate('/sales/pending');
+      } else {
+        reply = 'Navigating to Sales Orders.';
+        actionTag = '⚡ Executing: Navigating to Sales Orders';
+        navigate('/sales/orders');
+      }
+    } else if (text.includes('challan') || text.includes('delivery challan')) {
+      reply = 'Navigating to Delivery Challan Register.';
+      actionTag = '⚡ Executing: Navigating to Delivery Challan';
+      navigate('/sales/delivery-challan');
+    } else if (text.includes('dispatch') || text.includes('digital dispatch')) {
+      reply = 'Navigating to Digital Dispatch Management.';
+      actionTag = '⚡ Executing: Navigating to Digital Dispatch';
+      navigate('/sales/digital-dispatch');
+    } else if (text.includes('sales report') || text.includes('sales analytics')) {
+      reply = 'Navigating to Sales Reports & Business Intelligence.';
+      actionTag = '⚡ Executing: Navigating to Sales Reports';
+      navigate('/sales/reports');
     }
-    // 7. INVENTORY LEDGER / BATCH STOCK
-    else if (text.includes('ledger') || text.includes('history')) {
+    // 7. INVENTORY CONVERSIONS, BOM RECIPE & STOCK TRANSFERS
+    else if (text.includes('bom') || text.includes('recipe') || text.includes('conversion')) {
+      reply = 'Navigating to Bill of Materials (BOM) Recipe Master.';
+      actionTag = '⚡ Executing: Navigating to BOM Recipe Master';
+      navigate('/inventory-v2/conversions/bom');
+    } else if (text.includes('transfer') || text.includes('stock transfer')) {
+      reply = 'Navigating to Stock Transfer Module.';
+      actionTag = '⚡ Executing: Navigating to Stock Transfer';
+      navigate('/inventory-v2/conversions/transfer');
+    } else if (text.includes('ledger') || text.includes('history')) {
       reply = 'Navigating to Inventory Stock Ledger.';
       actionTag = '⚡ Executing: Navigating to Stock Ledger';
       navigate('/inventory-v2/ledger');
     }
-    // 8. GENERAL AI ASSISTANT CONVERSATION
-    else {
-      if (text.includes('hello') || text.includes('hi') || text.includes('hey')) {
-        reply = 'Hello! I am ready to help you navigate, check stock, or create purchase batches. What would you like to do?';
-      } else if (text.includes('who are you') || text.includes('what can you do')) {
-        reply = 'I am your intelligent ERP Assistant. You can ask me to open Stock Alerts, create Purchase Batches, view Item Master, check Warehouse locations, or search parties by voice or text!';
-      } else {
-        reply = `I have received your request regarding "${userInput}". I am ready to assist you across Stock Inventory, Item Master, and Purchase Batches.`;
-      }
+    // 8. DASHBOARD, SETTINGS & TOOLS
+    else if (text.includes('dashboard') || text.includes('overview') || text.includes('home')) {
+      reply = 'Navigating to Main ERP Dashboard.';
+      actionTag = '⚡ Executing: Navigating to Dashboard';
+      navigate('/dashboard');
+    } else if (text.includes('setting') || text.includes('config')) {
+      reply = 'Navigating to Inventory & ERP System Settings.';
+      actionTag = '⚡ Executing: Navigating to Settings';
+      navigate('/inventory-v2/settings');
+    } else if (text.includes('company') || text.includes('switch company')) {
+      reply = 'Navigating to Company Selection screen.';
+      actionTag = '⚡ Executing: Navigating to Company Selection';
+      navigate('/company-selection');
+    } else if (text.includes('import') || text.includes('export') || text.includes('excel') || text.includes('transaction')) {
+      reply = 'Opening Transaction & Data Tools.';
+      actionTag = '⚡ Executing: Navigating to Transaction Tools';
+      navigate('/transactions');
+    }
+    // 9. ERP KNOWLEDGE BASE QA & HELP
+    else if (text.includes('gbl') || text.includes('unit conversion') || text.includes('pcs')) {
+      reply = 'In Item Master unit conversion, bulk package units appear on the left (e.g. 1 GBL = 200 Pcs). This ensures clear inventory scaling!';
+    } else if (text.includes('ream') || text.includes('sheets')) {
+      reply = 'Standard paper reams default to 500 sheets per ream. The ream weight is calculated using (Width * Length * GSM * 500) / 10,000,000.';
+    } else if (text.includes('who are you') || text.includes('what can you do') || text.includes('help')) {
+      reply = 'I am your dynamic AI ERP Copilot! You can tell me to "create new agent in business directory", "open purchase batch", "check low stock alerts", "add new SKU", or navigate to any module by voice or text.';
+    } else {
+      reply = `Understood! I have processed your request for "${userInput}". How else may I assist you in the ERP today?`;
     }
 
     return { reply, actionTag };

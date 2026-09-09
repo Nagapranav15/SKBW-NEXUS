@@ -1121,6 +1121,46 @@ export const BusinessDirectoryV2: React.FC = () => {
     setShowModal(true);
   };
 
+  // Listen to AI Copilot actions
+  useEffect(() => {
+    const handleAiAction = (e: any) => {
+      const action = e.detail?.action;
+      if (action === 'open-add-agent') {
+        setActiveMainTab('agents');
+        openModal();
+      } else if (action === 'open-add-vendor') {
+        setActiveMainTab('vendors');
+        openModal();
+      } else if (action === 'open-add-customer') {
+        setActiveMainTab('customers');
+        openModal();
+      } else if (action === 'open-add-transporter') {
+        setActiveMainTab('transporters');
+        openModal();
+      } else if (action === 'open-add-region' || action === 'open-add-route') {
+        setActiveMainTab('regions');
+        openModal();
+      } else if (action === 'open-add-city' || action === 'open-add-market') {
+        setActiveMainTab('cities');
+        openModal();
+      } else if (action === 'select-tab-agents') {
+        setActiveMainTab('agents');
+      } else if (action === 'select-tab-vendors') {
+        setActiveMainTab('vendors');
+      } else if (action === 'select-tab-customers') {
+        setActiveMainTab('customers');
+      } else if (action === 'select-tab-transporters') {
+        setActiveMainTab('transporters');
+      } else if (action === 'select-tab-regions') {
+        setActiveMainTab('regions');
+      } else if (action === 'select-tab-cities') {
+        setActiveMainTab('cities');
+      }
+    };
+    window.addEventListener('erp-ai-action', handleAiAction);
+    return () => window.removeEventListener('erp-ai-action', handleAiAction);
+  }, [openModal]);
+
   // Create / Save Item Handler
   const handleSaveItem = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
