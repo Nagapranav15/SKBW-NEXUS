@@ -506,10 +506,27 @@ const SkuMasterV2: React.FC = () => {
   const [modalDynamicLiveStock, setModalDynamicLiveStock] = useState<number | null>(null);
 
   // Helper to build parent-to-child location path (Factory ➔ Zone ➔ Storage Location)
-  const buildModalLocationPath = (locId: string, allLocations: WarehouseLocationV2[]): string => {
+  const buildModalLocationPath = (locIdOrObj: any, allLocations: WarehouseLocationV2[]): string => {
+    if (!locIdOrObj) return '';
+    if (typeof locIdOrObj === 'object') {
+      if (locIdOrObj._id) {
+        const path = buildModalLocationPath(locIdOrObj._id, allLocations);
+        if (path && path !== locIdOrObj._id) return path;
+      }
+      if (locIdOrObj.name) return locIdOrObj.name;
+    }
+
+    const targetStr = String(locIdOrObj).trim();
+    if (!targetStr) return '';
+
     const locMap = new Map(allLocations.map(l => [l._id, l]));
-    const current = locMap.get(locId);
-    if (!current) return locId;
+    let current = locMap.get(targetStr);
+
+    if (!current) {
+      current = allLocations.find(l => l.name?.toLowerCase() === targetStr.toLowerCase());
+    }
+
+    if (!current) return targetStr;
 
     const path: string[] = [current.name];
     let parentId = current.parentId;
@@ -568,13 +585,17 @@ const SkuMasterV2: React.FC = () => {
             if (isMounted) setModalDynamicLiveStock(null);
           }
 
-          const directLoc = (selectedSkuDetails as any)?.locationId || (selectedSkuDetails as any)?.initialLocationId || (selectedSkuDetails as any)?.warehouseLocation || (selectedSkuDetails as any)?.location || (selectedSkuDetails as any)?.locationName || (selectedSkuDetails as any)?.defaultLocation;
+          const directLoc = (selectedSkuDetails as any)?.initialLocationId || 
+                           (selectedSkuDetails as any)?.initialLocation || 
+                           (selectedSkuDetails as any)?.locationId || 
+                           (selectedSkuDetails as any)?.warehouseLocation || 
+                           (selectedSkuDetails as any)?.location || 
+                           (selectedSkuDetails as any)?.locationName || 
+                           (selectedSkuDetails as any)?.defaultLocation;
           if (directLoc) {
-            if (typeof directLoc === 'object' && directLoc._id) {
-              if (isMounted) setModalDynamicLocation(buildModalLocationPath(directLoc._id, hierarchy));
-              return;
-            } else if (typeof directLoc === 'string') {
-              if (isMounted) setModalDynamicLocation(buildModalLocationPath(directLoc, hierarchy));
+            const locPath = buildModalLocationPath(directLoc, hierarchy);
+            if (locPath && isMounted) {
+              setModalDynamicLocation(locPath);
               return;
             }
           }
@@ -2922,23 +2943,43 @@ const SkuMasterV2: React.FC = () => {
                     const liveStockQty = modalDynamicLiveStock !== null 
                       ? modalDynamicLiveStock 
                       : Number((selectedSkuDetails as any).presentStock ?? selectedSkuDetails.openingStock ?? 0);
+
                     const minStockVal = (selectedSkuDetails as any).minStockLevel;
                     const hasMinStock = minStockVal !== undefined && minStockVal !== null && minStockVal !== '' && Number(minStockVal) > 0;
                     const reorderVal = (selectedSkuDetails as any).reorderLevel;
                     const hasReorder = reorderVal !== undefined && reorderVal !== null && reorderVal !== '' && Number(reorderVal) > 0;
+                    const maxStockVal = (selectedSkuDetails as any).maxStockLevel;
+                    const hasMaxStock = maxStockVal !== undefined && maxStockVal !== null && maxStockVal !== '' && Number(maxStockVal) > 0;
+
+                    const unitRate = Number((selectedSkuDetails as any).purchasePrice || (selectedSkuDetails as any).ratePerKg || (selectedSkuDetails as any).cost || 45);
+                    const totalEstVal = liveStockQty * unitRate;
+
+                    let statusBadge = { label: 'Normal', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+                    if (liveStockQty === 0) {
+                      statusBadge = { label: 'Out of Stock', bg: 'bg-rose-50 text-rose-700 border-rose-200' };
+                    } else if (hasMinStock && liveStockQty <= Number(minStockVal)) {
+                      statusBadge = { label: 'Low Stock', bg: 'bg-amber-50 text-amber-800 border-amber-200' };
+                    } else if (hasReorder && liveStockQty <= Number(reorderVal)) {
+                      statusBadge = { label: 'Low Stock', bg: 'bg-amber-50 text-amber-800 border-amber-200' };
+                    } else if (hasMaxStock && liveStockQty > Number(maxStockVal)) {
+                      statusBadge = { label: 'Overstock', bg: 'bg-purple-50 text-purple-700 border-purple-200' };
+                    }
 
                     return (
-                      <div className="bg-white p-4 rounded-2xl border border-emerald-200/70 shadow-2xs space-y-3">
-                        <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                      <div className="bg-white p-4.5 rounded-2xl border border-emerald-200/70 shadow-2xs space-y-3.5">
+                        <div className="flex items-center justify-between pb-2.5 border-b border-gray-100">
                           <div className="flex items-center gap-2">
                             <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
                               <Package className="w-4 h-4" />
                             </div>
                             <h4 className="font-bold text-gray-900 text-xs">Stock & Warehouse Location</h4>
                           </div>
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${statusBadge.bg}`}>
+                            {statusBadge.label}
+                          </span>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-y-3.5 gap-x-4 text-xs">
                           <div>
                             <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">OPENING BALANCE</span>
                             <span className="font-mono font-bold text-gray-900 text-xs">{openingQty.toLocaleString('en-IN')} {stockUnit}</span>
@@ -2947,6 +2988,12 @@ const SkuMasterV2: React.FC = () => {
                             <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PRESENT LIVE STOCK</span>
                             <span className="font-mono font-extrabold text-emerald-600 text-xs">
                               {liveStockQty.toLocaleString('en-IN')} {stockUnit}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">EST. STOCK VALUE</span>
+                            <span className="font-mono font-bold text-slate-800 text-xs">
+                              ₹{totalEstVal.toLocaleString('en-IN')}
                             </span>
                           </div>
                           <div>
@@ -2961,14 +3008,23 @@ const SkuMasterV2: React.FC = () => {
                               {hasReorder ? `${Number(reorderVal).toLocaleString('en-IN')} ${stockUnit}` : '—'}
                             </span>
                           </div>
+                          <div>
+                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">MAX STOCK LEVEL</span>
+                            <span className="font-mono font-bold text-purple-600 text-xs">
+                              {hasMaxStock ? `${Number(maxStockVal).toLocaleString('en-IN')} ${stockUnit}` : '—'}
+                            </span>
+                          </div>
                         </div>
 
-                        <div className="pt-2.5 border-t border-gray-100">
-                          <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1 mb-0.5">
-                            <MapPin className="w-3 h-3 text-blue-600" />
-                            STORAGE LOCATION
+                        <div className="pt-3 border-t border-gray-100">
+                          <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1 mb-1">
+                            <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                            <span>STORAGE LOCATION / GODOWN</span>
                           </div>
-                          <div className="font-bold text-xs text-gray-800">{modalDynamicLocation || 'Not assigned to any location'}</div>
+                          <div className="font-bold text-xs text-gray-800 bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0"></span>
+                            <span>{modalDynamicLocation || 'Not assigned to any location'}</span>
+                          </div>
                         </div>
                       </div>
                     );

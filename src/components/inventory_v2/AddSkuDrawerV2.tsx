@@ -196,10 +196,27 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   const [availableLocations, setAvailableLocations] = useState<{ id: string; name: string }[]>([]);
 
   // Helper to build parent-to-child location path (Factory ➔ Zone ➔ Storage Location)
-  const buildLocationPath = (locId: string, allLocations: WarehouseLocationV2[]): string => {
+  const buildLocationPath = (locIdOrObj: any, allLocations: WarehouseLocationV2[]): string => {
+    if (!locIdOrObj) return '';
+    if (typeof locIdOrObj === 'object') {
+      if (locIdOrObj._id) {
+        const path = buildLocationPath(locIdOrObj._id, allLocations);
+        if (path && path !== locIdOrObj._id) return path;
+      }
+      if (locIdOrObj.name) return locIdOrObj.name;
+    }
+
+    const targetStr = String(locIdOrObj).trim();
+    if (!targetStr) return '';
+
     const locMap = new Map(allLocations.map(l => [l._id, l]));
-    const current = locMap.get(locId);
-    if (!current) return locId;
+    let current = locMap.get(targetStr);
+
+    if (!current) {
+      current = allLocations.find(l => l.name?.toLowerCase() === targetStr.toLowerCase());
+    }
+
+    if (!current) return targetStr;
 
     const path: string[] = [current.name];
     let parentId = current.parentId;
@@ -259,13 +276,17 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
             }
           }
 
-          const directLoc = (editSku as any)?.locationId || (editSku as any)?.warehouseLocation || (editSku as any)?.location || (editSku as any)?.locationName;
+          const directLoc = (editSku as any)?.initialLocationId || 
+                           (editSku as any)?.initialLocation || 
+                           (editSku as any)?.locationId || 
+                           (editSku as any)?.warehouseLocation || 
+                           (editSku as any)?.location || 
+                           (editSku as any)?.locationName || 
+                           (editSku as any)?.defaultLocation;
           if (directLoc) {
-            if (typeof directLoc === 'object' && directLoc._id) {
-              if (isMounted) setDynamicLocationText(buildLocationPath(directLoc._id, hierarchy));
-              return;
-            } else if (typeof directLoc === 'string') {
-              if (isMounted) setDynamicLocationText(buildLocationPath(directLoc, hierarchy));
+            const locPath = buildLocationPath(directLoc, hierarchy);
+            if (locPath && isMounted) {
+              setDynamicLocationText(locPath);
               return;
             }
           }
@@ -584,7 +605,15 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         minStockLevel: (editSku as any).minStockLevel !== undefined ? String((editSku as any).minStockLevel) : '500',
         reorderLevel: (editSku as any).reorderLevel !== undefined ? String((editSku as any).reorderLevel) : '',
         openingStock: (editSku as any)?.openingStock !== undefined ? String((editSku as any)?.openingStock) : '',
-        initialLocationId: (editSku as any)?.initialLocation || (editSku as any)?.locationId || '',
+        initialLocationId: (() => {
+          const rawLoc = (editSku as any)?.initialLocationId || 
+                         (editSku as any)?.initialLocation || 
+                         (editSku as any)?.locationId || 
+                         (editSku as any)?.location || 
+                         (editSku as any)?.warehouseLocation || 
+                         (editSku as any)?.defaultLocation || '';
+          return typeof rawLoc === 'object' ? (rawLoc._id || rawLoc.name || '') : String(rawLoc);
+        })(),
         recipeYieldQty: (editSku as any)?.recipeYieldQty !== undefined ? String((editSku as any)?.recipeYieldQty) : ((editSku as any)?.batchYieldQty !== undefined ? String((editSku as any)?.batchYieldQty) : '1'),
         status: editSku.status || 'Active'
       });
@@ -784,7 +813,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           reamWeight: form.reamWeight ? Number(form.reamWeight) : undefined,
           booksGbl: form.booksGbl ? Number(form.booksGbl) : undefined,
           openingStock: form.openingStock ? Number(form.openingStock) : 0,
-          initialLocationId: form.initialLocationId || undefined,
+          initialLocationId: form.initialLocationId || (editSku as any)?.initialLocationId || (editSku as any)?.initialLocation || (editSku as any)?.locationId || undefined,
           recipeYieldQty: Number(form.recipeYieldQty) || 1,
           status: form.status || 'Active',
           company: companyId,
