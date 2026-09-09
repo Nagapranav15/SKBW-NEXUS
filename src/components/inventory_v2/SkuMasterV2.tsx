@@ -510,10 +510,9 @@ const SkuMasterV2: React.FC = () => {
   const buildModalLocationPath = (locIdOrObj: any, allLocations: WarehouseLocationV2[]): string => {
     if (!locIdOrObj) return '';
     if (typeof locIdOrObj === 'object') {
-      if (locIdOrObj._id || locIdOrObj.id) {
-        const targetId = String(locIdOrObj._id || locIdOrObj.id);
-        const path = buildModalLocationPath(targetId, allLocations);
-        if (path && !/^[0-9a-fA-F]{24}$/.test(path)) return path;
+      if (locIdOrObj._id) {
+        const path = buildModalLocationPath(locIdOrObj._id, allLocations);
+        if (path && path !== locIdOrObj._id) return path;
       }
       if (locIdOrObj.name) return locIdOrObj.name;
     }
@@ -521,30 +520,21 @@ const SkuMasterV2: React.FC = () => {
     const targetStr = String(locIdOrObj).trim();
     if (!targetStr) return '';
 
-    const locMap = new Map();
-    (allLocations || []).forEach(l => {
-      if (l._id) locMap.set(String(l._id), l);
-      if ((l as any).id) locMap.set(String((l as any).id), l);
-    });
-
+    const locMap = new Map(allLocations.map(l => [l._id, l]));
     let current = locMap.get(targetStr);
 
     if (!current) {
-      current = (allLocations || []).find(l => l.name?.toLowerCase() === targetStr.toLowerCase());
+      current = allLocations.find(l => l.name?.toLowerCase() === targetStr.toLowerCase());
     }
 
-    if (!current) {
-      if (/^[0-9a-fA-F]{24}$/.test(targetStr)) return '';
-      return targetStr;
-    }
+    if (!current) return targetStr;
 
     const path: string[] = [current.name];
     let parentId = current.parentId;
     let guard = 0;
 
     while (parentId && guard < 10) {
-      const parentStr = String(typeof parentId === 'object' ? (parentId as any)._id || (parentId as any).id : parentId);
-      const parent = locMap.get(parentStr);
+      const parent = locMap.get(parentId);
       if (!parent) break;
       path.unshift(parent.name);
       parentId = parent.parentId;
@@ -563,8 +553,8 @@ const SkuMasterV2: React.FC = () => {
       try {
         const hierarchy = currentCompanyId ? await getWarehouseHierarchyV2(currentCompanyId).catch(() => []) : [];
         
-        let initialLocStr = '';
-        let dynamicLocsStr = '';
+        let initialLocStr = 'Not assigned';
+        let dynamicLocsStr = 'No live stock entries assigned';
         let resolvedLiveStock: number | null = null;
 
         // 1. Resolve Initial Assigned Location
@@ -576,13 +566,11 @@ const SkuMasterV2: React.FC = () => {
                          (selectedSkuDetails as any)?.locationName || 
                          (selectedSkuDetails as any)?.defaultLocation;
         if (directLoc) {
-          initialLocStr = buildModalLocationPath(directLoc, hierarchy);
-          if (!initialLocStr && typeof directLoc === 'object') {
-            initialLocStr = directLoc.name || directLoc.locationName || directLoc.title || '';
+          const locPath = buildModalLocationPath(directLoc, hierarchy);
+          if (locPath) {
+            initialLocStr = locPath;
           }
         }
-
-        const stockUnit = selectedSkuDetails.unit || (selectedSkuDetails.paperType === 'Sheets' ? 'Sheets' : selectedSkuDetails.paperType === 'Reels' ? 'KG' : (getItemType(selectedSkuDetails) === 'materials' ? 'KG' : 'Pcs'));
 
         // 2. Resolve Dynamic Live Stock & Locations from Balances
         if (selectedSkuDetails._id && currentCompanyId) {
@@ -596,11 +584,11 @@ const SkuMasterV2: React.FC = () => {
             for (const b of balances) {
               const locObj = b.locationId || b.location;
               if (locObj) {
+                const stockUnit = selectedSkuDetails.unit || (getItemType(selectedSkuDetails) === 'materials' ? 'KG' : 'Pcs');
                 const p = buildModalLocationPath(locObj, hierarchy);
-                const locName = p || (typeof locObj === 'object' ? locObj.name : '');
-                if (locName) {
+                if (p) {
                   const qtyText = b.onHand !== undefined ? ` (${b.onHand} ${stockUnit})` : '';
-                  locPaths.push(`${locName}${qtyText}`);
+                  locPaths.push(`${p}${qtyText}`);
                 }
               }
             }
@@ -608,23 +596,6 @@ const SkuMasterV2: React.FC = () => {
               dynamicLocsStr = Array.from(new Set(locPaths)).join(' • ');
             }
           }
-        }
-
-        const liveStockQty = resolvedLiveStock !== null 
-          ? resolvedLiveStock 
-          : Number((selectedSkuDetails as any).presentStock ?? selectedSkuDetails.openingStock ?? 0);
-
-        // Dynamic fallback if no separate warehouse movements exist
-        if (!dynamicLocsStr) {
-          if (initialLocStr && initialLocStr !== 'Not assigned') {
-            dynamicLocsStr = `${initialLocStr} (${liveStockQty.toLocaleString('en-IN')} ${stockUnit})`;
-          } else {
-            dynamicLocsStr = 'Not assigned to any location';
-          }
-        }
-
-        if (!initialLocStr) {
-          initialLocStr = 'Not assigned';
         }
 
         if (isMounted) {
@@ -635,7 +606,7 @@ const SkuMasterV2: React.FC = () => {
       } catch (err) {
         if (isMounted) {
           setModalInitialLocationText('Not assigned');
-          setModalDynamicLocationsText('Not assigned to any location');
+          setModalDynamicLocationsText('No live stock entries assigned');
           setModalDynamicLiveStock(null);
         }
       }
@@ -2703,11 +2674,9 @@ const SkuMasterV2: React.FC = () => {
         existingProductsCount={productsList.length}
         existingMaterialsCount={materialsList.length}
         existingSemiCount={semiList.length}
-        onSaveSuccess={(savedSku) => {
+        onClose={() => setShowAddDrawer(false)}
+        onSaveSuccess={() => {
           setShowAddDrawer(false);
-          if (savedSku && selectedSkuDetails && (savedSku._id === selectedSkuDetails._id || savedSku.skuCode === selectedSkuDetails.skuCode)) {
-            setSelectedSkuDetails(prev => prev ? ({ ...prev, ...savedSku }) : null);
-          }
           loadSkus(false);
         }}
         customColumns={customColumns}
@@ -2993,82 +2962,101 @@ const SkuMasterV2: React.FC = () => {
                     }
 
                     return (
-                      <div className="bg-white p-5 rounded-2xl border border-emerald-200/80 shadow-2xs space-y-4">
-                        {/* Header */}
-                        <div className="flex items-center justify-between pb-3 border-b border-gray-150">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-2xs">
-                              <Package className="w-4.5 h-4.5" />
+                      <div className="bg-white p-4.5 rounded-2xl border border-emerald-200/70 shadow-2xs space-y-3.5">
+                        <div className="flex items-center justify-between pb-2.5 border-b border-gray-100">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                              <Package className="w-4 h-4" />
                             </div>
-                            <div>
-                              <h4 className="font-bold text-gray-900 text-xs tracking-tight">Stock & Warehouse Location</h4>
-                              <p className="text-[10px] font-medium text-gray-400">Live inventory balances & assigned storage points</p>
-                            </div>
+                            <h4 className="font-bold text-gray-900 text-xs">Stock & Warehouse Location</h4>
                           </div>
-                          <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase border tracking-wide shadow-2xs ${statusBadge.bg}`}>
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${statusBadge.bg}`}>
                             {statusBadge.label}
                           </span>
                         </div>
 
                         {/* Top Stock Metrics Grid */}
-                        <div className="grid grid-cols-3 gap-3 bg-slate-50/90 p-3.5 rounded-xl border border-slate-200/70 text-xs">
-                          <div className="space-y-1">
-                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block">OPENING BALANCE</span>
-                            <span className="font-mono font-bold text-gray-900 text-xs block">{openingQty.toLocaleString('en-IN')} <span className="text-[11px] font-semibold text-gray-500">{stockUnit}</span></span>
+                        <div className="grid grid-cols-3 gap-3 bg-slate-50/80 p-3 rounded-xl border border-slate-100 text-xs">
+                          <div>
+                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">OPENING BALANCE</span>
+                            <span className="font-mono font-bold text-gray-900 text-xs">{openingQty.toLocaleString('en-IN')} {stockUnit}</span>
                           </div>
-                          <div className="space-y-1">
-                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block">PRESENT LIVE STOCK</span>
-                            <span className="font-mono font-extrabold text-emerald-600 text-xs block">
-                              {liveStockQty.toLocaleString('en-IN')} <span className="text-[11px] font-bold text-emerald-700">{stockUnit}</span>
+                          <div>
+                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PRESENT LIVE STOCK</span>
+                            <span className="font-mono font-extrabold text-emerald-600 text-xs">
+                              {liveStockQty.toLocaleString('en-IN')} {stockUnit}
                             </span>
                           </div>
-                          <div className="space-y-1">
-                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block">EST. STOCK VALUE</span>
-                            <span className="font-mono font-bold text-slate-800 text-xs block">
+                          <div>
+                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">EST. STOCK VALUE</span>
+                            <span className="font-mono font-bold text-slate-800 text-xs">
                               ₹{totalEstVal.toLocaleString('en-IN')}
                             </span>
                           </div>
                         </div>
 
-                        {/* Dynamic Stock Thresholds */}
-                        <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50/60 p-3 rounded-xl border border-slate-200/60">
-                          <div className="space-y-1">
-                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block">MIN STOCK THRESHOLD</span>
-                            <span className="font-mono font-bold text-amber-600 text-xs block">
-                              {hasMinStock ? `${Number(minStockVal).toLocaleString('en-IN')} ${stockUnit}` : '—'}
-                            </span>
-                          </div>
-                          <div className="space-y-1">
-                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block">REORDER LEVEL</span>
-                            <span className="font-mono font-bold text-blue-600 text-xs block">
-                              {hasReorder ? `${Number(reorderVal).toLocaleString('en-IN')} ${stockUnit}` : '—'}
-                            </span>
-                          </div>
-                        </div>
+                        {/* Dynamic Stock Thresholds & Standard Sheets */}
+                        {(() => {
+                          const isSheetItem = selectedSkuDetails.paperType === 'Sheets' || (selectedSkuDetails.name || '').toLowerCase().includes('sheet');
+                          const stdSheetsVal = selectedSkuDetails.pages || 500;
+
+                          return (
+                            <div className={`grid ${isSheetItem ? 'grid-cols-3' : 'grid-cols-2'} gap-3 text-xs bg-slate-50/50 p-3 rounded-xl border border-slate-100`}>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">MIN STOCK THRESHOLD</span>
+                                <span className="font-mono font-bold text-amber-600 text-xs block">
+                                  {hasMinStock ? (
+                                    `${Number(minStockVal).toLocaleString('en-IN')} ${stockUnit}`
+                                  ) : (
+                                    <span className="inline-block w-4 h-1 bg-amber-500 rounded-full my-1" title="Unconfigured"></span>
+                                  )}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">REORDER LEVEL</span>
+                                <span className="font-mono font-bold text-blue-600 text-xs block">
+                                  {hasReorder ? (
+                                    `${Number(reorderVal).toLocaleString('en-IN')} ${stockUnit}`
+                                  ) : (
+                                    <span className="inline-block w-4 h-1 bg-blue-500 rounded-full my-1" title="Unconfigured"></span>
+                                  )}
+                                </span>
+                              </div>
+                              {isSheetItem && (
+                                <div>
+                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">STD. SHEETS / REAM</span>
+                                  <span className="font-mono font-bold text-indigo-600 text-xs block">
+                                    {stdSheetsVal} Sheets
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
 
                         {/* Separated Location Blocks: Initial Assigned & Current Dynamic */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-3 border-t border-gray-150">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2.5 border-t border-gray-100">
                           {/* Initial Location */}
-                          <div className="bg-slate-50/90 p-3.5 rounded-xl border border-slate-200/80 space-y-2 flex flex-col justify-between">
-                            <div className="text-[9.5px] font-extrabold text-indigo-600 uppercase tracking-wider flex items-center gap-1.5">
-                              <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                              <span>INITIAL LOCATION</span>
+                          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 space-y-1">
+                            <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                              <MapPin className="w-3.5 h-3.5 text-indigo-500" />
+                              <span>INITIAL ASSIGNED LOCATION</span>
                             </div>
-                            <div className="font-bold text-xs text-gray-800 flex items-start gap-2 pt-0.5 leading-relaxed break-words">
-                              <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0 mt-1"></span>
-                              <span className="text-gray-900 break-words leading-normal">{modalInitialLocationText || 'Not assigned'}</span>
+                            <div className="font-bold text-xs text-gray-800 flex items-center gap-2 pt-0.5">
+                              <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0"></span>
+                              <span className="truncate">{modalInitialLocationText || 'Not assigned'}</span>
                             </div>
                           </div>
 
                           {/* Dynamic Location */}
-                          <div className="bg-slate-50/90 p-3.5 rounded-xl border border-slate-200/80 space-y-2 flex flex-col justify-between">
-                            <div className="text-[9.5px] font-extrabold text-emerald-700 uppercase tracking-wider flex items-center gap-1.5">
-                              <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                              <span>DYNAMIC LIVE LOCATION(S)</span>
+                          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 space-y-1">
+                            <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                              <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>CURRENT DYNAMIC LOCATION(S)</span>
                             </div>
-                            <div className="font-bold text-xs text-gray-800 flex items-start gap-2 pt-0.5 leading-relaxed break-words">
-                              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 mt-1"></span>
-                              <span className="text-gray-900 break-words leading-normal">{modalDynamicLocationsText || 'Not assigned to any location'}</span>
+                            <div className="font-bold text-xs text-gray-800 flex items-center gap-2 pt-0.5">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                              <span className="truncate">{modalDynamicLocationsText || 'No live stock entries assigned'}</span>
                             </div>
                           </div>
                         </div>

@@ -930,8 +930,8 @@ export const StockInventoryV2: React.FC = () => {
           return;
         }
 
-        const isReel = lot.paperType === 'Reel';
-        const isSheet = lot.paperType === 'Sheet' || lot.paperType === 'Board';
+        const isReel = lot.paperType === 'Reel' || (targetSku as any)?.paperType === 'Reels' || (targetSku as any)?.paperType === 'Reel';
+        const isSheet = lot.paperType === 'Sheet' || lot.paperType === 'Board' || (targetSku as any)?.paperType === 'Sheets' || (targetSku as any)?.paperType === 'Sheet' || (targetSku?.name || '').toLowerCase().includes('sheet');
 
         if (isReel) {
           const reelsList = lot.reels || [];
@@ -975,7 +975,7 @@ export const StockInventoryV2: React.FC = () => {
           const reams = Number(lot.reamsCount) || 0;
           const rw = Number(lot.reamWeight) || 0;
           const rkg = Number(lot.ratePerKg) || 0;
-          const stdSheets = (targetSku as any)?.pages || 500;
+          const stdSheets = (targetSku as any)?.pages || (targetSku as any)?.standardSheets || 500;
 
           const totalSheets = reams > 0 ? (reams * stdSheets) : (Number(lot.totalKg) || 100);
           const totalWeight = reams > 0 && rw > 0 ? Number((reams * rw).toFixed(2)) : (Number(lot.totalKg) || 100);

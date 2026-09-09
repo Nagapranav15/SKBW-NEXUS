@@ -812,12 +812,10 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           pages: form.pages ? Number(form.pages) : (form.paperType === 'Sheets' ? 500 : undefined),
           reamWeight: form.reamWeight ? Number(form.reamWeight) : undefined,
           booksGbl: form.booksGbl ? Number(form.booksGbl) : undefined,
+          minStockLevel: form.minStockLevel ? Number(form.minStockLevel) : undefined,
+          reorderLevel: form.reorderLevel ? Number(form.reorderLevel) : undefined,
           openingStock: form.openingStock ? Number(form.openingStock) : 0,
-          initialLocationId: (() => {
-            const locVal = form.initialLocationId || (editSku as any)?.initialLocationId || (editSku as any)?.initialLocation || (editSku as any)?.locationId;
-            if (!locVal) return undefined;
-            return typeof locVal === 'object' ? String(locVal._id || locVal.id || '') : String(locVal);
-          })(),
+          initialLocationId: form.initialLocationId || (editSku as any)?.initialLocationId || (editSku as any)?.initialLocation || (editSku as any)?.locationId || undefined,
           recipeYieldQty: Number(form.recipeYieldQty) || 1,
           status: form.status || 'Active',
           company: companyId,
