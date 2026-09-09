@@ -503,6 +503,7 @@ const SkuMasterV2: React.FC = () => {
   const [isSavingBuildBom, setIsSavingBuildBom] = useState(false);
 
   const [modalDynamicLocation, setModalDynamicLocation] = useState<string>('Loading location...');
+  const [modalDynamicLiveStock, setModalDynamicLiveStock] = useState<number | null>(null);
 
   // Helper to build parent-to-child location path (Factory ➔ Zone ➔ Storage Location)
   const buildModalLocationPath = (locId: string, allLocations: WarehouseLocationV2[]): string => {
@@ -538,13 +539,17 @@ const SkuMasterV2: React.FC = () => {
           const balances = await getBalancesV2(currentCompanyId, undefined, undefined, selectedSkuDetails._id).catch(() => []);
           
           if (balances && balances.length > 0) {
+            const sumOnHand = balances.reduce((s: number, b: any) => s + Number(b.onHand ?? b.quantity ?? 0), 0);
+            if (isMounted) setModalDynamicLiveStock(sumOnHand);
+
             const locPaths: string[] = [];
             for (const b of balances) {
               const locObj = b.locationId || b.location;
               if (locObj) {
+                const stockUnit = selectedSkuDetails.unit || (getItemType(selectedSkuDetails) === 'materials' ? 'KG' : 'Pcs');
                 if (typeof locObj === 'object' && locObj._id) {
                   const p = buildModalLocationPath(locObj._id, hierarchy);
-                  const qtyText = b.onHand !== undefined ? ` (${b.onHand} ${selectedSkuDetails.unit || ''})` : '';
+                  const qtyText = b.onHand !== undefined ? ` (${b.onHand} ${stockUnit})` : '';
                   locPaths.push(`${p}${qtyText}`);
                 } else if (typeof locObj === 'object' && locObj.name) {
                   locPaths.push(locObj.name);
@@ -559,9 +564,11 @@ const SkuMasterV2: React.FC = () => {
               if (isMounted) setModalDynamicLocation(unique.join(' • '));
               return;
             }
+          } else {
+            if (isMounted) setModalDynamicLiveStock(null);
           }
 
-          const directLoc = (selectedSkuDetails as any)?.locationId || (selectedSkuDetails as any)?.warehouseLocation || (selectedSkuDetails as any)?.location || (selectedSkuDetails as any)?.locationName;
+          const directLoc = (selectedSkuDetails as any)?.locationId || (selectedSkuDetails as any)?.initialLocationId || (selectedSkuDetails as any)?.warehouseLocation || (selectedSkuDetails as any)?.location || (selectedSkuDetails as any)?.locationName || (selectedSkuDetails as any)?.defaultLocation;
           if (directLoc) {
             if (typeof directLoc === 'object' && directLoc._id) {
               if (isMounted) setModalDynamicLocation(buildModalLocationPath(directLoc._id, hierarchy));
@@ -573,9 +580,15 @@ const SkuMasterV2: React.FC = () => {
           }
         }
 
-        if (isMounted) setModalDynamicLocation('Not assigned to any location');
+        if (isMounted) {
+          setModalDynamicLocation('Not assigned to any location');
+          setModalDynamicLiveStock(null);
+        }
       } catch (err) {
-        if (isMounted) setModalDynamicLocation('Not assigned to any location');
+        if (isMounted) {
+          setModalDynamicLocation('Not assigned to any location');
+          setModalDynamicLiveStock(null);
+        }
       }
     };
 
@@ -2891,45 +2904,63 @@ const SkuMasterV2: React.FC = () => {
                   </div>
 
                   {/* CARD 4: 📦 Stock & Warehouse Location */}
-                  <div className="bg-white p-4 rounded-2xl border border-emerald-200/70 shadow-2xs space-y-3">
-                    <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-                          <Package className="w-4 h-4" />
+                  {(() => {
+                    const stockUnit = selectedSkuDetails.unit || (selectedSkuDetails.paperType === 'Sheets' ? 'Sheets' : selectedSkuDetails.paperType === 'Reels' ? 'KG' : (getItemType(selectedSkuDetails) === 'materials' ? 'KG' : 'Pcs'));
+                    const openingQty = Number(selectedSkuDetails.openingStock || 0);
+                    const liveStockQty = modalDynamicLiveStock !== null 
+                      ? modalDynamicLiveStock 
+                      : Number((selectedSkuDetails as any).presentStock ?? selectedSkuDetails.openingStock ?? 0);
+                    const minStockVal = (selectedSkuDetails as any).minStockLevel;
+                    const hasMinStock = minStockVal !== undefined && minStockVal !== null && minStockVal !== '' && Number(minStockVal) > 0;
+                    const reorderVal = (selectedSkuDetails as any).reorderLevel;
+                    const hasReorder = reorderVal !== undefined && reorderVal !== null && reorderVal !== '' && Number(reorderVal) > 0;
+
+                    return (
+                      <div className="bg-white p-4 rounded-2xl border border-emerald-200/70 shadow-2xs space-y-3">
+                        <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                              <Package className="w-4 h-4" />
+                            </div>
+                            <h4 className="font-bold text-gray-900 text-xs">Stock & Warehouse Location</h4>
+                          </div>
                         </div>
-                        <h4 className="font-bold text-gray-900 text-xs">Stock & Warehouse Location</h4>
-                      </div>
-                    </div>
 
-                    <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs">
-                      <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">OPENING BALANCE</span>
-                        <span className="font-mono font-bold text-gray-900 text-xs">{selectedSkuDetails.openingStock || 0} {selectedSkuDetails.unit || 'GBL'}</span>
-                      </div>
-                      <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PRESENT LIVE STOCK</span>
-                        <span className="font-mono font-extrabold text-emerald-600 text-xs">
-                          {(selectedSkuDetails as any).presentStock ?? selectedSkuDetails.openingStock ?? 0} {selectedSkuDetails.unit || 'GBL'}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">MIN STOCK THRESHOLD</span>
-                        <span className="font-mono font-bold text-amber-600 text-xs">{(selectedSkuDetails as any).minStockLevel || 500} {selectedSkuDetails.unit || 'GBL'}</span>
-                      </div>
-                      <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">REORDER LEVEL</span>
-                        <span className="font-mono font-bold text-blue-600 text-xs">{(selectedSkuDetails as any).reorderLevel || '—'}</span>
-                      </div>
-                    </div>
+                        <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs">
+                          <div>
+                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">OPENING BALANCE</span>
+                            <span className="font-mono font-bold text-gray-900 text-xs">{openingQty.toLocaleString('en-IN')} {stockUnit}</span>
+                          </div>
+                          <div>
+                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PRESENT LIVE STOCK</span>
+                            <span className="font-mono font-extrabold text-emerald-600 text-xs">
+                              {liveStockQty.toLocaleString('en-IN')} {stockUnit}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">MIN STOCK THRESHOLD</span>
+                            <span className="font-mono font-bold text-amber-600 text-xs">
+                              {hasMinStock ? `${Number(minStockVal).toLocaleString('en-IN')} ${stockUnit}` : '—'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">REORDER LEVEL</span>
+                            <span className="font-mono font-bold text-blue-600 text-xs">
+                              {hasReorder ? `${Number(reorderVal).toLocaleString('en-IN')} ${stockUnit}` : '—'}
+                            </span>
+                          </div>
+                        </div>
 
-                    <div className="pt-2.5 border-t border-gray-100">
-                      <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1 mb-0.5">
-                        <MapPin className="w-3 h-3 text-blue-600" />
-                        STORAGE LOCATION
+                        <div className="pt-2.5 border-t border-gray-100">
+                          <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1 mb-0.5">
+                            <MapPin className="w-3 h-3 text-blue-600" />
+                            STORAGE LOCATION
+                          </div>
+                          <div className="font-bold text-xs text-gray-800">{modalDynamicLocation || 'Not assigned to any location'}</div>
+                        </div>
                       </div>
-                      <div className="font-bold text-xs text-gray-800">{modalDynamicLocation || 'Not assigned to any location'}</div>
-                    </div>
-                  </div>
+                    );
+                  })()}
 
                 </div>
 
