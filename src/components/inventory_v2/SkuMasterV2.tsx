@@ -2703,9 +2703,11 @@ const SkuMasterV2: React.FC = () => {
         existingProductsCount={productsList.length}
         existingMaterialsCount={materialsList.length}
         existingSemiCount={semiList.length}
-        onClose={() => setShowAddDrawer(false)}
-        onSaveSuccess={() => {
+        onSaveSuccess={(savedSku) => {
           setShowAddDrawer(false);
+          if (savedSku && selectedSkuDetails && (savedSku._id === selectedSkuDetails._id || savedSku.skuCode === selectedSkuDetails.skuCode)) {
+            setSelectedSkuDetails(prev => prev ? ({ ...prev, ...savedSku }) : null);
+          }
           loadSkus(false);
         }}
         customColumns={customColumns}

@@ -813,7 +813,11 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           reamWeight: form.reamWeight ? Number(form.reamWeight) : undefined,
           booksGbl: form.booksGbl ? Number(form.booksGbl) : undefined,
           openingStock: form.openingStock ? Number(form.openingStock) : 0,
-          initialLocationId: form.initialLocationId || (editSku as any)?.initialLocationId || (editSku as any)?.initialLocation || (editSku as any)?.locationId || undefined,
+          initialLocationId: (() => {
+            const locVal = form.initialLocationId || (editSku as any)?.initialLocationId || (editSku as any)?.initialLocation || (editSku as any)?.locationId;
+            if (!locVal) return undefined;
+            return typeof locVal === 'object' ? String(locVal._id || locVal.id || '') : String(locVal);
+          })(),
           recipeYieldQty: Number(form.recipeYieldQty) || 1,
           status: form.status || 'Active',
           company: companyId,

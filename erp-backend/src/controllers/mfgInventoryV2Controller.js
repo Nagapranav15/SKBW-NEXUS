@@ -73,7 +73,7 @@ exports.getSkus = async (req, res, next) => {
       }
     }
 
-    const skus = await SkuV2.find(query).sort({ createdAt: -1 });
+    const skus = await SkuV2.find(query).populate('initialLocation').sort({ createdAt: -1 });
     res.json(skus);
   } catch (err) {
     next(err);
@@ -109,7 +109,7 @@ exports.createSku = async (req, res, next) => {
       ruleType,
       pages: pages ? Number(pages) : undefined,
       booksGbl: booksGbl ? Number(booksGbl) : undefined,
-      openingStock: openingStock ? Number(openingStock) : 0,
+      openingStock: openingStock !== undefined ? Number(openingStock) : 0,
       status: status || "Active",
       bomItems: req.body.bomItems || [],
       processSteps: req.body.processSteps || [],
@@ -117,15 +117,24 @@ exports.createSku = async (req, res, next) => {
       createdBy: req.user?.id ? toObjectId(req.user.id) : undefined
     });
 
-    if (req.body.initialLocationId) {
-      newSku.initialLocation = toObjectId(req.body.initialLocationId);
+    const locVal = req.body.initialLocationId || req.body.initialLocation;
+    if (locVal) {
+      const locIdStr = typeof locVal === 'object' ? String(locVal._id || locVal.id) : String(locVal);
+      if (locIdStr && /^[0-9a-fA-F]{24}$/.test(locIdStr)) {
+        newSku.initialLocation = toObjectId(locIdStr);
+        newSku.initialLocationId = toObjectId(locIdStr);
+      } else if (locIdStr) {
+        newSku.initialLocation = locIdStr;
+        newSku.initialLocationId = locIdStr;
+      }
     }
 
     await newSku.save();
 
-    if (newSku.openingStock > 0 && req.body.initialLocationId) {
+    if (newSku.openingStock > 0 && locVal) {
       try {
-        const targetLoc = await WarehouseLocationV2.findById(toObjectId(req.body.initialLocationId));
+        const locIdStr = typeof locVal === 'object' ? String(locVal._id || locVal.id) : String(locVal);
+        const targetLoc = /^[0-9a-fA-F]{24}$/.test(locIdStr) ? await WarehouseLocationV2.findById(toObjectId(locIdStr)) : null;
         if (targetLoc) {
           await InventoryLedger.create({
             transactionNumber: `IL-OPEN-${Date.now()}`,
@@ -170,6 +179,8 @@ exports.createSku = async (req, res, next) => {
       performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
       company: toObjectId(company)
     }).catch(e => console.error("ActivityLog error:", e));
+
+    await newSku.populate('initialLocation');
     res.status(201).json(newSku);
   } catch (err) {
     next(err);
@@ -232,6 +243,20 @@ exports.updateSku = async (req, res, next) => {
     if (req.body.bomItems !== undefined) sku.bomItems = req.body.bomItems;
     if (req.body.processSteps !== undefined) sku.processSteps = req.body.processSteps;
 
+    if (req.body.initialLocationId !== undefined || req.body.initialLocation !== undefined) {
+      const locVal = req.body.initialLocationId || req.body.initialLocation;
+      if (locVal) {
+        const locIdStr = typeof locVal === 'object' ? String(locVal._id || locVal.id) : String(locVal);
+        if (locIdStr && /^[0-9a-fA-F]{24}$/.test(locIdStr)) {
+          sku.initialLocation = toObjectId(locIdStr);
+          sku.initialLocationId = toObjectId(locIdStr);
+        } else if (locIdStr) {
+          sku.initialLocation = locIdStr;
+          sku.initialLocationId = locIdStr;
+        }
+      }
+    }
+
     if (req.body.isDeleted !== undefined) {
       sku.isDeleted = req.body.isDeleted;
     }
@@ -247,6 +272,7 @@ exports.updateSku = async (req, res, next) => {
       company: sku.company
     }).catch(e => console.error("ActivityLog error:", e));
 
+    await sku.populate('initialLocation');
     res.json(sku);
   } catch (err) {
     next(err);
