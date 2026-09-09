@@ -2113,11 +2113,11 @@ export const StockInventoryV2: React.FC = () => {
               </div>
             </form>
           ) : (
-            <form onSubmit={handleSavePurchaseBatch} className="space-y-4 p-1">
+            <form onSubmit={handleSavePurchaseBatch} className="space-y-4 p-1 text-slate-800">
               {/* Modal Header */}
               <div className="flex items-center justify-between border-b border-slate-100 pb-3.5 mb-1">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-xl shadow-sm">
+                  <div className="p-2.5 bg-blue-600 text-white rounded-xl shadow-xs">
                     <Package className="w-5 h-5" />
                   </div>
                   <div>
@@ -2146,14 +2146,14 @@ export const StockInventoryV2: React.FC = () => {
               </div>
 
               {/* Modal Scrollable Body Form Fields */}
-              <div className="space-y-5 max-h-[75vh] overflow-y-auto pr-2 text-xs">
+              <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1 text-xs">
                 
                 {/* 1. PURCHASE BATCH DETAILS */}
-                <div className="bg-slate-50/80 p-4.5 rounded-2xl border border-slate-200/80 space-y-3.5 shadow-3xs">
-                  <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
-                    <h4 className="font-extrabold text-slate-800 uppercase tracking-wider text-[11px] flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                      1. Purchase Batch Details
+                <div className="bg-white p-4.5 rounded-2xl border border-slate-200 space-y-3.5 shadow-2xs">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <h4 className="font-extrabold text-slate-900 uppercase tracking-wider text-[11px] flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center font-black text-[10px]">1</div>
+                      Purchase Batch Details
                     </h4>
                   </div>
 
@@ -2208,13 +2208,9 @@ export const StockInventoryV2: React.FC = () => {
                         onChange={e => {
                           const newType = e.target.value;
                           setBatchForm(f => ({ ...f, purchaseType: newType }));
-                          // Dynamically reset lots that don't match the newly selected purchase type
                           setLots(prevLots => prevLots.map(lot => {
                             if (!lot.skuId) {
-                              return {
-                                ...lot,
-                                paperType: newType === 'Semi' ? 'Sheet' : 'Reel'
-                              };
+                              return { ...lot, paperType: newType === 'Semi' ? 'Sheet' : 'Reel' };
                             }
                             const curSku = allSkus.find(s => s._id === lot.skuId);
                             if (curSku) {
@@ -2253,8 +2249,9 @@ export const StockInventoryV2: React.FC = () => {
                 {/* 2. MATERIAL LOTS */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-gray-900 uppercase tracking-wider text-[11px]">
-                      MATERIAL LOTS
+                    <h4 className="font-extrabold text-slate-900 uppercase tracking-wider text-[11px] flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center font-black text-[10px]">2</div>
+                      Material Lots
                     </h4>
                     <button
                       type="button"
@@ -2270,22 +2267,22 @@ export const StockInventoryV2: React.FC = () => {
                     const lotSubtotal = (Number(lot.totalKg) || 0) * (Number(lot.ratePerKg) || 0);
 
                     return (
-                      <div key={getKey(lot.id, `lot-card-${idx}`)} className="bg-white p-4 rounded-2xl border border-gray-200/80 space-y-3 shadow-2xs relative">
-                        <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                          <div className="flex items-center gap-2">
-                            <span className="px-2.5 py-1 bg-gray-100 text-gray-700 font-black rounded-lg text-[10px] uppercase">
+                      <div key={getKey(lot.id, `lot-card-${idx}`)} className="bg-white p-4.5 rounded-2xl border border-slate-200 space-y-3.5 shadow-2xs relative">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                          <div className="flex items-center gap-2.5">
+                            <span className="px-2.5 py-1 bg-blue-50 text-blue-700 font-black rounded-lg text-[10px] uppercase border border-blue-100">
                               LOT - {idx + 1}
                             </span>
                             
-                            {/* Interactive Format Switcher */}
-                            <div className="inline-flex rounded-lg bg-gray-100 p-0.5 text-[10px] font-bold">
+                            {/* Format Switcher */}
+                            <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-[10px] font-bold">
                               <button
                                 type="button"
                                 onClick={() => updateLotField(lot.id, 'paperType', 'Reel')}
-                                className={`px-2.5 py-0.5 rounded-md transition-all cursor-pointer ${
+                                className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
                                   lot.paperType === 'Reel'
-                                    ? 'bg-amber-500 text-white shadow-xs font-black'
-                                    : 'text-gray-600 hover:text-gray-900'
+                                    ? 'bg-blue-600 text-white shadow-2xs font-extrabold'
+                                    : 'text-slate-600 hover:text-slate-900'
                                 }`}
                               >
                                 🗞️ Reel
@@ -2304,10 +2301,10 @@ export const StockInventoryV2: React.FC = () => {
                                     }
                                   }
                                 }}
-                                className={`px-2.5 py-0.5 rounded-md transition-all cursor-pointer ${
+                                className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
                                   lot.paperType === 'Sheet' || lot.paperType === 'Board'
-                                    ? 'bg-blue-600 text-white shadow-xs font-black'
-                                    : 'text-gray-600 hover:text-gray-900'
+                                    ? 'bg-blue-600 text-white shadow-2xs font-extrabold'
+                                    : 'text-slate-600 hover:text-slate-900'
                                 }`}
                               >
                                 📄 Sheet / Board
@@ -2319,7 +2316,7 @@ export const StockInventoryV2: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => handleRemoveLot(lot.id)}
-                              className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg"
+                              className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                             >
                               <X className="w-4 h-4" />
                             </button>
@@ -2338,10 +2335,10 @@ export const StockInventoryV2: React.FC = () => {
                                 return (
                                   <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded border ${
                                     isPositive
-                                      ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
-                                      : 'text-rose-700 bg-rose-50 border-rose-200'
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                      : 'bg-rose-50 text-rose-700 border-rose-200'
                                   }`}>
-                                    Present Stock: {liveStock.toLocaleString('en-IN')} {unit}
+                                    Available Stock: {liveStock.toLocaleString('en-IN')} {unit}
                                   </span>
                                 );
                               })()}
@@ -2350,43 +2347,24 @@ export const StockInventoryV2: React.FC = () => {
                               required
                               value={lot.skuId}
                               onChange={e => {
-                                const selSku = allSkus.find(s => s._id === e.target.value);
-                                updateLotField(lot.id, 'skuId', e.target.value);
+                                const selId = e.target.value;
+                                const selSku = allSkus.find(s => s._id === selId);
+                                updateLotField(lot.id, 'skuId', selId);
                                 if (selSku) {
-                                  const skuNameLower = (selSku.name || '').toLowerCase();
-                                  const catLower = (selSku.category || '').toLowerCase();
-                                  const rawType = (selSku as any).paperType;
-
-                                  let detectedWidth = selSku.width ? String(selSku.width) : '';
-                                  let detectedLength = selSku.length ? String(selSku.length) : '';
-                                  if ((!detectedWidth || !detectedLength) && selSku.name) {
-                                    const match = selSku.name.match(/(\d+(?:\.\d+)?)\s*[xX\*]\s*(\d+(?:\.\d+)?)/i);
-                                    if (match) {
-                                      if (!detectedWidth) detectedWidth = match[1];
-                                      if (!detectedLength) detectedLength = match[2];
-                                    }
-                                  }
-
-                                  const isReel = rawType === 'Reels' || rawType === 'Reel' || (!detectedLength && (skuNameLower.includes('reel') || catLower.includes('reel')));
-                                  const isSheet = rawType === 'Sheets' || rawType === 'Sheet' || rawType === 'Board' || 
-                                    catLower.includes('semi') || catLower.includes('board') || catLower.includes('sheet') || 
-                                    (Boolean(detectedWidth) && Boolean(detectedLength)) || (selSku.unit || '').toUpperCase() === 'PCS';
-
-                                  const detectedType: 'Reel' | 'Sheet' | 'Board' | 'General' = isReel ? 'Reel' : isSheet ? 'Sheet' : 'General';
-
-                                  let calcReamWeight = (selSku as any).reamWeight ? String((selSku as any).reamWeight) : '';
-                                  const wNum = Number(detectedWidth) || 0;
-                                  const lNum = Number(detectedLength) || 0;
-                                  const gsmNum = Number(selSku.gsm) || 0;
-                                  const stdSheets = Number((selSku as any).pages) || 500;
-                                  if (!calcReamWeight && wNum > 0 && lNum > 0 && gsmNum > 0) {
-                                    calcReamWeight = ((wNum * lNum * gsmNum * stdSheets) / 10000000).toFixed(4);
-                                  }
-
                                   updateLotField(lot.id, 'skuCode', selSku.skuCode);
                                   updateLotField(lot.id, 'skuName', selSku.name);
                                   updateLotField(lot.id, 'brand', selSku.brand || '');
-                                  updateLotField(lot.id, 'gsm', String(selSku.gsm || ''));
+                                  updateLotField(lot.id, 'gsm', selSku.gsm ? String(selSku.gsm) : '');
+                                  
+                                  const detectedType = selSku.paperType === 'Sheets' ? 'Sheet' : selSku.paperType === 'Reels' ? 'Reel' : (selSku.name.toLowerCase().includes('sheet') ? 'Sheet' : 'Reel');
+                                  const detectedWidth = selSku.width ? String(selSku.width) : '';
+                                  const detectedLength = selSku.length ? String(selSku.length) : '';
+                                  
+                                  let calcReamWeight = selSku.reamWeight ? String(selSku.reamWeight) : '';
+                                  if (!calcReamWeight && detectedWidth && detectedLength && selSku.gsm) {
+                                    calcReamWeight = ((Number(detectedWidth) * Number(detectedLength) * Number(selSku.gsm) * 500) / 10000000).toFixed(4);
+                                  }
+
                                   updateLotField(lot.id, 'paperType', detectedType);
                                   updateLotField(lot.id, 'width', detectedWidth || '64');
                                   updateLotField(lot.id, 'length', detectedLength || '');
@@ -2395,41 +2373,8 @@ export const StockInventoryV2: React.FC = () => {
                               }}
                               className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:border-blue-500 bg-white"
                             >
-                              <option value="">
-                                {(() => {
-                                  const matchingCount = allSkus.filter(s => {
-                                    const grp = getSkuCategoryGroup(s);
-                                    if (batchForm.purchaseType === 'Products') return grp === 'products';
-                                    if (batchForm.purchaseType === 'Semi') return grp === 'semi';
-                                    return grp === 'materials';
-                                  }).length;
-                                  return matchingCount === 0
-                                    ? `No ${batchForm.purchaseType} items found...`
-                                    : `Select ${batchForm.purchaseType} SKU (${matchingCount} items)...`;
-                                })()}
-                              </option>
-                              {lot.skuId && !allSkus.filter(s => {
-                                const grp = getSkuCategoryGroup(s);
-                                if (batchForm.purchaseType === 'Products') return grp === 'products';
-                                if (batchForm.purchaseType === 'Semi') return grp === 'semi';
-                                return grp === 'materials';
-                              }).some(s => s._id === lot.skuId) && (
-                                (() => {
-                                  const cur = allSkus.find(s => s._id === lot.skuId);
-                                  return cur ? <option key={cur._id} value={cur._id}>{cur.name} ({cur.skuCode})</option> : null;
-                                })()
-                              )}
-                              {allSkus
-                                .filter(s => {
-                                  const grp = getSkuCategoryGroup(s);
-                                  if (batchForm.purchaseType === 'Products') return grp === 'products';
-                                  if (batchForm.purchaseType === 'Semi') return grp === 'semi';
-                                  return grp === 'materials';
-                                })
-                                .map((s: SkuV2) => (
-                                  <option key={s._id} value={s._id}>{s.name} ({s.skuCode})</option>
-                                ))
-                              }
+                              <option value="">Select SKU...</option>
+                              {allSkus.map((s: any) => <option key={s._id} value={s._id}>{s.name} ({s.skuCode})</option>)}
                             </select>
                           </div>
 
@@ -2439,7 +2384,6 @@ export const StockInventoryV2: React.FC = () => {
                               type="text"
                               value={lot.brand}
                               onChange={e => updateLotField(lot.id, 'brand', e.target.value)}
-                              placeholder=""
                               className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:border-blue-500 bg-white"
                             />
                           </div>
@@ -2450,12 +2394,10 @@ export const StockInventoryV2: React.FC = () => {
                               type="text"
                               value={lot.gsm}
                               onChange={e => updateLotField(lot.id, 'gsm', e.target.value)}
-                              placeholder=""
                               className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono text-center font-bold focus:outline-none focus:border-blue-500 bg-white"
                             />
                           </div>
 
-                          {/* REELS ROW & SPECIFICATIONS TABLE MATCHING SCREENSHOT 1 & 2 */}
                           {lot.paperType === 'Reel' && (
                             <>
                               <div>
@@ -2464,7 +2406,6 @@ export const StockInventoryV2: React.FC = () => {
                                   type="number"
                                   value={lot.width || ''}
                                   onChange={e => updateLotField(lot.id, 'width', e.target.value)}
-                                  placeholder="64"
                                   className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono text-center font-bold bg-white"
                                 />
                               </div>
@@ -2477,19 +2418,10 @@ export const StockInventoryV2: React.FC = () => {
                                   onChange={e => {
                                     const cnt = Number(e.target.value) || 0;
                                     updateLotField(lot.id, 'reelsCount', cnt);
-                                    const existingReels = lot.reels || [];
-                                    const updatedReels = [...existingReels];
-                                    if (updatedReels.length < cnt) {
-                                      while (updatedReels.length < cnt) {
-                                        updatedReels.push({ weight: 0, width: lot.width || '64', locationId: lot.locationId || '' });
-                                      }
-                                    } else if (updatedReels.length > cnt) {
-                                      updatedReels.length = cnt;
-                                    }
+                                    const updatedReels = Array.from({ length: cnt }).map((_, i) => lot.reels?.[i] || { weight: 0, width: lot.width || '64', locationId: lot.locationId || '' });
                                     updateLotField(lot.id, 'reels', updatedReels);
                                   }}
-                                  placeholder="0"
-                                  className="w-full border border-blue-300 rounded-lg px-2.5 py-1.5 text-xs font-mono text-center font-bold bg-white focus:ring-2 focus:ring-blue-500"
+                                  className="w-full border border-blue-200 bg-blue-50/20 rounded-lg px-2.5 py-1.5 text-xs font-mono text-center font-bold text-blue-800 focus:ring-2 focus:ring-blue-500"
                                 />
                               </div>
 
@@ -2497,31 +2429,79 @@ export const StockInventoryV2: React.FC = () => {
                                 <label className="block text-gray-400 font-bold mb-1 uppercase text-[9px]">TOTAL KG</label>
                                 <input
                                   type="number"
-                                  value={lot.totalKg || 0}
-                                  disabled
-                                  className="w-full border border-gray-150 rounded-lg px-2.5 py-1.5 text-xs font-mono text-right font-black bg-gray-50 text-gray-500 cursor-not-allowed"
+                                  value={lot.totalKg || ''}
+                                  onChange={e => updateLotField(lot.id, 'totalKg', Number(e.target.value))}
+                                  placeholder="0"
+                                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono text-right font-bold bg-white"
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-gray-400 font-bold mb-1 uppercase text-[9px]">RATE / KG (₹)</label>
+                                <label className="block text-blue-600 font-bold mb-1 uppercase text-[9px]">RATE / KG (₹)</label>
                                 <input
                                   type="number"
                                   step="any"
                                   value={lot.ratePerKg || ''}
                                   onChange={e => updateLotField(lot.id, 'ratePerKg', e.target.value)}
                                   placeholder="0.00"
-                                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono text-right font-bold bg-white"
+                                  className="w-full border border-blue-200 bg-blue-50/20 rounded-lg px-2.5 py-1.5 text-xs font-mono text-right font-bold text-blue-800 focus:ring-2 focus:ring-blue-500"
                                 />
                               </div>
                             </>
                           )}
 
-                          {/* SHEETS ROW MATCHING OLD PURCHASE BATCH MODULE */}
                           {(lot.paperType === 'Sheet' || lot.paperType === 'Board') && (
                             <>
                               <div>
-                                <label className="block text-blue-600 font-bold mb-1 uppercase text-[9px]">QTY IN REAMS *</label>
+                                <label className="block text-gray-400 font-bold mb-1 uppercase text-[9px]">WIDTH (CM) *</label>
+                                <input
+                                  type="number"
+                                  step="any"
+                                  value={lot.width || ''}
+                                  onChange={e => {
+                                    const w = e.target.value;
+                                    updateLotField(lot.id, 'width', w);
+                                    if (w && lot.length && lot.gsm) {
+                                      const rw = ((Number(w) * Number(lot.length) * Number(lot.gsm) * 500) / 10000000).toFixed(4);
+                                      updateLotField(lot.id, 'reamWeight', rw);
+                                      const reams = Number(lot.reamsCount) || 0;
+                                      if (reams > 0) {
+                                        updateLotField(lot.id, 'totalKg', Number((Number(rw) * reams).toFixed(2)));
+                                        updateLotField(lot.id, 'totalSheets', reams * 500);
+                                      }
+                                    }
+                                  }}
+                                  placeholder="e.g. 58.5"
+                                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono text-center font-bold bg-white"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-gray-400 font-bold mb-1 uppercase text-[9px]">LENGTH (CM) *</label>
+                                <input
+                                  type="number"
+                                  step="any"
+                                  value={lot.length || ''}
+                                  onChange={e => {
+                                    const l = e.target.value;
+                                    updateLotField(lot.id, 'length', l);
+                                    if (lot.width && l && lot.gsm) {
+                                      const rw = ((Number(lot.width) * Number(l) * Number(lot.gsm) * 500) / 10000000).toFixed(4);
+                                      updateLotField(lot.id, 'reamWeight', rw);
+                                      const reams = Number(lot.reamsCount) || 0;
+                                      if (reams > 0) {
+                                        updateLotField(lot.id, 'totalKg', Number((Number(rw) * reams).toFixed(2)));
+                                        updateLotField(lot.id, 'totalSheets', reams * 500);
+                                      }
+                                    }
+                                  }}
+                                  placeholder="e.g. 91"
+                                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono text-center font-bold bg-white"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-blue-600 font-bold mb-1 uppercase text-[9px]">REAMS COUNT *</label>
                                 <input
                                   type="number"
                                   value={lot.reamsCount || ''}
@@ -2529,12 +2509,13 @@ export const StockInventoryV2: React.FC = () => {
                                     const reams = Number(e.target.value) || 0;
                                     updateLotField(lot.id, 'reamsCount', reams);
                                     const rw = Number(lot.reamWeight) || 0;
-                                    const totalKg = Number((rw * reams).toFixed(2));
-                                    updateLotField(lot.id, 'totalKg', totalKg);
+                                    if (rw > 0) {
+                                      updateLotField(lot.id, 'totalKg', Number((rw * reams).toFixed(2)));
+                                    }
                                     updateLotField(lot.id, 'totalSheets', reams * 500);
                                   }}
                                   placeholder="0"
-                                  className="w-full border border-blue-200 bg-blue-50/20 rounded-lg px-2.5 py-1.5 text-xs font-mono text-right font-bold text-blue-800 focus:ring-2 focus:ring-blue-500"
+                                  className="w-full border border-blue-200 bg-blue-50/20 rounded-lg px-2.5 py-1.5 text-xs font-mono text-center font-bold text-blue-800 focus:ring-2 focus:ring-blue-500"
                                 />
                               </div>
 
@@ -2549,128 +2530,27 @@ export const StockInventoryV2: React.FC = () => {
                                     updateLotField(lot.id, 'reamWeight', rw);
                                     const reams = Number(lot.reamsCount) || 0;
                                     const rwNum = Number(rw) || 0;
-                                    const totalKg = Number((rwNum * reams).toFixed(2));
-                                    updateLotField(lot.id, 'totalKg', totalKg);
-                                    updateLotField(lot.id, 'totalSheets', reams * 500);
+                                    updateLotField(lot.id, 'totalKg', Number((rwNum * reams).toFixed(2)));
                                   }}
                                   placeholder="e.g. 13.7982"
-                                  className="w-full border border-blue-200 bg-blue-50/20 rounded-lg px-2.5 py-1.5 text-xs font-mono text-right font-bold text-blue-800 focus:ring-2 focus:ring-blue-500"
-                                />
-                              </div>
-
-                              <div>
-                                <label className="block text-gray-400 font-bold mb-1 uppercase text-[9px]">TOTAL WEIGHT (KG)</label>
-                                <input
-                                  type="text"
-                                  disabled
-                                  value={`${lot.totalKg || 0} kg`}
-                                  className="w-full border border-gray-150 bg-gray-50 rounded-lg px-2.5 py-1.5 text-xs font-mono text-right font-bold text-gray-500 cursor-not-allowed"
-                                />
-                              </div>
-
-                              <div>
-                                <label className="block text-blue-600 font-bold mb-1 uppercase text-[9px]">RATE / KG (₹) *</label>
-                                <input
-                                  type="number"
-                                  step="any"
-                                  value={lot.ratePerKg || ''}
-                                  onChange={e => updateLotField(lot.id, 'ratePerKg', e.target.value)}
-                                  placeholder="e.g. 80"
-                                  className="w-full border border-blue-200 bg-blue-50/20 rounded-lg px-2.5 py-1.5 text-xs font-mono text-right font-bold text-blue-800 focus:ring-2 focus:ring-blue-500"
-                                />
-                              </div>
-
-                              {/* Row 3 for Sheet Lots */}
-                              <div>
-                                <label className="block text-gray-400 font-bold mb-1 uppercase text-[9px]">TOTAL SHEETS</label>
-                                <input
-                                  type="text"
-                                  disabled
-                                  value={((Number(lot.reamsCount) || 0) * 500).toLocaleString('en-IN')}
-                                  className="w-full border border-gray-150 bg-gray-50 rounded-lg px-2.5 py-1.5 text-xs font-mono text-right font-black text-blue-900 cursor-not-allowed"
-                                />
-                              </div>
-
-                              <div>
-                                <label className="block text-gray-400 font-bold mb-1 uppercase text-[9px]">TOTAL COST (₹)</label>
-                                <input
-                                  type="text"
-                                  disabled
-                                  value={`₹${((Number(lot.totalKg) || 0) * (Number(lot.ratePerKg) || 0)).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`}
-                                  className="w-full border border-gray-150 bg-gray-50 rounded-lg px-2.5 py-1.5 text-xs font-mono text-right font-bold text-gray-700 cursor-not-allowed"
-                                />
-                              </div>
-
-                              <div>
-                                <label className="block text-gray-400 font-bold mb-1 uppercase text-[9px]">RATE / SHEET (₹)</label>
-                                <input
-                                  type="text"
-                                  disabled
-                                  value={`₹${(500 > 0 && (Number(lot.reamsCount) || 0) > 0) ? (((Number(lot.totalKg) || 0) * (Number(lot.ratePerKg) || 0)) / ((Number(lot.reamsCount) || 0) * 500)).toFixed(4) : '0.0000'}`}
-                                  className="w-full border border-gray-150 bg-gray-50 rounded-lg px-2.5 py-1.5 text-xs font-mono text-right font-bold text-gray-500 cursor-not-allowed"
-                                />
-                              </div>
-
-                              <div>
-                                <label className="block text-gray-400 font-bold mb-1 uppercase text-[9px]">STANDARD SHEETS/REAM</label>
-                                <input
-                                  type="text"
-                                  disabled
-                                  value="500"
-                                  className="w-full border border-gray-150 bg-gray-50 rounded-lg px-2.5 py-1.5 text-xs font-mono text-center font-bold text-gray-500 cursor-not-allowed"
-                                />
-                              </div>
-                            </>
-                          )}
-
-                          {/* GENERAL MATERIAL ROW */}
-                          {(!lot.paperType || lot.paperType === 'General') && (
-                            <>
-                              <div className="col-span-2">
-                                <label className="block text-gray-400 font-bold mb-1 uppercase text-[9px]">TOTAL KG / QTY *</label>
-                                <input
-                                  type="number"
-                                  value={lot.totalKg}
-                                  onChange={e => updateLotField(lot.id, 'totalKg', Number(e.target.value))}
-                                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono text-right font-bold bg-white"
-                                />
-                              </div>
-
-                              <div className="col-span-2">
-                                <label className="block text-gray-400 font-bold mb-1 uppercase text-[9px]">RATE / KG (₹) *</label>
-                                <input
-                                  type="number"
-                                  step="any"
-                                  value={lot.ratePerKg}
-                                  onChange={e => updateLotField(lot.id, 'ratePerKg', Number(e.target.value))}
-                                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono text-right font-bold bg-white"
+                                  className="w-full border border-blue-200 bg-blue-50/20 rounded-lg px-2.5 py-1.5 text-xs font-mono text-center font-bold text-blue-800 focus:ring-2 focus:ring-blue-500"
                                 />
                               </div>
                             </>
                           )}
                         </div>
 
-                        {/* Lot Subtotal & Storage Location Row */}
-                        <div className="flex flex-wrap items-center justify-between gap-4 bg-gray-50/50 p-3 rounded-lg border border-gray-100 text-xs">
+                        <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-50/60 p-3 rounded-xl border border-slate-100 text-xs">
                           <div className="flex items-center gap-4">
-                            <span className="font-semibold text-gray-500">
-                              Lot Subtotal: <strong className="text-gray-900 font-mono text-sm">₹{lotSubtotal.toLocaleString('en-IN')}</strong>
+                            <span className="font-semibold text-slate-500">
+                              Lot Subtotal: <strong className="text-slate-900 font-mono text-sm">₹{lotSubtotal.toLocaleString('en-IN')}</strong>
                             </span>
                           </div>
 
                           <div className="flex items-center gap-2">
                             <div className="flex flex-col">
-                              <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider flex justify-between items-center">
+                              <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider flex justify-between items-center">
                                 <span>{lot.paperType === 'Reel' ? 'DEFAULT LOT STORAGE:' : 'LOT STORAGE LOCATION:'}</span>
-                                {lot.paperType === 'Sheet' && (
-                                  <button
-                                    type="button"
-                                    onClick={() => showToast('Godown splits enabled', 'info')}
-                                    className="text-[9px] text-blue-600 hover:text-blue-800 font-bold ml-2 cursor-pointer hover:underline"
-                                  >
-                                    [Split Godowns]
-                                  </button>
-                                )}
                               </label>
                               <select
                                 value={lot.locationId}
@@ -2679,46 +2559,43 @@ export const StockInventoryV2: React.FC = () => {
                                   updateLotField(lot.id, 'locationId', e.target.value);
                                   updateLotField(lot.id, 'locationName', selLoc?.name || '');
                                 }}
-                                className="px-2 py-1 border border-gray-200 rounded-lg bg-white text-[11px] font-bold text-gray-800 mt-0.5"
+                                className="px-2 py-1 border border-slate-200 rounded-lg bg-white text-[11px] font-bold text-slate-800 mt-0.5"
                               >
                                 <option value="">-- Select Destination Storage --</option>
                                 {allLocations
                                   .filter(loc => loc.level === 'Storage Location' || !allLocations.some(c => c.parentId === loc._id))
                                   .map((loc: any) => (
-                                    <option key={loc._id} value={loc._id}>
-                                      {resolveLocationPath(loc._id)}
-                                    </option>
+                                    <option key={loc._id} value={loc._id}>{resolveLocationPath(loc._id)}</option>
                                   ))}
                               </select>
                             </div>
                           </div>
                         </div>
 
-                        {/* REEL SPECIFICATIONS & STORAGE PLACEMENT TABLE MATCHING SCREENSHOT 1 & 2 */}
                         {lot.paperType === 'Reel' && (Number(lot.reelsCount) || 0) > 0 && (
-                          <div className="pt-3 border-t border-gray-100 space-y-2 text-left">
-                            <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                          <div className="pt-3 border-t border-slate-100 space-y-2 text-left">
+                            <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                               REEL SPECIFICATIONS & STORAGE PLACEMENT:
                             </span>
 
-                            <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                            <div className="overflow-x-auto border border-slate-200 rounded-xl">
                               <table className="w-full text-left text-xs border-collapse">
                                 <thead>
-                                  <tr className="bg-gray-50 text-gray-400 font-bold uppercase text-[9px] border-b border-gray-150">
+                                  <tr className="bg-slate-50 text-slate-500 font-bold uppercase text-[9px] border-b border-slate-200">
                                     <th className="py-2 px-3 w-16">REEL</th>
                                     <th className="py-2 px-3 w-32">WEIGHT (KG) *</th>
                                     <th className="py-2 px-3 w-32">WIDTH (CM) *</th>
                                     <th className="py-2 px-3">STORAGE ALLOCATION *</th>
                                   </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-100 font-semibold text-gray-700">
+                                <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
                                   {Array.from({ length: Number(lot.reelsCount) || 0 }).map((_, rIdx) => {
                                     const reelsList = lot.reels || [];
                                     const reelObj = reelsList[rIdx] || {};
 
                                     return (
-                                      <tr key={rIdx} className="hover:bg-gray-50/20">
-                                        <td className="py-1.5 px-3 font-mono text-gray-500 font-bold">R-{rIdx + 1}</td>
+                                      <tr key={rIdx} className="hover:bg-blue-50/20">
+                                        <td className="py-1.5 px-3 font-mono text-slate-500 font-bold">R-{rIdx + 1}</td>
                                         <td className="py-1.5 px-3">
                                           <input
                                             type="number"
@@ -2732,20 +2609,20 @@ export const StockInventoryV2: React.FC = () => {
                                               updateLotField(lot.id, 'totalKg', sumKg);
                                             }}
                                             placeholder="0"
-                                            className="w-full px-2 py-1 border border-gray-200 rounded-md text-xs font-mono font-bold text-gray-900"
+                                            className="w-full px-2 py-1 border border-slate-200 rounded-md text-xs font-mono font-bold text-slate-900"
                                           />
                                         </td>
                                         <td className="py-1.5 px-3">
                                           <input
                                             type="number"
-                                            value={reelObj.width || lot.width || '64'}
+                                            value={reelObj.width !== undefined ? reelObj.width : (lot.width || '64')}
                                             onChange={e => {
                                               const updatedReels = [...(lot.reels || [])];
                                               updatedReels[rIdx] = { ...updatedReels[rIdx], width: e.target.value };
                                               updateLotField(lot.id, 'reels', updatedReels);
                                             }}
                                             placeholder="64"
-                                            className="w-full px-2 py-1 border border-gray-200 rounded-md text-xs font-mono"
+                                            className="w-full px-2 py-1 border border-slate-200 rounded-md text-xs font-mono font-bold text-slate-900"
                                           />
                                         </td>
                                         <td className="py-1.5 px-3">
@@ -2756,15 +2633,13 @@ export const StockInventoryV2: React.FC = () => {
                                               updatedReels[rIdx] = { ...updatedReels[rIdx], locationId: e.target.value };
                                               updateLotField(lot.id, 'reels', updatedReels);
                                             }}
-                                            className="w-full px-2 py-1 border border-gray-200 rounded-md bg-white text-xs font-bold text-gray-800"
+                                            className="w-full px-2 py-1 border border-slate-200 rounded-md text-xs font-semibold text-slate-900 bg-white"
                                           >
-                                            <option value="">-- Choose Storage Area --</option>
+                                            <option value="">-- Inherit Lot Storage --</option>
                                             {allLocations
                                               .filter(loc => loc.level === 'Storage Location' || !allLocations.some(c => c.parentId === loc._id))
                                               .map((loc: any) => (
-                                                <option key={loc._id} value={loc._id}>
-                                                  {resolveLocationPath(loc._id)}
-                                                </option>
+                                                <option key={loc._id} value={loc._id}>{resolveLocationPath(loc._id)}</option>
                                               ))}
                                           </select>
                                         </td>
@@ -2774,25 +2649,6 @@ export const StockInventoryV2: React.FC = () => {
                                 </tbody>
                               </table>
                             </div>
-
-                            {/* RECONCILIATION BOX MATCHING SCREENSHOT 1 & 2 */}
-                            {(() => {
-                              const reelsList = lot.reels || [];
-                              const validCount = Number(lot.reelsCount) || 0;
-                              const totalWeight = reelsList.reduce((sum: number, r: any) => sum + (Number(r?.weight) || 0), 0);
-
-                              return (
-                                <div className="mt-2 bg-blue-50/70 border border-blue-200 rounded-lg px-3 py-2 flex items-center justify-between text-xs font-bold text-blue-900">
-                                  <span className="flex items-center gap-1.5">
-                                    <Layers className="w-3.5 h-3.5 text-blue-600" />
-                                    Reconciliation:
-                                  </span>
-                                  <span className="font-mono text-blue-700">
-                                    {validCount} reels • {totalWeight.toLocaleString('en-IN')} KG
-                                  </span>
-                                </div>
-                              );
-                            })()}
                           </div>
                         )}
                       </div>
@@ -2801,10 +2657,10 @@ export const StockInventoryV2: React.FC = () => {
                 </div>
 
                 {/* 3. SUMMARY & OTHER CHARGES */}
-                <div className="bg-slate-50/80 p-4.5 rounded-2xl border border-slate-200/80 space-y-4 shadow-3xs text-left">
-                  <h4 className="font-extrabold text-slate-800 uppercase tracking-wider text-[11px] border-b border-slate-200/60 pb-2 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                    3. Freight & Other Charges
+                <div className="bg-white p-4.5 rounded-2xl border border-slate-200 space-y-4 shadow-2xs text-left">
+                  <h4 className="font-extrabold text-slate-900 uppercase tracking-wider text-[11px] border-b border-slate-100 pb-2 flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center font-black text-[10px]">3</div>
+                    Freight & Other Charges
                   </h4>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -2849,38 +2705,40 @@ export const StockInventoryV2: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Summary Breakdown Card */}
-                  <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 text-white p-4.5 rounded-2xl shadow-md border border-slate-700/50 space-y-3 text-xs">
-                    <div className="flex items-center justify-between font-bold text-slate-300 uppercase text-[11px] tracking-wider border-b border-slate-700/60 pb-2.5">
-                      <span className="flex items-center gap-1.5"><FileText className="w-4 h-4 text-blue-400" /> BATCH SUMMARY</span>
-                      <span className="px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-extrabold text-[10px] border border-blue-400/30">
+                  {/* Clean White Summary Breakdown Card */}
+                  <div className="bg-white p-4.5 rounded-2xl border border-blue-200 shadow-2xs space-y-3 text-xs">
+                    <div className="flex items-center justify-between font-bold text-slate-900 uppercase text-[11px] tracking-wider border-b border-blue-100 pb-2.5">
+                      <span className="flex items-center gap-2 text-blue-700">
+                        <FileText className="w-4 h-4 text-blue-600" /> BATCH SUMMARY
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-extrabold text-[10px] border border-blue-200">
                         {lots.length} {lots.length === 1 ? 'LOT' : 'LOTS'}
                       </span>
                     </div>
 
                     {lots.some(l => l.paperType === 'Reel') ? (
-                      <div className="grid grid-cols-2 gap-2 text-slate-300 text-[11px] font-semibold">
-                        <div>TOTAL REELS: <strong className="text-white font-mono">{lots.reduce((acc, l) => acc + (Number(l.reelsCount) || 0), 0)}</strong></div>
-                        <div className="text-right">TOTAL REEL WEIGHT: <strong className="text-white font-mono">{lotCalculations.totalQty.toLocaleString('en-IN')} KG</strong></div>
+                      <div className="grid grid-cols-2 gap-2 text-slate-600 text-[11px] font-semibold">
+                        <div>TOTAL REELS: <strong className="text-slate-900 font-mono">{lots.reduce((acc, l) => acc + (Number(l.reelsCount) || 0), 0)}</strong></div>
+                        <div className="text-right">TOTAL REEL WEIGHT: <strong className="text-slate-900 font-mono">{lotCalculations.totalQty.toLocaleString('en-IN')} KG</strong></div>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-2 gap-2 text-slate-300 text-[11px] font-semibold">
-                        <div>TOTAL REAMS: <strong className="text-white font-mono">{lots.reduce((acc, l) => acc + (Number(l.reamsCount) || 0), 0)}</strong></div>
-                        <div className="text-right">TOTAL SHEETS: <strong className="text-white font-mono">{(lots.reduce((acc, l) => acc + (Number(l.reamsCount) || 0), 0) * 500).toLocaleString('en-IN')}</strong></div>
+                      <div className="grid grid-cols-2 gap-2 text-slate-600 text-[11px] font-semibold">
+                        <div>TOTAL REAMS: <strong className="text-slate-900 font-mono">{lots.reduce((acc, l) => acc + (Number(l.reamsCount) || 0), 0)}</strong></div>
+                        <div className="text-right">TOTAL SHEETS: <strong className="text-slate-900 font-mono">{(lots.reduce((acc, l) => acc + (Number(l.reamsCount) || 0), 0) * 500).toLocaleString('en-IN')}</strong></div>
                       </div>
                     )}
 
-                    <div className="pt-2 border-t border-slate-700/60 flex items-center justify-between text-xs font-semibold">
-                      <span className="text-slate-300">Material Subtotal:</span>
-                      <span className="font-mono font-bold text-slate-100">₹{lotCalculations.materialTotal.toLocaleString('en-IN')}</span>
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-semibold">
+                      <span className="text-slate-600">Material Subtotal:</span>
+                      <span className="font-mono font-bold text-slate-900">₹{lotCalculations.materialTotal.toLocaleString('en-IN')}</span>
                     </div>
                     <div className="flex items-center justify-between text-xs font-semibold">
-                      <span className="text-slate-300">Other Charges Subtotal:</span>
-                      <span className="font-mono font-bold text-slate-100">₹{lotCalculations.otherChargesTotal.toLocaleString('en-IN')}</span>
+                      <span className="text-slate-600">Other Charges Subtotal:</span>
+                      <span className="font-mono font-bold text-slate-900">₹{lotCalculations.otherChargesTotal.toLocaleString('en-IN')}</span>
                     </div>
-                    <div className="flex items-center justify-between text-sm font-black text-blue-300 border-t border-slate-700/80 pt-2.5">
+                    <div className="flex items-center justify-between text-sm font-black text-slate-900 border-t border-blue-100 pt-2.5">
                       <span>GRAND TOTAL:</span>
-                      <span className="font-mono text-lg text-emerald-400 font-black">₹{lotCalculations.grandTotal.toLocaleString('en-IN')}</span>
+                      <span className="font-mono text-xl text-blue-600 font-black">₹{lotCalculations.grandTotal.toLocaleString('en-IN')}</span>
                     </div>
                   </div>
                 </div>
@@ -2899,7 +2757,7 @@ export const StockInventoryV2: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-md disabled:opacity-50 flex items-center gap-1.5 transition-all cursor-pointer"
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md disabled:opacity-50 flex items-center gap-1.5 transition-all cursor-pointer"
                 >
                   {isSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
                   <span>{editingItem ? 'Update Purchase Batch' : 'Save Purchase Batch'}</span>
