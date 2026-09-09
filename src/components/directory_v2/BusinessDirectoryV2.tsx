@@ -94,17 +94,17 @@ const TagInput: React.FC<TagInputProps> = ({ tags = [], onChange, placeholder = 
   };
 
   return (
-    <div className="w-full border border-gray-200 rounded-xl px-3 py-2 bg-white shadow-2xs focus-within:border-purple-600 focus-within:ring-2 focus-within:ring-purple-100 transition-all flex flex-wrap items-center gap-1.5 min-h-[42px]">
+    <div className="w-full border border-gray-200 rounded-xl px-3 py-2 bg-white shadow-2xs focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all flex flex-wrap items-center gap-1.5 min-h-[42px]">
       {(tags || []).map((tag, idx) => (
         <span
           key={idx}
-          className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-xs font-semibold px-2.5 py-1 rounded-lg border border-purple-200/60"
+          className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-lg border border-blue-200/60"
         >
           <span>{tag}</span>
           <button
             type="button"
             onClick={() => removeTag(idx)}
-            className="hover:bg-purple-200/60 rounded p-0.5 text-purple-500 hover:text-purple-800 transition-colors cursor-pointer"
+            className="hover:bg-blue-200/60 rounded p-0.5 text-blue-500 hover:text-blue-800 transition-colors cursor-pointer"
           >
             <X className="w-3 h-3 stroke-[2.5]" />
           </button>
@@ -1249,13 +1249,13 @@ export const BusinessDirectoryV2: React.FC = () => {
   const getItemIcon = (tab?: DirectoryTabType) => {
     const targetTab = tab || activeMainTab;
     switch (targetTab) {
-      case 'customers': return <Users className="w-4 h-4 text-purple-600 shrink-0" />;
-      case 'vendors': return <Factory className="w-4 h-4 text-purple-600 shrink-0" />;
-      case 'agents': return <Briefcase className="w-4 h-4 text-purple-600 shrink-0" />;
-      case 'transporters': return <Truck className="w-4 h-4 text-purple-600 shrink-0" />;
-      case 'regions': return <Map className="w-4 h-4 text-purple-600 shrink-0" />;
-      case 'cities': return <Building className="w-4 h-4 text-purple-600 shrink-0" />;
-      default: return <Users className="w-4 h-4 text-purple-600 shrink-0" />;
+      case 'customers': return <Users className="w-4 h-4 text-blue-600 shrink-0" />;
+      case 'vendors': return <Factory className="w-4 h-4 text-blue-600 shrink-0" />;
+      case 'agents': return <Briefcase className="w-4 h-4 text-blue-600 shrink-0" />;
+      case 'transporters': return <Truck className="w-4 h-4 text-blue-600 shrink-0" />;
+      case 'regions': return <Map className="w-4 h-4 text-blue-600 shrink-0" />;
+      case 'cities': return <Building className="w-4 h-4 text-blue-600 shrink-0" />;
+      default: return <Users className="w-4 h-4 text-blue-600 shrink-0" />;
     }
   };
 
@@ -1267,13 +1267,13 @@ export const BusinessDirectoryV2: React.FC = () => {
       {/* 1. Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs">
         <div className="flex items-center gap-3.5">
-          <div className="p-3 bg-purple-100/80 text-purple-700 rounded-2xl shadow-2xs">
+          <div className="p-3 bg-blue-100/80 text-blue-700 rounded-2xl shadow-2xs">
             <Users className="w-6 h-6 stroke-[2.2]" />
           </div>
           <div>
             <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
               <span>Business Directory</span>
-              <span className="text-xs bg-purple-100 text-purple-700 px-2.5 py-0.5 rounded-full font-bold">
+              <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-bold">
                 {totalRecords} Total
               </span>
             </h1>
@@ -1304,11 +1304,11 @@ export const BusinessDirectoryV2: React.FC = () => {
             onClick={() => handleTabChange('customers')}
             className={`px-4 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap ${
               activeMainTab === 'customers'
-                ? 'border-purple-600 text-purple-700 bg-purple-50/50'
+                ? 'border-blue-600 text-blue-700 bg-blue-50/50'
                 : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50'
             }`}
           >
-            <Users className={`w-4 h-4 ${activeMainTab === 'customers' ? 'text-purple-600' : 'text-gray-400'}`} />
+            <Users className={`w-4 h-4 ${activeMainTab === 'customers' ? 'text-blue-600' : 'text-gray-400'}`} />
             <span>Customers</span>
           </button>
 
@@ -1316,11 +1316,11 @@ export const BusinessDirectoryV2: React.FC = () => {
             onClick={() => handleTabChange('vendors')}
             className={`px-4 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap ${
               activeMainTab === 'vendors'
-                ? 'border-purple-600 text-purple-700 bg-purple-50/50'
+                ? 'border-blue-600 text-blue-700 bg-blue-50/50'
                 : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50'
             }`}
           >
-            <Factory className={`w-4 h-4 ${activeMainTab === 'vendors' ? 'text-purple-600' : 'text-gray-400'}`} />
+            <Factory className={`w-4 h-4 ${activeMainTab === 'vendors' ? 'text-blue-600' : 'text-gray-400'}`} />
             <span>Suppliers</span>
           </button>
 
@@ -1328,11 +1328,11 @@ export const BusinessDirectoryV2: React.FC = () => {
             onClick={() => handleTabChange('agents')}
             className={`px-4 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap ${
               activeMainTab === 'agents'
-                ? 'border-purple-600 text-purple-700 bg-purple-50/50'
+                ? 'border-blue-600 text-blue-700 bg-blue-50/50'
                 : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50'
             }`}
           >
-            <Briefcase className={`w-4 h-4 ${activeMainTab === 'agents' ? 'text-purple-600' : 'text-gray-400'}`} />
+            <Briefcase className={`w-4 h-4 ${activeMainTab === 'agents' ? 'text-blue-600' : 'text-gray-400'}`} />
             <span>Agents</span>
           </button>
 
@@ -1340,11 +1340,11 @@ export const BusinessDirectoryV2: React.FC = () => {
             onClick={() => handleTabChange('transporters')}
             className={`px-4 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap ${
               activeMainTab === 'transporters'
-                ? 'border-purple-600 text-purple-700 bg-purple-50/50'
+                ? 'border-blue-600 text-blue-700 bg-blue-50/50'
                 : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50'
             }`}
           >
-            <Truck className={`w-4 h-4 ${activeMainTab === 'transporters' ? 'text-purple-600' : 'text-gray-400'}`} />
+            <Truck className={`w-4 h-4 ${activeMainTab === 'transporters' ? 'text-blue-600' : 'text-gray-400'}`} />
             <span>Transporters</span>
           </button>
 
@@ -1352,11 +1352,11 @@ export const BusinessDirectoryV2: React.FC = () => {
             onClick={() => handleTabChange('regions')}
             className={`px-4 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap ${
               activeMainTab === 'regions'
-                ? 'border-purple-600 text-purple-700 bg-purple-50/50'
+                ? 'border-blue-600 text-blue-700 bg-blue-50/50'
                 : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50'
             }`}
           >
-            <Map className={`w-4 h-4 ${activeMainTab === 'regions' ? 'text-purple-600' : 'text-gray-400'}`} />
+            <Map className={`w-4 h-4 ${activeMainTab === 'regions' ? 'text-blue-600' : 'text-gray-400'}`} />
             <span>Regions</span>
           </button>
 
@@ -1364,11 +1364,11 @@ export const BusinessDirectoryV2: React.FC = () => {
             onClick={() => handleTabChange('cities')}
             className={`px-4 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap ${
               activeMainTab === 'cities'
-                ? 'border-purple-600 text-purple-700 bg-purple-50/50'
+                ? 'border-blue-600 text-blue-700 bg-blue-50/50'
                 : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50'
             }`}
           >
-            <Building className={`w-4 h-4 ${activeMainTab === 'cities' ? 'text-purple-600' : 'text-gray-400'}`} />
+            <Building className={`w-4 h-4 ${activeMainTab === 'cities' ? 'text-blue-600' : 'text-gray-400'}`} />
             <span>Cities</span>
           </button>
         </div>
@@ -1383,7 +1383,7 @@ export const BusinessDirectoryV2: React.FC = () => {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={`Search ${activeMainTab}...`}
-              className="pl-8 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl w-40 md:w-52 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-100 shadow-2xs font-medium"
+              className="pl-8 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl w-40 md:w-52 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
             />
             {search && (
               <button 
@@ -1402,8 +1402,8 @@ export const BusinessDirectoryV2: React.FC = () => {
               onClick={() => setShowFilterDrawer(!showFilterDrawer)}
               className={`p-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
                 activeFilterCount > 0
-                  ? 'bg-purple-600 text-white border-purple-600 shadow-purple-100'
-                  : 'bg-white hover:bg-purple-50/60 text-purple-600 border-gray-200 hover:border-purple-200'
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-blue-100'
+                  : 'bg-white hover:bg-blue-50/60 text-blue-600 border-gray-200 hover:border-blue-200'
               }`}
               title={`Filter Results ${activeFilterCount > 0 ? `(${activeFilterCount} active)` : ''}`}
               aria-label={`Filter Results ${activeFilterCount > 0 ? `(${activeFilterCount} active)` : ''}`}
@@ -1424,7 +1424,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                 setShowColumnPicker(false);
                 setShowExportMenu(false);
               }}
-              className="p-2 rounded-xl bg-white hover:bg-purple-50/60 border border-gray-200 hover:border-purple-200 text-purple-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
               title="Sort Records"
               aria-label="Sort Records"
             >
@@ -1440,31 +1440,31 @@ export const BusinessDirectoryV2: React.FC = () => {
                 <div className="px-2 py-1 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Sort Options</div>
                 <button
                   onClick={() => { setSortField('firmName'); setSortOrder('asc'); setShowSortMenu(false); }}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortField === 'firmName' && sortOrder === 'asc' ? 'bg-purple-50 text-purple-700 font-bold' : 'hover:bg-gray-50 text-gray-700'}`}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortField === 'firmName' && sortOrder === 'asc' ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-gray-50 text-gray-700'}`}
                 >
                   <span>Firm Name (A to Z)</span>
                 </button>
                 <button
                   onClick={() => { setSortField('firmName'); setSortOrder('desc'); setShowSortMenu(false); }}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortField === 'firmName' && sortOrder === 'desc' ? 'bg-purple-50 text-purple-700 font-bold' : 'hover:bg-gray-50 text-gray-700'}`}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortField === 'firmName' && sortOrder === 'desc' ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-gray-50 text-gray-700'}`}
                 >
                   <span>Firm Name (Z to A)</span>
                 </button>
                 <button
                   onClick={() => { setSortField('outstandingBalance'); setSortOrder('desc'); setShowSortMenu(false); }}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortField === 'outstandingBalance' && sortOrder === 'desc' ? 'bg-purple-50 text-purple-700 font-bold' : 'hover:bg-gray-50 text-gray-700'}`}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortField === 'outstandingBalance' && sortOrder === 'desc' ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-gray-50 text-gray-700'}`}
                 >
                   <span>Outstanding (High to Low)</span>
                 </button>
                 <button
                   onClick={() => { setSortField('outstandingBalance'); setSortOrder('asc'); setShowSortMenu(false); }}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortField === 'outstandingBalance' && sortOrder === 'asc' ? 'bg-purple-50 text-purple-700 font-bold' : 'hover:bg-gray-50 text-gray-700'}`}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortField === 'outstandingBalance' && sortOrder === 'asc' ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-gray-50 text-gray-700'}`}
                 >
                   <span>Outstanding (Low to High)</span>
                 </button>
                 <button
                   onClick={() => { setSortField('city'); setSortOrder('asc'); setShowSortMenu(false); }}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortField === 'city' ? 'bg-purple-50 text-purple-700 font-bold' : 'hover:bg-gray-50 text-gray-700'}`}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortField === 'city' ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-gray-50 text-gray-700'}`}
                 >
                   <span>City (A to Z)</span>
                 </button>
@@ -1481,7 +1481,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                 setShowSortMenu(false);
                 setShowExportMenu(false);
               }}
-              className="p-2 rounded-xl bg-white hover:bg-purple-50/60 border border-gray-200 hover:border-purple-200 text-purple-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
               title="Toggle Columns"
               aria-label="Toggle Columns"
             >
@@ -1496,7 +1496,7 @@ export const BusinessDirectoryV2: React.FC = () => {
               <div className="absolute right-0 mt-1.5 w-52 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2.5 space-y-2 text-xs">
                 <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
                   <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Visible Columns</span>
-                  <button onClick={() => setHiddenColumns({})} className="text-[10px] text-purple-600 font-bold hover:underline">Reset</button>
+                  <button onClick={() => setHiddenColumns({})} className="text-[10px] text-blue-600 font-bold hover:underline">Reset</button>
                 </div>
                 <div className="space-y-1.5 max-h-48 overflow-y-auto">
                   {getColumnList(activeMainTab).map(col => (
@@ -1507,7 +1507,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         onChange={(e) => {
                           setHiddenColumns(prev => ({ ...prev, [col.id]: !e.target.checked }));
                         }}
-                        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
                       <span>{col.label}</span>
                     </label>
@@ -1526,7 +1526,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                 setShowSortMenu(false);
                 setShowColumnPicker(false);
               }}
-              className="p-2 rounded-xl bg-white hover:bg-purple-50/60 border border-gray-200 hover:border-purple-200 text-purple-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
               title="Export Data (PDF / Excel)"
               aria-label="Export Data (PDF / Excel)"
             >
@@ -1541,14 +1541,14 @@ export const BusinessDirectoryV2: React.FC = () => {
               <div className="absolute right-0 mt-1.5 w-44 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs">
                 <button
                   onClick={() => { handleExportExcel(); setShowExportMenu(false); }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-xl font-semibold hover:bg-purple-50 hover:text-purple-700 flex items-center gap-2 text-gray-700"
+                  className="w-full text-left px-2.5 py-1.5 rounded-xl font-semibold hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 text-gray-700"
                 >
                   <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
                   <span>Export Excel (.csv)</span>
                 </button>
                 <button
                   onClick={() => { handleExportPDF(); setShowExportMenu(false); }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-xl font-semibold hover:bg-purple-50 hover:text-purple-700 flex items-center gap-2 text-gray-700"
+                  className="w-full text-left px-2.5 py-1.5 rounded-xl font-semibold hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 text-gray-700"
                 >
                   <FileText className="w-3.5 h-3.5 text-rose-600" />
                   <span>Export PDF</span>
@@ -1562,11 +1562,11 @@ export const BusinessDirectoryV2: React.FC = () => {
             <button
               type="button"
               onClick={handleDownloadSampleCSV}
-              className="p-2 rounded-xl bg-white hover:bg-purple-50/60 text-purple-600 border border-gray-200 hover:border-purple-200 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 text-blue-600 border border-gray-200 hover:border-blue-200 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
               title="Download Sample CSV"
               aria-label="Download Sample CSV"
             >
-              <FileSpreadsheet className="w-4 h-4 text-purple-600" />
+              <FileSpreadsheet className="w-4 h-4 text-blue-600" />
             </button>
             <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
               Sample CSV
@@ -1576,13 +1576,13 @@ export const BusinessDirectoryV2: React.FC = () => {
           {/* 6. Import CSV Icon Button */}
           <div className="relative group">
             <label
-              className={`p-2 rounded-xl border text-purple-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
-                isImporting ? 'bg-purple-100 border-purple-300 animate-pulse' : 'bg-white hover:bg-purple-50/60 border-gray-200 hover:border-purple-200'
+              className={`p-2 rounded-xl border text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
+                isImporting ? 'bg-blue-100 border-blue-300 animate-pulse' : 'bg-white hover:bg-blue-50/60 border-gray-200 hover:border-blue-200'
               }`}
               title="Import CSV File"
               aria-label="Import CSV File"
             >
-              <Upload className={`w-4 h-4 text-purple-600 ${isImporting ? 'animate-bounce' : ''}`} />
+              <Upload className={`w-4 h-4 text-blue-600 ${isImporting ? 'animate-bounce' : ''}`} />
               <input
                 type="file"
                 accept=".csv,.xlsx,.xls"
@@ -1604,11 +1604,11 @@ export const BusinessDirectoryV2: React.FC = () => {
                 fetchActivityLogs();
                 setShowActivityLogModal(true);
               }}
-              className="p-2 rounded-xl bg-white hover:bg-purple-50/60 border border-gray-200 hover:border-purple-200 text-purple-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
               title="Activity Logs"
               aria-label="Activity Logs"
             >
-              <History className="w-4 h-4 text-purple-600" />
+              <History className="w-4 h-4 text-blue-600" />
             </button>
             <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
               Activity Logs
@@ -1620,11 +1620,11 @@ export const BusinessDirectoryV2: React.FC = () => {
             <button
               type="button"
               onClick={() => openModal()}
-              className="w-8 h-8 rounded-full border border-gray-200 bg-white hover:bg-purple-50 text-purple-600 flex items-center justify-center transition-all shadow-2xs cursor-pointer font-bold shrink-0"
+              className="w-8 h-8 rounded-full border border-gray-200 bg-white hover:bg-blue-50 text-blue-600 flex items-center justify-center transition-all shadow-2xs cursor-pointer font-bold shrink-0"
               title={`Add New ${activeMainTab === 'customers' ? 'Customer' : activeMainTab === 'vendors' ? 'Supplier' : activeMainTab === 'agents' ? 'Agent' : activeMainTab === 'transporters' ? 'Transporter' : activeMainTab === 'regions' ? 'Region' : 'City'}`}
               aria-label={`Add New ${activeMainTab === 'customers' ? 'Customer' : activeMainTab === 'vendors' ? 'Supplier' : activeMainTab === 'agents' ? 'Agent' : activeMainTab === 'transporters' ? 'Transporter' : activeMainTab === 'regions' ? 'Region' : 'City'}`}
             >
-              <Plus className="w-4 h-4 text-purple-600 stroke-[2.5]" />
+              <Plus className="w-4 h-4 text-blue-600 stroke-[2.5]" />
             </button>
             <div className="absolute top-full mt-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
               Add {activeMainTab === 'customers' ? 'Customer' : activeMainTab === 'vendors' ? 'Supplier' : activeMainTab === 'agents' ? 'Agent' : activeMainTab === 'transporters' ? 'Transporter' : activeMainTab === 'regions' ? 'Region' : 'City'}
@@ -1635,10 +1635,10 @@ export const BusinessDirectoryV2: React.FC = () => {
 
       {/* Expandable Filter Drawer Bar */}
       {showFilterDrawer && (
-        <div className="bg-slate-50 border border-purple-100 rounded-2xl p-3.5 shadow-2xs space-y-3">
+        <div className="bg-slate-50 border border-blue-100 rounded-2xl p-3.5 shadow-2xs space-y-3">
           <div className="flex items-center justify-between border-b border-gray-200/60 pb-2">
             <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-purple-600" />
+              <Filter className="w-4 h-4 text-blue-600" />
               <span className="font-extrabold text-gray-900 text-xs uppercase tracking-wider">Advanced Filters</span>
             </div>
             {activeFilterCount > 0 && (
@@ -1659,7 +1659,7 @@ export const BusinessDirectoryV2: React.FC = () => {
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-purple-500"
+                className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-blue-500"
               >
                 <option value="all">All Statuses</option>
                 <option value="active">Active</option>
@@ -1673,7 +1673,7 @@ export const BusinessDirectoryV2: React.FC = () => {
               <select
                 value={filterCity}
                 onChange={(e) => setFilterCity(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-purple-500"
+                className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-blue-500"
               >
                 <option value="all">All Cities</option>
                 {allCities.map(c => (
@@ -1687,7 +1687,7 @@ export const BusinessDirectoryV2: React.FC = () => {
               <select
                 value={filterRoute}
                 onChange={(e) => setFilterRoute(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-purple-500"
+                className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-blue-500"
               >
                 <option value="all">All Regions</option>
                 {allRoutes.map(r => (
@@ -1702,7 +1702,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                 <select
                   value={filterVendorType}
                   onChange={(e) => setFilterVendorType(e.target.value)}
-                  className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-purple-500"
+                  className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-blue-500"
                 >
                   <option value="all">All Vendor Types</option>
                   <option value="BOARD SUPPLIER">BOARD SUPPLIER</option>
@@ -1719,7 +1719,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                 <select
                   value={filterAgent}
                   onChange={(e) => setFilterAgent(e.target.value)}
-                  className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-purple-500"
+                  className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-blue-500"
                 >
                   <option value="all">All Agents</option>
                   {allAgents.map(a => (
@@ -1736,7 +1736,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                 value={filterMinBal}
                 onChange={(e) => setFilterMinBal(e.target.value)}
                 placeholder="0"
-                className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-mono text-gray-800 focus:outline-none focus:border-purple-500"
+                className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-mono text-gray-800 focus:outline-none focus:border-blue-500"
               />
             </div>
 
@@ -1747,7 +1747,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                 value={filterMaxBal}
                 onChange={(e) => setFilterMaxBal(e.target.value)}
                 placeholder="Unlimited"
-                className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-mono text-gray-800 focus:outline-none focus:border-purple-500"
+                className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-mono text-gray-800 focus:outline-none focus:border-blue-500"
               />
             </div>
 
@@ -1758,7 +1758,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                 value={filterTag}
                 onChange={(e) => setFilterTag(e.target.value)}
                 placeholder="e.g. VIP, regular"
-                className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-purple-500"
+                className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-blue-500"
               />
             </div>
           </div>
@@ -1779,7 +1779,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                       if (e.target.checked) setSelectedIds(items.map(i => i._id));
                       else setSelectedIds([]);
                     }}
-                    className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                   />
                 </th>
                 <th className="py-3 px-3 w-8 text-center text-gray-400 font-semibold">#</th>
@@ -1877,7 +1877,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                 <tr>
                   <td colSpan={12} className="py-12 text-center text-gray-400 whitespace-nowrap">
                     <div className="inline-flex items-center gap-2">
-                      <RefreshCw className="w-4 h-4 animate-spin text-purple-600" />
+                      <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
                       <span>Fetching backend records...</span>
                     </div>
                   </td>
@@ -1905,7 +1905,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         animation: 'slideDownFade 0.35s ease-out forwards',
                         animationDelay: `${index * 35}ms`
                       }}
-                      className={`hover:bg-purple-50/20 transition-all cursor-pointer opacity-0 whitespace-nowrap ${isSelected ? 'bg-purple-50/30' : ''}`}
+                      className={`hover:bg-blue-50/20 transition-all cursor-pointer opacity-0 whitespace-nowrap ${isSelected ? 'bg-blue-50/30' : ''}`}
                     >
                       <td className="py-3 px-3 text-center" onClick={(e) => e.stopPropagation()}>
                         <input
@@ -1915,7 +1915,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                             if (e.target.checked) setSelectedIds(prev => [...prev, item._id]);
                             else setSelectedIds(prev => prev.filter(id => id !== item._id));
                           }}
-                          className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                         />
                       </td>
                       <td className="py-3 px-3 text-center text-gray-400 font-mono font-semibold text-xs">
@@ -1928,7 +1928,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           {!hiddenColumns['firmName'] && (
                             <td className="py-3 px-3 font-semibold text-gray-900">
                               <div className="flex items-center gap-2">
-                                <Users className="w-4 h-4 text-purple-600 shrink-0" />
+                                <Users className="w-4 h-4 text-blue-600 shrink-0" />
                                 <div className="flex flex-col">
                                   <span className="font-bold text-gray-900">{item.firmName}</span>
                                   {(item.contactName || item.ownerName || item.contactPersons?.[0]?.name) && (
@@ -1978,7 +1978,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                               {Array.isArray(item.tags) && item.tags.length > 0 ? (
                                 <div className="flex items-center gap-1 whitespace-nowrap" title={item.tags.join(', ')}>
                                   {item.tags.slice(0, 2).map((t: string, i: number) => (
-                                    <span key={i} className="px-2 py-0.5 bg-purple-50 text-purple-700 text-[10px] font-bold rounded-md border border-purple-200 uppercase shrink-0">
+                                    <span key={i} className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-md border border-blue-200 uppercase shrink-0">
                                       {t}
                                     </span>
                                   ))}
@@ -2001,12 +2001,12 @@ export const BusinessDirectoryV2: React.FC = () => {
                         <>
                           <td className="py-3 px-3 font-semibold text-gray-900">
                             <div className="flex items-center gap-2">
-                              <Factory className="w-4 h-4 text-purple-600 shrink-0" />
+                              <Factory className="w-4 h-4 text-blue-600 shrink-0" />
                               <span className="font-bold text-gray-900">{item.firmName}</span>
                             </div>
                           </td>
                           <td className="py-3 px-3">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-100">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
                               {item.vendorType || 'Paper Mill'}
                             </span>
                           </td>
@@ -2025,7 +2025,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                             {Array.isArray(item.tags) && item.tags.length > 0 ? (
                               <div className="flex items-center gap-1 whitespace-nowrap" title={item.tags.join(', ')}>
                                 {item.tags.slice(0, 2).map((t: string, i: number) => (
-                                  <span key={i} className="px-2 py-0.5 bg-purple-50 text-purple-700 text-[10px] font-bold rounded-md border border-purple-200 uppercase shrink-0">
+                                  <span key={i} className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-md border border-blue-200 uppercase shrink-0">
                                     {t}
                                   </span>
                                 ))}
@@ -2073,7 +2073,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                   {assigned.map((r: any, idx: number) => (
                                     <span
                                       key={r._id || idx}
-                                      className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-xs font-bold border border-purple-100/80"
+                                      className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-bold border border-blue-100/80"
                                       title={r.name}
                                     >
                                       {r.code || r.name}
@@ -2137,11 +2137,11 @@ export const BusinessDirectoryV2: React.FC = () => {
                           </td>
                           <td className="py-3 px-3">
                             {item.agentAssigned || item.assignedAgent ? (
-                              <span className="px-2.5 py-0.5 rounded-md bg-purple-50 text-purple-700 text-xs font-bold border border-purple-100/60 inline-block">
+                              <span className="px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-bold border border-blue-100/60 inline-block">
                                 {item.agentAssigned || item.assignedAgent}
                               </span>
                             ) : (
-                              <span className="px-2.5 py-0.5 rounded-md bg-purple-50 text-purple-700 text-xs font-bold border border-purple-100/60 inline-block">
+                              <span className="px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-bold border border-blue-100/60 inline-block">
                                 —
                               </span>
                             )}
@@ -2240,11 +2240,11 @@ export const BusinessDirectoryV2: React.FC = () => {
                         <>
                           <td className="py-3 px-3 font-semibold text-gray-900">
                             <div className="flex items-center gap-2">
-                              <Building className="w-4 h-4 text-purple-600 shrink-0" />
+                              <Building className="w-4 h-4 text-blue-600 shrink-0" />
                               <span className="font-bold text-gray-900">{item.firmName || item.name}</span>
                             </div>
                           </td>
-                          <td className="py-3 px-3 text-purple-700 font-bold">{item.route || '—'}</td>
+                          <td className="py-3 px-3 text-blue-700 font-bold">{item.route || '—'}</td>
                           <td className="py-3 px-3 text-gray-600 font-medium">{[item.district, item.state].filter(Boolean).join(', ') || '—'}</td>
                           <td className="py-3 px-3 text-gray-600 font-medium">{item.agentAssigned || '—'}</td>
                         </>
@@ -2287,11 +2287,11 @@ export const BusinessDirectoryV2: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => openModal(item)}
-                              className="p-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200/80 rounded-lg transition-all cursor-pointer shadow-2xs flex items-center justify-center"
+                              className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/80 rounded-lg transition-all cursor-pointer shadow-2xs flex items-center justify-center"
                               title="Edit Record"
                               aria-label="Edit Record"
                             >
-                              <Edit className="w-3.5 h-3.5 text-purple-700" />
+                              <Edit className="w-3.5 h-3.5 text-blue-700" />
                             </button>
                             <div className="absolute bottom-full mb-1.5 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
                               Edit Record
@@ -2366,7 +2366,7 @@ export const BusinessDirectoryV2: React.FC = () => {
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-purple-100 text-purple-700 rounded-xl">
+                <div className="p-2 bg-blue-100 text-blue-700 rounded-xl">
                   <span className="text-base">{getItemIcon()}</span>
                 </div>
                 <div>
@@ -2391,8 +2391,8 @@ export const BusinessDirectoryV2: React.FC = () => {
                 
                 {/* 1. BASIC INFORMATION */}
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
-                  <h4 className="font-bold text-purple-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+                  <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                     <span>BASIC INFORMATION</span>
                   </h4>
                   <div className="grid grid-cols-2 gap-3">
@@ -2404,7 +2404,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.firmName}
                         onChange={e => setForm(f => ({ ...f, firmName: e.target.value }))}
                         placeholder="e.g. Sri Krishna Binding Works"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-100 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -2414,7 +2414,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.ownerName}
                         onChange={e => setForm(f => ({ ...f, ownerName: e.target.value }))}
                         placeholder="e.g. Ram Prasad"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -2425,7 +2425,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.phone}
                         onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
                         placeholder="10-digit number"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -2435,7 +2435,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.whatsapp}
                         onChange={e => setForm(f => ({ ...f, whatsapp: e.target.value }))}
                         placeholder="Leave blank to match Mobile"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -2445,7 +2445,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.altPhone}
                         onChange={e => setForm(f => ({ ...f, altPhone: e.target.value }))}
                         placeholder="Alternate number"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div className="col-span-2">
@@ -2455,7 +2455,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.email}
                         onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
                         placeholder="e.g. customer@gmail.com"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -2465,7 +2465,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.gstNumber}
                         onChange={e => setForm(f => ({ ...f, gstNumber: e.target.value }))}
                         placeholder="e.g. 37AAAAA1111A1Z1"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono uppercase focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono uppercase focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -2475,7 +2475,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.aadharNumber}
                         onChange={e => setForm(f => ({ ...f, aadharNumber: e.target.value }))}
                         placeholder="e.g. 123456789012"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                   </div>
@@ -2483,8 +2483,8 @@ export const BusinessDirectoryV2: React.FC = () => {
 
                 {/* 2. ADDRESS INFORMATION */}
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
-                  <h4 className="font-bold text-purple-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+                  <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                     <span>ADDRESS INFORMATION</span>
                   </h4>
                   <div className="grid grid-cols-2 gap-3">
@@ -2495,7 +2495,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.doorNo}
                         onChange={e => setForm(f => ({ ...f, doorNo: e.target.value }))}
                         placeholder="e.g. 5-3/A"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -2505,7 +2505,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.streetName}
                         onChange={e => setForm(f => ({ ...f, streetName: e.target.value }))}
                         placeholder="e.g. Press Bazar"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div className="col-span-2">
@@ -2515,7 +2515,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.address1}
                         onChange={e => setForm(f => ({ ...f, address1: e.target.value }))}
                         placeholder="Building, lane details..."
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -2525,7 +2525,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.area}
                         onChange={e => setForm(f => ({ ...f, area: e.target.value }))}
                         placeholder="e.g. Auto Nagar"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -2535,14 +2535,14 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.landmark}
                         onChange={e => setForm(f => ({ ...f, landmark: e.target.value }))}
                         placeholder="e.g. Near Water Tank"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div className="col-span-2">
                       <label className="block text-gray-700 font-semibold mb-1 flex items-center justify-between">
                         <span>City</span>
                         {form.route && (
-                          <span className="text-[10px] text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full font-bold">
+                          <span className="text-[10px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full font-bold">
                             Auto Region: {form.route}
                           </span>
                         )}
@@ -2550,7 +2550,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                       <select
                         value={form.city}
                         onChange={e => handleCitySelect(e.target.value)}
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       >
                         <option value="">Select City</option>
                         {allCities.map((c: any) => {
@@ -2570,7 +2570,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.district}
                         onChange={e => setForm(f => ({ ...f, district: e.target.value }))}
                         placeholder="e.g. Tirupati"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -2580,7 +2580,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.state}
                         onChange={e => setForm(f => ({ ...f, state: e.target.value }))}
                         placeholder="Andhra Pradesh"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -2590,7 +2590,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.pincode}
                         onChange={e => setForm(f => ({ ...f, pincode: e.target.value }))}
                         placeholder="e.g. 517501"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div className="col-span-2">
@@ -2600,7 +2600,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.gpsLocation}
                         onChange={e => setForm(f => ({ ...f, gpsLocation: e.target.value }))}
                         placeholder="https://maps.google.com/..."
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                   </div>
@@ -2608,8 +2608,8 @@ export const BusinessDirectoryV2: React.FC = () => {
 
                 {/* 3. BUSINESS & LOGISTICS */}
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
-                  <h4 className="font-bold text-purple-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+                  <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                     <span>BUSINESS & LOGISTICS</span>
                   </h4>
                   <div className="grid grid-cols-2 gap-3">
@@ -2618,7 +2618,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                       <select
                         value={form.route}
                         onChange={e => setForm(f => ({ ...f, route: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       >
                         <option value="">Select Region</option>
                         {allRoutes.map((r: any) => (
@@ -2631,7 +2631,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                       <select
                         value={form.agentAssigned}
                         onChange={e => setForm(f => ({ ...f, agentAssigned: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       >
                         <option value="">Select Agent</option>
                         {allAgents.map((a: any) => (
@@ -2644,7 +2644,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                       <select
                         value={form.preferredTransport}
                         onChange={e => setForm(f => ({ ...f, preferredTransport: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       >
                         <option value="">Select Transporter</option>
                         {allTransporters.map((t: any) => (
@@ -2657,8 +2657,8 @@ export const BusinessDirectoryV2: React.FC = () => {
 
                 {/* 4. CREDIT & GRADE SETTINGS */}
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
-                  <h4 className="font-bold text-purple-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+                  <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                     <span>CREDIT & GRADE SETTINGS</span>
                   </h4>
                   <div className="grid grid-cols-2 gap-3">
@@ -2668,7 +2668,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         type="number"
                         value={form.creditDays}
                         onChange={e => setForm(f => ({ ...f, creditDays: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -2677,7 +2677,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         type="number"
                         value={form.creditLimit}
                         onChange={e => setForm(f => ({ ...f, creditLimit: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -2686,7 +2686,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         type="number"
                         value={form.openingBalance}
                         onChange={e => setForm(f => ({ ...f, openingBalance: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -2695,7 +2695,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         type="number"
                         value={form.outstandingBalance}
                         onChange={e => setForm(f => ({ ...f, outstandingBalance: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600 bg-gray-100 shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-gray-100 shadow-2xs"
                       />
                     </div>
                     <div className="col-span-2">
@@ -2713,7 +2713,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.notes}
                         onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                         placeholder="General business remarks..."
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                   </div>
@@ -2727,8 +2727,8 @@ export const BusinessDirectoryV2: React.FC = () => {
               <div className="space-y-5 max-h-[75vh] overflow-y-auto pr-2 text-xs">
                 {/* 1. BASIC INFORMATION */}
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
-                  <h4 className="font-bold text-purple-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+                  <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                     <span>Basic Information</span>
                   </h4>
                   <div className="space-y-3">
@@ -2740,7 +2740,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.firmName}
                         onChange={e => setForm(f => ({ ...f, firmName: e.target.value }))}
                         placeholder="e.g. Tirupati Card Centre"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-100 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 bg-white shadow-2xs"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
@@ -2752,7 +2752,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.ownerName}
                           onChange={e => setForm(f => ({ ...f, ownerName: e.target.value }))}
                           placeholder="e.g. Ramesh Kumar"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                       <div>
@@ -2761,7 +2761,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           required
                           value={form.vendorType}
                           onChange={e => setForm(f => ({ ...f, vendorType: e.target.value }))}
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         >
                           <option value="">Select Vendor Type</option>
                           <option value="PAPER SUPPLIER">PAPER SUPPLIER</option>
@@ -2783,7 +2783,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.phone}
                           onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
                           placeholder="e.g. 98765 43210"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                       <div>
@@ -2793,7 +2793,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.whatsapp}
                           onChange={e => setForm(f => ({ ...f, whatsapp: e.target.value }))}
                           placeholder="Leave blank to match Mobile"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                     </div>
@@ -2804,7 +2804,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.altPhone}
                         onChange={e => setForm(f => ({ ...f, altPhone: e.target.value }))}
                         placeholder="Alternate mobile"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -2814,7 +2814,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.email}
                         onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
                         placeholder="e.g. example@mail.com"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
@@ -2825,7 +2825,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.gstNumber}
                           onChange={e => setForm(f => ({ ...f, gstNumber: e.target.value }))}
                           placeholder="e.g. 37AAAAA1111A1Z1"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono uppercase focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono uppercase focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                       <div>
@@ -2835,7 +2835,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.aadharNumber}
                           onChange={e => setForm(f => ({ ...f, aadharNumber: e.target.value }))}
                           placeholder="e.g. 123456789012"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                     </div>
@@ -2844,8 +2844,8 @@ export const BusinessDirectoryV2: React.FC = () => {
 
                 {/* 2. ADDRESS INFORMATION */}
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
-                  <h4 className="font-bold text-purple-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+                  <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                     <span>Address Information</span>
                   </h4>
                   <div className="space-y-3">
@@ -2857,7 +2857,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.doorNo}
                           onChange={e => setForm(f => ({ ...f, doorNo: e.target.value }))}
                           placeholder="e.g. 12/A"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                       <div>
@@ -2867,7 +2867,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.streetName}
                           onChange={e => setForm(f => ({ ...f, streetName: e.target.value }))}
                           placeholder="e.g. Gandhi Road"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                     </div>
@@ -2878,7 +2878,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.address1}
                         onChange={e => setForm(f => ({ ...f, address1: e.target.value }))}
                         placeholder="e.g. Near Bus Stand"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
@@ -2889,7 +2889,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.area}
                           onChange={e => setForm(f => ({ ...f, area: e.target.value }))}
                           placeholder="e.g. Anna Nagar"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                       <div>
@@ -2899,7 +2899,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.landmark}
                           onChange={e => setForm(f => ({ ...f, landmark: e.target.value }))}
                           placeholder="e.g. Opp. SBI Bank"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                     </div>
@@ -2912,7 +2912,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.city}
                           onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
                           placeholder="e.g. Chennai"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                       <div>
@@ -2923,7 +2923,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.district}
                           onChange={e => setForm(f => ({ ...f, district: e.target.value }))}
                           placeholder="e.g. Chennai"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                     </div>
@@ -2936,7 +2936,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.state}
                           onChange={e => setForm(f => ({ ...f, state: e.target.value }))}
                           placeholder="Andhra Pradesh"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                       <div>
@@ -2947,7 +2947,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.pincode}
                           onChange={e => setForm(f => ({ ...f, pincode: e.target.value }))}
                           placeholder="e.g. 600001"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                     </div>
@@ -2956,8 +2956,8 @@ export const BusinessDirectoryV2: React.FC = () => {
 
                 {/* 3. LOCATION */}
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
-                  <h4 className="font-bold text-purple-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+                  <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                     <span>Location</span>
                   </h4>
                   <div>
@@ -2967,15 +2967,15 @@ export const BusinessDirectoryV2: React.FC = () => {
                       value={form.gpsLocation}
                       onChange={e => setForm(f => ({ ...f, gpsLocation: e.target.value }))}
                       placeholder="Paste Google Maps URL"
-                      className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                      className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                     />
                   </div>
                 </div>
 
                 {/* 4. BUSINESS SETTINGS */}
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
-                  <h4 className="font-bold text-purple-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+                  <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                     <span>Business Settings</span>
                   </h4>
                   <div className="space-y-3">
@@ -2984,7 +2984,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                       <select
                         value={form.status}
                         onChange={e => setForm(f => ({ ...f, status: e.target.value as any }))}
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       >
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
@@ -2997,7 +2997,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         type="number"
                         value={form.outstandingBalance}
                         onChange={e => setForm(f => ({ ...f, outstandingBalance: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -3015,7 +3015,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.notes}
                         onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                         placeholder="General remarks/instructions..."
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                   </div>
@@ -3024,8 +3024,8 @@ export const BusinessDirectoryV2: React.FC = () => {
                 {/* 5. CONTACT PERSONS */}
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-purple-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+                    <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                       <span>CONTACT PERSONS</span>
                     </h4>
                     <button
@@ -3034,7 +3034,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         ...f,
                         contactPersons: [...(f.contactPersons || []), { name: '', phone: '', email: '', designation: '' }]
                       }))}
-                      className="text-xs font-bold text-purple-600 hover:text-purple-700 flex items-center gap-1 cursor-pointer"
+                      className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Add Contact</span>
@@ -3067,7 +3067,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 newCP[idx].name = e.target.value;
                                 setForm(f => ({ ...f, contactPersons: newCP }));
                               }}
-                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:border-purple-600"
+                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:border-blue-600"
                             />
                             <input
                               type="text"
@@ -3078,7 +3078,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 newCP[idx].phone = e.target.value;
                                 setForm(f => ({ ...f, contactPersons: newCP }));
                               }}
-                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:border-purple-600"
+                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:border-blue-600"
                             />
                             <input
                               type="email"
@@ -3089,7 +3089,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 newCP[idx].email = e.target.value;
                                 setForm(f => ({ ...f, contactPersons: newCP }));
                               }}
-                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:border-purple-600"
+                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:border-blue-600"
                             />
                             <input
                               type="text"
@@ -3100,7 +3100,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 newCP[idx].designation = e.target.value;
                                 setForm(f => ({ ...f, contactPersons: newCP }));
                               }}
-                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:border-purple-600"
+                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:border-blue-600"
                             />
                           </div>
                         </div>
@@ -3117,8 +3117,8 @@ export const BusinessDirectoryV2: React.FC = () => {
               <div className="space-y-4 text-xs">
                 {/* 1. AGENT DETAILS */}
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
-                  <h4 className="font-bold text-purple-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+                  <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                     <span>Agent Details</span>
                   </h4>
                   <div className="space-y-3">
@@ -3130,7 +3130,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.firmName}
                         onChange={e => setForm(f => ({ ...f, firmName: e.target.value }))}
                         placeholder="e.g. Rajesh Kumar"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-100 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -3141,7 +3141,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.phone}
                         onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
                         placeholder="e.g. 98765 43210"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -3151,7 +3151,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.altPhone}
                         onChange={e => setForm(f => ({ ...f, altPhone: e.target.value }))}
                         placeholder="Alternate mobile"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                   </div>
@@ -3160,8 +3160,8 @@ export const BusinessDirectoryV2: React.FC = () => {
                 {/* 2. ASSIGNED ROUTES */}
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
                   <div>
-                    <h4 className="font-bold text-purple-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+                    <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                       <span>Assigned Routes</span>
                     </h4>
                     <p className="text-[11px] text-gray-500 font-medium mt-0.5">
@@ -3175,7 +3175,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                       allRoutes.map((r: any) => {
                         const checked = form.assignedRoutes.includes(r._id);
                         return (
-                          <label key={r._id} className="flex items-center gap-2.5 cursor-pointer text-xs select-none hover:bg-purple-50/30 p-1.5 rounded-lg transition-all">
+                          <label key={r._id} className="flex items-center gap-2.5 cursor-pointer text-xs select-none hover:bg-blue-50/30 p-1.5 rounded-lg transition-all">
                             <input
                               type="checkbox"
                               checked={checked}
@@ -3183,7 +3183,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 if (e.target.checked) setForm(f => ({ ...f, assignedRoutes: [...f.assignedRoutes, r._id] }));
                                 else setForm(f => ({ ...f, assignedRoutes: f.assignedRoutes.filter(id => id !== r._id) }));
                               }}
-                              className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer w-4 h-4"
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer w-4 h-4"
                             />
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-bold text-gray-900">{r.name}</span>
@@ -3206,8 +3206,8 @@ export const BusinessDirectoryV2: React.FC = () => {
             {activeMainTab === 'regions' && (
               <div className="space-y-4 text-xs">
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
-                  <h4 className="font-bold text-purple-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+                  <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                     <span>Region Details</span>
                   </h4>
                   <div className="space-y-3">
@@ -3220,7 +3220,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.firmName}
                           onChange={e => setForm(f => ({ ...f, firmName: e.target.value }))}
                           placeholder="e.g. Andhra Line"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                       <div>
@@ -3231,7 +3231,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.code}
                           onChange={e => setForm(f => ({ ...f, code: e.target.value }))}
                           placeholder="e.g. A"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono uppercase focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono uppercase focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                     </div>
@@ -3240,7 +3240,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                       <select
                         value={form.agentAssigned}
                         onChange={e => setForm(f => ({ ...f, agentAssigned: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       >
                         <option value="">Select Agent</option>
                         {allAgents.map((a: any) => (
@@ -3255,7 +3255,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.notes}
                         onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                         placeholder="Region notes or details"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                   </div>
@@ -3275,7 +3275,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                       value={form.firmName}
                       onChange={e => setForm(f => ({ ...f, firmName: e.target.value }))}
                       placeholder="e.g. Vijayawada"
-                      className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                      className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                     />
                   </div>
                   <div>
@@ -3284,7 +3284,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                       required
                       value={form.route}
                       onChange={e => setForm(f => ({ ...f, route: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                      className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                     >
                       <option value="">Select Region</option>
                       {allRoutes.map((r: any) => (
@@ -3300,7 +3300,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.district}
                         onChange={e => setForm(f => ({ ...f, district: e.target.value }))}
                         placeholder="e.g. Krishna"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -3310,7 +3310,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.state}
                         onChange={e => setForm(f => ({ ...f, state: e.target.value }))}
                         placeholder="Andhra Pradesh"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                   </div>
@@ -3319,7 +3319,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                     <select
                       value={form.agentAssigned}
                       onChange={e => setForm(f => ({ ...f, agentAssigned: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                      className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                     >
                       <option value="">Select Agent</option>
                       {allAgents.map((a: any) => (
@@ -3336,8 +3336,8 @@ export const BusinessDirectoryV2: React.FC = () => {
               <div className="space-y-4 text-xs">
                 {/* 1. TRANSPORTER DETAILS */}
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
-                  <h4 className="font-bold text-purple-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+                  <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                     <span>Transporter Details</span>
                   </h4>
                   <div className="space-y-3">
@@ -3349,7 +3349,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.firmName}
                         onChange={e => setForm(f => ({ ...f, firmName: e.target.value }))}
                         placeholder="e.g. Garuda"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-100 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -3359,7 +3359,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.phone}
                         onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
                         placeholder="e.g. 9876543210"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -3369,7 +3369,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.email}
                         onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
                         placeholder="e.g. example@mail.com"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -3379,7 +3379,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.city}
                         onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
                         placeholder="e.g. Bangalore"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                   </div>
@@ -3388,8 +3388,8 @@ export const BusinessDirectoryV2: React.FC = () => {
                 {/* 2. CONTACT PERSONS */}
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-purple-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+                    <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                       <span>CONTACT PERSONS</span>
                     </h4>
                     <button
@@ -3398,7 +3398,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         ...f,
                         contactPersons: [...(f.contactPersons || []), { name: '', phone: '', email: '', designation: '' }]
                       }))}
-                      className="text-xs font-bold text-purple-600 hover:text-purple-700 flex items-center gap-1 cursor-pointer"
+                      className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Add Contact</span>
@@ -3431,7 +3431,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 newCP[idx].name = e.target.value;
                                 setForm(f => ({ ...f, contactPersons: newCP }));
                               }}
-                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:border-purple-600"
+                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:border-blue-600"
                             />
                             <input
                               type="text"
@@ -3442,7 +3442,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 newCP[idx].phone = e.target.value;
                                 setForm(f => ({ ...f, contactPersons: newCP }));
                               }}
-                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:border-purple-600"
+                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:border-blue-600"
                             />
                             <input
                               type="email"
@@ -3453,7 +3453,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 newCP[idx].email = e.target.value;
                                 setForm(f => ({ ...f, contactPersons: newCP }));
                               }}
-                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:border-purple-600"
+                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:border-blue-600"
                             />
                             <input
                               type="text"
@@ -3464,7 +3464,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 newCP[idx].designation = e.target.value;
                                 setForm(f => ({ ...f, contactPersons: newCP }));
                               }}
-                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:border-purple-600"
+                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:border-blue-600"
                             />
                           </div>
                         </div>
@@ -3522,7 +3522,7 @@ export const BusinessDirectoryV2: React.FC = () => {
               <button
                 type="submit"
                 disabled={isSaving}
-                className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-sm disabled:opacity-50 flex items-center gap-1.5 transition-all cursor-pointer"
+                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm disabled:opacity-50 flex items-center gap-1.5 transition-all cursor-pointer"
               >
                 {isSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
                 <span>Save {activeMainTab.slice(0, -1).toUpperCase()}</span>
@@ -3549,7 +3549,7 @@ export const BusinessDirectoryV2: React.FC = () => {
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-purple-100 text-purple-700 rounded-2xl border border-purple-200/60 shadow-2xs">
+                <div className="p-2.5 bg-blue-100 text-blue-700 rounded-2xl border border-blue-200/60 shadow-2xs">
                   {getItemIcon(effectiveTab)}
                 </div>
                 <div>
@@ -3568,11 +3568,11 @@ export const BusinessDirectoryV2: React.FC = () => {
                   {(selectedDetails.contactName || selectedDetails.ownerName || selectedDetails.contactPersons?.[0]?.name) && (
                     <div className="text-xs text-gray-600 font-medium mt-0.5 flex items-center gap-1">
                       <span className="text-gray-400 font-normal">Contact Person:</span>
-                      <span className="text-purple-700 font-bold">{selectedDetails.contactName || selectedDetails.ownerName || selectedDetails.contactPersons?.[0]?.name}</span>
+                      <span className="text-blue-700 font-bold">{selectedDetails.contactName || selectedDetails.ownerName || selectedDetails.contactPersons?.[0]?.name}</span>
                     </div>
                   )}
                   <p className="text-[11px] text-gray-400 font-mono mt-0.5">
-                    {effectiveTab.toUpperCase()} CODE: <span className="font-extrabold text-purple-600">{selectedDetails.code || selectedDetails._id?.slice(-6).toUpperCase()}</span>
+                    {effectiveTab.toUpperCase()} CODE: <span className="font-extrabold text-blue-600">{selectedDetails.code || selectedDetails._id?.slice(-6).toUpperCase()}</span>
                   </p>
                 </div>
               </div>
@@ -3695,9 +3695,9 @@ export const BusinessDirectoryV2: React.FC = () => {
                           {selectedDetails.route || selectedDetails.assignedRegion || 'Unassigned'}
                         </span>
                       </div>
-                      <div className="bg-purple-50/60 border border-purple-100 p-2.5 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[9px] text-purple-700 font-extrabold uppercase tracking-wider">ASSIGNED CITY</span>
-                        <span className="block text-xs font-extrabold text-purple-950 mt-0.5 truncate" title={selectedDetails.city || selectedDetails.assignedMarket || 'Unassigned'}>
+                      <div className="bg-blue-50/60 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs">
+                        <span className="block text-[9px] text-blue-700 font-extrabold uppercase tracking-wider">ASSIGNED CITY</span>
+                        <span className="block text-xs font-extrabold text-blue-950 mt-0.5 truncate" title={selectedDetails.city || selectedDetails.assignedMarket || 'Unassigned'}>
                           {selectedDetails.city || selectedDetails.assignedMarket || 'Unassigned'}
                         </span>
                       </div>
@@ -3760,7 +3760,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                               </div>
                               <div>
                                 <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">GST Number</span>
-                                <span className="font-mono font-bold text-purple-600 text-xs">{selectedDetails.gstNumber || selectedDetails.gstin || '—'}</span>
+                                <span className="font-mono font-bold text-blue-600 text-xs">{selectedDetails.gstNumber || selectedDetails.gstin || '—'}</span>
                               </div>
                               <div>
                                 <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Aadhar / PAN</span>
@@ -3773,7 +3773,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-2.5">
                             <div className="flex items-center justify-between pb-2 border-b border-gray-100">
                               <div className="flex items-center gap-2">
-                                <div className="w-6 h-6 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
+                                <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
                                   <Building2 className="w-3.5 h-3.5" />
                                 </div>
                                 <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">BUSINESS & CREDIT DETAILS</h4>
@@ -3783,7 +3783,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                             <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs">
                               <div>
                                 <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Assigned Region</span>
-                                <span className="inline-block px-2 py-0.5 bg-purple-50 text-purple-700 font-bold rounded-md border border-purple-200 text-xs">
+                                <span className="inline-block px-2 py-0.5 bg-blue-50 text-blue-700 font-bold rounded-md border border-blue-200 text-xs">
                                   {selectedDetails.route || selectedDetails.assignedRegion || 'Unassigned'}
                                 </span>
                               </div>
@@ -3795,7 +3795,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                               </div>
                               <div>
                                 <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Credit Limit</span>
-                                <span className="font-mono font-bold text-purple-700 text-xs">
+                                <span className="font-mono font-bold text-blue-700 text-xs">
                                   {selectedDetails.creditLimit ? `₹${Number(selectedDetails.creditLimit).toLocaleString('en-IN')} (${selectedDetails.creditDays || 30} days)` : '—'}
                                 </span>
                               </div>
@@ -3861,10 +3861,10 @@ export const BusinessDirectoryV2: React.FC = () => {
                             </div>
 
                             <div className="pt-2 border-t border-gray-100 mt-2">
-                              <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="w-full py-2 px-3.5 bg-slate-50 hover:bg-purple-50 text-purple-700 font-bold rounded-xl border border-gray-200 hover:border-purple-300 transition-all flex items-center justify-center gap-2 text-xs shadow-2xs group cursor-pointer">
-                                <MapPin className="w-3.5 h-3.5 text-purple-600 group-hover:scale-110 transition-transform" />
+                              <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="w-full py-2 px-3.5 bg-slate-50 hover:bg-blue-50 text-blue-700 font-bold rounded-xl border border-gray-200 hover:border-blue-300 transition-all flex items-center justify-center gap-2 text-xs shadow-2xs group cursor-pointer">
+                                <MapPin className="w-3.5 h-3.5 text-blue-600 group-hover:scale-110 transition-transform" />
                                 <span>Search Address on Google Maps</span>
-                                <ExternalLink className="w-3 h-3 text-purple-400 group-hover:text-purple-600 ml-auto" />
+                                <ExternalLink className="w-3 h-3 text-blue-400 group-hover:text-blue-600 ml-auto" />
                               </a>
                             </div>
                           </div>
@@ -3891,9 +3891,9 @@ export const BusinessDirectoryV2: React.FC = () => {
                           {selectedDetails.vendorType || 'General Supplier'}
                         </span>
                       </div>
-                      <div className="bg-purple-50/60 border border-purple-100 p-2.5 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[9px] text-purple-700 font-extrabold uppercase tracking-wider">PAYMENT TERMS</span>
-                        <span className="block text-xs font-bold font-mono text-purple-950 mt-0.5">
+                      <div className="bg-blue-50/60 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs">
+                        <span className="block text-[9px] text-blue-700 font-extrabold uppercase tracking-wider">PAYMENT TERMS</span>
+                        <span className="block text-xs font-bold font-mono text-blue-950 mt-0.5">
                           {selectedDetails.creditDays || 30} Days
                         </span>
                       </div>
@@ -3944,7 +3944,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                               </div>
                               <div>
                                 <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">GSTIN / Tax ID</span>
-                                <span className="font-mono font-bold text-purple-600 text-xs">{selectedDetails.gstNumber || selectedDetails.gstin || '—'}</span>
+                                <span className="font-mono font-bold text-blue-600 text-xs">{selectedDetails.gstNumber || selectedDetails.gstin || '—'}</span>
                               </div>
                               <div>
                                 <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Aadhar / PAN</span>
@@ -3957,7 +3957,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-2.5">
                             <div className="flex items-center justify-between pb-2 border-b border-gray-100">
                               <div className="flex items-center gap-2">
-                                <div className="w-6 h-6 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
+                                <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
                                   <CreditCard className="w-3.5 h-3.5" />
                                 </div>
                                 <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">FINANCIAL TERMS</h4>
@@ -3970,7 +3970,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                               </div>
                               <div>
                                 <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Credit Limit</span>
-                                <span className="font-mono font-bold text-purple-700 text-xs">
+                                <span className="font-mono font-bold text-blue-700 text-xs">
                                   {selectedDetails.creditLimit ? `₹${Number(selectedDetails.creditLimit).toLocaleString('en-IN')}` : '—'}
                                 </span>
                               </div>
@@ -4009,7 +4009,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 </div>
                                 <div>
                                   <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Account Number</span>
-                                  <span className="font-mono font-bold text-purple-700 text-xs">{selectedDetails.accountNo || selectedDetails.accountNumber || '—'}</span>
+                                  <span className="font-mono font-bold text-blue-700 text-xs">{selectedDetails.accountNo || selectedDetails.accountNumber || '—'}</span>
                                 </div>
                                 <div>
                                   <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">IFSC Code</span>
@@ -4064,7 +4064,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           {contactPersons.length > 0 && (
                             <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-2.5">
                               <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
-                                <div className="w-6 h-6 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
+                                <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
                                   <Users className="w-3.5 h-3.5" />
                                 </div>
                                 <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">CONTACT PERSONS</h4>
@@ -4074,7 +4074,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                   <div key={idx} className="p-2.5 bg-slate-50 rounded-xl border border-gray-100 space-y-1">
                                     <div className="flex items-center justify-between">
                                       <span className="font-extrabold text-gray-900 text-xs">{cp.name || '—'}</span>
-                                      {cp.designation && <span className="text-[10px] bg-purple-50 text-purple-700 font-bold px-2 py-0.5 rounded-md">{cp.designation}</span>}
+                                      {cp.designation && <span className="text-[10px] bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded-md">{cp.designation}</span>}
                                     </div>
                                     <div className="flex items-center gap-3 text-[11px] text-gray-600">
                                       {cp.phone && <span className="font-mono font-semibold">{cp.phone}</span>}
@@ -4109,9 +4109,9 @@ export const BusinessDirectoryV2: React.FC = () => {
                           {selectedDetails.commissionRate || 0}%
                         </span>
                       </div>
-                      <div className="bg-purple-50/60 border border-purple-100 p-2.5 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[9px] text-purple-700 font-extrabold uppercase tracking-wider">ASSIGNED REGIONS</span>
-                        <span className="block text-xs font-bold text-purple-950 mt-0.5">
+                      <div className="bg-blue-50/60 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs">
+                        <span className="block text-[9px] text-blue-700 font-extrabold uppercase tracking-wider">ASSIGNED REGIONS</span>
+                        <span className="block text-xs font-bold text-blue-950 mt-0.5">
                           {assignedRoutes.length} Regions
                         </span>
                       </div>
@@ -4153,7 +4153,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                             </div>
                             <div>
                               <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Agent Code</span>
-                              <span className="font-mono font-bold text-purple-600 text-xs">{code}</span>
+                              <span className="font-mono font-bold text-blue-600 text-xs">{code}</span>
                             </div>
                             <div>
                               <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Mobile Number</span>
@@ -4177,7 +4177,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-2.5">
                           <div className="flex items-center justify-between pb-2 border-b border-gray-100">
                             <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
+                              <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
                                 <Percent className="w-3.5 h-3.5" />
                               </div>
                               <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">COMMISSION & COVERAGE</h4>
@@ -4188,7 +4188,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                               <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Assigned Regions / Routes</span>
                               <div className="flex flex-wrap gap-1.5">
                                 {assignedRoutes.length > 0 ? assignedRoutes.map((r: any) => (
-                                  <span key={r._id} className="px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 font-bold rounded-md text-[11px]">
+                                  <span key={r._id} className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 font-bold rounded-md text-[11px]">
                                     {r.name} ({r.code})
                                   </span>
                                 )) : <span className="text-gray-400 italic text-xs">No regions assigned</span>}
@@ -4275,7 +4275,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           </div>
                           <div>
                             <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">GSTIN Number</span>
-                            <span className="font-mono font-bold text-purple-600 text-xs">{selectedDetails.gstNumber || selectedDetails.gstin || '—'}</span>
+                            <span className="font-mono font-bold text-blue-600 text-xs">{selectedDetails.gstNumber || selectedDetails.gstin || '—'}</span>
                           </div>
                         </div>
                       </div>
@@ -4327,10 +4327,10 @@ export const BusinessDirectoryV2: React.FC = () => {
                           });
                           setCardCustomerSearch('');
                         }}
-                        className="bg-purple-50/60 hover:bg-purple-100/70 border border-purple-100 p-2.5 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.01] group"
+                        className="bg-blue-50/60 hover:bg-blue-100/70 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.01] group"
                       >
-                        <span className="block text-[9.5px] text-purple-700 font-bold uppercase tracking-wider group-hover:underline">NO OF CITIES</span>
-                        <span className="block text-lg font-black text-purple-900 mt-0.5">{citiesInRegion.length} Cities ↗</span>
+                        <span className="block text-[9.5px] text-blue-700 font-bold uppercase tracking-wider group-hover:underline">NO OF CITIES</span>
+                        <span className="block text-lg font-black text-blue-900 mt-0.5">{citiesInRegion.length} Cities ↗</span>
                       </div>
                       <div 
                         onClick={() => {
@@ -4389,7 +4389,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                             </div>
                             <div>
                               <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Region Code</span>
-                              <span className="font-mono font-extrabold text-purple-600 text-xs">{code}</span>
+                              <span className="font-mono font-extrabold text-blue-600 text-xs">{code}</span>
                             </div>
                             <div>
                               <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Assigned Agent</span>
@@ -4407,7 +4407,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           {/* CARD HEADER */}
                           <div className="flex items-center justify-between pb-3 border-b border-gray-100">
                             <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600">
+                              <div className="w-7 h-7 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
                                 <Building className="w-4 h-4" />
                               </div>
                               <h4 className="font-extrabold text-gray-800 text-xs tracking-wider uppercase">CITIES IN REGION</h4>
@@ -4541,9 +4541,9 @@ export const BusinessDirectoryV2: React.FC = () => {
                           {cityCusts.length} Customers ↗
                         </span>
                       </div>
-                      <div className="bg-purple-50/60 border border-purple-100 p-2.5 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[9px] text-purple-700 font-extrabold uppercase tracking-wider">DISTRICT</span>
-                        <span className="block text-xs font-extrabold text-purple-950 mt-0.5 truncate">
+                      <div className="bg-blue-50/60 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs">
+                        <span className="block text-[9px] text-blue-700 font-extrabold uppercase tracking-wider">DISTRICT</span>
+                        <span className="block text-xs font-extrabold text-blue-950 mt-0.5 truncate">
                           {selectedDetails.district || '—'}
                         </span>
                       </div>
@@ -4568,7 +4568,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                               </div>
                               <div>
                                 <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Parent Route</span>
-                                <span className="font-bold text-purple-700 text-xs">{selectedDetails.route || selectedDetails.assignedRegion || 'Unassigned'}</span>
+                                <span className="font-bold text-blue-700 text-xs">{selectedDetails.route || selectedDetails.assignedRegion || 'Unassigned'}</span>
                               </div>
                               <div>
                                 <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">District</span>
@@ -4634,9 +4634,9 @@ export const BusinessDirectoryV2: React.FC = () => {
         >
           <div className="relative bg-white rounded-3xl shadow-2xl border border-gray-100 flex flex-col w-full max-w-5xl max-h-[92vh] overflow-hidden">
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-gray-100 bg-linear-to-r from-purple-50/70 via-indigo-50/40 to-white flex items-center justify-between shrink-0">
+            <div className="px-6 py-4 border-b border-gray-100 bg-linear-to-r from-blue-50/70 via-indigo-50/40 to-white flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-purple-600 text-white flex items-center justify-center shadow-md shadow-purple-500/20">
+                <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
                   <Users className="w-5 h-5" />
                 </div>
                 <div>
@@ -4644,7 +4644,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                     <h3 className="text-base sm:text-lg font-black text-gray-900 leading-tight">
                       {cardCustomersModal.title}
                     </h3>
-                    <span className="px-2 py-0.5 bg-purple-100 text-purple-700 font-extrabold text-[11px] rounded-full">
+                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 font-extrabold text-[11px] rounded-full">
                       {cardCustomersModal.customers.length} Customers
                     </span>
                   </div>
@@ -4675,7 +4675,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                   placeholder="Search customer by firm, contact, phone, city, GST..."
                   value={cardCustomerSearch}
                   onChange={(e) => setCardCustomerSearch(e.target.value)}
-                  className="w-full pl-9 pr-8 py-2 bg-white border border-gray-200 rounded-xl text-xs font-medium focus:outline-none focus:border-purple-600 shadow-2xs"
+                  className="w-full pl-9 pr-8 py-2 bg-white border border-gray-200 rounded-xl text-xs font-medium focus:outline-none focus:border-blue-600 shadow-2xs"
                   autoFocus
                 />
                 {cardCustomerSearch && (
@@ -4735,7 +4735,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                 if (filtered.length === 0) {
                   return (
                     <div className="py-16 text-center">
-                      <div className="w-16 h-16 rounded-3xl bg-purple-50 text-purple-400 flex items-center justify-center mx-auto mb-3">
+                      <div className="w-16 h-16 rounded-3xl bg-blue-50 text-blue-400 flex items-center justify-center mx-auto mb-3">
                         <Users className="w-8 h-8" />
                       </div>
                       <h4 className="font-bold text-gray-800 text-sm">No customers found</h4>
@@ -4748,7 +4748,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setCardCustomerSearch('')}
-                          className="mt-3 px-3 py-1.5 rounded-xl bg-purple-50 text-purple-700 font-bold text-xs hover:bg-purple-100 transition-colors"
+                          className="mt-3 px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 font-bold text-xs hover:bg-blue-100 transition-colors"
                         >
                           Clear Search
                         </button>
@@ -4783,14 +4783,14 @@ export const BusinessDirectoryV2: React.FC = () => {
                                   setCardCustomersModal(null);
                                   setSelectedDetails(cust);
                                 }}
-                                className="hover:bg-purple-50/50 transition-colors cursor-pointer group"
+                                className="hover:bg-blue-50/50 transition-colors cursor-pointer group"
                                 title="Click to view full customer details"
                               >
                                 <td className="py-3 px-4 text-center font-bold text-gray-400 font-mono text-[11px]">
                                   {idx + 1}
                                 </td>
                                 <td className="py-3 px-4">
-                                  <div className="font-bold text-gray-900 group-hover:text-purple-700 transition-colors text-xs">
+                                  <div className="font-bold text-gray-900 group-hover:text-blue-700 transition-colors text-xs">
                                     {cust.firmName || cust.name || 'Unnamed Customer'}
                                   </div>
                                   {(cust.contactName || cust.ownerName || cust.contactPersons?.[0]?.name) && (
@@ -4845,7 +4845,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                       setCardCustomersModal(null);
                                       setSelectedDetails(cust);
                                     }}
-                                    className="px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-600 hover:text-white font-bold text-[10px] transition-all cursor-pointer"
+                                    className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white font-bold text-[10px] transition-all cursor-pointer"
                                   >
                                     View
                                   </button>
@@ -4893,7 +4893,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                 value={logSearch}
                 onChange={(e) => setLogSearch(e.target.value)}
                 placeholder="Search activity logs..."
-                className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs w-full focus:outline-none focus:border-purple-500 font-medium"
+                className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs w-full focus:outline-none focus:border-blue-500 font-medium"
               />
               <button
                 type="button"
@@ -4933,7 +4933,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           {log.createdAt ? new Date(log.createdAt).toLocaleString('en-IN') : 'Just now'}
                         </span>
                         {log.performedBy && (
-                          <span className="block text-[10px] text-purple-600 font-semibold">{log.performedBy}</span>
+                          <span className="block text-[10px] text-blue-600 font-semibold">{log.performedBy}</span>
                         )}
                       </div>
                     </div>

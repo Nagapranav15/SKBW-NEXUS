@@ -60,7 +60,7 @@ export const SearchableMaterialDropdown: React.FC<{
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full px-3 py-2 bg-white border border-gray-200 hover:border-purple-300 rounded-xl text-xs font-semibold text-gray-800 flex items-center justify-between shadow-2xs transition-all cursor-pointer"
+        className="w-full px-3 py-2 bg-white border border-gray-200 hover:border-blue-300 rounded-xl text-xs font-semibold text-gray-800 flex items-center justify-between shadow-2xs transition-all cursor-pointer"
       >
         <span className="truncate">
           {value || <span className="text-gray-400 font-normal">-- Select Raw Material --</span>}
@@ -86,7 +86,7 @@ export const SearchableMaterialDropdown: React.FC<{
                 }
               }}
               placeholder="Search or type raw material..."
-              className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-purple-500 focus:outline-none bg-gray-50/50"
+              className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none bg-gray-50/50"
             />
           </div>
 
@@ -115,12 +115,12 @@ export const SearchableMaterialDropdown: React.FC<{
                     setOpen(false);
                     setSearch('');
                   }}
-                  className={`p-2 hover:bg-purple-50 rounded-xl cursor-pointer transition-colors flex items-center justify-between group ${
-                    isSelected ? 'bg-purple-50/70 font-bold' : ''
+                  className={`p-2 hover:bg-blue-50 rounded-xl cursor-pointer transition-colors flex items-center justify-between group ${
+                    isSelected ? 'bg-blue-50/70 font-bold' : ''
                   }`}
                 >
                   <div className="space-y-0.5 max-w-[180px]">
-                    <div className="font-semibold text-gray-900 text-xs truncate group-hover:text-purple-700">{mat.name}</div>
+                    <div className="font-semibold text-gray-900 text-xs truncate group-hover:text-blue-700">{mat.name}</div>
                     <div className="text-[10px] text-gray-400 flex items-center gap-1.5">
                       <span className="bg-gray-100 px-1.5 py-0.2 rounded text-gray-600 font-mono">{mat.skuCode}</span>
                       <span>·</span>
@@ -872,7 +872,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
             {/* Group 1: General Information */}
             <div className="space-y-4">
               <h3 className="text-xs font-bold text-gray-900 border-b border-gray-100 pb-1.5 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+                <span className="w-2 h-2 rounded-full bg-blue-600"></span>
                 General Information
               </h3>
               <div className="grid grid-cols-2 gap-4">
@@ -883,7 +883,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     placeholder="e.g. RM-REEL-01"
                     value={form.skuCode}
                     onChange={e => setForm({ ...form, skuCode: e.target.value.toUpperCase() })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                     required
                   />
                 </div>
@@ -904,12 +904,12 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         }));
                       }
                     }}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800 cursor-pointer"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
                   >
                     {sectionCategories.map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
-                    <option value="__ADD_NEW__" className="text-purple-600 font-bold">+ Add Custom...</option>
+                    <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
                   </select>
                 </div>
 
@@ -927,7 +927,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           value="Reels"
                           checked={form.paperType === 'Reels'}
                           onChange={() => setForm({ ...form, paperType: 'Reels', length: '' })}
-                          className="text-purple-600 focus:ring-purple-500"
+                          className="text-blue-600 focus:ring-blue-500"
                         />
                         Reels
                       </label>
@@ -938,7 +938,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           value="Sheets"
                           checked={form.paperType === 'Sheets'}
                           onChange={() => setForm({ ...form, paperType: 'Sheets' })}
-                          className="text-purple-600 focus:ring-purple-500"
+                          className="text-blue-600 focus:ring-blue-500"
                         />
                         Sheets
                       </label>
@@ -953,7 +953,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       <button
                         type="button"
                         onClick={() => setIsNameManuallyEdited(false)}
-                        className="text-[10px] text-purple-600 font-bold hover:underline flex items-center gap-1"
+                        className="text-[10px] text-blue-600 font-bold hover:underline flex items-center gap-1"
                       >
                         ⚡ Re-sync auto name
                       </button>
@@ -967,7 +967,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       setForm({ ...form, name: e.target.value });
                       setIsNameManuallyEdited(true);
                     }}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                     required
                   />
                 </div>
@@ -986,7 +986,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           placeholder={form.paperType === 'Sheets' ? 'e.g. 500' : 'e.g. 112 / 132'}
                           value={form.pages}
                           onChange={e => setForm({ ...form, pages: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800"
+                          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                         />
                       </div>
                     )}
@@ -1008,7 +1008,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                               setShowBrandDropdown(true);
                               setBrandAtFocus(form.brand);
                             }}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800"
+                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                           />
                           {showBrandDropdown && (
                             <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg z-20 divide-y divide-gray-50">
@@ -1026,7 +1026,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                       setBrandSearch(b);
                                       setShowBrandDropdown(false);
                                     }}
-                                    className="w-full px-3 py-2 text-left text-xs hover:bg-purple-50 hover:text-purple-600 transition-colors font-semibold text-gray-700 block"
+                                    className="w-full px-3 py-2 text-left text-xs hover:bg-blue-50 hover:text-blue-600 transition-colors font-semibold text-gray-700 block"
                                   >
                                     {b}
                                   </button>
@@ -1070,12 +1070,12 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                               setForm({ ...form, ruleType: e.target.value });
                             }
                           }}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800 cursor-pointer"
+                          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
                         >
                           {ruleTypesList.map(rule => (
                             <option key={rule} value={rule}>{rule}</option>
                           ))}
-                          <option value="__ADD_NEW__" className="text-purple-600 font-bold">+ Add Custom...</option>
+                          <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
                         </select>
                       </div>
                     )}
@@ -1092,20 +1092,20 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                             setForm({ ...form, unit: e.target.value });
                           }
                         }}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800 cursor-pointer"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
                       >
                         <option value="">Select Unit</option>
                         {unitsList.map(unit => (
                           <option key={unit} value={unit}>{unit}</option>
                         ))}
-                        <option value="__ADD_NEW__" className="text-purple-600 font-bold">+ Add Custom...</option>
+                        <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
                       </select>
                     </div>
 
                     {/* 5. Alternate Units Toggle */}
                     {activeFields.includes('altUnit') && (
                       <div className="flex items-end h-full">
-                        <label className="flex items-center space-x-2.5 bg-gray-50 border border-gray-200 hover:border-purple-300 hover:bg-purple-50/10 rounded-xl px-3 py-2 w-full cursor-pointer select-none transition-all">
+                        <label className="flex items-center space-x-2.5 bg-gray-50 border border-gray-200 hover:border-blue-300 hover:bg-blue-50/10 rounded-xl px-3 py-2 w-full cursor-pointer select-none transition-all">
                           <input
                             type="checkbox"
                             checked={hasAltUnit}
@@ -1116,7 +1116,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                 setForm(prev => ({ ...prev, altUnit: '', altUnitConversion: '' }));
                               }
                             }}
-                            className="rounded text-purple-600 focus:ring-purple-500 w-4 h-4 border-gray-300 cursor-pointer"
+                            className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 border-gray-300 cursor-pointer"
                           />
                           <div className="text-left">
                             <span className="block text-[11px] font-bold text-gray-700">Enable Alternate Unit</span>
@@ -1128,7 +1128,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
                     {/* Alternate Unit & Conversion Rate if Enabled */}
                     {activeFields.includes('altUnit') && hasAltUnit && (
-                      <div className="col-span-2 grid grid-cols-2 gap-3 bg-purple-50/20 p-3.5 rounded-xl border border-purple-100/50 animate-in fade-in duration-200">
+                      <div className="col-span-2 grid grid-cols-2 gap-3 bg-blue-50/20 p-3.5 rounded-xl border border-blue-100/50 animate-in fade-in duration-200">
                         <div>
                           <label className="block text-[11px] font-semibold text-gray-600 mb-1">ALTERNATIVE UNIT</label>
                           <select
@@ -1140,13 +1140,13 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                 setForm({ ...form, altUnit: e.target.value });
                               }
                             }}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800 cursor-pointer"
+                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
                           >
                             <option value="">Select Alternative</option>
                             {unitsList.map(unit => (
                               <option key={unit} value={unit}>{unit}</option>
                             ))}
-                            <option value="__ADD_NEW__" className="text-purple-600 font-bold">+ Add Custom...</option>
+                            <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
                           </select>
                         </div>
                         <div>
@@ -1157,16 +1157,16 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                               placeholder="e.g. 20"
                               value={form.altUnitConversion}
                               onChange={e => setForm({ ...form, altUnitConversion: e.target.value })}
-                              className="w-full pl-3 pr-24 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800 font-mono"
+                              className="w-full pl-3 pr-24 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 font-mono"
                             />
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-purple-600 uppercase font-mono select-none">
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-blue-600 uppercase font-mono select-none">
                               {form.unit || 'units'} / {form.altUnit || 'AUOM'}
                             </div>
                           </div>
                         </div>
                         {form.altUnit && form.altUnitConversion && (
-                          <div className="col-span-2 text-center bg-purple-50/70 py-1.5 px-3 rounded-lg border border-purple-100 text-[10.5px] font-medium text-purple-900">
-                            Formula: <span className="font-extrabold text-slate-900">1 {form.altUnit}</span> = <span className="font-extrabold text-purple-700 font-mono text-xs">{form.altUnitConversion}</span> <span className="font-extrabold text-slate-900">{form.unit}</span>
+                          <div className="col-span-2 text-center bg-blue-50/70 py-1.5 px-3 rounded-lg border border-blue-100 text-[10.5px] font-medium text-blue-900">
+                            Formula: <span className="font-extrabold text-slate-900">1 {form.altUnit}</span> = <span className="font-extrabold text-blue-700 font-mono text-xs">{form.altUnitConversion}</span> <span className="font-extrabold text-slate-900">{form.unit}</span>
                           </div>
                         )}
                       </div>
@@ -1180,7 +1180,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
             {(activeFields.includes('gsm') || activeFields.includes('brand') || activeFields.includes('title') || activeFields.includes('width') || activeFields.includes('length')) && (
               <div className="space-y-4 border-t border-gray-100 pt-4">
                 <h3 className="text-xs font-bold text-gray-900 pb-1.5 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+                  <span className="w-2 h-2 rounded-full bg-blue-600"></span>
                   Specifications
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
@@ -1192,7 +1192,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         placeholder="e.g. 70"
                         value={form.gsm}
                         onChange={e => setForm({ ...form, gsm: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                       />
                     </div>
                   )}
@@ -1213,7 +1213,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                             setShowBrandDropdown(true);
                             setBrandAtFocus(form.brand);
                           }}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800"
+                          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                         />
                         {showBrandDropdown && (
                           <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg z-20 divide-y divide-gray-50">
@@ -1231,7 +1231,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                     setBrandSearch(b);
                                     setShowBrandDropdown(false);
                                   }}
-                                  className="w-full px-3 py-2 text-left text-xs hover:bg-purple-50 hover:text-purple-600 transition-colors font-semibold text-gray-700 block"
+                                  className="w-full px-3 py-2 text-left text-xs hover:bg-blue-50 hover:text-blue-600 transition-colors font-semibold text-gray-700 block"
                                 >
                                   {b}
                                 </button>
@@ -1270,7 +1270,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         placeholder="e.g. Premium White Paper Roll"
                         value={form.title}
                         onChange={e => setForm({ ...form, title: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                       />
                     </div>
                   )}
@@ -1325,7 +1325,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         placeholder="e.g. 57"
                         value={form.width}
                         onChange={e => setForm({ ...form, width: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                       />
                     </div>
                   )}
@@ -1339,7 +1339,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         placeholder="e.g. 70"
                         value={form.length}
                         onChange={e => setForm({ ...form, length: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                       />
                     </div>
                   )}
@@ -1350,7 +1350,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
             {/* Group 3: Additional Attributes */}
             <div className="space-y-4 border-t border-gray-100 pt-4">
               <h3 className="text-xs font-bold text-gray-900 pb-1.5 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+                <span className="w-2 h-2 rounded-full bg-blue-600"></span>
                 Inventory & Additional Attributes
               </h3>
               <div className="grid grid-cols-2 gap-3">
@@ -1368,19 +1368,19 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                             setForm({ ...form, unit: e.target.value });
                           }
                         }}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800 cursor-pointer"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
                       >
                         <option value="">Select Unit</option>
                         {unitsList.map(unit => (
                           <option key={unit} value={unit}>{unit}</option>
                         ))}
-                        <option value="__ADD_NEW__" className="text-purple-600 font-bold">+ Add Custom...</option>
+                        <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
                       </select>
                     </div>
 
                     {activeFields.includes('altUnit') && (
                       <div className="flex items-end h-full">
-                        <label className="flex items-center space-x-2.5 bg-gray-50 border border-gray-200 hover:border-purple-300 hover:bg-purple-50/10 rounded-xl px-3 py-2 w-full cursor-pointer select-none transition-all">
+                        <label className="flex items-center space-x-2.5 bg-gray-50 border border-gray-200 hover:border-blue-300 hover:bg-blue-50/10 rounded-xl px-3 py-2 w-full cursor-pointer select-none transition-all">
                           <input
                             type="checkbox"
                             checked={hasAltUnit}
@@ -1391,7 +1391,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                 setForm(prev => ({ ...prev, altUnit: '', altUnitConversion: '' }));
                               }
                             }}
-                            className="rounded text-purple-600 focus:ring-purple-500 w-4 h-4 border-gray-300 cursor-pointer"
+                            className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 border-gray-300 cursor-pointer"
                           />
                           <div className="text-left">
                             <span className="block text-[11px] font-bold text-gray-700">Enable Alternate Unit</span>
@@ -1402,7 +1402,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     )}
 
                     {activeFields.includes('altUnit') && hasAltUnit && (
-                      <div className="col-span-2 grid grid-cols-2 gap-3 bg-purple-50/20 p-3.5 rounded-xl border border-purple-100/50 animate-in fade-in duration-200">
+                      <div className="col-span-2 grid grid-cols-2 gap-3 bg-blue-50/20 p-3.5 rounded-xl border border-blue-100/50 animate-in fade-in duration-200">
                         <div>
                           <label className="block text-[11px] font-semibold text-gray-600 mb-1">ALTERNATIVE UNIT</label>
                           <select
@@ -1426,13 +1426,13 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                 }));
                               }
                             }}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800 cursor-pointer"
+                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
                           >
                             <option value="">Select Alternative</option>
                             {unitsList.map(unit => (
                               <option key={unit} value={unit}>{unit}</option>
                             ))}
-                            <option value="__ADD_NEW__" className="text-purple-600 font-bold">+ Add Custom...</option>
+                            <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
                           </select>
                         </div>
                         <div>
@@ -1443,16 +1443,16 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                               placeholder="e.g. 20"
                               value={form.altUnitConversion}
                               onChange={e => setForm({ ...form, altUnitConversion: e.target.value })}
-                              className="w-full pl-3 pr-24 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800 font-mono"
+                              className="w-full pl-3 pr-24 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 font-mono"
                             />
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-purple-600 uppercase font-mono select-none">
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-blue-600 uppercase font-mono select-none">
                               {form.unit || 'units'} / {form.altUnit || 'AUOM'}
                             </div>
                           </div>
                         </div>
                         {form.altUnit && form.altUnitConversion && (
-                          <div className="col-span-2 text-center bg-purple-50/70 py-1.5 px-3 rounded-lg border border-purple-100 text-[10.5px] font-medium text-purple-900">
-                            Formula: <span className="font-extrabold text-slate-900">1 {form.altUnit}</span> = <span className="font-extrabold text-purple-700 font-mono text-xs">{form.altUnitConversion}</span> <span className="font-extrabold text-slate-900">{form.unit}</span>
+                          <div className="col-span-2 text-center bg-blue-50/70 py-1.5 px-3 rounded-lg border border-blue-100 text-[10.5px] font-medium text-blue-900">
+                            Formula: <span className="font-extrabold text-slate-900">1 {form.altUnit}</span> = <span className="font-extrabold text-blue-700 font-mono text-xs">{form.altUnitConversion}</span> <span className="font-extrabold text-slate-900">{form.unit}</span>
                           </div>
                         )}
                       </div>
@@ -1476,7 +1476,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           setShowGroupDropdown(true);
                           setGroupAtFocus(form.group);
                         }}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                       />
                       {showGroupDropdown && (
                         <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg z-20 divide-y divide-gray-50">
@@ -1494,7 +1494,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                   setGroupSearch(g);
                                   setShowGroupDropdown(false);
                                 }}
-                                className="w-full px-3 py-2 text-left text-xs hover:bg-purple-50 hover:text-purple-600 transition-colors font-semibold text-gray-700 block"
+                                className="w-full px-3 py-2 text-left text-xs hover:bg-blue-50 hover:text-blue-600 transition-colors font-semibold text-gray-700 block"
                               >
                                 {g}
                               </button>
@@ -1536,12 +1536,12 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           setForm({ ...form, ruleType: e.target.value });
                         }
                       }}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800 cursor-pointer"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
                     >
                       {ruleTypesList.map(rule => (
                         <option key={rule} value={rule}>{rule}</option>
                       ))}
-                      <option value="__ADD_NEW__" className="text-purple-600 font-bold">+ Add Custom...</option>
+                      <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
                     </select>
                   </div>
                 )}
@@ -1555,7 +1555,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       placeholder={form.paperType === 'Sheets' ? 'e.g. 500' : 'e.g. 112 / 132'}
                       value={form.pages}
                       onChange={e => setForm({ ...form, pages: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                     />
                   </div>
                 )}
@@ -1568,7 +1568,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       placeholder="e.g. 10.37"
                       value={form.reamWeight}
                       onChange={e => setForm({ ...form, reamWeight: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                     />
                   </div>
                 )}
@@ -1580,7 +1580,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       placeholder="e.g. 200 / 240"
                       value={form.booksGbl}
                       onChange={e => setForm({ ...form, booksGbl: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                     />
                   </div>
                 )}
@@ -1589,7 +1589,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                   <select
                     value={form.status}
                     onChange={e => setForm({ ...form, status: e.target.value as any })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-semibold text-gray-800 cursor-pointer"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
                   >
                     <option value="Active">Active</option>
                     <option value="Inactive">Inactive</option>
@@ -1647,7 +1647,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
               <div className="space-y-1 mt-3">
                 <label className="block text-[11px] font-bold text-gray-700 flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-purple-600" />
+                    <MapPin className="w-3.5 h-3.5 text-blue-600" />
                     <span>Warehouse Storage Location</span>
                   </div>
                   <span className="text-[10px] font-semibold text-gray-400 flex items-center gap-1">
@@ -1664,7 +1664,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     className="w-full pl-3 pr-24 py-2 bg-gray-50/80 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 font-mono cursor-not-allowed select-none"
                   />
                   <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
-                    <span className="text-[9.5px] font-bold text-purple-600 bg-purple-50 border border-purple-100 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                    <span className="text-[9.5px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md uppercase tracking-wider">
                       System Tracked
                     </span>
                   </div>
@@ -1676,7 +1676,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
             {customColumns && customColumns.length > 0 && (
               <div className="space-y-3 border-t border-gray-100 pt-4">
                 <h3 className="text-xs font-bold text-gray-900 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+                  <span className="w-2 h-2 rounded-full bg-blue-600"></span>
                   Custom Fields
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
@@ -1693,7 +1693,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                             onChange={(e) => {
                               setFormCustomValues(prev => ({ ...prev, [col]: e.target.checked }));
                             }}
-                            className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                           />
                           <label className="text-xs font-semibold text-gray-700">{col}</label>
                         </div>
@@ -1737,7 +1737,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           onChange={(e) => {
                             setFormCustomValues(prev => ({ ...prev, [col]: e.target.value }));
                           }}
-                          className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-medium text-gray-800 focus:outline-none focus:border-purple-500 shadow-2xs"
+                          className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-medium text-gray-800 focus:outline-none focus:border-blue-500 shadow-2xs"
                         />
                       </div>
                       );
@@ -1765,7 +1765,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3 relative">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <div className="p-1.5 bg-purple-50 text-purple-700 rounded-lg">
+                          <div className="p-1.5 bg-blue-50 text-blue-700 rounded-lg">
                             <BookOpen className="w-4 h-4" />
                           </div>
                           <div>
@@ -1792,7 +1792,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           placeholder="1"
                           value={form.recipeYieldQty || '1'}
                           onChange={(e) => setForm({ ...form, recipeYieldQty: e.target.value })}
-                          className="w-16 px-2 py-0.5 border border-purple-300 rounded-md text-xs font-extrabold text-purple-700 text-center focus:ring-2 focus:ring-purple-500 bg-purple-50/60"
+                          className="w-16 px-2 py-0.5 border border-blue-300 rounded-md text-xs font-extrabold text-blue-700 text-center focus:ring-2 focus:ring-blue-500 bg-blue-50/60"
                         />
                         <span className="font-bold text-gray-800 uppercase">{form.unit || 'Pcs'}</span>
                         <span className="italic text-gray-400 text-[11px]">(use 1 for per-unit quantities)</span>
@@ -1944,7 +1944,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
               <button
                 type="submit"
                 disabled={isSaving}
-                className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl text-xs transition-all shadow-sm cursor-pointer flex items-center gap-2 disabled:opacity-50"
+                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-xs transition-all shadow-sm cursor-pointer flex items-center gap-2 disabled:opacity-50"
               >
                 {isSaving ? (
                   <>

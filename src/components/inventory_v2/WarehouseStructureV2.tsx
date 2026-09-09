@@ -301,7 +301,7 @@ const WarehouseStructureV2: React.FC = () => {
       case 'Floor':
         return <Layers className="w-4 h-4 text-blue-600 shrink-0" />;
       case 'Zone':
-        return <Folder className="w-4 h-4 text-purple-600 shrink-0" />;
+        return <Folder className="w-4 h-4 text-blue-600 shrink-0" />;
       case 'Storage Location':
         return <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />;
       default:
@@ -317,7 +317,7 @@ const WarehouseStructureV2: React.FC = () => {
       case 'Floor':
         return 'bg-blue-50 text-blue-800 border-blue-200';
       case 'Zone':
-        return 'bg-purple-50 text-purple-800 border-purple-200';
+        return 'bg-blue-50 text-blue-800 border-blue-200';
       case 'Storage Location':
         return 'bg-emerald-50 text-emerald-800 border-emerald-200';
       default:
@@ -528,7 +528,7 @@ const WarehouseStructureV2: React.FC = () => {
         </div>
         <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-3xs col-span-2 md:col-span-1">
           <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Avg Occupancy</span>
-          <span className="text-xl font-black text-purple-600 mt-1 block">{avgOccupancy}%</span>
+          <span className="text-xl font-black text-blue-600 mt-1 block">{avgOccupancy}%</span>
         </div>
       </div>
 

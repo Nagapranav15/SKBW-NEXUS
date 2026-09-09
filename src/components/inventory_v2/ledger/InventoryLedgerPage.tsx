@@ -163,8 +163,8 @@ const getTypeBadgeStyle = (type: string) => {
     };
   } else if (t.includes('CONVERSION')) {
     return {
-      bg: 'bg-purple-50 text-purple-700 border-purple-200',
-      icon: <RotateCcw className="w-3 h-3 text-purple-600 shrink-0" />
+      bg: 'bg-blue-50 text-blue-700 border-blue-200',
+      icon: <RotateCcw className="w-3 h-3 text-blue-600 shrink-0" />
     };
   } else if (t.includes('ADJUSTMENT')) {
     return {
@@ -697,7 +697,7 @@ const InventoryLedgerPage: React.FC = () => {
                     onClick={handlePrint}
                     className="flex items-center gap-2.5 w-full px-3.5 py-2.5 hover:bg-gray-50 text-gray-700 transition-colors"
                   >
-                    <Printer className="w-4 h-4 text-purple-600" />
+                    <Printer className="w-4 h-4 text-blue-600" />
                     <span>Print Ledger</span>
                   </button>
                 </div>
@@ -762,15 +762,15 @@ const InventoryLedgerPage: React.FC = () => {
 
         <button
           onClick={() => handleStatCardClick('ADJUSTMENT')}
-          className={`w-full text-left rounded-xl shadow-xs border p-3 border-l-4 border-l-purple-500 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] group ${
+          className={`w-full text-left rounded-xl shadow-xs border p-3 border-l-4 border-l-blue-500 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] group ${
             activeStatFilter === 'ADJUSTMENT' 
-              ? 'bg-purple-50/40 border-purple-400 ring-2 ring-purple-100 shadow-sm' 
+              ? 'bg-blue-50/40 border-blue-400 ring-2 ring-blue-100 shadow-sm' 
               : 'bg-white border-gray-100 hover:shadow-md hover:-translate-y-0.5'
           }`}
         >
           <div>
-            <p className={`text-xs font-semibold uppercase tracking-wider transition-colors ${activeStatFilter === 'ADJUSTMENT' ? 'text-purple-600' : 'text-gray-400 group-hover:text-purple-500'}`}>ADJUSTMENTS (TOTAL)</p>
-            <p className="text-2xl font-bold text-purple-600 mt-0.5">+190 KG</p>
+            <p className={`text-xs font-semibold uppercase tracking-wider transition-colors ${activeStatFilter === 'ADJUSTMENT' ? 'text-blue-600' : 'text-gray-400 group-hover:text-blue-500'}`}>ADJUSTMENTS (TOTAL)</p>
+            <p className="text-2xl font-bold text-blue-600 mt-0.5">+190 KG</p>
             <p className="text-[10px] text-gray-400 font-medium mt-0.5">Across all items</p>
           </div>
         </button>

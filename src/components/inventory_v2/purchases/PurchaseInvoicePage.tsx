@@ -1236,15 +1236,15 @@ const PurchaseInvoicePage: React.FC = () => {
 
                 <button
                   onClick={() => handleStatsCardClick('Draft')}
-                  className={`w-full text-left rounded-xl shadow-xs border p-3 border-l-4 border-l-purple-500 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] group ${
+                  className={`w-full text-left rounded-xl shadow-xs border p-3 border-l-4 border-l-blue-500 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] group ${
                     statusFilter === 'Draft' 
-                      ? 'bg-purple-50/40 border-purple-400 ring-2 ring-purple-100 shadow-sm' 
+                      ? 'bg-blue-50/40 border-blue-400 ring-2 ring-blue-100 shadow-sm' 
                       : 'bg-white border-gray-100 hover:shadow-md hover:-translate-y-0.5'
                   }`}
                 >
                   <div>
-                    <p className={`text-xs font-semibold uppercase tracking-wider transition-colors ${statusFilter === 'Draft' ? 'text-purple-600' : 'text-gray-400 group-hover:text-purple-500'}`}>Pending Receipts</p>
-                    <p className="text-2xl font-bold text-purple-600 mt-0.5">{dashboardPendingReceipts}</p>
+                    <p className={`text-xs font-semibold uppercase tracking-wider transition-colors ${statusFilter === 'Draft' ? 'text-blue-600' : 'text-gray-400 group-hover:text-blue-500'}`}>Pending Receipts</p>
+                    <p className="text-2xl font-bold text-blue-600 mt-0.5">{dashboardPendingReceipts}</p>
                   </div>
                 </button>
 
@@ -2301,9 +2301,9 @@ const PurchaseInvoicePage: React.FC = () => {
                   </div>
 
                   {/* Card 3: Purchase Date */}
-                  <div className="bg-purple-50/40 border border-purple-100 rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-                    <span className="block text-[10px] text-purple-650 font-bold uppercase tracking-wider leading-tight">Purchase Date</span>
-                    <span className="block text-xs text-purple-900 font-extrabold mt-1 truncate px-1">
+                  <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+                    <span className="block text-[10px] text-blue-650 font-bold uppercase tracking-wider leading-tight">Purchase Date</span>
+                    <span className="block text-xs text-blue-900 font-extrabold mt-1 truncate px-1">
                       {selectedInvoice.createdAt ? new Date(selectedInvoice.createdAt).toLocaleDateString('en-IN') : '—'}
                     </span>
                   </div>

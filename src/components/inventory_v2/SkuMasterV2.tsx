@@ -1366,11 +1366,11 @@ const SkuMasterV2: React.FC = () => {
           onClick={() => setActiveMainTab('products')}
           className={`flex items-center gap-2 px-4 py-2.5 text-xs md:text-sm font-semibold rounded-t-xl transition-all cursor-pointer whitespace-nowrap ${
             activeMainTab === 'products'
-              ? 'text-purple-700 border-b-2 border-purple-600 bg-purple-50/40'
+              ? 'text-blue-700 border-b-2 border-blue-600 bg-blue-50/40'
               : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100/50'
           }`}
         >
-          <BookOpen className={`w-4 h-4 ${activeMainTab === 'products' ? 'text-purple-600' : 'text-gray-400'}`} />
+          <BookOpen className={`w-4 h-4 ${activeMainTab === 'products' ? 'text-blue-600' : 'text-gray-400'}`} />
           <span>Products</span>
         </button>
 
@@ -1379,11 +1379,11 @@ const SkuMasterV2: React.FC = () => {
           onClick={() => setActiveMainTab('materials')}
           className={`flex items-center gap-2 px-4 py-2.5 text-xs md:text-sm font-semibold rounded-t-xl transition-all cursor-pointer whitespace-nowrap ${
             activeMainTab === 'materials'
-              ? 'text-purple-700 border-b-2 border-purple-600 bg-purple-50/40'
+              ? 'text-blue-700 border-b-2 border-blue-600 bg-blue-50/40'
               : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100/50'
           }`}
         >
-          <Scroll className={`w-4 h-4 ${activeMainTab === 'materials' ? 'text-purple-600' : 'text-gray-400'}`} />
+          <Scroll className={`w-4 h-4 ${activeMainTab === 'materials' ? 'text-blue-600' : 'text-gray-400'}`} />
           <span>Materials</span>
         </button>
 
@@ -1392,11 +1392,11 @@ const SkuMasterV2: React.FC = () => {
           onClick={() => setActiveMainTab('semi')}
           className={`flex items-center gap-2 px-4 py-2.5 text-xs md:text-sm font-semibold rounded-t-xl transition-all cursor-pointer whitespace-nowrap ${
             activeMainTab === 'semi'
-              ? 'text-purple-700 border-b-2 border-purple-600 bg-purple-50/40'
+              ? 'text-blue-700 border-b-2 border-blue-600 bg-blue-50/40'
               : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100/50'
           }`}
         >
-          <Copy className={`w-4 h-4 ${activeMainTab === 'semi' ? 'text-purple-600' : 'text-gray-400'}`} />
+          <Copy className={`w-4 h-4 ${activeMainTab === 'semi' ? 'text-blue-600' : 'text-gray-400'}`} />
           <span>Semi</span>
         </button>
 
@@ -1405,11 +1405,11 @@ const SkuMasterV2: React.FC = () => {
           onClick={() => setActiveMainTab('categories')}
           className={`flex items-center gap-2 px-4 py-2.5 text-xs md:text-sm font-semibold rounded-t-xl transition-all cursor-pointer whitespace-nowrap ${
             activeMainTab === 'categories'
-              ? 'text-purple-700 border-b-2 border-purple-600 bg-purple-50/40'
+              ? 'text-blue-700 border-b-2 border-blue-600 bg-blue-50/40'
               : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100/50'
           }`}
         >
-          <Folder className={`w-4 h-4 ${activeMainTab === 'categories' ? 'text-purple-600' : 'text-gray-400'}`} />
+          <Folder className={`w-4 h-4 ${activeMainTab === 'categories' ? 'text-blue-600' : 'text-gray-400'}`} />
           <span>Categories</span>
         </button>
       </div>
@@ -1426,7 +1426,7 @@ const SkuMasterV2: React.FC = () => {
             {/* Left Counter */}
             <div className="flex items-center gap-2">
               <span className="text-sm font-bold text-gray-700">
-                Items: <span className="text-purple-600 font-bold">{total}</span>
+                Items: <span className="text-blue-600 font-bold">{total}</span>
               </span>
             </div>
 
@@ -1439,11 +1439,11 @@ const SkuMasterV2: React.FC = () => {
                   type="button"
                   onClick={() => setShowColumnCustomizer(!showColumnCustomizer)}
                   className={`px-3 py-2 rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-2xs ${
-                    showColumnCustomizer ? 'bg-purple-50 text-purple-700 border-purple-300' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                    showColumnCustomizer ? 'bg-blue-50 text-blue-700 border-blue-300' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
                   }`}
                   title="Customize & Rearrange Columns"
                 >
-                  <SlidersHorizontal className="w-3.5 h-3.5 text-purple-600" />
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-blue-600" />
                   <span>Columns ({columnsConfig.filter(c => c.visible).length})</span>
                 </button>
 
@@ -1458,7 +1458,7 @@ const SkuMasterV2: React.FC = () => {
                           else if (activeMainTab === 'semi') setColumnsConfig(DEFAULT_SEMI_COLUMNS);
                           else setColumnsConfig(DEFAULT_PRODUCTS_COLUMNS);
                         }}
-                        className="text-[10.5px] font-bold text-purple-600 hover:underline cursor-pointer"
+                        className="text-[10.5px] font-bold text-blue-600 hover:underline cursor-pointer"
                       >
                         Reset default
                       </button>
@@ -1480,8 +1480,8 @@ const SkuMasterV2: React.FC = () => {
                           onDrop={(e) => handlePopoverDrop(e, idx)}
                           className={`flex items-center justify-between p-2.5 rounded-xl border text-xs font-semibold cursor-grab active:cursor-grabbing transition-all select-none ${
                             draggedPopoverColIdx === idx
-                              ? 'bg-purple-100/90 border-purple-500 shadow-xl scale-[1.02] opacity-80 ring-2 ring-purple-400 z-10'
-                              : 'bg-gray-50/80 border-gray-200/80 hover:bg-purple-50/40 hover:border-purple-300'
+                              ? 'bg-blue-100/90 border-blue-500 shadow-xl scale-[1.02] opacity-80 ring-2 ring-blue-400 z-10'
+                              : 'bg-gray-50/80 border-gray-200/80 hover:bg-blue-50/40 hover:border-blue-300'
                           }`}
                         >
                           <label className="flex items-center gap-2.5 cursor-pointer text-gray-800 font-semibold" onClick={(e) => e.stopPropagation()}>
@@ -1493,7 +1493,7 @@ const SkuMasterV2: React.FC = () => {
                                 const checked = e.target.checked;
                                 setColumnsConfig(prev => prev.map(c => c.id === col.id ? { ...c, visible: checked } : c));
                               }}
-                              className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-3.5 h-3.5 cursor-pointer"
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
                             />
                             <span className="text-[12px]">{col.label}</span>
                           </label>
@@ -1514,12 +1514,12 @@ const SkuMasterV2: React.FC = () => {
                   onClick={() => setShowFilterPanel(!showFilterPanel)}
                   className={`p-2 rounded-lg border transition-all cursor-pointer ${
                     showFilterPanel || filterRules.length > 0
-                      ? 'bg-purple-50 text-purple-700 border-purple-300'
-                      : 'bg-white text-purple-600 border-gray-200 hover:bg-purple-50/50'
+                      ? 'bg-blue-50 text-blue-700 border-blue-300'
+                      : 'bg-white text-blue-600 border-gray-200 hover:bg-blue-50/50'
                   }`}
                   title="Filter options"
                 >
-                  <Filter className="w-4 h-4 text-purple-600" />
+                  <Filter className="w-4 h-4 text-blue-600" />
                 </button>
 
                 {/* Filter Popover matching Images 3 & 4 */}
@@ -1621,7 +1621,7 @@ const SkuMasterV2: React.FC = () => {
                           { id: 'filter_' + Date.now(), field: 'name', operator: 'contains', value: '' }
                         ]);
                       }}
-                      className="w-full mt-3 py-2.5 border border-dashed border-gray-300 hover:border-purple-300 hover:bg-purple-50/40 rounded-xl text-xs font-semibold text-gray-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      className="w-full mt-3 py-2.5 border border-dashed border-gray-300 hover:border-blue-300 hover:bg-blue-50/40 rounded-xl text-xs font-semibold text-gray-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Add filter</span>
@@ -1640,7 +1640,7 @@ const SkuMasterV2: React.FC = () => {
                       showProductTypeDropdown ? 'border-emerald-600 ring-2 ring-emerald-100' : 'border-gray-200'
                     }`}
                   >
-                    <BookOpen className="w-3.5 h-3.5 text-purple-600" />
+                    <BookOpen className="w-3.5 h-3.5 text-blue-600" />
                     <span>
                       {selectedProductSubFilter === 'all'
                         ? 'All products'
@@ -1649,7 +1649,7 @@ const SkuMasterV2: React.FC = () => {
                         : 'Diaries & Registers'}
                     </span>
                     {showProductTypeDropdown ? (
-                      <ChevronUp className="w-3.5 h-3.5 text-purple-600 ml-1" />
+                      <ChevronUp className="w-3.5 h-3.5 text-blue-600 ml-1" />
                     ) : (
                       <ChevronDown className="w-3.5 h-3.5 text-gray-400 ml-1" />
                     )}
@@ -1667,16 +1667,16 @@ const SkuMasterV2: React.FC = () => {
                         }}
                         className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                           selectedProductSubFilter === 'all'
-                            ? 'bg-emerald-50/70 text-purple-700 font-bold'
+                            ? 'bg-emerald-50/70 text-blue-700 font-bold'
                             : 'text-gray-700 hover:bg-gray-50'
                         }`}
                       >
                         <div className="flex items-center gap-2.5">
-                          <BookOpen className="w-4 h-4 text-purple-600" />
+                          <BookOpen className="w-4 h-4 text-blue-600" />
                           <span>All products ({productCounts.all})</span>
                         </div>
                         {selectedProductSubFilter === 'all' && (
-                          <Check className="w-4 h-4 text-purple-600 font-bold stroke-[3]" />
+                          <Check className="w-4 h-4 text-blue-600 font-bold stroke-[3]" />
                         )}
                       </button>
 
@@ -1688,16 +1688,16 @@ const SkuMasterV2: React.FC = () => {
                         }}
                         className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                           selectedProductSubFilter === 'finished-goods'
-                            ? 'bg-emerald-50/70 text-purple-700 font-bold'
+                            ? 'bg-emerald-50/70 text-blue-700 font-bold'
                             : 'text-gray-700 hover:bg-gray-50'
                         }`}
                       >
                         <div className="flex items-center gap-2.5">
-                          <Book className="w-4 h-4 text-purple-600" />
+                          <Book className="w-4 h-4 text-blue-600" />
                           <span>Finished Goods ({productCounts.finishedGoods})</span>
                         </div>
                         {selectedProductSubFilter === 'finished-goods' && (
-                          <Check className="w-4 h-4 text-purple-600 font-bold stroke-[3]" />
+                          <Check className="w-4 h-4 text-blue-600 font-bold stroke-[3]" />
                         )}
                       </button>
 
@@ -1709,16 +1709,16 @@ const SkuMasterV2: React.FC = () => {
                         }}
                         className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                           selectedProductSubFilter === 'sub-assemblies'
-                            ? 'bg-emerald-50/70 text-purple-700 font-bold'
+                            ? 'bg-emerald-50/70 text-blue-700 font-bold'
                             : 'text-gray-700 hover:bg-gray-50'
                         }`}
                       >
                         <div className="flex items-center gap-2.5">
-                          <Scroll className="w-4 h-4 text-purple-600" />
+                          <Scroll className="w-4 h-4 text-blue-600" />
                           <span>Diaries & Registers ({productCounts.subAssemblies})</span>
                         </div>
                         {selectedProductSubFilter === 'sub-assemblies' && (
-                          <Check className="w-4 h-4 text-purple-600 font-bold stroke-[3]" />
+                          <Check className="w-4 h-4 text-blue-600 font-bold stroke-[3]" />
                         )}
                       </button>
                     </div>
@@ -1729,7 +1729,7 @@ const SkuMasterV2: React.FC = () => {
               {/* 3. Help icon button */}
               <button 
                 onClick={() => setShowHelpModal(true)}
-                className="p-2 text-purple-600 hover:bg-purple-50/50 rounded-lg border border-transparent hover:border-purple-100 transition-all cursor-pointer"
+                className="p-2 text-blue-600 hover:bg-blue-50/50 rounded-lg border border-transparent hover:border-blue-100 transition-all cursor-pointer"
                 title="Help & Info"
               >
                 <HelpCircle className="w-4 h-4" />
@@ -1749,7 +1749,7 @@ const SkuMasterV2: React.FC = () => {
               {/* 5. Share / Export button */}
               <button 
                 onClick={handleExportCSV}
-                className="p-2 text-purple-600 hover:bg-purple-50/50 rounded-lg border border-transparent hover:border-purple-100 transition-all cursor-pointer"
+                className="p-2 text-blue-600 hover:bg-blue-50/50 rounded-lg border border-transparent hover:border-blue-100 transition-all cursor-pointer"
                 title="Export Data"
               >
                 <Share2 className="w-4 h-4" />
@@ -1763,7 +1763,7 @@ const SkuMasterV2: React.FC = () => {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder={`Search ${getTabLabel(activeMainTab).toLowerCase()}...`}
-                  className="pl-9 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-xl w-48 md:w-60 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-100 shadow-2xs"
+                  className="pl-9 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-xl w-48 md:w-60 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs"
                 />
                 {search && (
                   <button 
@@ -1778,7 +1778,7 @@ const SkuMasterV2: React.FC = () => {
               {/* 7. Download icon button */}
               <button
                 onClick={handleExportCSV}
-                className="p-2 text-purple-600 hover:bg-purple-50/50 rounded-lg border border-transparent hover:border-purple-100 transition-all cursor-pointer"
+                className="p-2 text-blue-600 hover:bg-blue-50/50 rounded-lg border border-transparent hover:border-blue-100 transition-all cursor-pointer"
                 title="Download CSV/Excel"
               >
                 <Download className="w-4 h-4" />
@@ -1787,10 +1787,10 @@ const SkuMasterV2: React.FC = () => {
               {/* 8. Plus Circle Button */}
               <button
                 onClick={() => { setEditSku(null); setShowAddDrawer(true); }}
-                className="w-8 h-8 rounded-full border border-gray-200 bg-white hover:bg-purple-50 text-purple-600 flex items-center justify-center transition-all shadow-2xs cursor-pointer font-bold"
+                className="w-8 h-8 rounded-full border border-gray-200 bg-white hover:bg-blue-50 text-blue-600 flex items-center justify-center transition-all shadow-2xs cursor-pointer font-bold"
                 title={`Add ${getTabLabel(activeMainTab).slice(0, -1)}`}
               >
-                <Plus className="w-4 h-4 text-purple-600" />
+                <Plus className="w-4 h-4 text-blue-600" />
               </button>
 
             </div>
@@ -1798,17 +1798,17 @@ const SkuMasterV2: React.FC = () => {
 
           {/* Filter Panel Drawer if toggled */}
           {showFilterPanel && (
-            <div className="p-4 bg-purple-50/40 border-b border-purple-100 flex items-center justify-between text-xs">
+            <div className="p-4 bg-blue-50/40 border-b border-blue-100 flex items-center justify-between text-xs">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-purple-900">Active Filters:</span>
+                <span className="font-semibold text-blue-900">Active Filters:</span>
                 {categoryFilter && (
-                  <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded-md font-medium flex items-center gap-1">
+                  <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md font-medium flex items-center gap-1">
                     Category: {categoryFilter}
                     <X className="w-3 h-3 cursor-pointer" onClick={() => setCategoryFilter('')} />
                   </span>
                 )}
                 {search && (
-                  <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded-md font-medium flex items-center gap-1">
+                  <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md font-medium flex items-center gap-1">
                     Search: "{search}"
                     <X className="w-3 h-3 cursor-pointer" onClick={() => setSearch('')} />
                   </span>
@@ -1816,7 +1816,7 @@ const SkuMasterV2: React.FC = () => {
               </div>
               <button
                 onClick={() => { setCategoryFilter(''); setSearch(''); }}
-                className="text-purple-700 hover:underline font-semibold cursor-pointer"
+                className="text-blue-700 hover:underline font-semibold cursor-pointer"
               >
                 Clear all filters
               </button>
@@ -1825,8 +1825,8 @@ const SkuMasterV2: React.FC = () => {
 
           {/* Drag & Drop Column Reordering Bar */}
           {customColumns.length > 0 && (
-            <div className="bg-purple-50/50 border-b border-purple-100 px-4 py-2 flex items-center gap-2 overflow-x-auto text-xs">
-              <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider whitespace-nowrap flex items-center gap-1">
+            <div className="bg-blue-50/50 border-b border-blue-100 px-4 py-2 flex items-center gap-2 overflow-x-auto text-xs">
+              <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider whitespace-nowrap flex items-center gap-1">
                 <span>⋮⋮</span> Drag to reorder columns:
               </span>
               {customColumns.map((col, idx) => (
@@ -1836,8 +1836,8 @@ const SkuMasterV2: React.FC = () => {
                   onDragStart={(e) => handleDragStart(e, idx)}
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, idx)}
-                  className={`inline-flex items-center gap-1.5 bg-white border border-purple-200 hover:border-purple-400 px-2.5 py-1 rounded-xl text-xs font-semibold text-purple-900 shadow-2xs cursor-grab active:cursor-grabbing transition-all ${
-                    draggedColIdx === idx ? 'opacity-40 ring-2 ring-purple-400' : ''
+                  className={`inline-flex items-center gap-1.5 bg-white border border-blue-200 hover:border-blue-400 px-2.5 py-1 rounded-xl text-xs font-semibold text-blue-900 shadow-2xs cursor-grab active:cursor-grabbing transition-all ${
+                    draggedColIdx === idx ? 'opacity-40 ring-2 ring-blue-400' : ''
                   }`}
                 >
                   <span className="text-gray-400 font-bold select-none text-[10px]">⋮⋮</span>
@@ -1864,7 +1864,7 @@ const SkuMasterV2: React.FC = () => {
                       type="checkbox"
                       checked={paginatedSkus.length > 0 && selectedIds.length === paginatedSkus.length}
                       onChange={(e) => handleSelectAll(e.target.checked)}
-                      className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                     />
                   </th>
 
@@ -1886,8 +1886,8 @@ const SkuMasterV2: React.FC = () => {
                       onDragStart={(e) => handleDragStart(e, idx)}
                       onDragOver={handleDragOver}
                       onDrop={(e) => handleDrop(e, idx)}
-                      className={`py-3 px-3 whitespace-nowrap group cursor-grab active:cursor-grabbing hover:bg-purple-50 transition-colors ${
-                        draggedColIdx === idx ? 'opacity-40 bg-purple-100/50' : ''
+                      className={`py-3 px-3 whitespace-nowrap group cursor-grab active:cursor-grabbing hover:bg-blue-50 transition-colors ${
+                        draggedColIdx === idx ? 'opacity-40 bg-blue-100/50' : ''
                       }`}
                     >
                       <div className="flex items-center gap-1.5">
@@ -1897,7 +1897,7 @@ const SkuMasterV2: React.FC = () => {
                           {idx > 0 && (
                             <button
                               onClick={() => moveColumnLeft(idx)}
-                              className="hover:text-purple-600 px-0.5 cursor-pointer"
+                              className="hover:text-blue-600 px-0.5 cursor-pointer"
                               title="Move column left"
                             >
                               ‹
@@ -1906,7 +1906,7 @@ const SkuMasterV2: React.FC = () => {
                           {idx < customColumns.length - 1 && (
                             <button
                               onClick={() => moveColumnRight(idx)}
-                              className="hover:text-purple-600 px-0.5 cursor-pointer"
+                              className="hover:text-blue-600 px-0.5 cursor-pointer"
                               title="Move column right"
                             >
                               ›
@@ -1928,7 +1928,7 @@ const SkuMasterV2: React.FC = () => {
                   <th className="py-3 px-2 text-center w-8 whitespace-nowrap">
                     <button
                       onClick={handleAddCustomColumn}
-                      className="p-1 rounded-md text-gray-400 hover:text-purple-600 hover:bg-purple-50 font-bold transition-all cursor-pointer"
+                      className="p-1 rounded-md text-gray-400 hover:text-blue-600 hover:bg-blue-50 font-bold transition-all cursor-pointer"
                       title="Add Custom Column"
                     >
                       <Plus className="w-3.5 h-3.5" />
@@ -1944,7 +1944,7 @@ const SkuMasterV2: React.FC = () => {
                   <tr>
                     <td colSpan={1 + visibleColumns.length + customColumns.length + 2} className="py-12 text-center text-gray-400 whitespace-nowrap">
                       <div className="inline-flex items-center gap-2">
-                        <RefreshCw className="w-4 h-4 animate-spin text-purple-600" />
+                        <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
                         <span>Loading items...</span>
                       </div>
                     </td>
@@ -1973,14 +1973,14 @@ const SkuMasterV2: React.FC = () => {
                           animation: 'slideDownFade 0.35s ease-out forwards',
                           animationDelay: `${index * 45}ms`
                         }}
-                        className={`hover:bg-purple-50/20 transition-all cursor-pointer opacity-0 whitespace-nowrap ${isSelected ? 'bg-purple-50/30' : ''}`}
+                        className={`hover:bg-blue-50/20 transition-all cursor-pointer opacity-0 whitespace-nowrap ${isSelected ? 'bg-blue-50/30' : ''}`}
                       >
                         <td className="py-3 px-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                           <input
                             type="checkbox"
                             checked={isSelected}
                             onChange={(e) => handleSelectRow(sku._id!, e.target.checked)}
-                            className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                           />
                         </td>
 
@@ -2112,7 +2112,7 @@ const SkuMasterV2: React.FC = () => {
                             case 'dispatchOrders':
                               return (
                                 <td key="dispatchOrders" className="py-3 px-3 whitespace-nowrap">
-                                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold bg-purple-50 text-purple-600 border border-purple-200">
+                                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-200">
                                     {getDispatchOrderCount(sku)}
                                   </span>
                                 </td>
@@ -2152,7 +2152,7 @@ const SkuMasterV2: React.FC = () => {
                                   type="checkbox"
                                   checked={!!cellVal}
                                   onChange={(e) => setCustomColumnValues(prev => ({ ...prev, [valKey]: e.target.checked }))}
-                                  className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                 />
                               </td>
                             );
@@ -2166,7 +2166,7 @@ const SkuMasterV2: React.FC = () => {
                                   value={cellVal ?? ''}
                                   placeholder="0"
                                   onChange={(e) => setCustomColumnValues(prev => ({ ...prev, [valKey]: e.target.value }))}
-                                  className="px-2 py-1 text-xs font-mono font-semibold bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-1 focus:ring-purple-400 focus:border-purple-400 w-24"
+                                  className="px-2 py-1 text-xs font-mono font-semibold bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-1 focus:ring-blue-400 focus:border-blue-400 w-24"
                                 />
                               </td>
                             );
@@ -2179,7 +2179,7 @@ const SkuMasterV2: React.FC = () => {
                                   type="date"
                                   value={cellVal ?? ''}
                                   onChange={(e) => setCustomColumnValues(prev => ({ ...prev, [valKey]: e.target.value }))}
-                                  className="px-2 py-1 text-xs font-semibold bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-1 focus:ring-purple-400 focus:border-purple-400"
+                                  className="px-2 py-1 text-xs font-semibold bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-1 focus:ring-blue-400 focus:border-blue-400"
                                 />
                               </td>
                             );
@@ -2213,7 +2213,7 @@ const SkuMasterV2: React.FC = () => {
                             const expression = customColumnFormulas[col] || '';
                             const calculatedVal = evaluateFormula(expression, sku);
                             return (
-                              <td key={col} className="py-3 px-3 whitespace-nowrap font-mono font-bold text-purple-700 text-xs">
+                              <td key={col} className="py-3 px-3 whitespace-nowrap font-mono font-bold text-blue-700 text-xs">
                                 {calculatedVal}
                               </td>
                             );
@@ -2226,7 +2226,7 @@ const SkuMasterV2: React.FC = () => {
                                 value={cellVal ?? ''}
                                 placeholder={`Set ${col.toLowerCase()}...`}
                                 onChange={(e) => setCustomColumnValues(prev => ({ ...prev, [valKey]: e.target.value }))}
-                                className="px-2.5 py-1 text-xs font-semibold bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-1 focus:ring-purple-400 focus:border-purple-400 w-28"
+                                className="px-2.5 py-1 text-xs font-semibold bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-1 focus:ring-blue-400 focus:border-blue-400 w-28"
                               />
                             </td>
                           );
@@ -2246,10 +2246,10 @@ const SkuMasterV2: React.FC = () => {
                                 setEditSku(sku);
                                 setShowAddDrawer(true);
                               }}
-                              className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-all cursor-pointer font-bold"
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-all cursor-pointer font-bold"
                               title="Edit item"
                             >
-                              <Edit className="w-4 h-4 text-purple-600" />
+                              <Edit className="w-4 h-4 text-blue-600" />
                             </button>
 
                             {/* Trash Delete Icon */}
@@ -2274,7 +2274,7 @@ const SkuMasterV2: React.FC = () => {
           <div className="p-4 border-t border-gray-100 bg-gray-50/40">
             <button
               onClick={() => { setEditSku(null); setShowAddDrawer(true); }}
-              className="px-4 py-2 border border-purple-300 text-purple-600 hover:bg-purple-50 bg-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+              className="px-4 py-2 border border-blue-300 text-blue-600 hover:bg-blue-50 bg-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Add {activeMainTab === 'products' ? 'product' : activeMainTab === 'materials' ? 'raw material' : 'semi finished material'}</span>
@@ -2292,7 +2292,7 @@ const SkuMasterV2: React.FC = () => {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-2 border-b border-gray-100">
             <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
               {activeCategorySubTab === 'products' ? 'Product Categories:' : activeCategorySubTab === 'materials' ? 'Material Categories:' : 'Semi Categories:'} 
-              <span className="text-purple-600 font-bold ml-1">
+              <span className="text-blue-600 font-bold ml-1">
                 {categoriesData.filter(c => c.type === activeCategorySubTab).length}
               </span>
             </h2>
@@ -2300,7 +2300,7 @@ const SkuMasterV2: React.FC = () => {
             <div className="flex items-center gap-2">
               <button 
                 onClick={handleOpenAddCategoryModal}
-                className="p-2 bg-purple-600 hover:bg-purple-700 text-white rounded-full transition-all shadow-sm cursor-pointer"
+                className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full transition-all shadow-sm cursor-pointer"
                 title="Add Category"
               >
                 <Plus className="w-4 h-4" />
@@ -2320,7 +2320,7 @@ const SkuMasterV2: React.FC = () => {
                 onClick={() => setActiveCategorySubTab('products')}
                 className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                   activeCategorySubTab === 'products'
-                    ? 'bg-white text-purple-700 shadow-2xs font-bold'
+                    ? 'bg-white text-blue-700 shadow-2xs font-bold'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
@@ -2331,7 +2331,7 @@ const SkuMasterV2: React.FC = () => {
                 onClick={() => setActiveCategorySubTab('materials')}
                 className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                   activeCategorySubTab === 'materials'
-                    ? 'bg-white text-purple-700 shadow-2xs font-bold'
+                    ? 'bg-white text-blue-700 shadow-2xs font-bold'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
@@ -2342,7 +2342,7 @@ const SkuMasterV2: React.FC = () => {
                 onClick={() => setActiveCategorySubTab('semi')}
                 className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                   activeCategorySubTab === 'semi'
-                    ? 'bg-white text-purple-700 shadow-2xs font-bold'
+                    ? 'bg-white text-blue-700 shadow-2xs font-bold'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
@@ -2353,7 +2353,7 @@ const SkuMasterV2: React.FC = () => {
 
           {/* Select all bar */}
           <div className="bg-gray-50 border border-gray-200/80 rounded-xl px-4 py-2.5 flex items-center gap-2 text-xs font-semibold text-gray-600">
-            <input type="checkbox" className="rounded border-gray-300 text-purple-600" />
+            <input type="checkbox" className="rounded border-gray-300 text-blue-600" />
             <span>Select all</span>
           </div>
 
@@ -2366,13 +2366,13 @@ const SkuMasterV2: React.FC = () => {
               return (
                 <div 
                   key={cat.id}
-                  className="bg-white border border-gray-200 hover:border-purple-300 rounded-2xl p-4 shadow-2xs transition-all space-y-3"
+                  className="bg-white border border-gray-200 hover:border-blue-300 rounded-2xl p-4 shadow-2xs transition-all space-y-3"
                 >
                   <div className="flex items-center justify-between">
                     
                     {/* Left Details */}
                     <div className="flex items-center gap-3">
-                      <input type="checkbox" className="rounded border-gray-300 text-purple-600" />
+                      <input type="checkbox" className="rounded border-gray-300 text-blue-600" />
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-gray-900 text-sm">{cat.name}</span>
@@ -2401,7 +2401,7 @@ const SkuMasterV2: React.FC = () => {
                       <div className="flex items-center gap-1">
                         <button 
                           onClick={() => handleOpenEditCategoryModal(cat)}
-                          className="p-1.5 text-gray-400 hover:text-purple-600 rounded-lg hover:bg-purple-50 transition-all cursor-pointer"
+                          className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-all cursor-pointer"
                           title="Edit category"
                         >
                           <Edit className="w-4 h-4" />
@@ -2449,7 +2449,7 @@ const SkuMasterV2: React.FC = () => {
           {/* Bottom Dashed Add Category Dropzone */}
           <div
             onClick={handleOpenAddCategoryModal}
-            className="border-2 border-dashed border-gray-200 hover:border-purple-400 rounded-2xl p-4 text-center text-purple-600 font-semibold text-xs hover:bg-purple-50/40 cursor-pointer transition-all flex items-center justify-center gap-2"
+            className="border-2 border-dashed border-gray-200 hover:border-blue-400 rounded-2xl p-4 text-center text-blue-600 font-semibold text-xs hover:bg-blue-50/40 cursor-pointer transition-all flex items-center justify-center gap-2"
           >
             <Plus className="w-4 h-4" />
             <span>+ Add {activeCategorySubTab === 'products' ? 'product' : activeCategorySubTab === 'materials' ? 'material' : 'semi'} category</span>
@@ -2498,28 +2498,28 @@ const SkuMasterV2: React.FC = () => {
               <button
                 disabled={page <= 1}
                 onClick={() => setPage(1)}
-                className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-600 hover:text-purple-600 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
+                className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-600 hover:text-blue-600 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
               >
                 &laquo;
               </button>
               <button
                 disabled={page <= 1}
                 onClick={() => setPage(prev => Math.max(1, prev - 1))}
-                className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-600 hover:text-purple-600 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
+                className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-600 hover:text-blue-600 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
               >
                 &lsaquo;
               </button>
               <button
                 disabled={page >= totalPages}
                 onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
-                className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-600 hover:text-purple-600 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
+                className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-600 hover:text-blue-600 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
               >
                 &rsaquo;
               </button>
               <button
                 disabled={page >= totalPages}
                 onClick={() => setPage(totalPages)}
-                className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-600 hover:text-purple-600 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
+                className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-600 hover:text-blue-600 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
               >
                 &raquo;
               </button>
@@ -2545,7 +2545,7 @@ const SkuMasterV2: React.FC = () => {
                 value={categoryForm.name}
                 onChange={(e) => setCategoryForm(prev => ({ ...prev, name: e.target.value }))}
                 placeholder="e.g. Notebooks, Paper Reels"
-                className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-purple-500"
+                className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
               />
             </div>
 
@@ -2555,7 +2555,7 @@ const SkuMasterV2: React.FC = () => {
                 <select
                   value={categoryForm.type}
                   onChange={(e) => setCategoryForm(prev => ({ ...prev, type: e.target.value as any }))}
-                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-purple-500"
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
                 >
                   <option value="products">Products</option>
                   <option value="materials">Materials</option>
@@ -2570,7 +2570,7 @@ const SkuMasterV2: React.FC = () => {
                   value={categoryForm.uom}
                   onChange={(e) => setCategoryForm(prev => ({ ...prev, uom: e.target.value }))}
                   placeholder="e.g. Pcs, Kg, Ream"
-                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-purple-500"
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
                 />
               </div>
             </div>
@@ -2582,7 +2582,7 @@ const SkuMasterV2: React.FC = () => {
                 value={categoryForm.fieldsText}
                 onChange={(e) => setCategoryForm(prev => ({ ...prev, fieldsText: e.target.value }))}
                 placeholder="Pages, Size, GSM, Ruling"
-                className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-purple-500"
+                className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
               />
             </div>
 
@@ -2595,7 +2595,7 @@ const SkuMasterV2: React.FC = () => {
               </button>
               <button
                 onClick={handleSaveCategory}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold shadow-xs"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold shadow-xs"
               >
                 Save Category
               </button>
@@ -2690,7 +2690,7 @@ const SkuMasterV2: React.FC = () => {
                     setEditSku(itemToEdit);
                     setShowAddDrawer(true);
                   }}
-                  className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                  className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
                 >
                   <Edit className="w-3.5 h-3.5" />
                   <span>Edit Item</span>
@@ -2717,13 +2717,13 @@ const SkuMasterV2: React.FC = () => {
             <div className="border-b border-gray-200 flex items-center gap-6 text-xs font-semibold text-gray-500">
               <button
                 onClick={() => setDetailsSubTab('details')}
-                className={`pb-2 transition-all cursor-pointer ${detailsSubTab === 'details' ? 'text-purple-700 border-b-2 border-purple-600 font-bold' : 'hover:text-gray-800'}`}
+                className={`pb-2 transition-all cursor-pointer ${detailsSubTab === 'details' ? 'text-blue-700 border-b-2 border-blue-600 font-bold' : 'hover:text-gray-800'}`}
               >
                 Details & Categories
               </button>
               <button
                 onClick={() => setDetailsSubTab('work-orders')}
-                className={`pb-2 transition-all cursor-pointer flex items-center gap-1.5 ${detailsSubTab === 'work-orders' ? 'text-purple-700 border-b-2 border-purple-600 font-bold' : 'hover:text-gray-800'}`}
+                className={`pb-2 transition-all cursor-pointer flex items-center gap-1.5 ${detailsSubTab === 'work-orders' ? 'text-blue-700 border-b-2 border-blue-600 font-bold' : 'hover:text-gray-800'}`}
               >
                 <span>Work Orders</span>
                 <span className="bg-gray-100 text-gray-600 px-1.5 py-0.2 rounded-full text-[10px] font-bold">
@@ -2732,7 +2732,7 @@ const SkuMasterV2: React.FC = () => {
               </button>
               <button
                 onClick={() => setDetailsSubTab('dispatches')}
-                className={`pb-2 transition-all cursor-pointer flex items-center gap-1.5 ${detailsSubTab === 'dispatches' ? 'text-purple-700 border-b-2 border-purple-600 font-bold' : 'hover:text-gray-800'}`}
+                className={`pb-2 transition-all cursor-pointer flex items-center gap-1.5 ${detailsSubTab === 'dispatches' ? 'text-blue-700 border-b-2 border-blue-600 font-bold' : 'hover:text-gray-800'}`}
               >
                 <span>Dispatches</span>
                 <span className="bg-gray-100 text-gray-600 px-1.5 py-0.2 rounded-full text-[10px] font-bold">
@@ -2741,7 +2741,7 @@ const SkuMasterV2: React.FC = () => {
               </button>
               <button
                 onClick={() => setDetailsSubTab('rough-calc')}
-                className={`pb-2 transition-all cursor-pointer ${detailsSubTab === 'rough-calc' ? 'text-purple-700 border-b-2 border-purple-600 font-bold' : 'hover:text-gray-800'}`}
+                className={`pb-2 transition-all cursor-pointer ${detailsSubTab === 'rough-calc' ? 'text-blue-700 border-b-2 border-blue-600 font-bold' : 'hover:text-gray-800'}`}
               >
                 Rough Calculations
               </button>
@@ -2756,7 +2756,7 @@ const SkuMasterV2: React.FC = () => {
                   <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-2xs space-y-3">
                     <div className="flex items-center justify-between pb-2 border-b border-gray-100">
                       <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
+                        <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
                           <Tag className="w-4 h-4" />
                         </div>
                         <h4 className="font-bold text-gray-900 text-xs">General & Classification</h4>
@@ -2780,7 +2780,7 @@ const SkuMasterV2: React.FC = () => {
                       </div>
                       <div>
                         <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">SKU CODE</span>
-                        <span className="font-mono font-bold text-purple-600 text-xs">{selectedSkuDetails.skuCode}</span>
+                        <span className="font-mono font-bold text-blue-600 text-xs">{selectedSkuDetails.skuCode}</span>
                       </div>
                       <div>
                         <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">BRAND</span>
@@ -2856,8 +2856,8 @@ const SkuMasterV2: React.FC = () => {
                     </div>
 
                     <div className="bg-[#faf5ff] p-3 rounded-xl border border-[#f3e8ff] text-center space-y-0.5">
-                      <div className="text-[10px] font-black text-purple-600 uppercase tracking-wider">CONVERSION FORMULA</div>
-                      <div className="font-extrabold text-xs text-purple-950">
+                      <div className="text-[10px] font-black text-blue-600 uppercase tracking-wider">CONVERSION FORMULA</div>
+                      <div className="font-extrabold text-xs text-blue-950">
                         {getItemType(selectedSkuDetails) === 'materials' || selectedSkuDetails.category === 'Raw Material' ? (
                           `Direct Unit Tracking (${selectedSkuDetails.unit || 'Kg'}) • No AUOM Conversion`
                         ) : selectedSkuDetails.altUnit && selectedSkuDetails.altUnitConversion ? (
@@ -2905,7 +2905,7 @@ const SkuMasterV2: React.FC = () => {
 
                     <div className="pt-2.5 border-t border-gray-100">
                       <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1 mb-0.5">
-                        <MapPin className="w-3 h-3 text-purple-600" />
+                        <MapPin className="w-3 h-3 text-blue-600" />
                         STORAGE LOCATION
                       </div>
                       <div className="font-bold text-xs text-gray-800">{modalDynamicLocation || 'Not assigned to any location'}</div>
@@ -2928,7 +2928,7 @@ const SkuMasterV2: React.FC = () => {
                     {/* Header row */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-start gap-2">
-                        <div className="p-2 bg-purple-100 text-purple-700 rounded-xl">
+                        <div className="p-2 bg-blue-100 text-blue-700 rounded-xl">
                           <ClipboardList className="w-4 h-4" />
                         </div>
                         <div>
@@ -2955,7 +2955,7 @@ const SkuMasterV2: React.FC = () => {
                         placeholder="1"
                         value={recipeYieldQty}
                         onChange={(e) => setRecipeYieldQty(e.target.value)}
-                        className="w-16 px-2 py-0.5 border border-purple-300 rounded-md text-xs font-extrabold text-purple-700 text-center focus:ring-2 focus:ring-purple-500 bg-purple-50/60"
+                        className="w-16 px-2 py-0.5 border border-blue-300 rounded-md text-xs font-extrabold text-blue-700 text-center focus:ring-2 focus:ring-blue-500 bg-blue-50/60"
                       />
                       <span className="font-bold text-gray-700">{selectedSkuDetails?.unit || 'Pcs'}</span>
                       <span className="italic text-gray-400">(use 1 for per-unit quantities)</span>
@@ -3006,7 +3006,7 @@ const SkuMasterV2: React.FC = () => {
                                     const val = e.target.value;
                                     setBomRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, qty: val === '' ? ('' as any) : Number(val) } : item));
                                   }}
-                                  className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs font-semibold text-center focus:outline-none focus:border-purple-500"
+                                  className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs font-semibold text-center focus:outline-none focus:border-blue-500"
                                 />
                               </td>
                               <td className="py-2 px-3 text-gray-500 font-medium">{b.uom}</td>
@@ -3020,7 +3020,7 @@ const SkuMasterV2: React.FC = () => {
                                     const val = e.target.value;
                                     setBomRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, notes: val } : item));
                                   }}
-                                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1 text-xs text-gray-600 focus:outline-none focus:border-purple-500"
+                                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1 text-xs text-gray-600 focus:outline-none focus:border-blue-500"
                                 />
                               </td>
                               <td className="py-2 px-3 text-right">
@@ -3055,7 +3055,7 @@ const SkuMasterV2: React.FC = () => {
                 <div className="space-y-3 border-t border-gray-100 pt-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className="p-2 bg-purple-100 text-purple-700 rounded-xl">
+                      <div className="p-2 bg-blue-100 text-blue-700 rounded-xl">
                         <SlidersHorizontal className="w-4 h-4" />
                       </div>
                       <div>
@@ -3066,7 +3066,7 @@ const SkuMasterV2: React.FC = () => {
 
                     <button 
                       onClick={() => showToast('Process step added', 'success')}
-                      className="px-3 py-1.5 border border-purple-300 text-purple-600 bg-white hover:bg-purple-50 rounded-lg font-semibold text-xs shadow-2xs flex items-center gap-1 cursor-pointer"
+                      className="px-3 py-1.5 border border-blue-300 text-blue-600 bg-white hover:bg-blue-50 rounded-lg font-semibold text-xs shadow-2xs flex items-center gap-1 cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" /> Add Step
                     </button>
@@ -3094,7 +3094,7 @@ const SkuMasterV2: React.FC = () => {
                                 type="checkbox"
                                 checked={!!cellVal}
                                 onChange={(e) => setCustomColumnValues(prev => ({ ...prev, [valKey]: e.target.checked }))}
-                                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                               />
                               <label className="text-xs font-semibold text-gray-700">{col}</label>
                             </div>
@@ -3132,7 +3132,7 @@ const SkuMasterV2: React.FC = () => {
                           return (
                             <div key={col}>
                               <label className="block text-[11px] font-semibold text-gray-600 mb-1">{col.toLowerCase()}</label>
-                              <div className="w-full bg-purple-50/50 border border-purple-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-purple-700">
+                              <div className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-blue-700">
                                 {calculatedVal}
                               </div>
                             </div>
@@ -3147,7 +3147,7 @@ const SkuMasterV2: React.FC = () => {
                               value={cellVal ?? ''}
                               placeholder={`Enter ${col.toLowerCase()}...`}
                               onChange={(e) => setCustomColumnValues(prev => ({ ...prev, [valKey]: e.target.value }))}
-                              className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-medium text-gray-800 focus:outline-none focus:border-purple-500 shadow-2xs"
+                              className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-medium text-gray-800 focus:outline-none focus:border-blue-500 shadow-2xs"
                             />
                           </div>
                         );
@@ -3206,7 +3206,7 @@ const SkuMasterV2: React.FC = () => {
               activityLogs.map((log, idx) => (
                 <div key={log._id || idx} className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-purple-700">{log.action}</span>
+                    <span className="font-bold text-blue-700">{log.action}</span>
                     <span className="text-[10px] text-gray-400">{new Date(log.createdAt).toLocaleString()}</span>
                   </div>
                   <p className="text-gray-800 font-medium">{log.entityName}</p>
@@ -3238,7 +3238,7 @@ const SkuMasterV2: React.FC = () => {
             <div className="pt-3 flex justify-end">
               <button
                 onClick={() => setShowHelpModal(false)}
-                className="px-4 py-2 bg-purple-600 text-white rounded-xl font-semibold"
+                className="px-4 py-2 bg-blue-600 text-white rounded-xl font-semibold"
               >
                 Got it
               </button>
@@ -3270,7 +3270,7 @@ const SkuMasterV2: React.FC = () => {
                 placeholder="e.g. Remarks, Priority, Tracking URL"
                 value={newCustomColName}
                 onChange={(e) => setNewCustomColName(e.target.value)}
-                className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 bg-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 autoFocus
               />
             </div>
@@ -3420,7 +3420,7 @@ const SkuMasterV2: React.FC = () => {
                         { id: 'opt_' + Date.now(), label: `Option ${nextNum}`, color }
                       ]);
                     }}
-                    className="text-[11px] font-bold text-purple-600 hover:text-purple-700 flex items-center gap-1 cursor-pointer"
+                    className="text-[11px] font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
                   >
                     + ADD OPTION
                   </button>
@@ -3437,7 +3437,7 @@ const SkuMasterV2: React.FC = () => {
                           const val = e.target.value;
                           setDropdownOptionsList(prev => prev.map(o => o.id === opt.id ? { ...o, label: val } : o));
                         }}
-                        className="flex-1 px-3 py-1.5 border border-gray-200 rounded-xl text-xs font-medium text-gray-800 focus:ring-1 focus:ring-purple-400 bg-white"
+                        className="flex-1 px-3 py-1.5 border border-gray-200 rounded-xl text-xs font-medium text-gray-800 focus:ring-1 focus:ring-blue-400 bg-white"
                         placeholder="Option name"
                       />
 
@@ -3452,7 +3452,7 @@ const SkuMasterV2: React.FC = () => {
                             }}
                             style={{ backgroundColor: c }}
                             className={`w-3.5 h-3.5 rounded-full transition-transform cursor-pointer border border-gray-300/40 ${
-                              opt.color === c ? 'scale-125 ring-2 ring-purple-500' : 'hover:scale-110'
+                              opt.color === c ? 'scale-125 ring-2 ring-blue-500' : 'hover:scale-110'
                             }`}
                           />
                         ))}
@@ -3485,7 +3485,7 @@ const SkuMasterV2: React.FC = () => {
                   placeholder="e.g. {Stock} * {Pages}"
                   value={formulaExpression}
                   onChange={(e) => setFormulaExpression(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs font-mono text-gray-800 bg-white focus:ring-2 focus:ring-purple-500"
+                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs font-mono text-gray-800 bg-white focus:ring-2 focus:ring-blue-500"
                 />
                 <p className="text-[10px] text-gray-400 leading-normal">
                   Click a column above to insert it, or type <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-700 font-mono">{"{Column Name}"}</code> manually. Supports + - * / ( ). Division by zero shows —.
@@ -3588,7 +3588,7 @@ const SkuMasterV2: React.FC = () => {
                       value={buildBomsSearch}
                       onChange={(e) => setBuildBomsSearch(e.target.value)}
                       placeholder="Search products..."
-                      className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 shadow-2xs"
+                      className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 shadow-2xs"
                     />
                   </div>
                   <label className="flex items-center gap-2 text-[11px] font-semibold text-gray-600 cursor-pointer select-none px-1">
@@ -3596,7 +3596,7 @@ const SkuMasterV2: React.FC = () => {
                       type="checkbox"
                       checked={onlyNoRecipeFilter}
                       onChange={(e) => setOnlyNoRecipeFilter(e.target.checked)}
-                      className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     />
                     <span>Only products without a recipe</span>
                   </label>
@@ -3681,7 +3681,7 @@ const SkuMasterV2: React.FC = () => {
                           placeholder="1"
                           value={buildBatchYieldQty}
                           onChange={(e) => setBuildBatchYieldQty(e.target.value)}
-                          className="w-14 px-1.5 py-0.5 border border-purple-300 rounded text-xs font-bold text-purple-700 text-center bg-white"
+                          className="w-14 px-1.5 py-0.5 border border-blue-300 rounded text-xs font-bold text-blue-700 text-center bg-white"
                         />
                         <strong className="text-gray-800">{activeBomProduct?.unit || 'Pcs'}</strong>
                       </div>
@@ -3733,7 +3733,7 @@ const SkuMasterV2: React.FC = () => {
                                 const val = Number(e.target.value);
                                 setActiveRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, qty: val } : item));
                               }}
-                              className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs font-semibold text-center focus:outline-none focus:border-purple-500"
+                              className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs font-semibold text-center focus:outline-none focus:border-blue-500"
                             />
                           </div>
 
@@ -3750,7 +3750,7 @@ const SkuMasterV2: React.FC = () => {
                                 const val = e.target.value;
                                 setActiveRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, notes: val } : item));
                               }}
-                              className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-600 focus:outline-none focus:border-purple-500"
+                              className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-600 focus:outline-none focus:border-blue-500"
                             />
                           </div>
 
@@ -3792,7 +3792,7 @@ const SkuMasterV2: React.FC = () => {
                     value={catalogSearch}
                     onChange={(e) => setCatalogSearch(e.target.value)}
                     placeholder="Filter catalog..."
-                    className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 shadow-2xs"
+                    className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 shadow-2xs"
                   />
                 </div>
 
@@ -3829,11 +3829,11 @@ const SkuMasterV2: React.FC = () => {
                           className={`p-2 rounded-xl text-xs font-semibold flex items-center justify-between cursor-pointer transition-all border ${
                             isAdded
                               ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800'
-                              : 'bg-white border-gray-200 hover:border-purple-300 text-gray-800 shadow-2xs'
+                              : 'bg-white border-gray-200 hover:border-blue-300 text-gray-800 shadow-2xs'
                           }`}
                         >
                           <div className="flex items-center gap-1.5 min-w-0">
-                            <span className={isAdded ? 'text-emerald-600 font-bold' : 'text-purple-600 font-bold'}>
+                            <span className={isAdded ? 'text-emerald-600 font-bold' : 'text-blue-600 font-bold'}>
                               {isAdded ? '✓' : '+'}
                             </span>
                             <span className="truncate text-[11px]">{mat.name}</span>
@@ -3878,11 +3878,11 @@ const SkuMasterV2: React.FC = () => {
                           className={`p-2 rounded-xl text-xs font-semibold flex items-center justify-between cursor-pointer transition-all border ${
                             isAdded
                               ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800'
-                              : 'bg-white border-gray-200 hover:border-purple-300 text-gray-800 shadow-2xs'
+                              : 'bg-white border-gray-200 hover:border-blue-300 text-gray-800 shadow-2xs'
                           }`}
                         >
                           <div className="flex items-center gap-1.5 min-w-0">
-                            <span className={isAdded ? 'text-emerald-600 font-bold' : 'text-purple-600 font-bold'}>
+                            <span className={isAdded ? 'text-emerald-600 font-bold' : 'text-blue-600 font-bold'}>
                               {isAdded ? '✓' : '+'}
                             </span>
                             <span className="truncate text-[11px]">{semi.name}</span>

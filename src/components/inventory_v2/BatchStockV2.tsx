@@ -545,7 +545,7 @@ const BatchStockV2: React.FC = () => {
                           ledgerHistory.map((h, idx) => {
                             const typeColor = h.transactionType === 'Purchase' ? 'bg-green-50 text-green-700 border-green-200' :
                                               h.transactionType === 'Transfer' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                                              'bg-purple-50 text-purple-700 border-purple-200';
+                                              'bg-blue-50 text-blue-700 border-blue-200';
                              
                              return (
                                <tr key={idx} className="hover:bg-gray-50/50">
@@ -717,7 +717,7 @@ const BatchStockV2: React.FC = () => {
                   <button
                     className="w-full py-2.5 border border-gray-200 hover:bg-gray-50 rounded-xl transition-all shadow-3xs flex items-center justify-center gap-2"
                   >
-                    <Layers className="w-3.5 h-3.5 text-purple-600" /> Convert / Use Stock
+                    <Layers className="w-3.5 h-3.5 text-blue-600" /> Convert / Use Stock
                   </button>
                   <button
                     className="w-full py-2.5 border border-gray-200 hover:bg-gray-50 rounded-xl transition-all shadow-3xs flex items-center justify-center gap-2"
@@ -822,13 +822,13 @@ const BatchStockV2: React.FC = () => {
               onClick={() => { setFilterCategory('Semi Finished'); setPage(1); }}
               className={`w-full text-left rounded-xl border p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] group ${
                 filterCategory === 'Semi Finished' 
-                  ? 'bg-purple-50/50 border-purple-200 ring-1 ring-purple-100 shadow-2xs' 
-                  : 'bg-white border-gray-200 border-l-4 border-l-purple-500 hover:shadow-xs'
+                  ? 'bg-blue-50/50 border-blue-200 ring-1 ring-blue-100 shadow-2xs' 
+                  : 'bg-white border-gray-200 border-l-4 border-l-blue-500 hover:shadow-xs'
               }`}
             >
               <div>
-                <p className={`text-[11px] font-bold uppercase tracking-wider transition-colors ${filterCategory === 'Semi Finished' ? 'text-purple-600' : 'text-gray-400 group-hover:text-purple-500'}`}>Semi-Finished</p>
-                <p className="text-2xl font-extrabold text-purple-600 mt-1">{statSemiCount}</p>
+                <p className={`text-[11px] font-bold uppercase tracking-wider transition-colors ${filterCategory === 'Semi Finished' ? 'text-blue-600' : 'text-gray-400 group-hover:text-blue-500'}`}>Semi-Finished</p>
+                <p className="text-2xl font-extrabold text-blue-600 mt-1">{statSemiCount}</p>
                 <p className="text-[10px] text-gray-400 font-medium mt-0.5">{statSemiSheets.toLocaleString('en-IN')} Sheets</p>
               </div>
             </button>

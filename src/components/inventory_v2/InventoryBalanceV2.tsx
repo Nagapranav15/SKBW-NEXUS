@@ -212,7 +212,7 @@ const InventoryBalanceV2: React.FC = () => {
                       <td className="px-6 py-3.5 text-center">
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold inline-block ${
                           b.sku?.category === 'Raw Material' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
-                          b.sku?.category === 'Semi Finished' ? 'bg-purple-50 text-purple-700 border border-purple-100' :
+                          b.sku?.category === 'Semi Finished' ? 'bg-blue-50 text-blue-700 border border-blue-100' :
                           'bg-emerald-50 text-emerald-700 border border-emerald-100'
                         }`}>
                           {b.sku?.category}

@@ -97,7 +97,7 @@ const DashboardV2: React.FC = () => {
             </span>
             <span className="text-[10px] text-gray-400 font-bold">Ruled & Plain Inserts</span>
           </div>
-          <div className="p-3 bg-purple-50 border border-purple-100 rounded-xl text-purple-600">
+          <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-blue-600">
             <Layers className="w-5 h-5" />
           </div>
         </div>
@@ -131,7 +131,7 @@ const DashboardV2: React.FC = () => {
             </h2>
             <div className="pt-4 space-y-4">
               {stats?.categoryDistribution?.map((dist: any) => {
-                const color = dist.category === 'Raw Material' ? 'bg-amber-500' : dist.category === 'Semi Finished' ? 'bg-purple-500' : 'bg-emerald-500';
+                const color = dist.category === 'Raw Material' ? 'bg-amber-500' : dist.category === 'Semi Finished' ? 'bg-blue-500' : 'bg-emerald-500';
                 return (
                   <div key={dist.category} className="space-y-1">
                     <div className="flex justify-between text-xs font-semibold text-gray-700">

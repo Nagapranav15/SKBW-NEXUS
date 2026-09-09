@@ -1048,8 +1048,8 @@ export const StockInventoryV2: React.FC = () => {
           }}
           className={`group flex items-center justify-between px-3 py-2 rounded-xl cursor-pointer transition-all ${
             isSelected 
-              ? 'bg-purple-600 text-white font-bold shadow-xs' 
-              : 'hover:bg-purple-50/60 text-gray-800'
+              ? 'bg-blue-600 text-white font-bold shadow-xs' 
+              : 'hover:bg-blue-50/60 text-gray-800'
           }`}
         >
           <div className="flex items-center gap-2.5 min-w-0">
@@ -1057,7 +1057,7 @@ export const StockInventoryV2: React.FC = () => {
               <button
                 type="button"
                 onClick={(e) => toggleNode(node._id!, e)}
-                className={`p-0.5 rounded transition-transform ${isSelected ? 'text-white' : 'text-purple-400 group-hover:text-purple-700'}`}
+                className={`p-0.5 rounded transition-transform ${isSelected ? 'text-white' : 'text-blue-400 group-hover:text-blue-700'}`}
               >
                 <ChevronRight className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
               </button>
@@ -1074,7 +1074,7 @@ export const StockInventoryV2: React.FC = () => {
             </span>
 
             {hasChildren && (
-              <span className={`text-[11px] font-normal ${isSelected ? 'text-purple-200' : 'text-gray-400'}`}>
+              <span className={`text-[11px] font-normal ${isSelected ? 'text-blue-200' : 'text-gray-400'}`}>
                 ({children.length} {childTypeLabel})
               </span>
             )}
@@ -1083,7 +1083,7 @@ export const StockInventoryV2: React.FC = () => {
 
         {/* Children Render with subtle indentation */}
         {hasChildren && isExpanded && (
-          <div className="pl-3.5 space-y-0.5 border-l-2 border-purple-100 ml-4">
+          <div className="pl-3.5 space-y-0.5 border-l-2 border-blue-100 ml-4">
             {children.map(child => renderTreeNode(child))}
           </div>
         )}
@@ -1097,13 +1097,13 @@ export const StockInventoryV2: React.FC = () => {
       {/* 1. Header & Actions */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs">
         <div className="flex items-center gap-3.5">
-          <div className="p-3 bg-purple-100/80 text-purple-700 rounded-2xl shadow-2xs">
+          <div className="p-3 bg-blue-100/80 text-blue-700 rounded-2xl shadow-2xs">
             <Boxes className="w-6 h-6 stroke-[2.2]" />
           </div>
           <div>
             <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
               <span>Stock & Inventory</span>
-              <span className="text-xs bg-purple-100 text-purple-700 px-2.5 py-0.5 rounded-full font-bold">
+              <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-bold">
                 {totalRecords} Total
               </span>
             </h1>
@@ -1116,7 +1116,7 @@ export const StockInventoryV2: React.FC = () => {
         <div className="flex items-center gap-2.5 shrink-0">
           <button
             onClick={() => openModal()}
-            className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm transition-all cursor-pointer"
+            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
             <span>{activeTab === 'warehouse' ? '+ New Factory / Storage' : '+ Add New Purchase Batch'}</span>
@@ -1127,7 +1127,7 @@ export const StockInventoryV2: React.FC = () => {
             className="p-2.5 text-gray-600 hover:bg-gray-100 rounded-xl border border-gray-200 transition-all cursor-pointer"
             title="Refresh Data"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-purple-600' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-blue-600' : ''}`} />
           </button>
         </div>
       </div>
@@ -1139,11 +1139,11 @@ export const StockInventoryV2: React.FC = () => {
             onClick={() => handleTabChange('batches')}
             className={`px-4 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap ${
               activeTab === 'batches'
-                ? 'border-purple-600 text-purple-700 bg-purple-50/50'
+                ? 'border-blue-600 text-blue-700 bg-blue-50/50'
                 : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50'
             }`}
           >
-            <Package className={`w-4 h-4 ${activeTab === 'batches' ? 'text-purple-600' : 'text-gray-400'}`} />
+            <Package className={`w-4 h-4 ${activeTab === 'batches' ? 'text-blue-600' : 'text-gray-400'}`} />
             <span>Purchase Batches</span>
           </button>
 
@@ -1151,11 +1151,11 @@ export const StockInventoryV2: React.FC = () => {
             onClick={() => handleTabChange('manager')}
             className={`px-4 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap ${
               activeTab === 'manager'
-                ? 'border-purple-600 text-purple-700 bg-purple-50/50'
+                ? 'border-blue-600 text-blue-700 bg-blue-50/50'
                 : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50'
             }`}
           >
-            <BarChart3 className={`w-4 h-4 ${activeTab === 'manager' ? 'text-purple-600' : 'text-gray-400'}`} />
+            <BarChart3 className={`w-4 h-4 ${activeTab === 'manager' ? 'text-blue-600' : 'text-gray-400'}`} />
             <span>Stock Manager</span>
           </button>
 
@@ -1163,11 +1163,11 @@ export const StockInventoryV2: React.FC = () => {
             onClick={() => handleTabChange('ledger')}
             className={`px-4 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap ${
               activeTab === 'ledger'
-                ? 'border-purple-600 text-purple-700 bg-purple-50/50'
+                ? 'border-blue-600 text-blue-700 bg-blue-50/50'
                 : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50'
             }`}
           >
-            <FileText className={`w-4 h-4 ${activeTab === 'ledger' ? 'text-purple-600' : 'text-gray-400'}`} />
+            <FileText className={`w-4 h-4 ${activeTab === 'ledger' ? 'text-blue-600' : 'text-gray-400'}`} />
             <span>Stock Ledger</span>
           </button>
 
@@ -1175,11 +1175,11 @@ export const StockInventoryV2: React.FC = () => {
             onClick={() => handleTabChange('warehouse')}
             className={`px-4 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap ${
               activeTab === 'warehouse'
-                ? 'border-purple-600 text-purple-700 bg-purple-50/50'
+                ? 'border-blue-600 text-blue-700 bg-blue-50/50'
                 : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50'
             }`}
           >
-            <Warehouse className={`w-4 h-4 ${activeTab === 'warehouse' ? 'text-purple-600' : 'text-gray-400'}`} />
+            <Warehouse className={`w-4 h-4 ${activeTab === 'warehouse' ? 'text-blue-600' : 'text-gray-400'}`} />
             <span>Warehouse Setup</span>
           </button>
         </div>
@@ -1193,7 +1193,7 @@ export const StockInventoryV2: React.FC = () => {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={`Search ${activeTab}...`}
-              className="pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl w-44 md:w-56 focus:outline-none focus:border-purple-500 shadow-2xs font-medium"
+              className="pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl w-44 md:w-56 focus:outline-none focus:border-blue-500 shadow-2xs font-medium"
             />
           </div>
         </div>
@@ -1206,13 +1206,13 @@ export const StockInventoryV2: React.FC = () => {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
             <div 
               style={{ animation: 'slideDownFade 0.35s ease-out forwards', animationDelay: '0ms' }}
-              className="bg-white p-3.5 rounded-2xl border border-purple-100/80 shadow-2xs flex items-center justify-between opacity-0"
+              className="bg-white p-3.5 rounded-2xl border border-blue-100/80 shadow-2xs flex items-center justify-between opacity-0"
             >
               <div>
-                <span className="text-[10px] font-extrabold text-purple-400 uppercase tracking-wider block">LOCATIONS</span>
+                <span className="text-[10px] font-extrabold text-blue-400 uppercase tracking-wider block">LOCATIONS</span>
                 <span className="text-xl font-black text-gray-900 mt-0.5 block">{totalLocationsCount || 21}</span>
               </div>
-              <div className="p-2.5 bg-purple-50 text-purple-600 rounded-xl text-lg">🏭</div>
+              <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl text-lg">🏭</div>
             </div>
 
             <div 
@@ -1272,7 +1272,7 @@ export const StockInventoryV2: React.FC = () => {
                   <span className="text-base">🏬</span>
                   <span>Warehouse Hierarchy</span>
                 </h3>
-                <span className="text-[10px] bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full font-bold">
+                <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold">
                   {allLocations.filter(l => l.level === 'Factory').length} Factories
                 </span>
               </div>
@@ -1297,7 +1297,7 @@ export const StockInventoryV2: React.FC = () => {
                 <>
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-100 pb-3 gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="p-3 bg-gradient-to-br from-purple-100 to-pink-100 text-purple-700 rounded-2xl text-xl shadow-2xs shrink-0">
+                      <div className="p-3 bg-gradient-to-br from-blue-100 to-pink-100 text-blue-700 rounded-2xl text-xl shadow-2xs shrink-0">
                         {selectedNode.level === 'Factory' ? '🏭' : selectedNode.level === 'Floor' ? '📐' : selectedNode.level === 'Zone' ? '📂' : '📦'}
                       </div>
                       <div className="min-w-0">
@@ -1313,7 +1313,7 @@ export const StockInventoryV2: React.FC = () => {
                     <div className="flex items-center gap-2 self-end sm:self-center">
                       <button
                         onClick={() => openLocationModal(selectedNode.level, selectedNode.parentId || undefined, selectedNode)}
-                        className="px-3 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                        className="px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer"
                       >
                         <Edit className="w-3.5 h-3.5" /> Edit
                       </button>
@@ -1327,11 +1327,11 @@ export const StockInventoryV2: React.FC = () => {
                   </div>
 
                   {/* Live Backend Stock Summary & Stored Items */}
-                  <div className="bg-purple-50/40 p-4 rounded-2xl border border-purple-100/70 space-y-3">
+                  <div className="bg-blue-50/40 p-4 rounded-2xl border border-blue-100/70 space-y-3">
                     <div className="flex items-center justify-between">
-                      <h4 className="font-extrabold text-purple-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                      <h4 className="font-extrabold text-blue-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
                         <span>📦 LIVE STORED STOCK</span>
-                        <span className="bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full text-[10px]">
+                        <span className="bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full text-[10px]">
                           {nodeLoading ? (
                             '...'
                           ) : !nodeDetails?.storedSkus || nodeDetails.storedSkus.length === 0 ? (
@@ -1348,24 +1348,24 @@ export const StockInventoryV2: React.FC = () => {
                     </div>
 
                     {nodeLoading ? (
-                      <div className="py-4 text-center text-xs text-purple-400 font-medium animate-pulse">
+                      <div className="py-4 text-center text-xs text-blue-400 font-medium animate-pulse">
                         Fetching live stored stock from database...
                       </div>
                     ) : nodeDetails?.storedSkus && nodeDetails.storedSkus.length > 0 ? (
                       <div className="overflow-x-auto max-h-40 overflow-y-auto">
                         <table className="w-full text-left text-xs">
                           <thead>
-                            <tr className="border-b border-purple-100 text-[10px] font-bold text-purple-600 uppercase">
+                            <tr className="border-b border-blue-100 text-[10px] font-bold text-blue-600 uppercase">
                               <th className="py-1.5 px-2">SKU</th>
                               <th className="py-1.5 px-2">ITEM NAME</th>
                               <th className="py-1.5 px-2">CATEGORY</th>
                               <th className="py-1.5 px-2 text-right">QTY STORED</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-purple-100/50 text-[11px] font-medium text-gray-700">
+                          <tbody className="divide-y divide-blue-100/50 text-[11px] font-medium text-gray-700">
                             {nodeDetails.storedSkus.map((item: any, idx: number) => (
-                              <tr key={getKey(item.sku?._id, `stored-sku-${idx}`)} className="hover:bg-purple-100/30 transition-colors">
-                                <td className="py-1.5 px-2 font-mono font-bold text-purple-700">{item.sku?.skuCode || 'RM-SKU'}</td>
+                              <tr key={getKey(item.sku?._id, `stored-sku-${idx}`)} className="hover:bg-blue-100/30 transition-colors">
+                                <td className="py-1.5 px-2 font-mono font-bold text-blue-700">{item.sku?.skuCode || 'RM-SKU'}</td>
                                 <td className="py-1.5 px-2 font-semibold text-gray-900">{item.sku?.name || 'Item Name'}</td>
                                 <td className="py-1.5 px-2 text-gray-500">{item.sku?.category || 'Raw Material'}</td>
                                 <td className="py-1.5 px-2 text-right font-mono font-bold text-emerald-700">
@@ -1377,7 +1377,7 @@ export const StockInventoryV2: React.FC = () => {
                         </table>
                       </div>
                     ) : (
-                      <div className="py-3 text-center text-[11px] text-purple-400 font-medium">
+                      <div className="py-3 text-center text-[11px] text-blue-400 font-medium">
                         No active items currently stored at this location node in database.
                       </div>
                     )}
@@ -1388,7 +1388,7 @@ export const StockInventoryV2: React.FC = () => {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <h4 className="font-extrabold text-gray-800 text-xs uppercase tracking-wider flex items-center gap-1.5">
                         <span>SUB-NODES</span>
-                        <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full text-[10px]">
+                        <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[10px]">
                           {allLocations.filter(l => l.parentId === selectedNode._id).length}
                         </span>
                       </h4>
@@ -1397,7 +1397,7 @@ export const StockInventoryV2: React.FC = () => {
                           const nextLevel = selectedNode.level === 'Factory' ? 'Floor' : selectedNode.level === 'Floor' ? 'Zone' : 'Storage Location';
                           openLocationModal(nextLevel, selectedNode._id!);
                         }}
-                        className="px-3.5 py-1.5 bg-purple-100/80 hover:bg-purple-200 text-purple-700 font-bold rounded-full text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs self-start sm:self-auto"
+                        className="px-3.5 py-1.5 bg-blue-100/80 hover:bg-blue-200 text-blue-700 font-bold rounded-full text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs self-start sm:self-auto"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>Add {selectedNode.level === 'Factory' ? 'Floor' : selectedNode.level === 'Floor' ? 'Zone' : 'Bin'}</span>
@@ -1406,7 +1406,7 @@ export const StockInventoryV2: React.FC = () => {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {allLocations.filter(l => l.parentId === selectedNode._id).length === 0 ? (
-                        <div className="col-span-full p-8 bg-purple-50/30 border border-dashed border-purple-200/80 rounded-2xl text-center text-xs text-purple-400">
+                        <div className="col-span-full p-8 bg-blue-50/30 border border-dashed border-blue-200/80 rounded-2xl text-center text-xs text-blue-400">
                           ✨ No sub-nodes inside {selectedNode.name}. Click button above to add children.
                         </div>
                       ) : (
@@ -1414,20 +1414,20 @@ export const StockInventoryV2: React.FC = () => {
                           <div
                             key={getKey(child._id, `child-${child.name}-${idx}`)}
                             onClick={() => setSelectedNode(child)}
-                            className="p-3.5 bg-white border border-gray-100 hover:border-purple-300 hover:bg-purple-50/20 rounded-2xl flex items-center justify-between cursor-pointer transition-all shadow-2xs group"
+                            className="p-3.5 bg-white border border-gray-100 hover:border-blue-300 hover:bg-blue-50/20 rounded-2xl flex items-center justify-between cursor-pointer transition-all shadow-2xs group"
                           >
                             <div className="flex items-center gap-3 min-w-0">
                               <span className="text-lg select-none shrink-0">
                                 {child.level === 'Floor' ? '📐' : child.level === 'Zone' ? '📂' : '📦'}
                               </span>
                               <div className="min-w-0">
-                                <h5 className="font-bold text-xs text-gray-900 group-hover:text-purple-700 transition-colors truncate">{child.name}</h5>
+                                <h5 className="font-bold text-xs text-gray-900 group-hover:text-blue-700 transition-colors truncate">{child.name}</h5>
                                 <span className={`text-[9px] uppercase px-2 py-0.5 rounded-full inline-block mt-0.5 ${getLevelChip(child.level)}`}>
                                   {child.level}
                                 </span>
                               </div>
                             </div>
-                            <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-purple-500 transition-colors shrink-0" />
+                            <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-blue-500 transition-colors shrink-0" />
                           </div>
                         ))
                       )}
@@ -1457,7 +1457,7 @@ export const StockInventoryV2: React.FC = () => {
                         if (e.target.checked) setSelectedIds(paginatedItems.map(i => i._id));
                         else setSelectedIds([]);
                       }}
-                      className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                     />
                   </th>
 
@@ -1507,7 +1507,7 @@ export const StockInventoryV2: React.FC = () => {
                   <tr>
                     <td colSpan={12} className="py-12 text-center text-gray-400 whitespace-nowrap">
                       <div className="inline-flex items-center gap-2">
-                        <RefreshCw className="w-4 h-4 animate-spin text-purple-600" />
+                        <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
                         <span>Fetching live stock data from backend...</span>
                       </div>
                     </td>
@@ -1534,7 +1534,7 @@ export const StockInventoryV2: React.FC = () => {
                           animation: 'slideDownFade 0.35s ease-out forwards',
                           animationDelay: `${index * 35}ms`
                         }}
-                        className={`hover:bg-purple-50/20 transition-all cursor-pointer opacity-0 whitespace-nowrap ${isSelected ? 'bg-purple-50/30' : ''}`}
+                        className={`hover:bg-blue-50/20 transition-all cursor-pointer opacity-0 whitespace-nowrap ${isSelected ? 'bg-blue-50/30' : ''}`}
                       >
                         <td className="py-3 px-3 text-center" onClick={(e) => e.stopPropagation()}>
                           <input
@@ -1544,13 +1544,13 @@ export const StockInventoryV2: React.FC = () => {
                               if (e.target.checked) setSelectedIds(prev => [...prev, rowId]);
                               else setSelectedIds(prev => prev.filter(id => id !== rowId));
                             }}
-                            className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                           />
                         </td>
 
                         {activeTab === 'batches' && (
                           <>
-                            <td className="py-3 px-3 font-mono font-bold text-purple-700">{item.batchNumber}</td>
+                            <td className="py-3 px-3 font-mono font-bold text-blue-700">{item.batchNumber}</td>
                             <td className="py-3 px-3 font-semibold text-gray-900">
                               <div className="flex items-center gap-2">
                                 <span>📦</span>
@@ -1634,7 +1634,7 @@ export const StockInventoryV2: React.FC = () => {
                           <div className="flex items-center justify-end gap-1">
                             <button
                               onClick={() => openModal(item)}
-                              className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
+                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
                               title="Edit Record"
                             >
                               <Edit className="w-3.5 h-3.5" />
@@ -1719,7 +1719,7 @@ export const StockInventoryV2: React.FC = () => {
                     value={locationForm.name}
                     onChange={e => setLocationForm(f => ({ ...f, name: e.target.value }))}
                     placeholder="e.g. Ground Floor or Rack A-1"
-                    className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                    className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                   />
                 </div>
 
@@ -1728,7 +1728,7 @@ export const StockInventoryV2: React.FC = () => {
                   <select
                     value={locationForm.level}
                     onChange={e => setLocationForm(f => ({ ...f, level: e.target.value as any }))}
-                    className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                    className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                   >
                     <option value="Factory">Factory</option>
                     <option value="Floor">Floor</option>
@@ -1744,7 +1744,7 @@ export const StockInventoryV2: React.FC = () => {
                       required
                       value={locationForm.parentId}
                       onChange={e => setLocationForm(f => ({ ...f, parentId: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600 bg-white shadow-2xs"
+                      className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                     >
                       <option value="">Select Parent Location</option>
                       {allLocations.map((loc: WarehouseLocationV2, idx: number) => (
@@ -1759,7 +1759,7 @@ export const StockInventoryV2: React.FC = () => {
                 <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 border border-gray-200 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-50">
                   Cancel
                 </button>
-                <button type="submit" disabled={isSaving} className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-sm">
+                <button type="submit" disabled={isSaving} className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm">
                   Save Location
                 </button>
               </div>
@@ -1769,7 +1769,7 @@ export const StockInventoryV2: React.FC = () => {
               {/* Modal Header */}
               <div className="flex items-center justify-between border-b border-slate-100 pb-3.5 mb-1">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-gradient-to-br from-purple-600 to-indigo-600 text-white rounded-xl shadow-sm">
+                  <div className="p-2.5 bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-xl shadow-sm">
                     <Package className="w-5 h-5" />
                   </div>
                   <div>
@@ -1778,7 +1778,7 @@ export const StockInventoryV2: React.FC = () => {
                         {editingItem ? 'Edit Purchase Batch' : 'New Purchase Batch'}
                       </h3>
                       {editingItem && batchForm.batchNumber && (
-                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
                           {batchForm.batchNumber}
                         </span>
                       )}
@@ -1804,7 +1804,7 @@ export const StockInventoryV2: React.FC = () => {
                 <div className="bg-slate-50/80 p-4.5 rounded-2xl border border-slate-200/80 space-y-3.5 shadow-3xs">
                   <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
                     <h4 className="font-extrabold text-slate-800 uppercase tracking-wider text-[11px] flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+                      <span className="w-2 h-2 rounded-full bg-blue-600"></span>
                       1. Purchase Batch Details
                     </h4>
                   </div>
@@ -1818,7 +1818,7 @@ export const StockInventoryV2: React.FC = () => {
                         value={batchForm.batchNumber}
                         onChange={e => setBatchForm(f => ({ ...f, batchNumber: e.target.value }))}
                         placeholder="e.g. PB-SEP-001"
-                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 bg-white shadow-3xs transition-all"
+                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-3xs transition-all"
                       />
                       <span className="text-[10px] text-slate-400 mt-1 block font-medium">Auto-generated if left empty</span>
                     </div>
@@ -1830,7 +1830,7 @@ export const StockInventoryV2: React.FC = () => {
                         required
                         value={batchForm.purchaseDate}
                         onChange={e => setBatchForm(f => ({ ...f, purchaseDate: e.target.value }))}
-                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 bg-white shadow-3xs transition-all"
+                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-3xs transition-all"
                       />
                     </div>
 
@@ -1843,7 +1843,7 @@ export const StockInventoryV2: React.FC = () => {
                           const sel = allSuppliers.find(s => s._id === e.target.value);
                           setBatchForm(f => ({ ...f, supplierId: e.target.value, supplierName: sel?.firmName || sel?.contactName || '' }));
                         }}
-                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 bg-white shadow-3xs transition-all"
+                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-3xs transition-all"
                       >
                         <option value="">Search or select Supplier...</option>
                         {allSuppliers.map((s: any) => (
@@ -1891,7 +1891,7 @@ export const StockInventoryV2: React.FC = () => {
                             return lot;
                           }));
                         }}
-                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 bg-white shadow-3xs transition-all"
+                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-3xs transition-all"
                       >
                         <option value="Materials">Materials</option>
                         <option value="Semi">Semi-Finished</option>
@@ -2465,7 +2465,7 @@ export const StockInventoryV2: React.FC = () => {
                 {/* 3. SUMMARY & OTHER CHARGES */}
                 <div className="bg-slate-50/80 p-4.5 rounded-2xl border border-slate-200/80 space-y-4 shadow-3xs text-left">
                   <h4 className="font-extrabold text-slate-800 uppercase tracking-wider text-[11px] border-b border-slate-200/60 pb-2 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+                    <span className="w-2 h-2 rounded-full bg-blue-600"></span>
                     3. Freight & Other Charges
                   </h4>
 
@@ -2476,7 +2476,7 @@ export const StockInventoryV2: React.FC = () => {
                         type="number"
                         value={batchForm.freightCharges}
                         onChange={e => setBatchForm(f => ({ ...f, freightCharges: Number(e.target.value) }))}
-                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-right focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 bg-white shadow-3xs transition-all"
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-right focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-3xs transition-all"
                       />
                     </div>
 
@@ -2486,7 +2486,7 @@ export const StockInventoryV2: React.FC = () => {
                         type="number"
                         value={batchForm.craneCharges}
                         onChange={e => setBatchForm(f => ({ ...f, craneCharges: Number(e.target.value) }))}
-                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-right focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 bg-white shadow-3xs transition-all"
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-right focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-3xs transition-all"
                       />
                     </div>
 
@@ -2496,7 +2496,7 @@ export const StockInventoryV2: React.FC = () => {
                         type="number"
                         value={batchForm.loadingCharges}
                         onChange={e => setBatchForm(f => ({ ...f, loadingCharges: Number(e.target.value) }))}
-                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-right focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 bg-white shadow-3xs transition-all"
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-right focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-3xs transition-all"
                       />
                     </div>
 
@@ -2506,16 +2506,16 @@ export const StockInventoryV2: React.FC = () => {
                         type="number"
                         value={batchForm.otherCharges}
                         onChange={e => setBatchForm(f => ({ ...f, otherCharges: Number(e.target.value) }))}
-                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-right focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 bg-white shadow-3xs transition-all"
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-right focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-3xs transition-all"
                       />
                     </div>
                   </div>
 
                   {/* Summary Breakdown Card */}
-                  <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-purple-950 text-white p-4.5 rounded-2xl shadow-md border border-slate-700/50 space-y-3 text-xs">
+                  <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 text-white p-4.5 rounded-2xl shadow-md border border-slate-700/50 space-y-3 text-xs">
                     <div className="flex justify-between font-bold text-slate-300 uppercase text-[11px] tracking-wider border-b border-slate-700/60 pb-2">
-                      <span className="flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-purple-400" /> BATCH SUMMARY</span>
-                      <span className="text-purple-300 font-extrabold">{lots.length} Lots</span>
+                      <span className="flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-blue-400" /> BATCH SUMMARY</span>
+                      <span className="text-blue-300 font-extrabold">{lots.length} Lots</span>
                     </div>
 
                     {lots.some(l => l.paperType === 'Reel') ? (
@@ -2538,7 +2538,7 @@ export const StockInventoryV2: React.FC = () => {
                       <span className="text-slate-300">Other Charges Subtotal:</span>
                       <span className="font-mono font-bold text-slate-100">₹{lotCalculations.otherChargesTotal.toLocaleString('en-IN')}</span>
                     </div>
-                    <div className="flex items-center justify-between text-sm font-black text-purple-300 border-t border-slate-700/80 pt-2.5">
+                    <div className="flex items-center justify-between text-sm font-black text-blue-300 border-t border-slate-700/80 pt-2.5">
                       <span>GRAND TOTAL:</span>
                       <span className="font-mono text-lg text-emerald-400 font-black">₹{lotCalculations.grandTotal.toLocaleString('en-IN')}</span>
                     </div>
@@ -2559,7 +2559,7 @@ export const StockInventoryV2: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-md disabled:opacity-50 flex items-center gap-1.5 transition-all cursor-pointer"
+                  className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-md disabled:opacity-50 flex items-center gap-1.5 transition-all cursor-pointer"
                 >
                   {isSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
                   <span>{editingItem ? 'Update Purchase Batch' : 'Save Purchase Batch'}</span>
