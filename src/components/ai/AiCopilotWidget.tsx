@@ -10,13 +10,20 @@ import {
   Volume2, 
   VolumeX, 
   ArrowRight,
-  RefreshCw,
-  AlertTriangle,
-  Package,
-  Boxes,
+  ArrowUp,
+  SquarePen,
+  Plus,
   Zap,
-  CheckCircle2
+  Package,
+  ClipboardList,
+  Wallet,
+  Compass,
+  MapPin,
+  CheckCircle2,
+  AlertTriangle,
+  Boxes
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 interface ChatMessage {
   id: string;
@@ -28,6 +35,7 @@ interface ChatMessage {
 
 export const AiCopilotWidget: React.FC = () => {
   const navigate = useNavigate();
+  const { selectedCompany } = useAuth();
 
   const [isOpen, setIsOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
@@ -36,21 +44,24 @@ export const AiCopilotWidget: React.FC = () => {
   const [isMuted, setIsMuted] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
 
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 'msg-welcome',
-      sender: 'ai',
-      text: 'Hello! I am your AI ERP Assistant. How can I assist you with stock, purchase batches, items, or warehouse actions today?',
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    }
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
 
+  // Listen to global open event triggered from top navbar
+  useEffect(() => {
+    const handleOpen = () => {
+      setIsOpen(true);
+      setIsClosing(false);
+    };
+    window.addEventListener('open-ai-copilot', handleOpen);
+    return () => window.removeEventListener('open-ai-copilot', handleOpen);
+  }, []);
+
   // Auto-scroll chat to bottom on new message
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && messages.length > 0) {
       chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isOpen, isThinking]);
@@ -129,6 +140,12 @@ export const AiCopilotWidget: React.FC = () => {
     }
   };
 
+  // Reset to New Chat State
+  const handleNewChat = () => {
+    setMessages([]);
+    setInput('');
+  };
+
   // Process Natural Language Commands & Execute System Actions across the entire ERP System
   const processAICommand = (userInput: string) => {
     const text = userInput.toLowerCase().trim();
@@ -148,246 +165,162 @@ export const AiCopilotWidget: React.FC = () => {
       text.includes('transporter') ||
       text.includes('route') ||
       text.includes('region') ||
-      text.includes('city') ||
-      text.includes('market')
+      text.includes('market') ||
+      text.includes('city')
     ) {
       if (text.includes('agent')) {
-        navigate('/party/directory');
+        reply = isCreate
+          ? 'Opening Business Directory modal to add a new sales agent...'
+          : 'Navigating to Business Directory (Sales Agents tab)...';
+        actionTag = isCreate ? 'Directory: Create Agent' : 'Navigate: Directory Agents';
+        navigate('/directory?subtab=agents');
         if (isCreate) {
-          reply = 'Opening Business Directory and launching the Create New Agent form for you!';
-          actionTag = '⚡ Executing: Create New Agent in Business Directory';
           setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'open-add-agent' } }));
-          }, 250);
-        } else {
-          reply = 'Navigating to Business Directory - Agents tab.';
-          actionTag = '⚡ Executing: Navigating to Agents Directory';
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'select-tab-agents' } }));
-          }, 150);
+            window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { target: 'directory', action: 'create_agent' } }));
+          }, 300);
         }
       } else if (text.includes('vendor') || text.includes('supplier')) {
+        reply = isCreate
+          ? 'Opening form to register a new vendor/supplier...'
+          : 'Opening Suppliers & Vendors directory...';
+        actionTag = isCreate ? 'Directory: Create Vendor' : 'Navigate: Suppliers';
         navigate('/party/vendors');
-        if (isCreate) {
-          reply = 'Opening Business Directory and launching the Create New Vendor / Supplier form.';
-          actionTag = '⚡ Executing: Create New Vendor in Business Directory';
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'open-add-vendor' } }));
-          }, 250);
-        } else {
-          reply = 'Navigating to Vendor & Supplier Directory.';
-          actionTag = '⚡ Executing: Navigating to Vendors Directory';
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'select-tab-vendors' } }));
-          }, 150);
-        }
       } else if (text.includes('customer')) {
+        reply = isCreate
+          ? 'Opening Customer Registration drawer...'
+          : 'Navigating to Customer Master Directory...';
+        actionTag = isCreate ? 'Directory: Create Customer' : 'Navigate: Customers';
         navigate('/party/customers');
-        if (isCreate) {
-          reply = 'Opening Business Directory and launching the Create New Customer form.';
-          actionTag = '⚡ Executing: Create New Customer in Business Directory';
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'open-add-customer' } }));
-          }, 250);
-        } else {
-          reply = 'Navigating to Customer Directory.';
-          actionTag = '⚡ Executing: Navigating to Customers Directory';
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'select-tab-customers' } }));
-          }, 150);
-        }
-      } else if (text.includes('transporter')) {
-        navigate('/party/transporters');
-        if (isCreate) {
-          reply = 'Opening Transporters Directory and launching New Transporter creation form.';
-          actionTag = '⚡ Executing: Create New Transporter';
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'open-add-transporter' } }));
-          }, 250);
-        } else {
-          reply = 'Navigating to Transporters Directory.';
-          actionTag = '⚡ Executing: Navigating to Transporters';
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'select-tab-transporters' } }));
-          }, 150);
-        }
       } else if (text.includes('route') || text.includes('region')) {
+        reply = 'Opening Regions & Routes directory...';
+        actionTag = 'Navigate: Regions';
         navigate('/party/routes');
-        if (isCreate) {
-          reply = 'Opening Region & Route Master and launching New Route creation form.';
-          actionTag = '⚡ Executing: Create New Region / Route';
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'open-add-region' } }));
-          }, 250);
-        } else {
-          reply = 'Navigating to Region & Route Directory.';
-          actionTag = '⚡ Executing: Navigating to Regions & Routes';
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'select-tab-regions' } }));
-          }, 150);
-        }
-      } else if (text.includes('city') || text.includes('market')) {
+      } else if (text.includes('market') || text.includes('city')) {
+        reply = 'Opening Cities & Markets directory...';
+        actionTag = 'Navigate: Cities';
         navigate('/party/markets');
-        if (isCreate) {
-          reply = 'Opening Market & City Master and launching New City creation form.';
-          actionTag = '⚡ Executing: Create New Market / City';
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'open-add-city' } }));
-          }, 250);
-        } else {
-          reply = 'Navigating to Market & City Directory.';
-          actionTag = '⚡ Executing: Navigating to Markets & Cities';
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'select-tab-cities' } }));
-          }, 150);
-        }
+      } else if (text.includes('transporter')) {
+        reply = 'Opening Transporters directory...';
+        actionTag = 'Navigate: Transporters';
+        navigate('/party/transporters');
       } else {
-        navigate('/party/directory');
-        reply = 'Opening Business Directory & Party Management.';
-        actionTag = '⚡ Executing: Navigating to Business Directory';
+        reply = 'Navigating to main Business Directory...';
+        actionTag = 'Navigate: Business Directory';
+        navigate('/directory');
       }
     }
-    // 2. PURCHASE BATCH & MATERIAL LOTS
-    else if (text.includes('purchase batch') || text.includes('batch') || text.includes('lot delivery') || text.includes('grn')) {
-      navigate('/stock-inventory');
-      if (isCreate || text.includes('record')) {
-        reply = 'Opening the New Purchase Batch form for you right away!';
-        actionTag = '⚡ Executing: Opening New Purchase Batch Window';
+
+    // 2. STOCK & ITEM MASTER ACTIONS
+    else if (text.includes('item') || text.includes('sku') || text.includes('product') || text.includes('stock') || text.includes('inventory') || text.includes('material')) {
+      if (isCreate || text.includes('add stock')) {
+        reply = 'Opening Item Master drawer to add a new item or stock entry...';
+        actionTag = 'Inventory: Add Item';
+        navigate('/inventory-v2/skus');
         setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'open-purchase-batch' } }));
-        }, 250);
+          window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { target: 'stock', action: 'create_sku' } }));
+        }, 300);
+      } else if (text.includes('alert') || text.includes('low stock') || text.includes('threshold')) {
+        reply = 'Displaying low stock items and reorder alerts...';
+        actionTag = 'Inventory: Stock Alerts';
+        navigate('/stock-inventory');
+      } else if (text.includes('ledger') || text.includes('movement') || text.includes('history')) {
+        reply = 'Opening Stock Movement Ledger...';
+        actionTag = 'Inventory: Stock Ledger';
+        navigate('/inventory-v2/ledger?mode=stock');
+      } else if (text.includes('batch')) {
+        reply = 'Navigating to Finished Batch Stock...';
+        actionTag = 'Inventory: Batch Stock';
+        navigate('/inventory-v2/batch-stock');
       } else {
-        reply = 'Navigating to Purchase Batches & Material Delivery Lot Register.';
-        actionTag = '⚡ Executing: Opening Purchase Batches';
+        reply = 'Navigating to Item Master Directory...';
+        actionTag = 'Navigate: Item Master';
+        navigate('/inventory-v2/skus');
       }
     }
-    // 3. STOCK ALERTS & LOW STOCK
-    else if (text.includes('alert') || text.includes('low stock') || text.includes('out of stock') || text.includes('reorder')) {
-      reply = 'Navigating to Stock Alerts! Showing all items needing reordering.';
-      actionTag = '⚡ Executing: Navigating to Stock Alerts';
-      navigate('/stock-inventory');
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'select-tab-alerts' } }));
-      }, 150);
-    }
-    // 4. ITEM MASTER & SKU MANAGEMENT
-    else if (text.includes('item master') || text.includes('sku') || text.includes('item') || text.includes('product') || text.includes('raw material')) {
-      navigate('/inventory-v2/skus');
-      if (isCreate) {
-        reply = 'Opening the Add SKU / Item drawer in Item Master.';
-        actionTag = '⚡ Executing: Opening Add SKU Drawer';
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'open-add-sku' } }));
-        }, 250);
+
+    // 3. PURCHASE BATCHES & WORK ORDERS
+    else if (text.includes('purchase') || text.includes('work order') || text.includes('po') || text.includes('procurement')) {
+      if (isCreate || text.includes('create a work order')) {
+        reply = 'Opening Purchase & Work Order Entry dialog...';
+        actionTag = 'Purchases: Create Batch';
+        navigate('/inventory-v2/purchases');
       } else {
-        reply = 'Navigating to Item Master & SKU Register.';
-        actionTag = '⚡ Executing: Navigating to Item Master';
+        reply = 'Opening Purchase & Work Order Register...';
+        actionTag = 'Navigate: Purchase Batches';
+        navigate('/inventory-v2/purchases');
       }
     }
-    // 5. WAREHOUSE SETUP & STORAGE LOCATIONS
-    else if (text.includes('warehouse') || text.includes('location') || text.includes('storage') || text.includes('bin') || text.includes('zone') || text.includes('factory')) {
-      reply = 'Navigating to Warehouse Hierarchy & Storage Locations.';
-      actionTag = '⚡ Executing: Opening Warehouse Setup';
-      navigate('/stock-inventory');
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('erp-ai-action', { detail: { action: 'select-tab-warehouse' } }));
-      }, 150);
+
+    // 4. DIGITAL DISPATCH & LOGISTICS
+    else if (text.includes('dispatch') || text.includes('shipment') || text.includes('delivery')) {
+      reply = 'Navigating to Digital Dispatch center...';
+      actionTag = 'Navigate: Digital Dispatch';
+      navigate('/sales/digital-dispatch');
     }
-    // 6. SALES QUOTES, ORDERS & DIGITAL DISPATCH
-    else if (text.includes('quote') || text.includes('quotation')) {
-      reply = 'Navigating to Sales Quotations.';
-      actionTag = '⚡ Executing: Navigating to Sales Quotes';
-      navigate('/sales/quotes');
-    } else if (text.includes('order') || text.includes('sales order') || text.includes('pending')) {
-      if (text.includes('pending')) {
-        reply = 'Navigating to Pending Orders.';
-        actionTag = '⚡ Executing: Navigating to Pending Orders';
+
+    // 5. SALES, QUOTATIONS & CUSTOMER OUTSTANDINGS
+    else if (text.includes('quote') || text.includes('quotation') || text.includes('order') || text.includes('outstanding') || text.includes('sale')) {
+      if (text.includes('quote') || text.includes('quotation')) {
+        reply = 'Opening Sales Quotation management...';
+        actionTag = 'Navigate: Quotations';
+        navigate('/sales/quotes');
+      } else if (text.includes('outstanding') || text.includes('pending')) {
+        reply = 'Displaying outstanding customer orders and pending balances...';
+        actionTag = 'Sales: Pending Orders';
         navigate('/sales/pending');
       } else {
-        reply = 'Navigating to Sales Orders.';
-        actionTag = '⚡ Executing: Navigating to Sales Orders';
+        reply = 'Navigating to Sale Orders register...';
+        actionTag = 'Navigate: Sale Orders';
         navigate('/sales/orders');
       }
-    } else if (text.includes('challan') || text.includes('delivery challan')) {
-      reply = 'Navigating to Delivery Challan Register.';
-      actionTag = '⚡ Executing: Navigating to Delivery Challan';
-      navigate('/sales/delivery-challan');
-    } else if (text.includes('dispatch') || text.includes('digital dispatch')) {
-      reply = 'Navigating to Digital Dispatch Management.';
-      actionTag = '⚡ Executing: Navigating to Digital Dispatch';
-      navigate('/sales/digital-dispatch');
-    } else if (text.includes('sales report') || text.includes('sales analytics')) {
-      reply = 'Navigating to Sales Reports & Business Intelligence.';
-      actionTag = '⚡ Executing: Navigating to Sales Reports';
-      navigate('/sales/reports');
     }
-    // 7. INVENTORY CONVERSIONS, BOM RECIPE & STOCK TRANSFERS
-    else if (text.includes('bom') || text.includes('recipe') || text.includes('conversion')) {
-      reply = 'Navigating to Bill of Materials (BOM) Recipe Master.';
-      actionTag = '⚡ Executing: Navigating to BOM Recipe Master';
-      navigate('/inventory-v2/conversions/bom');
-    } else if (text.includes('transfer') || text.includes('stock transfer')) {
-      reply = 'Navigating to Stock Transfer Module.';
-      actionTag = '⚡ Executing: Navigating to Stock Transfer';
-      navigate('/inventory-v2/conversions/transfer');
-    } else if (text.includes('ledger') || text.includes('history')) {
-      reply = 'Navigating to Inventory Stock Ledger.';
-      actionTag = '⚡ Executing: Navigating to Stock Ledger';
-      navigate('/inventory-v2/ledger');
+
+    // 6. BUSINESS ANALYZER & REPORTS
+    else if (text.includes('analytics') || text.includes('report') || text.includes('dashboard') || text.includes('stat') || text.includes('transaction')) {
+      if (text.includes('transaction')) {
+        reply = 'Opening Transactions log...';
+        actionTag = 'Navigate: Transactions';
+        navigate('/transactions');
+      } else if (text.includes('report')) {
+        reply = 'Opening Sales Reports...';
+        actionTag = 'Navigate: Sales Reports';
+        navigate('/sales/reports');
+      } else {
+        reply = 'Opening Business Intelligence Analyzer...';
+        actionTag = 'Navigate: BI Analyzer';
+        navigate('/analyzer');
+      }
     }
-    // 8. DASHBOARD, SETTINGS & TOOLS
-    else if (text.includes('dashboard') || text.includes('overview') || text.includes('home')) {
-      reply = 'Navigating to Main ERP Dashboard.';
-      actionTag = '⚡ Executing: Navigating to Dashboard';
-      navigate('/dashboard');
-    } else if (text.includes('setting') || text.includes('config')) {
-      reply = 'Navigating to Inventory & ERP System Settings.';
-      actionTag = '⚡ Executing: Navigating to Settings';
-      navigate('/inventory-v2/settings');
-    } else if (text.includes('company') || text.includes('switch company')) {
-      reply = 'Navigating to Company Selection screen.';
-      actionTag = '⚡ Executing: Navigating to Company Selection';
-      navigate('/company-selection');
-    } else if (text.includes('import') || text.includes('export') || text.includes('excel') || text.includes('transaction')) {
-      reply = 'Opening Transaction & Data Tools.';
-      actionTag = '⚡ Executing: Navigating to Transaction Tools';
-      navigate('/transactions');
-    }
-    // 9. ERP KNOWLEDGE BASE QA & HELP
-    else if (text.includes('gbl') || text.includes('unit conversion') || text.includes('pcs')) {
-      reply = 'In Item Master unit conversion, bulk package units appear on the left (e.g. 1 GBL = 200 Pcs). This ensures clear inventory scaling!';
-    } else if (text.includes('ream') || text.includes('sheets')) {
-      reply = 'Standard paper reams default to 500 sheets per ream. The ream weight is calculated using (Width * Length * GSM * 500) / 10,000,000.';
-    } else if (text.includes('who are you') || text.includes('what can you do') || text.includes('help')) {
-      reply = 'I am your dynamic AI ERP Copilot! You can tell me to "create new agent in business directory", "open purchase batch", "check low stock alerts", "add new SKU", or navigate to any module by voice or text.';
-    } else {
-      reply = `Understood! I have processed your request for "${userInput}". How else may I assist you in the ERP today?`;
+
+    // GENERAL DEFAULT
+    else {
+      reply = `I have received your request regarding: "${userInput}". You can manage this dynamically across Item Master, Stock Inventory, Business Directory, or Sales Orders.`;
+      actionTag = 'AI General Response';
     }
 
     return { reply, actionTag };
   };
 
   // Send Message Handler
-  const handleSendMessage = (textToSend?: string) => {
-    const messageText = (textToSend || input).trim();
-    if (!messageText) return;
+  const handleSendMessage = (customText?: string) => {
+    const queryText = customText || input;
+    if (!queryText.trim()) return;
 
     const userMsg: ChatMessage = {
-      id: `user-${Date.now()}`,
+      id: `msg-${Date.now()}`,
       sender: 'user',
-      text: messageText,
+      text: queryText.trim(),
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
     setMessages(prev => [...prev, userMsg]);
-    setInput('');
+    if (!customText) setInput('');
     setIsThinking(true);
 
     setTimeout(() => {
-      const { reply, actionTag } = processAICommand(messageText);
-
+      const { reply, actionTag } = processAICommand(queryText);
       const aiMsg: ChatMessage = {
-        id: `ai-${Date.now()}`,
+        id: `msg-ai-${Date.now()}`,
         sender: 'ai',
         text: reply,
         actionTag,
@@ -407,130 +340,160 @@ export const AiCopilotWidget: React.FC = () => {
         <button
           type="button"
           onClick={handleToggleOpen}
-          className="fixed bottom-6 right-6 z-[90] p-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-full shadow-2xl shadow-blue-500/40 ring-4 ring-blue-500/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-3 group cursor-pointer"
-          title="Open AI Assistant"
+          className="fixed bottom-6 right-6 z-[90] p-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-2xl shadow-blue-500/30 ring-4 ring-blue-500/15 hover:scale-105 active:scale-95 transition-all flex items-center gap-2.5 group cursor-pointer"
+          title="Open AI Copilot"
         >
           <div className="relative">
-            <Bot className="w-6 h-6 animate-bounce" />
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-blue-600"></span>
+            <Sparkles className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+            <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-400 rounded-full ring-2 ring-blue-600"></span>
           </div>
-          <span className="text-xs font-black tracking-wide pr-1 hidden sm:inline-block">AI Assistant</span>
-          <Sparkles className="w-4 h-4 text-blue-200 group-hover:rotate-12 transition-transform" />
+          <span className="text-xs font-extrabold tracking-wide pr-1 hidden sm:inline-block">Copilot</span>
         </button>
       )}
 
-      {/* 2. POPUP WINDOW */}
+      {/* 2. COPILOT FLYOUT DRAWER (Matching Screenshot 2) */}
       {isOpen && (
         <div
-          className={`fixed bottom-6 right-6 w-96 max-w-[calc(100vw-2rem)] h-[520px] max-h-[calc(100vh-6rem)] z-[95] bg-white rounded-3xl border border-slate-200/90 shadow-2xl overflow-hidden flex flex-col ${
+          className={`fixed bottom-6 right-6 w-96 max-w-[calc(100vw-2rem)] h-[560px] max-h-[calc(100vh-5rem)] z-[95] bg-white rounded-3xl border border-gray-200/90 shadow-2xl overflow-hidden flex flex-col ${
             isClosing ? 'animate-aiClose' : 'animate-aiOpen'
           }`}
         >
-          {/* POPUP HEADER */}
-          <div className="shrink-0 px-4 py-3.5 bg-slate-900 text-white flex items-center justify-between z-10 border-b border-slate-800">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-500/20">
-                <Bot className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-xs font-bold text-white tracking-wide">AI ERP Copilot</h3>
-                  <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-800/60">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                    Online
-                  </span>
-                </div>
-                <p className="text-[10.5px] text-slate-400 font-medium">Voice & System Automation</p>
-              </div>
+          {/* HEADER (Matching Screenshot 2) */}
+          <div className="shrink-0 px-4 py-3.5 bg-white text-gray-900 flex items-center justify-between z-10 border-b border-gray-100">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4.5 h-4.5 text-blue-600" />
+              <h3 className="text-sm font-extrabold text-gray-900 tracking-tight">Copilot</h3>
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
+              {/* New Chat Button */}
+              <button
+                type="button"
+                onClick={handleNewChat}
+                className="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center transition-all cursor-pointer"
+                title="New Chat"
+              >
+                <SquarePen className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Audio Voice Mute Toggle */}
               <button
                 type="button"
                 onClick={() => setIsMuted(!isMuted)}
-                className={`p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer ${
-                  isMuted ? 'text-rose-400' : ''
+                className={`w-7 h-7 rounded-full transition-colors cursor-pointer flex items-center justify-center ${
+                  isMuted ? 'bg-rose-50 text-rose-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
                 title={isMuted ? 'Unmute Audio Voice' : 'Mute Audio Voice'}
               >
-                {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
               </button>
 
+              {/* Close Drawer Button */}
               <button
                 type="button"
                 onClick={handleToggleOpen}
-                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
-                title="Close AI Assistant"
+                className="w-7 h-7 rounded-full hover:bg-gray-100 text-gray-500 flex items-center justify-center transition-all cursor-pointer"
+                title="Close Copilot"
               >
-                <X className="w-4.5 h-4.5" />
+                <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           </div>
 
-          {/* QUICK SUGGESTIONS CAROUSEL */}
-          <div className="shrink-0 bg-slate-50 px-3 py-2 border-b border-slate-200/70 flex items-center gap-1.5 overflow-x-auto no-scrollbar text-[11px]">
-            <button
-              type="button"
-              onClick={() => handleSendMessage('Show stock alerts')}
-              className="px-2.5 py-1 bg-white hover:bg-amber-50 text-amber-800 border border-amber-200 rounded-full font-semibold flex items-center gap-1 whitespace-nowrap shadow-2xs transition-all cursor-pointer shrink-0"
-            >
-              <AlertTriangle className="w-3 h-3 text-amber-600" />
-              <span>⚠️ Stock Alerts</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleSendMessage('Create new purchase batch')}
-              className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-800 border border-blue-200 rounded-full font-semibold flex items-center gap-1 whitespace-nowrap shadow-2xs transition-all cursor-pointer shrink-0"
-            >
-              <Package className="w-3 h-3 text-blue-600" />
-              <span>📦 New Batch</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleSendMessage('Go to item master')}
-              className="px-2.5 py-1 bg-white hover:bg-purple-50 text-purple-800 border border-purple-200 rounded-full font-semibold flex items-center gap-1 whitespace-nowrap shadow-2xs transition-all cursor-pointer shrink-0"
-            >
-              <Boxes className="w-3 h-3 text-purple-600" />
-              <span>📄 Item Master</span>
-            </button>
-          </div>
-
-          {/* CHAT MESSAGES CONTAINER */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-slate-50/50 text-xs">
-            {messages.map(msg => (
-              <div
-                key={msg.id}
-                className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'} animate-fadeIn`}
-              >
-                <div
-                  className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs ${
-                    msg.sender === 'user'
-                      ? 'bg-blue-600 text-white rounded-br-xs font-medium'
-                      : 'bg-white text-slate-800 border border-slate-200/80 rounded-bl-xs leading-relaxed font-normal'
-                  }`}
-                >
-                  {msg.actionTag && (
-                    <div className="mb-1.5 pb-1 border-b border-blue-100 flex items-center gap-1.5 text-[10.5px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
-                      <Zap className="w-3 h-3 fill-blue-600 text-blue-600" />
-                      <span>{msg.actionTag}</span>
-                    </div>
-                  )}
-                  <p>{msg.text}</p>
+          {/* MAIN BODY AREA */}
+          <div className="flex-1 overflow-y-auto p-4 bg-white flex flex-col justify-between custom-scrollbar">
+            {messages.length === 0 ? (
+              /* INITIAL HERO VIEW (Matching Screenshot 2) */
+              <div className="flex-1 flex flex-col items-center justify-center py-4 px-2 text-center my-auto animate-fadeIn">
+                {/* Center Sparkles Icon Avatar */}
+                <div className="w-14 h-14 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-2xs mb-3">
+                  <Sparkles className="w-7 h-7" />
                 </div>
-                <span className="text-[9.5px] font-bold text-slate-400 mt-1 px-1">{msg.time}</span>
-              </div>
-            ))}
 
-            {isThinking && (
-              <div className="flex items-center gap-2 text-slate-500 bg-white p-3 rounded-2xl border border-slate-200/70 max-w-[70%] animate-pulse">
-                <Bot className="w-4 h-4 text-blue-600" />
-                <span className="text-[11px] font-semibold">AI is thinking...</span>
+                <h2 className="text-xl font-extrabold text-gray-900 tracking-tight mb-2">
+                  How can I help?
+                </h2>
+
+                <p className="text-xs text-gray-500 text-center max-w-[270px] leading-relaxed mb-6">
+                  Ask about your operations, or just describe what happened — I'll draft it for your approval before anything is saved.
+                </p>
+
+                {/* Suggested Action List (Matching Screenshot 2) */}
+                <div className="w-full space-y-0.5 border-t border-gray-100 pt-2 text-left">
+                  <button
+                    type="button"
+                    onClick={() => handleSendMessage('Add stock')}
+                    className="w-full py-2.5 px-3 flex items-center gap-3 text-xs font-bold text-gray-800 hover:bg-slate-50 rounded-xl transition-colors group cursor-pointer"
+                  >
+                    <Package className="w-4 h-4 text-gray-400 group-hover:text-blue-600 shrink-0" />
+                    <span>Add stock</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSendMessage('Create a work order')}
+                    className="w-full py-2.5 px-3 flex items-center gap-3 text-xs font-bold text-gray-800 hover:bg-slate-50 rounded-xl transition-colors group cursor-pointer"
+                  >
+                    <ClipboardList className="w-4 h-4 text-gray-400 group-hover:text-blue-600 shrink-0" />
+                    <span>Create a work order</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSendMessage("What's outstanding from customers?")}
+                    className="w-full py-2.5 px-3 flex items-center gap-3 text-xs font-bold text-gray-800 hover:bg-slate-50 rounded-xl transition-colors group cursor-pointer"
+                  >
+                    <Wallet className="w-4 h-4 text-gray-400 group-hover:text-blue-600 shrink-0" />
+                    <span>What's outstanding from customers?</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSendMessage('Take me to dispatch')}
+                    className="w-full py-2.5 px-3 flex items-center gap-3 text-xs font-bold text-gray-800 hover:bg-slate-50 rounded-xl transition-colors group cursor-pointer"
+                  >
+                    <Compass className="w-4 h-4 text-gray-400 group-hover:text-blue-600 shrink-0" />
+                    <span>Take me to dispatch</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* CHAT THREAD MESSAGES LIST */
+              <div className="space-y-3 text-xs">
+                {messages.map(msg => (
+                  <div
+                    key={msg.id}
+                    className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'} animate-fadeIn`}
+                  >
+                    <div
+                      className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs ${
+                        msg.sender === 'user'
+                          ? 'bg-blue-600 text-white rounded-br-xs font-medium'
+                          : 'bg-slate-50 text-slate-800 border border-slate-200/80 rounded-bl-xs leading-relaxed font-normal'
+                      }`}
+                    >
+                      {msg.actionTag && (
+                        <div className="mb-1.5 pb-1 border-b border-blue-100 flex items-center gap-1.5 text-[10.5px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
+                          <Zap className="w-3 h-3 fill-blue-600 text-blue-600" />
+                          <span>{msg.actionTag}</span>
+                        </div>
+                      )}
+                      <p>{msg.text}</p>
+                    </div>
+                    <span className="text-[9.5px] font-bold text-slate-400 mt-1 px-1">{msg.time}</span>
+                  </div>
+                ))}
+
+                {isThinking && (
+                  <div className="flex items-center gap-2 text-slate-500 bg-slate-50 p-3 rounded-2xl border border-slate-200/70 max-w-[70%] animate-pulse">
+                    <Bot className="w-4 h-4 text-blue-600" />
+                    <span className="text-[11px] font-semibold">Copilot is thinking...</span>
+                  </div>
+                )}
+
+                <div ref={chatEndRef} />
               </div>
             )}
-
-            <div ref={chatEndRef} />
           </div>
 
           {/* VOICE LISTENING ANIMATION INDICATOR */}
@@ -548,45 +511,83 @@ export const AiCopilotWidget: React.FC = () => {
             </div>
           )}
 
-          {/* POPUP FOOTER / INPUT TOOLBAR */}
-          <div className="shrink-0 p-3 bg-white border-t border-slate-200 z-10">
-            <form
-              onSubmit={e => {
-                e.preventDefault();
-                handleSendMessage();
-              }}
-              className="flex items-center gap-2"
-            >
-              <button
-                type="button"
-                onClick={toggleListening}
-                className={`p-2.5 rounded-xl transition-all cursor-pointer ${
-                  isListening
-                    ? 'bg-rose-600 text-white shadow-md shadow-rose-500/20 animate-pulse'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-                title={isListening ? 'Stop Listening' : 'Speak Prompt with Voice'}
-              >
-                {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-              </button>
-
+          {/* INPUT CONTAINER (Matching Screenshot 2 Footer) */}
+          <div className="shrink-0 p-3 bg-white border-t border-gray-100 z-10">
+            <div className="rounded-2xl border border-gray-200/90 bg-white p-3 shadow-2xs space-y-2 focus-within:border-blue-500 transition-all">
               <input
                 type="text"
                 value={input}
                 onChange={e => setInput(e.target.value)}
-                placeholder={isListening ? 'Listening...' : 'Type or speak a command...'}
-                className="flex-1 bg-slate-100 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                placeholder={isListening ? 'Listening...' : 'Message Copilot'}
+                className="w-full text-xs font-medium text-gray-900 placeholder:text-gray-400 bg-transparent focus:outline-none"
               />
 
-              <button
-                type="submit"
-                disabled={!input.trim()}
-                className="p-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-xl shadow-xs transition-all cursor-pointer"
-                title="Send Message"
-              >
-                <Send className="w-4 h-4" />
-              </button>
-            </form>
+              {/* Bottom Toolbar Inside Input Card */}
+              <div className="flex items-center justify-between pt-1">
+                {/* Left Action Buttons & Tags */}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                    title="Add Attachment"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    type="button"
+                    className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                    title="System Actions"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                  </button>
+
+                  <span className="px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-[10.5px] font-bold text-blue-700 flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-blue-600" />
+                    Items
+                  </span>
+                </div>
+
+                {/* Right Action Controls */}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={toggleListening}
+                    className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                      isListening ? 'text-rose-600 animate-pulse bg-rose-50' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'
+                    }`}
+                    title={isListening ? 'Stop Listening' : 'Voice Input'}
+                  >
+                    {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  </button>
+
+                  <span className="px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600 text-[10px] font-bold flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    {selectedCompany?.name || 'SKBW ERP'}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSendMessage()}
+                    disabled={!input.trim()}
+                    className={`w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+                      input.trim()
+                        ? 'bg-blue-600 text-white shadow-xs hover:bg-blue-700'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    }`}
+                    title="Send Message"
+                  >
+                    <ArrowUp className="w-4 h-4 stroke-[2.5]" />
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
