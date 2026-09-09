@@ -38,42 +38,28 @@ import {
 import { useAuth } from '../context/AuthContext';
 import DataManager from './DataManager';
 import AiCopilotWidget from './ai/AiCopilotWidget';
+import ModuleActivityTrackerDrawer from './common/ModuleActivityTrackerDrawer';
 
 const Layout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
   const [showDataManager, setShowDataManager] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showActivityTracker, setShowActivityTracker] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, hasPermission, hasRole, selectedCompany } = useAuth();
 
-  const getPageTitle = (path: string) => {
-    if (path.includes('/inventory-v2/skus')) return 'Item Master';
-    if (path.includes('/stock-inventory')) return 'Stock & Inventory';
-    if (path.includes('/inventory-v2/batch-stock')) return 'Batch Stock';
-    if (path.includes('/inventory-v2/ledger')) return 'Stock Ledger';
-    if (path.includes('/inventory-v2/warehouse')) return 'Warehouse Setup';
-    if (path.includes('/inventory-v2/conversions/bom')) return 'BOM / Recipes';
-    if (path.includes('/inventory-v2/conversions/transfer')) return 'Stock Transfers';
-    if (path.includes('/sales/digital-dispatch')) return 'Digital Dispatch';
-    if (path.includes('/directory')) return 'Business Directory';
-    if (path.includes('/party/customers')) return 'Customers';
-    if (path.includes('/party/vendors')) return 'Suppliers';
-    if (path.includes('/party/agents')) return 'Agents';
-    if (path.includes('/party/routes')) return 'Regions & Routes';
-    if (path.includes('/party/markets')) return 'Cities & Markets';
-    if (path.includes('/party/transporters')) return 'Transporters';
-    if (path.includes('/inventory-v2/purchases')) return 'Purchase Batches';
-    if (path.includes('/sales/quotes')) return 'Quotations';
-    if (path.includes('/sales/orders')) return 'Sale Orders';
-    if (path.includes('/sales/pending')) return 'Pending Orders';
-    if (path.includes('/sales/delivery-challan')) return 'Delivery Challan';
-    if (path.includes('/analyzer')) return 'Business Intelligence';
-    if (path.includes('/sales/reports')) return 'Sales Reports';
-    if (path.includes('/transactions')) return 'Transactions';
-    if (path.includes('/company-selection')) return 'Company Selection';
-    if (path.includes('/inventory-v2/settings')) return 'Settings';
-    return 'Item';
+  const getNavbarModuleInfo = (path: string) => {
+    if (path.includes('/inventory-v2/skus')) {
+      return { name: 'Item Master', title: 'Item', key: 'skus' };
+    }
+    if (path.includes('/stock-inventory')) {
+      return { name: 'Stock Inventory', title: 'Stock & Inventory', key: 'stock' };
+    }
+    if (path.includes('/directory') || path.startsWith('/party/')) {
+      return { name: 'Business Directory', title: 'Business Directory', key: 'directory' };
+    }
+    return null;
   };
 
   useEffect(() => {
@@ -377,66 +363,88 @@ const Layout: React.FC = () => {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden relative">
-        {/* Upper Top Navbar (Matching Screenshot 1) */}
-        <header className="h-13 bg-white border-b border-gray-200/80 px-4 md:px-6 flex items-center justify-between shrink-0 z-30 shadow-2xs">
-          {/* Left Side: Mobile Sidebar Toggle + Dynamic Page Title */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="md:hidden p-1.5 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-700 transition-colors cursor-pointer"
-              title="Toggle Navigation Menu"
-            >
-              <Menu className="w-4.5 h-4.5" />
-            </button>
+        {/* Upper Top Navbar - Applicable ONLY for Item Master, Stock Inventory, Business Directory (Matching Image 1) */}
+        {(() => {
+          const activeModuleInfo = getNavbarModuleInfo(location.pathname);
+          if (!activeModuleInfo) return null;
 
-            <h1 className="text-xs md:text-sm font-extrabold text-gray-800 tracking-tight">
-              {getPageTitle(location.pathname)}
-            </h1>
-          </div>
+          return (
+            <header className="h-14 md:h-16 bg-white border-b border-gray-100 px-4 md:px-6 py-3 flex items-center justify-between shrink-0 z-30 shadow-2xs">
+              {/* Left Side: Mobile Sidebar Toggle + Dynamic Page Title */}
+              <div className="flex items-center gap-3 md:gap-4">
+                <button
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  className="md:hidden p-1.5 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-700 transition-colors cursor-pointer"
+                  title="Toggle Navigation Menu"
+                >
+                  <Menu className="w-5 h-5" />
+                </button>
 
-          {/* Right Side: Company Selector, Bell, Divider, AI Copilot Trigger */}
-          <div className="flex items-center gap-2 md:gap-3">
-            {/* Company / Factory Selector Pill */}
-            <button
-              onClick={() => navigate('/company-selection')}
-              className="border border-gray-200 hover:border-blue-300 bg-white hover:bg-slate-50/80 rounded-xl px-3 py-1.5 flex items-center gap-2 text-xs font-bold text-gray-700 shadow-2xs transition-all cursor-pointer group"
-              title="Switch Active Company / Warehouse"
-            >
-              <Building2 className="w-3.5 h-3.5 text-blue-600 shrink-0 group-hover:scale-105 transition-transform" />
-              <span className="truncate max-w-[120px] sm:max-w-[180px] md:max-w-[220px] text-gray-900 font-extrabold">
-                {selectedCompany?.name || 'SKBW ERP'}
-              </span>
-              <ChevronDown className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-            </button>
+                <h1 className="text-sm md:text-base font-extrabold text-gray-900 tracking-tight">
+                  {activeModuleInfo.title}
+                </h1>
+              </div>
 
-            {/* Notification Bell Icon */}
-            <button
-              className="p-1.5 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors relative cursor-pointer"
-              title="Notifications"
-            >
-              <Bell className="w-4 h-4" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-blue-600 rounded-full ring-2 ring-white" />
-            </button>
+              {/* Right Side: Company Selector, Bell Activity Tracker, Divider, AI Copilot Trigger */}
+              <div className="flex items-center gap-2.5 md:gap-3.5">
+                {/* Company / Factory Selector Pill */}
+                <button
+                  onClick={() => navigate('/company-selection')}
+                  className="border border-gray-200 hover:border-blue-300 bg-white hover:bg-slate-50/90 rounded-xl px-3.5 py-1.5 flex items-center gap-2 text-xs font-bold text-gray-700 shadow-2xs transition-all cursor-pointer group"
+                  title="Switch Active Company / Warehouse"
+                >
+                  <Building2 className="w-4 h-4 text-blue-600 shrink-0 group-hover:scale-105 transition-transform" />
+                  <span className="truncate max-w-[130px] sm:max-w-[190px] md:max-w-[240px] text-gray-900 font-extrabold">
+                    {selectedCompany?.name || 'SKBW ERP'}
+                  </span>
+                  <ChevronDown className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                </button>
 
-            {/* Vertical Divider */}
-            <div className="h-4 w-[1px] bg-gray-200/90 mx-0.5" />
+                {/* Bell Icon = Module Activity Tracker Button */}
+                <button
+                  onClick={() => setShowActivityTracker(true)}
+                  className="p-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors relative cursor-pointer group"
+                  title={`View ${activeModuleInfo.name} Activity Logs`}
+                >
+                  <Bell className="w-4.5 h-4.5 group-hover:scale-105 transition-transform" />
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full ring-2 ring-white" />
+                </button>
 
-            {/* AI Copilot Sparkle Icon Trigger Button */}
-            <button
-              onClick={() => window.dispatchEvent(new CustomEvent('open-ai-copilot'))}
-              className="p-1.5 rounded-xl text-blue-600 hover:bg-blue-50 border border-blue-200/80 transition-all cursor-pointer shadow-2xs flex items-center justify-center relative group"
-              title="Open AI Copilot"
-            >
-              <Sparkles className="w-4 h-4 text-blue-600 group-hover:rotate-12 transition-transform" />
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-blue-500 rounded-full animate-ping" />
-            </button>
-          </div>
-        </header>
+                {/* Vertical Divider */}
+                <div className="h-4.5 w-[1px] bg-gray-200/90 mx-0.5" />
+
+                {/* AI Copilot Sparkle Icon Trigger Button */}
+                <button
+                  onClick={() => window.dispatchEvent(new CustomEvent('open-ai-copilot'))}
+                  className="p-2 rounded-xl text-blue-600 hover:bg-blue-50 border border-blue-200/80 transition-all cursor-pointer shadow-2xs flex items-center justify-center relative group"
+                  title="Open AI Copilot"
+                >
+                  <Sparkles className="w-4.5 h-4.5 text-blue-600 group-hover:rotate-12 transition-transform" />
+                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-blue-500 rounded-full animate-ping" />
+                </button>
+              </div>
+            </header>
+          );
+        })()}
 
         <main className="flex-1 overflow-y-auto">
           <Outlet />
         </main>
       </div>
+
+      {/* Module Activity Tracker Drawer (Bell Icon Triggered) */}
+      {(() => {
+        const activeModuleInfo = getNavbarModuleInfo(location.pathname);
+        if (!activeModuleInfo) return null;
+        return (
+          <ModuleActivityTrackerDrawer
+            isOpen={showActivityTracker}
+            onClose={() => setShowActivityTracker(false)}
+            moduleName={activeModuleInfo.name}
+            moduleKey={activeModuleInfo.key}
+          />
+        );
+      })()}
 
       {/* Logout Confirmation Modal */}
       {showLogoutConfirm && (
