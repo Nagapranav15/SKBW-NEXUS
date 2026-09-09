@@ -12,6 +12,7 @@ interface ModalProps {
   className?: string;
   hideCloseButton?: boolean;
   zIndex?: string;
+  padding?: string;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -24,6 +25,7 @@ export const Modal: React.FC<ModalProps> = ({
   className = '',
   hideCloseButton = false,
   zIndex = 'z-[90]',
+  padding = 'p-6',
 }) => {
   const modalSize = maxWidth || size || 'max-w-lg';
   useEffect(() => {
@@ -41,10 +43,10 @@ export const Modal: React.FC<ModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className={`fixed inset-0 ${zIndex} overflow-y-auto flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs transition-all animate-fadeIn`}>
-      <div className={`relative bg-white rounded-2xl shadow-2xl shadow-slate-900/10 border border-slate-200/80 flex flex-col w-full ${modalSize} max-h-[92vh] overflow-hidden ${className}`}>
+    <div className={`fixed inset-0 ${zIndex} overflow-y-auto flex items-center justify-center p-4 sm:p-6 bg-slate-900/40 backdrop-blur-xs transition-all duration-300 animate-fadeIn`}>
+      <div className={`relative bg-white rounded-2xl shadow-2xl shadow-slate-900/10 border border-slate-200/90 flex flex-col w-full ${modalSize} max-h-[90vh] overflow-hidden animate-modalPop ${className}`}>
         {title && (
-          <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/70 flex justify-between items-center shrink-0">
+          <div className="px-6 py-4 border-b border-slate-100 bg-white flex justify-between items-center shrink-0">
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               {title}
             </h3>
@@ -55,7 +57,7 @@ export const Modal: React.FC<ModalProps> = ({
             )}
           </div>
         )}
-        <div className="p-6 overflow-y-auto flex-1">
+        <div className={`overflow-y-auto flex-1 flex flex-col ${padding}`}>
           {!title && !hideCloseButton && (
             <button type="button" onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1.5 hover:bg-slate-100 rounded-xl z-10 cursor-pointer transition-colors">
               <X className="w-5 h-5" />

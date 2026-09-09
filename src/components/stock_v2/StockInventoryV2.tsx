@@ -2046,14 +2046,15 @@ export const StockInventoryV2: React.FC = () => {
           onClose={() => setShowModal(false)}
           maxWidth={modalType === 'location' ? 'max-w-md' : 'max-w-4xl'}
           hideCloseButton
+          padding="p-0"
         >
           {modalType === 'location' ? (
-            <form onSubmit={handleSaveLocation} className="space-y-4 p-1">
+            <form onSubmit={handleSaveLocation} className="p-5 space-y-4 bg-white text-slate-800">
               <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                 <h3 className="text-base font-bold text-gray-900">
                   {editingItem ? 'Edit' : 'Add'} Warehouse Location Node
                 </h3>
-                <button type="button" onClick={() => setShowModal(false)} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-xl">
+                <button type="button" onClick={() => setShowModal(false)} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-xl cursor-pointer">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -2104,25 +2105,25 @@ export const StockInventoryV2: React.FC = () => {
               </div>
 
               <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-3">
-                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 border border-gray-200 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-50">
+                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 border border-gray-200 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-50 cursor-pointer">
                   Cancel
                 </button>
-                <button type="submit" disabled={isSaving} className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm">
+                <button type="submit" disabled={isSaving} className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer">
                   Save Location
                 </button>
               </div>
             </form>
           ) : (
-            <form onSubmit={handleSavePurchaseBatch} className="space-y-4 p-1 text-slate-800">
-              {/* Modal Header */}
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3.5 mb-1">
+            <form onSubmit={handleSavePurchaseBatch} className="flex flex-col h-full max-h-[85vh] bg-white rounded-2xl overflow-hidden text-slate-800">
+              {/* FIXED MODAL HEADER */}
+              <div className="shrink-0 px-6 py-4 border-b border-gray-100 bg-white flex items-center justify-between z-10">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-blue-600 text-white rounded-xl shadow-xs">
+                  <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
                     <Package className="w-5 h-5" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-black text-slate-900 tracking-tight">
+                      <h3 className="text-base font-bold text-gray-900">
                         {editingItem ? 'Edit Purchase Batch' : 'New Purchase Batch'}
                       </h3>
                       {editingItem && batchForm.batchNumber && (
@@ -2131,7 +2132,7 @@ export const StockInventoryV2: React.FC = () => {
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-slate-500 font-medium">
+                    <p className="text-xs text-gray-500 font-medium">
                       {editingItem ? 'Update details for this supplier lot delivery' : 'Record a new supplier materials lot delivery'}
                     </p>
                   </div>
@@ -2139,52 +2140,50 @@ export const StockInventoryV2: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              {/* Modal Scrollable Body Form Fields */}
-              <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1 text-xs">
+              {/* SCROLLABLE FORM BODY */}
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6 text-xs bg-white">
                 
-                {/* 1. PURCHASE BATCH DETAILS */}
-                <div className="bg-white p-4.5 rounded-2xl border border-slate-200 space-y-3.5 shadow-2xs">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                    <h4 className="font-extrabold text-slate-900 uppercase tracking-wider text-[11px] flex items-center gap-2">
-                      <div className="w-5 h-5 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center font-black text-[10px]">1</div>
-                      Purchase Batch Details
-                    </h4>
-                  </div>
+                {/* 1. BATCH GENERAL DETAILS */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                    1. Purchase Batch Details
+                  </h4>
 
-                  <div className="grid grid-cols-2 gap-3.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <label className="block text-slate-600 font-bold uppercase text-[10px]">BATCH NO.</label>
-                        <span className="text-[9.5px] text-slate-400 font-medium">(Auto-generated if empty)</span>
+                        <label className="block text-xs font-semibold text-gray-700">Batch No.</label>
+                        <span className="text-[10px] text-gray-400 font-medium">(Auto)</span>
                       </div>
                       <input
                         type="text"
                         value={batchForm.batchNumber}
                         onChange={e => setBatchForm(f => ({ ...f, batchNumber: e.target.value }))}
                         placeholder="e.g. PB-SEP-001"
-                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-3xs transition-all"
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-2xs transition-all"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-slate-600 font-bold mb-1 uppercase text-[10px]">PURCHASE DATE *</label>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Purchase Date *</label>
                       <input
                         type="date"
                         required
                         value={batchForm.purchaseDate}
                         onChange={e => setBatchForm(f => ({ ...f, purchaseDate: e.target.value }))}
-                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-3xs transition-all"
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-2xs transition-all"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-slate-600 font-bold mb-1 uppercase text-[10px]">SUPPLIER *</label>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Supplier *</label>
                       <select
                         required
                         value={batchForm.supplierId}
@@ -2192,9 +2191,9 @@ export const StockInventoryV2: React.FC = () => {
                           const sel = allSuppliers.find(s => s._id === e.target.value);
                           setBatchForm(f => ({ ...f, supplierId: e.target.value, supplierName: sel?.firmName || sel?.contactName || '' }));
                         }}
-                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-3xs transition-all"
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-2xs transition-all"
                       >
-                        <option value="">Search or select Supplier...</option>
+                        <option value="">Select party...</option>
                         {allSuppliers.map((s: any) => (
                           <option key={s._id} value={s._id}>{s.firmName || s.contactName}</option>
                         ))}
@@ -2202,7 +2201,7 @@ export const StockInventoryV2: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-slate-600 font-bold mb-1 uppercase text-[10px]">PURCHASE TYPE</label>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Purchase Type</label>
                       <select
                         value={batchForm.purchaseType}
                         onChange={e => {
@@ -2236,7 +2235,7 @@ export const StockInventoryV2: React.FC = () => {
                             return lot;
                           }));
                         }}
-                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-3xs transition-all"
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-2xs transition-all"
                       >
                         <option value="Materials">Materials</option>
                         <option value="Semi">Semi-Finished</option>
@@ -2247,16 +2246,16 @@ export const StockInventoryV2: React.FC = () => {
                 </div>
 
                 {/* 2. MATERIAL LOTS */}
-                <div className="space-y-3">
+                <div className="space-y-3 pt-2 border-t border-gray-100">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-extrabold text-slate-900 uppercase tracking-wider text-[11px] flex items-center gap-2">
-                      <div className="w-5 h-5 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center font-black text-[10px]">2</div>
+                    <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
                       Material Lots
                     </h4>
                     <button
                       type="button"
                       onClick={handleAddLot}
-                      className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Add Material Lot</span>
@@ -2267,22 +2266,22 @@ export const StockInventoryV2: React.FC = () => {
                     const lotSubtotal = (Number(lot.totalKg) || 0) * (Number(lot.ratePerKg) || 0);
 
                     return (
-                      <div key={getKey(lot.id, `lot-card-${idx}`)} className="bg-white p-4.5 rounded-2xl border border-slate-200 space-y-3.5 shadow-2xs relative">
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                      <div key={getKey(lot.id, `lot-card-${idx}`)} className="bg-white p-4 rounded-2xl border border-gray-200 space-y-3.5 shadow-2xs relative">
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
                           <div className="flex items-center gap-2.5">
-                            <span className="px-2.5 py-1 bg-blue-50 text-blue-700 font-black rounded-lg text-[10px] uppercase border border-blue-100">
-                              LOT - {idx + 1}
+                            <span className="px-2.5 py-0.5 bg-blue-50 text-blue-700 font-bold rounded-md text-[10.5px] uppercase border border-blue-100">
+                              Lot #{idx + 1}
                             </span>
                             
                             {/* Format Switcher */}
-                            <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-[10px] font-bold">
+                            <div className="inline-flex rounded-lg bg-gray-100 p-0.5 text-[10.5px] font-semibold">
                               <button
                                 type="button"
                                 onClick={() => updateLotField(lot.id, 'paperType', 'Reel')}
-                                className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                                className={`px-2.5 py-0.5 rounded-md transition-all cursor-pointer ${
                                   lot.paperType === 'Reel'
-                                    ? 'bg-blue-600 text-white shadow-2xs font-extrabold'
-                                    : 'text-slate-600 hover:text-slate-900'
+                                    ? 'bg-blue-600 text-white shadow-2xs font-bold'
+                                    : 'text-gray-600 hover:text-gray-900'
                                 }`}
                               >
                                 🗞️ Reel
@@ -2301,10 +2300,10 @@ export const StockInventoryV2: React.FC = () => {
                                     }
                                   }
                                 }}
-                                className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                                className={`px-2.5 py-0.5 rounded-md transition-all cursor-pointer ${
                                   lot.paperType === 'Sheet' || lot.paperType === 'Board'
-                                    ? 'bg-blue-600 text-white shadow-2xs font-extrabold'
-                                    : 'text-slate-600 hover:text-slate-900'
+                                    ? 'bg-blue-600 text-white shadow-2xs font-bold'
+                                    : 'text-gray-600 hover:text-gray-900'
                                 }`}
                               >
                                 📄 Sheet / Board
@@ -2316,29 +2315,25 @@ export const StockInventoryV2: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => handleRemoveLot(lot.id)}
-                              className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                              className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                              title="Remove Lot"
                             >
                               <X className="w-4 h-4" />
                             </button>
                           )}
                         </div>
 
-                        <div className="grid grid-cols-4 gap-3 text-xs">
-                          <div className="col-span-2">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+                          <div className="md:col-span-2">
                             <div className="flex items-center justify-between mb-1">
-                              <label className="block text-gray-400 font-bold uppercase text-[9px]">ITEM SKU *</label>
+                              <label className="block text-gray-700 font-semibold text-xs">Item SKU *</label>
                               {lot.skuId && (() => {
                                 const matchedSku = allSkus.find(s => s._id === lot.skuId);
                                 const liveStock = Number(matchedSku?.presentStock ?? matchedSku?.openingStock ?? 0);
                                 const unit = matchedSku?.unit || 'KG';
-                                const isPositive = liveStock > 0;
                                 return (
-                                  <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded border ${
-                                    isPositive
-                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                      : 'bg-rose-50 text-rose-700 border-rose-200'
-                                  }`}>
-                                    Available Stock: {liveStock.toLocaleString('en-IN')} {unit}
+                                  <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                    Stock: {liveStock.toLocaleString('en-IN')} {unit}
                                   </span>
                                 );
                               })()}
@@ -2371,47 +2366,51 @@ export const StockInventoryV2: React.FC = () => {
                                   updateLotField(lot.id, 'reamWeight', calcReamWeight);
                                 }
                               }}
-                              className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:border-blue-500 bg-white"
+                              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white"
                             >
-                              <option value="">Select SKU...</option>
+                              <option value="">Select SKU material...</option>
                               {allSkus.map((s: any) => <option key={s._id} value={s._id}>{s.name} ({s.skuCode})</option>)}
                             </select>
                           </div>
 
                           <div>
-                            <label className="block text-gray-400 font-bold mb-1 uppercase text-[9px]">BRAND</label>
+                            <label className="block text-gray-700 font-semibold mb-1 text-xs">Brand</label>
                             <input
                               type="text"
                               value={lot.brand}
                               onChange={e => updateLotField(lot.id, 'brand', e.target.value)}
-                              className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:border-blue-500 bg-white"
+                              placeholder="e.g. Bestfriend"
+                              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white"
                             />
                           </div>
 
                           <div>
-                            <label className="block text-gray-400 font-bold mb-1 uppercase text-[9px]">GSM</label>
+                            <label className="block text-gray-700 font-semibold mb-1 text-xs">GSM</label>
                             <input
                               type="text"
                               value={lot.gsm}
                               onChange={e => updateLotField(lot.id, 'gsm', e.target.value)}
-                              className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono text-center font-bold focus:outline-none focus:border-blue-500 bg-white"
+                              placeholder="e.g. 54"
+                              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono text-center font-semibold focus:outline-none focus:border-blue-600 bg-white"
                             />
                           </div>
 
+                          {/* REELS ROW */}
                           {lot.paperType === 'Reel' && (
                             <>
                               <div>
-                                <label className="block text-gray-400 font-bold mb-1 uppercase text-[9px]">WIDTH (CM)</label>
+                                <label className="block text-gray-700 font-semibold mb-1 text-xs">Width (CM)</label>
                                 <input
                                   type="number"
                                   value={lot.width || ''}
                                   onChange={e => updateLotField(lot.id, 'width', e.target.value)}
-                                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono text-center font-bold bg-white"
+                                  placeholder="64"
+                                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono text-center font-semibold bg-white"
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-blue-600 font-bold mb-1 uppercase text-[9px]">REELS COUNT</label>
+                                <label className="block text-blue-700 font-semibold mb-1 text-xs">Reels Count</label>
                                 <input
                                   type="number"
                                   value={lot.reelsCount || ''}
@@ -2421,39 +2420,41 @@ export const StockInventoryV2: React.FC = () => {
                                     const updatedReels = Array.from({ length: cnt }).map((_, i) => lot.reels?.[i] || { weight: 0, width: lot.width || '64', locationId: lot.locationId || '' });
                                     updateLotField(lot.id, 'reels', updatedReels);
                                   }}
-                                  className="w-full border border-blue-200 bg-blue-50/20 rounded-lg px-2.5 py-1.5 text-xs font-mono text-center font-bold text-blue-800 focus:ring-2 focus:ring-blue-500"
+                                  placeholder="0"
+                                  className="w-full border border-blue-200 bg-blue-50/20 rounded-xl px-3 py-2 text-xs font-mono text-center font-bold text-blue-800 focus:ring-2 focus:ring-blue-500"
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-gray-400 font-bold mb-1 uppercase text-[9px]">TOTAL KG</label>
+                                <label className="block text-gray-700 font-semibold mb-1 text-xs">Total Weight (KG)</label>
                                 <input
                                   type="number"
                                   value={lot.totalKg || ''}
                                   onChange={e => updateLotField(lot.id, 'totalKg', Number(e.target.value))}
                                   placeholder="0"
-                                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono text-right font-bold bg-white"
+                                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono text-right font-semibold bg-white"
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-blue-600 font-bold mb-1 uppercase text-[9px]">RATE / KG (₹)</label>
+                                <label className="block text-blue-700 font-semibold mb-1 text-xs">Rate / KG (₹)</label>
                                 <input
                                   type="number"
                                   step="any"
                                   value={lot.ratePerKg || ''}
                                   onChange={e => updateLotField(lot.id, 'ratePerKg', e.target.value)}
                                   placeholder="0.00"
-                                  className="w-full border border-blue-200 bg-blue-50/20 rounded-lg px-2.5 py-1.5 text-xs font-mono text-right font-bold text-blue-800 focus:ring-2 focus:ring-blue-500"
+                                  className="w-full border border-blue-200 bg-blue-50/20 rounded-xl px-3 py-2 text-xs font-mono text-right font-bold text-blue-800 focus:ring-2 focus:ring-blue-500"
                                 />
                               </div>
                             </>
                           )}
 
+                          {/* SHEET / BOARD ROW */}
                           {(lot.paperType === 'Sheet' || lot.paperType === 'Board') && (
                             <>
                               <div>
-                                <label className="block text-gray-400 font-bold mb-1 uppercase text-[9px]">WIDTH (CM) *</label>
+                                <label className="block text-gray-700 font-semibold mb-1 text-xs">Width (CM) *</label>
                                 <input
                                   type="number"
                                   step="any"
@@ -2472,12 +2473,12 @@ export const StockInventoryV2: React.FC = () => {
                                     }
                                   }}
                                   placeholder="e.g. 58.5"
-                                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono text-center font-bold bg-white"
+                                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono text-center font-semibold bg-white"
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-gray-400 font-bold mb-1 uppercase text-[9px]">LENGTH (CM) *</label>
+                                <label className="block text-gray-700 font-semibold mb-1 text-xs">Length (CM) *</label>
                                 <input
                                   type="number"
                                   step="any"
@@ -2496,12 +2497,12 @@ export const StockInventoryV2: React.FC = () => {
                                     }
                                   }}
                                   placeholder="e.g. 91"
-                                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono text-center font-bold bg-white"
+                                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono text-center font-semibold bg-white"
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-blue-600 font-bold mb-1 uppercase text-[9px]">REAMS COUNT *</label>
+                                <label className="block text-blue-700 font-semibold mb-1 text-xs">Reams Count *</label>
                                 <input
                                   type="number"
                                   value={lot.reamsCount || ''}
@@ -2515,12 +2516,12 @@ export const StockInventoryV2: React.FC = () => {
                                     updateLotField(lot.id, 'totalSheets', reams * 500);
                                   }}
                                   placeholder="0"
-                                  className="w-full border border-blue-200 bg-blue-50/20 rounded-lg px-2.5 py-1.5 text-xs font-mono text-center font-bold text-blue-800 focus:ring-2 focus:ring-blue-500"
+                                  className="w-full border border-blue-200 bg-blue-50/20 rounded-xl px-3 py-2 text-xs font-mono text-center font-bold text-blue-800 focus:ring-2 focus:ring-blue-500"
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-blue-600 font-bold mb-1 uppercase text-[9px]">REAM WEIGHT (KG) *</label>
+                                <label className="block text-blue-700 font-semibold mb-1 text-xs">Ream Weight (KG) *</label>
                                 <input
                                   type="number"
                                   step="any"
@@ -2533,14 +2534,14 @@ export const StockInventoryV2: React.FC = () => {
                                     updateLotField(lot.id, 'totalKg', Number((rwNum * reams).toFixed(2)));
                                   }}
                                   placeholder="e.g. 13.7982"
-                                  className="w-full border border-blue-200 bg-blue-50/20 rounded-lg px-2.5 py-1.5 text-xs font-mono text-center font-bold text-blue-800 focus:ring-2 focus:ring-blue-500"
+                                  className="w-full border border-blue-200 bg-blue-50/20 rounded-xl px-3 py-2 text-xs font-mono text-right font-bold text-blue-800 focus:ring-2 focus:ring-blue-500"
                                 />
                               </div>
                             </>
                           )}
                         </div>
 
-                        <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-50/60 p-3 rounded-xl border border-slate-100 text-xs">
+                        <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-50/70 p-3 rounded-xl border border-slate-100 text-xs">
                           <div className="flex items-center gap-4">
                             <span className="font-semibold text-slate-500">
                               Lot Subtotal: <strong className="text-slate-900 font-mono text-sm">₹{lotSubtotal.toLocaleString('en-IN')}</strong>
@@ -2549,8 +2550,8 @@ export const StockInventoryV2: React.FC = () => {
 
                           <div className="flex items-center gap-2">
                             <div className="flex flex-col">
-                              <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider flex justify-between items-center">
-                                <span>{lot.paperType === 'Reel' ? 'DEFAULT LOT STORAGE:' : 'LOT STORAGE LOCATION:'}</span>
+                              <label className="text-[10px] font-semibold text-slate-500">
+                                {lot.paperType === 'Reel' ? 'Storage Location:' : 'Storage Location:'}
                               </label>
                               <select
                                 value={lot.locationId}
@@ -2559,9 +2560,9 @@ export const StockInventoryV2: React.FC = () => {
                                   updateLotField(lot.id, 'locationId', e.target.value);
                                   updateLotField(lot.id, 'locationName', selLoc?.name || '');
                                 }}
-                                className="px-2 py-1 border border-slate-200 rounded-lg bg-white text-[11px] font-bold text-slate-800 mt-0.5"
+                                className="px-2.5 py-1 border border-slate-200 rounded-lg bg-white text-xs font-medium text-slate-800 mt-0.5"
                               >
-                                <option value="">-- Select Destination Storage --</option>
+                                <option value="">Select storage location...</option>
                                 {allLocations
                                   .filter(loc => loc.level === 'Storage Location' || !allLocations.some(c => c.parentId === loc._id))
                                   .map((loc: any) => (
@@ -2574,21 +2575,21 @@ export const StockInventoryV2: React.FC = () => {
 
                         {lot.paperType === 'Reel' && (Number(lot.reelsCount) || 0) > 0 && (
                           <div className="pt-3 border-t border-slate-100 space-y-2 text-left">
-                            <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                              REEL SPECIFICATIONS & STORAGE PLACEMENT:
+                            <span className="block text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">
+                              Reel Placement Breakdown:
                             </span>
 
                             <div className="overflow-x-auto border border-slate-200 rounded-xl">
                               <table className="w-full text-left text-xs border-collapse">
                                 <thead>
-                                  <tr className="bg-slate-50 text-slate-500 font-bold uppercase text-[9px] border-b border-slate-200">
-                                    <th className="py-2 px-3 w-16">REEL</th>
-                                    <th className="py-2 px-3 w-32">WEIGHT (KG) *</th>
-                                    <th className="py-2 px-3 w-32">WIDTH (CM) *</th>
-                                    <th className="py-2 px-3">STORAGE ALLOCATION *</th>
+                                  <tr className="bg-slate-50 text-slate-500 font-semibold text-[10.5px] border-b border-slate-200">
+                                    <th className="py-2 px-3 w-16">Reel</th>
+                                    <th className="py-2 px-3 w-32">Weight (KG) *</th>
+                                    <th className="py-2 px-3 w-32">Width (CM) *</th>
+                                    <th className="py-2 px-3">Storage Location</th>
                                   </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                                   {Array.from({ length: Number(lot.reelsCount) || 0 }).map((_, rIdx) => {
                                     const reelsList = lot.reels || [];
                                     const reelObj = reelsList[rIdx] || {};
@@ -2609,7 +2610,7 @@ export const StockInventoryV2: React.FC = () => {
                                               updateLotField(lot.id, 'totalKg', sumKg);
                                             }}
                                             placeholder="0"
-                                            className="w-full px-2 py-1 border border-slate-200 rounded-md text-xs font-mono font-bold text-slate-900"
+                                            className="w-full px-2.5 py-1 border border-slate-200 rounded-lg text-xs font-mono font-semibold text-slate-900"
                                           />
                                         </td>
                                         <td className="py-1.5 px-3">
@@ -2622,7 +2623,7 @@ export const StockInventoryV2: React.FC = () => {
                                               updateLotField(lot.id, 'reels', updatedReels);
                                             }}
                                             placeholder="64"
-                                            className="w-full px-2 py-1 border border-slate-200 rounded-md text-xs font-mono font-bold text-slate-900"
+                                            className="w-full px-2.5 py-1 border border-slate-200 rounded-lg text-xs font-mono font-semibold text-slate-900"
                                           />
                                         </td>
                                         <td className="py-1.5 px-3">
@@ -2633,9 +2634,9 @@ export const StockInventoryV2: React.FC = () => {
                                               updatedReels[rIdx] = { ...updatedReels[rIdx], locationId: e.target.value };
                                               updateLotField(lot.id, 'reels', updatedReels);
                                             }}
-                                            className="w-full px-2 py-1 border border-slate-200 rounded-md text-xs font-semibold text-slate-900 bg-white"
+                                            className="w-full px-2.5 py-1 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 bg-white"
                                           >
-                                            <option value="">-- Inherit Lot Storage --</option>
+                                            <option value="">Default Lot Location</option>
                                             {allLocations
                                               .filter(loc => loc.level === 'Storage Location' || !allLocations.some(c => c.parentId === loc._id))
                                               .map((loc: any) => (
@@ -2656,58 +2657,58 @@ export const StockInventoryV2: React.FC = () => {
                   })}
                 </div>
 
-                {/* 3. SUMMARY & OTHER CHARGES */}
-                <div className="bg-white p-4.5 rounded-2xl border border-slate-200 space-y-4 shadow-2xs text-left">
-                  <h4 className="font-extrabold text-slate-900 uppercase tracking-wider text-[11px] border-b border-slate-100 pb-2 flex items-center gap-2">
-                    <div className="w-5 h-5 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center font-black text-[10px]">3</div>
-                    Freight & Other Charges
+                {/* 3. FREIGHT & OTHER CHARGES */}
+                <div className="space-y-3 pt-2 border-t border-gray-100">
+                  <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                    3. Freight & Other Charges
                   </h4>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     <div>
-                      <label className="block text-slate-600 font-bold mb-1 uppercase text-[10px]">FREIGHT (₹)</label>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Freight (₹)</label>
                       <input
                         type="number"
                         value={batchForm.freightCharges}
                         onChange={e => setBatchForm(f => ({ ...f, freightCharges: Number(e.target.value) }))}
-                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-right focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-3xs transition-all"
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-right focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-2xs transition-all"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-slate-600 font-bold mb-1 uppercase text-[10px]">CRANE (₹)</label>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Crane (₹)</label>
                       <input
                         type="number"
                         value={batchForm.craneCharges}
                         onChange={e => setBatchForm(f => ({ ...f, craneCharges: Number(e.target.value) }))}
-                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-right focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-3xs transition-all"
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-right focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-2xs transition-all"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-slate-600 font-bold mb-1 uppercase text-[10px]">LOADING (₹)</label>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Loading (₹)</label>
                       <input
                         type="number"
                         value={batchForm.loadingCharges}
                         onChange={e => setBatchForm(f => ({ ...f, loadingCharges: Number(e.target.value) }))}
-                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-right focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-3xs transition-all"
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-right focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-2xs transition-all"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-slate-600 font-bold mb-1 uppercase text-[10px]">OTHER (₹)</label>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Other (₹)</label>
                       <input
                         type="number"
                         value={batchForm.otherCharges}
                         onChange={e => setBatchForm(f => ({ ...f, otherCharges: Number(e.target.value) }))}
-                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-right focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-3xs transition-all"
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-right focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-2xs transition-all"
                       />
                     </div>
                   </div>
 
-                  {/* Clean White Summary Breakdown Card */}
+                  {/* Clean Batch Summary */}
                   <div className="bg-white p-4.5 rounded-2xl border border-blue-200 shadow-2xs space-y-3 text-xs">
-                    <div className="flex items-center justify-between font-bold text-slate-900 uppercase text-[11px] tracking-wider border-b border-blue-100 pb-2.5">
+                    <div className="flex items-center justify-between font-bold text-gray-900 uppercase text-[11px] tracking-wider border-b border-blue-100 pb-2.5">
                       <span className="flex items-center gap-2 text-blue-700">
                         <FileText className="w-4 h-4 text-blue-600" /> BATCH SUMMARY
                       </span>
@@ -2717,26 +2718,26 @@ export const StockInventoryV2: React.FC = () => {
                     </div>
 
                     {lots.some(l => l.paperType === 'Reel') ? (
-                      <div className="grid grid-cols-2 gap-2 text-slate-600 text-[11px] font-semibold">
-                        <div>TOTAL REELS: <strong className="text-slate-900 font-mono">{lots.reduce((acc, l) => acc + (Number(l.reelsCount) || 0), 0)}</strong></div>
-                        <div className="text-right">TOTAL REEL WEIGHT: <strong className="text-slate-900 font-mono">{lotCalculations.totalQty.toLocaleString('en-IN')} KG</strong></div>
+                      <div className="grid grid-cols-2 gap-2 text-gray-600 text-[11px] font-semibold">
+                        <div>TOTAL REELS: <strong className="text-gray-900 font-mono">{lots.reduce((acc, l) => acc + (Number(l.reelsCount) || 0), 0)}</strong></div>
+                        <div className="text-right">TOTAL REEL WEIGHT: <strong className="text-gray-900 font-mono">{lotCalculations.totalQty.toLocaleString('en-IN')} KG</strong></div>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-2 gap-2 text-slate-600 text-[11px] font-semibold">
-                        <div>TOTAL REAMS: <strong className="text-slate-900 font-mono">{lots.reduce((acc, l) => acc + (Number(l.reamsCount) || 0), 0)}</strong></div>
-                        <div className="text-right">TOTAL SHEETS: <strong className="text-slate-900 font-mono">{(lots.reduce((acc, l) => acc + (Number(l.reamsCount) || 0), 0) * 500).toLocaleString('en-IN')}</strong></div>
+                      <div className="grid grid-cols-2 gap-2 text-gray-600 text-[11px] font-semibold">
+                        <div>TOTAL REAMS: <strong className="text-gray-900 font-mono">{lots.reduce((acc, l) => acc + (Number(l.reamsCount) || 0), 0)}</strong></div>
+                        <div className="text-right">TOTAL SHEETS: <strong className="text-gray-900 font-mono">{(lots.reduce((acc, l) => acc + (Number(l.reamsCount) || 0), 0) * 500).toLocaleString('en-IN')}</strong></div>
                       </div>
                     )}
 
                     <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-semibold">
-                      <span className="text-slate-600">Material Subtotal:</span>
-                      <span className="font-mono font-bold text-slate-900">₹{lotCalculations.materialTotal.toLocaleString('en-IN')}</span>
+                      <span className="text-gray-600">Material Subtotal:</span>
+                      <span className="font-mono font-bold text-gray-900">₹{lotCalculations.materialTotal.toLocaleString('en-IN')}</span>
                     </div>
                     <div className="flex items-center justify-between text-xs font-semibold">
-                      <span className="text-slate-600">Other Charges Subtotal:</span>
-                      <span className="font-mono font-bold text-slate-900">₹{lotCalculations.otherChargesTotal.toLocaleString('en-IN')}</span>
+                      <span className="text-gray-600">Other Charges Subtotal:</span>
+                      <span className="font-mono font-bold text-gray-900">₹{lotCalculations.otherChargesTotal.toLocaleString('en-IN')}</span>
                     </div>
-                    <div className="flex items-center justify-between text-sm font-black text-slate-900 border-t border-blue-100 pt-2.5">
+                    <div className="flex items-center justify-between text-sm font-black text-gray-900 border-t border-blue-100 pt-2.5">
                       <span>GRAND TOTAL:</span>
                       <span className="font-mono text-xl text-blue-600 font-black">₹{lotCalculations.grandTotal.toLocaleString('en-IN')}</span>
                     </div>
@@ -2745,21 +2746,22 @@ export const StockInventoryV2: React.FC = () => {
 
               </div>
 
-              {/* Modal Footer */}
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+              {/* FIXED MODAL FOOTER */}
+              <div className="shrink-0 px-6 py-4 border-t border-gray-100 bg-white flex items-center justify-between gap-3 z-10">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-semibold hover:bg-slate-50 transition-all cursor-pointer"
+                  className="px-4 py-2 border border-gray-200 text-gray-700 rounded-xl text-xs font-semibold hover:bg-gray-50 flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
-                  Cancel
+                  <X className="w-4 h-4" />
+                  <span>Cancel</span>
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md disabled:opacity-50 flex items-center gap-1.5 transition-all cursor-pointer"
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs disabled:opacity-50 flex items-center gap-2 transition-colors cursor-pointer"
                 >
-                  {isSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                  {isSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                   <span>{editingItem ? 'Update Purchase Batch' : 'Save Purchase Batch'}</span>
                 </button>
               </div>
