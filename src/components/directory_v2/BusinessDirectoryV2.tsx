@@ -4712,7 +4712,7 @@ export const BusinessDirectoryV2: React.FC = () => {
       {/* Dynamic Customer Data Modal (Triggered by clicking any card) */}
       {cardCustomersModal && (
         <div 
-          className="fixed inset-0 z-[80] bg-slate-950/50 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-150"
+          className="fixed inset-0 z-[80] bg-slate-900/35 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-150"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setCardCustomersModal(null);
