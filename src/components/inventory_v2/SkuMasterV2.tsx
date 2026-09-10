@@ -1203,6 +1203,17 @@ const SkuMasterV2: React.FC = () => {
   const filteredAndSortedSkus = useMemo(() => {
     let list = [...tabFilteredSkus];
 
+    // Apply categoryFilter if set
+    if (categoryFilter && categoryFilter.trim()) {
+      const catLower = categoryFilter.toLowerCase().trim();
+      list = list.filter(item => {
+        const itemCat = (item.category || '').toLowerCase();
+        const itemGroup = (item.group || '').toLowerCase();
+        const itemName = (item.name || '').toLowerCase();
+        return itemCat === catLower || itemGroup === catLower || itemName.includes(catLower);
+      });
+    }
+
     // Apply custom filter rules
     if (filterRules && filterRules.length > 0) {
       list = list.filter(item => {
@@ -1440,6 +1451,34 @@ const SkuMasterV2: React.FC = () => {
       }).catch(() => {});
     } catch (e) {
       showToast('Failed to delete item', 'error');
+    }
+  // Inline Table Category Change Handler (Saves directly to MongoDB database)
+  const handleInlineCategoryChange = async (sku: SkuV2, newCatName: string) => {
+    if (!sku._id) return;
+    try {
+      // 1. Instant local UI update
+      setSkus(prev => prev.map(s => s._id === sku._id ? { ...s, group: newCatName, category: newCatName } : s));
+      
+      // 2. Persist to MongoDB database via API
+      await updateSkuV2(sku._id, {
+        group: newCatName,
+        category: newCatName
+      });
+      
+      showToast(`Category updated to '${newCatName}' for ${sku.skuCode}`, 'success');
+
+      // 3. Log activity
+      createActivityLog({
+        action: 'UPDATE',
+        entityType: 'SkuV2',
+        entityName: sku.skuCode,
+        details: `Updated category of item '${sku.name}' to '${newCatName}'`,
+        company: selectedCompany?._id
+      }).catch(() => {});
+    } catch (err) {
+      console.error('Failed to update category:', err);
+      showToast('Failed to update category in database', 'error');
+      loadSkus(false);
     }
   };
 
@@ -2199,25 +2238,32 @@ const SkuMasterV2: React.FC = () => {
                                 </td>
                               );
                             case 'category':
-                              const genericCats = ['Finished Goods', 'Raw Material', 'Semi Finished', 'Products', 'Materials', 'Semi'];
-                              let displayCategory = sku.group || (sku.category && !genericCats.includes(sku.category) ? sku.category : null);
-                              if (!displayCategory) {
-                                const matched = categoriesData.find(c => (sku.name || '').toLowerCase().includes(c.name.toLowerCase()));
-                                if (matched) displayCategory = matched.name;
-                              }
-                              const fallbackCat = sku.category || (
-                                (sku.skuCode || '').toUpperCase().startsWith('RM') || activeMainTab === 'materials' ? 'Raw Material' :
-                                (sku.skuCode || '').toUpperCase().startsWith('SEM') || activeMainTab === 'semi' ? 'Semi Finished' : 'Finished Goods'
-                              );
+                              const targetSection = activeMainTab === 'materials' ? 'materials' : activeMainTab === 'semi' ? 'semi' : 'products';
+                              const defaultBaseCat = targetSection === 'materials' ? 'Raw Material' : targetSection === 'semi' ? 'Semi Finished' : 'Finished Goods';
+                              const createdOptionsForTab = categoriesData.filter(c => c.type === targetSection).map(c => c.name);
+                              const allOptionsForTab = Array.from(new Set([defaultBaseCat, ...createdOptionsForTab]));
+                              const currentSelectedCategory = sku.group || sku.category || defaultBaseCat;
+
                               return (
-                                <td key="category" className="py-3 px-3 text-gray-600 font-medium whitespace-nowrap">
-                                  {displayCategory ? (
-                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100/80 shadow-2xs">
-                                      {displayCategory}
-                                    </span>
-                                  ) : (
-                                    <span className="text-gray-600 font-medium">{fallbackCat}</span>
-                                  )}
+                                <td key="category" className="py-2.5 px-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                  <div className="relative inline-block">
+                                    <select
+                                      value={currentSelectedCategory}
+                                      onChange={(e) => handleInlineCategoryChange(sku, e.target.value)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="appearance-none pr-6 pl-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-50/90 hover:bg-blue-100/90 text-blue-800 border border-blue-200 focus:ring-2 focus:ring-blue-400 focus:outline-none cursor-pointer transition-all shadow-2xs"
+                                      title="Click to change category for this item (saves to database)"
+                                    >
+                                      {allOptionsForTab.map(catOpt => (
+                                        <option key={catOpt} value={catOpt} className="bg-white text-gray-900 font-semibold py-1">
+                                          {catOpt}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <div className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-blue-600 font-bold text-[9px]">
+                                      ▼
+                                    </div>
+                                  </div>
                                 </td>
                               );
                             case 'unit':
@@ -2572,7 +2618,13 @@ const SkuMasterV2: React.FC = () => {
           <div className="space-y-3">
             {categoriesData.filter(c => c.type === activeCategorySubTab).map(cat => {
               const isExpanded = expandedCategoryIds.includes(cat.id);
-              const linkedItemsCount = skus.filter(s => s.category?.toLowerCase() === cat.name.toLowerCase()).length || 1;
+              const linkedItemsCount = skus.filter(s => {
+                const cName = cat.name.toLowerCase();
+                const sGroup = (s.group || '').toLowerCase();
+                const sCat = (s.category || '').toLowerCase();
+                const sName = (s.name || '').toLowerCase();
+                return sGroup === cName || sCat === cName || (sCat === 'finished goods' && sName.includes(cName)) || (sCat === 'raw material' && sName.includes(cName));
+              }).length;
 
               return (
                 <div 
@@ -2622,7 +2674,7 @@ const SkuMasterV2: React.FC = () => {
                         className="text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1 rounded-lg shadow-2xs cursor-pointer transition-all"
                         title={`Filter items by category '${cat.name}'`}
                       >
-                        {linkedItemsCount} {cat.type === 'products' ? 'product' : 'material'}{linkedItemsCount > 1 ? 's' : ''}
+                        {linkedItemsCount} {cat.type === 'products' ? 'product' : 'material'}{linkedItemsCount === 1 ? '' : 's'}
                       </button>
 
                       <div className="flex items-center gap-1">
