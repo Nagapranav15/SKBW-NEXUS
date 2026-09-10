@@ -338,7 +338,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   }, [isOpen, editSku, customColumns, customColumnValues]);
 
   const [categoriesList, setCategoriesList] = useState<string[]>(["Raw Material", "Semi Finished", "Finished Goods"]);
-  const [unitsList, setUnitsList] = useState<string[]>(["kg", "pcs", "Sheets", "Reels", "mtr", "GBL", "Ream", "Gross", "Box", "Pkt"]);
+  const [unitsList, setUnitsList] = useState<string[]>(["Pcs", "Kg", "Sheets", "Reels", "Mtr", "GBL", "Ream", "Gross", "Box", "Pkt", "pcs", "kg"]);
   const [ruleTypesList, setRuleTypesList] = useState<string[]>(["Plain", "Single Line", "Double Line", "Square Ruled", "Four Line", "Unruled", "UR"]);
   const [groupsList, setGroupsList] = useState<string[]>(["132P Happy days (UR)", "220P Happy days (SR)"]);
   const [brandsList, setBrandsList] = useState<string[]>(["Happy Days", "Classmate", "Navneet"]);
@@ -633,7 +633,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         status: editSku.status || 'Active'
       });
       setHasAltUnit(!!editSku.altUnit);
-      setIsNameManuallyEdited(false); // Allow dynamic auto-update when fields like pages/brand are changed during edit
+      setIsNameManuallyEdited(true); // Preserve existing item name when editing
       if ((editSku as any).bomItems && Array.isArray((editSku as any).bomItems)) {
         setBomItems((editSku as any).bomItems);
       } else {
@@ -763,9 +763,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     }
   }, [isOpen, form.category, editSku, activeSection, existingProductsCount, existingMaterialsCount, existingSemiCount, rawMaterialsList, allSkusList]);
 
-    // Compile Sku Name dynamically from other inputs
+    // Compile Sku Name dynamically from other inputs (Only when creating a new item and name was not manually edited)
     useEffect(() => {
-      if (!isNameManuallyEdited) {
+      if (!editSku && !isNameManuallyEdited) {
         if (form.category === 'Raw Material') {
           if (!form.brand && !form.title && !form.gsm && !form.width && !form.length) {
             setForm(prev => ({ ...prev, name: '' }));
@@ -1224,7 +1224,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     <div>
                       <label className="block text-[11px] font-semibold text-gray-600 mb-1">PRIMARY UNIT *</label>
                       <select
-                        value={form.unit}
+                        value={unitsList.find(u => u.toLowerCase() === (form.unit || '').toLowerCase()) || form.unit || ''}
                         onChange={e => {
                           if (e.target.value === '__ADD_NEW__') {
                             handleAddNewOption('units');
@@ -1506,7 +1506,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     <div>
                       <label className="block text-[11px] font-semibold text-gray-600 mb-1">PRIMARY UNIT *</label>
                       <select
-                        value={form.unit}
+                        value={unitsList.find(u => u.toLowerCase() === (form.unit || '').toLowerCase()) || form.unit || ''}
                         onChange={e => {
                           if (e.target.value === '__ADD_NEW__') {
                             handleAddNewOption('units');
