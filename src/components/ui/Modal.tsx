@@ -36,15 +36,28 @@ export const Modal: React.FC<ModalProps> = ({
     };
     if (isOpen) {
       document.addEventListener('keydown', handleEscape);
+      const originalOverflow = document.body.style.overflow;
+      const originalPaddingRight = document.body.style.paddingRight;
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      
+      document.body.style.overflow = 'hidden';
+      if (scrollbarWidth > 0) {
+        document.body.style.paddingRight = `${scrollbarWidth}px`;
+      }
+
+      return () => {
+        document.removeEventListener('keydown', handleEscape);
+        document.body.style.overflow = originalOverflow;
+        document.body.style.paddingRight = originalPaddingRight;
+      };
     }
-    return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
   return (
-    <div className={`fixed inset-0 ${zIndex} overflow-y-auto flex items-center justify-center p-4 sm:p-6 bg-slate-900/40 backdrop-blur-xs transition-all duration-300 animate-fadeIn`}>
-      <div className={`relative bg-white rounded-2xl shadow-2xl shadow-slate-900/10 border border-slate-200/90 flex flex-col w-full ${modalSize} max-h-[90vh] overflow-hidden animate-modalPop ${className}`}>
+    <div className={`fixed inset-0 ${zIndex} overflow-y-auto flex items-center justify-center p-3 sm:p-6 bg-slate-950/50 backdrop-blur-md transition-all duration-200 animate-fadeIn`}>
+      <div className={`relative bg-white rounded-2xl shadow-2xl shadow-slate-900/20 border border-slate-200/90 flex flex-col w-full ${modalSize} max-h-[90vh] overflow-hidden animate-modalPop ${className}`}>
         {title && (
           <div className="px-6 py-4 border-b border-slate-100 bg-white flex justify-between items-center shrink-0">
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
