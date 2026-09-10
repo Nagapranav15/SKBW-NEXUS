@@ -786,6 +786,22 @@ const SkuMasterV2: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    if (skusList.length > 0 && !autoRenumberedRef.current && selectedCompany?._id) {
+      const hasLegacyCodes = skusList.some(s => {
+        const code = (s.skuCode || '').trim().toUpperCase();
+        if (code.startsWith('SEM-')) return true;
+        const numMatch = code.match(/-(0*\d+)$/);
+        if (numMatch && parseInt(numMatch[1], 10) > 500) return true;
+        return false;
+      });
+      if (hasLegacyCodes) {
+        autoRenumberedRef.current = true;
+        handleRenumberSkus(true);
+      }
+    }
+  }, [skusList, selectedCompany?._id]);
+
   // Demo Finished Products (Notebooks, Diaries, Longbooks, Registers)
   const DEMO_FINISHED_PRODUCTS: SkuV2[] = [
     {
@@ -1303,19 +1319,81 @@ const SkuMasterV2: React.FC = () => {
     }
   }, [showActivityLog]);
 
-  // Export handlers
-  const handleRenumberSkus = async () => {
-    if (!selectedCompany?._id) return;
-    if (!window.confirm("Re-sequence all existing SKU codes into clean continuous series (FG-001..., SM-001..., RM-001...)?")) {
+  const [isRenumbering, setIsRenumbering] = useState(false);
+  const autoRenumberedRef = useRef(false);
+
+  const handleRenumberSkus = async (silent = false) => {
+    if (!selectedCompany?._id || isRenumbering) return;
+    if (!silent && !window.confirm("Re-sequence all existing SKU codes into clean continuous series (FG-001..., SM-001..., RM-001...)?")) {
       return;
     }
+    setIsRenumbering(true);
     try {
-      const res = await renumberSkusV2(selectedCompany._id);
-      showToast(res.msg || "SKU series re-sequenced successfully!", "success");
+      // 1. Call backend API
+      const res = await renumberSkusV2(selectedCompany._id).catch(() => null);
+      
+      // 2. Fetch fresh SKUs to check if any legacy codes remain
+      const freshSkus = await getSkusV2(selectedCompany._id).catch(() => []);
+      
+      // 3. Fallback: If any legacy codes remain, perform sequential update via updateSkuV2
+      const fgList: SkuV2[] = [];
+      const smList: SkuV2[] = [];
+      const rmList: SkuV2[] = [];
+
+      (freshSkus || []).forEach(sku => {
+        const cat = (sku.category || "").trim().toLowerCase();
+        const code = (sku.skuCode || "").trim().toUpperCase();
+        if (cat.includes("finished") || cat.includes("product") || code.startsWith("FG")) {
+          fgList.push(sku);
+        } else if (cat.includes("semi") || code.startsWith("SM") || code.startsWith("SEM")) {
+          smList.push(sku);
+        } else {
+          rmList.push(sku);
+        }
+      });
+
+      fgList.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+      smList.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+      rmList.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+
+      let clientUpdatesCount = 0;
+
+      // Renumber FG
+      for (let i = 0; i < fgList.length; i++) {
+        const targetCode = `FG-${String(i + 1).padStart(3, '0')}`;
+        if (fgList[i]._id && fgList[i].skuCode !== targetCode) {
+          await updateSkuV2(fgList[i]._id!, { skuCode: targetCode }).catch(console.error);
+          clientUpdatesCount++;
+        }
+      }
+
+      // Renumber SM
+      for (let i = 0; i < smList.length; i++) {
+        const targetCode = `SM-${String(i + 1).padStart(3, '0')}`;
+        if (smList[i]._id && smList[i].skuCode !== targetCode) {
+          await updateSkuV2(smList[i]._id!, { skuCode: targetCode }).catch(console.error);
+          clientUpdatesCount++;
+        }
+      }
+
+      // Renumber RM
+      for (let i = 0; i < rmList.length; i++) {
+        const targetCode = `RM-${String(i + 1).padStart(3, '0')}`;
+        if (rmList[i]._id && rmList[i].skuCode !== targetCode) {
+          await updateSkuV2(rmList[i]._id!, { skuCode: targetCode }).catch(console.error);
+          clientUpdatesCount++;
+        }
+      }
+
+      if (!silent) {
+        showToast(res?.msg || `Renumbered ${fgList.length + smList.length + rmList.length} SKUs into continuous series!`, "success");
+      }
       loadSkus(false);
     } catch (err: any) {
-      console.error(err);
-      showToast(err.response?.data?.msg || "Failed to re-sequence SKUs", "error");
+      console.error('Renumbering error:', err);
+      if (!silent) showToast(err.response?.data?.msg || "Failed to re-sequence SKUs", "error");
+    } finally {
+      setIsRenumbering(false);
     }
   };
 

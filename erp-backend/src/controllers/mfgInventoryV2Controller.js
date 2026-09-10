@@ -414,7 +414,8 @@ exports.renumberSkus = async (req, res, next) => {
     }
 
     const companyObjId = toObjectId(companyId);
-    const allSkus = await SkuV2.find({ company: companyObjId, isDeleted: { $ne: true } }).sort({ createdAt: 1, _id: 1 });
+    const companyQuery = companyObjId ? { $in: [companyObjId, String(companyId)] } : companyId;
+    const allSkus = await SkuV2.find({ company: companyQuery, isDeleted: { $ne: true } }).sort({ createdAt: 1, _id: 1 });
 
     if (!allSkus || allSkus.length === 0) {
       return res.json({ msg: "No SKUs to renumber", updatedCount: 0 });
