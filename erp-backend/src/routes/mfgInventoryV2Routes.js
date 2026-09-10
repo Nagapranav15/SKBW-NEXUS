@@ -49,6 +49,17 @@ router.delete("/purchases/invoices/:id", auth, rbac(manage), purchaseCtrl.delete
 router.put("/purchases/invoices/:id/cancel", auth, rbac(manage), purchaseCtrl.cancelPurchaseInvoice);
 router.post("/purchases/payments", auth, rbac(manage), purchaseCtrl.recordPurchasePayment);
 
+const salesOrderCtrl = require("../controllers/mfgSalesOrderV2Controller");
+
+// Sales Orders V2 Routes (Makoro Replicated Engine)
+router.get("/sales-orders/next-number", auth, rbac(view), salesOrderCtrl.getNextSalesOrderNumber);
+router.get("/sales-orders", auth, rbac(view), salesOrderCtrl.getSalesOrders);
+router.get("/sales-orders/:id", auth, rbac(view), salesOrderCtrl.getSalesOrderById);
+router.get("/sales-orders/:id/bom-requirements", auth, rbac(view), salesOrderCtrl.getSalesOrderBomRequirements);
+router.post("/sales-orders", auth, rbac(manage), salesOrderCtrl.createSalesOrder);
+router.put("/sales-orders/:id", auth, rbac(manage), salesOrderCtrl.updateSalesOrder);
+router.patch("/sales-orders/:id/status", auth, rbac(manage), salesOrderCtrl.updateSalesOrderStatus);
+
 // Metadata routes
 router.get("/metadata", auth, ctrl.getMetadata);
 router.post("/metadata", auth, ctrl.updateMetadata);

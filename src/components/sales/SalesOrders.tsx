@@ -1,364 +1,380 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Plus, Search, Edit, Trash2, RefreshCw, Download, FileText, Calendar, Filter, CheckCircle, AlertTriangle, Layers, User, Package, Eye, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { getSalesOrders, createSalesOrder, updateSalesOrder, deleteSalesOrder, updateSalesOrderStatus } from '../../api/salesOrderApi';
-import { getParties } from '../../api/partyApi';
-import { getItems } from '../../api/itemApi';
-
-interface OrderItem { itemId: string; itemName: string; quantity: number; price: number; total: number; }
-interface SalesOrder {
-  _id: string; orderNumber: string; customerId: string; customerName: string;
-  date: string; deliveryDate: string; items: OrderItem[];
-  subtotal: number; tax: number; total: number;
-  status: string; notes: string; createdAt: string;
-  payment_mode?: string; payment_reference_id?: string; payment_status?: string; payment_notes?: string;
-}
-
-const PAYMENT_MODES = [
-  { value: 'upi', label: 'UPI' },
-  { value: 'cash', label: 'Cash' },
-  { value: 'bank_transfer', label: 'Bank Transfer' },
-  { value: 'cheque', label: 'Cheque' },
-];
-
-const getRefLabel = (mode: string) => {
-  switch (mode) {
-    case 'upi': return 'UTR Number';
-    case 'cheque': return 'Cheque Number';
-    case 'bank_transfer': return 'Reference Number';
-    case 'cash': return 'Notes (optional)';
-    default: return 'Reference ID';
-  }
-};
-
-const isRefRequired = (mode: string) => mode !== 'cash';
+import { getSalesOrdersV2, updateSalesOrderV2Status, SalesOrderV2 } from '../../api/salesOrderApiV2';
+import SalesOrderDrawerV2 from './SalesOrderDrawerV2';
+import SalesOrderDetailPanelV2 from './SalesOrderDetailPanelV2';
+import { showToast } from '../ui/Toast';
+import * as XLSX from 'xlsx';
 
 const SalesOrders: React.FC = () => {
-  const { selectedCompany, hasPermission } = useAuth();
-  const [orders, setOrders] = useState<SalesOrder[]>([]);
-  const [filteredOrders, setFilteredOrders] = useState<SalesOrder[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [editingOrder, setEditingOrder] = useState<SalesOrder | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [itemsList, setItemsList] = useState<any[]>([]);
+  const { selectedCompany } = useAuth();
+  const [orders, setOrders] = useState<SalesOrderV2[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const canCreate = hasPermission(['MANAGE_ORDERS', 'CREATE_ORDERS']);
-  const canManage = hasPermission('MANAGE_ORDERS');
+  // Tab & Filters
+  const [activeMainTab, setActiveMainTab] = useState<'orders' | 'templates' | 'quotes' | 'materials'>('orders');
+  const [periodFilter, setPeriodFilter] = useState<'all' | '30d' | '60d' | '90d'>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [search, setSearch] = useState('');
 
-  const [formData, setFormData] = useState({
-    customerId: '', date: new Date().toISOString().split('T')[0],
-    deliveryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    items: [{ itemId: '', itemName: '', quantity: 1, price: 0, total: 0 }] as OrderItem[],
-    notes: '', tax: 18,
-    payment_mode: 'cash', payment_reference_id: '', payment_status: 'pending', payment_notes: ''
-  });
+  // Modals & Panel State
+  const [showDrawer, setShowDrawer] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<SalesOrderV2 | null>(null);
+  const [selectedOrderDetail, setSelectedOrderDetail] = useState<SalesOrderV2 | null>(null);
 
-  useEffect(() => { fetchData(); }, [selectedCompany]);
+  const fetchOrders = async () => {
+    if (!selectedCompany?._id) return;
+    setLoading(true);
+    try {
+      const data = await getSalesOrdersV2(selectedCompany._id, statusFilter, periodFilter, search);
+      setOrders(data || []);
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to load Sales Orders', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    let filtered = orders;
-    if (searchTerm) {
-      const lowerSearch = searchTerm.toLowerCase();
-      filtered = filtered.filter(o =>
-        (o.orderNumber || '').toLowerCase().includes(lowerSearch) ||
-        (o.customerName || '').toLowerCase().includes(lowerSearch) ||
-        (o.status || '').toLowerCase().includes(lowerSearch) ||
-        (o.payment_mode || '').toLowerCase().includes(lowerSearch) ||
-        (o.payment_status || '').toLowerCase().includes(lowerSearch) ||
-        String(o.total || '').toLowerCase().includes(lowerSearch) ||
-        (o.items || []).some((item: any) =>
-          (item.itemName || '').toLowerCase().includes(lowerSearch) ||
-          (item.itemId || '').toLowerCase().includes(lowerSearch)
-        )
-      );
-    }
-    if (filterStatus !== 'all') filtered = filtered.filter(o => o.status === filterStatus);
-    setFilteredOrders(filtered);
-  }, [orders, searchTerm, filterStatus]);
+    fetchOrders();
+  }, [selectedCompany?._id, periodFilter, statusFilter]);
 
-  const fetchData = async () => {
-    try {
-      const [ordersRes, partiesRes, itemsRes] = await Promise.all([
-        getSalesOrders(selectedCompany?._id),
-        getParties({ company: selectedCompany?._id, type: 'customer', limit: 1000, light: true }),
-        getItems(selectedCompany?._id)
-      ]);
-      setOrders(ordersRes.data);
-      setCustomers(partiesRes.data.parties || []);
-      setItemsList(itemsRes.data);
-    } catch (err) { console.error(err); }
-    finally { setLoading(false); }
-  };
+  const filteredOrders = useMemo(() => {
+    return orders.filter(o => {
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        const matchNumber = (o.orderNumber || '').toLowerCase().includes(q);
+        const matchCustomer = (o.customerName || '').toLowerCase().includes(q);
+        const matchItems = (o.items || []).some(i => (i.itemName || '').toLowerCase().includes(q) || (i.skuCode || '').toLowerCase().includes(q));
+        if (!matchNumber && !matchCustomer && !matchItems) return false;
+      }
+      return true;
+    });
+  }, [orders, search]);
 
-  const generateOrderNumber = () => `SO-${new Date().getFullYear()}-${(orders.length + 1).toString().padStart(4, '0')}`;
+  const openOrdersCount = useMemo(() => {
+    return orders.filter(o => o.status === 'Confirmed' || o.status === 'In Production' || o.fulfillmentStatus !== 'Fulfilled').length;
+  }, [orders]);
 
-  const calculateTotals = (items: OrderItem[], taxRate: number) => {
-    const subtotal = items.reduce((s, i) => s + i.total, 0);
-    const tax = (subtotal * taxRate) / 100;
-    return { subtotal, tax, total: subtotal + tax };
-  };
+  const totalCommittedValue = useMemo(() => {
+    return orders.reduce((sum, o) => sum + (o.grandTotal || 0), 0);
+  }, [orders]);
 
-  const handleItemChange = (index: number, field: keyof OrderItem, value: any) => {
-    const updated = [...formData.items];
-    updated[index] = { ...updated[index], [field]: value };
-    if (field === 'itemId') {
-      const sel = itemsList.find((i: any) => i._id === value);
-      if (sel) { updated[index].itemName = sel.name; updated[index].price = sel.price; updated[index].total = updated[index].quantity * sel.price; }
-    }
-    if (field === 'quantity' || field === 'price') updated[index].total = updated[index].quantity * updated[index].price;
-    setFormData(prev => ({ ...prev, items: updated }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    // Validation
-    if (isRefRequired(formData.payment_mode) && !formData.payment_reference_id.trim()) {
-      alert(`${getRefLabel(formData.payment_mode)} is required for ${PAYMENT_MODES.find(m => m.value === formData.payment_mode)?.label} payments`);
+  const handleExportCSV = () => {
+    if (filteredOrders.length === 0) {
+      showToast('No orders available to export', 'error');
       return;
     }
-    const { subtotal, tax, total } = calculateTotals(formData.items, formData.tax);
-    if (total <= 0) { alert('Total amount must be > 0'); return; }
-    const customer = customers.find((c: any) => c._id === formData.customerId);
-    try {
-      if (editingOrder) {
-        await updateSalesOrder(editingOrder._id, { ...formData, subtotal, tax, total, customerName: customer?.firmName || customer?.contactName || '', company: selectedCompany?._id });
-      } else {
-        await createSalesOrder({ ...formData, orderNumber: generateOrderNumber(), customerName: customer?.firmName || customer?.contactName || '', subtotal, tax, total, status: 'pending', company: selectedCompany?._id });
-      }
-      await fetchData(); resetForm();
-    } catch (err: any) {
-      console.error(err);
-      const data = err.response?.data;
-      if (data?.stockErrors && data.stockErrors.length > 0) {
-        const errorLines = data.stockErrors.map((e: any) => 
-          `• ${e.itemName}: requested ${e.requested}, available ${e.available} (${e.reason})`
-        ).join('\n');
-        alert(`Insufficient stock:\n${errorLines}`);
-      } else {
-        alert(data?.msg || 'Error saving order. Please try again.');
-      }
-    }
-  };
+    const exportData = filteredOrders.map(o => ({
+      'SO Number': o.orderNumber,
+      'Client': o.customerName,
+      'Order Date': o.orderDate,
+      'Delivery Date': o.promisedDate || '—',
+      'Value (₹)': o.grandTotal,
+      'Material Readiness': o.materialsStatus,
+      'Fulfillment Status': o.fulfillmentStatus,
+      'Status': o.status
+    }));
 
-  const handleEdit = (order: SalesOrder) => {
-    setEditingOrder(order);
-    setFormData({
-      customerId: order.customerId, date: order.date, deliveryDate: order.deliveryDate,
-      items: order.items, notes: order.notes,
-      tax: order.subtotal > 0 ? (order.tax / order.subtotal) * 100 : 18,
-      payment_mode: order.payment_mode || 'cash',
-      payment_reference_id: order.payment_reference_id || '',
-      payment_status: order.payment_status || 'pending',
-      payment_notes: order.payment_notes || ''
-    });
-    setShowForm(true);
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sales Orders');
+    XLSX.writeFile(wb, `Sales_Orders_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
-
-  const handleDelete = async (id: string) => { if (window.confirm('Delete this order?')) { await deleteSalesOrder(id); await fetchData(); } };
-  const handleStatusUpdate = async (id: string, status: string) => { await updateSalesOrderStatus(id, status); await fetchData(); };
-  const resetForm = () => {
-    setFormData({
-      customerId: '', date: new Date().toISOString().split('T')[0],
-      deliveryDate: new Date(Date.now() + 14*24*60*60*1000).toISOString().split('T')[0],
-      items: [{ itemId: '', itemName: '', quantity: 1, price: 0, total: 0 }],
-      notes: '', tax: 18,
-      payment_mode: 'cash', payment_reference_id: '', payment_status: 'pending', payment_notes: ''
-    });
-    setEditingOrder(null); setShowForm(false);
-  };
-
-  const getStatusColor = (s: string) => {
-    const m: any = { pending: 'bg-yellow-100 text-yellow-800', confirmed: 'bg-blue-100 text-blue-800', in_production: 'bg-indigo-100 text-indigo-800', ready: 'bg-green-100 text-green-800', dispatched: 'bg-gray-100 text-gray-800', delivered: 'bg-emerald-100 text-emerald-800', cancelled: 'bg-red-100 text-red-800' };
-    return m[s] || 'bg-gray-100 text-gray-800';
-  };
-
-  const getPaymentBadge = (mode?: string) => {
-    if (!mode) return null;
-    const colors: any = { upi: 'bg-purple-100 text-purple-700', cash: 'bg-green-100 text-green-700', bank_transfer: 'bg-indigo-100 text-indigo-700', cheque: 'bg-orange-100 text-orange-700' };
-    const label = PAYMENT_MODES.find(m => m.value === mode)?.label || mode;
-    return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${colors[mode] || 'bg-gray-100 text-gray-700'}`}>{label}</span>;
-  };
-
-  if (loading) return <div className="p-6 flex justify-center"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>;
 
   return (
-    <div className="p-6">
-      <div className="mb-6"><h1 className="text-2xl font-bold text-gray-900 mb-2">Sales Orders</h1><p className="text-sm text-gray-500">Manage sales orders</p></div>
-
-      <div className="bg-white rounded-xl border p-4 mb-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-          <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input type="text" placeholder="Search orders..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg" />
-            </div>
-            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-4 py-2 border border-gray-300 rounded-lg">
-              <option value="all">All Status</option>
-              <option value="pending">Pending</option><option value="confirmed">Confirmed</option>
-              <option value="in_production">In Production</option><option value="ready">Ready</option>
-              <option value="dispatched">Dispatched</option><option value="delivered">Delivered</option>
-            </select>
+    <div className="p-3 sm:p-6 space-y-4 max-w-[1600px] mx-auto text-left font-sans">
+      
+      {/* ── TOP HEADER & BREADCRUMB ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+        <div>
+          <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
+            <span>Fulfillment</span>
+            <span>/</span>
+            <span className="font-bold text-gray-900">Demand</span>
           </div>
-          <div className="flex items-center space-x-2">
-            <button onClick={fetchData} className="p-2 text-gray-600 hover:bg-gray-100 border border-gray-300 rounded-lg transition-colors bg-white shadow-sm" title="Refresh page"><RefreshCw className="w-4 h-4" /></button>
-            {canCreate && <button onClick={() => setShowForm(true)} className="flex items-center gap-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"><Plus className="w-4 h-4" /> New Order</button>}
+          <h1 className="text-2xl font-black text-gray-900 tracking-tight mt-0.5">Sales Orders</h1>
+        </div>
+
+        {/* Action Controls */}
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={fetchOrders}
+            className="p-2 text-gray-500 hover:text-gray-900 bg-white hover:bg-gray-100 border border-gray-200 rounded-xl transition-all cursor-pointer shadow-2xs"
+            title="Refresh Order Data"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            onClick={handleExportCSV}
+            className="p-2 text-gray-500 hover:text-gray-900 bg-white hover:bg-gray-100 border border-gray-200 rounded-xl transition-all cursor-pointer shadow-2xs"
+            title="Export to Excel"
+          >
+            <Download className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => { setEditingOrder(null); setShowDrawer(true); }}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-2 text-xs"
+          >
+            <Plus className="w-4 h-4 stroke-[3]" />
+            <span>New Sales Order</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── MAKORO SUB-TAB NAVIGATION BAR ── */}
+      <div className="border-b border-gray-200 flex items-center justify-between pt-1 overflow-x-auto">
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setActiveMainTab('orders')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
+              activeMainTab === 'orders' ? 'text-blue-700 border-blue-600 bg-blue-50/40' : 'text-gray-500 border-transparent hover:text-gray-900'
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            <span>Orders ({orders.length})</span>
+            <span className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold">Open: {openOrdersCount}</span>
+          </button>
+          <button
+            onClick={() => setActiveMainTab('quotes')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
+              activeMainTab === 'quotes' ? 'text-blue-700 border-blue-600 bg-blue-50/40' : 'text-gray-500 border-transparent hover:text-gray-900'
+            }`}
+          >
+            <Layers className="w-4 h-4 text-gray-400" />
+            <span>Quotes</span>
+          </button>
+          <button
+            onClick={() => setActiveMainTab('templates')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
+              activeMainTab === 'templates' ? 'text-blue-700 border-blue-600 bg-blue-50/40' : 'text-gray-500 border-transparent hover:text-gray-900'
+            }`}
+          >
+            <span>Templates</span>
+          </button>
+          <button
+            onClick={() => setActiveMainTab('materials')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
+              activeMainTab === 'materials' ? 'text-blue-700 border-blue-600 bg-blue-50/40' : 'text-gray-500 border-transparent hover:text-gray-900'
+            }`}
+          >
+            <span>Materials</span>
+          </button>
+        </div>
+
+        {/* Total Committed Value Indicator */}
+        <div className="text-xs font-bold text-gray-700 hidden md:flex items-center gap-2 pr-2">
+          <span className="text-gray-400 font-normal">Total Value:</span>
+          <span className="text-blue-900 font-black">₹{totalCommittedValue.toLocaleString('en-IN')}</span>
+        </div>
+      </div>
+
+      {/* ── TOOLBAR & PERIOD QUICK PILLS ── */}
+      <div className="bg-white rounded-2xl border border-gray-200/90 p-3 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
+        
+        {/* Quick Date Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto text-xs font-semibold">
+          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mr-1">PERIOD:</span>
+          {(['all', '30d', '60d', '90d'] as const).map(p => (
+            <button
+              key={p}
+              onClick={() => setPeriodFilter(p)}
+              className={`px-3 py-1 rounded-xl transition-all cursor-pointer text-xs ${
+                periodFilter === p ? 'bg-gray-900 text-white font-bold shadow-xs' : 'bg-gray-100/80 hover:bg-gray-200 text-gray-600'
+              }`}
+            >
+              {p === 'all' ? 'All Time' : p.toUpperCase()}
+            </button>
+          ))}
+        </div>
+
+        {/* Search & Status Filter */}
+        <div className="flex items-center gap-2.5">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 cursor-pointer focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          >
+            <option value="all">All Statuses</option>
+            <option value="Confirmed">Confirmed</option>
+            <option value="In Production">In Production</option>
+            <option value="Delivered">Delivered</option>
+            <option value="Draft">Draft</option>
+          </select>
+
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search SO #, client, items..."
+              className="pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-xl w-48 md:w-64 font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border overflow-hidden">
+      {/* ── MAKORO SALES ORDERS TABLE ── */}
+      <div className="bg-white border border-gray-200/90 rounded-2xl overflow-hidden shadow-2xs">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50"><tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order Details</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-            </tr></thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredOrders.map((order) => (
-                <tr key={order._id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-[13.5px] font-medium text-gray-900">{order.orderNumber}</div>
-                    <div className="text-[13.5px] text-gray-500">Date: {new Date(order.date).toLocaleDateString()}</div>
-                    <div className="text-[13.5px] text-gray-500">Delivery: {order.deliveryDate ? new Date(order.deliveryDate).toLocaleDateString() : 'N/A'}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-[13.5px] font-medium text-gray-900">{order.customerName}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-[13.5px] font-medium text-gray-900">₹{order.total?.toFixed(2)}</div>
-                    <div className="text-[13.5px] text-gray-500">{order.items?.length} items</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="space-y-1">
-                      {getPaymentBadge(order.payment_mode)}
-                      {order.payment_status && <div><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${order.payment_status === 'paid' ? 'bg-green-100 text-green-700' : order.payment_status === 'partial' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>{order.payment_status}</span></div>}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {canManage ? (
-                      <select value={order.status} onChange={(e) => handleStatusUpdate(order._id, e.target.value)} className={`text-xs font-semibold rounded-full px-2 py-1 border-0 ${getStatusColor(order.status)}`}>
-                        <option value="pending">Pending</option><option value="confirmed">Confirmed</option>
-                        <option value="in_production">In Production</option><option value="ready">Ready</option>
-                        <option value="dispatched">Dispatched</option><option value="delivered">Delivered</option>
-                        <option value="cancelled">Cancelled</option>
-                      </select>
-                    ) : <span className={`text-xs font-semibold rounded-full px-2 py-1 ${getStatusColor(order.status)}`}>{order.status.replace('_', ' ')}</span>}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-[13.5px] font-medium">
-                    <div className="flex space-x-2">
-                      {canManage && <button onClick={() => handleEdit(order)} className="text-blue-600 hover:text-blue-900"><Edit className="w-4 h-4" /></button>}
-                      {canManage && <button onClick={() => handleDelete(order._id)} className="text-red-600 hover:text-red-900"><Trash2 className="w-4 h-4" /></button>}
-                    </div>
+          <table className="w-full text-left divide-y divide-gray-200">
+            <thead className="bg-gray-50/90 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider">
+              <tr>
+                <th className="py-3 px-3 w-8">
+                  <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                </th>
+                <th className="py-3 px-3">SO NO.</th>
+                <th className="py-3 px-4">CLIENT</th>
+                <th className="py-3 px-4">ITEMS</th>
+                <th className="py-3 px-3">START DATE</th>
+                <th className="py-3 px-3">DELIVERY DATE</th>
+                <th className="py-3 px-3 text-right">VALUE (₹)</th>
+                <th className="py-3 px-3">MATERIALS</th>
+                <th className="py-3 px-3">FULFILLMENT</th>
+                <th className="py-3 px-3 text-center">ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 bg-white text-xs">
+              {filteredOrders.map((order) => {
+                const itemCount = (order.items || []).length;
+                const firstItemName = order.items && order.items[0] ? order.items[0].itemName : 'No Items';
+                const remainingCount = itemCount > 1 ? itemCount - 1 : 0;
+
+                return (
+                  <tr
+                    key={order._id}
+                    onClick={() => setSelectedOrderDetail(order)}
+                    className="hover:bg-blue-50/40 transition-colors cursor-pointer group"
+                  >
+                    <td className="py-3 px-3" onClick={(e) => e.stopPropagation()}>
+                      <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                    </td>
+
+                    {/* SO Number */}
+                    <td className="py-3 px-3 font-mono font-bold text-blue-700 whitespace-nowrap group-hover:underline">
+                      {order.orderNumber}
+                    </td>
+
+                    {/* Client Firm Name Pill */}
+                    <td className="py-3 px-4 font-bold text-gray-900 whitespace-nowrap">
+                      <span className="bg-gray-100/90 text-gray-900 border border-gray-200/70 px-2.5 py-1 rounded-xl">
+                        {order.customerName}
+                      </span>
+                    </td>
+
+                    {/* Items Summary Preview */}
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-1.5 max-w-xs truncate">
+                        <span className="font-semibold text-gray-800 truncate">{firstItemName}</span>
+                        {remainingCount > 0 && (
+                          <span className="bg-blue-50 text-blue-700 text-[10px] font-bold px-1.5 py-0.2 rounded-full shrink-0 border border-blue-100">
+                            +{remainingCount} more
+                          </span>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Start Date */}
+                    <td className="py-3 px-3 text-gray-600 font-medium whitespace-nowrap">
+                      {order.orderDate}
+                    </td>
+
+                    {/* Delivery Date */}
+                    <td className="py-3 px-3 text-gray-900 font-bold whitespace-nowrap">
+                      {order.promisedDate || '—'}
+                    </td>
+
+                    {/* Value */}
+                    <td className="py-3 px-3 text-right font-black text-gray-900 whitespace-nowrap">
+                      ₹{(order.grandTotal || 0).toLocaleString('en-IN')}
+                    </td>
+
+                    {/* Materials BOM Status Badge */}
+                    <td className="py-3 px-3 whitespace-nowrap">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                        order.materialsStatus === 'Shortfall'
+                          ? 'bg-amber-50 text-amber-700 border-amber-200'
+                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      }`}>
+                        {order.materialsStatus === 'Shortfall' ? 'Shortfall Warning' : 'Ready'}
+                      </span>
+                    </td>
+
+                    {/* Fulfillment Progress */}
+                    <td className="py-3 px-3 whitespace-nowrap">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                        order.fulfillmentStatus === 'Fulfilled' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                        order.fulfillmentStatus === 'Partial' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-gray-100 text-gray-700 border-gray-200'
+                      }`}>
+                        {order.fulfillmentStatus || 'Not Started'}
+                      </span>
+                    </td>
+
+                    {/* Actions */}
+                    <td className="py-3 px-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedOrderDetail(order)}
+                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                          title="View Order Details & BOM Requirements"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setEditingOrder(order); setShowDrawer(true); }}
+                          className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                          title="Edit Order"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+
+              {filteredOrders.length === 0 && !loading && (
+                <tr>
+                  <td colSpan={10} className="py-8 text-center text-gray-400 italic">
+                    No Sales Orders found matching your criteria.
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
-          {filteredOrders.length === 0 && <div className="text-center py-8 text-gray-500">No orders found</div>}
         </div>
       </div>
 
-      {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <h2 className="text-2xl font-bold mb-4">{editingOrder ? 'Edit Order' : 'Create New Order'}</h2>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><label className="block text-sm font-medium text-gray-700 mb-2">Customer *</label>
-                  <select value={formData.customerId} onChange={(e) => setFormData(p => ({ ...p, customerId: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg" required>
-                    <option value="">Select Customer</option>
-                    {customers.map((c: any) => <option key={c._id} value={c._id}>{c.firmName || c.contactName}</option>)}
-                  </select></div>
-                <div><label className="block text-sm font-medium text-gray-700 mb-2">Order Date *</label>
-                  <input type="date" value={formData.date} onChange={(e) => setFormData(p => ({ ...p, date: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg" required /></div>
-                <div><label className="block text-sm font-medium text-gray-700 mb-2">Delivery Date</label>
-                  <input type="date" value={formData.deliveryDate} onChange={(e) => setFormData(p => ({ ...p, deliveryDate: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg" /></div>
-                <div><label className="block text-sm font-medium text-gray-700 mb-2">Tax Rate (%)</label>
-                  <input type="number" step="0.01" value={formData.tax} onChange={(e) => setFormData(p => ({ ...p, tax: parseFloat(e.target.value) || 0 }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg" /></div>
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-4"><h3 className="text-lg font-semibold">Items</h3>
-                  <button type="button" onClick={() => setFormData(p => ({ ...p, items: [...p.items, { itemId: '', itemName: '', quantity: 1, price: 0, total: 0 }] }))} className="flex items-center space-x-2 px-3 py-1 bg-blue-600 text-white rounded-lg text-sm"><Plus className="w-4 h-4" /><span>Add</span></button></div>
-                {formData.items.map((item, i) => (
-                  <div key={i} className="p-4 bg-gray-50 rounded-lg mb-2">
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                      <div><select value={item.itemId} onChange={(e) => handleItemChange(i, 'itemId', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" required>
-                        <option value="">Select Item</option>{itemsList.map((it: any) => <option key={it._id} value={it._id}>{it.name}</option>)}
-                      </select></div>
-                      <div><input type="number" value={item.quantity} onChange={(e) => handleItemChange(i, 'quantity', parseInt(e.target.value) || 0)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" min="1" required /></div>
-                      <div><input type="number" step="0.01" value={item.price} onChange={(e) => handleItemChange(i, 'price', parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" required /></div>
-                      <div><input type="number" value={item.total.toFixed(2)} readOnly className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-sm" /></div>
-                      <div><button type="button" onClick={() => setFormData(p => ({ ...p, items: p.items.filter((_, idx) => idx !== i) }))} className="w-full px-3 py-2 bg-red-600 text-white rounded-lg text-sm" disabled={formData.items.length === 1}>Remove</button></div>
-                    </div>
-                    {item.itemId && (() => {
-                      const found = itemsList.find((it: any) => it._id === item.itemId);
-                      if (!found) return null;
-                      const isLow = found.stock < item.quantity;
-                      return (
-                        <div className={`mt-2 text-xs flex items-center gap-2 ${isLow ? 'text-red-600' : 'text-green-600'}`}>
-                          <span className={`inline-block w-2 h-2 rounded-full ${isLow ? 'bg-red-500' : 'bg-green-500'}`}></span>
-                          Stock: {found.stock} {found.primaryUnit || 'units'}
-                          {isLow && <span className="font-semibold">(Insufficient — need {item.quantity})</span>}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                ))}
-                <div className="mt-4 p-4 bg-gray-50 rounded-lg"><div className="flex justify-end space-x-8">
-                  <div className="text-right"><div className="text-sm text-gray-600">Subtotal:</div><div className="text-sm text-gray-600">Tax ({formData.tax}%):</div><div className="text-lg font-semibold">Total:</div></div>
-                  <div className="text-right"><div className="text-sm">₹{calculateTotals(formData.items, formData.tax).subtotal.toFixed(2)}</div><div className="text-sm">₹{calculateTotals(formData.items, formData.tax).tax.toFixed(2)}</div><div className="text-lg font-semibold">₹{calculateTotals(formData.items, formData.tax).total.toFixed(2)}</div></div>
-                </div></div>
-              </div>
+      {/* ── CREATE / EDIT SALES ORDER MODAL FORM ── */}
+      <SalesOrderDrawerV2
+        isOpen={showDrawer}
+        companyId={selectedCompany?._id || ''}
+        editOrder={editingOrder}
+        onClose={() => setShowDrawer(false)}
+        onSaveSuccess={() => {
+          setShowDrawer(false);
+          fetchOrders();
+          showToast('Sales Order saved successfully!', 'success');
+        }}
+      />
 
-              {/* Payment Details Section */}
-              <div className="border border-blue-200 rounded-lg p-4 bg-blue-50/30">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
-                  <span className="w-2 h-2 rounded-full bg-blue-500 mr-2"></span>
-                  Payment Details
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Payment Mode *</label>
-                    <select value={formData.payment_mode} onChange={(e) => setFormData(p => ({ ...p, payment_mode: e.target.value, payment_reference_id: '' }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" required>
-                      {PAYMENT_MODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      {getRefLabel(formData.payment_mode)} {isRefRequired(formData.payment_mode) && '*'}
-                    </label>
-                    <input
-                      value={formData.payment_reference_id}
-                      onChange={(e) => setFormData(p => ({ ...p, payment_reference_id: e.target.value }))}
-                      placeholder={getRefLabel(formData.payment_mode)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                      required={isRefRequired(formData.payment_mode)}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Payment Status</label>
-                    <select value={formData.payment_status} onChange={(e) => setFormData(p => ({ ...p, payment_status: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                      <option value="paid">Paid</option><option value="pending">Pending</option><option value="partial">Partial</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
+      {/* ── MAKORO SLIDE-OUT ORDER DETAIL PANEL ── */}
+      <SalesOrderDetailPanelV2
+        isOpen={!!selectedOrderDetail}
+        order={selectedOrderDetail}
+        onClose={() => setSelectedOrderDetail(null)}
+        onEdit={(ord) => {
+          setSelectedOrderDetail(null);
+          setEditingOrder(ord);
+          setShowDrawer(true);
+        }}
+      />
 
-              <div><label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
-                <textarea value={formData.notes} onChange={(e) => setFormData(p => ({ ...p, notes: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg" rows={3} /></div>
-              <div className="flex space-x-4 pt-4">
-                <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg">{editingOrder ? 'Update Order' : 'Create Order'}</button>
-                <button type="button" onClick={resetForm} className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 py-2 px-4 rounded-lg">Cancel</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
