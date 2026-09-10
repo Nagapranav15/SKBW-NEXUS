@@ -686,11 +686,41 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     }
   }, [companyId]);
 
-  const activeFields = [...(categoryFieldsMap[form.category] || ['gsm', 'width', 'length'])];
-  if (form.paperType === 'Sheets') {
-    if (!activeFields.includes('pages')) activeFields.push('pages');
-    if (!activeFields.includes('reamWeight')) activeFields.push('reamWeight');
-  }
+  const isProductCategory = React.useMemo(() => {
+    if (activeSection === 'products' || form.category === 'Finished Goods' || form.category === 'Products') return true;
+    if (activeSection === 'materials' || activeSection === 'semi') return false;
+    const matched = (createdCategories || []).find(c => c.name === form.category);
+    if (matched) return matched.type === 'products';
+    return !['Raw Material', 'Semi Finished'].includes(form.category);
+  }, [activeSection, form.category, createdCategories]);
+
+  const activeFields = React.useMemo(() => {
+    if (categoryFieldsMap[form.category]) return categoryFieldsMap[form.category];
+
+    const matchedCatObj = (createdCategories || []).find(c => c.name === form.category);
+    if (matchedCatObj?.fields?.length) {
+      const fieldsList: string[] = ['altUnit'];
+      matchedCatObj.fields.forEach(f => {
+        const lower = f.toLowerCase();
+        if (lower.includes('page') || lower.includes('sheet')) fieldsList.push('pages');
+        if (lower.includes('size') || lower.includes('width') || lower.includes('length') || lower.includes('dim')) {
+          fieldsList.push('width', 'length');
+        }
+        if (lower.includes('gsm')) fieldsList.push('gsm');
+        if (lower.includes('rule') || lower.includes('ruling')) fieldsList.push('ruleType');
+        if (lower.includes('brand')) fieldsList.push('brand');
+      });
+      return Array.from(new Set(fieldsList));
+    }
+
+    if (isProductCategory) {
+      return ['gsm', 'brand', 'width', 'length', 'ruleType', 'pages', 'altUnit'];
+    }
+    if (activeSection === 'semi' || form.category === 'Semi Finished') {
+      return ['gsm', 'brand', 'width', 'length', 'ruleType', 'altUnit', 'group'];
+    }
+    return ['gsm', 'brand', 'title', 'width', 'length', 'paperType'];
+  }, [categoryFieldsMap, form.category, createdCategories, isProductCategory, activeSection]);
 
   // Auto-generate neat sequential SKU Code (RM-001, FG-001, SM-001)
   const regenerateSkuCode = (targetCategory?: string) => {
@@ -965,7 +995,10 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                   />
                 </div>
                 <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-[11px] font-semibold text-gray-600 mb-1">CATEGORY *</label>
+                  <label className="block text-[11px] font-bold text-blue-900 mb-1 flex items-center justify-between">
+                    <span>CATEGORY *</span>
+                    <span className="text-[10px] text-blue-600 font-semibold">(Created Categories)</span>
+                  </label>
                   <select
                     value={form.category}
                     onChange={e => {
@@ -973,23 +1006,31 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       if (val === '__ADD_NEW__') {
                         handleAddNewOption('categories');
                       } else {
+                        const matchedCatObj = (createdCategories || []).find(c => c.name === val);
                         setForm(prev => ({
                           ...prev,
                           category: val,
-                          paperType: val === 'Raw Material' ? 'Reels' : 'None',
-                          ruleType: val === 'Finished Goods' ? (prev.ruleType || 'UR') : (val === 'Raw Material' ? '' : prev.ruleType)
+                          group: val,
+                          unit: matchedCatObj?.uom || prev.unit,
+                          paperType: val === 'Raw Material' || val.toLowerCase().includes('reel') ? 'Reels' : (val.toLowerCase().includes('sheet') ? 'Sheets' : prev.paperType),
+                          ruleType: isProductCategory || val.toLowerCase().includes('notebook') || val.toLowerCase().includes('diary') ? (prev.ruleType || 'UR') : prev.ruleType
                         }));
                         if (!editSku) {
                           regenerateSkuCode(val);
                         }
                       }
                     }}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
+                    className="w-full px-3 py-2 border-2 border-blue-300 hover:border-blue-400 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-blue-50/40 font-bold text-gray-900 cursor-pointer shadow-2xs transition-all"
+                    required
                   >
-                    {sectionCategories.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                    <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
+                    <optgroup label="Select Category">
+                      {sectionCategories.map(cat => (
+                        <option key={cat} value={cat} className="bg-white text-gray-900 font-semibold py-1">
+                          {cat}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <option value="__ADD_NEW__" className="bg-white text-blue-600 font-bold">+ Add Custom Category...</option>
                   </select>
                 </div>
 
@@ -1052,8 +1093,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                   />
                 </div>
 
-                {/* For Finished Goods: Pages, Brand, Rule Type, Primary Unit, Alternate Units right below SKU Name */}
-                {form.category === 'Finished Goods' && (
+                {/* For Product categories: Pages, Brand, Rule Type, Primary Unit, Alternate Units right below SKU Name */}
+                {isProductCategory && (
                   <>
                     {/* 1. Pages */}
                     {activeFields.includes('pages') && (
@@ -1282,8 +1323,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       />
                     </div>
                   )}
-                  {/* Skip Brand for Finished Goods as it's right below SKU Name */}
-                  {form.category !== 'Finished Goods' && activeFields.includes('brand') && (
+                  {/* Skip Brand for Product categories as it's right below SKU Name */}
+                  {!isProductCategory && activeFields.includes('brand') && (
                     <div>
                       <label className="block text-[11px] font-semibold text-gray-600 mb-1">BRAND</label>
                       <div className="relative" ref={brandContainerRef}>
@@ -1440,8 +1481,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                 Inventory & Additional Attributes
               </h3>
               <div className="grid grid-cols-2 gap-3">
-                {/* For non-Finished Goods: Primary Unit & Alternate Unit right here */}
-                {form.category !== 'Finished Goods' && (
+                {/* For non-Product categories: Primary Unit & Alternate Unit right here */}
+                {!isProductCategory && (
                   <>
                     <div>
                       <label className="block text-[11px] font-semibold text-gray-600 mb-1">PRIMARY UNIT *</label>
@@ -1616,7 +1657,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     </div>
                   </div>
                 )}
-                {form.category !== 'Finished Goods' && activeFields.includes('ruleType') && (
+                {!isProductCategory && activeFields.includes('ruleType') && (
                   <div>
                     <label className="block text-[11px] font-semibold text-gray-600 mb-1">RULE TYPE</label>
                     <select
@@ -1637,7 +1678,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     </select>
                   </div>
                 )}
-                {form.category !== 'Finished Goods' && activeFields.includes('pages') && (
+                {!isProductCategory && activeFields.includes('pages') && (
                   <div>
                     <label className="block text-[11px] font-semibold text-gray-600 mb-1">
                       {form.paperType === 'Sheets' ? 'STANDARD SHEETS/REAM' : 'PAGES'}
