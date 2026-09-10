@@ -19,6 +19,7 @@ interface AddSkuDrawerV2Props {
   customColumnValues?: { [key: string]: any };
   setCustomColumnValues?: React.Dispatch<React.SetStateAction<{ [key: string]: any }>>;
   customColumnOptions?: { [colName: string]: { label: string; color: string }[] };
+  createdCategories?: { id?: string; name: string; type?: 'products' | 'materials' | 'semi'; uom?: string }[];
 }
 
 export const SearchableMaterialDropdown: React.FC<{
@@ -161,7 +162,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   customColumnTypes = {},
   customColumnValues = {},
   setCustomColumnValues,
-  customColumnOptions = {}
+  customColumnOptions = {},
+  createdCategories = []
 }) => {
   const [form, setForm] = useState({
     skuCode: '',
@@ -336,14 +338,22 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   }, [isOpen, editSku, customColumns, customColumnValues]);
 
   const sectionCategories = React.useMemo(() => {
-    if (activeSection === 'products' || defaultCategory === 'Finished Goods') {
-      return ['Finished Goods'];
-    }
+    let baseCategory = 'Finished Goods';
+    let targetType: 'products' | 'materials' | 'semi' = 'products';
     if (activeSection === 'semi' || defaultCategory === 'Semi Finished') {
-      return ['Semi Finished'];
+      baseCategory = 'Semi Finished';
+      targetType = 'semi';
+    } else if (activeSection === 'materials' || defaultCategory === 'Raw Material') {
+      baseCategory = 'Raw Material';
+      targetType = 'materials';
     }
-    return ['Raw Material'];
-  }, [activeSection, defaultCategory]);
+
+    const createdList = (createdCategories || [])
+      .filter(c => !c.type || c.type === targetType)
+      .map(c => c.name);
+
+    return Array.from(new Set([baseCategory, ...createdList, ...categoriesList]));
+  }, [activeSection, defaultCategory, createdCategories, categoriesList]);
 
   const [categoriesList, setCategoriesList] = useState<string[]>(["Raw Material", "Semi Finished", "Finished Goods"]);
   const [unitsList, setUnitsList] = useState<string[]>(["kg", "pcs", "Sheets", "Reels", "mtr", "GBL", "Ream", "Gross", "Box", "Pkt"]);

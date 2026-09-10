@@ -2199,13 +2199,25 @@ const SkuMasterV2: React.FC = () => {
                                 </td>
                               );
                             case 'category':
-                              const categoryText = sku.category || (
+                              const genericCats = ['Finished Goods', 'Raw Material', 'Semi Finished', 'Products', 'Materials', 'Semi'];
+                              let displayCategory = sku.group || (sku.category && !genericCats.includes(sku.category) ? sku.category : null);
+                              if (!displayCategory) {
+                                const matched = categoriesData.find(c => (sku.name || '').toLowerCase().includes(c.name.toLowerCase()));
+                                if (matched) displayCategory = matched.name;
+                              }
+                              const fallbackCat = sku.category || (
                                 (sku.skuCode || '').toUpperCase().startsWith('RM') || activeMainTab === 'materials' ? 'Raw Material' :
                                 (sku.skuCode || '').toUpperCase().startsWith('SEM') || activeMainTab === 'semi' ? 'Semi Finished' : 'Finished Goods'
                               );
                               return (
                                 <td key="category" className="py-3 px-3 text-gray-600 font-medium whitespace-nowrap">
-                                  {categoryText}
+                                  {displayCategory ? (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100/80 shadow-2xs">
+                                      {displayCategory}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-600 font-medium">{fallbackCat}</span>
+                                  )}
                                 </td>
                               );
                             case 'unit':
@@ -2823,6 +2835,7 @@ const SkuMasterV2: React.FC = () => {
         customColumnValues={customColumnValues}
         setCustomColumnValues={setCustomColumnValues}
         customColumnOptions={customColumnOptions}
+        createdCategories={categoriesData}
       />
 
       {/* ── DELETE CONFIRMATION MODAL ── */}

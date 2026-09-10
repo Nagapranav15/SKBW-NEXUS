@@ -1399,18 +1399,6 @@ export const BusinessDirectoryV2: React.FC = () => {
           </button>
 
           <button
-            onClick={() => handleTabChange('transporters')}
-            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
-              activeMainTab === 'transporters'
-                ? 'border-teal-700 text-teal-700 bg-transparent'
-                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
-            }`}
-          >
-            <Truck className={`w-4 h-4 ${activeMainTab === 'transporters' ? 'text-teal-700' : 'text-slate-400'}`} />
-            <span>Transporters</span>
-          </button>
-
-          <button
             onClick={() => handleTabChange('regions')}
             className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
               activeMainTab === 'regions'
@@ -1432,6 +1420,18 @@ export const BusinessDirectoryV2: React.FC = () => {
           >
             <Building className={`w-4 h-4 ${activeMainTab === 'cities' ? 'text-teal-700' : 'text-slate-400'}`} />
             <span>Cities</span>
+          </button>
+
+          <button
+            onClick={() => handleTabChange('transporters')}
+            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+              activeMainTab === 'transporters'
+                ? 'border-teal-700 text-teal-700 bg-transparent'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
+            }`}
+          >
+            <Truck className={`w-4 h-4 ${activeMainTab === 'transporters' ? 'text-teal-700' : 'text-slate-400'}`} />
+            <span>Transporters</span>
           </button>
         </div>
 
