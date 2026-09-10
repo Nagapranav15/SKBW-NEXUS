@@ -749,7 +749,7 @@ const SkuMasterV2: React.FC = () => {
       const [data, balancesData] = await Promise.all([
         getSkusV2(
           companyId, 
-          categoryFilter || undefined, 
+          undefined, 
           debouncedSearch || undefined,
           statusFilter || undefined
         ),
@@ -2910,8 +2910,19 @@ const SkuMasterV2: React.FC = () => {
         existingMaterialsCount={materialsList.length}
         existingSemiCount={semiList.length}
         onClose={() => setShowAddDrawer(false)}
-        onSaveSuccess={() => {
+        onSaveSuccess={(savedSku) => {
           setShowAddDrawer(false);
+          if (savedSku?._id) {
+            setSkus(prev => {
+              const idx = prev.findIndex(s => s._id === savedSku._id);
+              if (idx >= 0) {
+                const copy = [...prev];
+                copy[idx] = { ...copy[idx], ...savedSku };
+                return copy;
+              }
+              return [savedSku, ...prev];
+            });
+          }
           loadSkus(false);
         }}
         customColumns={customColumns}
