@@ -682,54 +682,39 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     if (!activeFields.includes('reamWeight')) activeFields.push('reamWeight');
   }
 
-  // Auto-generate SKU Code
+  // Auto-generate neat sequential SKU Code (RM-001, FG-001, SM-001)
   const regenerateSkuCode = (targetCategory?: string) => {
-    let prefix = 'RM';
-    let count = 0;
+    let prefix: 'RM' | 'FG' | 'SM' = 'RM';
 
     const cat = targetCategory || form.category || defaultCategory || (activeSection === 'products' ? 'Finished Goods' : activeSection === 'semi' ? 'Semi Finished' : 'Raw Material');
-    const skuSourceList = (allSkusList && allSkusList.length > 0) ? allSkusList : rawMaterialsList;
 
     if (cat === 'Finished Goods' || activeSection === 'products') {
       prefix = 'FG';
-      if (skuSourceList && skuSourceList.length > 0) {
-        const fgSkus = skuSourceList.filter(s => (s.category || '').toLowerCase().includes('finished') || (s.category || '').toLowerCase().includes('product') || (s.skuCode || '').toUpperCase().startsWith('FG'));
-        const nums = fgSkus.map(s => {
-          const match = (s.skuCode || '').match(/FG-?(\d+)/i);
-          return match ? parseInt(match[1], 10) : NaN;
-        }).filter(n => !isNaN(n));
-        count = nums.length > 0 ? Math.max(...nums) : (existingProductsCount ?? fgSkus.length);
-      } else {
-        count = existingProductsCount ?? 0;
-      }
     } else if (cat === 'Semi Finished' || activeSection === 'semi') {
       prefix = 'SM';
-      if (skuSourceList && skuSourceList.length > 0) {
-        const semSkus = skuSourceList.filter(s => (s.category || '').toLowerCase().includes('semi') || (s.skuCode || '').toUpperCase().startsWith('SM') || (s.skuCode || '').toUpperCase().startsWith('SEM'));
-        const nums = semSkus.map(s => {
-          const match = (s.skuCode || '').match(/(?:SM|SEM)-?(\d+)/i);
-          return match ? parseInt(match[1], 10) : NaN;
-        }).filter(n => !isNaN(n));
-        count = nums.length > 0 ? Math.max(...nums) : (existingSemiCount ?? semSkus.length);
-      } else {
-        count = existingSemiCount ?? 0;
-      }
     } else {
       prefix = 'RM';
-      if (skuSourceList && skuSourceList.length > 0) {
-        const rmSkus = skuSourceList.filter(s => (s.category || '').toLowerCase().includes('raw') || (s.category || '').toLowerCase().includes('material') || (s.skuCode || '').toUpperCase().startsWith('RM'));
-        const nums = rmSkus.map(s => {
-          const match = (s.skuCode || '').match(/RM-?(\d+)/i);
-          return match ? parseInt(match[1], 10) : NaN;
-        }).filter(n => !isNaN(n));
-        count = nums.length > 0 ? Math.max(...nums) : (existingMaterialsCount ?? rmSkus.length);
-      } else {
-        count = existingMaterialsCount ?? 0;
-      }
     }
 
-    const nextSeq = String(count + 1).padStart(3, '0');
-    setForm(prev => ({ ...prev, skuCode: `${prefix}-${nextSeq}` }));
+    const skuSourceList = (allSkusList && allSkusList.length > 0) ? allSkusList : rawMaterialsList;
+    const existingCodesSet = new Set(
+      (skuSourceList || [])
+        .map(s => (s.skuCode || '').trim().toUpperCase())
+        .filter(Boolean)
+    );
+
+    let seq = 1;
+    let nextSkuCode = `${prefix}-001`;
+    while (seq < 9999) {
+      const candidate = `${prefix}-${String(seq).padStart(3, '0')}`;
+      if (!existingCodesSet.has(candidate)) {
+        nextSkuCode = candidate;
+        break;
+      }
+      seq++;
+    }
+
+    setForm(prev => ({ ...prev, skuCode: nextSkuCode }));
   };
 
   useEffect(() => {
