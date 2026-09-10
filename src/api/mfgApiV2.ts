@@ -242,3 +242,8 @@ export const getNextInvoiceNumberV2 = async (companyId: string): Promise<string>
   });
   return response.data.nextInvoiceNumber;
 };
+
+export const renumberSkusV2 = async (companyId: string): Promise<{ msg: string; updatedCount: number }> => {
+  const response = await api.post('/v2/skus/renumber', { companyId });
+  return response.data;
+};

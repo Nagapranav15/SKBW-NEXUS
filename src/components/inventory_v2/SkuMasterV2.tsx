@@ -27,14 +27,16 @@ import {
   BookOpen,
   Scroll,
   Copy,
-  Ruler
+  Ruler,
+  Hash
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { 
   getSkusV2, 
   getBalancesV2,
   deleteSkuV2, 
-  updateSkuV2, 
+  updateSkuV2,
+  renumberSkusV2,
   getWarehouseHierarchyV2,
   WarehouseLocationV2,
   SkuV2 
@@ -1302,6 +1304,21 @@ const SkuMasterV2: React.FC = () => {
   }, [showActivityLog]);
 
   // Export handlers
+  const handleRenumberSkus = async () => {
+    if (!selectedCompany?._id) return;
+    if (!window.confirm("Re-sequence all existing SKU codes into clean continuous series (FG-001..., SM-001..., RM-001...)?")) {
+      return;
+    }
+    try {
+      const res = await renumberSkusV2(selectedCompany._id);
+      showToast(res.msg || "SKU series re-sequenced successfully!", "success");
+      loadSkus(false);
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.response?.data?.msg || "Failed to re-sequence SKUs", "error");
+    }
+  };
+
   const handleExportCSV = () => {
     if (filteredAndSortedSkus.length === 0) {
       showToast('No items available to export', 'error');
@@ -1869,6 +1886,16 @@ const SkuMasterV2: React.FC = () => {
                 title="Download CSV/Excel"
               >
                 <Download className="w-4 h-4" />
+              </button>
+
+              {/* Re-sequence SKU Series button */}
+              <button
+                onClick={handleRenumberSkus}
+                className="px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:text-blue-700 bg-white hover:bg-blue-50/70 border border-gray-200 hover:border-blue-300 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                title="Re-sequence all existing SKU codes into continuous series (FG-001..., SM-001..., RM-001...)"
+              >
+                <Hash className="w-3.5 h-3.5 text-blue-600" />
+                <span className="hidden sm:inline">Re-sequence Series</span>
               </button>
 
               {/* 8. Plus Circle Button */}

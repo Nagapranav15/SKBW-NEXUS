@@ -406,6 +406,86 @@ exports.bulkImportSkus = async (req, res, next) => {
   }
 };
 
+exports.renumberSkus = async (req, res, next) => {
+  try {
+    const { companyId } = req.body;
+    if (!companyId) {
+      return res.status(400).json({ msg: "companyId is required" });
+    }
+
+    const companyObjId = toObjectId(companyId);
+    const allSkus = await SkuV2.find({ company: companyObjId, isDeleted: { $ne: true } }).sort({ createdAt: 1, _id: 1 });
+
+    if (!allSkus || allSkus.length === 0) {
+      return res.json({ msg: "No SKUs to renumber", updatedCount: 0 });
+    }
+
+    const fgList = [];
+    const smList = [];
+    const rmList = [];
+
+    for (const sku of allSkus) {
+      const cat = (sku.category || "").trim().toLowerCase();
+      const code = (sku.skuCode || "").trim().toUpperCase();
+
+      if (cat.includes("finished") || cat.includes("product") || code.startsWith("FG")) {
+        fgList.push(sku);
+      } else if (cat.includes("semi") || code.startsWith("SM") || code.startsWith("SEM")) {
+        smList.push(sku);
+      } else {
+        rmList.push(sku);
+      }
+    }
+
+    // Pass 1: Set temporary codes to avoid unique index conflict during batch update
+    let tempCounter = 1;
+    for (const sku of allSkus) {
+      sku.skuCode = `TEMP-RENUMBER-${tempCounter++}-${Date.now()}`;
+      await sku.save();
+    }
+
+    // Pass 2: Set clean continuous series numbers
+    let updatedCount = 0;
+
+    for (let i = 0; i < fgList.length; i++) {
+      fgList[i].skuCode = `FG-${String(i + 1).padStart(3, "0")}`;
+      await fgList[i].save();
+      updatedCount++;
+    }
+
+    for (let i = 0; i < smList.length; i++) {
+      smList[i].skuCode = `SM-${String(i + 1).padStart(3, "0")}`;
+      await smList[i].save();
+      updatedCount++;
+    }
+
+    for (let i = 0; i < rmList.length; i++) {
+      rmList[i].skuCode = `RM-${String(i + 1).padStart(3, "0")}`;
+      await rmList[i].save();
+      updatedCount++;
+    }
+
+    ActivityLog.create({
+      action: "UPDATE",
+      entityType: "SkuV2",
+      entityName: "Renumber Series",
+      details: `Renumbered ${updatedCount} SKUs into continuous series (FG-001..., SM-001..., RM-001...).`,
+      performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
+      company: companyObjId
+    }).catch(e => console.error("ActivityLog error:", e));
+
+    res.json({
+      msg: `Successfully renumbered ${updatedCount} SKUs into continuous series`,
+      updatedCount,
+      fgCount: fgList.length,
+      smCount: smList.length,
+      rmCount: rmList.length
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // ── WAREHOUSE STRUCTURE V2 ───────────────────────────────────────────────────
 
 exports.getWarehouseHierarchy = async (req, res, next) => {

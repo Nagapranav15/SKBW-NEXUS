@@ -14,6 +14,7 @@ router.post("/skus", auth, rbac(manage), ctrl.createSku);
 router.put("/skus/:id", auth, rbac(manage), ctrl.updateSku);
 router.delete("/skus/:id", auth, rbac(manage), ctrl.deleteSku);
 router.post("/skus/bulk-import", auth, rbac(manage), ctrl.bulkImportSkus);
+router.post("/skus/renumber", auth, rbac(manage), ctrl.renumberSkus);
 
 // Warehouse routes
 router.get("/warehouse/hierarchy", auth, rbac(view), ctrl.getWarehouseHierarchy);
