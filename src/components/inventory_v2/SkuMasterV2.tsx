@@ -1966,16 +1966,6 @@ const SkuMasterV2: React.FC = () => {
                 <Download className="w-4 h-4" />
               </button>
 
-              {/* Re-sequence SKU Series button */}
-              <button
-                onClick={handleRenumberSkus}
-                className="px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:text-blue-700 bg-white hover:bg-blue-50/70 border border-gray-200 hover:border-blue-300 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                title="Re-sequence all existing SKU codes into continuous series (FG-001..., SM-001..., RM-001...)"
-              >
-                <Hash className="w-3.5 h-3.5 text-blue-600" />
-                <span className="hidden sm:inline">Re-sequence Series</span>
-              </button>
-
               {/* 8. Plus Circle Button */}
               <button
                 onClick={() => { setEditSku(null); setShowAddDrawer(true); }}
