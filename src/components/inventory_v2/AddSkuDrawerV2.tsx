@@ -337,6 +337,12 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     }
   }, [isOpen, editSku, customColumns, customColumnValues]);
 
+  const [categoriesList, setCategoriesList] = useState<string[]>(["Raw Material", "Semi Finished", "Finished Goods"]);
+  const [unitsList, setUnitsList] = useState<string[]>(["kg", "pcs", "Sheets", "Reels", "mtr", "GBL", "Ream", "Gross", "Box", "Pkt"]);
+  const [ruleTypesList, setRuleTypesList] = useState<string[]>(["Plain", "Single Line", "Double Line", "Square Ruled", "Four Line", "Unruled", "UR"]);
+  const [groupsList, setGroupsList] = useState<string[]>(["132P Happy days (UR)", "220P Happy days (SR)"]);
+  const [brandsList, setBrandsList] = useState<string[]>(["Happy Days", "Classmate", "Navneet"]);
+
   const sectionCategories = React.useMemo(() => {
     let baseCategory = 'Finished Goods';
     let targetType: 'products' | 'materials' | 'semi' = 'products';
@@ -354,12 +360,6 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
     return Array.from(new Set([baseCategory, ...createdList, ...categoriesList]));
   }, [activeSection, defaultCategory, createdCategories, categoriesList]);
-
-  const [categoriesList, setCategoriesList] = useState<string[]>(["Raw Material", "Semi Finished", "Finished Goods"]);
-  const [unitsList, setUnitsList] = useState<string[]>(["kg", "pcs", "Sheets", "Reels", "mtr", "GBL", "Ream", "Gross", "Box", "Pkt"]);
-  const [ruleTypesList, setRuleTypesList] = useState<string[]>(["Plain", "Single Line", "Double Line", "Square Ruled", "Four Line", "Unruled", "UR"]);
-  const [groupsList, setGroupsList] = useState<string[]>(["132P Happy days (UR)", "220P Happy days (SR)"]);
-  const [brandsList, setBrandsList] = useState<string[]>(["Happy Days", "Classmate", "Navneet"]);
   
   const [isNameManuallyEdited, setIsNameManuallyEdited] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
