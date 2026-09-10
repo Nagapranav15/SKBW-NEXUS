@@ -143,7 +143,7 @@ const Layout: React.FC = () => {
     setShowLogoutConfirm(true);
   };
 
-  // Grouped Navigation Items (Matching Makoro layout & section header vibe!)
+  // Grouped Navigation Items (Cleaned up matching requested modules)
   const navSections = [
     {
       title: 'OPERATIONS',
@@ -161,7 +161,6 @@ const Layout: React.FC = () => {
     {
       title: 'PARTNERS & DIRECTORY',
       items: [
-        { label: 'Business Directory', path: '/directory', icon: Users, permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
         { label: 'Customers', path: '/party/customers', icon: UserCheck, permission: ['MANAGE_PARTIES', 'VIEW_PARTIES'] },
         { label: 'Suppliers', path: '/party/vendors', icon: Factory, permission: ['MANAGE_PARTIES', 'VIEW_PARTIES'] },
         { label: 'Agents', path: '/party/agents', icon: Briefcase, permission: ['MANAGE_PARTIES', 'VIEW_PARTIES'] },
@@ -174,18 +173,7 @@ const Layout: React.FC = () => {
       title: 'FINANCE & SALES',
       items: [
         { label: 'Purchase Batches', path: '/inventory-v2/purchases', icon: Receipt, permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
-        { label: 'Quotations', path: '/sales/quotes', icon: FileText, permission: ['MANAGE_QUOTES', 'VIEW_QUOTES'] },
         { label: 'Sale Orders', path: '/sales/orders', icon: ShoppingBag, permission: ['MANAGE_ORDERS', 'VIEW_ORDERS'] },
-        { label: 'Pending Orders', path: '/sales/pending', icon: Clock, permission: ['MANAGE_ORDERS', 'VIEW_ORDERS'] },
-        { label: 'Delivery Challan', path: '/sales/delivery-challan', icon: FileCheck, permission: ['MANAGE_DELIVERY', 'VIEW_DELIVERY'] },
-      ]
-    },
-    {
-      title: 'INSIGHTS',
-      items: [
-        { label: 'Business Intelligence', path: '/analyzer', icon: BarChart2, permission: ['MANAGE_REPORTS', 'VIEW_REPORTS'] },
-        { label: 'Sales Reports', path: '/sales/reports', icon: LineChart, permission: ['MANAGE_REPORTS', 'VIEW_REPORTS'] },
-        { label: 'Transactions', path: '/transactions', icon: CreditCard, permission: ['MANAGE_REPORTS', 'VIEW_REPORTS', 'VIEW_TRANSACTIONS'] },
       ]
     }
   ];
