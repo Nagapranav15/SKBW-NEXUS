@@ -679,31 +679,49 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   }
 
   // Auto-generate SKU Code
-  useEffect(() => {
-    if (!editSku) {
-      regenerateSkuCode();
-    }
-  }, [form.category, editSku, activeSection, existingProductsCount, existingMaterialsCount, existingSemiCount]);
-
-  const regenerateSkuCode = () => {
+  const regenerateSkuCode = (targetCategory?: string) => {
     let prefix = 'RM';
     let count = 0;
 
-    const cat = form.category || defaultCategory || '';
+    const cat = targetCategory || form.category || defaultCategory || (activeSection === 'products' ? 'Finished Goods' : activeSection === 'semi' ? 'Semi Finished' : 'Raw Material');
     if (cat === 'Finished Goods' || activeSection === 'products') {
       prefix = 'FG';
-      count = existingProductsCount !== undefined ? existingProductsCount : 5;
+      if (rawMaterialsList && rawMaterialsList.length > 0) {
+        const fgSkus = rawMaterialsList.filter(s => (s.category || '').toLowerCase().includes('finished') || (s.skuCode || '').toUpperCase().startsWith('FG'));
+        const nums = fgSkus.map(s => parseInt((s.skuCode || '').replace(/[^0-9]/g, ''), 10)).filter(n => !isNaN(n));
+        count = nums.length > 0 ? Math.max(...nums) : (existingProductsCount ?? fgSkus.length);
+      } else {
+        count = existingProductsCount ?? 0;
+      }
     } else if (cat === 'Semi Finished' || activeSection === 'semi') {
       prefix = 'SEM';
-      count = existingSemiCount !== undefined ? existingSemiCount : 3;
+      if (rawMaterialsList && rawMaterialsList.length > 0) {
+        const semSkus = rawMaterialsList.filter(s => (s.category || '').toLowerCase().includes('semi') || (s.skuCode || '').toUpperCase().startsWith('SEM'));
+        const nums = semSkus.map(s => parseInt((s.skuCode || '').replace(/[^0-9]/g, ''), 10)).filter(n => !isNaN(n));
+        count = nums.length > 0 ? Math.max(...nums) : (existingSemiCount ?? semSkus.length);
+      } else {
+        count = existingSemiCount ?? 0;
+      }
     } else {
       prefix = 'RM';
-      count = existingMaterialsCount !== undefined ? existingMaterialsCount : 4;
+      if (rawMaterialsList && rawMaterialsList.length > 0) {
+        const rmSkus = rawMaterialsList.filter(s => (s.category || '').toLowerCase().includes('raw') || (s.skuCode || '').toUpperCase().startsWith('RM'));
+        const nums = rmSkus.map(s => parseInt((s.skuCode || '').replace(/[^0-9]/g, ''), 10)).filter(n => !isNaN(n));
+        count = nums.length > 0 ? Math.max(...nums) : (existingMaterialsCount ?? rmSkus.length);
+      } else {
+        count = existingMaterialsCount ?? 0;
+      }
     }
 
     const nextSeq = String(count + 1).padStart(3, '0');
     setForm(prev => ({ ...prev, skuCode: `${prefix}-${nextSeq}` }));
   };
+
+  useEffect(() => {
+    if (!editSku && isOpen) {
+      regenerateSkuCode();
+    }
+  }, [isOpen, form.category, editSku, activeSection, existingProductsCount, existingMaterialsCount, existingSemiCount, rawMaterialsList]);
 
     // Compile Sku Name dynamically from other inputs
     useEffect(() => {
@@ -951,6 +969,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           paperType: val === 'Raw Material' ? 'Reels' : 'None',
                           ruleType: val === 'Finished Goods' ? (prev.ruleType || 'UR') : (val === 'Raw Material' ? '' : prev.ruleType)
                         }));
+                        if (!editSku) {
+                          regenerateSkuCode(val);
+                        }
                       }
                     }}
                     className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"

@@ -59,7 +59,7 @@ export const Modal: React.FC<ModalProps> = ({
     <div className={`fixed inset-0 ${zIndex} transition-all duration-200 animate-fadeIn`}>
       {/* Dedicated Full-Screen Backdrop Overlay covering 100% of viewport edge-to-edge */}
       <div 
-        className="fixed inset-0 bg-slate-900/35 backdrop-blur-xs transition-opacity cursor-pointer"
+        className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity cursor-pointer"
         onClick={onClose}
       />
 
