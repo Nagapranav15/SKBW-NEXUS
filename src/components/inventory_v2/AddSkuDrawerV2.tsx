@@ -191,6 +191,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   });
 
   const [rawMaterialsList, setRawMaterialsList] = useState<SkuV2[]>([]);
+  const [allSkusList, setAllSkusList] = useState<SkuV2[]>([]);
   const [formCustomValues, setFormCustomValues] = useState<{ [colName: string]: any }>({});
   const [dynamicLocationText, setDynamicLocationText] = useState<string>('Loading location...');
   const [availableLocations, setAvailableLocations] = useState<{ id: string; name: string }[]>([]);
@@ -308,13 +309,16 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   useEffect(() => {
     if (isOpen && companyId) {
       getSkusV2(companyId).then(skus => {
-        const rawAndSemi = (skus || []).filter(item => {
-          const cat = (item.category || '').trim().toLowerCase();
-          const code = (item.skuCode || '').trim().toUpperCase();
-          const isFinishedGoods = cat === 'finished goods' || cat === 'products' || cat === 'finished' || code.startsWith('FG-') || code.startsWith('FG');
-          return !isFinishedGoods;
-        });
-        setRawMaterialsList(rawAndSemi);
+        if (skus) {
+          setAllSkusList(skus);
+          const rawAndSemi = skus.filter(item => {
+            const cat = (item.category || '').trim().toLowerCase();
+            const code = (item.skuCode || '').trim().toUpperCase();
+            const isFinishedGoods = cat === 'finished goods' || cat === 'products' || cat === 'finished' || code.startsWith('FG-') || code.startsWith('FG');
+            return !isFinishedGoods;
+          });
+          setRawMaterialsList(rawAndSemi);
+        }
       }).catch(console.error);
     }
   }, [isOpen, companyId]);
@@ -684,29 +688,40 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     let count = 0;
 
     const cat = targetCategory || form.category || defaultCategory || (activeSection === 'products' ? 'Finished Goods' : activeSection === 'semi' ? 'Semi Finished' : 'Raw Material');
+    const skuSourceList = (allSkusList && allSkusList.length > 0) ? allSkusList : rawMaterialsList;
+
     if (cat === 'Finished Goods' || activeSection === 'products') {
       prefix = 'FG';
-      if (rawMaterialsList && rawMaterialsList.length > 0) {
-        const fgSkus = rawMaterialsList.filter(s => (s.category || '').toLowerCase().includes('finished') || (s.skuCode || '').toUpperCase().startsWith('FG'));
-        const nums = fgSkus.map(s => parseInt((s.skuCode || '').replace(/[^0-9]/g, ''), 10)).filter(n => !isNaN(n));
+      if (skuSourceList && skuSourceList.length > 0) {
+        const fgSkus = skuSourceList.filter(s => (s.category || '').toLowerCase().includes('finished') || (s.category || '').toLowerCase().includes('product') || (s.skuCode || '').toUpperCase().startsWith('FG'));
+        const nums = fgSkus.map(s => {
+          const match = (s.skuCode || '').match(/FG-?(\d+)/i);
+          return match ? parseInt(match[1], 10) : NaN;
+        }).filter(n => !isNaN(n));
         count = nums.length > 0 ? Math.max(...nums) : (existingProductsCount ?? fgSkus.length);
       } else {
         count = existingProductsCount ?? 0;
       }
     } else if (cat === 'Semi Finished' || activeSection === 'semi') {
-      prefix = 'SEM';
-      if (rawMaterialsList && rawMaterialsList.length > 0) {
-        const semSkus = rawMaterialsList.filter(s => (s.category || '').toLowerCase().includes('semi') || (s.skuCode || '').toUpperCase().startsWith('SEM'));
-        const nums = semSkus.map(s => parseInt((s.skuCode || '').replace(/[^0-9]/g, ''), 10)).filter(n => !isNaN(n));
+      prefix = 'SM';
+      if (skuSourceList && skuSourceList.length > 0) {
+        const semSkus = skuSourceList.filter(s => (s.category || '').toLowerCase().includes('semi') || (s.skuCode || '').toUpperCase().startsWith('SM') || (s.skuCode || '').toUpperCase().startsWith('SEM'));
+        const nums = semSkus.map(s => {
+          const match = (s.skuCode || '').match(/(?:SM|SEM)-?(\d+)/i);
+          return match ? parseInt(match[1], 10) : NaN;
+        }).filter(n => !isNaN(n));
         count = nums.length > 0 ? Math.max(...nums) : (existingSemiCount ?? semSkus.length);
       } else {
         count = existingSemiCount ?? 0;
       }
     } else {
       prefix = 'RM';
-      if (rawMaterialsList && rawMaterialsList.length > 0) {
-        const rmSkus = rawMaterialsList.filter(s => (s.category || '').toLowerCase().includes('raw') || (s.skuCode || '').toUpperCase().startsWith('RM'));
-        const nums = rmSkus.map(s => parseInt((s.skuCode || '').replace(/[^0-9]/g, ''), 10)).filter(n => !isNaN(n));
+      if (skuSourceList && skuSourceList.length > 0) {
+        const rmSkus = skuSourceList.filter(s => (s.category || '').toLowerCase().includes('raw') || (s.category || '').toLowerCase().includes('material') || (s.skuCode || '').toUpperCase().startsWith('RM'));
+        const nums = rmSkus.map(s => {
+          const match = (s.skuCode || '').match(/RM-?(\d+)/i);
+          return match ? parseInt(match[1], 10) : NaN;
+        }).filter(n => !isNaN(n));
         count = nums.length > 0 ? Math.max(...nums) : (existingMaterialsCount ?? rmSkus.length);
       } else {
         count = existingMaterialsCount ?? 0;
@@ -721,7 +736,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     if (!editSku && isOpen) {
       regenerateSkuCode();
     }
-  }, [isOpen, form.category, editSku, activeSection, existingProductsCount, existingMaterialsCount, existingSemiCount, rawMaterialsList]);
+  }, [isOpen, form.category, editSku, activeSection, existingProductsCount, existingMaterialsCount, existingSemiCount, rawMaterialsList, allSkusList]);
 
     // Compile Sku Name dynamically from other inputs
     useEffect(() => {
