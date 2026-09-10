@@ -424,15 +424,31 @@ const SkuMasterV2: React.FC = () => {
   const STORAGE_KEY = 'skbw_sku_master_tab_columns_v2';
 
   const [tabColumnsMap, setTabColumnsMap] = useState<Record<string, typeof DEFAULT_PRODUCTS_COLUMNS>>(() => {
+    const ensureGroupCol = (savedCols: any[], defaultCols: typeof DEFAULT_PRODUCTS_COLUMNS) => {
+      if (!Array.isArray(savedCols) || savedCols.length === 0) return defaultCols;
+      const hasGroup = savedCols.some(c => c.id === 'group');
+      if (!hasGroup) {
+        const catIdx = savedCols.findIndex(c => c.id === 'category');
+        const groupCol = { id: 'group', label: 'Item Category', visible: true };
+        if (catIdx >= 0) {
+          const copy = [...savedCols];
+          copy.splice(catIdx + 1, 0, groupCol);
+          return copy;
+        }
+        return [...savedCols, groupCol];
+      }
+      return savedCols;
+    };
+
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === 'object') {
           return {
-            products: Array.isArray(parsed.products) ? parsed.products : DEFAULT_PRODUCTS_COLUMNS,
-            materials: Array.isArray(parsed.materials) ? parsed.materials : DEFAULT_MATERIALS_COLUMNS,
-            semi: Array.isArray(parsed.semi) ? parsed.semi : DEFAULT_SEMI_COLUMNS
+            products: ensureGroupCol(parsed.products, DEFAULT_PRODUCTS_COLUMNS),
+            materials: ensureGroupCol(parsed.materials, DEFAULT_MATERIALS_COLUMNS),
+            semi: ensureGroupCol(parsed.semi, DEFAULT_SEMI_COLUMNS)
           };
         }
       }
@@ -2258,7 +2274,8 @@ const SkuMasterV2: React.FC = () => {
                               const sectionTypeGroup = activeMainTab === 'materials' ? 'materials' : activeMainTab === 'semi' ? 'semi' : 'products';
                               const createdCatsForGroup = categoriesData.filter(c => c.type === sectionTypeGroup).map(c => c.name);
                               const groupSelectOptions = Array.from(new Set(['— Select Category —', ...createdCatsForGroup]));
-                              const currentAssignedGroup = sku.group || '— Select Category —';
+                              const matchedCatName = categoriesData.find(c => c.type === sectionTypeGroup && (sku.name || '').toLowerCase().includes(c.name.toLowerCase()))?.name;
+                              const currentAssignedGroup = sku.group || matchedCatName || '— Select Category —';
 
                               return (
                                 <td key="group" className="py-2.5 px-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
