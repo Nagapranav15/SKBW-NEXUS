@@ -143,7 +143,7 @@ const Layout: React.FC = () => {
     setShowLogoutConfirm(true);
   };
 
-  // Grouped Navigation Items (Cleaned up matching requested modules)
+  // Grouped Navigation Items (Matching Makoro layout & section header vibe!)
   const navSections = [
     {
       title: 'OPERATIONS',
@@ -161,6 +161,7 @@ const Layout: React.FC = () => {
     {
       title: 'PARTNERS & DIRECTORY',
       items: [
+        { label: 'Business Directory', path: '/directory', icon: Users, permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
         { label: 'Customers', path: '/party/customers', icon: UserCheck, permission: ['MANAGE_PARTIES', 'VIEW_PARTIES'] },
         { label: 'Suppliers', path: '/party/vendors', icon: Factory, permission: ['MANAGE_PARTIES', 'VIEW_PARTIES'] },
         { label: 'Agents', path: '/party/agents', icon: Briefcase, permission: ['MANAGE_PARTIES', 'VIEW_PARTIES'] },
