@@ -787,8 +787,8 @@ const SkuMasterV2: React.FC = () => {
   };
 
   useEffect(() => {
-    if (skusList.length > 0 && !autoRenumberedRef.current && selectedCompany?._id) {
-      const hasLegacyCodes = skusList.some(s => {
+    if (skus.length > 0 && !autoRenumberedRef.current && selectedCompany?._id) {
+      const hasLegacyCodes = skus.some(s => {
         const code = (s.skuCode || '').trim().toUpperCase();
         if (code.startsWith('SEM-')) return true;
         const numMatch = code.match(/-(0*\d+)$/);
@@ -800,7 +800,7 @@ const SkuMasterV2: React.FC = () => {
         handleRenumberSkus(true);
       }
     }
-  }, [skusList, selectedCompany?._id]);
+  }, [skus, selectedCompany?._id]);
 
   // Demo Finished Products (Notebooks, Diaries, Longbooks, Registers)
   const DEMO_FINISHED_PRODUCTS: SkuV2[] = [
