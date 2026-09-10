@@ -1452,6 +1452,8 @@ const SkuMasterV2: React.FC = () => {
     } catch (e) {
       showToast('Failed to delete item', 'error');
     }
+  };
+
   // Inline Table Category Change Handler (Saves directly to MongoDB database)
   const handleInlineCategoryChange = async (sku: SkuV2, newCatName: string) => {
     if (!sku._id) return;
