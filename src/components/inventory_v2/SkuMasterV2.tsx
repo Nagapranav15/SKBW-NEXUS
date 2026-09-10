@@ -375,7 +375,6 @@ const SkuMasterV2: React.FC = () => {
     { id: 'skuCode', label: 'ID / SKU Code', visible: true },
     { id: 'name', label: 'Item Name', visible: true },
     { id: 'category', label: 'Category', visible: true },
-    { id: 'group', label: 'Item Category', visible: true },
     { id: 'unit', label: 'UOM', visible: true },
     { id: 'altUnit', label: 'AUOM (Alt Unit)', visible: true },
     { id: 'altUnitConversion', label: 'Con Rate', visible: true },
@@ -392,7 +391,6 @@ const SkuMasterV2: React.FC = () => {
     { id: 'skuCode', label: 'ID / SKU Code', visible: true },
     { id: 'name', label: 'Item Name', visible: true },
     { id: 'category', label: 'Category', visible: true },
-    { id: 'group', label: 'Item Category', visible: true },
     { id: 'unit', label: 'UOM', visible: true },
     { id: 'altUnit', label: 'AUOM (Alt Unit)', visible: true },
     { id: 'altUnitConversion', label: 'Con Rate', visible: true },
@@ -408,7 +406,6 @@ const SkuMasterV2: React.FC = () => {
     { id: 'skuCode', label: 'ID / SKU Code', visible: true },
     { id: 'name', label: 'Item Name', visible: true },
     { id: 'category', label: 'Category', visible: true },
-    { id: 'group', label: 'Item Category', visible: true },
     { id: 'unit', label: 'UOM', visible: true },
     { id: 'altUnit', label: 'AUOM (Alt Unit)', visible: true },
     { id: 'altUnitConversion', label: 'Con Rate', visible: true },
@@ -424,31 +421,15 @@ const SkuMasterV2: React.FC = () => {
   const STORAGE_KEY = 'skbw_sku_master_tab_columns_v2';
 
   const [tabColumnsMap, setTabColumnsMap] = useState<Record<string, typeof DEFAULT_PRODUCTS_COLUMNS>>(() => {
-    const ensureGroupCol = (savedCols: any[], defaultCols: typeof DEFAULT_PRODUCTS_COLUMNS) => {
-      if (!Array.isArray(savedCols) || savedCols.length === 0) return defaultCols;
-      const hasGroup = savedCols.some(c => c.id === 'group');
-      if (!hasGroup) {
-        const catIdx = savedCols.findIndex(c => c.id === 'category');
-        const groupCol = { id: 'group', label: 'Item Category', visible: true };
-        if (catIdx >= 0) {
-          const copy = [...savedCols];
-          copy.splice(catIdx + 1, 0, groupCol);
-          return copy;
-        }
-        return [...savedCols, groupCol];
-      }
-      return savedCols;
-    };
-
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === 'object') {
           return {
-            products: ensureGroupCol(parsed.products, DEFAULT_PRODUCTS_COLUMNS),
-            materials: ensureGroupCol(parsed.materials, DEFAULT_MATERIALS_COLUMNS),
-            semi: ensureGroupCol(parsed.semi, DEFAULT_SEMI_COLUMNS)
+            products: Array.isArray(parsed.products) ? parsed.products : DEFAULT_PRODUCTS_COLUMNS,
+            materials: Array.isArray(parsed.materials) ? parsed.materials : DEFAULT_MATERIALS_COLUMNS,
+            semi: Array.isArray(parsed.semi) ? parsed.semi : DEFAULT_SEMI_COLUMNS
           };
         }
       }
@@ -765,7 +746,7 @@ const SkuMasterV2: React.FC = () => {
       const [data, balancesData] = await Promise.all([
         getSkusV2(
           companyId, 
-          undefined, 
+          categoryFilter || undefined, 
           debouncedSearch || undefined,
           statusFilter || undefined
         ),
@@ -2259,44 +2240,23 @@ const SkuMasterV2: React.FC = () => {
                                 </td>
                               );
                             case 'category':
-                              const mainCategoryText = sku.category || (
+                              const genericCats = ['Finished Goods', 'Raw Material', 'Semi Finished', 'Products', 'Materials', 'Semi'];
+                              let dynamicCat = sku.group || (sku.category && !genericCats.includes(sku.category) ? sku.category : null);
+                              if (!dynamicCat) {
+                                const matched = categoriesData.find(c => (sku.name || '').toLowerCase().includes(c.name.toLowerCase()));
+                                if (matched) dynamicCat = matched.name;
+                              }
+                              const fallbackCat = sku.category || (
                                 (sku.skuCode || '').toUpperCase().startsWith('RM') || activeMainTab === 'materials' ? 'Raw Material' :
                                 (sku.skuCode || '').toUpperCase().startsWith('SEM') || activeMainTab === 'semi' ? 'Semi Finished' : 'Finished Goods'
                               );
-                              return (
-                                <td key="category" className="py-3 px-3 text-gray-600 font-medium whitespace-nowrap">
-                                  <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-gray-100 text-gray-700 border border-gray-200/70">
-                                    {mainCategoryText}
-                                  </span>
-                                </td>
-                              );
-                            case 'group':
-                              const sectionTypeGroup = activeMainTab === 'materials' ? 'materials' : activeMainTab === 'semi' ? 'semi' : 'products';
-                              const createdCatsForGroup = categoriesData.filter(c => c.type === sectionTypeGroup).map(c => c.name);
-                              const groupSelectOptions = Array.from(new Set(['— Select Category —', ...createdCatsForGroup]));
-                              const matchedCatName = categoriesData.find(c => c.type === sectionTypeGroup && (sku.name || '').toLowerCase().includes(c.name.toLowerCase()))?.name;
-                              const currentAssignedGroup = sku.group || matchedCatName || '— Select Category —';
+                              const catToShow = dynamicCat || fallbackCat;
 
                               return (
-                                <td key="group" className="py-2.5 px-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                                  <div className="relative inline-block">
-                                    <select
-                                      value={currentAssignedGroup}
-                                      onChange={(e) => handleInlineCategoryChange(sku, e.target.value === '— Select Category —' ? '' : e.target.value)}
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="appearance-none pr-6 pl-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-50/90 hover:bg-blue-100/90 text-blue-800 border border-blue-200 focus:ring-2 focus:ring-blue-400 focus:outline-none cursor-pointer transition-all shadow-2xs"
-                                      title="Click to select/change created category for this item (saves to database)"
-                                    >
-                                      {groupSelectOptions.map(catOpt => (
-                                        <option key={catOpt} value={catOpt} className="bg-white text-gray-900 font-semibold py-1">
-                                          {catOpt}
-                                        </option>
-                                      ))}
-                                    </select>
-                                    <div className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-blue-600 font-bold text-[9px]">
-                                      ▼
-                                    </div>
-                                  </div>
+                                <td key="category" className="py-3 px-3 whitespace-nowrap">
+                                  <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50/90 text-blue-800 border border-blue-200/80 shadow-2xs">
+                                    {catToShow}
+                                  </span>
                                 </td>
                               );
                             case 'unit':
@@ -2927,19 +2887,8 @@ const SkuMasterV2: React.FC = () => {
         existingMaterialsCount={materialsList.length}
         existingSemiCount={semiList.length}
         onClose={() => setShowAddDrawer(false)}
-        onSaveSuccess={(savedSku) => {
+        onSaveSuccess={() => {
           setShowAddDrawer(false);
-          if (savedSku?._id) {
-            setSkus(prev => {
-              const idx = prev.findIndex(s => s._id === savedSku._id);
-              if (idx >= 0) {
-                const copy = [...prev];
-                copy[idx] = { ...copy[idx], ...savedSku };
-                return copy;
-              }
-              return [savedSku, ...prev];
-            });
-          }
           loadSkus(false);
         }}
         customColumns={customColumns}
