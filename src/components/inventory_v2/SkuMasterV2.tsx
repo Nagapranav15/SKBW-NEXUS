@@ -1352,11 +1352,10 @@ const SkuMasterV2: React.FC = () => {
       const rmList: SkuV2[] = [];
 
       (freshSkus || []).forEach(sku => {
-        const cat = (sku.category || "").trim().toLowerCase();
-        const code = (sku.skuCode || "").trim().toUpperCase();
-        if (cat.includes("finished") || cat.includes("product") || code.startsWith("FG")) {
+        const type = getItemType(sku);
+        if (type === 'products') {
           fgList.push(sku);
-        } else if (cat.includes("semi") || code.startsWith("SM") || code.startsWith("SEM")) {
+        } else if (type === 'semi') {
           smList.push(sku);
         } else {
           rmList.push(sku);
