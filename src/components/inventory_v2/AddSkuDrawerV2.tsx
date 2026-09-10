@@ -994,13 +994,40 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     required
                   />
                 </div>
+                {/* 2. CATEGORY (Main Section Type) */}
                 <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-[11px] font-bold text-blue-900 mb-1 flex items-center justify-between">
-                    <span>CATEGORY *</span>
-                    <span className="text-[10px] text-blue-600 font-semibold">(Created Categories)</span>
-                  </label>
+                  <label className="block text-[11px] font-semibold text-gray-600 mb-1">CATEGORY *</label>
                   <select
                     value={form.category}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setForm(prev => ({
+                        ...prev,
+                        category: val,
+                        paperType: val === 'Raw Material' ? 'Reels' : 'None',
+                        ruleType: val === 'Finished Goods' ? (prev.ruleType || 'UR') : (val === 'Raw Material' ? '' : prev.ruleType)
+                      }));
+                      if (!editSku) {
+                        regenerateSkuCode(val);
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
+                    required
+                  >
+                    <option value="Finished Goods">Finished Goods</option>
+                    <option value="Raw Material">Raw Material</option>
+                    <option value="Semi Finished">Semi Finished</option>
+                  </select>
+                </div>
+
+                {/* 3. SEPARATE FIELD: CREATED ITEM CATEGORY */}
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block text-[11px] font-bold text-blue-900 mb-1 flex items-center justify-between">
+                    <span>CREATED ITEM CATEGORY</span>
+                    <span className="text-[10px] text-blue-600 font-semibold">(Your Categories)</span>
+                  </label>
+                  <select
+                    value={form.group}
                     onChange={e => {
                       const val = e.target.value;
                       if (val === '__ADD_NEW__') {
@@ -1009,27 +1036,19 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         const matchedCatObj = (createdCategories || []).find(c => c.name === val);
                         setForm(prev => ({
                           ...prev,
-                          category: val,
                           group: val,
-                          unit: matchedCatObj?.uom || prev.unit,
-                          paperType: val === 'Raw Material' || val.toLowerCase().includes('reel') ? 'Reels' : (val.toLowerCase().includes('sheet') ? 'Sheets' : prev.paperType),
-                          ruleType: isProductCategory || val.toLowerCase().includes('notebook') || val.toLowerCase().includes('diary') ? (prev.ruleType || 'UR') : prev.ruleType
+                          unit: matchedCatObj?.uom || prev.unit
                         }));
-                        if (!editSku) {
-                          regenerateSkuCode(val);
-                        }
                       }
                     }}
                     className="w-full px-3 py-2 border-2 border-blue-300 hover:border-blue-400 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-blue-50/40 font-bold text-gray-900 cursor-pointer shadow-2xs transition-all"
-                    required
                   >
-                    <optgroup label="Select Category">
-                      {sectionCategories.map(cat => (
-                        <option key={cat} value={cat} className="bg-white text-gray-900 font-semibold py-1">
-                          {cat}
-                        </option>
-                      ))}
-                    </optgroup>
+                    <option value="" className="text-gray-400 font-normal">-- Select Created Category --</option>
+                    {sectionCategories.map(cat => (
+                      <option key={cat} value={cat} className="bg-white text-gray-900 font-semibold py-1">
+                        {cat}
+                      </option>
+                    ))}
                     <option value="__ADD_NEW__" className="bg-white text-blue-600 font-bold">+ Add Custom Category...</option>
                   </select>
                 </div>

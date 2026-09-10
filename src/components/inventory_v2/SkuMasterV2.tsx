@@ -375,6 +375,7 @@ const SkuMasterV2: React.FC = () => {
     { id: 'skuCode', label: 'ID / SKU Code', visible: true },
     { id: 'name', label: 'Item Name', visible: true },
     { id: 'category', label: 'Category', visible: true },
+    { id: 'group', label: 'Item Category', visible: true },
     { id: 'unit', label: 'UOM', visible: true },
     { id: 'altUnit', label: 'AUOM (Alt Unit)', visible: true },
     { id: 'altUnitConversion', label: 'Con Rate', visible: true },
@@ -391,6 +392,7 @@ const SkuMasterV2: React.FC = () => {
     { id: 'skuCode', label: 'ID / SKU Code', visible: true },
     { id: 'name', label: 'Item Name', visible: true },
     { id: 'category', label: 'Category', visible: true },
+    { id: 'group', label: 'Item Category', visible: true },
     { id: 'unit', label: 'UOM', visible: true },
     { id: 'altUnit', label: 'AUOM (Alt Unit)', visible: true },
     { id: 'altUnitConversion', label: 'Con Rate', visible: true },
@@ -406,6 +408,7 @@ const SkuMasterV2: React.FC = () => {
     { id: 'skuCode', label: 'ID / SKU Code', visible: true },
     { id: 'name', label: 'Item Name', visible: true },
     { id: 'category', label: 'Category', visible: true },
+    { id: 'group', label: 'Item Category', visible: true },
     { id: 'unit', label: 'UOM', visible: true },
     { id: 'altUnit', label: 'AUOM (Alt Unit)', visible: true },
     { id: 'altUnitConversion', label: 'Con Rate', visible: true },
@@ -2240,23 +2243,34 @@ const SkuMasterV2: React.FC = () => {
                                 </td>
                               );
                             case 'category':
-                              const targetSection = activeMainTab === 'materials' ? 'materials' : activeMainTab === 'semi' ? 'semi' : 'products';
-                              const defaultBaseCat = targetSection === 'materials' ? 'Raw Material' : targetSection === 'semi' ? 'Semi Finished' : 'Finished Goods';
-                              const createdOptionsForTab = categoriesData.filter(c => c.type === targetSection).map(c => c.name);
-                              const allOptionsForTab = Array.from(new Set([defaultBaseCat, ...createdOptionsForTab]));
-                              const currentSelectedCategory = sku.group || sku.category || defaultBaseCat;
+                              const mainCategoryText = sku.category || (
+                                (sku.skuCode || '').toUpperCase().startsWith('RM') || activeMainTab === 'materials' ? 'Raw Material' :
+                                (sku.skuCode || '').toUpperCase().startsWith('SEM') || activeMainTab === 'semi' ? 'Semi Finished' : 'Finished Goods'
+                              );
+                              return (
+                                <td key="category" className="py-3 px-3 text-gray-600 font-medium whitespace-nowrap">
+                                  <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-gray-100 text-gray-700 border border-gray-200/70">
+                                    {mainCategoryText}
+                                  </span>
+                                </td>
+                              );
+                            case 'group':
+                              const sectionTypeGroup = activeMainTab === 'materials' ? 'materials' : activeMainTab === 'semi' ? 'semi' : 'products';
+                              const createdCatsForGroup = categoriesData.filter(c => c.type === sectionTypeGroup).map(c => c.name);
+                              const groupSelectOptions = Array.from(new Set(['— Select Category —', ...createdCatsForGroup]));
+                              const currentAssignedGroup = sku.group || '— Select Category —';
 
                               return (
-                                <td key="category" className="py-2.5 px-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                <td key="group" className="py-2.5 px-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                                   <div className="relative inline-block">
                                     <select
-                                      value={currentSelectedCategory}
-                                      onChange={(e) => handleInlineCategoryChange(sku, e.target.value)}
+                                      value={currentAssignedGroup}
+                                      onChange={(e) => handleInlineCategoryChange(sku, e.target.value === '— Select Category —' ? '' : e.target.value)}
                                       onClick={(e) => e.stopPropagation()}
                                       className="appearance-none pr-6 pl-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-50/90 hover:bg-blue-100/90 text-blue-800 border border-blue-200 focus:ring-2 focus:ring-blue-400 focus:outline-none cursor-pointer transition-all shadow-2xs"
-                                      title="Click to change category for this item (saves to database)"
+                                      title="Click to select/change created category for this item (saves to database)"
                                     >
-                                      {allOptionsForTab.map(catOpt => (
+                                      {groupSelectOptions.map(catOpt => (
                                         <option key={catOpt} value={catOpt} className="bg-white text-gray-900 font-semibold py-1">
                                           {catOpt}
                                         </option>
