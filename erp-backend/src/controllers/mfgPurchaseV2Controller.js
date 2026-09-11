@@ -303,13 +303,39 @@ const migratePurchaseBatchNumbers = async (companyObjId) => {
     const allInvoices = await PurchaseInvoiceV2.find(query).sort({ createdAt: 1 });
     if (!allInvoices || allInvoices.length === 0) return;
 
-    let index = 1;
+    // Collect all existing invoice numbers in the database
+    const existingInvoiceDocs = await PurchaseInvoiceV2.find({}, { invoiceNumber: 1 });
+    const existingNumbers = new Set(existingInvoiceDocs.map(i => i.invoiceNumber));
+
+    // Track highest sequence index per month prefix (e.g., PB-SEP-001 -> 1)
+    const monthMaxIndexMap = {};
+    for (const no of existingNumbers) {
+      if (!no) continue;
+      const match = /^PB-([A-Z]{3})-(\d+)$/i.exec(no);
+      if (match) {
+        const month = match[1].toUpperCase();
+        const num = parseInt(match[2], 10);
+        if (!monthMaxIndexMap[month] || num > monthMaxIndexMap[month]) {
+          monthMaxIndexMap[month] = num;
+        }
+      }
+    }
+
     for (const inv of allInvoices) {
       const oldNo = inv.invoiceNumber;
       if (!/^PB-[A-Z]{3}-\d{3}$/i.test(oldNo)) {
-        const monthShort = inv.createdAt ? new Date(inv.createdAt).toLocaleString('en-US', { month: 'short' }).toUpperCase() : 'AUG';
-        const newNo = `PB-${monthShort}-${String(index).padStart(3, '0')}`;
-        index++;
+        const monthShort = inv.createdAt ? new Date(inv.createdAt).toLocaleString('en-US', { month: 'short' }).toUpperCase() : 'SEP';
+        
+        let nextIndex = (monthMaxIndexMap[monthShort] || 0) + 1;
+        let newNo = `PB-${monthShort}-${String(nextIndex).padStart(3, '0')}`;
+
+        while (existingNumbers.has(newNo)) {
+          nextIndex++;
+          newNo = `PB-${monthShort}-${String(nextIndex).padStart(3, '0')}`;
+        }
+
+        monthMaxIndexMap[monthShort] = nextIndex;
+        existingNumbers.add(newNo);
 
         inv.invoiceNumber = newNo;
         if (Array.isArray(inv.items)) {
@@ -319,20 +345,25 @@ const migratePurchaseBatchNumbers = async (companyObjId) => {
             }
           });
         }
-        await inv.save();
+        
+        try {
+          await inv.save();
 
-        await InventoryLedger.updateMany(
-          { referenceId: oldNo },
-          { $set: { referenceId: newNo, batchNumber: newNo } }
-        );
-        await InventoryLedger.updateMany(
-          { batchNumber: oldNo },
-          { $set: { batchNumber: newNo } }
-        );
-        await Transaction.updateMany(
-          { source_type: "PURCHASE", description: { $regex: oldNo } },
-          { $set: { description: `Inwarded materials under invoice ${newNo}` } }
-        );
+          await InventoryLedger.updateMany(
+            { referenceId: oldNo },
+            { $set: { referenceId: newNo, batchNumber: newNo } }
+          );
+          await InventoryLedger.updateMany(
+            { batchNumber: oldNo },
+            { $set: { batchNumber: newNo } }
+          );
+          await Transaction.updateMany(
+            { source_type: "PURCHASE", description: { $regex: oldNo } },
+            { $set: { description: `Inwarded materials under invoice ${newNo}` } }
+          );
+        } catch (saveErr) {
+          console.error(`Skipping invoice migration for ID ${inv._id} due to save error:`, saveErr.message);
+        }
       }
     }
   } catch (err) {

@@ -86,7 +86,7 @@ const SalesOrders: React.FC = () => {
 
   return (
     <div className="p-3 sm:p-6 space-y-4 max-w-[1600px] mx-auto text-left font-sans">
-      
+
       {/* ── TOP HEADER & BREADCRUMB ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
         <div>
@@ -129,9 +129,8 @@ const SalesOrders: React.FC = () => {
         <div className="flex items-center gap-1">
           <button
             onClick={() => setActiveMainTab('orders')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
-              activeMainTab === 'orders' ? 'text-blue-700 border-blue-600 bg-blue-50/40' : 'text-gray-500 border-transparent hover:text-gray-900'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${activeMainTab === 'orders' ? 'text-blue-700 border-blue-600 bg-blue-50/40' : 'text-gray-500 border-transparent hover:text-gray-900'
+              }`}
           >
             <FileText className="w-4 h-4" />
             <span>Orders ({orders.length})</span>
@@ -139,26 +138,23 @@ const SalesOrders: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveMainTab('quotes')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
-              activeMainTab === 'quotes' ? 'text-blue-700 border-blue-600 bg-blue-50/40' : 'text-gray-500 border-transparent hover:text-gray-900'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${activeMainTab === 'quotes' ? 'text-blue-700 border-blue-600 bg-blue-50/40' : 'text-gray-500 border-transparent hover:text-gray-900'
+              }`}
           >
             <Layers className="w-4 h-4 text-gray-400" />
             <span>Quotes</span>
           </button>
           <button
             onClick={() => setActiveMainTab('templates')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
-              activeMainTab === 'templates' ? 'text-blue-700 border-blue-600 bg-blue-50/40' : 'text-gray-500 border-transparent hover:text-gray-900'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${activeMainTab === 'templates' ? 'text-blue-700 border-blue-600 bg-blue-50/40' : 'text-gray-500 border-transparent hover:text-gray-900'
+              }`}
           >
             <span>Templates</span>
           </button>
           <button
             onClick={() => setActiveMainTab('materials')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
-              activeMainTab === 'materials' ? 'text-blue-700 border-blue-600 bg-blue-50/40' : 'text-gray-500 border-transparent hover:text-gray-900'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${activeMainTab === 'materials' ? 'text-blue-700 border-blue-600 bg-blue-50/40' : 'text-gray-500 border-transparent hover:text-gray-900'
+              }`}
           >
             <span>Materials</span>
           </button>
@@ -173,7 +169,7 @@ const SalesOrders: React.FC = () => {
 
       {/* ── TOOLBAR & PERIOD QUICK PILLS ── */}
       <div className="bg-white rounded-2xl border border-gray-200/90 p-3 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
-        
+
         {/* Quick Date Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto text-xs font-semibold">
           <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mr-1">PERIOD:</span>
@@ -181,9 +177,8 @@ const SalesOrders: React.FC = () => {
             <button
               key={p}
               onClick={() => setPeriodFilter(p)}
-              className={`px-3 py-1 rounded-xl transition-all cursor-pointer text-xs ${
-                periodFilter === p ? 'bg-gray-900 text-white font-bold shadow-xs' : 'bg-gray-100/80 hover:bg-gray-200 text-gray-600'
-              }`}
+              className={`px-3 py-1 rounded-xl transition-all cursor-pointer text-xs ${periodFilter === p ? 'bg-gray-900 text-white font-bold shadow-xs' : 'bg-gray-100/80 hover:bg-gray-200 text-gray-600'
+                }`}
             >
               {p === 'all' ? 'All Time' : p.toUpperCase()}
             </button>
@@ -294,21 +289,19 @@ const SalesOrders: React.FC = () => {
 
                     {/* Materials BOM Status Badge */}
                     <td className="py-3 px-3 whitespace-nowrap">
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                        order.materialsStatus === 'Shortfall'
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${order.materialsStatus === 'Shortfall'
                           ? 'bg-amber-50 text-amber-700 border-amber-200'
                           : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      }`}>
+                        }`}>
                         {order.materialsStatus === 'Shortfall' ? 'Shortfall Warning' : 'Ready'}
                       </span>
                     </td>
 
                     {/* Fulfillment Progress */}
                     <td className="py-3 px-3 whitespace-nowrap">
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                        order.fulfillmentStatus === 'Fulfilled' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                        order.fulfillmentStatus === 'Partial' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-gray-100 text-gray-700 border-gray-200'
-                      }`}>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${order.fulfillmentStatus === 'Fulfilled' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                          order.fulfillmentStatus === 'Partial' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-gray-100 text-gray-700 border-gray-200'
+                        }`}>
                         {order.fulfillmentStatus || 'Not Started'}
                       </span>
                     </td>

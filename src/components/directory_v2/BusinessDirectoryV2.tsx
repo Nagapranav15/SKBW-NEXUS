@@ -37,7 +37,11 @@ import {
   RotateCcw,
   Check,
   FileCheck,
-  Eye
+  Eye,
+  Copy,
+  GitMerge,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import Modal from '../ui/Modal';
@@ -47,7 +51,8 @@ import {
   createParty, 
   updateParty, 
   deleteParty as deletePartyApi,
-  importParties
+  importParties,
+  mergeParties
 } from '../../api/partyApi';
 import { 
   getRoutes, 
@@ -182,7 +187,35 @@ interface DirectoryItem {
 export const BusinessDirectoryV2: React.FC = () => {
   const { selectedCompany } = useAuth();
 
-  const [activeMainTab, setActiveMainTab] = useState<DirectoryTabType>('customers');
+  const [activeMainTab, setActiveMainTabState] = useState<DirectoryTabType>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const tabFromUrl = params.get('tab') as DirectoryTabType;
+      if (tabFromUrl && ['customers', 'vendors', 'agents', 'transporters', 'regions', 'cities'].includes(tabFromUrl)) {
+        return tabFromUrl;
+      }
+      const tabFromStorage = localStorage.getItem('skbw_business_directory_tab') as DirectoryTabType;
+      if (tabFromStorage && ['customers', 'vendors', 'agents', 'transporters', 'regions', 'cities'].includes(tabFromStorage)) {
+        return tabFromStorage;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return 'customers';
+  });
+
+  const setActiveMainTab = (tab: DirectoryTabType) => {
+    setActiveMainTabState(tab);
+    try {
+      localStorage.setItem('skbw_business_directory_tab', tab);
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', tab);
+      window.history.replaceState({}, '', url.toString());
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const [animationKey, setAnimationKey] = useState<number>(Date.now());
 
   // Fast On-Demand Pagination State
@@ -216,6 +249,15 @@ export const BusinessDirectoryV2: React.FC = () => {
   } | null>(null);
   const [cardCustomerSearch, setCardCustomerSearch] = useState('');
 
+  // Duplicates Detector Modal State
+  const [showDuplicatesModal, setShowDuplicatesModal] = useState(false);
+  const [duplicateGroups, setDuplicateGroups] = useState<{ field: string; value: string; items: DirectoryItem[] }[]>([]);
+  const [activeDuplicateIdx, setActiveDuplicateIdx] = useState(0);
+  const [isScanningDuplicates, setIsScanningDuplicates] = useState(false);
+  const [mergePrimaryId, setMergePrimaryId] = useState<string>('');
+  const [showMergeConfirmModal, setShowMergeConfirmModal] = useState(false);
+  const [isMerging, setIsMerging] = useState(false);
+
   // Accessibility & Action Toolbar Popover States
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
   const [showSortMenu, setShowSortMenu] = useState(false);
@@ -234,7 +276,7 @@ export const BusinessDirectoryV2: React.FC = () => {
   const [filterTag, setFilterTag] = useState<string>('');
 
   // Sort State
-  const [sortField, setSortField] = useState<'firmName' | 'outstandingBalance' | 'city' | 'code' | 'created'>('firmName');
+  const [sortField, setSortField] = useState<string>('firmName');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // Dynamic Column Visibility State
@@ -429,25 +471,157 @@ export const BusinessDirectoryV2: React.FC = () => {
       result = result.filter(i => Array.isArray(i.tags) && i.tags.some(t => t.toLowerCase().includes(tLower)));
     }
 
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.toLowerCase().trim();
+      result = result.filter(i => {
+        const firmName = String(i.firmName || i.name || '').toLowerCase();
+        const ownerName = String(i.ownerName || '').toLowerCase();
+        const contactName = String(i.contactName || '').toLowerCase();
+        const code = String(i.code || '').toLowerCase();
+        const phone = String(i.phone || '').toLowerCase();
+        const altPhone = String(i.altPhone || '').toLowerCase();
+        const whatsapp = String(i.whatsapp || '').toLowerCase();
+        const email = String(i.email || '').toLowerCase();
+        const gstNumber = String(i.gstNumber || i.gstin || '').toLowerCase();
+        const aadharNumber = String(i.aadharNumber || '').toLowerCase();
+        const doorNo = String(i.doorNo || '').toLowerCase();
+        const streetName = String(i.streetName || '').toLowerCase();
+        const address1 = String(i.address1 || '').toLowerCase();
+        const area = String(i.area || '').toLowerCase();
+        const landmark = String(i.landmark || '').toLowerCase();
+        const city = String(i.city || i.assignedMarket || '').toLowerCase();
+        const district = String(i.district || '').toLowerCase();
+        const state = String(i.state || '').toLowerCase();
+        const pincode = String(i.pincode || '').toLowerCase();
+        const route = String(i.route || i.assignedRegion || '').toLowerCase();
+        const agentAssigned = String(i.agentAssigned || i.assignedAgent || '').toLowerCase();
+        const preferredTransport = String(i.preferredTransport || '').toLowerCase();
+        const vendorType = String(i.vendorType || '').toLowerCase();
+        const status = String(i.status || '').toLowerCase();
+        const notes = String(i.notes || '').toLowerCase();
+        const tagsStr = Array.isArray(i.tags) ? i.tags.join(' ').toLowerCase() : String(i.tags || '').toLowerCase();
+        const contactPersonsStr = Array.isArray(i.contactPersons)
+          ? i.contactPersons.map((cp: any) => `${cp.name} ${cp.phone} ${cp.email} ${cp.role || ''} ${cp.designation || ''}`).join(' ').toLowerCase()
+          : '';
+
+        return firmName.includes(q) ||
+          ownerName.includes(q) ||
+          contactName.includes(q) ||
+          code.includes(q) ||
+          phone.includes(q) ||
+          altPhone.includes(q) ||
+          whatsapp.includes(q) ||
+          email.includes(q) ||
+          gstNumber.includes(q) ||
+          aadharNumber.includes(q) ||
+          doorNo.includes(q) ||
+          streetName.includes(q) ||
+          address1.includes(q) ||
+          area.includes(q) ||
+          landmark.includes(q) ||
+          city.includes(q) ||
+          district.includes(q) ||
+          state.includes(q) ||
+          pincode.includes(q) ||
+          route.includes(q) ||
+          agentAssigned.includes(q) ||
+          preferredTransport.includes(q) ||
+          vendorType.includes(q) ||
+          status.includes(q) ||
+          notes.includes(q) ||
+          tagsStr.includes(q) ||
+          contactPersonsStr.includes(q);
+      });
+    }
+
     result.sort((a, b) => {
       let valA: any = '';
       let valB: any = '';
 
-      if (sortField === 'firmName') {
-        valA = (a.firmName || a.name || '').toLowerCase();
-        valB = (b.firmName || b.name || '').toLowerCase();
-      } else if (sortField === 'outstandingBalance') {
-        valA = Number(a.outstandingBalance) || Number(a.outstanding) || 0;
-        valB = Number(b.outstandingBalance) || Number(b.outstanding) || 0;
-      } else if (sortField === 'city') {
-        valA = (a.city || a.assignedMarket || '').toLowerCase();
-        valB = (b.city || b.assignedMarket || '').toLowerCase();
-      } else if (sortField === 'code') {
-        valA = (a.code || '').toLowerCase();
-        valB = (b.code || '').toLowerCase();
-      } else if (sortField === 'created') {
-        valA = new Date(a.createdAt || 0).getTime();
-        valB = new Date(b.createdAt || 0).getTime();
+      switch (sortField) {
+        case 'firmName':
+        case 'name':
+          valA = (a.firmName || a.name || '').toLowerCase();
+          valB = (b.firmName || b.name || '').toLowerCase();
+          break;
+        case 'contactName':
+        case 'ownerName':
+          valA = (a.contactName || a.ownerName || '').toLowerCase();
+          valB = (b.contactName || b.ownerName || '').toLowerCase();
+          break;
+        case 'phone':
+        case 'mobile':
+          valA = (a.phone || a.whatsapp || '').toLowerCase();
+          valB = (b.phone || b.whatsapp || '').toLowerCase();
+          break;
+        case 'city':
+          valA = (a.city || a.assignedMarket || '').toLowerCase();
+          valB = (b.city || b.assignedMarket || '').toLowerCase();
+          break;
+        case 'district':
+          valA = (a.district || '').toLowerCase();
+          valB = (b.district || '').toLowerCase();
+          break;
+        case 'state':
+          valA = (a.state || '').toLowerCase();
+          valB = (b.state || '').toLowerCase();
+          break;
+        case 'route':
+        case 'region':
+          valA = (a.route || a.assignedRegion || a.name || '').toLowerCase();
+          valB = (b.route || b.assignedRegion || b.name || '').toLowerCase();
+          break;
+        case 'agent':
+        case 'agentAssigned':
+          valA = (a.agentAssigned || a.assignedAgent || '').toLowerCase();
+          valB = (b.agentAssigned || b.assignedAgent || '').toLowerCase();
+          break;
+        case 'vendorType':
+          valA = (a.vendorType || '').toLowerCase();
+          valB = (b.vendorType || '').toLowerCase();
+          break;
+        case 'code':
+          valA = (a.code || '').toLowerCase();
+          valB = (b.code || '').toLowerCase();
+          break;
+        case 'creditLimit':
+          valA = Number(a.creditLimit) || 0;
+          valB = Number(b.creditLimit) || 0;
+          break;
+        case 'creditDays':
+        case 'credit':
+          valA = Number(a.creditDays) || 0;
+          valB = Number(b.creditDays) || 0;
+          break;
+        case 'outstanding':
+        case 'outstandingBalance':
+          valA = Number(a.outstandingBalance) || Number(a.outstanding) || 0;
+          valB = Number(b.outstandingBalance) || Number(b.outstanding) || 0;
+          break;
+        case 'citiesCount':
+          valA = Number(a.citiesCount) || 0;
+          valB = Number(b.citiesCount) || 0;
+          break;
+        case 'customersCount':
+          valA = Number(a.customersCount) || Number(a.assignedCustomersCount) || 0;
+          valB = Number(b.customersCount) || Number(b.assignedCustomersCount) || 0;
+          break;
+        case 'status':
+          valA = (a.status || '').toLowerCase();
+          valB = (b.status || '').toLowerCase();
+          break;
+        case 'tags':
+          valA = Array.isArray(a.tags) ? a.tags.join(', ') : (a.tags || '');
+          valB = Array.isArray(b.tags) ? b.tags.join(', ') : (b.tags || '');
+          break;
+        case 'created':
+          valA = new Date(a.createdAt || 0).getTime();
+          valB = new Date(b.createdAt || 0).getTime();
+          break;
+        default:
+          valA = (a[sortField] || '').toString().toLowerCase();
+          valB = (b[sortField] || '').toString().toLowerCase();
+          break;
       }
 
       if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
@@ -456,7 +630,7 @@ export const BusinessDirectoryV2: React.FC = () => {
     });
 
     return result;
-  }, [items, filterStatus, filterCity, filterRoute, filterVendorType, filterAgent, filterMinBal, filterMaxBal, filterTag, sortField, sortOrder]);
+  }, [items, filterStatus, filterCity, filterRoute, filterVendorType, filterAgent, filterMinBal, filterMaxBal, filterTag, debouncedSearch, sortField, sortOrder]);
 
   const activeFilterCount = [
     filterStatus !== 'all',
@@ -564,7 +738,7 @@ export const BusinessDirectoryV2: React.FC = () => {
 
     if (activeMainTab === 'customers') {
       headers = [
-        'Firm Name', 'Owner Name', 'Contact Name', 'Phone', 'Alt Phone', 'WhatsApp', 'Email',
+        'Firm Name', 'Owner Name', 'Phone', 'Alt Phone', 'WhatsApp', 'Email',
         'GST Number', 'Aadhar Number', 'Door No', 'Street Name', 'Address Line', 'Area', 'Landmark',
         'City', 'District', 'State', 'Pincode', 'GPS Location', 'Region', 'Agent Assigned',
         'Preferred Transport', 'Credit Limit', 'Credit Days', 'Opening Balance', 'Outstanding Balance', 'Tags', 'Remarks', 'Status'
@@ -572,7 +746,6 @@ export const BusinessDirectoryV2: React.FC = () => {
       sampleRows = [
         [
           'Charminar Notebook Publishers',
-          'Mohammad Ali',
           'Mohammad Ali',
           '9988776611',
           '9848022334',
@@ -604,7 +777,7 @@ export const BusinessDirectoryV2: React.FC = () => {
       ];
     } else if (activeMainTab === 'vendors') {
       headers = [
-        'Firm Name', 'Owner Name', 'Contact Name', 'Phone', 'Alt Phone', 'WhatsApp', 'Email',
+        'Firm Name', 'Owner Name', 'Phone', 'Alt Phone', 'WhatsApp', 'Email',
         'GST Number', 'Aadhar Number', 'Door No', 'Street Name', 'Address Line', 'Area', 'Landmark',
         'City', 'District', 'State', 'Pincode', 'GPS Location', 'Vendor Type', 'Credit Limit', 'Credit Days',
         'Opening Balance', 'Outstanding Balance', 'Tags', 'Remarks', 'Status'
@@ -612,7 +785,6 @@ export const BusinessDirectoryV2: React.FC = () => {
       sampleRows = [
         [
           'Paper Mills Supplier Ltd',
-          'Mohammad Ali',
           'Mohammad Ali',
           '9988776611',
           '9848022334',
@@ -647,9 +819,9 @@ export const BusinessDirectoryV2: React.FC = () => {
         ['Ramesh Kumar', '9440212345', 'active']
       ];
     } else if (activeMainTab === 'transporters') {
-      headers = ['Transporter Name', 'Contact Person', 'Mobile', 'Email', 'City', 'Status'];
+      headers = ['Transporter Name', 'Mobile', 'Email', 'City', 'Status'];
       sampleRows = [
-        ['VRL Logistics', 'Suresh Kumar', '9876543210', 'info@vrl.com', 'Vijayawada', 'active']
+        ['VRL Logistics', '9876543210', 'info@vrl.com', 'Vijayawada', 'active']
       ];
     } else if (activeMainTab === 'regions') {
       headers = ['Region Name', 'Assigned Agent', 'Status'];
@@ -1018,6 +1190,219 @@ export const BusinessDirectoryV2: React.FC = () => {
       console.error('Failed to fetch activity logs:', err);
     } finally {
       setActivityLogLoading(false);
+    }
+  };
+
+  // Sorting Column Header Helper
+  const handleColumnSort = (fieldKey: string) => {
+    if (sortField === fieldKey) {
+      setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(fieldKey);
+      setSortOrder('asc');
+    }
+  };
+
+  const renderSortHeader = (label: string, fieldKey: string, hiddenCondition?: boolean, extraClasses = '') => {
+    if (hiddenCondition) return null;
+    const isSorted = sortField === fieldKey;
+    return (
+      <th
+        key={fieldKey}
+        onClick={() => handleColumnSort(fieldKey)}
+        className={`py-3 px-3 whitespace-nowrap cursor-pointer hover:bg-slate-200/80 transition-colors select-none group text-left ${extraClasses}`}
+        title={`Click to sort by ${label}`}
+      >
+        <div className="flex items-center justify-between gap-1.5">
+          <span className={isSorted ? 'text-blue-700 font-extrabold' : ''}>{label}</span>
+          <span className="shrink-0 text-xs">
+            {isSorted ? (
+              sortOrder === 'asc' ? (
+                <ChevronUp className="w-3.5 h-3.5 text-blue-600 stroke-[2.5]" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5 text-blue-600 stroke-[2.5]" />
+              )
+            ) : (
+              <ArrowUpDown className="w-3.5 h-3.5 text-gray-400 group-hover:text-gray-600 opacity-60 group-hover:opacity-100 transition-opacity" />
+            )}
+          </span>
+        </div>
+      </th>
+    );
+  };
+
+  // Duplicates Scanner Logic
+  const handleFindDuplicates = async () => {
+    if (!selectedCompany?._id) return;
+    setIsScanningDuplicates(true);
+    try {
+      let allRecords: DirectoryItem[] = [];
+      if (activeMainTab === 'regions') {
+        const res = await getRoutes(selectedCompany._id);
+        const routeData = res.data.routes || res.data || [];
+        allRecords = routeData.map((r: any) => ({
+          _id: r._id,
+          type: 'route',
+          firmName: r.name,
+          name: r.name,
+          code: r.code || r.name,
+          assignedAgent: r.assignedAgent || '—',
+          status: r.status || 'active'
+        }));
+      } else {
+        let partyType = 'customer';
+        if (activeMainTab === 'vendors') partyType = 'vendor';
+        if (activeMainTab === 'agents') partyType = 'agent';
+        if (activeMainTab === 'transporters') partyType = 'transporter';
+        if (activeMainTab === 'cities') partyType = 'market';
+
+        const res = await getParties({
+          company: selectedCompany._id,
+          type: partyType,
+          limit: 10000
+        });
+        allRecords = res.data.parties || res.data || [];
+      }
+
+      const groups: { field: string; value: string; items: DirectoryItem[] }[] = [];
+
+      if (activeMainTab === 'regions') {
+        const nameMap = new Map<string, DirectoryItem[]>();
+        allRecords.forEach(item => {
+          const nm = (item.name || item.firmName || '').trim().toLowerCase();
+          if (!nm) return;
+          if (!nameMap.has(nm)) nameMap.set(nm, []);
+          nameMap.get(nm)!.push(item);
+        });
+        nameMap.forEach((gItems) => {
+          if (gItems.length > 1) {
+            groups.push({ field: 'Region Name', value: gItems[0].name || gItems[0].firmName, items: gItems });
+          }
+        });
+      } else {
+        const nameMap = new Map<string, DirectoryItem[]>();
+        const phoneMap = new Map<string, DirectoryItem[]>();
+        const emailMap = new Map<string, DirectoryItem[]>();
+        const gstMap = new Map<string, DirectoryItem[]>();
+
+        allRecords.forEach(item => {
+          const name = (item.firmName || item.contactName || item.name || '').trim().toLowerCase();
+          const phone = (item.phone || item.whatsapp || '').trim();
+          const email = (item.email || '').trim().toLowerCase();
+          const gst = (item.gstNumber || item.gstin || '').trim().toUpperCase();
+
+          const isDummyName = !name || ['-', 'undefined', 'null', 'n/a', 'none'].includes(name);
+          const isDummyPhone = !phone || ['-', 'undefined', 'null', 'n/a', 'none', '0'].includes(phone);
+          const isDummyEmail = !email || ['-', 'undefined', 'null', 'n/a', 'none', 'example@mail.com'].includes(email);
+          const isDummyGst = !gst || ['-', 'undefined', 'null', 'n/a', 'none'].includes(gst);
+
+          if (!isDummyPhone) {
+            if (!phoneMap.has(phone)) phoneMap.set(phone, []);
+            phoneMap.get(phone)!.push(item);
+          }
+          if (!isDummyGst) {
+            if (!gstMap.has(gst)) gstMap.set(gst, []);
+            gstMap.get(gst)!.push(item);
+          }
+          if (!isDummyEmail) {
+            if (!emailMap.has(email)) emailMap.set(email, []);
+            emailMap.get(email)!.push(item);
+          }
+          if (!isDummyName) {
+            if (!nameMap.has(name)) nameMap.set(name, []);
+            nameMap.get(name)!.push(item);
+          }
+        });
+
+        phoneMap.forEach((gItems, val) => {
+          if (gItems.length > 1) groups.push({ field: 'Mobile / WhatsApp', value: val, items: gItems });
+        });
+        gstMap.forEach((gItems, val) => {
+          if (gItems.length > 1) groups.push({ field: 'GST Number', value: val, items: gItems });
+        });
+        emailMap.forEach((gItems, val) => {
+          if (gItems.length > 1) groups.push({ field: 'Email Address', value: val, items: gItems });
+        });
+        nameMap.forEach((gItems) => {
+          if (gItems.length > 1) {
+            groups.push({ field: 'Firm / Contact Name', value: gItems[0].firmName || gItems[0].name || '', items: gItems });
+          }
+        });
+      }
+
+      setDuplicateGroups(groups);
+      setActiveDuplicateIdx(0);
+      setShowDuplicatesModal(true);
+
+      if (groups.length === 0) {
+        showToast(`No duplicate ${activeMainTab} found! Directory is clean.`, 'success');
+      } else {
+        showToast(`Found ${groups.length} duplicate group(s) in ${activeMainTab}!`, 'info');
+      }
+    } catch (err: any) {
+      console.error('Error finding duplicates:', err);
+      showToast(err.message || 'Failed to scan for duplicates', 'error');
+    } finally {
+      setIsScanningDuplicates(false);
+    }
+  };
+
+  const handleKeepBoth = (groupIdx: number) => {
+    setDuplicateGroups(prev => prev.filter((_, idx) => idx !== groupIdx));
+    if (activeDuplicateIdx >= groupIdx && activeDuplicateIdx > 0) {
+      setActiveDuplicateIdx(prev => prev - 1);
+    }
+  };
+
+  const handleDeleteDuplicateRecord = async (itemToDelete: DirectoryItem) => {
+    if (!window.confirm(`Are you sure you want to delete "${itemToDelete.firmName || itemToDelete.name}"?`)) return;
+    try {
+      if (activeMainTab === 'regions') {
+        await deleteRoute(itemToDelete._id);
+      } else {
+        await deletePartyApi(itemToDelete._id);
+      }
+      showToast(`Successfully deleted duplicate record`, 'success');
+
+      setDuplicateGroups(prev => {
+        return prev.map(g => ({
+          ...g,
+          items: g.items.filter(i => i._id !== itemToDelete._id)
+        })).filter(g => g.items.length > 1);
+      });
+      loadDirectoryData();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to delete record', 'error');
+    }
+  };
+
+  const handleExecuteMerge = async () => {
+    const currentGroup = duplicateGroups[activeDuplicateIdx];
+    if (!currentGroup || !mergePrimaryId) return;
+
+    const primaryItem = currentGroup.items.find(i => i._id === mergePrimaryId);
+    const duplicatesToMerge = currentGroup.items.filter(i => i._id !== mergePrimaryId);
+
+    if (!primaryItem || duplicatesToMerge.length === 0) return;
+
+    setIsMerging(true);
+    try {
+      for (const dup of duplicatesToMerge) {
+        await mergeParties(mergePrimaryId, dup._id);
+      }
+      showToast(`Merged ${duplicatesToMerge.length} record(s) into "${primaryItem.firmName || primaryItem.name}". All transactions updated.`, 'success');
+      setShowMergeConfirmModal(false);
+
+      setDuplicateGroups(prev => prev.filter((_, idx) => idx !== activeDuplicateIdx));
+      if (activeDuplicateIdx > 0) {
+        setActiveDuplicateIdx(prev => prev - 1);
+      }
+      loadDirectoryData();
+    } catch (err: any) {
+      console.error('Merge failed:', err);
+      showToast(err.response?.data?.msg || err.message || 'Failed to merge duplicate records', 'error');
+    } finally {
+      setIsMerging(false);
     }
   };
 
@@ -1677,7 +2062,24 @@ export const BusinessDirectoryV2: React.FC = () => {
             </div>
           </div>
 
-          {/* 8. Add New Item Icon Button (Circular + Button matching SkuMasterV2) */}
+          {/* 8. Find Duplicates Icon Button */}
+          <div className="relative group">
+            <button
+              type="button"
+              onClick={handleFindDuplicates}
+              disabled={isScanningDuplicates}
+              className="p-2 rounded-xl bg-amber-50 hover:bg-amber-100/80 border border-amber-200 text-amber-700 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              title="Scan for Duplicate Records"
+              aria-label="Scan for Duplicate Records"
+            >
+              <Copy className={`w-4 h-4 text-amber-600 ${isScanningDuplicates ? 'animate-spin' : ''}`} />
+            </button>
+            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+              Find Duplicates
+            </div>
+          </div>
+
+          {/* 9. Add New Item Icon Button (Circular + Button matching SkuMasterV2) */}
           <div className="relative group">
             <button
               type="button"
@@ -1698,24 +2100,25 @@ export const BusinessDirectoryV2: React.FC = () => {
       {/* Expandable Filter Drawer Bar */}
       {showFilterDrawer && (
         <div className="bg-slate-50 border border-blue-100 rounded-2xl p-3.5 shadow-2xs space-y-3">
-          <div className="flex items-center justify-between border-b border-gray-200/60 pb-2">
+          <div className="flex items-center justify-between border-b border-gray-200/80 pb-2">
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-blue-600" />
-              <span className="font-extrabold text-gray-900 text-xs uppercase tracking-wider">Advanced Filters</span>
+              <h3 className="font-bold text-xs text-gray-900">Advanced Filter Controls</h3>
+              {activeFilterCount > 0 && (
+                <span className="bg-blue-600 text-white text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full">
+                  {activeFilterCount} Active
+                </span>
+              )}
             </div>
-            {activeFilterCount > 0 && (
-              <button
-                type="button"
-                onClick={resetFilters}
-                className="text-xs text-rose-600 hover:text-rose-700 font-bold flex items-center gap-1 cursor-pointer"
-              >
-                <RotateCcw className="w-3 h-3" />
-                <span>Reset All Filters</span>
-              </button>
-            )}
+            <button
+              onClick={resetFilters}
+              className="text-xs text-blue-600 hover:text-blue-800 font-bold hover:underline cursor-pointer"
+            >
+              Reset All Filters
+            </button>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3 text-xs">
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Status</label>
               <select
@@ -1724,49 +2127,53 @@ export const BusinessDirectoryV2: React.FC = () => {
                 className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-blue-500"
               >
                 <option value="all">All Statuses</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
+                <option value="active">Active Only</option>
+                <option value="inactive">Inactive Only</option>
                 <option value="on-hold">On Hold</option>
               </select>
             </div>
 
-            <div>
-              <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">City / Market</label>
-              <select
-                value={filterCity}
-                onChange={(e) => setFilterCity(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-blue-500"
-              >
-                <option value="all">All Cities</option>
-                {allCities.map(c => (
-                  <option key={c._id} value={c.firmName || c.name}>{c.firmName || c.name}</option>
-                ))}
-              </select>
-            </div>
+            {(activeMainTab === 'customers' || activeMainTab === 'vendors') && (
+              <div>
+                <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">City</label>
+                <select
+                  value={filterCity}
+                  onChange={(e) => setFilterCity(e.target.value)}
+                  className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="all">All Cities</option>
+                  {allCities.map(c => (
+                    <option key={c._id} value={c.firmName || c.name}>{c.firmName || c.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
-            <div>
-              <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Region / Line</label>
-              <select
-                value={filterRoute}
-                onChange={(e) => setFilterRoute(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-blue-500"
-              >
-                <option value="all">All Regions</option>
-                {allRoutes.map(r => (
-                  <option key={r._id} value={r.name}>{r.name}</option>
-                ))}
-              </select>
-            </div>
+            {(activeMainTab === 'customers' || activeMainTab === 'cities') && (
+              <div>
+                <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Region / Route</label>
+                <select
+                  value={filterRoute}
+                  onChange={(e) => setFilterRoute(e.target.value)}
+                  className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="all">All Regions</option>
+                  {allRoutes.map(r => (
+                    <option key={r._id} value={r.name}>{r.name} ({r.code})</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {activeMainTab === 'vendors' && (
               <div>
-                <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Vendor Type</label>
+                <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Vendor Category</label>
                 <select
                   value={filterVendorType}
                   onChange={(e) => setFilterVendorType(e.target.value)}
                   className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-blue-500"
                 >
-                  <option value="all">All Vendor Types</option>
+                  <option value="all">All Categories</option>
                   <option value="BOARD SUPPLIER">BOARD SUPPLIER</option>
                   <option value="PAPER SUPPLIER">PAPER SUPPLIER</option>
                   <option value="PRINTING VENDOR">PRINTING VENDOR</option>
@@ -1848,90 +2255,68 @@ export const BusinessDirectoryV2: React.FC = () => {
 
                 {activeMainTab === 'customers' && (
                   <>
-                    {!hiddenColumns['firmName'] && <th className="py-3 px-3 whitespace-nowrap">CUSTOMER FIRM</th>}
-                    {!hiddenColumns['phone'] && <th className="py-3 px-3 whitespace-nowrap">MOBILE / WHATSAPP</th>}
-                    {!hiddenColumns['city'] && <th className="py-3 px-3 whitespace-nowrap">CITY & DISTRICT</th>}
-                    {!hiddenColumns['route'] && <th className="py-3 px-3 whitespace-nowrap">REGION</th>}
-                    {!hiddenColumns['agent'] && <th className="py-3 px-3 whitespace-nowrap">ASSIGNED AGENT</th>}
-                    {!hiddenColumns['creditLimit'] && <th className="py-3 px-3 whitespace-nowrap">CREDIT LIMIT</th>}
-                    {!hiddenColumns['creditDays'] && <th className="py-3 px-3 whitespace-nowrap">CREDIT DAYS</th>}
-                    {!hiddenColumns['outstanding'] && <th className="py-3 px-3 whitespace-nowrap">OUTSTANDING</th>}
-                    {!hiddenColumns['tags'] && <th className="py-3 px-3 whitespace-nowrap">TAGS</th>}
+                    {renderSortHeader('CUSTOMER FIRM', 'firmName', hiddenColumns['firmName'])}
+                    {renderSortHeader('MOBILE / WHATSAPP', 'phone', hiddenColumns['phone'])}
+                    {renderSortHeader('CITY & DISTRICT', 'city', hiddenColumns['city'])}
+                    {renderSortHeader('REGION', 'route', hiddenColumns['route'])}
+                    {renderSortHeader('ASSIGNED AGENT', 'agent', hiddenColumns['agent'])}
+                    {renderSortHeader('CREDIT LIMIT', 'creditLimit', hiddenColumns['creditLimit'])}
+                    {renderSortHeader('CREDIT DAYS', 'creditDays', hiddenColumns['creditDays'])}
+                    {renderSortHeader('OUTSTANDING', 'outstanding', hiddenColumns['outstanding'])}
+                    {renderSortHeader('TAGS', 'tags', hiddenColumns['tags'])}
                   </>
                 )}
 
                 {activeMainTab === 'vendors' && (
                   <>
-                    {!hiddenColumns['firmName'] && <th className="py-3 px-3 whitespace-nowrap">SUPPLIER NAME</th>}
-                    {!hiddenColumns['vendorType'] && <th className="py-3 px-3 whitespace-nowrap">VENDOR CATEGORY</th>}
-                    {!hiddenColumns['contactName'] && <th className="py-3 px-3 whitespace-nowrap">CONTACT PERSON</th>}
-                    {!hiddenColumns['phone'] && <th className="py-3 px-3 whitespace-nowrap">MOBILE / CONTACT</th>}
-                    {!hiddenColumns['city'] && <th className="py-3 px-3 whitespace-nowrap">CITY & STATE</th>}
-                    {!hiddenColumns['credit'] && <th className="py-3 px-3 whitespace-nowrap">CREDIT DAYS</th>}
-                    {!hiddenColumns['outstanding'] && <th className="py-3 px-3 whitespace-nowrap">OUTSTANDING</th>}
-                    {!hiddenColumns['tags'] && <th className="py-3 px-3 whitespace-nowrap">TAGS</th>}
+                    {renderSortHeader('SUPPLIER NAME', 'firmName', hiddenColumns['firmName'])}
+                    {renderSortHeader('VENDOR CATEGORY', 'vendorType', hiddenColumns['vendorType'])}
+                    {renderSortHeader('CONTACT PERSON', 'contactName', hiddenColumns['contactName'])}
+                    {renderSortHeader('MOBILE / CONTACT', 'phone', hiddenColumns['phone'])}
+                    {renderSortHeader('CITY & STATE', 'city', hiddenColumns['city'])}
+                    {renderSortHeader('CREDIT DAYS', 'creditDays', hiddenColumns['credit'])}
+                    {renderSortHeader('OUTSTANDING', 'outstanding', hiddenColumns['outstanding'])}
+                    {renderSortHeader('TAGS', 'tags', hiddenColumns['tags'])}
                   </>
                 )}
 
                 {activeMainTab === 'agents' && (
                   <>
-                    <th className="py-3 px-3 whitespace-nowrap">
-                      <span>AGENT NAME</span>
-                      <span className="text-[10px] text-gray-400 font-normal ml-1 inline-block">⇅</span>
-                    </th>
-                    <th className="py-3 px-3 whitespace-nowrap">
-                      <span>MOBILE</span>
-                      <span className="text-[10px] text-gray-400 font-normal ml-1 inline-block">⇅</span>
-                    </th>
-                    <th className="py-3 px-3 whitespace-nowrap">
-                      <span>ASSIGNED REGIONS</span>
-                      <span className="text-[10px] text-gray-400 font-normal ml-1 inline-block">⇅</span>
-                    </th>
+                    {renderSortHeader('AGENT NAME', 'firmName')}
+                    {renderSortHeader('MOBILE', 'phone')}
+                    {renderSortHeader('ASSIGNED REGIONS', 'route')}
                   </>
                 )}
 
                 {activeMainTab === 'transporters' && (
                   <>
-                    <th className="py-3 px-3 whitespace-nowrap">
-                      <span>TRANSPORTER</span>
-                      <span className="text-[10px] text-gray-400 font-normal ml-1 inline-block">⇅</span>
-                    </th>
-                    <th className="py-3 px-3 whitespace-nowrap">
-                      <span>MOBILE</span>
-                      <span className="text-[10px] text-gray-400 font-normal ml-1 inline-block">⇅</span>
-                    </th>
-                    <th className="py-3 px-3 whitespace-nowrap">
-                      <span>CUSTOMERS USING</span>
-                      <span className="text-[10px] text-gray-400 font-normal ml-1 inline-block">⇅</span>
-                    </th>
+                    {renderSortHeader('TRANSPORTER', 'firmName')}
+                    {renderSortHeader('MOBILE', 'phone')}
+                    {renderSortHeader('CUSTOMERS USING', 'customersCount')}
                   </>
                 )}
 
                 {activeMainTab === 'regions' && (
                   <>
-                    <th className="py-3 px-3 whitespace-nowrap">REGION CODE</th>
-                    <th className="py-3 px-3 whitespace-nowrap">ASSIGNED AGENT</th>
-                    <th className="py-3 px-3 whitespace-nowrap">CITIES COUNT</th>
-                    <th className="py-3 px-3 whitespace-nowrap">CUSTOMERS COUNT</th>
-                    <th className="py-3 px-3 whitespace-nowrap">OUTSTANDING BALANCE</th>
+                    {renderSortHeader('REGION NAME', 'name')}
+                    {renderSortHeader('REGION CODE', 'code')}
+                    {renderSortHeader('ASSIGNED AGENT', 'agent')}
+                    {renderSortHeader('CITIES COUNT', 'citiesCount')}
+                    {renderSortHeader('CUSTOMERS COUNT', 'customersCount')}
+                    {renderSortHeader('OUTSTANDING BALANCE', 'outstanding')}
                   </>
                 )}
 
                 {activeMainTab === 'cities' && (
                   <>
-                    <th className="py-3 px-3 whitespace-nowrap">CITY NAME</th>
-                    <th className="py-3 px-3 whitespace-nowrap">PARENT REGION</th>
-                    <th className="py-3 px-3 whitespace-nowrap">DISTRICT & STATE</th>
-                    <th className="py-3 px-3 whitespace-nowrap">ASSIGNED AGENT</th>
+                    {renderSortHeader('CITY NAME', 'name')}
+                    {renderSortHeader('PARENT REGION', 'route')}
+                    {renderSortHeader('DISTRICT & STATE', 'district')}
+                    {renderSortHeader('ASSIGNED AGENT', 'agent')}
                   </>
                 )}
 
-                <th className="py-3 px-3 whitespace-nowrap">
-                  <span>STATUS</span>
-                  {(activeMainTab === 'agents' || activeMainTab === 'transporters') && (
-                    <span className="text-[10px] text-gray-400 font-normal ml-1 inline-block">⇅</span>
-                  )}
-                </th>
+                {renderSortHeader('STATUS', 'status')}
                 <th className="py-3 px-3 text-right whitespace-nowrap">ACTIONS</th>
               </tr>
             </thead>
@@ -5035,6 +5420,256 @@ export const BusinessDirectoryV2: React.FC = () => {
                 className="px-4 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs transition-colors cursor-pointer"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── DUPLICATE RECORDS SCANNER MODAL ── */}
+      {showDuplicatesModal && (
+        <Modal
+          isOpen={showDuplicatesModal}
+          onClose={() => setShowDuplicatesModal(false)}
+          title={`Find Duplicates — ${activeMainTab.toUpperCase()}`}
+          maxWidth="max-w-5xl"
+        >
+          <div className="space-y-4 text-left">
+            <div className="flex items-center justify-between bg-amber-50/80 border border-amber-200 rounded-2xl p-3.5 text-xs text-amber-900">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-amber-500 text-white rounded-xl shadow-xs">
+                  <Copy className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-amber-900">
+                    {duplicateGroups.length > 0 ? `${duplicateGroups.length} Duplicate Cluster(s) Detected` : 'No Duplicates Found'}
+                  </h4>
+                  <p className="text-amber-700 text-xs mt-0.5">
+                    Scanned all records in <span className="font-bold capitalize">{activeMainTab}</span> for matching phone numbers, email addresses, GST numbers, or firm names.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleFindDuplicates}
+                disabled={isScanningDuplicates}
+                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isScanningDuplicates ? 'animate-spin' : ''}`} />
+                <span>Re-scan</span>
+              </button>
+            </div>
+
+            {duplicateGroups.length === 0 ? (
+              <div className="py-12 text-center bg-slate-50 border border-dashed border-gray-200 rounded-2xl">
+                <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-3">
+                  <Check className="w-6 h-6 stroke-[3]" />
+                </div>
+                <h3 className="font-bold text-base text-gray-900">No Duplicates Found</h3>
+                <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
+                  All records in <span className="font-semibold">{activeMainTab}</span> are clean with unique mobile numbers, emails, and names.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 min-h-[400px]">
+                {/* Duplicate Groups Sidebar */}
+                <div className="md:col-span-1 border border-gray-200 rounded-2xl p-2.5 space-y-1.5 max-h-[460px] overflow-y-auto bg-slate-50/50">
+                  <div className="text-[10px] font-extrabold uppercase text-gray-400 tracking-wider px-2 py-1">
+                    Clusters ({duplicateGroups.length})
+                  </div>
+                  {duplicateGroups.map((group, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setActiveDuplicateIdx(idx)}
+                      className={`w-full text-left p-2.5 rounded-xl border text-xs transition-all cursor-pointer ${
+                        activeDuplicateIdx === idx
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-md font-bold'
+                          : 'bg-white text-gray-800 border-gray-200 hover:bg-gray-100'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1 mb-0.5">
+                        <span className={`text-[9px] uppercase font-mono px-1.5 py-0.2 rounded-md ${
+                          activeDuplicateIdx === idx ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {group.field}
+                        </span>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
+                          activeDuplicateIdx === idx ? 'bg-white text-blue-700' : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {group.items.length}
+                        </span>
+                      </div>
+                      <div className="truncate font-semibold text-xs mt-1">
+                        {group.value || 'Unspecified'}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Main Comparison Panel */}
+                <div className="md:col-span-3 border border-gray-200 rounded-2xl p-4 flex flex-col justify-between bg-white">
+                  {duplicateGroups[activeDuplicateIdx] && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                        <div>
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                            Match Reason: {duplicateGroups[activeDuplicateIdx].field}
+                          </span>
+                          <h3 className="text-base font-black text-gray-900 mt-0.5">
+                            "{duplicateGroups[activeDuplicateIdx].value}"
+                          </h3>
+                        </div>
+                        <button
+                          onClick={() => handleKeepBoth(activeDuplicateIdx)}
+                          className="px-3 py-1.5 text-xs font-bold text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all cursor-pointer"
+                        >
+                          Keep Both (Dismiss)
+                        </button>
+                      </div>
+
+                      {/* Candidate Records Cards */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[320px] overflow-y-auto pr-1">
+                        {duplicateGroups[activeDuplicateIdx].items.map((item) => (
+                          <div
+                            key={item._id}
+                            className="border border-gray-200 rounded-2xl p-3.5 space-y-2 bg-slate-50/50 hover:bg-blue-50/20 transition-all text-xs relative group"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <h4 className="font-bold text-gray-900 text-sm">{item.firmName || item.name}</h4>
+                                {item.ownerName && (
+                                  <p className="text-[11px] text-gray-500 font-medium">Owner: {item.ownerName}</p>
+                                )}
+                              </div>
+                              <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase ${
+                                item.status === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-700'
+                              }`}>
+                                {item.status || 'active'}
+                              </span>
+                            </div>
+
+                            <div className="space-y-1 text-gray-600 text-[11px] font-medium pt-1 border-t border-gray-100">
+                              <p className="flex items-center gap-1.5">
+                                <Phone className="w-3 h-3 text-gray-400 shrink-0" />
+                                <span>{item.phone || item.whatsapp || 'No Phone'}</span>
+                              </p>
+                              {item.email && (
+                                <p className="flex items-center gap-1.5">
+                                  <Mail className="w-3 h-3 text-gray-400 shrink-0" />
+                                  <span>{item.email}</span>
+                                </p>
+                              )}
+                              {(item.city || item.district) && (
+                                <p className="flex items-center gap-1.5">
+                                  <MapPin className="w-3 h-3 text-gray-400 shrink-0" />
+                                  <span>{[item.city, item.district, item.state].filter(Boolean).join(', ')}</span>
+                                </p>
+                              )}
+                              {(item.gstNumber || item.gstin) && (
+                                <p className="flex items-center gap-1.5 font-mono text-[10px] text-gray-500">
+                                  <FileText className="w-3 h-3 text-gray-400 shrink-0" />
+                                  <span>GST: {item.gstNumber || item.gstin}</span>
+                                </p>
+                              )}
+                              {(item.outstandingBalance !== undefined || item.outstanding !== undefined) && (
+                                <p className="font-bold text-gray-800">
+                                  Balance: ₹{(Number(item.outstandingBalance) || Number(item.outstanding) || 0).toLocaleString('en-IN')}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="pt-2 flex items-center justify-between border-t border-gray-100 text-[10px]">
+                              <span className="text-gray-400 font-mono">ID: {item._id.slice(-6)}</span>
+                              <button
+                                onClick={() => handleDeleteDuplicateRecord(item)}
+                                className="px-2 py-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg font-bold transition-all cursor-pointer"
+                              >
+                                Delete Record
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Merge Initiator */}
+                      <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
+                        <span className="text-xs font-medium text-gray-500">
+                          Combine transactions into 1 master record?
+                        </span>
+                        <button
+                          onClick={() => {
+                            setMergePrimaryId(duplicateGroups[activeDuplicateIdx].items[0]._id);
+                            setShowMergeConfirmModal(true);
+                          }}
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all flex items-center gap-1.5 text-xs cursor-pointer"
+                        >
+                          <GitMerge className="w-3.5 h-3.5" />
+                          <span>Merge Group Records</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {/* ── MERGE CONFIRMATION MODAL ── */}
+      {showMergeConfirmModal && duplicateGroups[activeDuplicateIdx] && (
+        <Modal
+          isOpen={showMergeConfirmModal}
+          onClose={() => setShowMergeConfirmModal(false)}
+          title="Confirm Record Merge"
+          maxWidth="max-w-lg"
+        >
+          <div className="space-y-4 text-left">
+            <p className="text-xs text-gray-600">
+              Select which master record to <strong>KEEP as Primary</strong>. All transactions and ledger entries from duplicate records will be transferred to this primary record, and duplicate records will be merged.
+            </p>
+
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-gray-700">Choose Primary Master Record:</label>
+              {duplicateGroups[activeDuplicateIdx].items.map(item => (
+                <label
+                  key={item._id}
+                  className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${
+                    mergePrimaryId === item._id
+                      ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-100'
+                      : 'border-gray-200 bg-white hover:bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="primaryRecord"
+                    checked={mergePrimaryId === item._id}
+                    onChange={() => setMergePrimaryId(item._id)}
+                    className="text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <div className="text-xs">
+                    <span className="font-bold text-gray-900 block">{item.firmName || item.name}</span>
+                    <span className="text-[11px] text-gray-500 font-mono">
+                      {[item.phone, item.city, item.gstNumber || item.gstin].filter(Boolean).join(' • ')}
+                    </span>
+                  </div>
+                </label>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+              <button
+                onClick={() => setShowMergeConfirmModal(false)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExecuteMerge}
+                disabled={isMerging}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <GitMerge className={`w-3.5 h-3.5 ${isMerging ? 'animate-spin' : ''}`} />
+                <span>{isMerging ? 'Merging Records...' : 'Confirm & Merge Records'}</span>
               </button>
             </div>
           </div>

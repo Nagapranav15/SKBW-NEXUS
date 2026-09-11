@@ -438,7 +438,16 @@ exports.renumberSkus = async (req, res, next) => {
       }
     }
 
-    // Pass 1: Set temporary codes to avoid unique index conflict during batch update
+    // Step 0: Rename any soft-deleted SKUs for this company so their old codes (e.g. FG-004) do not block active series
+    const deletedSkus = await SkuV2.find({ company: companyQuery, isDeleted: true });
+    for (const dSku of deletedSkus) {
+      if (dSku.skuCode && !dSku.skuCode.startsWith("DEL-")) {
+        dSku.skuCode = `DEL-${dSku.skuCode}-${String(dSku._id).slice(-4)}`;
+        await dSku.save().catch(e => console.error("Error renaming deleted SKU code:", e.message));
+      }
+    }
+
+    // Pass 1: Set temporary codes for all active SKUs to avoid unique index conflict during batch update
     let tempCounter = 1;
     for (const sku of allSkus) {
       sku.skuCode = `TEMP-RENUMBER-${tempCounter++}-${Date.now()}`;
@@ -450,20 +459,41 @@ exports.renumberSkus = async (req, res, next) => {
 
     for (let i = 0; i < fgList.length; i++) {
       fgList[i].skuCode = `FG-${String(i + 1).padStart(3, "0")}`;
-      await fgList[i].save();
-      updatedCount++;
+      try {
+        await fgList[i].save();
+        updatedCount++;
+      } catch (err) {
+        console.error(`Failed to assign ${fgList[i].skuCode} to SKU ${fgList[i]._id}:`, err.message);
+        fgList[i].skuCode = `FG-${String(i + 1).padStart(3, "0")}-${String(fgList[i]._id).slice(-4)}`;
+        await fgList[i].save().catch(e => console.error(e));
+        updatedCount++;
+      }
     }
 
     for (let i = 0; i < smList.length; i++) {
       smList[i].skuCode = `SM-${String(i + 1).padStart(3, "0")}`;
-      await smList[i].save();
-      updatedCount++;
+      try {
+        await smList[i].save();
+        updatedCount++;
+      } catch (err) {
+        console.error(`Failed to assign ${smList[i].skuCode} to SKU ${smList[i]._id}:`, err.message);
+        smList[i].skuCode = `SM-${String(i + 1).padStart(3, "0")}-${String(smList[i]._id).slice(-4)}`;
+        await smList[i].save().catch(e => console.error(e));
+        updatedCount++;
+      }
     }
 
     for (let i = 0; i < rmList.length; i++) {
       rmList[i].skuCode = `RM-${String(i + 1).padStart(3, "0")}`;
-      await rmList[i].save();
-      updatedCount++;
+      try {
+        await rmList[i].save();
+        updatedCount++;
+      } catch (err) {
+        console.error(`Failed to assign ${rmList[i].skuCode} to SKU ${rmList[i]._id}:`, err.message);
+        rmList[i].skuCode = `RM-${String(i + 1).padStart(3, "0")}-${String(rmList[i]._id).slice(-4)}`;
+        await rmList[i].save().catch(e => console.error(e));
+        updatedCount++;
+      }
     }
 
     ActivityLog.create({
