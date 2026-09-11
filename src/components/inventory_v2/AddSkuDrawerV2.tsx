@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Save, RefreshCw, BookOpen, Layers, Plus, Trash2, AlertCircle, MapPin, Search, ChevronDown, Lock, Package } from 'lucide-react';
 import { createSkuV2, updateSkuV2, SkuV2, getMetadataV2, updateMetadataV2, getSkusV2, getNextSkuCodeV2, getBalancesV2, getWarehouseHierarchyV2, WarehouseLocationV2 } from '../../api/mfgApiV2';
 import Modal from '../ui/Modal';
+import { BomCopyPasteControls } from './BomCopyPasteControls';
 
 interface AddSkuDrawerV2Props {
   isOpen: boolean;
@@ -1998,23 +1999,79 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     {/* Bill of Materials (Paper & Covers) Table */}
                     <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3 relative">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="p-1.5 bg-blue-50 text-blue-700 rounded-lg">
-                            <BookOpen className="w-4 h-4" />
+                        <div className="flex items-start gap-2.5">
+                          <div className="p-2 bg-[#064E3B] text-white rounded-lg shrink-0 shadow-2xs">
+                            <BookOpen className="w-4 h-4 text-white" />
                           </div>
                           <div>
-                            <h4 className="font-bold text-gray-900 text-xs">Bill of Materials (Paper & Covers)</h4>
-                            <p className="text-[10px] text-gray-400">Enter paper reel consumption and cover board quantities per batch.</p>
+                            <h4 className="font-bold text-gray-900 text-sm">Bill of Materials</h4>
+                            <p className="text-[11px] text-gray-500">
+                              Enter the quantities for one <strong>batch</strong>. Work orders scale consumption by (qty ÷ batch size × units produced).
+                            </p>
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={handleAddBomItem}
-                          className="px-3 py-1.5 border border-emerald-300 text-emerald-700 hover:bg-emerald-50 font-bold rounded-xl text-xs flex items-center gap-1 transition-all cursor-pointer"
-                        >
-                          <Plus className="w-3 h-3" />
-                          <span>Add Material</span>
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <BomCopyPasteControls
+                            getCopyPayload={() => {
+                              if (!bomItems || bomItems.length === 0) return null;
+                              return {
+                                sourceSkuId: editSku?._id,
+                                sourceSkuCode: form.skuCode,
+                                sourceName: form.name || form.skuCode || 'Product',
+                                basis: form.recipeYieldQty || '1',
+                                basisUnit: form.unit || 'Pcs',
+                                lines: bomItems.map(item => ({
+                                  id: item.id,
+                                  name: item.name,
+                                  qty: item.qty,
+                                  uom: item.uom,
+                                  inStock: item.inStock,
+                                  notes: item.notes
+                                }))
+                              };
+                            }}
+                            onPaste={(copied, mode) => {
+                              if (mode === 'replace') {
+                                setBomItems(copied.lines.map((l, i) => ({
+                                  id: `b-paste-${Date.now()}-${i}`,
+                                  name: l.name,
+                                  qty: String(l.qty || ''),
+                                  uom: l.uom || form.unit || 'Kg',
+                                  inStock: l.inStock ?? 0,
+                                  notes: l.notes || ''
+                                })));
+                                if (copied.basis) {
+                                  setForm(prev => ({ ...prev, recipeYieldQty: String(copied.basis) }));
+                                }
+                              } else {
+                                const existingNames = new Set(bomItems.map(i => (i.name || '').toLowerCase().trim()));
+                                const toAdd = copied.lines
+                                  .filter(l => !existingNames.has((l.name || '').toLowerCase().trim()))
+                                  .map((l, i) => ({
+                                    id: `b-merge-${Date.now()}-${i}`,
+                                    name: l.name,
+                                    qty: String(l.qty || ''),
+                                    uom: l.uom || form.unit || 'Kg',
+                                    inStock: l.inStock ?? 0,
+                                    notes: l.notes || ''
+                                  }));
+                                if (bomItems.length === 0 && copied.basis) {
+                                  setForm(prev => ({ ...prev, recipeYieldQty: String(copied.basis) }));
+                                }
+                                setBomItems(prev => [...prev, ...toAdd]);
+                              }
+                            }}
+                            existingCount={bomItems.length}
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAddBomItem}
+                            className="px-3 py-1.5 border border-[#064E3B] text-[#064E3B] hover:bg-emerald-50/40 font-medium rounded-md text-xs flex items-center gap-1 transition-all cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Add Item</span>
+                          </button>
+                        </div>
                       </div>
 
                       {/* Customizable Batch Size Yield Row */}

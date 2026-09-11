@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { 
-  BookOpen, Plus, Search, RefreshCw, Trash2, Edit, Play, X 
+  BookOpen, Plus, Search, RefreshCw, Trash2, Edit, Play, X, Copy 
 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { getSkusV2, SkuV2 } from '../../../api/mfgApiV2';
 import { showToast } from '../../ui/Toast';
 import Modal from '../../ui/Modal';
 import Drawer from '../../ui/Drawer';
+import { BomCopyPasteControls } from '../BomCopyPasteControls';
+import { copyBom } from '../../../utils/bomClipboard';
 
 export interface BomComponent {
   skuId: string;
@@ -364,6 +366,30 @@ const BomRecipeMaster: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-1">
                   <button
+                    onClick={() => {
+                      copyBom({
+                        sourceSkuId: recipe.outputSkuId,
+                        sourceSkuCode: recipe.recipeCode,
+                        sourceName: recipe.name,
+                        basis: recipe.outputQty,
+                        basisUnit: recipe.outputUnit,
+                        lines: recipe.components.map(c => ({
+                          id: c.id,
+                          materialId: c.skuId,
+                          name: c.skuName,
+                          qty: c.quantity,
+                          uom: c.unit,
+                          notes: `Wastage: ${c.wastagePercent}%`
+                        }))
+                      });
+                      showToast(`BOM copied from "${recipe.name}"! Ready to paste.`, 'success');
+                    }}
+                    className="p-1.5 text-gray-400 hover:text-emerald-700 hover:bg-white rounded-lg transition-colors cursor-pointer"
+                    title="Copy BOM recipe"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+                  <button
                     onClick={() => handleOpenEdit(recipe)}
                     className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-white rounded-lg transition-colors cursor-pointer"
                     title="Edit Recipe"
@@ -533,13 +559,83 @@ const BomRecipeMaster: React.FC = () => {
                 <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider">
                   Raw Material Ingredients (Bill of Materials) *
                 </label>
-                <button
-                  type="button"
-                  onClick={handleAddComponentRow}
-                  className="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Add Ingredient
-                </button>
+                <div className="flex items-center gap-2">
+                  <BomCopyPasteControls
+                    getCopyPayload={() => {
+                      if (!form.components || form.components.length === 0) return null;
+                      return {
+                        sourceSkuId: form.outputSkuId,
+                        sourceName: form.name || 'Recipe',
+                        basis: form.outputQty,
+                        basisUnit: form.outputUnit,
+                        lines: form.components.map((c, i) => {
+                          const sel = skus.find(s => s._id === c.skuId);
+                          return {
+                            id: `c-${i}`,
+                            materialId: c.skuId,
+                            name: sel?.name || 'Ingredient',
+                            qty: c.quantity,
+                            uom: c.unit,
+                            notes: `Wastage: ${c.wastagePercent}%`
+                          };
+                        })
+                      };
+                    }}
+                    onPaste={(copied, mode) => {
+                      const resolveSkuId = (matName: string, matId?: string) => {
+                        if (matId && skus.some(s => s._id === matId)) return matId;
+                        const found = skus.find(s => (s.name || '').toLowerCase() === matName.toLowerCase());
+                        return found?._id || skus[0]?._id || '';
+                      };
+
+                      if (mode === 'replace') {
+                        setForm(prev => ({
+                          ...prev,
+                          outputQty: copied.basis ? String(copied.basis) : prev.outputQty,
+                          outputUnit: copied.basisUnit || prev.outputUnit,
+                          components: copied.lines.map(l => {
+                            const skuId = resolveSkuId(l.name, l.materialId);
+                            const sel = skus.find(s => s._id === skuId);
+                            return {
+                              skuId,
+                              quantity: String(l.qty || '1'),
+                              unit: l.uom || sel?.unit || 'KG',
+                              wastagePercent: '0'
+                            };
+                          })
+                        }));
+                      } else {
+                        const existingIds = new Set(form.components.map(c => c.skuId));
+                        const toAdd = copied.lines
+                          .map(l => {
+                            const skuId = resolveSkuId(l.name, l.materialId);
+                            const sel = skus.find(s => s._id === skuId);
+                            return {
+                              skuId,
+                              quantity: String(l.qty || '1'),
+                              unit: l.uom || sel?.unit || 'KG',
+                              wastagePercent: '0'
+                            };
+                          })
+                          .filter(c => !existingIds.has(c.skuId));
+                        
+                        setForm(prev => ({
+                          ...prev,
+                          components: [...prev.components, ...toAdd]
+                        }));
+                      }
+                    }}
+                    existingCount={form.components.length}
+                    onToast={showToast}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddComponentRow}
+                    className="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Ingredient
+                  </button>
+                </div>
               </div>
 
               {form.components.map((comp, idx) => (

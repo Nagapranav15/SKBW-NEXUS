@@ -28,6 +28,8 @@ import {
   BookOpen,
   Scroll,
   Copy,
+  ClipboardPaste,
+  Pencil,
   Ruler,
   Hash,
   ArrowUpDown,
@@ -62,6 +64,8 @@ import { showToast } from '../ui/Toast';
 import * as XLSX from 'xlsx';
 import Modal from '../ui/Modal';
 import { formatSkuName } from '../../utils/skuUtils';
+import { BomCopyPasteControls, MakoroPasteIcon } from './BomCopyPasteControls';
+import { copyBom, useCopiedBom } from '../../utils/bomClipboard';
 
 // Helper to render neat domain icon for items
 const renderItemDomainIcon = (skuItem: SkuV2, currentTab?: string) => {
@@ -278,6 +282,9 @@ const SkuMasterV2: React.FC = () => {
   const [debouncedSearch, setDebouncedSearch] = useState(search);
   const [categoryFilter, setCategoryFilter] = useState('');
   const [statusFilter] = useState('');
+
+  // Global reactive BOM clipboard
+  const copiedBom = useCopiedBom();
 
   // Pagination
   const [page, setPage] = useState(1);
@@ -504,6 +511,138 @@ const SkuMasterV2: React.FC = () => {
       showToast(err.message || 'Failed to save BOM recipe', 'error');
     } finally {
       setIsSavingBom(false);
+    }
+  };
+
+  // Direct paste copied BOM to a single SKU item
+  const handleDirectPasteBomToSku = async (targetSku: SkuV2) => {
+    if (!copiedBom || !targetSku._id) return;
+    try {
+      const existingItems = (targetSku as any).bomItems || [];
+      const existingNames = new Set(existingItems.map((i: any) => (i.name || '').toLowerCase().trim()));
+      const newItems = copiedBom.lines
+        .filter(l => !existingNames.has((l.name || '').toLowerCase().trim()))
+        .map((l, i) => ({
+          id: `b-paste-${Date.now()}-${i}`,
+          name: l.name,
+          qty: l.qty,
+          uom: l.uom,
+          inStock: l.inStock ?? 0,
+          notes: l.notes || ''
+        }));
+      
+      const updatedBomItems = existingItems.length === 0 
+        ? copiedBom.lines.map((l, i) => ({
+            id: `b-paste-${Date.now()}-${i}`,
+            name: l.name,
+            qty: l.qty,
+            uom: l.uom,
+            inStock: l.inStock ?? 0,
+            notes: l.notes || ''
+          }))
+        : [...existingItems, ...newItems];
+
+      const yieldQty = existingItems.length === 0 && copiedBom.basis ? Number(copiedBom.basis) || 1 : ((targetSku as any).recipeYieldQty || 1);
+
+      await updateSkuV2(targetSku._id, {
+        bomItems: updatedBomItems,
+        recipeYieldQty: yieldQty,
+        company: selectedCompany?._id
+      });
+
+      showToast(`Pasted BOM from "${copiedBom.sourceName}" to "${targetSku.name || targetSku.skuCode}"!`, 'success');
+      loadSkus(false);
+    } catch (err: any) {
+      console.error('Failed to paste BOM:', err);
+      showToast(err.message || 'Failed to paste BOM', 'error');
+    }
+  };
+
+  // Batch paste copied BOM to all filtered products without a recipe (Bulk Edit BOM modal)
+  const handleBatchPasteToAllWithoutRecipe = async (targets: SkuV2[]) => {
+    if (!copiedBom || targets.length === 0) return;
+    if (!window.confirm(`Paste BOM from "${copiedBom.sourceName}" (${copiedBom.lines.length} items) to all ${targets.length} products without a recipe?`)) {
+      return;
+    }
+    try {
+      showToast(`Pasting BOM to ${targets.length} products...`, 'info');
+      for (const targetSku of targets) {
+        if (!targetSku._id) continue;
+        const items = copiedBom.lines.map((l, i) => ({
+          id: `b-paste-${Date.now()}-${i}`,
+          name: l.name,
+          qty: l.qty,
+          uom: l.uom,
+          inStock: l.inStock ?? 0,
+          notes: l.notes || ''
+        }));
+        await updateSkuV2(targetSku._id, {
+          bomItems: items,
+          recipeYieldQty: Number(copiedBom.basis) || 1,
+          company: selectedCompany?._id
+        });
+      }
+      showToast(`Successfully pasted BOM to ${targets.length} products!`, 'success');
+      loadSkus(false);
+    } catch (err: any) {
+      console.error('Failed batch paste:', err);
+      showToast('Error pasting BOM to some products', 'error');
+    }
+  };
+
+  // Bulk paste copied BOM to all selected items
+  const handleBulkPasteBom = async () => {
+    if (!copiedBom || selectedIds.length === 0) return;
+    const count = selectedIds.length;
+    if (!window.confirm(`Are you sure you want to paste the BOM from "${copiedBom.sourceName}" (${copiedBom.lines.length} materials) onto ${count} selected items?`)) {
+      return;
+    }
+
+    try {
+      let updatedCount = 0;
+      for (const id of selectedIds) {
+        const sku = skus.find(s => s._id === id);
+        if (!sku) continue;
+        const existingItems = (sku as any).bomItems || [];
+        const existingNames = new Set(existingItems.map((i: any) => (i.name || '').toLowerCase().trim()));
+        const newItems = copiedBom.lines
+          .filter(l => !existingNames.has((l.name || '').toLowerCase().trim()))
+          .map((l, i) => ({
+            id: `b-bulk-paste-${Date.now()}-${i}`,
+            name: l.name,
+            qty: l.qty,
+            uom: l.uom,
+            inStock: l.inStock ?? 0,
+            notes: l.notes || ''
+          }));
+
+        const updatedBomItems = existingItems.length === 0 
+          ? copiedBom.lines.map((l, i) => ({
+              id: `b-bulk-paste-${Date.now()}-${i}`,
+              name: l.name,
+              qty: l.qty,
+              uom: l.uom,
+              inStock: l.inStock ?? 0,
+              notes: l.notes || ''
+            }))
+          : [...existingItems, ...newItems];
+
+        const yieldQty = existingItems.length === 0 && copiedBom.basis ? Number(copiedBom.basis) || 1 : ((sku as any).recipeYieldQty || 1);
+
+        await updateSkuV2(id, {
+          bomItems: updatedBomItems,
+          recipeYieldQty: yieldQty,
+          company: selectedCompany?._id
+        });
+        updatedCount++;
+      }
+
+      showToast(`Successfully pasted BOM to ${updatedCount} items!`, 'success');
+      setSelectedIds([]);
+      loadSkus(false);
+    } catch (err: any) {
+      console.error('Failed bulk paste BOM:', err);
+      showToast('Error applying BOM to some items', 'error');
     }
   };
 
@@ -2320,11 +2459,29 @@ const SkuMasterV2: React.FC = () => {
           {/* Header Control Row (Toolbar matching Makoro Image 2 & 3!) */}
           <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-gray-100 bg-white rounded-t-2xl relative z-30">
             
-            {/* Left Counter */}
-            <div className="flex items-center gap-2">
+            {/* Left Counter & Multi-Select Batch Actions */}
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-bold text-gray-700">
                 Items: <span className="text-blue-600 font-bold">{total}</span>
               </span>
+              {selectedIds.length > 0 && (
+                <div className="flex items-center gap-2 ml-2">
+                  <span className="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-lg">
+                    {selectedIds.length} selected
+                  </span>
+                  {copiedBom && (
+                    <button
+                      type="button"
+                      onClick={handleBulkPasteBom}
+                      className="px-2.5 py-1 text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 rounded-xl flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                      title={`Paste BOM from "${copiedBom.sourceName}" to ${selectedIds.length} selected items`}
+                    >
+                      <ClipboardPaste className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Paste BOM to {selectedIds.length} items</span>
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Right Action Bar (Search + Icon-Only Action Tools + Add Item Button) matching Business Directory */}
@@ -3118,15 +3275,55 @@ const SkuMasterV2: React.FC = () => {
                               const hasBom = isBomApplicable && Array.isArray((sku as any).bomItems) && (sku as any).bomItems.length > 0;
                               return (
                                 <td key="bom" className="py-3 px-3 whitespace-nowrap">
-                                  {hasBom ? (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                      Defined
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                                      Pending
-                                    </span>
-                                  )}
+                                  <div className="flex items-center gap-1.5">
+                                    {hasBom ? (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                        Defined
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                        Pending
+                                      </span>
+                                    )}
+
+                                    {/* Quick Copy BOM */}
+                                    {hasBom && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          copyBom({
+                                            sourceSkuId: sku._id,
+                                            sourceSkuCode: sku.skuCode,
+                                            sourceName: sku.name || sku.skuCode,
+                                            basis: (sku as any).recipeYieldQty || 1,
+                                            basisUnit: sku.unit || 'Pcs',
+                                            lines: (sku as any).bomItems || []
+                                          });
+                                          showToast(`BOM copied from "${sku.name || sku.skuCode}" (${(sku as any).bomItems?.length} items)! Ready to paste.`, 'success');
+                                        }}
+                                        className="p-1 text-gray-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-md transition-all cursor-pointer"
+                                        title={`Copy BOM from ${sku.name || sku.skuCode}`}
+                                      >
+                                        <Copy className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+
+                                    {/* Quick Paste BOM if clipboard has copied recipe */}
+                                    {copiedBom && isBomApplicable && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDirectPasteBomToSku(sku);
+                                        }}
+                                        className="p-1 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-100 rounded-md transition-all cursor-pointer"
+                                        title={`Paste BOM from "${copiedBom.sourceName}" to this product`}
+                                      >
+                                        <ClipboardPaste className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </td>
                               );
                             case 'openingStock':
@@ -4150,29 +4347,93 @@ const SkuMasterV2: React.FC = () => {
                       </span>
                     </div>
 
-                    {/* Header row */}
+                    {/* Header row matching Makoro Screenshot media_1789142185429.png */}
                     <div className="flex items-center justify-between">
-                      <div className="flex items-start gap-2">
-                        <div className="p-2 bg-blue-100 text-blue-700 rounded-xl">
-                          <ClipboardList className="w-4 h-4" />
+                      <div className="flex items-start gap-2.5">
+                        <div className="p-2 bg-[#064E3B] text-white rounded-lg shrink-0 shadow-2xs">
+                          <ClipboardList className="w-4 h-4 text-white" />
                         </div>
                         <div>
-                          <h4 className="font-bold text-gray-900 text-xs">Bill of Materials (Paper & Covers)</h4>
-                          <p className="text-[11px] text-gray-400">Enter paper reel consumption and cover board quantities per batch.</p>
+                          <h4 className="font-bold text-gray-900 text-sm">Bill of Materials</h4>
+                          <p className="text-[11px] text-gray-500">
+                            Enter the quantities for one <strong>batch</strong>. Work orders scale consumption by (qty ÷ batch size × units produced).
+                          </p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-2">
                         <button 
-                          onClick={handleAddBomItem}
-                          className="px-3 py-1.5 border border-emerald-600 text-emerald-700 hover:bg-emerald-50 font-semibold rounded-lg text-xs shadow-2xs flex items-center gap-1 cursor-pointer"
+                          type="button"
+                          onClick={() => showToast('Manage BOM categories', 'info')}
+                          className="px-3 py-1.5 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 font-medium rounded-md text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
                         >
-                          <Plus className="w-3.5 h-3.5" /> Add Material
+                          <Folder className="w-3.5 h-3.5 text-gray-500" /> Category
+                        </button>
+
+                        <BomCopyPasteControls
+                          getCopyPayload={() => {
+                            if (!bomRecipeItems || bomRecipeItems.length === 0) return null;
+                            return {
+                              sourceSkuId: selectedSkuDetails?._id,
+                              sourceSkuCode: selectedSkuDetails?.skuCode,
+                              sourceName: selectedSkuDetails?.name || selectedSkuDetails?.skuCode || 'Product',
+                              basis: recipeYieldQty,
+                              basisUnit: selectedSkuDetails?.unit || 'Pcs',
+                              lines: bomRecipeItems.map(item => ({
+                                id: item.id,
+                                name: item.name,
+                                qty: item.qty,
+                                uom: item.uom,
+                                inStock: item.inStock,
+                                notes: item.notes
+                              }))
+                            };
+                          }}
+                          onPaste={(copied, mode) => {
+                            if (mode === 'replace') {
+                              setBomRecipeItems(copied.lines.map((l, i) => ({
+                                id: `b-paste-${Date.now()}-${i}`,
+                                name: l.name,
+                                qty: l.qty,
+                                uom: l.uom,
+                                inStock: l.inStock ?? 0,
+                                notes: l.notes || ''
+                              })));
+                              if (copied.basis) setRecipeYieldQty(String(copied.basis));
+                            } else {
+                              const existingNames = new Set(bomRecipeItems.map(i => (i.name || '').toLowerCase().trim()));
+                              const toAdd = copied.lines
+                                .filter(l => !existingNames.has((l.name || '').toLowerCase().trim()))
+                                .map((l, i) => ({
+                                  id: `b-merge-${Date.now()}-${i}`,
+                                  name: l.name,
+                                  qty: l.qty,
+                                  uom: l.uom,
+                                  inStock: l.inStock ?? 0,
+                                  notes: l.notes || ''
+                                }));
+                              if (bomRecipeItems.length === 0 && copied.basis) {
+                                setRecipeYieldQty(String(copied.basis));
+                              }
+                              setBomRecipeItems(prev => [...prev, ...toAdd]);
+                            }
+                          }}
+                          existingCount={bomRecipeItems.length}
+                          sourceLabel={selectedSkuDetails?.name}
+                          onToast={showToast}
+                        />
+
+                        <button 
+                          onClick={handleAddBomItem}
+                          className="px-3.5 py-1.5 border border-[#064E3B] text-[#064E3B] hover:bg-emerald-50/40 font-medium rounded-md text-xs flex items-center gap-1 cursor-pointer transition-all shadow-2xs"
+                        >
+                          <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> Add Item
                         </button>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
+                    {/* Recipe Yield Box matching Makoro media_1789142185429.png */}
+                    <div className="border border-gray-200 rounded-lg p-2.5 px-3.5 text-xs text-gray-600 font-medium flex items-center gap-2 bg-white">
                       <span>This recipe makes</span>
                       <input
                         type="number"
@@ -4180,96 +4441,141 @@ const SkuMasterV2: React.FC = () => {
                         placeholder="1"
                         value={recipeYieldQty}
                         onChange={(e) => setRecipeYieldQty(e.target.value)}
-                        className="w-16 px-2 py-0.5 border border-blue-300 rounded-md text-xs font-extrabold text-blue-700 text-center focus:ring-2 focus:ring-blue-500 bg-blue-50/60"
+                        className="w-14 px-1.5 py-0.5 border border-gray-300 rounded font-bold text-gray-900 text-center focus:ring-1 focus:ring-[#064E3B]"
                       />
-                      <span className="font-bold text-gray-700">{selectedSkuDetails?.unit || 'Pcs'}</span>
-                      <span className="italic text-gray-400">(use 1 for per-unit quantities)</span>
+                      <strong className="text-gray-900">{selectedSkuDetails?.unit || 'Pcs'}</strong>
+                      <Pencil className="w-3.5 h-3.5 text-gray-400" />
+                      <span className="text-gray-400 font-normal">(use 1 for per-unit quantities)</span>
                     </div>
 
-                    {/* Recipe Items Table */}
-                    <div className="border border-gray-200 rounded-xl shadow-2xs relative">
-                      <table className="w-full text-left text-xs">
-                        <thead className="bg-gray-50 text-gray-500 font-bold uppercase text-[10px]">
+                    {/* Recipe Items Table matching Makoro media_1789142185429.png */}
+                    <div className="border border-gray-200 rounded-xl overflow-x-auto shadow-2xs bg-white">
+                      <table className="w-full text-left text-xs border-collapse min-w-[640px]">
+                        <thead className="bg-gray-50/80 text-gray-500 font-bold text-[11px] border-b border-gray-200">
                           <tr>
-                            <th className="py-2.5 px-3">Item</th>
-                            <th className="py-2.5 px-3">Qty</th>
-                            <th className="py-2.5 px-3">UoM</th>
-                            <th className="py-2.5 px-3">In Stock</th>
-                            <th className="py-2.5 px-3">Notes</th>
-                            <th className="py-2.5 px-3 text-right"></th>
+                            <th className="py-2.5 px-3 min-w-[200px]">Item</th>
+                            <th className="py-2.5 px-3 text-center w-20">Qty</th>
+                            <th className="py-2.5 px-3 w-16">UoM</th>
+                            <th className="py-2.5 px-3 w-20">In Stock</th>
+                            <th className="py-2.5 px-3 w-20 font-bold">Runs</th>
+                            <th className="py-2.5 px-3 min-w-[160px]">Notes</th>
+                            <th className="py-2.5 px-3 text-right w-10"></th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 text-gray-800">
-                          {bomRecipeItems.map((b) => (
-                            <tr key={b.id}>
-                              <td className="py-2 px-3">
-                                <SearchableMaterialDropdown
-                                  value={b.name}
-                                  materials={rawAndSemiMaterials}
-                                  onChange={(selectedName, matchedSku) => {
-                                    setBomRecipeItems(prev => prev.map(item => {
-                                      if (item.id === b.id) {
-                                        return {
-                                          ...item,
-                                          name: selectedName,
-                                          uom: matchedSku?.unit || item.uom || 'Kg',
-                                          inStock: (matchedSku as any)?.openingStock ?? item.inStock ?? 0
-                                        };
-                                      }
-                                      return item;
-                                    }));
-                                  }}
-                                />
-                              </td>
-                              <td className="py-2 px-3 w-24">
-                                <input
-                                  type="number"
-                                  step="any"
-                                  placeholder="Qty"
-                                  value={b.qty === 0 || b.qty === undefined ? '' : b.qty}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setBomRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, qty: val === '' ? ('' as any) : Number(val) } : item));
-                                  }}
-                                  className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs font-semibold text-center focus:outline-none focus:border-blue-500"
-                                />
-                              </td>
-                              <td className="py-2 px-3 text-gray-500 font-medium">{b.uom}</td>
-                              <td className="py-2 px-3 text-gray-500 font-mono">{b.inStock}</td>
-                              <td className="py-2 px-3">
-                                <input
-                                  type="text"
-                                  placeholder="Optional"
-                                  value={b.notes || ''}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setBomRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, notes: val } : item));
-                                  }}
-                                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1 text-xs text-gray-600 focus:outline-none focus:border-blue-500"
-                                />
-                              </td>
-                              <td className="py-2 px-3 text-right">
-                                <button
-                                  onClick={() => handleDeleteBomItem(b.id)}
-                                  className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-md transition-all cursor-pointer"
-                                  title="Remove ingredient"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
+                          {bomRecipeItems.map((b) => {
+                            const qtyNum = Number(b.qty);
+                            const inStockNum = Number(b.inStock) || 0;
+                            const runs = (qtyNum > 0) ? Math.floor(inStockNum / qtyNum) : null;
+
+                            return (
+                              <tr key={b.id} className="hover:bg-gray-50/50">
+                                <td className="py-2 px-3">
+                                  <div className="relative">
+                                    <input
+                                      type="text"
+                                      list={`item-materials-${b.id}`}
+                                      value={b.name}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        const matched = rawAndSemiMaterials.find(m => (m.name || '').toLowerCase() === val.toLowerCase());
+                                        setBomRecipeItems(prev => prev.map(item => {
+                                          if (item.id === b.id) {
+                                            return {
+                                              ...item,
+                                              name: val,
+                                              uom: matched?.unit || item.uom || 'Kg',
+                                              inStock: (matched as any)?.openingStock ?? item.inStock ?? 0
+                                            };
+                                          }
+                                          return item;
+                                        }));
+                                      }}
+                                      placeholder="Material name..."
+                                      className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-gray-800 focus:outline-none focus:border-[#064E3B] bg-white"
+                                    />
+                                    <datalist id={`item-materials-${b.id}`}>
+                                      {rawAndSemiMaterials.map((m) => (
+                                        <option key={m._id} value={m.name}>
+                                          {m.skuCode} ({m.unit || 'Kg'})
+                                        </option>
+                                      ))}
+                                    </datalist>
+                                  </div>
+                                </td>
+                                <td className="py-2 px-3 text-center w-20">
+                                  <input
+                                    type="number"
+                                    step="any"
+                                    placeholder="Qty"
+                                    value={b.qty === 0 || b.qty === undefined ? '' : b.qty}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setBomRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, qty: val === '' ? ('' as any) : Number(val) } : item));
+                                    }}
+                                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-semibold text-center focus:outline-none focus:border-[#064E3B]"
+                                  />
+                                </td>
+                                <td className="py-2 px-3 text-gray-600 font-medium whitespace-nowrap w-16">{b.uom}</td>
+                                <td className="py-2 px-3 text-gray-600 font-mono whitespace-nowrap w-20">{b.inStock ?? 0}</td>
+                                <td className="py-2 px-3 font-bold text-gray-900 whitespace-nowrap w-20">
+                                  {runs !== null ? runs.toLocaleString() : '—'}
+                                </td>
+                                <td className="py-2 px-3 min-w-[160px]">
+                                  <input
+                                    type="text"
+                                    placeholder="Optional"
+                                    value={b.notes || ''}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setBomRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, notes: val } : item));
+                                    }}
+                                    className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-600 focus:outline-none focus:border-[#064E3B]"
+                                  />
+                                </td>
+                                <td className="py-2 px-3 text-right w-10">
+                                  <button
+                                    onClick={() => handleDeleteBomItem(b.id)}
+                                    className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-md transition-all cursor-pointer"
+                                    title="Remove material"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
-                      <div className="p-2.5 bg-gray-50 border-t border-gray-100 text-gray-500 font-semibold text-[11px] flex items-center justify-between">
-                        <span>Items: {bomRecipeItems.length} materials</span>
+
+                      {/* Bottom Summary Bar matching Makoro media_1789142185429.png */}
+                      <div className="p-3 bg-white border-t border-gray-100 flex items-center justify-between">
+                        <div className="flex items-center gap-10 text-xs">
+                          <div>
+                            <div className="text-[11px] text-gray-400 font-medium">Items</div>
+                            <div className="text-sm font-bold text-gray-900">{bomRecipeItems.length} items</div>
+                          </div>
+                          <div>
+                            <div className="text-[11px] text-gray-400 font-medium">Can make</div>
+                            <div className="text-sm font-bold text-gray-900">
+                              {(() => {
+                                const validRuns = bomRecipeItems
+                                  .map(b => (b.qty && Number(b.qty) > 0) ? Math.floor((Number(b.inStock) || 0) / Number(b.qty)) : null)
+                                  .filter((v): v is number => v !== null);
+                                if (validRuns.length === 0) return '—';
+                                return `${Math.min(...validRuns).toLocaleString()} units`;
+                              })()}
+                            </div>
+                          </div>
+                        </div>
+
                         <button
                           onClick={handleSaveBomRecipe}
                           disabled={isSavingBom}
-                          className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                          className="px-4 py-1.5 bg-[#064E3B] hover:bg-[#0B6B63] text-white font-medium rounded-md text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer disabled:opacity-50"
                         >
                           {isSavingBom ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                          <span>Save BOM Recipe</span>
+                          <span>Save recipe</span>
                         </button>
                       </div>
                     </div>
@@ -5059,7 +5365,56 @@ const SkuMasterV2: React.FC = () => {
                   </label>
                 </div>
 
-                {/* Product List */}
+                {/* Product List with Quick Copy/Paste on Hover & Clipboard Banner */}
+                {copiedBom && (
+                  <div className="p-2.5 bg-emerald-50/90 border border-emerald-200 rounded-xl flex flex-col gap-2 text-xs shrink-0 shadow-2xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">BOM in Clipboard</span>
+                        <span className="text-xs font-bold text-gray-800 truncate block" title={copiedBom.sourceName}>
+                          {copiedBom.sourceName} ({copiedBom.lines.length} items)
+                        </span>
+                      </div>
+                      {activeBomProduct && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await handleDirectPasteBomToSku(activeBomProduct);
+                            setActiveRecipeItems(copiedBom.lines.map((l, i) => ({
+                              id: `b-build-paste-${Date.now()}-${i}`,
+                              name: l.name,
+                              qty: Number(l.qty) || 1,
+                              uom: l.uom,
+                              inStock: l.inStock ?? 500,
+                              notes: l.notes || ''
+                            })));
+                            if (copiedBom.basis) setBuildBatchYieldQty(String(copiedBom.basis));
+                          }}
+                          className="px-2.5 py-1 bg-[#064E3B] hover:bg-[#0B6B63] text-white rounded-md text-[11px] font-medium shrink-0 cursor-pointer shadow-2xs transition-all"
+                        >
+                          Paste to Active
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Bulk Action: Paste to all products without a recipe! */}
+                    {(() => {
+                      const noRecipeProducts = filteredBuildProducts.filter(p => !(p as any).bomItems || (p as any).bomItems.length === 0);
+                      if (noRecipeProducts.length === 0) return null;
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => handleBatchPasteToAllWithoutRecipe(noRecipeProducts)}
+                          className="w-full py-1.5 px-2 bg-white hover:bg-emerald-100/70 border border-emerald-300 text-emerald-900 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-all"
+                        >
+                          <MakoroPasteIcon className="w-3.5 h-3.5 text-[#064E3B]" />
+                          <span>Paste to all {noRecipeProducts.length} without recipe</span>
+                        </button>
+                      );
+                    })()}
+                  </div>
+                )}
+
                 <div className="flex-1 overflow-y-auto space-y-1 pr-1">
                   {filteredBuildProducts.map((prod) => {
                     const hasRecipe = (prod as any).bomItems && (prod as any).bomItems.length > 0;
@@ -5069,27 +5424,92 @@ const SkuMasterV2: React.FC = () => {
                       <div
                         key={prod._id}
                         onClick={() => handleSelectBomProduct(prod)}
-                        className={`p-2.5 rounded-xl cursor-pointer transition-all flex items-start gap-2.5 border ${
+                        className={`p-2.5 rounded-xl cursor-pointer transition-all flex items-center justify-between border group/item ${
                           isSelected
                             ? 'bg-emerald-50/80 border-emerald-300 shadow-2xs'
                             : 'bg-white border-transparent hover:bg-gray-100/80 hover:border-gray-200'
                         }`}
                       >
-                        <div className="mt-0.5 shrink-0">
-                          {hasRecipe ? (
-                            <div className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-[10px]">
-                              ✓
-                            </div>
-                          ) : (
-                            <div className="w-4 h-4 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-[10px]">
-                              !
-                            </div>
-                          )}
+                        <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                          <div className="mt-0.5 shrink-0">
+                            {hasRecipe ? (
+                              <div className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-[10px]">
+                                ✓
+                              </div>
+                            ) : (
+                              <div className="w-4 h-4 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-[10px]">
+                                !
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="font-bold text-xs text-gray-900 truncate">{prod.name}</div>
+                            <div className="text-[10px] text-gray-400 font-mono">{prod.skuCode}</div>
+                          </div>
                         </div>
 
-                        <div className="min-w-0 flex-1">
-                          <div className="font-bold text-xs text-gray-900 truncate">{prod.name}</div>
-                          <div className="text-[10px] text-gray-400 font-mono">{prod.skuCode}</div>
+                        {/* Quick Copy / Paste Icons for this product in the list matching Makoro style */}
+                        <div className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                          {hasRecipe && (
+                            <div className="relative group/copy">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  copyBom({
+                                    sourceSkuId: prod._id,
+                                    sourceSkuCode: prod.skuCode,
+                                    sourceName: prod.name || prod.skuCode,
+                                    basis: (prod as any).recipeYieldQty || 1,
+                                    basisUnit: prod.unit || 'Pcs',
+                                    lines: (prod as any).bomItems || []
+                                  });
+                                  showToast(`BOM copied from "${prod.name || prod.skuCode}"! Ready to paste.`, 'success');
+                                }}
+                                className="h-6 w-6 rounded border border-gray-200 bg-white text-[#0B6B63] hover:border-[#0B6B63] flex items-center justify-center shadow-2xs transition-all cursor-pointer"
+                                aria-label="Copy BOM"
+                              >
+                                <Copy className="w-3 h-3 text-[#0B6B63]" />
+                              </button>
+                              <div className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1 hidden group-hover/copy:block z-50 whitespace-nowrap">
+                                <div className="bg-[#323842] text-white text-[11px] font-normal px-2.5 py-1 rounded-md shadow-xl">
+                                  Copy this BOM
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          {copiedBom && (
+                            <div className="relative group/paste">
+                              <button
+                                type="button"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  await handleDirectPasteBomToSku(prod);
+                                  if (activeBomProduct?._id === prod._id) {
+                                    setActiveRecipeItems(copiedBom.lines.map((l, i) => ({
+                                      id: `b-build-paste-${Date.now()}-${i}`,
+                                      name: l.name,
+                                      qty: Number(l.qty) || 1,
+                                      uom: l.uom,
+                                      inStock: l.inStock ?? 500,
+                                      notes: l.notes || ''
+                                    })));
+                                    if (copiedBom.basis) setBuildBatchYieldQty(String(copiedBom.basis));
+                                  }
+                                }}
+                                className="h-6 w-6 rounded border border-gray-200 bg-white text-[#0B6B63] hover:border-[#0B6B63] flex items-center justify-center shadow-2xs transition-all cursor-pointer"
+                                aria-label="Paste BOM"
+                              >
+                                <MakoroPasteIcon className="w-3 h-3 text-[#0B6B63]" />
+                              </button>
+                              <div className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1 hidden group-hover/paste:block z-50 whitespace-nowrap">
+                                <div className="bg-[#323842] text-white text-[11px] font-normal px-2.5 py-1 rounded-md shadow-xl">
+                                  Paste BOM into this product
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -5115,10 +5535,62 @@ const SkuMasterV2: React.FC = () => {
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
+                        <BomCopyPasteControls
+                          getCopyPayload={() => {
+                            if (!activeRecipeItems || activeRecipeItems.length === 0) return null;
+                            return {
+                              sourceSkuId: activeBomProduct?._id,
+                              sourceSkuCode: activeBomProduct?.skuCode,
+                              sourceName: activeBomProduct?.name || activeBomProduct?.skuCode || 'Product',
+                              basis: buildBatchYieldQty,
+                              basisUnit: activeBomProduct?.unit || 'Pcs',
+                              lines: activeRecipeItems.map(item => ({
+                                id: item.id,
+                                name: item.name,
+                                qty: item.qty,
+                                uom: item.uom,
+                                inStock: item.inStock,
+                                notes: item.notes
+                              }))
+                            };
+                          }}
+                          onPaste={(copied, mode) => {
+                            if (mode === 'replace') {
+                              setActiveRecipeItems(copied.lines.map((l, i) => ({
+                                id: `b-build-paste-${Date.now()}-${i}`,
+                                name: l.name,
+                                qty: Number(l.qty) || 1,
+                                uom: l.uom,
+                                inStock: l.inStock ?? 500,
+                                notes: l.notes || ''
+                              })));
+                              if (copied.basis) setBuildBatchYieldQty(String(copied.basis));
+                            } else {
+                              const existingNames = new Set(activeRecipeItems.map(i => (i.name || '').toLowerCase().trim()));
+                              const toAdd = copied.lines
+                                .filter(l => !existingNames.has((l.name || '').toLowerCase().trim()))
+                                .map((l, i) => ({
+                                  id: `b-build-merge-${Date.now()}-${i}`,
+                                  name: l.name,
+                                  qty: Number(l.qty) || 1,
+                                  uom: l.uom,
+                                  inStock: l.inStock ?? 500,
+                                  notes: l.notes || ''
+                                }));
+                              if (activeRecipeItems.length === 0 && copied.basis) {
+                                setBuildBatchYieldQty(String(copied.basis));
+                              }
+                              setActiveRecipeItems(prev => [...prev, ...toAdd]);
+                            }
+                          }}
+                          existingCount={activeRecipeItems.length}
+                          sourceLabel={activeBomProduct?.name}
+                          onToast={showToast}
+                        />
                         <button
                           onClick={handleSaveBuildBomRecipe}
                           disabled={isSavingBuildBom}
-                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          className="px-3.5 py-1.5 bg-[#064E3B] hover:bg-[#0B6B63] text-white font-medium rounded-md text-xs shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                         >
                           {isSavingBuildBom ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                           <span>Save recipe</span>
@@ -5168,67 +5640,118 @@ const SkuMasterV2: React.FC = () => {
                       />
                     </div>
 
-                    {/* Draggable Recipe Items List */}
-                    <div className="flex-1 overflow-y-auto space-y-2 pr-1 border border-gray-100 rounded-xl p-2 bg-gray-50/20">
-                      {activeRecipeItems.map((b) => (
-                        <div
-                          key={b.id}
-                          className="p-2 bg-white border border-gray-200 rounded-xl shadow-2xs flex items-center gap-2 text-xs"
-                        >
-                          <span className="text-gray-400 font-bold select-none cursor-grab text-[11px]">⋮⋮</span>
-
-                          <div className="flex-1 font-semibold text-gray-800 text-xs truncate">
-                            {b.name}
-                          </div>
-
-                          <div className="w-20">
-                            <input
-                              type="number"
-                              step="any"
-                              value={b.qty}
-                              onChange={(e) => {
-                                const val = Number(e.target.value);
-                                setActiveRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, qty: val } : item));
-                              }}
-                              className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs font-semibold text-center focus:outline-none focus:border-blue-500"
-                            />
-                          </div>
-
-                          <span className="text-gray-500 font-medium text-[11px] w-8">{b.uom}</span>
-
-                          <span className="text-gray-400 font-mono text-[10px] w-12 text-center">{b.inStock}</span>
-
-                          <div className="w-28">
-                            <input
-                              type="text"
-                              placeholder="Notes"
-                              value={b.notes || ''}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setActiveRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, notes: val } : item));
-                              }}
-                              className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-600 focus:outline-none focus:border-blue-500"
-                            />
-                          </div>
-
-                          <button
-                            onClick={() => setActiveRecipeItems(prev => prev.filter(item => item.id !== b.id))}
-                            className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-md transition-all cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                    {/* Draggable Recipe Items List with Runs calculation */}
+                    <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 border border-gray-100 rounded-xl p-2 bg-gray-50/20">
+                      {activeRecipeItems.length > 0 && (
+                        <div className="flex items-center gap-2 px-2 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                          <span className="w-4"></span>
+                          <span className="flex-1">Material</span>
+                          <span className="w-20 text-center">Qty</span>
+                          <span className="w-8">UoM</span>
+                          <span className="w-12 text-center">In Stock</span>
+                          <span className="w-14 text-center">Runs</span>
+                          <span className="w-28">Notes</span>
+                          <span className="w-6"></span>
                         </div>
-                      ))}
+                      )}
+
+                      {activeRecipeItems.map((b) => {
+                        const qtyNum = Number(b.qty);
+                        const inStockNum = Number(b.inStock) || 0;
+                        const runs = (qtyNum > 0) ? Math.floor(inStockNum / qtyNum) : null;
+
+                        return (
+                          <div
+                            key={b.id}
+                            className="p-2 bg-white border border-gray-200 rounded-xl shadow-2xs flex items-center gap-2 text-xs hover:border-gray-300 transition-colors"
+                          >
+                            <span className="text-gray-400 font-bold select-none cursor-grab text-[11px] w-4">⋮⋮</span>
+
+                            <div className="flex-1 font-semibold text-gray-800 text-xs truncate" title={b.name}>
+                              {b.name}
+                            </div>
+
+                            <div className="w-20">
+                              <input
+                                type="number"
+                                step="any"
+                                value={b.qty}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value);
+                                  setActiveRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, qty: val } : item));
+                                }}
+                                className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs font-semibold text-center focus:outline-none focus:border-[#064E3B]"
+                              />
+                            </div>
+
+                            <span className="text-gray-500 font-medium text-[11px] w-8">{b.uom}</span>
+
+                            <span className="text-gray-400 font-mono text-[10px] w-12 text-center">{b.inStock}</span>
+
+                            <span className="text-gray-900 font-bold text-[11px] w-14 text-center">
+                              {runs !== null ? runs.toLocaleString() : '—'}
+                            </span>
+
+                            <div className="w-28">
+                              <input
+                                type="text"
+                                placeholder="Notes"
+                                value={b.notes || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setActiveRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, notes: val } : item));
+                                }}
+                                className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-600 focus:outline-none focus:border-[#064E3B]"
+                              />
+                            </div>
+
+                            <button
+                              onClick={() => setActiveRecipeItems(prev => prev.filter(item => item.id !== b.id))}
+                              className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-md transition-all cursor-pointer w-6 flex items-center justify-center"
+                              title="Remove material"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        );
+                      })}
 
                       {activeRecipeItems.length === 0 && (
                         <div className="p-8 text-center text-xs text-gray-400 italic">
-                          No material ingredients added to recipe yet. Select from right catalog or use search box above!
+                          No material ingredients added to recipe yet. Paste a BOM or select from the right catalog!
                         </div>
                       )}
                     </div>
 
-                    <div className="text-[11px] font-semibold text-gray-400">
-                      {activeRecipeItems.length} items
+                    {/* Bottom Summary Bar matching Makoro style */}
+                    <div className="p-2.5 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between shadow-2xs shrink-0">
+                      <div className="flex items-center gap-8 text-xs">
+                        <div>
+                          <div className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">Items</div>
+                          <div className="text-xs font-bold text-gray-900">{activeRecipeItems.length} items</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">Can make</div>
+                          <div className="text-xs font-bold text-gray-900">
+                            {(() => {
+                              const validRuns = activeRecipeItems
+                                .map(b => (b.qty && Number(b.qty) > 0) ? Math.floor((Number(b.inStock) || 0) / Number(b.qty)) : null)
+                                .filter((v): v is number => v !== null);
+                              if (validRuns.length === 0) return '—';
+                              return `${Math.min(...validRuns).toLocaleString()} units`;
+                            })()}
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={handleSaveBuildBomRecipe}
+                        disabled={isSavingBuildBom}
+                        className="px-3.5 py-1.5 bg-[#064E3B] hover:bg-[#0B6B63] text-white font-medium rounded-md text-xs shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        {isSavingBuildBom ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                        <span>Save recipe</span>
+                      </button>
                     </div>
                   </>
                 ) : (
