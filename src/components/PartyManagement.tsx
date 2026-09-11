@@ -24,9 +24,9 @@ import {
 } from '../api/routeApi';
 import { getActivityLogs } from '../api/activityLogApi';
 
-const WhatsAppIcon: React.FC = () => (
+const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = "w-4 h-4 text-emerald-500 hover:text-emerald-600 transition-all duration-300 transform hover:scale-125 inline-flex items-center justify-center shrink-0 cursor-pointer" }) => (
   <svg 
-    className="w-5 h-5 text-emerald-500 hover:text-emerald-600 transition-all duration-300 transform hover:scale-125 hover:rotate-[12deg] active:scale-95 inline-block align-middle ml-1.5 cursor-pointer shrink-0 filter hover:drop-shadow-[0_0_5px_rgba(16,185,129,0.65)]" 
+    className={className} 
     viewBox="0 0 24 24" 
     fill="currentColor"
     aria-label="Chat on WhatsApp"

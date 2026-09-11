@@ -128,9 +128,9 @@ const TagInput: React.FC<TagInputProps> = ({ tags = [], onChange, placeholder = 
   );
 };
 
-const WhatsAppIcon: React.FC = () => (
+const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = "w-4 h-4 text-emerald-500 hover:text-emerald-600 transition-all duration-300 transform hover:scale-125 block shrink-0" }) => (
   <svg 
-    className="w-4 h-4 text-emerald-500 hover:text-emerald-600 transition-all duration-300 transform hover:scale-125 inline-block align-middle cursor-pointer shrink-0" 
+    className={className} 
     viewBox="0 0 24 24" 
     fill="currentColor"
   >
@@ -2388,10 +2388,10 @@ export const BusinessDirectoryV2: React.FC = () => {
                           )}
                           {!hiddenColumns['phone'] && (
                             <td className="py-3 px-3 font-mono font-medium text-gray-700">
-                              <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                                <span>{item.phone || '—'}</span>
+                              <div className="flex items-center gap-1.5 leading-none" onClick={(e) => e.stopPropagation()}>
+                                <span className="leading-none">{item.phone || '—'}</span>
                                 {item.phone && item.phone.length >= 10 && (
-                                  <a href={`https://wa.me/91${item.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="Chat on WhatsApp">
+                                  <a href={`https://wa.me/91${item.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="Chat on WhatsApp" className="inline-flex items-center justify-center shrink-0 text-emerald-500 hover:text-emerald-600 transition-transform hover:scale-110">
                                     <WhatsAppIcon />
                                   </a>
                                 )}
@@ -2513,10 +2513,10 @@ export const BusinessDirectoryV2: React.FC = () => {
                             <span className="font-bold text-gray-900">{item.firmName || item.contactName || item.name}</span>
                           </td>
                           <td className="py-3 px-3 font-mono text-gray-700">
-                            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                              <span className={item.phone ? "font-bold text-blue-600" : "text-gray-400 font-normal"}>{item.phone || '—'}</span>
+                            <div className="flex items-center gap-1.5 leading-none" onClick={(e) => e.stopPropagation()}>
+                              <span className={item.phone ? "font-bold text-blue-600 leading-none" : "text-gray-400 font-normal leading-none"}>{item.phone || '—'}</span>
                               {item.phone && item.phone.length >= 10 && (
-                                <a href={`https://wa.me/91${item.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="Chat on WhatsApp">
+                                <a href={`https://wa.me/91${item.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="Chat on WhatsApp" className="inline-flex items-center justify-center shrink-0 text-emerald-500 hover:text-emerald-600 transition-transform hover:scale-110">
                                   <WhatsAppIcon />
                                 </a>
                               )}
@@ -2557,13 +2557,13 @@ export const BusinessDirectoryV2: React.FC = () => {
                             <span className="font-bold text-gray-900">{item.firmName || item.name}</span>
                           </td>
                           <td className="py-3 px-3 font-mono font-medium">
-                            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center gap-1.5 leading-none" onClick={(e) => e.stopPropagation()}>
                               {item.phone || item.contactPersons?.[0]?.phone ? (
-                                <span className="font-bold text-blue-600 font-mono">
+                                <span className="font-bold text-blue-600 font-mono leading-none">
                                   {item.phone || item.contactPersons?.[0]?.phone}
                                 </span>
                               ) : (
-                                <span className="text-gray-400 font-normal">—</span>
+                                <span className="text-gray-400 font-normal leading-none">—</span>
                               )}
                               {(item.phone || item.contactPersons?.[0]?.phone) && (
                                 <a
@@ -2571,7 +2571,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                   target="_blank"
                                   rel="noreferrer"
                                   title="Chat on WhatsApp"
-                                  className="inline-flex items-center"
+                                  className="inline-flex items-center justify-center shrink-0 text-emerald-500 hover:text-emerald-600 transition-transform hover:scale-110"
                                 >
                                   <WhatsAppIcon />
                                 </a>
@@ -4312,6 +4312,14 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 <div className="col-span-2">
                                   <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Address Line 1</span>
                                   <span className="font-bold text-gray-900 text-xs">{selectedDetails.address1 || selectedDetails.address || '—'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Area / Locality</span>
+                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.area || selectedDetails.locality || '—'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Landmark</span>
+                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.landmark || '—'}</span>
                                 </div>
                                 <div>
                                   <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">City / Town</span>
