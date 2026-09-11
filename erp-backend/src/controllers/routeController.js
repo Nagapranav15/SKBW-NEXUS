@@ -59,75 +59,67 @@ exports.getRoutes = async (req, res) => {
 
     const routes = await Route.find(filter).sort(sortObj).lean();
 
-    const rNames = routes.map(r => r.name).filter(Boolean);
-    const escapeRegex = (str) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-    const routeMatchRegexes = rNames.map(name => new RegExp('^' + escapeRegex(name) + '$', 'i'));
-    const marketMatch = {
-      type: 'market',
-      isDeleted: { $ne: true },
-      route: { $in: routeMatchRegexes }
-    };
-    const customerMatch = {
-      type: 'customer',
-      isDeleted: { $ne: true },
-      route: { $in: routeMatchRegexes }
-    };
+    const marketQuery = { type: 'market', isDeleted: { $ne: true } };
+    const customerQuery = { type: 'customer', isDeleted: { $ne: true } };
     if (companyId) {
-      try {
-        const companyObjectId = new (require('mongoose').Types.ObjectId)(companyId);
-        marketMatch.company = companyObjectId;
-        customerMatch.company = companyObjectId;
-      } catch (e) {
-        console.error("Invalid company ID in getRoutes:", companyId);
+      marketQuery.company = companyId;
+      customerQuery.company = companyId;
+    }
+
+    const [allMarkets, allCustomers] = await Promise.all([
+      Party.find(marketQuery).select('firmName name route code agentAssigned').lean(),
+      Party.find(customerQuery).select('firmName name city assignedMarket route outstandingBalance outstanding').lean()
+    ]);
+
+    // Backfill missing route fields on customer documents based on their city
+    const marketRouteMap = {};
+    allMarkets.forEach(m => {
+      const cName = (m.firmName || m.name || '').toLowerCase().trim();
+      if (cName && m.route) {
+        marketRouteMap[cName] = m.route;
+      }
+    });
+
+    const unassignedCustomers = allCustomers.filter(c => !c.route && (c.city || c.assignedMarket));
+    if (unassignedCustomers.length > 0) {
+      for (const cust of unassignedCustomers) {
+        const cCity = (cust.city || cust.assignedMarket || '').toLowerCase().trim();
+        if (cCity && marketRouteMap[cCity]) {
+          cust.route = marketRouteMap[cCity];
+          Party.updateOne({ _id: cust._id }, { $set: { route: marketRouteMap[cCity] } }).catch(e => console.error("Error backfilling customer route:", e));
+        }
       }
     }
 
-    const [marketStats, customerStats] = await Promise.all([
-      Party.aggregate([
-        { $match: marketMatch },
-        {
-          $group: {
-            _id: { $toLower: '$route' },
-            citiesCount: { $sum: 1 }
-          }
-        }
-      ]),
-      Party.aggregate([
-        { $match: customerMatch },
-        {
-          $group: {
-            _id: { $toLower: '$route' },
-            customersCount: { $sum: 1 },
-            outstanding: { $sum: '$outstanding' }
-          }
-        }
-      ])
-    ]);
-
-    const marketMap = {};
-    marketStats.forEach(s => {
-      marketMap[s._id] = s.citiesCount;
-    });
-
-    const customerMap = {};
-    customerStats.forEach(s => {
-      customerMap[s._id] = {
-        customersCount: s.customersCount,
-        outstanding: s.outstanding
-      };
-    });
-
     const routesWithCounts = routes.map(route => {
-      const routeLower = (route.name || '').toLowerCase();
-      const citiesCount = marketMap[routeLower] || 0;
-      const cStat = customerMap[routeLower] || { customersCount: 0, outstanding: 0 };
-      
+      const rName = (route.name || '').toLowerCase().trim();
+      const rCode = (route.code || '').toLowerCase().trim();
+
+      const citiesInRoute = allMarkets.filter(m => {
+        const cRoute = (m.route || '').toLowerCase().trim();
+        return cRoute && (cRoute === rName || (rCode && cRoute === rCode));
+      });
+
+      const cityNamesInRoute = new Set(citiesInRoute.map(m => (m.firmName || m.name || '').toLowerCase().trim()));
+
+      const customersInRoute = allCustomers.filter(c => {
+        const cRoute = (c.route || '').toLowerCase().trim();
+        if (cRoute && (cRoute === rName || (rCode && cRoute === rCode))) return true;
+        const cCity = (c.city || '').toLowerCase().trim();
+        if (cCity && cityNamesInRoute.has(cCity)) return true;
+        const cMarket = (c.assignedMarket || '').toLowerCase().trim();
+        if (cMarket && cityNamesInRoute.has(cMarket)) return true;
+        return false;
+      });
+
+      const totalOutstanding = customersInRoute.reduce((sum, c) => sum + (Number(c.outstandingBalance) || Number(c.outstanding) || 0), 0);
+
       return {
         ...route,
-        citiesCount,
-        customersCount: cStat.customersCount,
-        outstandingBalance: cStat.outstanding,
-        outstanding: cStat.outstanding
+        citiesCount: citiesInRoute.length,
+        customersCount: customersInRoute.length,
+        outstandingBalance: totalOutstanding,
+        outstanding: totalOutstanding
       };
     });
 

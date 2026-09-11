@@ -10,6 +10,7 @@ const manage = ["MANAGE_INVENTORY", "MANAGE_ITEMS"];
 
 // SKU Routes
 router.get("/skus", auth, rbac(view), ctrl.getSkus);
+router.get("/skus/next-code", auth, rbac(view), ctrl.getNextSkuCode);
 router.post("/skus", auth, rbac(manage), ctrl.createSku);
 router.put("/skus/:id", auth, rbac(manage), ctrl.updateSku);
 router.delete("/skus/:id", auth, rbac(manage), ctrl.deleteSku);

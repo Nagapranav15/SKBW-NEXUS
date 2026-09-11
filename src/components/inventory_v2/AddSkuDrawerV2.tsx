@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, RefreshCw, BookOpen, Layers, Plus, Trash2, AlertCircle, MapPin, Search, ChevronDown, Lock } from 'lucide-react';
-import { createSkuV2, updateSkuV2, SkuV2, getMetadataV2, updateMetadataV2, getSkusV2, getBalancesV2, getWarehouseHierarchyV2, WarehouseLocationV2 } from '../../api/mfgApiV2';
+import { Save, RefreshCw, BookOpen, Layers, Plus, Trash2, AlertCircle, MapPin, Search, ChevronDown, Lock, Package } from 'lucide-react';
+import { createSkuV2, updateSkuV2, SkuV2, getMetadataV2, updateMetadataV2, getSkusV2, getNextSkuCodeV2, getBalancesV2, getWarehouseHierarchyV2, WarehouseLocationV2 } from '../../api/mfgApiV2';
 import Modal from '../ui/Modal';
 
 interface AddSkuDrawerV2Props {
@@ -344,22 +344,35 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   const [brandsList, setBrandsList] = useState<string[]>(["Happy Days", "Classmate", "Navneet"]);
 
   const sectionCategories = React.useMemo(() => {
-    let baseCategory = 'Finished Goods';
     let targetType: 'products' | 'materials' | 'semi' = 'products';
-    if (activeSection === 'semi' || defaultCategory === 'Semi Finished') {
-      baseCategory = 'Semi Finished';
+    const catLower = (form.category || '').toLowerCase();
+
+    if (catLower === 'semi finished' || catLower === 'semi') {
+      targetType = 'semi';
+    } else if (catLower === 'raw material' || catLower === 'materials' || catLower === 'raw materials') {
+      targetType = 'materials';
+    } else if (catLower === 'finished goods' || catLower === 'products') {
+      targetType = 'products';
+    } else if (activeSection === 'semi' || defaultCategory === 'Semi Finished') {
       targetType = 'semi';
     } else if (activeSection === 'materials' || defaultCategory === 'Raw Material') {
-      baseCategory = 'Raw Material';
       targetType = 'materials';
     }
 
     const createdList = (createdCategories || [])
-      .filter(c => !c.type || c.type === targetType)
+      .filter(c => c.type === targetType)
       .map(c => c.name);
 
-    return Array.from(new Set([baseCategory, ...createdList, ...categoriesList]));
-  }, [activeSection, defaultCategory, createdCategories, categoriesList]);
+    const merged = Array.from(new Set(createdList))
+      .filter(name => !['Finished Goods', 'Raw Material', 'Semi Finished'].includes(name));
+
+    // If existing item has a group that isn't in list, preserve it
+    if (form.group && !merged.includes(form.group) && !['Finished Goods', 'Raw Material', 'Semi Finished'].includes(form.group)) {
+      merged.push(form.group);
+    }
+
+    return merged;
+  }, [form.category, activeSection, defaultCategory, createdCategories, form.group]);
   
   const [isNameManuallyEdited, setIsNameManuallyEdited] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -722,8 +735,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     return ['gsm', 'brand', 'title', 'width', 'length', 'paperType'];
   }, [categoryFieldsMap, form.category, createdCategories, isProductCategory, activeSection]);
 
-  // Auto-generate neat sequential SKU Code (RM-001, FG-001, SM-001)
-  const regenerateSkuCode = (targetCategory?: string) => {
+  // Auto-generate neat sequential SKU Code (RM-001, FG-001, SM-001) - strictly monotonic, never reusing deleted item IDs
+  const regenerateSkuCode = async (targetCategory?: string) => {
     let prefix: 'RM' | 'FG' | 'SM' = 'RM';
 
     const cat = targetCategory || form.category || defaultCategory || (activeSection === 'products' ? 'Finished Goods' : activeSection === 'semi' ? 'Semi Finished' : 'Raw Material');
@@ -736,24 +749,44 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       prefix = 'RM';
     }
 
-    const skuSourceList = (allSkusList && allSkusList.length > 0) ? allSkusList : rawMaterialsList;
-    const existingCodesSet = new Set(
-      (skuSourceList || [])
-        .map(s => (s.skuCode || '').trim().toUpperCase())
-        .filter(Boolean)
-    );
-
-    let seq = 1;
-    let nextSkuCode = `${prefix}-001`;
-    while (seq < 9999) {
-      const candidate = `${prefix}-${String(seq).padStart(3, '0')}`;
-      if (!existingCodesSet.has(candidate)) {
-        nextSkuCode = candidate;
-        break;
+    // 1. First check backend for definitive next code (accounts for both active and deleted items + Sequence counter)
+    if (companyId) {
+      try {
+        const res = await getNextSkuCodeV2(companyId, prefix);
+        if (res && res.nextCode) {
+          setForm(prev => ({ ...prev, skuCode: res.nextCode }));
+          return;
+        }
+      } catch (e) {
+        console.warn('Could not fetch next code from backend, calculating from local state:', e);
       }
-      seq++;
     }
 
+    // 2. Fallback: Strictly monotonic sequence (maxSeq + 1), never reusing any deleted item numbers
+    const skuSourceList = (allSkusList && allSkusList.length > 0) ? allSkusList : rawMaterialsList;
+    let maxSeq = 0;
+    const regex = new RegExp(`(?:^|DEL-)${prefix}-(\\d+)`, 'i');
+    (skuSourceList || []).forEach(s => {
+      const code = (s.skuCode || '').trim();
+      const match = code.match(regex);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num > maxSeq) {
+          maxSeq = num;
+        }
+      }
+    });
+
+    try {
+      const localMaxKey = `skbw_max_sku_seq_${companyId || 'default'}_${prefix}`;
+      const savedMax = parseInt(localStorage.getItem(localMaxKey) || '0', 10);
+      if (!isNaN(savedMax) && savedMax > maxSeq) {
+        maxSeq = savedMax;
+      }
+    } catch (_) {}
+
+    const nextSeq = maxSeq + 1;
+    const nextSkuCode = `${prefix}-${String(nextSeq).padStart(3, '0')}`;
     setForm(prev => ({ ...prev, skuCode: nextSkuCode }));
   };
 
@@ -921,6 +954,18 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           saved = await updateSkuV2(editSku._id, payload);
         } else {
           saved = await createSkuV2(payload);
+          try {
+            const match = (saved.skuCode || '').match(/^([A-Z]+)-(\d+)/i);
+            if (match) {
+              const p = match[1].toUpperCase();
+              const n = parseInt(match[2], 10);
+              const localMaxKey = `skbw_max_sku_seq_${companyId || 'default'}_${p}`;
+              const currentMax = parseInt(localStorage.getItem(localMaxKey) || '0', 10);
+              if (!isNaN(n) && n > currentMax) {
+                localStorage.setItem(localMaxKey, String(n));
+              }
+            }
+          } catch (_) {}
         }
 
         if (setCustomColumnValues && saved?._id) {
@@ -953,16 +998,16 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           size="max-w-4xl"
           title={
             <div className="flex items-center gap-2 text-left">
-              <div className="p-2 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-200">
-                <Save className="w-4 h-4 text-emerald-600" />
+              <div className="p-2 bg-slate-100 text-slate-700 rounded-xl border border-slate-200">
+                <Package className="w-4 h-4 text-slate-700" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-gray-900 text-base">
                     {editSku ? 'Edit SKU Item' : 'Add New SKU Item'}
                   </span>
-                  <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold px-2.5 py-0.5 rounded-md flex items-center gap-1">
-                    {form.category || 'Notebooks'}
+                  <span className="bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-semibold px-2.5 py-0.5 rounded-md flex items-center gap-1">
+                    {form.category || 'Finished Goods'}
                   </span>
                 </div>
               </div>
@@ -1030,26 +1075,21 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     value={form.group}
                     onChange={e => {
                       const val = e.target.value;
-                      if (val === '__ADD_NEW__') {
-                        handleAddNewOption('categories');
-                      } else {
-                        const matchedCatObj = (createdCategories || []).find(c => c.name === val);
-                        setForm(prev => ({
-                          ...prev,
-                          group: val,
-                          unit: matchedCatObj?.uom || prev.unit
-                        }));
-                      }
+                      const matchedCatObj = (createdCategories || []).find(c => c.name === val);
+                      setForm(prev => ({
+                        ...prev,
+                        group: val,
+                        unit: matchedCatObj?.uom || prev.unit
+                      }));
                     }}
                     className="w-full px-3 py-2 border-2 border-blue-300 hover:border-blue-400 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-blue-50/40 font-bold text-gray-900 cursor-pointer shadow-2xs transition-all"
                   >
-                    <option value="" className="text-gray-400 font-normal">-- Select Created Category --</option>
+                    <option value="" className="text-gray-400 font-normal">-- Select Category --</option>
                     {sectionCategories.map(cat => (
                       <option key={cat} value={cat} className="bg-white text-gray-900 font-semibold py-1">
                         {cat}
                       </option>
                     ))}
-                    <option value="__ADD_NEW__" className="bg-white text-blue-600 font-bold">+ Add Custom Category...</option>
                   </select>
                 </div>
 

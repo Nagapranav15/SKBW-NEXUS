@@ -98,6 +98,13 @@ export const bulkImportSkusV2 = async (skus: any[], company: string): Promise<an
   return response.data;
 };
 
+export const getNextSkuCodeV2 = async (companyId: string, prefix: string): Promise<{ nextCode: string; nextSequence: number; prefix: string }> => {
+  const response = await api.get('/v2/skus/next-code', {
+    params: { companyId, prefix }
+  });
+  return response.data;
+};
+
 // ── WAREHOUSE API ─────────────────────────────────────────────────────────────
 
 export const getWarehouseHierarchyV2 = async (companyId: string): Promise<WarehouseLocationV2[]> => {

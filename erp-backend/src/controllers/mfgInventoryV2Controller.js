@@ -73,8 +73,54 @@ exports.getSkus = async (req, res, next) => {
       }
     }
 
-    const skus = await SkuV2.find(query).sort({ createdAt: -1 });
+    const skus = await SkuV2.find(query).sort({ skuCode: 1, createdAt: 1 });
     res.json(skus);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getNextSkuCode = async (req, res, next) => {
+  try {
+    const { companyId, prefix = "FG" } = req.query;
+    if (!companyId) {
+      return res.status(400).json({ msg: "companyId query parameter is required" });
+    }
+
+    const cleanPrefix = String(prefix).trim().toUpperCase();
+    const companyObjId = toObjectId(companyId);
+
+    // Query ALL SKUs for this company, including soft-deleted ones (isDeleted: true)
+    const allCompanySkus = await SkuV2.find({ company: companyObjId }).select("skuCode isDeleted");
+
+    let maxNum = 0;
+    const regex = new RegExp(`(?:^|DEL-)${cleanPrefix}-(\\d+)`, "i");
+
+    for (const s of allCompanySkus) {
+      const code = (s.skuCode || "").trim();
+      const match = code.match(regex);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num > maxNum) {
+          maxNum = num;
+        }
+      }
+    }
+
+    // Check persistent Sequence counter if higher
+    const seqDoc = await Sequence.findOne({ prefix: `${companyId}_SKU_${cleanPrefix}` });
+    if (seqDoc && seqDoc.sequence > maxNum) {
+      maxNum = seqDoc.sequence;
+    }
+
+    const nextNum = maxNum + 1;
+    const nextCode = `${cleanPrefix}-${String(nextNum).padStart(3, "0")}`;
+
+    res.json({
+      nextCode,
+      nextSequence: nextNum,
+      prefix: cleanPrefix
+    });
   } catch (err) {
     next(err);
   }
@@ -89,6 +135,11 @@ exports.createSku = async (req, res, next) => {
 
     const exists = await SkuV2.findOne({ skuCode, company: toObjectId(company) });
     if (exists) {
+      if (exists.isDeleted) {
+        return res.status(400).json({ 
+          msg: `SKU Code '${skuCode}' was previously used by a deleted item and cannot be reused. Please use a new SKU Code.` 
+        });
+      }
       return res.status(400).json({ msg: `SKU Code '${skuCode}' already exists for this company` });
     }
 
@@ -125,6 +176,20 @@ exports.createSku = async (req, res, next) => {
     });
 
     await newSku.save();
+
+    // Permanently record sequence number so this SKU ID is never reused even if deleted
+    const numMatch = (newSku.skuCode || '').match(/([A-Z]+)-(\d+)/i);
+    if (numMatch) {
+      const p = numMatch[1].toUpperCase();
+      const n = parseInt(numMatch[2], 10);
+      if (!isNaN(n)) {
+        await Sequence.findOneAndUpdate(
+          { prefix: `${company}_SKU_${p}` },
+          { $max: { sequence: n } },
+          { upsert: true }
+        ).catch(() => {});
+      }
+    }
 
     if (newSku.openingStock > 0 && req.body.initialLocationId) {
       try {
@@ -283,6 +348,20 @@ exports.deleteSku = async (req, res, next) => {
       return res.status(404).json({ msg: "SKU not found" });
     }
 
+    // Permanently record sequence number in Sequence collection so this SKU ID is never reused
+    const numMatch = (sku.skuCode || '').match(/([A-Z]+)-(\d+)/i);
+    if (numMatch) {
+      const p = numMatch[1].toUpperCase();
+      const n = parseInt(numMatch[2], 10);
+      if (!isNaN(n)) {
+        await Sequence.findOneAndUpdate(
+          { prefix: `${companyId}_SKU_${p}` },
+          { $max: { sequence: n } },
+          { upsert: true }
+        ).catch(() => {});
+      }
+    }
+
     if (permanent === "true") {
       const count = await InventoryLedgerV2.countDocuments({ skuId: skuObjId, company: companyObjId });
       if (count > 0) {
@@ -343,6 +422,27 @@ exports.bulkImportSkus = async (req, res, next) => {
         continue;
       }
 
+      // Never reuse SKU Code of a deleted item
+      const existingDeleted = await SkuV2.findOne({ skuCode: item.skuCode, company: companyObjId, isDeleted: true });
+      if (existingDeleted) {
+        skipped.push({ code: item.skuCode, reason: `SKU Code '${item.skuCode}' was previously used by a deleted item and cannot be reused.` });
+        continue;
+      }
+
+      // Track max sequence in Sequence collection
+      const numMatch = (item.skuCode || '').match(/([A-Z]+)-(\d+)/i);
+      if (numMatch) {
+        const p = numMatch[1].toUpperCase();
+        const n = parseInt(numMatch[2], 10);
+        if (!isNaN(n)) {
+          await Sequence.findOneAndUpdate(
+            { prefix: `${company}_SKU_${p}` },
+            { $max: { sequence: n } },
+            { upsert: true }
+          ).catch(() => {});
+        }
+      }
+
       const updateData = {
         skuCode: item.skuCode,
         name: item.name,
@@ -355,11 +455,14 @@ exports.bulkImportSkus = async (req, res, next) => {
         width: item.width ? Number(item.width) : undefined,
         length: item.length ? Number(item.length) : undefined,
         brand: item.brand || "",
+        group: item.group || item.category || "",
         ruleType: item.ruleType,
         pages: item.pages ? Number(item.pages) : undefined,
         reamWeight: item.reamWeight ? Number(item.reamWeight) : undefined,
         booksGbl: item.booksGbl ? Number(item.booksGbl) : undefined,
         openingStock: item.openingStock !== undefined ? Number(item.openingStock) : 0,
+        presentStock: item.openingStock !== undefined ? Number(item.openingStock) : 0,
+        minStockLevel: item.minStockLevel !== undefined && item.minStockLevel !== null && item.minStockLevel !== '' ? Number(item.minStockLevel) : undefined,
         status: item.status || "Active",
         company: companyObjId,
         createdBy: req.user?.id ? toObjectId(req.user.id) : undefined
@@ -435,15 +538,6 @@ exports.renumberSkus = async (req, res, next) => {
         smList.push(sku);
       } else {
         rmList.push(sku);
-      }
-    }
-
-    // Step 0: Rename any soft-deleted SKUs for this company so their old codes (e.g. FG-004) do not block active series
-    const deletedSkus = await SkuV2.find({ company: companyQuery, isDeleted: true });
-    for (const dSku of deletedSkus) {
-      if (dSku.skuCode && !dSku.skuCode.startsWith("DEL-")) {
-        dSku.skuCode = `DEL-${dSku.skuCode}-${String(dSku._id).slice(-4)}`;
-        await dSku.save().catch(e => console.error("Error renaming deleted SKU code:", e.message));
       }
     }
 

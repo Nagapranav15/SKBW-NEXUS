@@ -1184,6 +1184,50 @@ exports.getParties = async (req, res) => {
         }
         return partyObj;
       });
+    } else if (req.query.type === 'route') {
+      const marketQuery = { type: 'market', isDeleted: { $ne: true } };
+      const customerQuery = { type: 'customer', isDeleted: { $ne: true } };
+      if (companyId) {
+        marketQuery.company = companyId;
+        customerQuery.company = companyId;
+      }
+
+      const [allMarkets, allCustomers] = await Promise.all([
+        Party.find(marketQuery).select('firmName name route code agentAssigned').lean(),
+        Party.find(customerQuery).select('firmName name city assignedMarket route outstandingBalance outstanding').lean()
+      ]);
+
+      parties = rawParties.map(route => {
+        const partyObj = { ...route };
+        const rName = (partyObj.firmName || partyObj.name || '').toLowerCase().trim();
+        const rCode = (partyObj.code || '').toLowerCase().trim();
+
+        const citiesInRoute = allMarkets.filter(m => {
+          const cRoute = (m.route || '').toLowerCase().trim();
+          return cRoute && (cRoute === rName || (rCode && cRoute === rCode));
+        });
+
+        const cityNamesInRoute = new Set(citiesInRoute.map(m => (m.firmName || m.name || '').toLowerCase().trim()));
+
+        const customersInRoute = allCustomers.filter(c => {
+          const cRoute = (c.route || '').toLowerCase().trim();
+          if (cRoute && (cRoute === rName || (rCode && cRoute === rCode))) return true;
+          const cCity = (c.city || '').toLowerCase().trim();
+          if (cCity && cityNamesInRoute.has(cCity)) return true;
+          const cMarket = (c.assignedMarket || '').toLowerCase().trim();
+          if (cMarket && cityNamesInRoute.has(cMarket)) return true;
+          return false;
+        });
+
+        const totalOutstanding = customersInRoute.reduce((sum, c) => sum + (Number(c.outstandingBalance) || Number(c.outstanding) || 0), 0);
+
+        partyObj.citiesCount = citiesInRoute.length;
+        partyObj.customersCount = customersInRoute.length;
+        partyObj.outstandingBalance = totalOutstanding;
+        partyObj.outstanding = totalOutstanding;
+
+        return partyObj;
+      });
     } else {
       // Fallback for customer or others
       // With lean() results, we can work directly with plain objects

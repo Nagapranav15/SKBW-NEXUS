@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { 
   Package, 
   Folder, 
@@ -28,14 +29,28 @@ import {
   Scroll,
   Copy,
   Ruler,
-  Hash
+  Hash,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Layers,
+  Boxes,
+  Component,
+  FileSpreadsheet,
+  Upload,
+  History,
+  FileText,
+  Columns,
+  Eye
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { 
   getSkusV2, 
   getBalancesV2,
+  createSkuV2,
   deleteSkuV2, 
   updateSkuV2,
+  bulkImportSkusV2,
   renumberSkusV2,
   getWarehouseHierarchyV2,
   WarehouseLocationV2,
@@ -47,6 +62,51 @@ import { showToast } from '../ui/Toast';
 import * as XLSX from 'xlsx';
 import Modal from '../ui/Modal';
 import { formatSkuName } from '../../utils/skuUtils';
+
+// Helper to render neat domain icon for items
+const renderItemDomainIcon = (skuItem: SkuV2, currentTab?: string) => {
+  const code = (skuItem.skuCode || '').toUpperCase();
+  const cat = (skuItem.category || skuItem.group || '').toLowerCase();
+  const nameLower = (skuItem.name || '').toLowerCase();
+
+  const isRaw = currentTab === 'materials' || 
+                code.startsWith('RM') || 
+                cat.includes('raw') || 
+                cat.includes('material') || 
+                nameLower.includes('reel') || 
+                nameLower.includes('wire') || 
+                nameLower.includes('adhesive') || 
+                nameLower.includes('glue') || 
+                nameLower.includes('board');
+
+  const isSemi = currentTab === 'semi' || 
+                 code.startsWith('SFG') || 
+                 cat.includes('semi') || 
+                 nameLower.includes('sheet') || 
+                 nameLower.includes('signature') || 
+                 nameLower.includes('block');
+
+  if (isRaw) {
+    return (
+      <div className="w-6 h-6 rounded-md bg-amber-50 text-amber-600 border border-amber-200/70 flex items-center justify-center shrink-0 shadow-2xs" title="Raw Material">
+        <Layers className="w-3.5 h-3.5" />
+      </div>
+    );
+  }
+  if (isSemi) {
+    return (
+      <div className="w-6 h-6 rounded-md bg-teal-50 text-teal-600 border border-teal-200/70 flex items-center justify-center shrink-0 shadow-2xs" title="Semi Finished">
+        <Boxes className="w-3.5 h-3.5" />
+      </div>
+    );
+  }
+  // Finished Goods (Products)
+  return (
+    <div className="w-6 h-6 rounded-md bg-blue-50 text-blue-600 border border-blue-200/70 flex items-center justify-center shrink-0 shadow-2xs" title="Finished Good">
+      <Package className="w-3.5 h-3.5" />
+    </div>
+  );
+};
 
 // Helper to format Size
 const formatSize = (s: SkuV2) => {
@@ -112,11 +172,36 @@ const SkuMasterV2: React.FC = () => {
   const { selectedCompany } = useAuth();
   const currentCompanyId = selectedCompany?._id || '';
 
+  const [searchParams, setSearchParams] = useSearchParams();
+
   // Key to force row animation trigger on reload / tab change
   const [animationKey, setAnimationKey] = useState(Date.now());
 
-  // 4 Main Tabs State: 'products' | 'materials' | 'semi' | 'categories'
-  const [activeMainTab, setActiveMainTab] = useState<'products' | 'materials' | 'semi' | 'categories'>('products');
+  // 4 Main Tabs State: 'products' | 'materials' | 'semi' | 'categories' (persisted in URL & localStorage)
+  const [activeMainTab, setActiveMainTab] = useState<'products' | 'materials' | 'semi' | 'categories'>(() => {
+    const tabFromUrl = searchParams.get('tab') as any;
+    if (tabFromUrl && ['products', 'materials', 'semi', 'categories'].includes(tabFromUrl)) {
+      return tabFromUrl;
+    }
+    const tabFromStorage = localStorage.getItem('skbw_item_master_active_tab') as any;
+    if (tabFromStorage && ['products', 'materials', 'semi', 'categories'].includes(tabFromStorage)) {
+      return tabFromStorage;
+    }
+    return 'products';
+  });
+
+  const handleMainTabChange = (tab: 'products' | 'materials' | 'semi' | 'categories') => {
+    setActiveMainTab(tab);
+    setSearchParams({ tab }, { replace: true });
+    localStorage.setItem('skbw_item_master_active_tab', tab);
+  };
+
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab') as any;
+    if (tabFromUrl && ['products', 'materials', 'semi', 'categories'].includes(tabFromUrl) && tabFromUrl !== activeMainTab) {
+      setActiveMainTab(tabFromUrl);
+    }
+  }, [searchParams]);
   
   // Categories SubTab State: 'products' | 'materials' | 'semi'
   const [activeCategorySubTab, setActiveCategorySubTab] = useState<'products' | 'materials' | 'semi'>('products');
@@ -141,11 +226,29 @@ const SkuMasterV2: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Categories list state
   const [categoriesData, setCategoriesData] = useState<CategoryCardData[]>(() => {
     const saved = localStorage.getItem('skbw_erp_categories_cards');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const hasProducts = parsed.some((c: any) => c.type === 'products');
+          const hasMaterials = parsed.some((c: any) => c.type === 'materials');
+          const hasSemi = parsed.some((c: any) => c.type === 'semi');
+
+          let combined = [...parsed];
+          if (!hasMaterials) {
+            combined = [...combined, ...DEFAULT_CATEGORIES.filter(c => c.type === 'materials')];
+          }
+          if (!hasSemi) {
+            combined = [...combined, ...DEFAULT_CATEGORIES.filter(c => c.type === 'semi')];
+          }
+          if (!hasProducts) {
+            combined = [...combined, ...DEFAULT_CATEGORIES.filter(c => c.type === 'products')];
+          }
+          return combined;
+        }
+      } catch (e) {}
     }
     return DEFAULT_CATEGORIES;
   });
@@ -181,22 +284,44 @@ const SkuMasterV2: React.FC = () => {
   const [limit, setLimit] = useState(25);
 
   // Sorting & Filtering
-  const [sortRules] = useState<{ field: string; order: 'asc' | 'desc' }[]>(() => {
-    const saved = localStorage.getItem('skbw_erp_sort_rules_skus');
+  const [sortRules, setSortRules] = useState<{ field: string; order: 'asc' | 'desc' }[]>(() => {
+    const saved = localStorage.getItem('skbw_erp_sort_rules_skus_v2');
     if (saved) {
       try { return JSON.parse(saved); } catch (e) {}
     }
-    return [];
+    return [{ field: 'skuCode', order: 'asc' }];
   });
+
+  const handleColumnSort = (fieldId: string) => {
+    setSortRules(prev => {
+      const existing = prev.find(r => r.field === fieldId);
+      let updated: { field: string; order: 'asc' | 'desc' }[];
+      if (!existing) {
+        updated = [{ field: fieldId, order: 'asc' }];
+      } else if (existing.order === 'asc') {
+        updated = [{ field: fieldId, order: 'desc' }];
+      } else {
+        updated = [];
+      }
+      localStorage.setItem('skbw_erp_sort_rules_skus_v2', JSON.stringify(updated));
+      return updated;
+    });
+  };
   const [filterRules, setFilterRules] = useState<{ id: string; field: string; operator: string; value: string }[]>([]);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const filterDropdownRef = useRef<HTMLDivElement>(null);
+  const toolbarActionsRef = useRef<HTMLDivElement>(null);
 
-  // Close filter dropdown on outside click
+  // Close filter and action dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (filterDropdownRef.current && !filterDropdownRef.current.contains(e.target as Node)) {
         setShowFilterPanel(false);
+      }
+      if (toolbarActionsRef.current && !toolbarActionsRef.current.contains(e.target as Node)) {
+        setShowSortMenu(false);
+        setShowColumnPicker(false);
+        setShowExportMenu(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -316,6 +441,19 @@ const SkuMasterV2: React.FC = () => {
   const [showActivityLog, setShowActivityLog] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
 
+  // Toolbar Dropdowns & Popovers
+  const [showSortMenu, setShowSortMenu] = useState(false);
+  const [showColumnPicker, setShowColumnPicker] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+
+  // Duplicates Scanner
+  const [isScanningDuplicates, setIsScanningDuplicates] = useState(false);
+  const [showDuplicatesModal, setShowDuplicatesModal] = useState(false);
+  const [duplicateGroups, setDuplicateGroups] = useState<{ field: string; value: string; items: SkuV2[] }[]>([]);
+  const [highlightedDuplicateIdx, setHighlightedDuplicateIdx] = useState<number>(0);
+  const [compareGroup, setCompareGroup] = useState<{ field: string; value: string; items: SkuV2[] } | null>(null);
+
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [activityLogLoading, setActivityLogLoading] = useState(false);
 
@@ -326,7 +464,7 @@ const SkuMasterV2: React.FC = () => {
   const [deleteConfirmSku, setDeleteConfirmSku] = useState<SkuV2 | null>(null);
 
   // Item Details Modal State
-  const [detailsSubTab, setDetailsSubTab] = useState<'details' | 'work-orders' | 'dispatches' | 'rough-calc'>('details');
+  const [detailsSubTab, setDetailsSubTab] = useState<'details' | 'work-orders' | 'dispatches'>('details');
   const [itemAttributes, setItemAttributes] = useState({
     fabricGsm: '70 GSM Maplitho',
     size: '18 x 24 CM',
@@ -418,18 +556,33 @@ const SkuMasterV2: React.FC = () => {
     { id: 'dispatchOrders', label: 'Dispatch Orders', visible: true }
   ];
 
-  const STORAGE_KEY = 'skbw_sku_master_tab_columns_v2';
+  const STORAGE_KEY = 'skbw_sku_master_tab_columns_v4';
+
+  // Helper to sanitize column list against current valid defaults
+  const sanitizeColumns = (savedList: any[], defaultList: typeof DEFAULT_PRODUCTS_COLUMNS) => {
+    if (!Array.isArray(savedList)) return defaultList;
+    const defaultIds = new Set(defaultList.map(c => c.id));
+    // Filter out obsolete or deleted column IDs (e.g. legacy 'group' or 'itemCategory')
+    const validSaved = savedList.filter(c => c && defaultIds.has(c.id));
+    // Add any missing default columns
+    const savedIds = new Set(validSaved.map(c => c.id));
+    const missing = defaultList.filter(c => !savedIds.has(c.id));
+    return [...validSaved, ...missing];
+  };
 
   const [tabColumnsMap, setTabColumnsMap] = useState<Record<string, typeof DEFAULT_PRODUCTS_COLUMNS>>(() => {
     try {
+      // Clean up legacy v2 and v3 keys which may contain obsolete column IDs
+      localStorage.removeItem('skbw_sku_master_tab_columns_v2');
+      localStorage.removeItem('skbw_sku_master_tab_columns_v3');
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === 'object') {
           return {
-            products: Array.isArray(parsed.products) ? parsed.products : DEFAULT_PRODUCTS_COLUMNS,
-            materials: Array.isArray(parsed.materials) ? parsed.materials : DEFAULT_MATERIALS_COLUMNS,
-            semi: Array.isArray(parsed.semi) ? parsed.semi : DEFAULT_SEMI_COLUMNS
+            products: sanitizeColumns(parsed.products, DEFAULT_PRODUCTS_COLUMNS),
+            materials: sanitizeColumns(parsed.materials, DEFAULT_MATERIALS_COLUMNS),
+            semi: sanitizeColumns(parsed.semi, DEFAULT_SEMI_COLUMNS)
           };
         }
       }
@@ -786,22 +939,6 @@ const SkuMasterV2: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    if (skus.length > 0 && !autoRenumberedRef.current && selectedCompany?._id) {
-      const hasLegacyCodes = skus.some(s => {
-        const code = (s.skuCode || '').trim().toUpperCase();
-        if (code.startsWith('SEM-')) return true;
-        const numMatch = code.match(/-(0*\d+)$/);
-        if (numMatch && parseInt(numMatch[1], 10) > 500) return true;
-        return false;
-      });
-      if (hasLegacyCodes) {
-        autoRenumberedRef.current = true;
-        handleRenumberSkus(true);
-      }
-    }
-  }, [skus, selectedCompany?._id]);
-
   // Demo Finished Products (Notebooks, Diaries, Longbooks, Registers)
   const DEMO_FINISHED_PRODUCTS: SkuV2[] = [
     {
@@ -990,42 +1127,19 @@ const SkuMasterV2: React.FC = () => {
     return 'products';
   };
 
-  // Helper to format SKU Code with exact sequential pattern (FG-001, RM-001, SEM-001)
-  const formatSkuCodeWithSeq = (item: SkuV2, prefix: 'FG' | 'RM' | 'SEM', index: number): string => {
-    const code = (item.skuCode || '').trim();
-    const match = code.match(/^(FG|RM|SEM)-(\d+)$/i);
-    if (match && match[1].toUpperCase() === prefix) {
-      const num = parseInt(match[2], 10);
-      return `${prefix}-${String(num).padStart(3, '0')}`;
-    }
-    return `${prefix}-${String(index + 1).padStart(3, '0')}`;
-  };
-
   // Products List (Only database finished products)
   const productsList = useMemo(() => {
-    const raw = skus.length > 0 ? skus.filter(item => getItemType(item) === 'products') : DEMO_FINISHED_PRODUCTS;
-    return raw.map((item, idx) => ({
-      ...item,
-      skuCode: formatSkuCodeWithSeq(item, 'FG', idx)
-    }));
+    return skus.length > 0 ? skus.filter(item => getItemType(item) === 'products') : DEMO_FINISHED_PRODUCTS;
   }, [skus]);
 
   // Materials List (Only database raw materials)
   const materialsList = useMemo(() => {
-    const raw = skus.length > 0 ? skus.filter(item => getItemType(item) === 'materials') : DEMO_RAW_MATERIALS;
-    return raw.map((item, idx) => ({
-      ...item,
-      skuCode: formatSkuCodeWithSeq(item, 'RM', idx)
-    }));
+    return skus.length > 0 ? skus.filter(item => getItemType(item) === 'materials') : DEMO_RAW_MATERIALS;
   }, [skus]);
 
   // Semi List (Only database semi-finished materials)
   const semiList = useMemo(() => {
-    const raw = skus.length > 0 ? skus.filter(item => getItemType(item) === 'semi') : DEMO_SEMI_MATERIALS;
-    return raw.map((item, idx) => ({
-      ...item,
-      skuCode: formatSkuCodeWithSeq(item, 'SEM', idx)
-    }));
+    return skus.length > 0 ? skus.filter(item => getItemType(item) === 'semi') : DEMO_SEMI_MATERIALS;
   }, [skus]);
 
   // Combined Raw Materials and Semi-Finished Materials ONLY (excluding Finished Goods) for BOM Recipe selection
@@ -1220,17 +1334,64 @@ const SkuMasterV2: React.FC = () => {
         return filterRules.every(rule => {
           if (!rule.value || !rule.value.trim()) return true;
           const targetStr = rule.value.toLowerCase().trim();
-          let itemVal = (item as any)[rule.field];
-          if (rule.field === 'dimensions') itemVal = formatSize(item);
+          let itemVal: any = '';
+          let isNumeric = false;
+
+          switch (rule.field) {
+            case 'skuCode':
+            case 'code':
+              itemVal = item.skuCode || item.code || item.itemCode || item._id || '';
+              break;
+            case 'name':
+              itemVal = item.name || item.firmName || '';
+              break;
+            case 'category':
+              itemVal = item.category || item.group || '';
+              break;
+            case 'unit':
+            case 'uom':
+              itemVal = item.unit || item.uom || item.unitOfMeasurement || '';
+              break;
+            case 'gsm':
+              itemVal = Number(item.gsm) || 0;
+              isNumeric = true;
+              break;
+            case 'openingStock':
+            case 'stock':
+              itemVal = Number(item.openingStock !== undefined ? item.openingStock : item.stock !== undefined ? item.stock : item.currentStock) || 0;
+              isNumeric = true;
+              break;
+            case 'dimensions':
+              itemVal = formatSize(item);
+              break;
+            case 'rate':
+            case 'price':
+              itemVal = Number(item.rate !== undefined ? item.rate : item.price !== undefined ? item.price : item.unitPrice) || 0;
+              isNumeric = true;
+              break;
+            default:
+              itemVal = (item as any)[rule.field] !== undefined ? (item as any)[rule.field] : '';
+              if (typeof itemVal === 'number') isNumeric = true;
+          }
+
           if (itemVal === undefined || itemVal === null) itemVal = '';
           const valStr = String(itemVal).toLowerCase();
+          const cleanTarget = targetStr.replace(/^[^a-z0-9]+/, '');
 
           switch (rule.operator) {
-            case 'equals': return valStr === targetStr;
-            case 'contains': return valStr.includes(targetStr);
-            case 'greater_than': return Number(itemVal) > Number(rule.value);
-            case 'less_than': return Number(itemVal) < Number(rule.value);
-            default: return valStr.includes(targetStr);
+            case 'equals':
+              if (isNumeric && !isNaN(Number(targetStr))) {
+                return Number(itemVal) === Number(targetStr);
+              }
+              return valStr === targetStr || valStr.includes(targetStr) || (cleanTarget.length >= 2 && valStr.includes(cleanTarget));
+            case 'contains':
+              return valStr.includes(targetStr) || (cleanTarget.length >= 2 && valStr.includes(cleanTarget));
+            case 'greater_than':
+              return Number(itemVal) > Number(targetStr);
+            case 'less_than':
+              return Number(itemVal) < Number(targetStr);
+            default:
+              return valStr.includes(targetStr) || (cleanTarget.length >= 2 && valStr.includes(cleanTarget));
           }
         });
       });
@@ -1240,19 +1401,62 @@ const SkuMasterV2: React.FC = () => {
     if (sortRules && sortRules.length > 0) {
       list.sort((a, b) => {
         for (const rule of sortRules) {
-          let fieldA = (a as any)[rule.field];
-          let fieldB = (b as any)[rule.field];
+          let fieldA: any;
+          let fieldB: any;
+
+          if (rule.field.startsWith('custom_')) {
+            const colName = rule.field.replace('custom_', '');
+            fieldA = customColumnValues[`${a._id}_${colName}`] || '';
+            fieldB = customColumnValues[`${b._id}_${colName}`] || '';
+          } else if (rule.field === 'skuCode' || rule.field === 'code') {
+            fieldA = a.skuCode || a.code || '';
+            fieldB = b.skuCode || b.code || '';
+            const comp = String(fieldA).localeCompare(String(fieldB), undefined, { numeric: true, sensitivity: 'base' });
+            if (comp !== 0) return rule.order === 'asc' ? comp : -comp;
+            continue;
+          } else if (rule.field === 'size') {
+            fieldA = (a.width || 0) * (a.length || 0);
+            fieldB = (b.width || 0) * (b.length || 0);
+          } else if (rule.field === 'workOrders') {
+            fieldA = getWorkOrderCount(a);
+            fieldB = getWorkOrderCount(b);
+          } else if (rule.field === 'dispatchOrders') {
+            fieldA = getDispatchOrderCount(a);
+            fieldB = getDispatchOrderCount(b);
+          } else if (rule.field === 'category') {
+            fieldA = a.group || a.category || '';
+            fieldB = b.group || b.category || '';
+          } else if (rule.field === 'altUnitConversion') {
+            fieldA = a.altUnitConversion || 0;
+            fieldB = b.altUnitConversion || 0;
+          } else {
+            fieldA = (a as any)[rule.field];
+            fieldB = (b as any)[rule.field];
+          }
+
           if (fieldA === undefined || fieldA === null) fieldA = '';
           if (fieldB === undefined || fieldB === null) fieldB = '';
 
           if (typeof fieldA === 'number' && typeof fieldB === 'number') {
             if (fieldA !== fieldB) return rule.order === 'asc' ? fieldA - fieldB : fieldB - fieldA;
           } else {
-            const strA = String(fieldA).localeCompare(String(fieldB));
+            const numA = Number(fieldA);
+            const numB = Number(fieldB);
+            if (!isNaN(numA) && !isNaN(numB) && fieldA !== '' && fieldB !== '') {
+              if (numA !== numB) return rule.order === 'asc' ? numA - numB : numB - numA;
+            }
+            const strA = String(fieldA).localeCompare(String(fieldB), undefined, { numeric: true, sensitivity: 'base' });
             if (strA !== 0) return rule.order === 'asc' ? strA : -strA;
           }
         }
         return 0;
+      });
+    } else {
+      // Natural sequential sort by SKU Code if no explicit sort rule
+      list.sort((a, b) => {
+        const codeA = a.skuCode || a.code || '';
+        const codeB = b.skuCode || b.code || '';
+        return codeA.localeCompare(codeB, undefined, { numeric: true, sensitivity: 'base' });
       });
     }
 
@@ -1407,7 +1611,7 @@ const SkuMasterV2: React.FC = () => {
     }
   };
 
-  const handleExportCSV = () => {
+  const handleExportExcel = () => {
     if (filteredAndSortedSkus.length === 0) {
       showToast('No items available to export', 'error');
       return;
@@ -1415,28 +1619,499 @@ const SkuMasterV2: React.FC = () => {
     const exportData = filteredAndSortedSkus.map(s => ({
       'Item Code': s.skuCode,
       'Item Name': s.name,
-      'Category': s.category,
+      'Category': s.category || s.group || '',
       'Primary Unit': s.unit,
       'Alternate Unit': s.altUnit || '—',
       'Conversion Rate': s.altUnitConversion || '—',
       'GSM': s.gsm || '—',
+      'Pages': s.pages || '—',
       'Width': s.width || '—',
       'Length': s.length || '—',
       'Opening Stock': s.openingStock || 0,
-      'Status': s.status
+      'Min Stock Level': s.minStockLevel || 0,
+      'Status': s.status || 'Active'
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Items');
     XLSX.writeFile(workbook, `Items_Export_${activeMainTab}_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    showToast('Items exported successfully', 'success');
+    showToast(`Exported ${filteredAndSortedSkus.length} items to Excel`, 'success');
+  };
+
+  const handleExportCSV = handleExportExcel;
+
+  const handleExportPDF = () => {
+    if (filteredAndSortedSkus.length === 0) {
+      showToast('No records available to print PDF', 'info');
+      return;
+    }
+
+    const printWin = window.open('', '_blank');
+    if (!printWin) {
+      showToast('Please allow popups to generate PDF', 'error');
+      return;
+    }
+
+    const tabTitle = getTabLabel(activeMainTab).toUpperCase();
+    const title = `${tabTitle} MASTER REPORT`;
+    const companyName = selectedCompany?.name || 'SKBW ERP';
+    const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+    const tableHeaders = `<th>#</th><th>Item Code</th><th>Item Name</th><th>Category</th><th>UOM</th><th>GSM</th><th>Pages</th><th>In Stock</th><th>Min Stock</th><th>Status</th>`;
+
+    const tableRowsHtml = filteredAndSortedSkus.map((item, idx) => {
+      return `<tr>
+        <td>${idx + 1}</td>
+        <td><b>${item.skuCode || '—'}</b></td>
+        <td>${item.name || '—'}</td>
+        <td>${item.category || item.group || '—'}</td>
+        <td>${item.unit || '—'}</td>
+        <td>${item.gsm || '—'}</td>
+        <td>${item.pages || '—'}</td>
+        <td><b>${Number(item.openingStock ?? 0).toLocaleString('en-IN')}</b></td>
+        <td>${Number(item.minStockLevel ?? 0).toLocaleString('en-IN')}</td>
+        <td>${item.status || 'Active'}</td>
+      </tr>`;
+    }).join('');
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${title} - ${companyName}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; color: #1e293b; }
+            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #2563eb; padding-bottom: 12px; margin-bottom: 20px; }
+            .title { font-size: 20px; font-weight: bold; color: #1d4ed8; text-transform: uppercase; }
+            .sub { font-size: 12px; color: #64748b; margin-top: 4px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+            th { background-color: #f1f5f9; color: #334155; text-align: left; padding: 8px 10px; border: 1px solid #cbd5e1; font-size: 11px; text-transform: uppercase; }
+            td { padding: 8px 10px; border: 1px solid #e2e8f0; }
+            tr:nth-child(even) { background-color: #f8fafc; }
+            .summary { margin-top: 20px; font-size: 12px; font-weight: bold; text-align: right; color: #334155; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <div class="title">${companyName} — ${title}</div>
+              <div class="sub">Generated on ${dateStr} • Total Records: ${filteredAndSortedSkus.length}</div>
+            </div>
+          </div>
+          <table>
+            <thead><tr>${tableHeaders}</tr></thead>
+            <tbody>${tableRowsHtml}</tbody>
+          </table>
+          <div class="summary">Report Total Count: ${filteredAndSortedSkus.length}</div>
+          <script>
+            window.onload = function() { window.print(); };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWin.document.write(htmlContent);
+    printWin.document.close();
+  };
+
+  const handleDownloadSampleCSV = () => {
+    let headers: string[] = [];
+    let sampleRows: string[][] = [];
+
+    if (activeMainTab === 'products') {
+      headers = [
+        'ID / SKU Code',
+        'Item Name',
+        'Category',
+        'UOM',
+        'AUOM (Alt Unit)',
+        'Con Rate',
+        'GSM',
+        'Size',
+        'Pages / Sheets',
+        'Stock',
+        'Min Stock Level',
+        'Status'
+      ];
+      sampleRows = [
+        ['FG-001', 'Bestfriend (UR)', 'Longbooks', 'Pcs', 'PCS', '500', '52', '14.25 x 35 CM', '132 P', '10', '50', 'Active'],
+        ['FG-002', '142P Bestfriend (UR)', 'Executive Diaries', 'Pcs', 'PCS', '200', '52', '57 x 70 CM', '142 P', '100', '50', 'Active'],
+        ['NB-A4-192', 'Deluxe Spiral Notebook A4', 'Notebooks', 'Pcs', 'Box', '24', '70', '21 x 29.7 CM', '192 P', '500', '100', 'Active']
+      ];
+    } else if (activeMainTab === 'materials') {
+      headers = [
+        'ID / SKU Code',
+        'Item Name',
+        'Category',
+        'UOM',
+        'AUOM (Alt Unit)',
+        'Con Rate',
+        'GSM',
+        'Size',
+        'Sheets per Ream',
+        'Paper Type',
+        'Stock',
+        'Min Stock Level',
+        'Status'
+      ];
+      sampleRows = [
+        ['RM-PR-001', 'Maplitho Paper Reel 70 GSM', 'Paper Reels', 'Kg', 'Reels', '500', '70', '84 CM', '0', 'Reels', '1500', '300', 'Active'],
+        ['RM-DB-002', 'Duplex Board Grey Back 300 GSM', 'Duplex Cover Board', 'Pcs', 'Bundles', '100', '300', '57 x 70 CM', '500', 'Sheets', '2500', '500', 'Active'],
+        ['RM-CR-003', 'Craft Paper Reel 80 GSM', 'Paper Reels', 'Kg', 'Reels', '400', '80', '90 CM', '0', 'Reels', '1200', '200', 'Active']
+      ];
+    } else {
+      headers = [
+        'ID / SKU Code',
+        'Item Name',
+        'Category',
+        'UOM',
+        'AUOM (Alt Unit)',
+        'Con Rate',
+        'GSM',
+        'Size',
+        'Pages / Sheets',
+        'Stock',
+        'Min Stock Level',
+        'Status'
+      ];
+      sampleRows = [
+        ['SFG-001', 'Folded Inner Signature 192P', 'Inner Forms', 'Pcs', 'Bundles', '50', '52', '14.25 x 35 CM', '192 P', '800', '100', 'Active'],
+        ['SFG-002', 'Laminated Printed Covers A4', 'Covers', 'Pcs', 'Bundles', '100', '250', '57 x 70 CM', '0', '1200', '200', 'Active']
+      ];
+    }
+
+    const csvContent = '\uFEFF' + [
+      headers.join(','),
+      ...sampleRows.map(row => row.map(val => {
+        const clean = String(val).replace(/"/g, '""');
+        return clean.includes(',') || clean.includes('\n') ? `"${clean}"` : clean;
+      }).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `sample_${activeMainTab}_import_template.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(`Downloaded sample template for ${getTabLabel(activeMainTab)}`, 'success');
+  };
+
+  const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedCompany?._id) return;
+    setIsImporting(true);
+
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const rawRows: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+      if (!rawRows || rawRows.length <= 1) {
+        showToast('Uploaded file is empty or missing data rows', 'error');
+        setIsImporting(false);
+        return;
+      }
+
+      const headers: string[] = (rawRows[0] || []).map((h: any) => String(h || '').trim());
+      const headerMap: Record<string, number> = {};
+      headers.forEach((h, idx) => {
+        const cleanH = h.toLowerCase().replace(/[^a-z0-9]/g, '');
+        headerMap[cleanH] = idx;
+      });
+
+      const itemsToCreate: any[] = [];
+      for (let i = 1; i < rawRows.length; i++) {
+        const row = rawRows[i];
+        if (!row || row.length === 0 || !row.some(Boolean)) continue;
+
+        const getFieldVal = (...aliases: string[]) => {
+          for (const alias of aliases) {
+            const cleanK = alias.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const idx = headerMap[cleanK];
+            if (idx !== undefined && row[idx] !== undefined && row[idx] !== null) {
+              const valStr = String(row[idx]).trim();
+              if (valStr !== '') return valStr;
+            }
+          }
+          return '';
+        };
+
+        const skuCode = getFieldVal('idskucode', 'skucode', 'itemcode', 'code', 'id', 'productcode', 'skuid') || String(row[0] || '').trim();
+        const name = getFieldVal('itemname', 'materialname', 'productname', 'name', 'title') || String(row[1] || '').trim();
+        if (!name && !skuCode) continue;
+
+        const defaultTabCat = activeMainTab === 'materials' ? 'Raw Material' : activeMainTab === 'semi' ? 'Semi Finished' : 'Finished Goods';
+        const rawCategory = getFieldVal('category', 'itemcategory', 'group', 'itemgroup', 'categoryname');
+        const category = rawCategory || defaultTabCat;
+        const group = rawCategory || category;
+
+        const unit = getFieldVal('uom', 'unit', 'primaryunit', 'baseunit', 'mainunit') || (activeMainTab === 'materials' ? 'Kg' : 'Pcs');
+        const altUnit = getFieldVal('auomaltunit', 'auom', 'altunit', 'secondaryunit', 'alternateunit') || '';
+
+        // Extract Con Rate / Conversion Rate
+        const rawConRate = getFieldVal('conrate', 'conversionrate', 'altunitconversion', 'conversion', 'rate', 'factor');
+        let altUnitConversion: number | undefined = undefined;
+        if (rawConRate) {
+          const numDirect = Number(rawConRate);
+          if (!isNaN(numDirect) && numDirect > 0) {
+            altUnitConversion = numDirect;
+          } else {
+            const eqMatch = rawConRate.match(/=\s*(\d+(?:\.\d+)?)/);
+            if (eqMatch) {
+              altUnitConversion = Number(eqMatch[1]);
+            } else {
+              const allNums = rawConRate.match(/\d+(?:\.\d+)?/g);
+              if (allNums && allNums.length > 0) {
+                altUnitConversion = Number(allNums[allNums.length - 1]);
+              }
+            }
+          }
+        }
+
+        // Extract GSM
+        const rawGsm = getFieldVal('gsm', 'papergsm', 'grammage');
+        const gsmMatch = rawGsm.match(/(\d+(?:\.\d+)?)/);
+        const gsm = gsmMatch ? Number(gsmMatch[1]) : (rawGsm ? Number(rawGsm) || 0 : undefined);
+
+        // Extract Dimensions / Size
+        let width = Number(getFieldVal('width', 'widthcm', 'widthmm', 'breadth')) || undefined;
+        let length = Number(getFieldVal('length', 'lengthcm', 'lengthmm', 'height')) || undefined;
+        const rawSize = getFieldVal('size', 'dimensions', 'dimension', 'booksize', 'cutsize');
+        if ((!width || !length) && rawSize) {
+          const dimMatch = rawSize.match(/(\d+(?:\.\d+)?)\s*[xX\*]\s*(\d+(?:\.\d+)?)/);
+          if (dimMatch) {
+            if (!width) width = Number(dimMatch[1]);
+            if (!length) length = Number(dimMatch[2]);
+          } else {
+            const singleDim = rawSize.match(/(\d+(?:\.\d+)?)/);
+            if (singleDim && !width) {
+              width = Number(singleDim[1]);
+            }
+          }
+        }
+
+        // Extract Pages / Sheets
+        const rawPages = getFieldVal('pagessheets', 'pages', 'sheetsperream', 'sheets', 'reamsheets', 'bookpages', 'sheetcount');
+        const pagesMatch = rawPages.match(/(\d+)/);
+        const pages = pagesMatch ? Number(pagesMatch[1]) : (rawPages ? Number(rawPages) || undefined : undefined);
+
+        // Extract Paper Type
+        const rawPaperType = getFieldVal('papertype', 'papertypeform', 'type', 'materialtype');
+        let paperType: 'Reels' | 'Sheets' | 'None' = 'None';
+        if (/reel/i.test(rawPaperType)) {
+          paperType = 'Reels';
+        } else if (/sheet/i.test(rawPaperType) || /board/i.test(rawPaperType)) {
+          paperType = 'Sheets';
+        } else if (activeMainTab === 'materials') {
+          if ((rawCategory || '').toLowerCase().includes('reel') || (name || '').toLowerCase().includes('reel')) paperType = 'Reels';
+          else if ((rawCategory || '').toLowerCase().includes('board') || (rawCategory || '').toLowerCase().includes('sheet')) paperType = 'Sheets';
+          else paperType = 'Reels';
+        }
+
+        // Extract Stock
+        const rawStock = getFieldVal('stock', 'openingstock', 'presentstock', 'qty', 'quantity', 'currentstock');
+        const stockMatch = rawStock.match(/(\d+(?:\.\d+)?)/);
+        const openingStock = stockMatch ? Number(stockMatch[1]) : (rawStock ? Number(rawStock) || 0 : 0);
+
+        // Extract Min Stock
+        const rawMinStock = getFieldVal('minstocklevel', 'minstock', 'minimumstock', 'reorderlevel', 'lowstockalert');
+        const minStockMatch = rawMinStock.match(/(\d+(?:\.\d+)?)/);
+        const minStockLevel = minStockMatch ? Number(minStockMatch[1]) : (rawMinStock ? Number(rawMinStock) || undefined : undefined);
+
+        // Extract Status
+        const rawStatus = getFieldVal('status', 'itemstatus', 'state').toLowerCase();
+        const status: 'Active' | 'Inactive' = rawStatus === 'inactive' ? 'Inactive' : 'Active';
+
+        itemsToCreate.push({
+          company: selectedCompany._id,
+          skuCode: skuCode || `SKU-${Date.now()}-${i}`,
+          name: name || skuCode,
+          category,
+          group,
+          unit,
+          altUnit: altUnit || undefined,
+          altUnitConversion,
+          gsm,
+          pages,
+          width,
+          length,
+          paperType,
+          openingStock,
+          presentStock: openingStock,
+          minStockLevel,
+          status
+        });
+      }
+
+      if (itemsToCreate.length === 0) {
+        showToast('No valid item records parsed from file', 'warning');
+        setIsImporting(false);
+        return;
+      }
+
+      let createdCount = 0;
+      let updatedCount = 0;
+
+      // Try bulk import first for instant upsert
+      let bulkSucceeded = false;
+      try {
+        const bulkRes = await bulkImportSkusV2(itemsToCreate, selectedCompany._id);
+        if (bulkRes && (bulkRes.importedCount !== undefined || bulkRes.msg)) {
+          bulkSucceeded = true;
+          showToast(bulkRes.msg || `Successfully processed ${itemsToCreate.length} item(s)!`, 'success');
+        }
+      } catch (bulkErr) {
+        console.warn('Bulk import endpoint returned error, falling back to per-item upsert:', bulkErr);
+      }
+
+      // Fallback: per-item create / update if bulkWrite wasn't processed
+      if (!bulkSucceeded) {
+        for (const item of itemsToCreate) {
+          try {
+            const existingItem = skus.find(s => (s.skuCode || '').toLowerCase().trim() === item.skuCode.toLowerCase().trim());
+            if (existingItem && existingItem._id) {
+              await updateSkuV2(existingItem._id, item);
+              updatedCount++;
+            } else {
+              await createSkuV2(item);
+              createdCount++;
+            }
+          } catch (itemErr) {
+            console.error('Failed to import SKU row:', item, itemErr);
+          }
+        }
+
+        const summaryMsg = updatedCount > 0 
+          ? `Successfully imported: ${createdCount} created, ${updatedCount} updated!`
+          : `Successfully imported ${createdCount} item(s) into database!`;
+        showToast(summaryMsg, 'success');
+      }
+
+      createActivityLog({
+        action: 'IMPORT',
+        entityType: 'SkuV2',
+        entityName: `${itemsToCreate.length} items imported`,
+        details: `Imported ${itemsToCreate.length} items into ${activeMainTab} via file import`,
+        company: selectedCompany?._id
+      }).catch(() => {});
+
+      await loadSkus(false);
+    } catch (err: any) {
+      console.error('Import failed:', err);
+      showToast(err.message || 'Failed to import file', 'error');
+    } finally {
+      setIsImporting(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleFindDuplicates = () => {
+    setIsScanningDuplicates(true);
+    try {
+      const listToScan = tabFilteredSkus.length > 0 ? tabFilteredSkus : skus;
+      const groups: { field: string; value: string; items: SkuV2[] }[] = [];
+
+      const codeMap = new Map<string, SkuV2[]>();
+      const nameMap = new Map<string, SkuV2[]>();
+
+      listToScan.forEach(item => {
+        const code = (item.skuCode || '').trim().toLowerCase();
+        const name = (item.name || '').trim().toLowerCase();
+
+        if (code && code !== '-' && code !== 'n/a' && code !== 'none') {
+          if (!codeMap.has(code)) codeMap.set(code, []);
+          codeMap.get(code)!.push(item);
+        }
+
+        if (name && name !== '-' && name !== 'n/a' && name !== 'none') {
+          if (!nameMap.has(name)) nameMap.set(name, []);
+          nameMap.get(name)!.push(item);
+        }
+      });
+
+      codeMap.forEach((items) => {
+        if (items.length > 1) {
+          groups.push({ field: 'SKU Code', value: items[0].skuCode, items });
+        }
+      });
+
+      nameMap.forEach((items) => {
+        if (items.length > 1) {
+          const ids = new Set(items.map(it => it._id));
+          const alreadyAdded = groups.some(g => g.items.length === items.length && g.items.every(it => ids.has(it._id)));
+          if (!alreadyAdded) {
+            groups.push({ field: 'Item Name', value: items[0].name, items });
+          }
+        }
+      });
+
+      setDuplicateGroups(groups);
+      setHighlightedDuplicateIdx(0);
+      setShowDuplicatesModal(true);
+
+      if (groups.length === 0) {
+        showToast(`No duplicate items found! All ${getTabLabel(activeMainTab)} are unique.`, 'success');
+      } else {
+        showToast(`Found ${groups.length} duplicate group(s) in ${getTabLabel(activeMainTab)}!`, 'info');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Failed to scan for duplicates', 'error');
+    } finally {
+      setIsScanningDuplicates(false);
+    }
+  };
+
+  const handleDeleteDuplicateItem = async (sku: SkuV2) => {
+    if (!sku._id || !selectedCompany?._id) return;
+    try {
+      // Record sequence so deleted ID is never reused
+      const numMatch = (sku.skuCode || '').match(/([A-Z]+)-(\d+)/i);
+      if (numMatch) {
+        const p = numMatch[1].toUpperCase();
+        const n = parseInt(numMatch[2], 10);
+        const localMaxKey = `skbw_max_sku_seq_${selectedCompany._id}_${p}`;
+        const currentMax = parseInt(localStorage.getItem(localMaxKey) || '0', 10);
+        if (!isNaN(n) && n > currentMax) {
+          localStorage.setItem(localMaxKey, String(n));
+        }
+      }
+
+      await deleteSkuV2(sku._id, selectedCompany._id);
+      showToast(`Deleted item ${sku.skuCode}`, 'success');
+      setDuplicateGroups(prev => prev.map(g => ({
+        ...g,
+        items: g.items.filter(it => it._id !== sku._id)
+      })).filter(g => g.items.length > 1));
+      loadSkus(false);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to delete item', 'error');
+    }
   };
 
   // Delete Single SKU
   const handleDeleteSku = async () => {
     if (!deleteConfirmSku?._id) return;
     try {
+      // Record sequence so deleted ID is never reused
+      if (deleteConfirmSku.skuCode && selectedCompany?._id) {
+        const numMatch = deleteConfirmSku.skuCode.match(/([A-Z]+)-(\d+)/i);
+        if (numMatch) {
+          const p = numMatch[1].toUpperCase();
+          const n = parseInt(numMatch[2], 10);
+          const localMaxKey = `skbw_max_sku_seq_${selectedCompany._id}_${p}`;
+          const currentMax = parseInt(localStorage.getItem(localMaxKey) || '0', 10);
+          if (!isNaN(n) && n > currentMax) {
+            localStorage.setItem(localMaxKey, String(n));
+          }
+        }
+      }
+
       await deleteSkuV2(deleteConfirmSku._id, selectedCompany?._id || '');
       showToast(`Item '${deleteConfirmSku.skuCode}' deleted`, 'success');
       setDeleteConfirmSku(null);
@@ -1445,7 +2120,7 @@ const SkuMasterV2: React.FC = () => {
         action: 'DELETE',
         entityType: 'SkuV2',
         entityName: deleteConfirmSku.skuCode,
-        details: `Deleted item '${deleteConfirmSku.name}'`,
+        details: `Deleted item '${deleteConfirmSku.name}' (${deleteConfirmSku.skuCode}). Code is retired.`,
         company: selectedCompany?._id
       }).catch(() => {});
     } catch (e) {
@@ -1585,46 +2260,46 @@ const SkuMasterV2: React.FC = () => {
         
         {/* Tab 1: Products (All Finished Products) */}
         <button
-          onClick={() => setActiveMainTab('products')}
+          onClick={() => handleMainTabChange('products')}
           className={`flex items-center gap-2 px-4 py-3 text-xs md:text-sm font-bold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
             activeMainTab === 'products'
               ? 'text-teal-700 border-teal-700 bg-transparent'
               : 'text-slate-500 hover:text-slate-800 border-transparent hover:border-slate-300 bg-transparent'
           }`}
         >
-          <BookOpen className={`w-4 h-4 ${activeMainTab === 'products' ? 'text-teal-700' : 'text-slate-400'}`} />
+          <Package className={`w-4 h-4 ${activeMainTab === 'products' ? 'text-teal-700' : 'text-slate-400'}`} />
           <span>Products</span>
         </button>
 
         {/* Tab 2: Materials (All Raw Materials) */}
         <button
-          onClick={() => setActiveMainTab('materials')}
+          onClick={() => handleMainTabChange('materials')}
           className={`flex items-center gap-2 px-4 py-3 text-xs md:text-sm font-bold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
             activeMainTab === 'materials'
               ? 'text-teal-700 border-teal-700 bg-transparent'
               : 'text-slate-500 hover:text-slate-800 border-transparent hover:border-slate-300 bg-transparent'
           }`}
         >
-          <Scroll className={`w-4 h-4 ${activeMainTab === 'materials' ? 'text-teal-700' : 'text-slate-400'}`} />
+          <Layers className={`w-4 h-4 ${activeMainTab === 'materials' ? 'text-teal-700' : 'text-slate-400'}`} />
           <span>Materials</span>
         </button>
 
         {/* Tab 3: Semi (Only Semi Finished Materials) */}
         <button
-          onClick={() => setActiveMainTab('semi')}
+          onClick={() => handleMainTabChange('semi')}
           className={`flex items-center gap-2 px-4 py-3 text-xs md:text-sm font-bold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
             activeMainTab === 'semi'
               ? 'text-teal-700 border-teal-700 bg-transparent'
               : 'text-slate-500 hover:text-slate-800 border-transparent hover:border-slate-300 bg-transparent'
           }`}
         >
-          <Copy className={`w-4 h-4 ${activeMainTab === 'semi' ? 'text-teal-700' : 'text-slate-400'}`} />
+          <Boxes className={`w-4 h-4 ${activeMainTab === 'semi' ? 'text-teal-700' : 'text-slate-400'}`} />
           <span>Semi</span>
         </button>
 
         {/* Tab 4: Categories */}
         <button
-          onClick={() => setActiveMainTab('categories')}
+          onClick={() => handleMainTabChange('categories')}
           className={`flex items-center gap-2 px-4 py-3 text-xs md:text-sm font-bold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
             activeMainTab === 'categories'
               ? 'text-teal-700 border-teal-700 bg-transparent'
@@ -1652,102 +2327,58 @@ const SkuMasterV2: React.FC = () => {
               </span>
             </div>
 
-            {/* Right Toolbar Controls */}
-            <div className="flex items-center flex-wrap gap-2.5">
-
-              {/* 0. Column Customizer Popover Tool */}
-              <div className="relative" ref={columnCustomizerRef}>
-                <button
-                  type="button"
-                  onClick={() => setShowColumnCustomizer(!showColumnCustomizer)}
-                  className={`px-3 py-2 rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-2xs ${
-                    showColumnCustomizer ? 'bg-blue-50 text-blue-700 border-blue-300' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-                  }`}
-                  title="Customize & Rearrange Columns"
-                >
-                  <SlidersHorizontal className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Columns ({columnsConfig.filter(c => c.visible).length})</span>
-                </button>
-
-                {showColumnCustomizer && (
-                  <div className="absolute left-0 sm:right-0 sm:left-auto top-full mt-2 w-72 bg-white/95 backdrop-blur-md rounded-2xl border border-gray-200 shadow-2xl p-3.5 z-50 animate-in fade-in duration-150 text-left">
-                    <div className="flex items-center justify-between pb-2.5 border-b border-gray-100 mb-2.5">
-                      <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Customize Columns</h4>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (activeMainTab === 'materials') setColumnsConfig(DEFAULT_MATERIALS_COLUMNS);
-                          else if (activeMainTab === 'semi') setColumnsConfig(DEFAULT_SEMI_COLUMNS);
-                          else setColumnsConfig(DEFAULT_PRODUCTS_COLUMNS);
-                        }}
-                        className="text-[10.5px] font-bold text-blue-600 hover:underline cursor-pointer"
-                      >
-                        Reset default
-                      </button>
-                    </div>
-
-                    <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
-                      {columnsConfig
-                        .filter(col => {
-                          if (col.id === 'bom' && activeMainTab !== 'products' && activeMainTab !== 'semi') return false;
-                          if (col.id === 'pages' && activeMainTab === 'materials') return false;
-                          return true;
-                        })
-                        .map((col, idx) => (
-                        <div
-                          key={col.id}
-                          draggable={true}
-                          onDragStart={(e) => handlePopoverDragStart(e, idx)}
-                          onDragOver={handlePopoverDragOver}
-                          onDrop={(e) => handlePopoverDrop(e, idx)}
-                          className={`flex items-center justify-between p-2.5 rounded-xl border text-xs font-semibold cursor-grab active:cursor-grabbing transition-all select-none ${
-                            draggedPopoverColIdx === idx
-                              ? 'bg-blue-100/90 border-blue-500 shadow-xl scale-[1.02] opacity-80 ring-2 ring-blue-400 z-10'
-                              : 'bg-gray-50/80 border-gray-200/80 hover:bg-blue-50/40 hover:border-blue-300'
-                          }`}
-                        >
-                          <label className="flex items-center gap-2.5 cursor-pointer text-gray-800 font-semibold" onClick={(e) => e.stopPropagation()}>
-                            <span className="text-gray-400 font-bold select-none text-xs">⋮⋮</span>
-                            <input
-                              type="checkbox"
-                              checked={col.visible}
-                              onChange={(e) => {
-                                const checked = e.target.checked;
-                                setColumnsConfig(prev => prev.map(c => c.id === col.id ? { ...c, visible: checked } : c));
-                              }}
-                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
-                            />
-                            <span className="text-[12px]">{col.label}</span>
-                          </label>
-
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-white border border-gray-200 px-1.5 py-0.5 rounded shadow-2xs">
-                            Drag
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+            {/* Right Action Bar (Search + Icon-Only Action Tools + Add Item Button) matching Business Directory */}
+            <div ref={toolbarActionsRef} className="py-1 flex items-center gap-2 flex-wrap shrink-0 relative z-40">
+              
+              {/* 1. Global Search Box */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={`Search ${getTabLabel(activeMainTab).toLowerCase()}...`}
+                  className="pl-8 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl w-40 md:w-52 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+                />
+                {search && (
+                  <button 
+                    onClick={() => setSearch('')}
+                    className="absolute right-2 top-2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
                 )}
               </div>
-              
-              {/* 1. Filter funnel icon button with Popover matching Images 3 & 4 */}
+
+              {/* 2. Filters Icon Button & Dynamic Filter Popover */}
               <div className="relative" ref={filterDropdownRef}>
                 <button
-                  onClick={() => setShowFilterPanel(!showFilterPanel)}
-                  className={`p-2 rounded-lg border transition-all cursor-pointer ${
-                    showFilterPanel || filterRules.length > 0
-                      ? 'bg-blue-50 text-blue-700 border-blue-300'
-                      : 'bg-white text-blue-600 border-gray-200 hover:bg-blue-50/50'
+                  type="button"
+                  onClick={() => {
+                    setShowFilterPanel(!showFilterPanel);
+                    setShowSortMenu(false);
+                    setShowColumnPicker(false);
+                    setShowExportMenu(false);
+                  }}
+                  className={`p-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
+                    filterRules.length > 0
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-blue-100'
+                      : 'bg-white hover:bg-blue-50/60 text-blue-600 border-gray-200 hover:border-blue-200'
                   }`}
-                  title="Filter options"
+                  title={`Filter Results ${filterRules.length > 0 ? `(${filterRules.length} rules)` : ''}`}
+                  aria-label="Filter Results"
                 >
-                  <Filter className="w-4 h-4 text-blue-600" />
+                  <Filter className="w-4 h-4" />
                 </button>
+                {!showFilterPanel && (
+                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                    Filters
+                  </div>
+                )}
 
-                {/* Filter Popover matching Images 3 & 4 */}
+                {/* Filter Popover matching Business Directory */}
                 {showFilterPanel && (
-                  <div className="absolute left-0 sm:right-0 sm:left-auto top-full mt-2 w-80 sm:w-96 bg-white/95 backdrop-blur-md rounded-2xl border border-gray-200 shadow-2xl p-4 z-50 animate-in fade-in slide-in-from-top-2 duration-150 text-left">
-                    {/* Header */}
+                  <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white/95 backdrop-blur-md rounded-2xl border border-gray-200 shadow-2xl p-4 z-50 animate-in fade-in zoom-in-95 duration-150 text-left">
                     <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-3">
                       <div className="flex items-center gap-2">
                         <h4 className="text-sm font-bold text-gray-900">Filters</h4>
@@ -1757,20 +2388,28 @@ const SkuMasterV2: React.FC = () => {
                           </span>
                         )}
                       </div>
-                      {filterRules.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        {filterRules.length > 0 && (
+                          <button
+                            onClick={() => setFilterRules([])}
+                            className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+                          >
+                            Clear All
+                          </button>
+                        )}
                         <button
-                          onClick={() => setFilterRules([])}
-                          className="text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline cursor-pointer"
+                          onClick={() => setShowFilterPanel(false)}
+                          className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 cursor-pointer"
                         >
-                          Clear all
+                          <X className="w-4 h-4" />
                         </button>
-                      )}
+                      </div>
                     </div>
 
                     {/* Rules list */}
                     {filterRules.length === 0 ? (
-                      <div className="border border-dashed border-gray-300 rounded-2xl p-6 text-center">
-                        <p className="text-sm font-semibold text-gray-700">No filters applied</p>
+                      <div className="border border-dashed border-gray-300 rounded-2xl p-6 text-center bg-white">
+                        <p className="text-sm font-bold text-gray-800">No filters applied</p>
                         <p className="text-xs text-gray-400 mt-1">Add a filter to narrow down rows</p>
                       </div>
                     ) : (
@@ -1796,11 +2435,12 @@ const SkuMasterV2: React.FC = () => {
                               }}
                               className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 bg-white cursor-pointer"
                             >
-                              <option value="name">Name</option>
-                              <option value="skuCode">ID / SKU Code</option>
+                              <option value="name">Item Name</option>
+                              <option value="skuCode">SKU Code</option>
                               <option value="category">Category</option>
                               <option value="unit">UOM</option>
                               <option value="gsm">GSM</option>
+                              <option value="pages">Pages</option>
                               <option value="openingStock">Stock</option>
                             </select>
 
@@ -1843,7 +2483,7 @@ const SkuMasterV2: React.FC = () => {
                           { id: 'filter_' + Date.now(), field: 'name', operator: 'contains', value: '' }
                         ]);
                       }}
-                      className="w-full mt-3 py-2.5 border border-dashed border-gray-300 hover:border-blue-300 hover:bg-blue-50/40 rounded-xl text-xs font-semibold text-gray-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      className="w-full mt-3 py-2.5 border border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50/40 rounded-xl text-xs font-semibold text-gray-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Add filter</span>
@@ -1852,169 +2492,298 @@ const SkuMasterV2: React.FC = () => {
                 )}
               </div>
 
-              {/* 2. Interactive Products Sub-Filter Custom Dropdown (ONLY shown in Products tab!) */}
-              {activeMainTab === 'products' ? (
-                <div className="relative" ref={dropdownRef}>
-                  <button
-                    type="button"
-                    onClick={() => setShowProductTypeDropdown(!showProductTypeDropdown)}
-                    className={`bg-white hover:bg-gray-50 border rounded-xl px-3.5 py-2 text-xs font-semibold text-gray-800 flex items-center gap-2 shadow-2xs transition-all cursor-pointer ${
-                      showProductTypeDropdown ? 'border-emerald-600 ring-2 ring-emerald-100' : 'border-gray-200'
-                    }`}
-                  >
-                    <BookOpen className="w-3.5 h-3.5 text-blue-600" />
-                    <span>
-                      {selectedProductSubFilter === 'all'
-                        ? 'All products'
-                        : selectedProductSubFilter === 'finished-goods'
-                        ? 'Finished Goods'
-                        : 'Diaries & Registers'}
-                    </span>
-                    {showProductTypeDropdown ? (
-                      <ChevronUp className="w-3.5 h-3.5 text-blue-600 ml-1" />
-                    ) : (
-                      <ChevronDown className="w-3.5 h-3.5 text-gray-400 ml-1" />
-                    )}
-                  </button>
-
-                  {/* Dropdown Menu Popup matching Image 1 & 2 */}
-                  {showProductTypeDropdown && (
-                    <div className="absolute right-0 top-full mt-1.5 w-64 bg-white/95 backdrop-blur-md rounded-2xl border border-gray-100 shadow-xl p-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                      {/* Option 1: All products */}
-                      <button
-                        onClick={() => {
-                          setSelectedProductSubFilter('all');
-                          setCategoryFilter('');
-                          setShowProductTypeDropdown(false);
-                        }}
-                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                          selectedProductSubFilter === 'all'
-                            ? 'bg-emerald-50/70 text-blue-700 font-bold'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <BookOpen className="w-4 h-4 text-blue-600" />
-                          <span>All products ({productCounts.all})</span>
-                        </div>
-                        {selectedProductSubFilter === 'all' && (
-                          <Check className="w-4 h-4 text-blue-600 font-bold stroke-[3]" />
-                        )}
-                      </button>
-
-                      {/* Option 2: Finished Goods */}
-                      <button
-                        onClick={() => {
-                          setSelectedProductSubFilter('finished-goods');
-                          setShowProductTypeDropdown(false);
-                        }}
-                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                          selectedProductSubFilter === 'finished-goods'
-                            ? 'bg-emerald-50/70 text-blue-700 font-bold'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <Book className="w-4 h-4 text-blue-600" />
-                          <span>Finished Goods ({productCounts.finishedGoods})</span>
-                        </div>
-                        {selectedProductSubFilter === 'finished-goods' && (
-                          <Check className="w-4 h-4 text-blue-600 font-bold stroke-[3]" />
-                        )}
-                      </button>
-
-                      {/* Option 3: Diaries & Registers */}
-                      <button
-                        onClick={() => {
-                          setSelectedProductSubFilter('sub-assemblies');
-                          setShowProductTypeDropdown(false);
-                        }}
-                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                          selectedProductSubFilter === 'sub-assemblies'
-                            ? 'bg-emerald-50/70 text-blue-700 font-bold'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <Scroll className="w-4 h-4 text-blue-600" />
-                          <span>Diaries & Registers ({productCounts.subAssemblies})</span>
-                        </div>
-                        {selectedProductSubFilter === 'sub-assemblies' && (
-                          <Check className="w-4 h-4 text-blue-600 font-bold stroke-[3]" />
-                        )}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : null}
-
-              {/* 3. Help icon button */}
-              <button 
-                onClick={() => setShowHelpModal(true)}
-                className="p-2 text-blue-600 hover:bg-blue-50/50 rounded-lg border border-transparent hover:border-blue-100 transition-all cursor-pointer"
-                title="Help & Info"
-              >
-                <HelpCircle className="w-4 h-4" />
-              </button>
-
-              {/* 4. Build BOMs / Bulk Edit BOM button (Replaces Activity Log in Products tab matching Screenshot 1!) */}
-              {activeMainTab === 'products' && (
-                <button 
-                  onClick={() => setShowBuildBomsModal(true)}
-                  className="p-2 text-emerald-700 bg-emerald-50/80 hover:bg-emerald-100/90 rounded-xl border border-emerald-200/80 transition-all cursor-pointer shadow-2xs flex items-center gap-1.5"
-                  title="Build BOMs / Bulk Edit BOM"
+              {/* 3. Sort Icon Button & Dropdown */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSortMenu(!showSortMenu);
+                    setShowColumnPicker(false);
+                    setShowExportMenu(false);
+                    setShowFilterPanel(false);
+                  }}
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  title="Sort Records"
+                  aria-label="Sort Records"
                 >
-                  <ClipboardList className="w-4 h-4 text-emerald-700 stroke-[2.2]" />
+                  <ArrowUpDown className="w-4 h-4" />
                 </button>
-              )}
-
-              {/* 5. Share / Export button */}
-              <button 
-                onClick={handleExportCSV}
-                className="p-2 text-blue-600 hover:bg-blue-50/50 rounded-lg border border-transparent hover:border-blue-100 transition-all cursor-pointer"
-                title="Export Data"
-              >
-                <Share2 className="w-4 h-4" />
-              </button>
-
-              {/* 6. Global Search Box Input (Replaces dropdown in Materials & Semi modules!) */}
-              <div className="relative">
-                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder={`Search ${getTabLabel(activeMainTab).toLowerCase()}...`}
-                  className="pl-9 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-xl w-48 md:w-60 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs"
-                />
-                {search && (
-                  <button 
-                    onClick={() => setSearch('')}
-                    className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
+                {!showSortMenu && (
+                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                    Sort Options
+                  </div>
+                )}
+                {showSortMenu && (
+                  <div className="absolute right-0 mt-1.5 w-52 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs text-left">
+                    <div className="px-2 py-1 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Sort Options</div>
+                    <button
+                      onClick={() => { setSortRules([{ field: 'name', order: 'asc' }]); setShowSortMenu(false); }}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortRules[0]?.field === 'name' && sortRules[0]?.order === 'asc' ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-gray-50 text-gray-700 cursor-pointer'}`}
+                    >
+                      <span>Item Name (A to Z)</span>
+                    </button>
+                    <button
+                      onClick={() => { setSortRules([{ field: 'name', order: 'desc' }]); setShowSortMenu(false); }}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortRules[0]?.field === 'name' && sortRules[0]?.order === 'desc' ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-gray-50 text-gray-700 cursor-pointer'}`}
+                    >
+                      <span>Item Name (Z to A)</span>
+                    </button>
+                    <button
+                      onClick={() => { setSortRules([{ field: 'openingStock', order: 'desc' }]); setShowSortMenu(false); }}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortRules[0]?.field === 'openingStock' && sortRules[0]?.order === 'desc' ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-gray-50 text-gray-700 cursor-pointer'}`}
+                    >
+                      <span>Stock (High to Low)</span>
+                    </button>
+                    <button
+                      onClick={() => { setSortRules([{ field: 'openingStock', order: 'asc' }]); setShowSortMenu(false); }}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortRules[0]?.field === 'openingStock' && sortRules[0]?.order === 'asc' ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-gray-50 text-gray-700 cursor-pointer'}`}
+                    >
+                      <span>Stock (Low to High)</span>
+                    </button>
+                    <button
+                      onClick={() => { setSortRules([{ field: 'skuCode', order: 'asc' }]); setShowSortMenu(false); }}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortRules[0]?.field === 'skuCode' ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-gray-50 text-gray-700 cursor-pointer'}`}
+                    >
+                      <span>SKU Code (A to Z)</span>
+                    </button>
+                    <button
+                      onClick={() => { setSortRules([{ field: 'category', order: 'asc' }]); setShowSortMenu(false); }}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortRules[0]?.field === 'category' ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-gray-50 text-gray-700 cursor-pointer'}`}
+                    >
+                      <span>Category (A to Z)</span>
+                    </button>
+                  </div>
                 )}
               </div>
 
-              {/* 7. Download icon button */}
-              <button
-                onClick={handleExportCSV}
-                className="p-2 text-blue-600 hover:bg-blue-50/50 rounded-lg border border-transparent hover:border-blue-100 transition-all cursor-pointer"
-                title="Download CSV/Excel"
-              >
-                <Download className="w-4 h-4" />
-              </button>
+              {/* 4. Columns Icon Button & Dropdown */}
+              <div className="relative group" ref={columnCustomizerRef}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowColumnPicker(!showColumnPicker);
+                    setShowSortMenu(false);
+                    setShowExportMenu(false);
+                    setShowFilterPanel(false);
+                  }}
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  title="Toggle Columns"
+                  aria-label="Toggle Columns"
+                >
+                  <Columns className="w-4 h-4" />
+                </button>
+                {!showColumnPicker && (
+                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                    Column Visibility
+                  </div>
+                )}
+                {showColumnPicker && (
+                  <div className="absolute right-0 mt-1.5 w-60 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-3 space-y-2 text-xs text-left">
+                    <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                      <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Visible Columns</span>
+                      <button 
+                        onClick={() => {
+                          if (activeMainTab === 'materials') setColumnsConfig(DEFAULT_MATERIALS_COLUMNS);
+                          else if (activeMainTab === 'semi') setColumnsConfig(DEFAULT_SEMI_COLUMNS);
+                          else setColumnsConfig(DEFAULT_PRODUCTS_COLUMNS);
+                        }} 
+                        className="text-[10.5px] text-blue-600 font-bold hover:underline cursor-pointer"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                    <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
+                      {columnsConfig
+                        .filter(col => {
+                          if (col.id === 'bom' && activeMainTab !== 'products' && activeMainTab !== 'semi') return false;
+                          if (col.id === 'pages' && activeMainTab === 'materials') return false;
+                          return true;
+                        })
+                        .map((col, idx) => (
+                          <div
+                            key={col.id}
+                            draggable={true}
+                            onDragStart={(e) => handlePopoverDragStart(e, idx)}
+                            onDragOver={handlePopoverDragOver}
+                            onDrop={(e) => handlePopoverDrop(e, idx)}
+                            className={`flex items-center justify-between p-1.5 rounded-lg border text-xs font-semibold cursor-grab active:cursor-grabbing transition-all select-none ${
+                              draggedPopoverColIdx === idx
+                                ? 'bg-blue-100/90 border-blue-500 shadow-md scale-[1.01] opacity-80'
+                                : 'bg-gray-50/80 border-gray-200/80 hover:bg-blue-50/40 hover:border-blue-300'
+                            }`}
+                          >
+                            <label className="flex items-center gap-2 cursor-pointer text-gray-800 font-semibold" onClick={(e) => e.stopPropagation()}>
+                              <span className="text-gray-400 font-bold select-none text-[10px]">⋮⋮</span>
+                              <input
+                                type="checkbox"
+                                checked={col.visible}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setColumnsConfig(prev => prev.map(c => c.id === col.id ? { ...c, visible: checked } : c));
+                                }}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
+                              />
+                              <span className="text-xs">{col.label}</span>
+                            </label>
+                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider bg-white border border-gray-200 px-1 py-0.2 rounded shadow-2xs">
+                              Drag
+                            </span>
+                          </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
 
-              {/* 8. Plus Circle Button */}
-              <button
-                onClick={() => { setEditSku(null); setShowAddDrawer(true); }}
-                className="w-8 h-8 rounded-full border border-gray-200 bg-white hover:bg-blue-50 text-blue-600 flex items-center justify-center transition-all shadow-2xs cursor-pointer font-bold"
-                title={`Add ${getTabLabel(activeMainTab).slice(0, -1)}`}
-              >
-                <Plus className="w-4 h-4 text-blue-600" />
-              </button>
+              {/* 5. Export Icon Button & Dropdown */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowExportMenu(!showExportMenu);
+                    setShowSortMenu(false);
+                    setShowColumnPicker(false);
+                    setShowFilterPanel(false);
+                  }}
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  title="Export Data (PDF / Excel)"
+                  aria-label="Export Data (PDF / Excel)"
+                >
+                  <Download className="w-4 h-4" />
+                </button>
+                {!showExportMenu && (
+                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                    Export Data
+                  </div>
+                )}
+                {showExportMenu && (
+                  <div className="absolute right-0 mt-1.5 w-44 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs text-left">
+                    <button
+                      onClick={() => { handleExportExcel(); setShowExportMenu(false); }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-xl font-semibold hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 text-gray-700 cursor-pointer"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Export Excel (.xlsx)</span>
+                    </button>
+                    <button
+                      onClick={() => { handleExportPDF(); setShowExportMenu(false); }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-xl font-semibold hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 text-gray-700 cursor-pointer"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Export PDF</span>
+                    </button>
+                  </div>
+                )}
+              </div>
 
+              {/* 6. Sample CSV Icon Button */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={handleDownloadSampleCSV}
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 text-blue-600 border border-gray-200 hover:border-blue-200 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  title="Download Sample CSV Template"
+                  aria-label="Download Sample CSV Template"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-blue-600" />
+                </button>
+                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                  Sample CSV
+                </div>
+              </div>
+
+              {/* 7. Import CSV Icon Button */}
+              <div className="relative group">
+                <label
+                  className={`p-2 rounded-xl border text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
+                    isImporting ? 'bg-blue-100 border-blue-300 animate-pulse' : 'bg-white hover:bg-blue-50/60 border-gray-200 hover:border-blue-200'
+                  }`}
+                  title="Import Excel/CSV File"
+                  aria-label="Import Excel/CSV File"
+                >
+                  <Upload className={`w-4 h-4 text-blue-600 ${isImporting ? 'animate-bounce' : ''}`} />
+                  <input
+                    type="file"
+                    accept=".csv,.xlsx,.xls"
+                    disabled={isImporting}
+                    onChange={handleImportCSV}
+                    className="hidden"
+                  />
+                </label>
+                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                  Import Excel/CSV
+                </div>
+              </div>
+
+              {/* 8. Activity Logs Icon Button */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={() => {
+                    fetchActivityLogs();
+                    setShowActivityLog(true);
+                  }}
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  title="Activity Logs"
+                  aria-label="Activity Logs"
+                >
+                  <History className="w-4 h-4 text-blue-600" />
+                </button>
+                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                  Activity Logs
+                </div>
+              </div>
+
+              {/* 9. Find Duplicates Icon Button */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={handleFindDuplicates}
+                  disabled={isScanningDuplicates}
+                  className="p-2 rounded-xl bg-amber-50 hover:bg-amber-100/80 border border-amber-200 text-amber-700 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  title="Scan for Duplicate Items"
+                  aria-label="Scan for Duplicate Items"
+                >
+                  <Copy className={`w-4 h-4 text-amber-600 ${isScanningDuplicates ? 'animate-spin' : ''}`} />
+                </button>
+                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                  Find Duplicates
+                </div>
+              </div>
+
+              {/* Optional: Build BOMs quick action for Products tab */}
+              {activeMainTab === 'products' && (
+                <div className="relative group">
+                  <button 
+                    type="button"
+                    onClick={() => setShowBuildBomsModal(true)}
+                    className="p-2 text-emerald-700 bg-emerald-50/80 hover:bg-emerald-100/90 rounded-xl border border-emerald-200/80 transition-all cursor-pointer shadow-2xs flex items-center justify-center"
+                    title="Build BOMs / Bulk Recipe Matrix"
+                    aria-label="Build BOMs / Bulk Recipe Matrix"
+                  >
+                    <ClipboardList className="w-4 h-4 text-emerald-700 stroke-[2.2]" />
+                  </button>
+                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                    Build BOMs
+                  </div>
+                </div>
+              )}
+
+              {/* 10. Add New Item Icon Button (Circular + Button) */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={() => { setEditSku(null); setShowAddDrawer(true); }}
+                  className="w-8 h-8 rounded-full border border-gray-200 bg-white hover:bg-blue-50 text-blue-600 flex items-center justify-center transition-all shadow-2xs cursor-pointer font-bold shrink-0"
+                  title={`Add New ${getTabLabel(activeMainTab).slice(0, -1)}`}
+                  aria-label={`Add New ${getTabLabel(activeMainTab).slice(0, -1)}`}
+                >
+                  <Plus className="w-4 h-4 text-blue-600 stroke-[2.5]" />
+                </button>
+                <div className="absolute top-full mt-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                  Add {getTabLabel(activeMainTab).slice(0, -1)}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -2089,62 +2858,95 @@ const SkuMasterV2: React.FC = () => {
                       className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                     />
                   </th>
+                  <th className="py-3 px-3 w-8 text-center text-gray-400 font-semibold select-none">#</th>
 
                   {/* Dynamic Table Headers matching visibleColumns order */}
-                  {visibleColumns.map((col) => (
-                    <th
-                      key={col.id}
-                      className="py-3 px-3 whitespace-nowrap"
-                    >
-                      {col.label}
-                    </th>
-                  ))}
+                  {visibleColumns.map((col) => {
+                    const currentSort = sortRules.find(r => r.field === col.id);
+                    return (
+                      <th
+                        key={col.id}
+                        onClick={() => handleColumnSort(col.id)}
+                        className="py-3 px-3 whitespace-nowrap cursor-pointer hover:bg-gray-100/80 transition-colors select-none group"
+                        title={`Sort by ${col.label}`}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span className={currentSort ? 'text-blue-700 font-bold' : ''}>{col.label}</span>
+                          {currentSort ? (
+                            currentSort.order === 'asc' ? (
+                              <ArrowUp className="w-3.5 h-3.5 text-blue-600 font-bold shrink-0" />
+                            ) : (
+                              <ArrowDown className="w-3.5 h-3.5 text-blue-600 font-bold shrink-0" />
+                            )
+                          ) : (
+                            <ArrowUpDown className="w-3 h-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                          )}
+                        </div>
+                      </th>
+                    );
+                  })}
                   
                   {/* Dynamic Custom Columns */}
-                  {customColumns.map((col, idx) => (
-                    <th
-                      key={col}
-                      draggable={true}
-                      onDragStart={(e) => handleDragStart(e, idx)}
-                      onDragOver={handleDragOver}
-                      onDrop={(e) => handleDrop(e, idx)}
-                      className={`py-3 px-3 whitespace-nowrap group cursor-grab active:cursor-grabbing hover:bg-blue-50 transition-colors ${
-                        draggedColIdx === idx ? 'opacity-40 bg-blue-100/50' : ''
-                      }`}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-gray-400 font-bold select-none text-xs">⋮⋮</span>
-                        <span>{col}</span>
-                        <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-all text-xs font-bold text-gray-400">
-                          {idx > 0 && (
-                            <button
-                              onClick={() => moveColumnLeft(idx)}
-                              className="hover:text-blue-600 px-0.5 cursor-pointer"
-                              title="Move column left"
-                            >
-                              ‹
-                            </button>
-                          )}
-                          {idx < customColumns.length - 1 && (
-                            <button
-                              onClick={() => moveColumnRight(idx)}
-                              className="hover:text-blue-600 px-0.5 cursor-pointer"
-                              title="Move column right"
-                            >
-                              ›
-                            </button>
-                          )}
-                          <button
-                            onClick={() => removeCustomColumn(col)}
-                            className="hover:text-rose-600 px-0.5 cursor-pointer"
-                            title="Remove column"
+                  {customColumns.map((col, idx) => {
+                    const currentSort = sortRules.find(r => r.field === `custom_${col}`);
+                    return (
+                      <th
+                        key={col}
+                        draggable={true}
+                        onDragStart={(e) => handleDragStart(e, idx)}
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, idx)}
+                        className={`py-3 px-3 whitespace-nowrap group cursor-grab active:cursor-grabbing hover:bg-blue-50 transition-colors select-none ${
+                          draggedColIdx === idx ? 'opacity-40 bg-blue-100/50' : ''
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-gray-400 font-bold select-none text-xs">⋮⋮</span>
+                          <span 
+                            onClick={() => handleColumnSort(`custom_${col}`)}
+                            className="cursor-pointer hover:text-blue-600 transition-colors"
+                            title={`Sort by ${col}`}
                           >
-                            ×
-                          </button>
+                            {col}
+                          </span>
+                          {currentSort && (
+                            currentSort.order === 'asc' ? (
+                              <ArrowUp className="w-3.5 h-3.5 text-blue-600 font-bold shrink-0" />
+                            ) : (
+                              <ArrowDown className="w-3.5 h-3.5 text-blue-600 font-bold shrink-0" />
+                            )
+                          )}
+                          <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-all text-xs font-bold text-gray-400 ml-1">
+                            {idx > 0 && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); moveColumnLeft(idx); }}
+                                className="hover:text-blue-600 px-0.5 cursor-pointer"
+                                title="Move column left"
+                              >
+                                ‹
+                              </button>
+                            )}
+                            {idx < customColumns.length - 1 && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); moveColumnRight(idx); }}
+                                className="hover:text-blue-600 px-0.5 cursor-pointer"
+                                title="Move column right"
+                              >
+                                ›
+                              </button>
+                            )}
+                            <button
+                              onClick={(e) => { e.stopPropagation(); removeCustomColumn(col); }}
+                              className="hover:text-rose-600 px-0.5 cursor-pointer"
+                              title="Remove column"
+                            >
+                              ×
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    </th>
-                  ))}
+                      </th>
+                    );
+                  })}
 
                   {/* Add Custom Column (+) Header Button */}
                   <th className="py-3 px-2 text-center w-8 whitespace-nowrap">
@@ -2164,7 +2966,7 @@ const SkuMasterV2: React.FC = () => {
               <tbody key={animationKey} className="divide-y divide-gray-100 text-xs text-gray-700">
                 {loading ? (
                   <tr>
-                    <td colSpan={1 + visibleColumns.length + customColumns.length + 2} className="py-12 text-center text-gray-400 whitespace-nowrap">
+                    <td colSpan={1 + 1 + visibleColumns.length + customColumns.length + 2} className="py-12 text-center text-gray-400 whitespace-nowrap">
                       <div className="inline-flex items-center gap-2">
                         <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
                         <span>Loading items...</span>
@@ -2173,7 +2975,7 @@ const SkuMasterV2: React.FC = () => {
                   </tr>
                 ) : paginatedSkus.length === 0 ? (
                   <tr>
-                    <td colSpan={1 + visibleColumns.length + customColumns.length + 2} className="py-12 text-center text-gray-400 whitespace-nowrap">
+                    <td colSpan={1 + 1 + visibleColumns.length + customColumns.length + 2} className="py-12 text-center text-gray-400 whitespace-nowrap">
                       <div className="flex flex-col items-center gap-2">
                         <Package className="w-8 h-8 text-gray-300" />
                         <p className="font-semibold text-gray-600">No {getTabLabel(activeMainTab).toLowerCase()} found</p>
@@ -2205,6 +3007,9 @@ const SkuMasterV2: React.FC = () => {
                             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                           />
                         </td>
+                        <td className="py-3 px-3 text-center text-gray-400 font-mono font-semibold text-xs whitespace-nowrap">
+                          {(page - 1) * limit + index + 1}
+                        </td>
 
                         {/* Render cells dynamically based on visibleColumns order */}
                         {visibleColumns.map(c => {
@@ -2216,19 +3021,11 @@ const SkuMasterV2: React.FC = () => {
                                 </td>
                               );
                             case 'name':
-                              let itemDomainIcon = '📖';
-                              if (activeMainTab === 'materials' || (sku.name || '').toLowerCase().includes('reel') || (sku.name || '').toLowerCase().includes('wire') || (sku.name || '').toLowerCase().includes('adhesive')) {
-                                itemDomainIcon = '🗞️';
-                              } else if (activeMainTab === 'semi' || (sku.name || '').toLowerCase().includes('sheet') || (sku.name || '').toLowerCase().includes('signature')) {
-                                itemDomainIcon = '📑';
-                              } else if ((sku.name || '').toLowerCase().includes('diary')) {
-                                itemDomainIcon = '📚';
-                              }
                               const isSheetItemBadge = sku.paperType === 'Sheets' || (sku.name || '').toLowerCase().includes('sheet');
                               return (
                                 <td key="name" className="py-3 px-3 font-medium text-gray-900 whitespace-nowrap">
                                   <div className="flex items-center gap-2">
-                                    <span className="text-base">{itemDomainIcon}</span>
+                                    {renderItemDomainIcon(sku, activeMainTab)}
                                     <span className="font-semibold text-gray-900">{sku.name}</span>
                                     {isSheetItemBadge && (
                                       <span className="px-1.5 py-0.5 rounded text-[9.5px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200/80">
@@ -2255,6 +3052,15 @@ const SkuMasterV2: React.FC = () => {
                                 <td key="category" className="py-3 px-3 whitespace-nowrap">
                                   <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50/90 text-blue-800 border border-blue-200/80 shadow-2xs">
                                     {catToShow}
+                                  </span>
+                                </td>
+                              );
+                            case 'group':
+                            case 'itemCategory':
+                              return (
+                                <td key={c.id} className="py-3 px-3 whitespace-nowrap">
+                                  <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200/80">
+                                    {sku.group || '—'}
                                   </span>
                                 </td>
                               );
@@ -2367,7 +3173,11 @@ const SkuMasterV2: React.FC = () => {
                                 </td>
                               );
                             default:
-                              return null;
+                              return (
+                                <td key={c.id} className="py-3 px-3 text-gray-500 whitespace-nowrap">
+                                  {(sku as any)[c.id] !== undefined && (sku as any)[c.id] !== null ? String((sku as any)[c.id]) : '—'}
+                                </td>
+                              );
                           }
                         })}
 
@@ -2632,7 +3442,7 @@ const SkuMasterV2: React.FC = () => {
                         <div className="flex items-center gap-2">
                           <span 
                             onClick={() => {
-                              setActiveMainTab(cat.type === 'products' ? 'products' : cat.type === 'semi' ? 'semi' : 'materials');
+                              handleMainTabChange(cat.type === 'products' ? 'products' : cat.type === 'semi' ? 'semi' : 'materials');
                               setCategoryFilter(cat.name);
                             }}
                             className="font-bold text-gray-900 text-sm hover:text-blue-600 cursor-pointer transition-colors"
@@ -2660,7 +3470,7 @@ const SkuMasterV2: React.FC = () => {
                       {/* Linked Items Green Pill Badge - Click to Filter */}
                       <button
                         onClick={() => {
-                          setActiveMainTab(cat.type === 'products' ? 'products' : cat.type === 'semi' ? 'semi' : 'materials');
+                          handleMainTabChange(cat.type === 'products' ? 'products' : cat.type === 'semi' ? 'semi' : 'materials');
                           setCategoryFilter(cat.name);
                         }}
                         className="text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1 rounded-lg shadow-2xs cursor-pointer transition-all"
@@ -2933,12 +3743,11 @@ const SkuMasterV2: React.FC = () => {
           isOpen={!!selectedSkuDetails}
           onClose={() => setSelectedSkuDetails(null)}
           size="max-w-4xl"
+          className="h-[84vh] min-h-[580px]"
           title={
             <div className="flex items-center justify-between w-full pr-6 text-left">
               <div className="flex items-center gap-2">
-                <div className="p-2 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-200">
-                  <Book className="w-4 h-4" />
-                </div>
+                {renderItemDomainIcon(selectedSkuDetails, activeMainTab)}
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-gray-900 text-base">{selectedSkuDetails.name}</span>
@@ -2983,10 +3792,10 @@ const SkuMasterV2: React.FC = () => {
             </div>
           }
         >
-          <div className="space-y-5 text-xs text-left max-h-[75vh] overflow-y-auto pr-1">
+          <div className="space-y-5 text-xs text-left h-full flex flex-col overflow-y-auto pr-1">
             
             {/* Modal Subtabs */}
-            <div className="border-b border-gray-200 flex items-center gap-6 text-xs font-semibold text-gray-500">
+            <div className="border-b border-gray-200 flex items-center gap-6 text-xs font-semibold text-gray-500 shrink-0">
               <button
                 onClick={() => setDetailsSubTab('details')}
                 className={`pb-2 transition-all cursor-pointer ${detailsSubTab === 'details' ? 'text-blue-700 border-b-2 border-blue-600 font-bold' : 'hover:text-gray-800'}`}
@@ -3010,12 +3819,6 @@ const SkuMasterV2: React.FC = () => {
                 <span className="bg-gray-100 text-gray-600 px-1.5 py-0.2 rounded-full text-[10px] font-bold">
                   {getDispatchOrderCount(selectedSkuDetails)}
                 </span>
-              </button>
-              <button
-                onClick={() => setDetailsSubTab('rough-calc')}
-                className={`pb-2 transition-all cursor-pointer ${detailsSubTab === 'rough-calc' ? 'text-blue-700 border-b-2 border-blue-600 font-bold' : 'hover:text-gray-800'}`}
-              >
-                Rough Calculations
               </button>
             </div>
 
@@ -3583,28 +4386,27 @@ const SkuMasterV2: React.FC = () => {
 
             {/* TAB CONTENT: Work Orders */}
             {detailsSubTab === 'work-orders' && (
-              <div className="py-6 text-center text-gray-400 space-y-2">
-                <ClipboardList className="w-8 h-8 text-gray-300 mx-auto" />
-                <p className="font-semibold text-gray-700 text-xs">Active Production Work Orders for {selectedSkuDetails.skuCode}</p>
-                <p className="text-[11px]">3 active book printing & binding orders on factory floor.</p>
+              <div className="flex-1 flex flex-col items-center justify-center py-12 text-center text-gray-400 space-y-3 bg-slate-50/60 rounded-2xl border border-dashed border-gray-200 my-auto min-h-[380px]">
+                <div className="w-14 h-14 rounded-2xl bg-white shadow-2xs border border-gray-200/80 flex items-center justify-center text-gray-400">
+                  <ClipboardList className="w-7 h-7 text-gray-400" />
+                </div>
+                <div className="space-y-1 max-w-sm">
+                  <p className="font-bold text-gray-800 text-sm">Active Production Work Orders for {selectedSkuDetails.skuCode}</p>
+                  <p className="text-xs text-gray-500">No active work orders currently scheduled for this SKU on factory floor.</p>
+                </div>
               </div>
             )}
 
             {/* TAB CONTENT: Dispatches */}
             {detailsSubTab === 'dispatches' && (
-              <div className="py-6 text-center text-gray-400 space-y-2">
-                <Book className="w-8 h-8 text-gray-300 mx-auto" />
-                <p className="font-semibold text-gray-700 text-xs">Fulfillment & Dispatches</p>
-                <p className="text-[11px]">3 pending delivery challans to distributors.</p>
-              </div>
-            )}
-
-            {/* TAB CONTENT: Rough Calculations */}
-            {detailsSubTab === 'rough-calc' && (
-              <div className="py-6 text-center text-gray-400 space-y-2">
-                <SlidersHorizontal className="w-8 h-8 text-gray-300 mx-auto" />
-                <p className="font-semibold text-gray-700 text-xs">Paper Yield & Unit Cost Estimator</p>
-                <p className="text-[11px]">Calculated paper reel cost: ₹18.20 per notebook unit.</p>
+              <div className="flex-1 flex flex-col items-center justify-center py-12 text-center text-gray-400 space-y-3 bg-slate-50/60 rounded-2xl border border-dashed border-gray-200 my-auto min-h-[380px]">
+                <div className="w-14 h-14 rounded-2xl bg-white shadow-2xs border border-gray-200/80 flex items-center justify-center text-gray-400">
+                  <Package className="w-7 h-7 text-gray-400" />
+                </div>
+                <div className="space-y-1 max-w-sm">
+                  <p className="font-bold text-gray-800 text-sm">Fulfillment & Dispatches for {selectedSkuDetails.skuCode}</p>
+                  <p className="text-xs text-gray-500">No pending dispatches or delivery challans recorded for this item.</p>
+                </div>
               </div>
             )}
 
@@ -3667,6 +4469,239 @@ const SkuMasterV2: React.FC = () => {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* ── DUPLICATE ITEMS SCANNER MODAL ── */}
+      {showDuplicatesModal && (
+        <Modal
+          isOpen={showDuplicatesModal}
+          onClose={() => setShowDuplicatesModal(false)}
+          title={`Find Duplicates — ${getTabLabel(activeMainTab).toUpperCase()}`}
+          maxWidth="max-w-3xl"
+        >
+          <div className="space-y-4 text-left">
+            {duplicateGroups.length === 0 ? (
+              <div className="py-12 text-center bg-slate-50 border border-dashed border-gray-200 rounded-2xl">
+                <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-3">
+                  <Check className="w-6 h-6 stroke-[3]" />
+                </div>
+                <h3 className="font-bold text-base text-gray-900">No Duplicates Detected!</h3>
+                <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
+                  All entries in <span className="font-semibold">{getTabLabel(activeMainTab)}</span> have unique SKU codes and names.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+                <p className="text-xs text-gray-500 font-medium">
+                  The following duplicate groups were identified. Check details and clean up if necessary:
+                </p>
+                
+                {duplicateGroups.map((group, gIdx) => (
+                  <div 
+                    key={gIdx}
+                    className={`border rounded-xl p-4 transition-all duration-150 ${
+                      gIdx === highlightedDuplicateIdx
+                        ? 'border-blue-500 bg-blue-50/20 ring-2 ring-blue-500/20 shadow-xs'
+                        : 'border-red-200 bg-red-50/10'
+                    }`}
+                    onMouseEnter={() => setHighlightedDuplicateIdx(gIdx)}
+                  >
+                    <div className="flex justify-between items-start md:items-center flex-col md:flex-row gap-2 mb-3 border-b pb-2 border-red-100/50">
+                      <div>
+                        <span className="text-xs font-bold bg-red-100 text-red-800 px-2.5 py-0.5 rounded-lg border border-red-200">
+                          Duplicate by {group.field}: {group.value}
+                        </span>
+                        <span className="text-xs text-gray-500 font-mono ml-2">{group.items.length} records</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setCompareGroup(group)}
+                          title="View Both"
+                          className="px-2.5 py-1 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1 transition-all cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>View Both</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setDuplicateGroups(prev => prev.filter((_, i) => i !== gIdx));
+                            setHighlightedDuplicateIdx(prev => (prev > 0 ? prev - 1 : 0));
+                          }}
+                          title="Keep Both"
+                          className="px-2.5 py-1 text-xs font-semibold text-gray-600 bg-gray-100 border border-gray-200 rounded-lg hover:bg-gray-200 flex items-center gap-1 transition-all cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          <span>Keep Both</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      {group.items.map((item) => (
+                        <div key={item._id} className="flex justify-between items-center bg-white p-3 border border-gray-200 rounded-xl text-xs">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                                {item.skuCode}
+                              </span>
+                              <p className="font-bold text-gray-900 text-sm">
+                                {item.name}
+                              </p>
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1 flex items-center space-x-2 flex-wrap">
+                              <span>Category: {item.category || item.group || '—'}</span>
+                              <span className="text-gray-300">|</span>
+                              <span>UOM: {item.unit || '—'}</span>
+                              {item.gsm && (
+                                <>
+                                  <span className="text-gray-300">|</span>
+                                  <span>GSM: {item.gsm}</span>
+                                </>
+                              )}
+                              <span className="text-gray-300">|</span>
+                              <span>Stock: <strong className="text-gray-800">{item.openingStock ?? 0}</strong></span>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => {
+                                setEditSku(item);
+                                setShowAddDrawer(true);
+                                setShowDuplicatesModal(false);
+                              }}
+                              className="px-2.5 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg font-bold transition-all flex items-center gap-1 cursor-pointer"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteDuplicateItem(item)}
+                              className="px-2.5 py-1 text-xs bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg font-bold transition-all flex items-center gap-1 cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="pt-3 border-t border-gray-100 flex justify-end">
+              <button
+                onClick={() => setShowDuplicatesModal(false)}
+                className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-100 font-bold text-xs cursor-pointer text-gray-700"
+              >
+                Close Window
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── COMPARE DUPLICATES MODAL (Side by side) ── */}
+      {compareGroup && (
+        <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-4 bg-gray-950/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative bg-white rounded-2xl max-w-4xl w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+              <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                <Copy className="w-5 h-5 text-blue-600" />
+                <span>Compare Duplicates — {compareGroup.field}: {compareGroup.value}</span>
+              </h3>
+              <button
+                onClick={() => setCompareGroup(null)}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-4">
+              {compareGroup.items.slice(0, 2).map((item, idx) => (
+                <div key={item._id || idx} className="border border-gray-200 rounded-xl p-4 bg-white shadow-2xs space-y-3">
+                  <div className="flex justify-between items-center border-b pb-2 border-gray-100">
+                    <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full">
+                      Item #{idx + 1}
+                    </span>
+                    <span className="text-xs font-mono text-gray-400">ID: {item._id?.slice(-6) || '—'}</span>
+                  </div>
+                  <div className="space-y-2 text-xs">
+                    <div>
+                      <span className="text-gray-400 text-[10px] uppercase font-bold">SKU Code:</span>
+                      <p className="font-mono font-bold text-gray-900 text-sm">{item.skuCode}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 text-[10px] uppercase font-bold">Item Name:</span>
+                      <p className="font-bold text-gray-900">{item.name}</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-gray-100">
+                      <div>
+                        <span className="text-gray-400 text-[10px] uppercase font-bold">Category:</span>
+                        <p className="font-medium text-gray-800">{item.category || item.group || '—'}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400 text-[10px] uppercase font-bold">UOM:</span>
+                        <p className="font-medium text-gray-800">{item.unit || '—'}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400 text-[10px] uppercase font-bold">GSM:</span>
+                        <p className="font-medium text-gray-800">{item.gsm || '—'}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400 text-[10px] uppercase font-bold">Pages:</span>
+                        <p className="font-medium text-gray-800">{item.pages || '—'}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400 text-[10px] uppercase font-bold">Opening Stock:</span>
+                        <p className="font-bold text-emerald-700">{item.openingStock ?? 0}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400 text-[10px] uppercase font-bold">Status:</span>
+                        <p className="font-medium text-gray-800">{item.status || 'Active'}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-3 border-t border-gray-100">
+                    <button
+                      onClick={() => {
+                        setEditSku(item);
+                        setShowAddDrawer(true);
+                        setCompareGroup(null);
+                        setShowDuplicatesModal(false);
+                      }}
+                      className="flex-1 py-1.5 bg-blue-50 text-blue-700 font-bold rounded-lg hover:bg-blue-100 text-xs flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleDeleteDuplicateItem(item);
+                        setCompareGroup(null);
+                      }}
+                      className="flex-1 py-1.5 bg-red-50 text-red-700 font-bold rounded-lg hover:bg-red-100 text-xs flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="px-6 py-3 bg-gray-50 border-t border-gray-200 flex justify-end">
+              <button
+                onClick={() => setCompareGroup(null)}
+                className="px-4 py-2 bg-gray-800 text-white rounded-xl text-xs font-bold hover:bg-gray-900 cursor-pointer"
+              >
+                Close Comparison
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── ADD CUSTOM COLUMN MODAL (Exact match to user screenshot!) ── */}

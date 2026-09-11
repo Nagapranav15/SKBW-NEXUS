@@ -5,7 +5,7 @@ import {
   Factory, 
   Briefcase, 
   Truck, 
-  Map, 
+  Map as MapIcon, 
   Search, 
   Plus, 
   X, 
@@ -241,6 +241,7 @@ export const BusinessDirectoryV2: React.FC = () => {
   const [editingItem, setEditingItem] = useState<DirectoryItem | null>(null);
   const [selectedDetails, setSelectedDetails] = useState<DirectoryItem | null>(null);
   const [regionCitySearch, setRegionCitySearch] = useState('');
+  const [agentCitySearch, setAgentCitySearch] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [cardCustomersModal, setCardCustomersModal] = useState<{
     title: string;
@@ -253,6 +254,9 @@ export const BusinessDirectoryV2: React.FC = () => {
   const [showDuplicatesModal, setShowDuplicatesModal] = useState(false);
   const [duplicateGroups, setDuplicateGroups] = useState<{ field: string; value: string; items: DirectoryItem[] }[]>([]);
   const [activeDuplicateIdx, setActiveDuplicateIdx] = useState(0);
+  const [highlightedDuplicateIdx, setHighlightedDuplicateIdx] = useState<number>(0);
+  const [compareGroup, setCompareGroup] = useState<any>(null);
+  const [mergeGroup, setMergeGroup] = useState<any>(null);
   const [isScanningDuplicates, setIsScanningDuplicates] = useState(false);
   const [mergePrimaryId, setMergePrimaryId] = useState<string>('');
   const [showMergeConfirmModal, setShowMergeConfirmModal] = useState(false);
@@ -260,6 +264,8 @@ export const BusinessDirectoryV2: React.FC = () => {
 
   // Accessibility & Action Toolbar Popover States
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
+  const [showFilterPopover, setShowFilterPopover] = useState(false);
+  const [filterRules, setFilterRules] = useState<{ id: string; field: string; operator: 'contains' | 'equals' | 'greater_than' | 'less_than'; value: string }[]>([]);
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [showColumnPicker, setShowColumnPicker] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -335,16 +341,44 @@ export const BusinessDirectoryV2: React.FC = () => {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Handle Escape key for customer card modal
+  // Handle Escape key and keyboard shortcuts for Find Duplicates modal
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && cardCustomersModal) {
         setCardCustomersModal(null);
       }
+      if (showDuplicatesModal) {
+        if (e.key === 'Escape') {
+          setShowDuplicatesModal(false);
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setHighlightedDuplicateIdx(prev => (prev < duplicateGroups.length - 1 ? prev + 1 : 0));
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setHighlightedDuplicateIdx(prev => (prev > 0 ? prev - 1 : duplicateGroups.length - 1));
+        } else if (e.key === 'v' || e.key === 'V') {
+          if (highlightedDuplicateIdx >= 0 && highlightedDuplicateIdx < duplicateGroups.length) {
+            setCompareGroup(duplicateGroups[highlightedDuplicateIdx]);
+          }
+        } else if (e.key === 'm' || e.key === 'M') {
+          if (activeMainTab !== 'regions' && highlightedDuplicateIdx >= 0 && highlightedDuplicateIdx < duplicateGroups.length) {
+            const group = duplicateGroups[highlightedDuplicateIdx];
+            setMergeGroup(group);
+            if (group.items && group.items.length > 0) {
+              setMergePrimaryId(group.items[0]._id);
+            }
+          }
+        } else if (e.key === 'k' || e.key === 'K') {
+          if (highlightedDuplicateIdx >= 0 && highlightedDuplicateIdx < duplicateGroups.length) {
+            setDuplicateGroups(prev => prev.filter((_, i) => i !== highlightedDuplicateIdx));
+            setHighlightedDuplicateIdx(prev => (prev > 0 ? prev - 1 : 0));
+          }
+        }
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [cardCustomersModal]);
+  }, [cardCustomersModal, showDuplicatesModal, duplicateGroups, highlightedDuplicateIdx, activeMainTab]);
 
   // Lazy-load auxiliary dropdown data on mount and whenever needed
   const loadAuxiliaryData = useCallback(async () => {
@@ -415,11 +449,13 @@ export const BusinessDirectoryV2: React.FC = () => {
         if (activeMainTab === 'transporters') partyType = 'transporter';
         if (activeMainTab === 'cities') partyType = 'market';
 
+        const hasActiveRules = filterRules.some(r => r.value && r.value.trim().length > 0);
+
         const res = await getParties({
           company: selectedCompany._id,
           type: partyType,
-          page,
-          limit,
+          page: hasActiveRules ? 1 : page,
+          limit: hasActiveRules ? 10000 : limit,
           search: debouncedSearch
         });
 
@@ -433,7 +469,7 @@ export const BusinessDirectoryV2: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedCompany?._id, activeMainTab, page, limit, debouncedSearch]);
+  }, [selectedCompany?._id, activeMainTab, page, limit, debouncedSearch, filterRules]);
 
   // Derived Filtered & Sorted Items
   const processedItems = React.useMemo(() => {
@@ -469,6 +505,79 @@ export const BusinessDirectoryV2: React.FC = () => {
     if (filterTag.trim()) {
       const tLower = filterTag.toLowerCase().trim();
       result = result.filter(i => Array.isArray(i.tags) && i.tags.some(t => t.toLowerCase().includes(tLower)));
+    }
+
+    if (filterRules.length > 0) {
+      result = result.filter(item => {
+        return filterRules.every(rule => {
+          if (!rule.value || !rule.value.trim()) return true;
+          const targetStr = rule.value.toLowerCase().trim();
+          let itemVal: any = '';
+          let isNumeric = false;
+
+          switch (rule.field) {
+            case 'firmName':
+              itemVal = item.firmName || item.name || '';
+              break;
+            case 'contactName':
+              itemVal = item.contactName || item.ownerName || '';
+              break;
+            case 'phone':
+              itemVal = item.phone || item.whatsapp || item.altPhone || '';
+              break;
+            case 'city':
+              itemVal = [item.city, item.assignedMarket, item.district].filter(Boolean).join(', ');
+              break;
+            case 'district':
+              itemVal = item.district || '';
+              break;
+            case 'route':
+              itemVal = item.route || item.assignedRegion || item.name || '';
+              break;
+            case 'assignedAgent':
+              itemVal = item.assignedAgent || item.agentAssigned || '';
+              break;
+            case 'status':
+              itemVal = item.status || 'active';
+              break;
+            case 'creditLimit':
+              itemVal = Number(item.creditLimit) || 0;
+              isNumeric = true;
+              break;
+            case 'creditDays':
+              itemVal = Number(item.creditDays) || 0;
+              isNumeric = true;
+              break;
+            case 'outstandingBalance':
+              itemVal = Number(item.outstandingBalance !== undefined ? item.outstandingBalance : item.outstanding) || 0;
+              isNumeric = true;
+              break;
+            default:
+              itemVal = (item as any)[rule.field] !== undefined ? (item as any)[rule.field] : '';
+              if (typeof itemVal === 'number') isNumeric = true;
+          }
+
+          if (itemVal === undefined || itemVal === null) itemVal = '';
+          const valStr = String(itemVal).toLowerCase();
+          const cleanTarget = targetStr.replace(/^[^a-z0-9]+/, '');
+
+          switch (rule.operator) {
+            case 'equals':
+              if (isNumeric && !isNaN(Number(targetStr))) {
+                return Number(itemVal) === Number(targetStr);
+              }
+              return valStr === targetStr || valStr.includes(targetStr) || (cleanTarget.length >= 2 && valStr.includes(cleanTarget));
+            case 'contains':
+              return valStr.includes(targetStr) || (cleanTarget.length >= 2 && valStr.includes(cleanTarget));
+            case 'greater_than':
+              return Number(itemVal) > Number(targetStr);
+            case 'less_than':
+              return Number(itemVal) < Number(targetStr);
+            default:
+              return valStr.includes(targetStr) || (cleanTarget.length >= 2 && valStr.includes(cleanTarget));
+          }
+        });
+      });
     }
 
     if (debouncedSearch.trim()) {
@@ -1700,7 +1809,7 @@ export const BusinessDirectoryV2: React.FC = () => {
       case 'vendors': return <Factory className="w-4 h-4 text-blue-600 shrink-0" />;
       case 'agents': return <Briefcase className="w-4 h-4 text-blue-600 shrink-0" />;
       case 'transporters': return <Truck className="w-4 h-4 text-blue-600 shrink-0" />;
-      case 'regions': return <Map className="w-4 h-4 text-blue-600 shrink-0" />;
+      case 'regions': return <MapIcon className="w-4 h-4 text-blue-600 shrink-0" />;
       case 'cities': return <Building className="w-4 h-4 text-blue-600 shrink-0" />;
       default: return <Users className="w-4 h-4 text-blue-600 shrink-0" />;
     }
@@ -1791,7 +1900,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
-            <Map className={`w-4 h-4 ${activeMainTab === 'regions' ? 'text-teal-700' : 'text-slate-400'}`} />
+            <MapIcon className={`w-4 h-4 ${activeMainTab === 'regions' ? 'text-teal-700' : 'text-slate-400'}`} />
             <span>Regions</span>
           </button>
 
@@ -1842,24 +1951,132 @@ export const BusinessDirectoryV2: React.FC = () => {
             )}
           </div>
 
-          {/* 1. Filters Icon Button */}
-          <div className="relative group">
+          {/* 1. Filters Icon Button & Dynamic Filter Popover */}
+          <div className="relative">
             <button
               type="button"
-              onClick={() => setShowFilterDrawer(!showFilterDrawer)}
+              onClick={() => setShowFilterPopover(!showFilterPopover)}
               className={`p-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
-                activeFilterCount > 0
+                (filterRules.length > 0 || activeFilterCount > 0)
                   ? 'bg-blue-600 text-white border-blue-600 shadow-blue-100'
                   : 'bg-white hover:bg-blue-50/60 text-blue-600 border-gray-200 hover:border-blue-200'
               }`}
-              title={`Filter Results ${activeFilterCount > 0 ? `(${activeFilterCount} active)` : ''}`}
-              aria-label={`Filter Results ${activeFilterCount > 0 ? `(${activeFilterCount} active)` : ''}`}
+              title={`Filter Results ${filterRules.length > 0 ? `(${filterRules.length} rules)` : ''}`}
+              aria-label="Filter Results"
             >
               <Filter className="w-4 h-4" />
             </button>
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-              Filters {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}
-            </div>
+
+            {showFilterPopover && (
+              <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-2xl border border-gray-100 shadow-2xl p-4 z-50 animate-in fade-in zoom-in-95 duration-150">
+                <div className="flex justify-between items-center pb-2.5 border-b border-gray-100">
+                  <h4 className="font-bold text-sm text-gray-900">Filters</h4>
+                  <div className="flex items-center gap-2">
+                    {filterRules.length > 0 && (
+                      <button 
+                        onClick={() => setFilterRules([])}
+                        className="text-xs text-blue-600 font-semibold hover:underline cursor-pointer"
+                      >
+                        Clear All
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setShowFilterPopover(false)}
+                      className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-3 space-y-3">
+                  {filterRules.length === 0 ? (
+                    <div className="border border-dashed border-gray-300 rounded-2xl p-6 text-center bg-white">
+                      <p className="text-sm font-bold text-gray-800">No filters applied</p>
+                      <p className="text-xs text-gray-400 mt-1">Add a filter to narrow down rows</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+                      {filterRules.map((rule) => (
+                        <div key={rule.id} className="bg-gray-50/70 border border-gray-200 rounded-xl p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-gray-400 tracking-wider uppercase">WHERE</span>
+                            <button
+                              onClick={() => setFilterRules(prev => prev.filter(r => r.id !== rule.id))}
+                              className="text-gray-400 hover:text-gray-600 cursor-pointer"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          {/* Field */}
+                          <select
+                            value={rule.field}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setFilterRules(prev => prev.map(r => r.id === rule.id ? { ...r, field: val } : r));
+                            }}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 bg-white cursor-pointer"
+                          >
+                            <option value="firmName">Firm / Master Name</option>
+                            <option value="contactName">Owner / Contact Name</option>
+                            <option value="phone">Mobile / WhatsApp</option>
+                            <option value="city">City / District</option>
+                            <option value="route">Region / Route</option>
+                            <option value="assignedAgent">Assigned Agent</option>
+                            <option value="status">Status</option>
+                            <option value="creditLimit">Credit Limit</option>
+                            <option value="creditDays">Credit Days</option>
+                            <option value="outstandingBalance">Outstanding Balance</option>
+                          </select>
+
+                          {/* Operator */}
+                          <select
+                            value={rule.operator}
+                            onChange={(e) => {
+                              const val = e.target.value as any;
+                              setFilterRules(prev => prev.map(r => r.id === rule.id ? { ...r, operator: val } : r));
+                            }}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 bg-white cursor-pointer"
+                          >
+                            <option value="contains">Contains</option>
+                            <option value="equals">Equals</option>
+                            <option value="greater_than">Greater than</option>
+                            <option value="less_than">Less than</option>
+                          </select>
+
+                          {/* Value */}
+                          <input
+                            type="text"
+                            placeholder="Value"
+                            value={rule.value}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setFilterRules(prev => prev.map(r => r.id === rule.id ? { ...r, value: val } : r));
+                            }}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 bg-white placeholder-gray-400"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Add filter button */}
+                  <button
+                    onClick={() => {
+                      setFilterRules(prev => [
+                        ...prev,
+                        { id: 'filter_' + Date.now(), field: 'firmName', operator: 'contains', value: '' }
+                      ]);
+                    }}
+                    className="w-full py-2.5 border border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50/40 rounded-xl text-xs font-semibold text-gray-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add filter</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 2. Sort Icon Button & Dropdown */}
@@ -2174,10 +2391,14 @@ export const BusinessDirectoryV2: React.FC = () => {
                   className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-blue-500"
                 >
                   <option value="all">All Categories</option>
-                  <option value="BOARD SUPPLIER">BOARD SUPPLIER</option>
                   <option value="PAPER SUPPLIER">PAPER SUPPLIER</option>
+                  <option value="BOARD SUPPLIER">BOARD SUPPLIER</option>
+                  <option value="ADHESIVE SUPPLIER">ADHESIVE SUPPLIER</option>
+                  <option value="WIRE SUPPLIER">WIRE SUPPLIER</option>
                   <option value="PRINTING VENDOR">PRINTING VENDOR</option>
-                  <option value="GENERAL VENDOR">GENERAL VENDOR</option>
+                  <option value="RAW MATERIAL">RAW MATERIAL</option>
+                  <option value="GENERAL SUPPLIER">GENERAL SUPPLIER</option>
+                  <option value="OTHERS">OTHERS</option>
                 </select>
               </div>
             )}
@@ -2313,6 +2534,8 @@ export const BusinessDirectoryV2: React.FC = () => {
                     {renderSortHeader('PARENT REGION', 'route')}
                     {renderSortHeader('DISTRICT & STATE', 'district')}
                     {renderSortHeader('ASSIGNED AGENT', 'agent')}
+                    {renderSortHeader('CUSTOMERS COUNT', 'customersCount')}
+                    {renderSortHeader('OUTSTANDING BALANCE', 'outstanding')}
                   </>
                 )}
 
@@ -2387,11 +2610,11 @@ export const BusinessDirectoryV2: React.FC = () => {
                             </td>
                           )}
                           {!hiddenColumns['phone'] && (
-                            <td className="py-3 px-3 font-mono font-medium text-gray-700">
-                              <div className="flex items-center gap-1.5 leading-none" onClick={(e) => e.stopPropagation()}>
-                                <span className="leading-none">{item.phone || '—'}</span>
+                            <td className="py-3 px-3 font-mono font-medium text-gray-700 whitespace-nowrap">
+                              <div className="inline-flex items-center gap-1.5 leading-none whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                <span className="inline-block min-w-[100px] font-mono tabular-nums leading-none whitespace-nowrap">{item.phone || '—'}</span>
                                 {item.phone && item.phone.length >= 10 && (
-                                  <a href={`https://wa.me/91${item.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="Chat on WhatsApp" className="inline-flex items-center justify-center shrink-0 text-emerald-500 hover:text-emerald-600 transition-transform hover:scale-110">
+                                  <a href={`https://wa.me/91${item.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="Chat on WhatsApp" className="inline-flex items-center justify-center shrink-0 text-emerald-500 hover:text-emerald-600 transition-transform hover:scale-110 align-middle -translate-y-[1.5px]">
                                     <WhatsAppIcon />
                                   </a>
                                 )}
@@ -2512,11 +2735,11 @@ export const BusinessDirectoryV2: React.FC = () => {
                           <td className="py-3 px-3 font-semibold text-gray-900">
                             <span className="font-bold text-gray-900">{item.firmName || item.contactName || item.name}</span>
                           </td>
-                          <td className="py-3 px-3 font-mono text-gray-700">
-                            <div className="flex items-center gap-1.5 leading-none" onClick={(e) => e.stopPropagation()}>
-                              <span className={item.phone ? "font-bold text-blue-600 leading-none" : "text-gray-400 font-normal leading-none"}>{item.phone || '—'}</span>
+                          <td className="py-3 px-3 font-mono text-gray-700 whitespace-nowrap">
+                            <div className="inline-flex items-center gap-1.5 leading-none whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                              <span className={item.phone ? "inline-block min-w-[100px] font-bold text-blue-600 font-mono tabular-nums leading-none whitespace-nowrap" : "inline-block min-w-[100px] text-gray-400 font-normal font-mono tabular-nums leading-none whitespace-nowrap"}>{item.phone || '—'}</span>
                               {item.phone && item.phone.length >= 10 && (
-                                <a href={`https://wa.me/91${item.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="Chat on WhatsApp" className="inline-flex items-center justify-center shrink-0 text-emerald-500 hover:text-emerald-600 transition-transform hover:scale-110">
+                                <a href={`https://wa.me/91${item.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="Chat on WhatsApp" className="inline-flex items-center justify-center shrink-0 text-emerald-500 hover:text-emerald-600 transition-transform hover:scale-110 align-middle -translate-y-[1.5px]">
                                   <WhatsAppIcon />
                                 </a>
                               )}
@@ -2556,14 +2779,14 @@ export const BusinessDirectoryV2: React.FC = () => {
                           <td className="py-3 px-3 font-semibold text-gray-900">
                             <span className="font-bold text-gray-900">{item.firmName || item.name}</span>
                           </td>
-                          <td className="py-3 px-3 font-mono font-medium">
-                            <div className="flex items-center gap-1.5 leading-none" onClick={(e) => e.stopPropagation()}>
+                          <td className="py-3 px-3 font-mono font-medium whitespace-nowrap">
+                            <div className="inline-flex items-center gap-1.5 leading-none whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                               {item.phone || item.contactPersons?.[0]?.phone ? (
-                                <span className="font-bold text-blue-600 font-mono leading-none">
+                                <span className="inline-block min-w-[100px] font-bold text-blue-600 font-mono tabular-nums leading-none whitespace-nowrap">
                                   {item.phone || item.contactPersons?.[0]?.phone}
                                 </span>
                               ) : (
-                                <span className="text-gray-400 font-normal leading-none">—</span>
+                                <span className="inline-block min-w-[100px] text-gray-400 font-normal font-mono tabular-nums leading-none whitespace-nowrap">—</span>
                               )}
                               {(item.phone || item.contactPersons?.[0]?.phone) && (
                                 <a
@@ -2571,7 +2794,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                   target="_blank"
                                   rel="noreferrer"
                                   title="Chat on WhatsApp"
-                                  className="inline-flex items-center justify-center shrink-0 text-emerald-500 hover:text-emerald-600 transition-transform hover:scale-110"
+                                  className="inline-flex items-center justify-center shrink-0 text-emerald-500 hover:text-emerald-600 transition-transform hover:scale-110 align-middle -translate-y-[1.5px]"
                                 >
                                   <WhatsAppIcon />
                                 </a>
@@ -2719,6 +2942,70 @@ export const BusinessDirectoryV2: React.FC = () => {
                           </td>
                           <td className="py-3 px-3 text-gray-600 font-medium">{[item.district, item.state].filter(Boolean).join(', ') || '—'}</td>
                           <td className="py-3 px-3 text-gray-600 font-medium">{item.agentAssigned || '—'}</td>
+                          <td className="py-3 px-3 font-bold text-gray-900 text-xs">
+                            {(() => {
+                              const cityName = (item.firmName || item.name || '').toLowerCase().trim();
+                              const cityCusts = allCustomers.filter((c: any) => {
+                                const custCity = (c.city || c.assignedMarket || '').toLowerCase().trim();
+                                return custCity && custCity === cityName;
+                              });
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setCardCustomersModal({
+                                      title: `Customers in Market / City: ${item.firmName || item.name}`,
+                                      subtitle: `Parent Route: ${item.route || 'Unassigned'} • ${cityCusts.length} Total Customers`,
+                                      customers: cityCusts
+                                    });
+                                    setCardCustomerSearch('');
+                                  }}
+                                  className="hover:text-blue-600 font-bold transition-colors cursor-pointer"
+                                >
+                                  {cityCusts.length}
+                                </button>
+                              );
+                            })()}
+                          </td>
+                          <td className="py-3 px-3">
+                            {(() => {
+                              const cityName = (item.firmName || item.name || '').toLowerCase().trim();
+                              const cityCusts = allCustomers.filter((c: any) => {
+                                const custCity = (c.city || c.assignedMarket || '').toLowerCase().trim();
+                                return custCity && custCity === cityName;
+                              });
+                              const cityOut = cityCusts.reduce((sum: number, c: any) => sum + (Number(c.outstandingBalance) || Number(c.outstanding) || 0), 0);
+                              if (cityOut > 0) {
+                                return (
+                                  <div className="flex flex-col items-start">
+                                    <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 font-mono font-bold text-xs">
+                                      ₹{cityOut.toLocaleString('en-IN')}
+                                    </span>
+                                    <span className="text-[10px] text-gray-500 font-medium mt-0.5">Outstanding (To Collect)</span>
+                                  </div>
+                                );
+                              }
+                              if (cityOut < 0) {
+                                return (
+                                  <div className="flex flex-col items-start">
+                                    <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono font-bold text-xs">
+                                      ₹{Math.abs(cityOut).toLocaleString('en-IN')}
+                                    </span>
+                                    <span className="text-[10px] text-gray-500 font-medium mt-0.5">Advance (Credit)</span>
+                                  </div>
+                                );
+                              }
+                              return (
+                                <div className="flex flex-col items-start">
+                                  <span className="font-bold text-xs text-gray-800 font-mono">
+                                    ₹0
+                                  </span>
+                                  <span className="text-[10px] text-gray-400 font-medium mt-0.5">No outstanding</span>
+                                </div>
+                              );
+                            })()}
+                          </td>
                         </>
                       )}
 
@@ -3243,6 +3530,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           <option value="PRINTING VENDOR">PRINTING VENDOR</option>
                           <option value="RAW MATERIAL">RAW MATERIAL</option>
                           <option value="GENERAL SUPPLIER">GENERAL SUPPLIER</option>
+                          <option value="OTHERS">OTHERS</option>
                         </select>
                       </div>
                     </div>
@@ -3452,18 +3740,6 @@ export const BusinessDirectoryV2: React.FC = () => {
                   </h4>
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-gray-700 font-semibold mb-1">Operating Status</label>
-                      <select
-                        value={form.status}
-                        onChange={e => setForm(f => ({ ...f, status: e.target.value as any }))}
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
-                      >
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                        <option value="on-hold">On Hold</option>
-                      </select>
-                    </div>
-                    <div>
                       <label className="block text-gray-700 font-semibold mb-1">Outstanding Balance (₹)</label>
                       <input
                         type="number"
@@ -3504,7 +3780,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                       type="button"
                       onClick={() => setForm(f => ({
                         ...f,
-                        contactPersons: [...(f.contactPersons || []), { name: '', phone: '', email: '', designation: '' }]
+                        contactPersons: [...(f.contactPersons || []), { name: '', phone: '', email: '' }]
                       }))}
                       className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
                     >
@@ -3529,7 +3805,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
-                          <div className="grid grid-cols-2 gap-2 pr-6">
+                          <div className="grid grid-cols-3 gap-2 pr-6">
                             <input
                               type="text"
                               placeholder="Contact Name"
@@ -3559,17 +3835,6 @@ export const BusinessDirectoryV2: React.FC = () => {
                               onChange={e => {
                                 const newCP = [...(form.contactPersons || [])];
                                 newCP[idx].email = e.target.value;
-                                setForm(f => ({ ...f, contactPersons: newCP }));
-                              }}
-                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:border-blue-600"
-                            />
-                            <input
-                              type="text"
-                              placeholder="Designation / Role"
-                              value={cp.designation}
-                              onChange={e => {
-                                const newCP = [...(form.contactPersons || [])];
-                                newCP[idx].designation = e.target.value;
                                 setForm(f => ({ ...f, contactPersons: newCP }));
                               }}
                               className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:border-blue-600"
@@ -3868,7 +4133,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                       type="button"
                       onClick={() => setForm(f => ({
                         ...f,
-                        contactPersons: [...(f.contactPersons || []), { name: '', phone: '', email: '', designation: '' }]
+                        contactPersons: [...(f.contactPersons || []), { name: '', phone: '', email: '' }]
                       }))}
                       className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
                     >
@@ -3893,7 +4158,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
-                          <div className="grid grid-cols-2 gap-2 pr-6">
+                          <div className="grid grid-cols-3 gap-2 pr-6">
                             <input
                               type="text"
                               placeholder="Contact Name"
@@ -3923,17 +4188,6 @@ export const BusinessDirectoryV2: React.FC = () => {
                               onChange={e => {
                                 const newCP = [...(form.contactPersons || [])];
                                 newCP[idx].email = e.target.value;
-                                setForm(f => ({ ...f, contactPersons: newCP }));
-                              }}
-                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:border-blue-600"
-                            />
-                            <input
-                              type="text"
-                              placeholder="Designation / Role"
-                              value={cp.designation}
-                              onChange={e => {
-                                const newCP = [...(form.contactPersons || [])];
-                                newCP[idx].designation = e.target.value;
                                 setForm(f => ({ ...f, contactPersons: newCP }));
                               }}
                               className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:border-blue-600"
@@ -4577,16 +4831,29 @@ export const BusinessDirectoryV2: React.FC = () => {
               // -------------------------------------------------------------
               if (effectiveTab === 'agents') {
                 const agentName = (name || '').toLowerCase().trim();
-                const assignedRoutes = allRoutes.filter((r: any) => (r.assignedAgent || '').toLowerCase().trim() === agentName);
+                const assignedRoutes = allRoutes.filter((r: any) => 
+                  (r.assignedAgent || '').toLowerCase().trim() === agentName ||
+                  (Array.isArray(selectedDetails.assignedRoutes) && selectedDetails.assignedRoutes.includes(r._id))
+                );
                 const agentCusts = allCustomers.filter((c: any) => (c.agentAssigned || '').toLowerCase().trim() === agentName);
+                const assignedCityObjs = allCities.filter((c: any) => {
+                  const cRoute = (c.route || '').toLowerCase().trim();
+                  const cAgent = (c.agent || c.assignedAgent || '').toLowerCase().trim();
+                  if (cAgent && cAgent === agentName) return true;
+                  return assignedRoutes.some((r: any) => {
+                    const rName = (r.firmName || r.name || '').toLowerCase().trim();
+                    const rCode = (r.code || '').toLowerCase().trim();
+                    return cRoute && (cRoute === rName || (rCode && cRoute === rCode));
+                  });
+                });
 
                 return (
                   <>
                     <div className="grid grid-cols-3 gap-2.5">
                       <div className="bg-blue-50/60 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[9px] text-blue-700 font-extrabold uppercase tracking-wider">COMMISSION RATE</span>
-                        <span className="block text-xs font-black text-blue-950 mt-0.5">
-                          {selectedDetails.commissionRate || 0}%
+                        <span className="block text-[9px] text-blue-700 font-extrabold uppercase tracking-wider">ASSIGNED CITIES</span>
+                        <span className="block text-xs font-bold text-blue-950 mt-0.5">
+                          {assignedCityObjs.length} Cities
                         </span>
                       </div>
                       <div className="bg-blue-50/60 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs">
@@ -4653,28 +4920,114 @@ export const BusinessDirectoryV2: React.FC = () => {
                           </div>
                         </div>
 
-                        {/* COMMISSION & COVERAGE */}
-                        <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-2.5">
-                          <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                        {/* REGIONS & CITIES COVERAGE */}
+                        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-2xs space-y-3.5">
+                          {/* CARD HEADER */}
+                          <div className="flex items-center justify-between pb-3 border-b border-gray-100">
                             <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
-                                <Percent className="w-3.5 h-3.5" />
+                              <div className="w-7 h-7 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+                                <Building className="w-4 h-4" />
                               </div>
-                              <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">COMMISSION & COVERAGE</h4>
+                              <h4 className="font-extrabold text-gray-800 text-xs tracking-wider uppercase">REGIONS & CITIES COVERAGE</h4>
+                            </div>
+                            <span className="px-3 py-1 bg-slate-100 text-slate-700 font-bold rounded-lg text-xs">
+                              {assignedCityObjs.length} Total
+                            </span>
+                          </div>
+
+                          {/* ASSIGNED REGIONS */}
+                          <div className="pb-2 border-b border-gray-100">
+                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Assigned Regions / Routes</span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {assignedRoutes.length > 0 ? assignedRoutes.map((r: any) => (
+                                <span key={r._id} className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 font-bold rounded-md text-[11px]">
+                                  {r.name} ({r.code})
+                                </span>
+                              )) : <span className="text-gray-400 italic text-xs">No regions assigned</span>}
                             </div>
                           </div>
-                          <div className="space-y-2 text-xs">
-                            <div>
-                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Assigned Regions / Routes</span>
-                              <div className="flex flex-wrap gap-1.5">
-                                {assignedRoutes.length > 0 ? assignedRoutes.map((r: any) => (
-                                  <span key={r._id} className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 font-bold rounded-md text-[11px]">
-                                    {r.name} ({r.code})
-                                  </span>
-                                )) : <span className="text-gray-400 italic text-xs">No regions assigned</span>}
-                              </div>
-                            </div>
+
+                          {/* SEARCH INPUT */}
+                          <div className="relative">
+                            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="text"
+                              value={agentCitySearch}
+                              onChange={(e) => setAgentCitySearch(e.target.value)}
+                              placeholder="Search cities in coverage..."
+                              className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all placeholder:text-gray-400"
+                            />
                           </div>
+
+                          {/* CITIES GRID */}
+                          {(() => {
+                            const filteredAgentCities = assignedCityObjs.filter((c: any) => {
+                              const q = agentCitySearch.toLowerCase().trim();
+                              if (!q) return true;
+                              return (c.firmName || c.name || '').toLowerCase().includes(q) || (c.code || '').toLowerCase().includes(q);
+                            });
+
+                            return (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1 pt-1">
+                                {filteredAgentCities.length > 0 ? (
+                                  filteredAgentCities.map((c: any) => {
+                                    const cityName = c.firmName || c.name || '';
+                                    const cNameLower = cityName.toLowerCase().trim();
+                                    const cityCusts = allCustomers.filter((cust: any) => {
+                                      const custCity = (cust.city || cust.assignedMarket || '').toLowerCase().trim();
+                                      return custCity && custCity === cNameLower;
+                                    });
+                                    const cityOut = cityCusts.reduce((sum: number, cust: any) => sum + (Number(cust.outstandingBalance) || Number(cust.outstanding) || 0), 0);
+
+                                    return (
+                                      <div
+                                        key={c._id || cityName}
+                                        title={`Click to view customers in ${cityName}`}
+                                        onClick={() => {
+                                          setSelectedDetails(null);
+                                          setCardCustomersModal({
+                                            title: `Customers in ${cityName} (${name} - Agent)`,
+                                            subtitle: `City Code: ${c.code || '—'} • ${cityCusts.length} Active Accounts`,
+                                            customers: cityCusts
+                                          });
+                                          setCardCustomerSearch('');
+                                        }}
+                                        className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs hover:border-blue-500 hover:ring-1 hover:ring-blue-500 transition-all cursor-pointer group space-y-2"
+                                      >
+                                        {/* City Header */}
+                                        <div className="flex items-center justify-between">
+                                          <span className="font-extrabold text-gray-900 text-xs group-hover:text-blue-600 transition-colors truncate" title={cityName}>
+                                            {cityName}
+                                          </span>
+                                          <span className="px-2 py-0.5 text-[9.5px] font-extrabold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md">
+                                            {c.status || 'ACTIVE'}
+                                          </span>
+                                        </div>
+
+                                        {/* Sub-rows inside city card */}
+                                        <div className="bg-slate-50/80 p-2.5 rounded-xl space-y-1.5 border border-slate-100 text-xs">
+                                          <div className="flex items-center justify-between">
+                                            <span className="text-gray-500 text-[11px] font-semibold">Customers</span>
+                                            <span className="font-extrabold text-gray-900 font-mono text-xs">{cityCusts.length}</span>
+                                          </div>
+                                          <div className="flex items-center justify-between">
+                                            <span className="text-gray-500 text-[11px] font-semibold">Outstanding</span>
+                                            <span className={`font-extrabold font-mono text-xs ${cityOut > 0 ? 'text-rose-600' : cityOut < 0 ? 'text-emerald-600' : 'text-gray-700'}`}>
+                                              ₹{Math.abs(cityOut).toLocaleString('en-IN')}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })
+                                ) : (
+                                  <div className="col-span-2 py-8 text-center bg-slate-50/50 rounded-2xl border border-dashed border-gray-200">
+                                    <p className="text-gray-400 font-medium text-xs">No cities found matching "{agentCitySearch}"</p>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
                     </div>
@@ -4733,7 +5086,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                             <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">TRANSPORTER PROFILE</h4>
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-y-2.5 gap-x-3 text-xs">
                           <div>
                             <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Firm Name</span>
                             <span className="font-bold text-gray-900 text-xs block truncate">{name}</span>
@@ -4752,10 +5105,6 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 </a>
                               )}
                             </div>
-                          </div>
-                          <div>
-                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">GSTIN Number</span>
-                            <span className="font-mono font-bold text-blue-600 text-xs">{selectedDetails.gstNumber || selectedDetails.gstin || '—'}</span>
                           </div>
                         </div>
                       </div>
@@ -4858,7 +5207,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         <div className="lg:col-span-1 bg-white p-4 rounded-2xl border border-gray-200/80 shadow-2xs space-y-3">
                           <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
                             <div className="w-6 h-6 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-                              <Map className="w-3.5 h-3.5" />
+                              <MapIcon className="w-3.5 h-3.5" />
                             </div>
                             <h4 className="font-extrabold text-gray-800 text-xs tracking-wider uppercase">REGION PROFILE</h4>
                           </div>
@@ -4967,8 +5316,8 @@ export const BusinessDirectoryV2: React.FC = () => {
                                       </div>
                                       <div className="flex items-center justify-between">
                                         <span className="text-gray-500 text-[11px] font-semibold">Outstanding</span>
-                                        <span className={`font-extrabold font-mono text-xs ${cityOut >= 100000 ? 'text-rose-600' : cityOut > 0 ? 'text-emerald-600' : 'text-gray-700'}`}>
-                                          ₹{cityOut.toLocaleString('en-IN')}
+                                        <span className={`font-extrabold font-mono text-xs ${cityOut > 0 ? 'text-rose-600' : cityOut < 0 ? 'text-emerald-600' : 'text-gray-700'}`}>
+                                          ₹{Math.abs(cityOut).toLocaleString('en-IN')}
                                         </span>
                                       </div>
                                     </div>
@@ -5181,7 +5530,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                     </div>
                     <div className="px-3 py-1.5 rounded-xl bg-white border border-gray-200 shadow-2xs flex items-center gap-2">
                       <span className="text-[10px] uppercase font-bold text-gray-400">Total Outstanding</span>
-                      <span className="font-mono font-black text-rose-600">₹{totalOut.toLocaleString('en-IN')}</span>
+                      <span className={`font-mono font-black ${totalOut > 0 ? 'text-rose-600' : totalOut < 0 ? 'text-emerald-600' : 'text-gray-700'}`}>₹{Math.abs(totalOut).toLocaleString('en-IN')}</span>
                     </div>
                   </div>
                 );
@@ -5247,7 +5596,6 @@ export const BusinessDirectoryV2: React.FC = () => {
                             <th className="py-3 px-4">Customer Firm</th>
                             <th className="py-3 px-4">Phone / WhatsApp</th>
                             <th className="py-3 px-4">City & Region</th>
-                            <th className="py-3 px-4">Agent</th>
                             <th className="py-3 px-4 text-right">Outstanding</th>
                             <th className="py-3 px-4 text-center">Status</th>
                             <th className="py-3 px-4 text-right">Profile</th>
@@ -5298,14 +5646,9 @@ export const BusinessDirectoryV2: React.FC = () => {
                                     {[cust.district, cust.route].filter(Boolean).join(' • ') || '—'}
                                   </div>
                                 </td>
-                                <td className="py-3 px-4">
-                                  <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-semibold text-[10px]">
-                                    {cust.agentAssigned || cust.assignedAgent || 'Direct'}
-                                  </span>
-                                </td>
                                 <td className="py-3 px-4 text-right">
-                                  <span className={`font-mono font-bold text-xs ${outBal > 0 ? 'text-rose-600' : 'text-gray-700'}`}>
-                                    ₹{outBal.toLocaleString('en-IN')}
+                                  <span className={`font-mono font-bold text-xs ${outBal > 0 ? 'text-rose-600' : outBal < 0 ? 'text-emerald-600' : 'text-gray-700'}`}>
+                                    ₹{Math.abs(outBal).toLocaleString('en-IN')}
                                   </span>
                                 </td>
                                 <td className="py-3 px-4 text-center">
@@ -5434,254 +5777,337 @@ export const BusinessDirectoryV2: React.FC = () => {
         </Modal>
       )}
 
-      {/* ── DUPLICATE RECORDS SCANNER MODAL ── */}
+      {/* ── DUPLICATE RECORDS SCANNER MODAL (PartyManagement exact style) ── */}
       {showDuplicatesModal && (
         <Modal
           isOpen={showDuplicatesModal}
           onClose={() => setShowDuplicatesModal(false)}
           title={`Find Duplicates — ${activeMainTab.toUpperCase()}`}
-          maxWidth="max-w-5xl"
+          maxWidth="max-w-3xl"
         >
           <div className="space-y-4 text-left">
-            <div className="flex items-center justify-between bg-amber-50/80 border border-amber-200 rounded-2xl p-3.5 text-xs text-amber-900">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-amber-500 text-white rounded-xl shadow-xs">
-                  <Copy className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-sm text-amber-900">
-                    {duplicateGroups.length > 0 ? `${duplicateGroups.length} Duplicate Cluster(s) Detected` : 'No Duplicates Found'}
-                  </h4>
-                  <p className="text-amber-700 text-xs mt-0.5">
-                    Scanned all records in <span className="font-bold capitalize">{activeMainTab}</span> for matching phone numbers, email addresses, GST numbers, or firm names.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={handleFindDuplicates}
-                disabled={isScanningDuplicates}
-                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isScanningDuplicates ? 'animate-spin' : ''}`} />
-                <span>Re-scan</span>
-              </button>
-            </div>
-
             {duplicateGroups.length === 0 ? (
               <div className="py-12 text-center bg-slate-50 border border-dashed border-gray-200 rounded-2xl">
                 <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-3">
                   <Check className="w-6 h-6 stroke-[3]" />
                 </div>
-                <h3 className="font-bold text-base text-gray-900">No Duplicates Found</h3>
+                <h3 className="font-bold text-base text-gray-900">No Duplicates Detected!</h3>
                 <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
-                  All records in <span className="font-semibold">{activeMainTab}</span> are clean with unique mobile numbers, emails, and names.
+                  All entries in <span className="font-semibold">{activeMainTab}</span> have unique keys.
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 min-h-[400px]">
-                {/* Duplicate Groups Sidebar */}
-                <div className="md:col-span-1 border border-gray-200 rounded-2xl p-2.5 space-y-1.5 max-h-[460px] overflow-y-auto bg-slate-50/50">
-                  <div className="text-[10px] font-extrabold uppercase text-gray-400 tracking-wider px-2 py-1">
-                    Clusters ({duplicateGroups.length})
-                  </div>
-                  {duplicateGroups.map((group, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setActiveDuplicateIdx(idx)}
-                      className={`w-full text-left p-2.5 rounded-xl border text-xs transition-all cursor-pointer ${
-                        activeDuplicateIdx === idx
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-md font-bold'
-                          : 'bg-white text-gray-800 border-gray-200 hover:bg-gray-100'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-1 mb-0.5">
-                        <span className={`text-[9px] uppercase font-mono px-1.5 py-0.2 rounded-md ${
-                          activeDuplicateIdx === idx ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600'
-                        }`}>
-                          {group.field}
+              <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+                <p className="text-xs text-gray-500 font-medium">
+                  The following duplicate groups were identified. Check details and clean up if necessary:
+                </p>
+                
+                {duplicateGroups.map((group, gIdx) => (
+                  <div 
+                    key={gIdx}
+                    className={`border rounded-xl p-4 transition-all duration-150 ${
+                      gIdx === highlightedDuplicateIdx
+                        ? 'border-blue-500 bg-blue-50/20 ring-2 ring-blue-500/20 shadow-xs'
+                        : 'border-red-200 bg-red-50/10'
+                    }`}
+                    onMouseEnter={() => setHighlightedDuplicateIdx(gIdx)}
+                  >
+                    <div className="flex justify-between items-start md:items-center flex-col md:flex-row gap-2 mb-3 border-b pb-2 border-red-100/50">
+                      <div>
+                        <span className="text-xs font-bold bg-red-100 text-red-800 px-2.5 py-0.5 rounded-lg border border-red-200">
+                          Duplicate by {group.field}: {group.value}
                         </span>
-                        <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
-                          activeDuplicateIdx === idx ? 'bg-white text-blue-700' : 'bg-amber-100 text-amber-800'
-                        }`}>
-                          {group.items.length}
-                        </span>
+                        <span className="text-xs text-gray-500 font-mono ml-2">{group.items.length} records</span>
                       </div>
-                      <div className="truncate font-semibold text-xs mt-1">
-                        {group.value || 'Unspecified'}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-
-                {/* Main Comparison Panel */}
-                <div className="md:col-span-3 border border-gray-200 rounded-2xl p-4 flex flex-col justify-between bg-white">
-                  {duplicateGroups[activeDuplicateIdx] && (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                        <div>
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                            Match Reason: {duplicateGroups[activeDuplicateIdx].field}
-                          </span>
-                          <h3 className="text-base font-black text-gray-900 mt-0.5">
-                            "{duplicateGroups[activeDuplicateIdx].value}"
-                          </h3>
-                        </div>
+                      <div className="flex items-center gap-2">
                         <button
-                          onClick={() => handleKeepBoth(activeDuplicateIdx)}
-                          className="px-3 py-1.5 text-xs font-bold text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all cursor-pointer"
+                          onClick={() => setCompareGroup(group)}
+                          title="View Both"
+                          className="px-2.5 py-1 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1 transition-all cursor-pointer"
                         >
-                          Keep Both (Dismiss)
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>View Both</span>
                         </button>
-                      </div>
-
-                      {/* Candidate Records Cards */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[320px] overflow-y-auto pr-1">
-                        {duplicateGroups[activeDuplicateIdx].items.map((item) => (
-                          <div
-                            key={item._id}
-                            className="border border-gray-200 rounded-2xl p-3.5 space-y-2 bg-slate-50/50 hover:bg-blue-50/20 transition-all text-xs relative group"
+                        {activeMainTab !== 'regions' && (
+                          <button
+                            onClick={() => {
+                              setMergeGroup(group);
+                              setMergePrimaryId(group.items[0]?._id || '');
+                            }}
+                            title="Merge"
+                            className="px-2.5 py-1 text-xs font-semibold text-white bg-blue-600 border border-blue-700 rounded-lg hover:bg-blue-700 flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
                           >
-                            <div className="flex items-start justify-between gap-2">
-                              <div>
-                                <h4 className="font-bold text-gray-900 text-sm">{item.firmName || item.name}</h4>
-                                {item.ownerName && (
-                                  <p className="text-[11px] text-gray-500 font-medium">Owner: {item.ownerName}</p>
-                                )}
-                              </div>
-                              <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase ${
-                                item.status === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-700'
-                              }`}>
-                                {item.status || 'active'}
-                              </span>
-                            </div>
-
-                            <div className="space-y-1 text-gray-600 text-[11px] font-medium pt-1 border-t border-gray-100">
-                              <p className="flex items-center gap-1.5">
-                                <Phone className="w-3 h-3 text-gray-400 shrink-0" />
-                                <span>{item.phone || item.whatsapp || 'No Phone'}</span>
-                              </p>
-                              {item.email && (
-                                <p className="flex items-center gap-1.5">
-                                  <Mail className="w-3 h-3 text-gray-400 shrink-0" />
-                                  <span>{item.email}</span>
-                                </p>
-                              )}
-                              {(item.city || item.district) && (
-                                <p className="flex items-center gap-1.5">
-                                  <MapPin className="w-3 h-3 text-gray-400 shrink-0" />
-                                  <span>{[item.city, item.district, item.state].filter(Boolean).join(', ')}</span>
-                                </p>
-                              )}
-                              {(item.gstNumber || item.gstin) && (
-                                <p className="flex items-center gap-1.5 font-mono text-[10px] text-gray-500">
-                                  <FileText className="w-3 h-3 text-gray-400 shrink-0" />
-                                  <span>GST: {item.gstNumber || item.gstin}</span>
-                                </p>
-                              )}
-                              {(item.outstandingBalance !== undefined || item.outstanding !== undefined) && (
-                                <p className="font-bold text-gray-800">
-                                  Balance: ₹{(Number(item.outstandingBalance) || Number(item.outstanding) || 0).toLocaleString('en-IN')}
-                                </p>
-                              )}
-                            </div>
-
-                            <div className="pt-2 flex items-center justify-between border-t border-gray-100 text-[10px]">
-                              <span className="text-gray-400 font-mono">ID: {item._id.slice(-6)}</span>
-                              <button
-                                onClick={() => handleDeleteDuplicateRecord(item)}
-                                className="px-2 py-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg font-bold transition-all cursor-pointer"
-                              >
-                                Delete Record
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Merge Initiator */}
-                      <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
-                        <span className="text-xs font-medium text-gray-500">
-                          Combine transactions into 1 master record?
-                        </span>
+                            <RefreshCw className="w-3.5 h-3.5" />
+                            <span>Merge</span>
+                          </button>
+                        )}
                         <button
                           onClick={() => {
-                            setMergePrimaryId(duplicateGroups[activeDuplicateIdx].items[0]._id);
-                            setShowMergeConfirmModal(true);
+                            setDuplicateGroups(prev => prev.filter((_, i) => i !== gIdx));
+                            setHighlightedDuplicateIdx(prev => (prev > 0 ? prev - 1 : 0));
                           }}
-                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all flex items-center gap-1.5 text-xs cursor-pointer"
+                          title="Keep Both"
+                          className="px-2.5 py-1 text-xs font-semibold text-gray-600 bg-gray-100 border border-gray-200 rounded-lg hover:bg-gray-200 flex items-center gap-1 transition-all cursor-pointer"
                         >
-                          <GitMerge className="w-3.5 h-3.5" />
-                          <span>Merge Group Records</span>
+                          <X className="w-3.5 h-3.5" />
+                          <span>Keep Both</span>
                         </button>
                       </div>
                     </div>
-                  )}
-                </div>
+
+                    <div className="space-y-2">
+                      {group.items.map((item) => (
+                        <div key={item._id} className="flex justify-between items-center bg-white p-3 border border-gray-200 rounded-xl text-xs">
+                          <div>
+                            <p className="font-bold text-gray-900 text-sm">
+                              {activeMainTab === 'regions' ? item.name : (item.firmName || item.contactName || item.name)}
+                            </p>
+                            <div className="text-xs text-gray-500 mt-0.5 flex items-center space-x-1.5 flex-wrap">
+                              {activeMainTab === 'regions' ? (
+                                <span>Agent: {item.assignedAgent || 'None'}</span>
+                              ) : (
+                                <>
+                                  <span className="flex items-center gap-1.5 font-mono">
+                                    <span>Mobile: {item.phone || '-'}</span>
+                                    {item.phone && item.phone.length >= 10 && (
+                                      <a
+                                        href={`https://wa.me/91${item.phone.replace(/\D/g, '')}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex items-center shrink-0 -mt-0.5 text-emerald-500 hover:text-emerald-600 transition-transform hover:scale-110"
+                                      >
+                                        <WhatsAppIcon />
+                                      </a>
+                                    )}
+                                  </span>
+                                  <span className="mx-1 text-gray-300">|</span>
+                                  <span>City: {[item.city, item.district].filter(Boolean).join(', ') || '-'}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => openModal(item)}
+                              className="px-2.5 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg font-bold transition-all flex items-center gap-1 cursor-pointer"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteDuplicateRecord(item)}
+                              className="px-2.5 py-1 text-xs bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg font-bold transition-all flex items-center gap-1 cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
+
+            <div className="pt-3 border-t border-gray-100 flex justify-end">
+              <button
+                onClick={() => setShowDuplicatesModal(false)}
+                className="px-4 py-2 border rounded-xl hover:bg-gray-100 font-bold text-xs cursor-pointer text-gray-700"
+              >
+                Close Window
+              </button>
+            </div>
           </div>
         </Modal>
       )}
 
-      {/* ── MERGE CONFIRMATION MODAL ── */}
-      {showMergeConfirmModal && duplicateGroups[activeDuplicateIdx] && (
-        <Modal
-          isOpen={showMergeConfirmModal}
-          onClose={() => setShowMergeConfirmModal(false)}
-          title="Confirm Record Merge"
-          maxWidth="max-w-lg"
-        >
-          <div className="space-y-4 text-left">
-            <p className="text-xs text-gray-600">
-              Select which master record to <strong>KEEP as Primary</strong>. All transactions and ledger entries from duplicate records will be transferred to this primary record, and duplicate records will be merged.
-            </p>
-
-            <div className="space-y-2">
-              <label className="block text-xs font-bold text-gray-700">Choose Primary Master Record:</label>
-              {duplicateGroups[activeDuplicateIdx].items.map(item => (
-                <label
-                  key={item._id}
-                  className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${
-                    mergePrimaryId === item._id
-                      ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-100'
-                      : 'border-gray-200 bg-white hover:bg-gray-50'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="primaryRecord"
-                    checked={mergePrimaryId === item._id}
-                    onChange={() => setMergePrimaryId(item._id)}
-                    className="text-blue-600 focus:ring-blue-500 cursor-pointer"
-                  />
-                  <div className="text-xs">
-                    <span className="font-bold text-gray-900 block">{item.firmName || item.name}</span>
-                    <span className="text-[11px] text-gray-500 font-mono">
-                      {[item.phone, item.city, item.gstNumber || item.gstin].filter(Boolean).join(' • ')}
-                    </span>
-                  </div>
-                </label>
-              ))}
+      {/* ── COMPARE DUPLICATES MODAL (View Both) ── */}
+      {compareGroup && (
+        <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-4 bg-gray-950/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative bg-white rounded-2xl max-w-4xl w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+              <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                <Users className="w-5 h-5 text-blue-600" />
+                Compare Duplicates ({compareGroup.field}: {compareGroup.value})
+              </h3>
+              <button onClick={() => setCompareGroup(null)} className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+            <div className="p-6 overflow-auto flex-1 text-xs">
+              <table className="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-xl overflow-hidden">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider border-r border-gray-200 w-[180px]">Field</th>
+                    {compareGroup.items.map((item: DirectoryItem, idx: number) => (
+                      <th key={item._id} className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider min-w-[200px] border-r last:border-r-0">
+                        <div className="flex justify-between items-center">
+                          <span>Record #{idx + 1}</span>
+                          <button
+                            onClick={() => handleDeleteDuplicateRecord(item)}
+                            className="text-red-600 hover:text-red-800 p-1 font-bold text-[10px] normal-case flex items-center gap-0.5 border border-red-200 bg-red-50 rounded-lg cursor-pointer"
+                            title="Delete Record"
+                          >
+                            <Trash2 className="w-3 h-3" /> Delete
+                          </button>
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {[
+                    { label: 'Firm/Company Name', key: 'firmName' },
+                    { label: 'Owner Name', key: 'ownerName' },
+                    { label: 'Contact Name', key: 'contactName' },
+                    { label: 'Mobile Number', key: 'phone' },
+                    { label: 'WhatsApp', key: 'whatsapp' },
+                    { label: 'Email', key: 'email' },
+                    { label: 'Vendor Type', key: 'vendorType', showIf: activeMainTab === 'vendors' },
+                    { label: 'GST Number', key: 'gstNumber' },
+                    { label: 'Aadhar Number', key: 'aadharNumber' },
+                    { label: 'City', key: 'city' },
+                    { label: 'District', key: 'district' },
+                    { label: 'State', key: 'state' },
+                    { label: 'Pincode', key: 'pincode' },
+                    { label: 'Outstanding Balance', key: 'outstandingBalance', isCurrency: true },
+                    { label: 'Assigned Agent', key: 'assignedAgent' },
+                    { label: 'Route / Region', key: 'route' },
+                    { label: 'Status', key: 'status' }
+                  ].filter(row => row.showIf !== false).map((row, rIdx) => (
+                    <tr key={rIdx} className={rIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                      <td className="px-4 py-2.5 text-xs font-bold text-gray-500 border-r border-gray-200 bg-gray-50/40">{row.label}</td>
+                      {compareGroup.items.map((item: DirectoryItem) => {
+                        const val = (item as any)[row.key];
+                        return (
+                          <td key={item._id} className="px-4 py-2.5 text-xs text-gray-800 border-r border-gray-200 last:border-r-0 break-words font-medium">
+                            {row.isCurrency ? (
+                              <span className={Number(val) > 0 ? 'text-red-600 font-bold' : 'text-emerald-600 font-bold'}>
+                                ₹{(Number(val) || 0).toLocaleString('en-IN')}
+                              </span>
+                            ) : row.key === 'status' ? (
+                              <span className={`inline-flex px-2 py-0.5 text-[10px] font-bold rounded-full ${
+                                val === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-700'
+                              }`}>
+                                {val || 'active'}
+                              </span>
+                            ) : (
+                              val || <span className="text-gray-400 italic text-[11px]">Empty</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-2">
+              {activeMainTab !== 'regions' && (
+                <button
+                  onClick={() => {
+                    const group = compareGroup;
+                    setCompareGroup(null);
+                    setMergeGroup(group);
+                    setMergePrimaryId(group.items[0]?._id || '');
+                  }}
+                  className="px-4 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md transition-colors cursor-pointer"
+                >
+                  Merge These Records
+                </button>
+              )}
               <button
-                onClick={() => setShowMergeConfirmModal(false)}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs cursor-pointer"
+                onClick={() => setCompareGroup(null)}
+                className="px-4 py-2 text-xs font-bold border border-gray-300 rounded-xl hover:bg-gray-100 text-gray-700 transition-colors cursor-pointer"
               >
-                Cancel
-              </button>
-              <button
-                onClick={handleExecuteMerge}
-                disabled={isMerging}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                <GitMerge className={`w-3.5 h-3.5 ${isMerging ? 'animate-spin' : ''}`} />
-                <span>{isMerging ? 'Merging Records...' : 'Confirm & Merge Records'}</span>
+                Close
               </button>
             </div>
           </div>
-        </Modal>
+        </div>
+      )}
+
+      {/* ── MERGE SELECTION MODAL ── */}
+      {mergeGroup && (
+        <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-4 bg-gray-950/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative bg-white rounded-2xl max-w-lg w-full shadow-2xl flex flex-col border border-gray-100 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+              <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                <RefreshCw className="w-5 h-5 text-blue-600" />
+                Merge Records
+              </h3>
+              <button onClick={() => { setMergeGroup(null); setMergePrimaryId(''); }} className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs">
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-xs text-blue-800 space-y-2">
+                <p className="font-bold flex items-center gap-1.5 text-blue-900">
+                  <Copy className="w-4 h-4 text-blue-600" />
+                  How Merge Works:
+                </p>
+                <ul className="list-disc pl-4 space-y-1 text-blue-700 text-[11px]">
+                  <li>Select one record to keep as the <strong>Primary</strong> record.</li>
+                  <li>Non-empty fields from duplicate records will be merged into primary.</li>
+                  <li>All outstanding balances will be <strong>summed up</strong>.</li>
+                  <li>All transactions and sales orders will point to the primary record.</li>
+                  <li>Duplicate records will be <strong>permanently deleted</strong>.</li>
+                </ul>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Select Primary Record:</label>
+                <div className="space-y-2.5">
+                  {mergeGroup.items.map((item: DirectoryItem) => (
+                    <label
+                      key={item._id}
+                      className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${
+                        mergePrimaryId === item._id
+                          ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-100'
+                          : 'border-gray-200 bg-white hover:bg-gray-50'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="primaryRecord"
+                        checked={mergePrimaryId === item._id}
+                        onChange={() => setMergePrimaryId(item._id)}
+                        className="text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      />
+                      <div className="text-xs">
+                        <span className="font-bold text-gray-900 block">{item.firmName || item.name}</span>
+                        <span className="text-[11px] text-gray-500 font-mono">
+                          {[item.phone, item.city, item.gstNumber].filter(Boolean).join(' • ')}
+                        </span>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+                <button
+                  onClick={() => { setMergeGroup(null); setMergePrimaryId(''); }}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleExecuteMerge}
+                  disabled={isMerging || !mergePrimaryId}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <GitMerge className={`w-3.5 h-3.5 ${isMerging ? 'animate-spin' : ''}`} />
+                  <span>{isMerging ? 'Merging Records...' : 'Confirm & Merge Records'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Keyframe Animation */}
