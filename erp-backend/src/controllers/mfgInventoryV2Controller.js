@@ -90,31 +90,43 @@ exports.getNextSkuCode = async (req, res, next) => {
     const cleanPrefix = String(prefix).trim().toUpperCase();
     const companyObjId = toObjectId(companyId);
 
-    // Query ALL SKUs for this company, including soft-deleted ones (isDeleted: true)
-    const allCompanySkus = await SkuV2.find({ company: companyObjId }).select("skuCode isDeleted");
+    // 1. Query active SKUs for this company to determine the current highest sequential number
+    const activeCompanySkus = await SkuV2.find({ 
+      company: companyObjId,
+      isDeleted: { $ne: true }
+    }).select("skuCode");
 
     let maxNum = 0;
-    const regex = new RegExp(`(?:^|DEL-)${cleanPrefix}-(\\d+)`, "i");
+    // Standard sequence regex: e.g. FG-001, RM-006, SM-002 (1 to 4 digits, <= 9999)
+    const seqRegex = new RegExp(`^${cleanPrefix}-(\\d{1,4})$`, "i");
 
-    for (const s of allCompanySkus) {
+    for (const s of activeCompanySkus) {
       const code = (s.skuCode || "").trim();
-      const match = code.match(regex);
+      const match = code.match(seqRegex);
       if (match) {
         const num = parseInt(match[1], 10);
-        if (!isNaN(num) && num > maxNum) {
+        if (!isNaN(num) && num > 0 && num < 10000 && num > maxNum) {
           maxNum = num;
         }
       }
     }
 
-    // Check persistent Sequence counter if higher
+    // 2. Check persistent Sequence counter if higher (only valid sequence numbers < 10000)
     const seqDoc = await Sequence.findOne({ prefix: `${companyId}_SKU_${cleanPrefix}` });
-    if (seqDoc && seqDoc.sequence > maxNum) {
-      maxNum = seqDoc.sequence;
+    if (seqDoc && typeof seqDoc.sequence === "number" && seqDoc.sequence > 0 && seqDoc.sequence < 10000) {
+      if (seqDoc.sequence > maxNum) {
+        maxNum = seqDoc.sequence;
+      }
     }
 
-    const nextNum = maxNum + 1;
-    const nextCode = `${cleanPrefix}-${String(nextNum).padStart(3, "0")}`;
+    // 3. Ensure the generated code does not collide with ANY existing SKU for this company (active or soft-deleted)
+    let nextNum = maxNum + 1;
+    let nextCode = `${cleanPrefix}-${String(nextNum).padStart(3, "0")}`;
+
+    while (await SkuV2.exists({ company: companyObjId, skuCode: nextCode })) {
+      nextNum++;
+      nextCode = `${cleanPrefix}-${String(nextNum).padStart(3, "0")}`;
+    }
 
     res.json({
       nextCode,
@@ -178,11 +190,11 @@ exports.createSku = async (req, res, next) => {
     await newSku.save();
 
     // Permanently record sequence number so this SKU ID is never reused even if deleted
-    const numMatch = (newSku.skuCode || '').match(/([A-Z]+)-(\d+)/i);
+    const numMatch = (newSku.skuCode || '').match(/^([A-Z]+)-(\d{1,4})$/i);
     if (numMatch) {
       const p = numMatch[1].toUpperCase();
       const n = parseInt(numMatch[2], 10);
-      if (!isNaN(n)) {
+      if (!isNaN(n) && n > 0 && n < 10000) {
         await Sequence.findOneAndUpdate(
           { prefix: `${company}_SKU_${p}` },
           { $max: { sequence: n } },
@@ -349,11 +361,11 @@ exports.deleteSku = async (req, res, next) => {
     }
 
     // Permanently record sequence number in Sequence collection so this SKU ID is never reused
-    const numMatch = (sku.skuCode || '').match(/([A-Z]+)-(\d+)/i);
+    const numMatch = (sku.skuCode || '').match(/^([A-Z]+)-(\d{1,4})$/i);
     if (numMatch) {
       const p = numMatch[1].toUpperCase();
       const n = parseInt(numMatch[2], 10);
-      if (!isNaN(n)) {
+      if (!isNaN(n) && n > 0 && n < 10000) {
         await Sequence.findOneAndUpdate(
           { prefix: `${companyId}_SKU_${p}` },
           { $max: { sequence: n } },
@@ -598,6 +610,25 @@ exports.renumberSkus = async (req, res, next) => {
       performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
       company: companyObjId
     }).catch(e => console.error("ActivityLog error:", e));
+
+    // Update persistent sequence counters to reflect the new continuous counts
+    if (companyId) {
+      await Sequence.findOneAndUpdate(
+        { prefix: `${companyId}_SKU_FG` },
+        { sequence: fgList.length },
+        { upsert: true }
+      ).catch(() => {});
+      await Sequence.findOneAndUpdate(
+        { prefix: `${companyId}_SKU_SM` },
+        { sequence: smList.length },
+        { upsert: true }
+      ).catch(() => {});
+      await Sequence.findOneAndUpdate(
+        { prefix: `${companyId}_SKU_RM` },
+        { sequence: rmList.length },
+        { upsert: true }
+      ).catch(() => {});
+    }
 
     res.json({
       msg: `Successfully renumbered ${updatedCount} SKUs into continuous series`,

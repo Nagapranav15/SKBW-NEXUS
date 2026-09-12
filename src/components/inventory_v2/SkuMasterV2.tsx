@@ -1738,6 +1738,14 @@ const SkuMasterV2: React.FC = () => {
         }
       }
 
+      try {
+        if (selectedCompany?._id) {
+          localStorage.setItem(`skbw_max_sku_seq_${selectedCompany._id}_FG`, String(fgList.length));
+          localStorage.setItem(`skbw_max_sku_seq_${selectedCompany._id}_SM`, String(smList.length));
+          localStorage.setItem(`skbw_max_sku_seq_${selectedCompany._id}_RM`, String(rmList.length));
+        }
+      } catch (_) {}
+
       if (!silent) {
         showToast(res?.msg || `Renumbered ${fgList.length + smList.length + rmList.length} SKUs into continuous series!`, "success");
       }
@@ -2209,15 +2217,19 @@ const SkuMasterV2: React.FC = () => {
   const handleDeleteDuplicateItem = async (sku: SkuV2) => {
     if (!sku._id || !selectedCompany?._id) return;
     try {
-      // Record sequence so deleted ID is never reused
-      const numMatch = (sku.skuCode || '').match(/([A-Z]+)-(\d+)/i);
+      // Record sequence so deleted ID is never reused (only for clean sequential codes < 10000)
+      const numMatch = (sku.skuCode || '').match(/^([A-Z]+)-(\d{1,4})$/i);
       if (numMatch) {
         const p = numMatch[1].toUpperCase();
         const n = parseInt(numMatch[2], 10);
-        const localMaxKey = `skbw_max_sku_seq_${selectedCompany._id}_${p}`;
-        const currentMax = parseInt(localStorage.getItem(localMaxKey) || '0', 10);
-        if (!isNaN(n) && n > currentMax) {
-          localStorage.setItem(localMaxKey, String(n));
+        if (!isNaN(n) && n > 0 && n < 10000) {
+          const localMaxKey = `skbw_max_sku_seq_${selectedCompany._id}_${p}`;
+          const currentMax = parseInt(localStorage.getItem(localMaxKey) || '0', 10);
+          if (!isNaN(currentMax) && currentMax >= 10000) {
+            localStorage.setItem(localMaxKey, String(n));
+          } else if (!isNaN(n) && n > currentMax) {
+            localStorage.setItem(localMaxKey, String(n));
+          }
         }
       }
 
@@ -2237,16 +2249,20 @@ const SkuMasterV2: React.FC = () => {
   const handleDeleteSku = async () => {
     if (!deleteConfirmSku?._id) return;
     try {
-      // Record sequence so deleted ID is never reused
+      // Record sequence so deleted ID is never reused (only for clean sequential codes < 10000)
       if (deleteConfirmSku.skuCode && selectedCompany?._id) {
-        const numMatch = deleteConfirmSku.skuCode.match(/([A-Z]+)-(\d+)/i);
+        const numMatch = deleteConfirmSku.skuCode.match(/^([A-Z]+)-(\d{1,4})$/i);
         if (numMatch) {
           const p = numMatch[1].toUpperCase();
           const n = parseInt(numMatch[2], 10);
-          const localMaxKey = `skbw_max_sku_seq_${selectedCompany._id}_${p}`;
-          const currentMax = parseInt(localStorage.getItem(localMaxKey) || '0', 10);
-          if (!isNaN(n) && n > currentMax) {
-            localStorage.setItem(localMaxKey, String(n));
+          if (!isNaN(n) && n > 0 && n < 10000) {
+            const localMaxKey = `skbw_max_sku_seq_${selectedCompany._id}_${p}`;
+            const currentMax = parseInt(localStorage.getItem(localMaxKey) || '0', 10);
+            if (!isNaN(currentMax) && currentMax >= 10000) {
+              localStorage.setItem(localMaxKey, String(n));
+            } else if (!isNaN(n) && n > currentMax) {
+              localStorage.setItem(localMaxKey, String(n));
+            }
           }
         }
       }
@@ -2387,11 +2403,24 @@ const SkuMasterV2: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50/60 p-4 md:p-6 space-y-4 font-sans text-gray-800">
       
-      {/* ── CLEAN TOP HEADER ── */}
-      <div className="flex items-center justify-between pt-1">
-        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
-          Item Master
-        </h1>
+      {/* 1. Header Banner */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs">
+        <div className="flex items-center gap-3.5">
+          <div className="p-3 bg-blue-100/80 text-blue-700 rounded-2xl shadow-2xs">
+            <Package className="w-6 h-6 stroke-[2.2]" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+              <span>Item Master</span>
+              <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-bold">
+                {skus.length} Total
+              </span>
+            </h1>
+            <p className="text-xs text-gray-500 font-medium">
+              Unified master directory for Products, Raw Materials, Semi Finished Goods & Categories.
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* ── 4 MAIN TAB NAVIGATION BAR (Products, Materials, Semi, Categories) ── */}
@@ -4092,7 +4121,7 @@ const SkuMasterV2: React.FC = () => {
                       </div>
                       <div>
                         <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">RULING SPEC</span>
-                        <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.ruleType || '(SR)'}</span>
+                        <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.ruleType || '-'}</span>
                       </div>
                       <div>
                         <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PAGES / SHEETS PER REAM</span>

@@ -659,11 +659,13 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         setProcessSteps([]);
       }
     } else {
+      const sectionCat = activeSection === 'products' ? 'Finished Goods' : activeSection === 'semi' ? 'Semi Finished' : 'Raw Material';
+      const initialCat = defaultCategory || sectionCat;
       setForm({
         skuCode: '',
         name: '',
-        category: defaultCategory || 'Raw Material',
-        paperType: 'None',
+        category: initialCat,
+        paperType: initialCat === 'Raw Material' ? 'Reels' : 'None',
         unit: 'kg',
         altUnit: '',
         altUnitConversion: '',
@@ -690,7 +692,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       setBomItems([]);
       setProcessSteps([]);
     }
-  }, [editSku, isOpen]);
+  }, [editSku, isOpen, defaultCategory, activeSection]);
 
   // Load custom metadata lists & brands from database
   useEffect(() => {
@@ -763,16 +765,17 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       }
     }
 
-    // 2. Fallback: Strictly monotonic sequence (maxSeq + 1), never reusing any deleted item numbers
+    // 2. Fallback: Strictly monotonic sequence (maxSeq + 1) for active items
     const skuSourceList = (allSkusList && allSkusList.length > 0) ? allSkusList : rawMaterialsList;
     let maxSeq = 0;
-    const regex = new RegExp(`(?:^|DEL-)${prefix}-(\\d+)`, 'i');
+    const regex = new RegExp(`^${prefix}-(\\d{1,4})$`, 'i');
     (skuSourceList || []).forEach(s => {
+      if (s.isDeleted) return;
       const code = (s.skuCode || '').trim();
       const match = code.match(regex);
       if (match) {
         const num = parseInt(match[1], 10);
-        if (!isNaN(num) && num > maxSeq) {
+        if (!isNaN(num) && num > 0 && num < 10000 && num > maxSeq) {
           maxSeq = num;
         }
       }
@@ -780,9 +783,16 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
     try {
       const localMaxKey = `skbw_max_sku_seq_${companyId || 'default'}_${prefix}`;
-      const savedMax = parseInt(localStorage.getItem(localMaxKey) || '0', 10);
-      if (!isNaN(savedMax) && savedMax > maxSeq) {
-        maxSeq = savedMax;
+      const savedVal = localStorage.getItem(localMaxKey);
+      if (savedVal) {
+        const savedMax = parseInt(savedVal, 10);
+        if (!isNaN(savedMax)) {
+          if (savedMax >= 10000) {
+            localStorage.removeItem(localMaxKey);
+          } else if (savedMax > maxSeq) {
+            maxSeq = savedMax;
+          }
+        }
       }
     } catch (_) {}
 
@@ -956,14 +966,18 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         } else {
           saved = await createSkuV2(payload);
           try {
-            const match = (saved.skuCode || '').match(/^([A-Z]+)-(\d+)/i);
+            const match = (saved.skuCode || '').match(/^([A-Z]+)-(\d{1,4})$/i);
             if (match) {
               const p = match[1].toUpperCase();
               const n = parseInt(match[2], 10);
-              const localMaxKey = `skbw_max_sku_seq_${companyId || 'default'}_${p}`;
-              const currentMax = parseInt(localStorage.getItem(localMaxKey) || '0', 10);
-              if (!isNaN(n) && n > currentMax) {
-                localStorage.setItem(localMaxKey, String(n));
+              if (!isNaN(n) && n > 0 && n < 10000) {
+                const localMaxKey = `skbw_max_sku_seq_${companyId || 'default'}_${p}`;
+                const currentMax = parseInt(localStorage.getItem(localMaxKey) || '0', 10);
+                if (!isNaN(currentMax) && currentMax >= 10000) {
+                  localStorage.setItem(localMaxKey, String(n));
+                } else if (!isNaN(n) && n > currentMax) {
+                  localStorage.setItem(localMaxKey, String(n));
+                }
               }
             }
           } catch (_) {}
@@ -1040,30 +1054,29 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     required
                   />
                 </div>
-                {/* 2. CATEGORY (Main Section Type) */}
+                {/* 2. CATEGORY (Main Section Type - Locked according to current tab) */}
                 <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-[11px] font-semibold text-gray-600 mb-1">CATEGORY *</label>
-                  <select
-                    value={form.category}
-                    onChange={e => {
-                      const val = e.target.value;
-                      setForm(prev => ({
-                        ...prev,
-                        category: val,
-                        paperType: val === 'Raw Material' ? 'Reels' : 'None',
-                        ruleType: val === 'Finished Goods' ? (prev.ruleType || 'UR') : (val === 'Raw Material' ? '' : prev.ruleType)
-                      }));
-                      if (!editSku) {
-                        regenerateSkuCode(val);
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
-                    required
-                  >
-                    <option value="Finished Goods">Finished Goods</option>
-                    <option value="Raw Material">Raw Material</option>
-                    <option value="Semi Finished">Semi Finished</option>
-                  </select>
+                  <label className="block text-[11px] font-semibold text-gray-600 mb-1 flex items-center justify-between">
+                    <span>CATEGORY *</span>
+                    <span className="text-[10px] text-gray-400 font-medium flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5 text-gray-400" /> Locked to current tab
+                    </span>
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={form.category}
+                      disabled
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-0 focus:border-gray-200 bg-gray-100/90 font-bold text-gray-700 cursor-not-allowed appearance-none shadow-2xs select-none"
+                      required
+                    >
+                      <option value="Finished Goods">Finished Goods</option>
+                      <option value="Raw Material">Raw Material</option>
+                      <option value="Semi Finished">Semi Finished</option>
+                    </select>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                      <Lock className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
                 </div>
 
                 {/* 3. SEPARATE FIELD: CREATED ITEM CATEGORY */}
@@ -1253,6 +1266,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           }}
                           className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
                         >
+                          <option value="">-- Select Rule Type --</option>
                           {ruleTypesList.map(rule => (
                             <option key={rule} value={rule}>{rule}</option>
                           ))}
@@ -1731,6 +1745,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       }}
                       className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
                     >
+                      <option value="">-- Select Rule Type --</option>
                       {ruleTypesList.map(rule => (
                         <option key={rule} value={rule}>{rule}</option>
                       ))}
