@@ -52,7 +52,9 @@ import {
   updateParty, 
   deleteParty as deletePartyApi,
   importParties,
-  mergeParties
+  mergeParties,
+  bulkDeleteParties,
+  bulkUpdateParties
 } from '../../api/partyApi';
 import { 
   getRoutes, 
@@ -250,6 +252,25 @@ export const BusinessDirectoryV2: React.FC = () => {
   } | null>(null);
   const [cardCustomerSearch, setCardCustomerSearch] = useState('');
 
+  // Bulk Actions State
+  const [showBulkEditModal, setShowBulkEditModal] = useState(false);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [isBulkOperating, setIsBulkOperating] = useState(false);
+  const [bulkEditFields, setBulkEditFields] = useState({
+    status: false,
+    category: false,
+    creditPeriod: false,
+    preferredTransporter: false,
+    route: false
+  });
+  const [bulkEditValues, setBulkEditValues] = useState({
+    status: 'active',
+    category: '',
+    creditPeriod: '',
+    preferredTransporter: '',
+    route: ''
+  });
+
   // Duplicates Detector Modal State
   const [showDuplicatesModal, setShowDuplicatesModal] = useState(false);
   const [duplicateGroups, setDuplicateGroups] = useState<{ field: string; value: string; items: DirectoryItem[] }[]>([]);
@@ -293,8 +314,9 @@ export const BusinessDirectoryV2: React.FC = () => {
   const [activityLogLoading, setActivityLogLoading] = useState(false);
   const [logSearch, setLogSearch] = useState('');
 
-  // CSV Import State
+  // CSV Import & Export State
   const [isImporting, setIsImporting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Complete Form State matching the exact 3 screenshots
   const [form, setForm] = useState({
@@ -1092,111 +1114,219 @@ export const BusinessDirectoryV2: React.FC = () => {
     }
   };
 
-  const handleExportExcel = () => {
-    if (processedItems.length === 0) {
-      showToast('No records available to export', 'info');
-      return;
-    }
+  const handleExportExcel = async () => {
+    if (!selectedCompany?._id) return;
+    setIsExporting(true);
 
-    let headers: string[] = [];
-    if (activeMainTab === 'customers') {
-      headers = ['Firm Name', 'Contact Person', 'Phone', 'City', 'District', 'Region', 'Assigned Agent', 'Credit Limit', 'Credit Days', 'Outstanding', 'Tags', 'Status'];
-    } else if (activeMainTab === 'vendors') {
-      headers = ['Supplier Name', 'Vendor Type', 'Contact Person', 'Phone', 'City', 'District', 'Credit Days', 'Outstanding Payable', 'Tags', 'Status'];
-    } else if (activeMainTab === 'agents') {
-      headers = ['Agent Name', 'Phone', 'Assigned Regions', 'Status'];
-    } else if (activeMainTab === 'transporters') {
-      headers = ['Transporter Name', 'Phone', 'Contact Person', 'City', 'Status'];
-    } else if (activeMainTab === 'regions') {
-      headers = ['Region Name', 'Code', 'Assigned Agent', 'Cities Count', 'Customers Count', 'Total Outstanding', 'Status'];
-    } else {
-      headers = ['City Name', 'District', 'State', 'Region', 'Customers Count', 'Total Outstanding', 'Status'];
-    }
+    try {
+      let exportItems: any[] = [];
 
-    const rows = processedItems.map(item => {
+      if (selectedIds.length > 0) {
+        // SELECT EXPORT ONLY THOSE TO COME
+        exportItems = items.filter(item => selectedIds.includes(item._id));
+        if (exportItems.length < selectedIds.length) {
+          // If items were from multiple pages, fetch from server
+          let partyType = 'customer';
+          if (activeMainTab === 'vendors') partyType = 'vendor';
+          else if (activeMainTab === 'agents') partyType = 'agent';
+          else if (activeMainTab === 'transporters') partyType = 'transporter';
+          else if (activeMainTab === 'cities') partyType = 'market';
+
+          if (activeMainTab === 'regions') {
+            const res = await getRoutes(selectedCompany._id);
+            const routeData = res.data.routes || res.data || [];
+            exportItems = routeData.filter((r: any) => selectedIds.includes(r._id));
+          } else {
+            const res = await getParties({ company: selectedCompany._id, type: partyType, limit: 10000 });
+            const allParties = res.data.parties || res.data || [];
+            exportItems = allParties.filter((p: any) => selectedIds.includes(p._id));
+          }
+        }
+        showToast(`Exporting ${exportItems.length} selected record(s)...`, 'info');
+      } else {
+        // JUST EXPORT WHOLE DATA EXPORT
+        showToast(`Exporting full dataset for ${activeMainTab}...`, 'info');
+        if (activeMainTab === 'regions') {
+          const res = await getRoutes(selectedCompany._id);
+          const routeData = res.data.routes || res.data || [];
+          exportItems = routeData.map((r: any) => ({
+            _id: r._id,
+            type: 'route',
+            firmName: r.name,
+            name: r.name,
+            code: r.code || r.name,
+            assignedAgent: r.assignedAgent || '—',
+            citiesCount: r.citiesCount || 0,
+            customersCount: r.customersCount || 0,
+            outstandingBalance: r.outstandingBalance || 0,
+            status: r.status || 'active'
+          }));
+        } else {
+          let partyType = 'customer';
+          if (activeMainTab === 'vendors') partyType = 'vendor';
+          else if (activeMainTab === 'agents') partyType = 'agent';
+          else if (activeMainTab === 'transporters') partyType = 'transporter';
+          else if (activeMainTab === 'cities') partyType = 'market';
+
+          const res = await getParties({
+            company: selectedCompany._id,
+            type: partyType,
+            limit: 100000 // Fetch whole dataset
+          });
+          exportItems = res.data.parties || res.data || [];
+        }
+      }
+
+      if (exportItems.length === 0) {
+        showToast('No records available to export', 'info');
+        setIsExporting(false);
+        return;
+      }
+
+      let headers: string[] = [];
       if (activeMainTab === 'customers') {
-        return [
-          item.firmName || item.name,
-          item.contactName || item.ownerName || '—',
-          item.phone || '—',
-          item.city || '—',
-          item.district || '—',
-          item.route || '—',
-          item.agentAssigned || '—',
-          item.creditLimit || 0,
-          item.creditDays || 30,
-          item.outstandingBalance || 0,
-          Array.isArray(item.tags) ? item.tags.join('; ') : '',
-          item.status || 'active'
+        // EXACT SAME 28 HEADERS AS CUSTOMER SAMPLE CSV (TRANSPORT SAME AND EXPORT)
+        headers = [
+          'Firm Name', 'Owner Name', 'Phone', 'Alt Phone', 'WhatsApp', 'Email',
+          'GST Number', 'Aadhar Number', 'Door No', 'Street Name', 'Address Line', 'Area', 'Landmark',
+          'City', 'District', 'State', 'Pincode', 'GPS Location', 'Region', 'Agent Assigned',
+          'Preferred Transport', 'Credit Limit', 'Credit Days', 'Opening Balance', 'Outstanding Balance', 'Tags', 'Remarks', 'Status'
         ];
       } else if (activeMainTab === 'vendors') {
-        return [
-          item.firmName || item.name,
-          item.vendorType || 'BOARD SUPPLIER',
-          item.contactName || item.ownerName || '—',
-          item.phone || '—',
-          item.city || '—',
-          item.district || '—',
-          item.creditDays || 30,
-          item.outstandingBalance || 0,
-          Array.isArray(item.tags) ? item.tags.join('; ') : '',
-          item.status || 'active'
+        // EXACT SAME HEADERS AS VENDOR SAMPLE CSV
+        headers = [
+          'Firm Name', 'Owner Name', 'Phone', 'Alt Phone', 'WhatsApp', 'Email',
+          'GST Number', 'Aadhar Number', 'Door No', 'Street Name', 'Address Line', 'Area', 'Landmark',
+          'City', 'District', 'State', 'Pincode', 'GPS Location', 'Vendor Type', 'Credit Limit', 'Credit Days',
+          'Opening Balance', 'Outstanding Balance', 'Tags', 'Remarks', 'Status'
         ];
       } else if (activeMainTab === 'agents') {
-        return [
-          item.firmName || item.contactName || item.name,
-          item.phone || '—',
-          Array.isArray(item.assignedRoutes) ? item.assignedRoutes.join('; ') : item.route || '—',
-          item.status || 'active'
-        ];
+        headers = ['Agent Name', 'Mobile', 'Status'];
       } else if (activeMainTab === 'transporters') {
-        return [
-          item.firmName || item.name,
-          item.phone || '—',
-          item.contactName || item.ownerName || '—',
-          item.city || '—',
-          item.status || 'active'
-        ];
+        headers = ['Transporter Name', 'Mobile', 'Email', 'City', 'Status'];
       } else if (activeMainTab === 'regions') {
-        return [
-          item.name || item.firmName,
-          item.code || '—',
-          item.assignedAgent || '—',
-          item.citiesCount || 0,
-          item.customersCount || 0,
-          item.outstandingBalance || 0,
-          item.status || 'active'
-        ];
+        headers = ['Region Name', 'Assigned Agent', 'Status'];
       } else {
-        return [
-          item.firmName || item.name,
-          item.district || '—',
-          item.state || 'Andhra Pradesh',
-          item.route || '—',
-          item.customersCount || 0,
-          item.outstandingBalance || 0,
-          item.status || 'active'
-        ];
+        headers = ['City Name', 'District', 'State', 'Region', 'Status'];
       }
-    });
 
-    const csvContent = '\uFEFF' + [
-      headers.join(','),
-      ...rows.map(row => row.map(val => {
-        const clean = String(val).replace(/"/g, '""');
-        return clean.includes(',') || clean.includes('\n') ? `"${clean}"` : clean;
-      }).join(','))
-    ].join('\n');
+      const rows = exportItems.map(item => {
+        if (activeMainTab === 'customers') {
+          return [
+            item.firmName || item.name || '',
+            item.ownerName || item.contactName || item.contactPerson || '',
+            item.phone || item.mobile || '',
+            item.altPhone || '',
+            item.whatsapp || item.phone || '',
+            item.email || '',
+            item.gstNumber || item.gstin || '',
+            item.aadharNumber || item.pan || '',
+            item.doorNo || '',
+            item.streetName || '',
+            item.address1 || item.address || '',
+            item.area || '',
+            item.landmark || '',
+            item.city || item.assignedMarket || '',
+            item.district || '',
+            item.state || 'Andhra Pradesh',
+            item.pincode || '',
+            item.gpsLocation || '',
+            item.route || item.assignedRegion || '',
+            item.agentAssigned || item.assignedAgent || '',
+            item.preferredTransport || (item as any).transport || '',
+            item.creditLimit !== undefined ? item.creditLimit : 0,
+            item.creditDays !== undefined ? item.creditDays : 30,
+            item.openingBalance !== undefined ? item.openingBalance : 0,
+            item.outstandingBalance !== undefined ? item.outstandingBalance : (item.outstanding || 0),
+            Array.isArray(item.tags) ? item.tags.join(', ') : (item.tags || ''),
+            item.notes || item.remarks || '',
+            item.status || 'active'
+          ];
+        } else if (activeMainTab === 'vendors') {
+          return [
+            item.firmName || item.name || '',
+            item.ownerName || item.contactName || item.contactPerson || '',
+            item.phone || item.mobile || '',
+            item.altPhone || '',
+            item.whatsapp || item.phone || '',
+            item.email || '',
+            item.gstNumber || item.gstin || '',
+            item.aadharNumber || item.pan || '',
+            item.doorNo || '',
+            item.streetName || '',
+            item.address1 || item.address || '',
+            item.area || '',
+            item.landmark || '',
+            item.city || item.assignedMarket || '',
+            item.district || '',
+            item.state || 'Andhra Pradesh',
+            item.pincode || '',
+            item.gpsLocation || '',
+            item.vendorType || 'BOARD SUPPLIER',
+            item.creditLimit !== undefined ? item.creditLimit : 0,
+            item.creditDays !== undefined ? item.creditDays : 30,
+            item.openingBalance !== undefined ? item.openingBalance : 0,
+            item.outstandingBalance !== undefined ? item.outstandingBalance : (item.outstanding || 0),
+            Array.isArray(item.tags) ? item.tags.join(', ') : (item.tags || ''),
+            item.notes || item.remarks || '',
+            item.status || 'active'
+          ];
+        } else if (activeMainTab === 'agents') {
+          return [
+            item.firmName || item.contactName || item.name || '',
+            item.phone || item.mobile || '',
+            item.status || 'active'
+          ];
+        } else if (activeMainTab === 'transporters') {
+          return [
+            item.firmName || item.name || '',
+            item.phone || item.mobile || '',
+            item.email || '',
+            item.city || '',
+            item.status || 'active'
+          ];
+        } else if (activeMainTab === 'regions') {
+          return [
+            item.name || item.firmName || '',
+            item.assignedAgent || '',
+            item.status || 'active'
+          ];
+        } else {
+          return [
+            item.firmName || item.name || '',
+            item.district || '',
+            item.state || 'Andhra Pradesh',
+            item.route || '',
+            item.status || 'active'
+          ];
+        }
+      });
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${activeMainTab}_export_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast(`Exported ${processedItems.length} ${activeMainTab} to Excel/CSV`, 'success');
+      const csvContent = '\uFEFF' + [
+        headers.join(','),
+        ...rows.map(row => row.map(val => {
+          const clean = String(val).replace(/"/g, '""');
+          return clean.includes(',') || clean.includes('\n') ? `"${clean}"` : clean;
+        }).join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      const scopeLabel = selectedIds.length > 0 ? `selected_${selectedIds.length}` : 'all';
+      link.setAttribute('download', `${activeMainTab}_${scopeLabel}_export_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      showToast(`Successfully exported ${exportItems.length} ${activeMainTab} records!`, 'success');
+    } catch (err: any) {
+      console.error('Export failed:', err);
+      showToast(err.message || 'Failed to export records', 'error');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleExportPDF = () => {
@@ -1486,7 +1616,7 @@ export const BusinessDirectoryV2: React.FC = () => {
   };
 
   const handleExecuteMerge = async () => {
-    const currentGroup = duplicateGroups[activeDuplicateIdx];
+    const currentGroup = mergeGroup || duplicateGroups[activeDuplicateIdx];
     if (!currentGroup || !mergePrimaryId) return;
 
     const primaryItem = currentGroup.items.find(i => i._id === mergePrimaryId);
@@ -1499,10 +1629,11 @@ export const BusinessDirectoryV2: React.FC = () => {
       for (const dup of duplicatesToMerge) {
         await mergeParties(mergePrimaryId, dup._id);
       }
-      showToast(`Merged ${duplicatesToMerge.length} record(s) into "${primaryItem.firmName || primaryItem.name}". All transactions updated.`, 'success');
-      setShowMergeConfirmModal(false);
+      showToast(`Merged ${duplicatesToMerge.length} record(s) into "${primaryItem.firmName || primaryItem.name}". All balances and transactions updated.`, 'success');
+      setMergeGroup(null);
+      setMergePrimaryId('');
 
-      setDuplicateGroups(prev => prev.filter((_, idx) => idx !== activeDuplicateIdx));
+      setDuplicateGroups(prev => prev.filter(g => g !== currentGroup));
       if (activeDuplicateIdx > 0) {
         setActiveDuplicateIdx(prev => prev - 1);
       }
@@ -1771,6 +1902,62 @@ export const BusinessDirectoryV2: React.FC = () => {
     }
   };
 
+  // Bulk Delete Parties
+  const handleBulkDeleteParties = async () => {
+    if (selectedIds.length === 0) return;
+    setIsBulkOperating(true);
+    try {
+      if (activeMainTab === 'regions') {
+        await Promise.all(selectedIds.map(id => deleteRoute(id)));
+      } else {
+        await bulkDeleteParties(selectedIds);
+      }
+      showToast(`Successfully moved ${selectedIds.length} records to recycle bin`, 'success');
+      setSelectedIds([]);
+      setShowBulkDeleteModal(false);
+      loadDirectoryData();
+      loadAuxiliaryData();
+    } catch (err: any) {
+      showToast(err.response?.data?.msg || err.message || 'Failed to delete records', 'error');
+    } finally {
+      setIsBulkOperating(false);
+    }
+  };
+
+  // Bulk Edit Parties
+  const handleBulkEditParties = async () => {
+    if (selectedIds.length === 0) return;
+    const updates: Record<string, any> = {};
+    if (bulkEditFields.status) updates.status = bulkEditValues.status;
+    if (bulkEditFields.category) updates.category = bulkEditValues.category;
+    if (bulkEditFields.creditPeriod) updates.creditPeriod = Number(bulkEditValues.creditPeriod) || 0;
+    if (bulkEditFields.preferredTransporter) updates.preferredTransporter = bulkEditValues.preferredTransporter;
+    if (bulkEditFields.route) updates.route = bulkEditValues.route;
+
+    if (Object.keys(updates).length === 0) {
+      showToast('Please select at least one field to update', 'error');
+      return;
+    }
+
+    setIsBulkOperating(true);
+    try {
+      if (activeMainTab === 'regions') {
+        await Promise.all(selectedIds.map(id => updateRoute(id, updates)));
+      } else {
+        await bulkUpdateParties(selectedIds, updates);
+      }
+      showToast(`Successfully updated ${selectedIds.length} records`, 'success');
+      setSelectedIds([]);
+      setShowBulkEditModal(false);
+      setBulkEditFields({ status: false, category: false, creditPeriod: false, preferredTransporter: false, route: false });
+      loadDirectoryData();
+    } catch (err: any) {
+      showToast(err.response?.data?.msg || err.message || 'Failed to update records', 'error');
+    } finally {
+      setIsBulkOperating(false);
+    }
+  };
+
   // Dynamic Effective Sub-Module Tab Resolver for Selected Details
   const getEffectiveTab = (item: any, currentTab: DirectoryTabType): DirectoryTabType => {
     if (!item) return currentTab;
@@ -1818,7 +2005,7 @@ export const BusinessDirectoryV2: React.FC = () => {
   const totalPages = Math.ceil(totalRecords / limit) || 1;
 
   return (
-    <div className="p-4 md:p-6 space-y-6 bg-slate-50/50 min-h-screen">
+    <div className="p-4 md:p-6 space-y-6 bg-white min-h-screen">
       
       {/* 1. Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs">
@@ -2202,20 +2389,31 @@ export const BusinessDirectoryV2: React.FC = () => {
               </div>
             )}
             {showExportMenu && (
-              <div className="absolute right-0 mt-1.5 w-44 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs">
+              <div className="absolute right-0 mt-1.5 w-56 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs">
                 <button
+                  disabled={isExporting}
                   onClick={() => { handleExportExcel(); setShowExportMenu(false); }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-xl font-semibold hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 text-gray-700"
+                  className="w-full text-left px-3 py-2 rounded-xl font-semibold hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2.5 text-gray-700 cursor-pointer disabled:opacity-50 transition-colors"
                 >
-                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Export Excel (.csv)</span>
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <div>
+                    <span className="block font-bold text-gray-900">
+                      {selectedIds.length > 0 ? `Export Selected (${selectedIds.length})` : 'Export Whole Data'}
+                    </span>
+                    <span className="text-[10.5px] text-gray-400 block font-normal">
+                      {selectedIds.length > 0 ? 'Download selected records (.csv)' : `Download all ${totalRecords} records (.csv)`}
+                    </span>
+                  </div>
                 </button>
                 <button
                   onClick={() => { handleExportPDF(); setShowExportMenu(false); }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-xl font-semibold hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 text-gray-700"
+                  className="w-full text-left px-3 py-2 rounded-xl font-semibold hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2.5 text-gray-700 cursor-pointer transition-colors"
                 >
-                  <FileText className="w-3.5 h-3.5 text-rose-600" />
-                  <span>Export PDF</span>
+                  <FileText className="w-4 h-4 text-rose-600 shrink-0" />
+                  <div>
+                    <span className="block font-bold text-gray-900">Export PDF</span>
+                    <span className="text-[10.5px] text-gray-400 block font-normal">Printable directory view</span>
+                  </div>
                 </button>
               </div>
             )}
@@ -2451,6 +2649,50 @@ export const BusinessDirectoryV2: React.FC = () => {
                 className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-blue-500"
               />
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2.5 Bulk Selection Bar (Grey Theme) */}
+      {selectedIds.length > 0 && (
+        <div className="bg-gray-100 border border-gray-200 text-gray-800 px-4 py-2.5 rounded-2xl shadow-xs flex items-center justify-between flex-wrap gap-2 text-xs font-semibold animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+            <span><strong className="text-gray-900">{selectedIds.length}</strong> {activeMainTab} selected</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportExcel}
+              disabled={isExporting}
+              className="px-3.5 py-1.5 bg-white hover:bg-gray-200/60 text-gray-700 border border-gray-300 font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all disabled:opacity-50"
+              title={`Export ${selectedIds.length} selected records`}
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>{isExporting ? 'Exporting...' : `Export (${selectedIds.length})`}</span>
+            </button>
+            <button
+              onClick={() => setShowBulkEditModal(true)}
+              className="px-3.5 py-1.5 bg-gray-800 hover:bg-gray-900 text-white font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
+              title={`Bulk edit ${selectedIds.length} selected records`}
+            >
+              <Edit className="w-3.5 h-3.5" />
+              <span>Bulk Edit ({selectedIds.length})</span>
+            </button>
+            <button
+              onClick={() => setShowBulkDeleteModal(true)}
+              className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all"
+              title={`Delete ${selectedIds.length} selected records`}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Delete ({selectedIds.length})</span>
+            </button>
+            <button
+              onClick={() => setSelectedIds([])}
+              className="px-3 py-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-200/60 rounded-xl cursor-pointer transition-colors flex items-center gap-1 font-medium"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Clear</span>
+            </button>
           </div>
         </div>
       )}
@@ -5777,13 +6019,13 @@ export const BusinessDirectoryV2: React.FC = () => {
         </Modal>
       )}
 
-      {/* ── DUPLICATE RECORDS SCANNER MODAL (PartyManagement exact style) ── */}
+      {/* ── DUPLICATE RECORDS SCANNER MODAL ── */}
       {showDuplicatesModal && (
         <Modal
           isOpen={showDuplicatesModal}
           onClose={() => setShowDuplicatesModal(false)}
           title={`Find Duplicates — ${activeMainTab.toUpperCase()}`}
-          maxWidth="max-w-3xl"
+          maxWidth="max-w-4xl"
         >
           <div className="space-y-4 text-left">
             {duplicateGroups.length === 0 ? (
@@ -5797,35 +6039,41 @@ export const BusinessDirectoryV2: React.FC = () => {
                 </p>
               </div>
             ) : (
-              <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
-                <p className="text-xs text-gray-500 font-medium">
-                  The following duplicate groups were identified. Check details and clean up if necessary:
-                </p>
+              <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
+                <div className="flex items-center justify-between bg-blue-50/60 border border-blue-100 rounded-xl px-3.5 py-2">
+                  <p className="text-xs text-blue-900 font-semibold flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
+                    <span>Found <strong>{duplicateGroups.length}</strong> duplicate group(s) across {totalRecords} records</span>
+                  </p>
+                  <span className="text-[11px] text-blue-700 font-medium">Review and merge duplicate records below</span>
+                </div>
                 
                 {duplicateGroups.map((group, gIdx) => (
                   <div 
                     key={gIdx}
-                    className={`border rounded-xl p-4 transition-all duration-150 ${
+                    className={`border rounded-2xl p-4 transition-all duration-150 ${
                       gIdx === highlightedDuplicateIdx
                         ? 'border-blue-500 bg-blue-50/20 ring-2 ring-blue-500/20 shadow-xs'
                         : 'border-red-200 bg-red-50/10'
                     }`}
                     onMouseEnter={() => setHighlightedDuplicateIdx(gIdx)}
                   >
-                    <div className="flex justify-between items-start md:items-center flex-col md:flex-row gap-2 mb-3 border-b pb-2 border-red-100/50">
-                      <div>
-                        <span className="text-xs font-bold bg-red-100 text-red-800 px-2.5 py-0.5 rounded-lg border border-red-200">
-                          Duplicate by {group.field}: {group.value}
+                    <div className="flex justify-between items-start md:items-center flex-col md:flex-row gap-2 mb-3 border-b pb-2.5 border-red-100">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-bold bg-red-100 text-red-800 px-2.5 py-1 rounded-lg border border-red-200">
+                          Duplicate by {group.field}: <span className="font-mono">{group.value}</span>
                         </span>
-                        <span className="text-xs text-gray-500 font-mono ml-2">{group.items.length} records</span>
+                        <span className="text-xs text-gray-500 font-bold bg-white px-2 py-0.5 rounded-md border border-gray-200">
+                          {group.items.length} records
+                        </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => setCompareGroup(group)}
                           title="View Both"
-                          className="px-2.5 py-1 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1 transition-all cursor-pointer"
+                          className="px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
                         >
-                          <Eye className="w-3.5 h-3.5" />
+                          <Eye className="w-3.5 h-3.5 text-gray-500" />
                           <span>View Both</span>
                         </button>
                         {activeMainTab !== 'regions' && (
@@ -5835,7 +6083,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                               setMergePrimaryId(group.items[0]?._id || '');
                             }}
                             title="Merge"
-                            className="px-2.5 py-1 text-xs font-semibold text-white bg-blue-600 border border-blue-700 rounded-lg hover:bg-blue-700 flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                            className="px-3 py-1.5 text-xs font-bold text-white bg-blue-600 border border-blue-700 rounded-xl hover:bg-blue-700 flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
                           >
                             <RefreshCw className="w-3.5 h-3.5" />
                             <span>Merge</span>
@@ -5847,7 +6095,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                             setHighlightedDuplicateIdx(prev => (prev > 0 ? prev - 1 : 0));
                           }}
                           title="Keep Both"
-                          className="px-2.5 py-1 text-xs font-semibold text-gray-600 bg-gray-100 border border-gray-200 rounded-lg hover:bg-gray-200 flex items-center gap-1 transition-all cursor-pointer"
+                          className="px-3 py-1.5 text-xs font-semibold text-gray-600 bg-gray-100 border border-gray-200 rounded-xl hover:bg-gray-200 flex items-center gap-1.5 transition-all cursor-pointer"
                         >
                           <X className="w-3.5 h-3.5" />
                           <span>Keep Both</span>
@@ -5855,55 +6103,93 @@ export const BusinessDirectoryV2: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      {group.items.map((item) => (
-                        <div key={item._id} className="flex justify-between items-center bg-white p-3 border border-gray-200 rounded-xl text-xs">
-                          <div>
-                            <p className="font-bold text-gray-900 text-sm">
-                              {activeMainTab === 'regions' ? item.name : (item.firmName || item.contactName || item.name)}
-                            </p>
-                            <div className="text-xs text-gray-500 mt-0.5 flex items-center space-x-1.5 flex-wrap">
-                              {activeMainTab === 'regions' ? (
-                                <span>Agent: {item.assignedAgent || 'None'}</span>
-                              ) : (
-                                <>
-                                  <span className="flex items-center gap-1.5 font-mono">
-                                    <span>Mobile: {item.phone || '-'}</span>
-                                    {item.phone && item.phone.length >= 10 && (
-                                      <a
-                                        href={`https://wa.me/91${item.phone.replace(/\D/g, '')}`}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="inline-flex items-center shrink-0 -mt-0.5 text-emerald-500 hover:text-emerald-600 transition-transform hover:scale-110"
-                                      >
-                                        <WhatsAppIcon />
-                                      </a>
+                    <div className="space-y-2.5">
+                      {group.items.map((item) => {
+                        const outBal = Number(item.outstandingBalance || item.outstanding || 0);
+                        const openBal = Number(item.openingBalance || 0);
+                        const isActive = (item.status || 'active').toLowerCase() === 'active';
+
+                        return (
+                          <div key={item._id} className="flex justify-between items-center bg-white p-3.5 border border-gray-200 rounded-xl text-xs hover:border-gray-300 transition-colors">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <p className="font-bold text-gray-900 text-sm">
+                                  {activeMainTab === 'regions' ? item.name : (item.firmName || item.contactName || item.name)}
+                                </p>
+                                <span className={`inline-flex px-2 py-0.5 text-[10px] font-bold rounded-full ${
+                                  isActive ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-gray-100 text-gray-700 border border-gray-200'
+                                }`}>
+                                  {isActive ? 'Active' : 'Inactive'}
+                                </span>
+                              </div>
+
+                              <div className="text-xs text-gray-500 flex items-center space-x-2 flex-wrap gap-y-1">
+                                {activeMainTab === 'regions' ? (
+                                  <span>Agent: <strong>{item.assignedAgent || 'None'}</strong></span>
+                                ) : (
+                                  <>
+                                    {(item.ownerName || item.contactName) && (
+                                      <span>Contact: <strong>{item.ownerName || item.contactName}</strong></span>
                                     )}
-                                  </span>
-                                  <span className="mx-1 text-gray-300">|</span>
-                                  <span>City: {[item.city, item.district].filter(Boolean).join(', ') || '-'}</span>
-                                </>
-                              )}
+                                    <span className="text-gray-300">|</span>
+                                    <span className="flex items-center gap-1 font-mono">
+                                      <span>Mobile: {item.phone || '-'}</span>
+                                      {item.phone && item.phone.length >= 10 && (
+                                        <a
+                                          href={`https://wa.me/91${item.phone.replace(/\D/g, '')}`}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="inline-flex items-center shrink-0 text-emerald-500 hover:text-emerald-600 transition-transform hover:scale-110"
+                                        >
+                                          <WhatsAppIcon />
+                                        </a>
+                                      )}
+                                    </span>
+                                    <span className="text-gray-300">|</span>
+                                    <span>City: {[item.city, item.district].filter(Boolean).join(', ') || '-'}</span>
+                                    {(item.preferredTransport || (item as any).transport) && (
+                                      <>
+                                        <span className="text-gray-300">|</span>
+                                        <span className="text-blue-600 font-medium">Transport: {item.preferredTransport || (item as any).transport}</span>
+                                      </>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+
+                              {/* Balance row */}
+                              <div className="flex items-center gap-3 pt-0.5 text-[11px]">
+                                <span className="text-gray-600">
+                                  Outstanding Balance: <strong className={outBal > 0 ? 'text-rose-600 font-bold' : 'text-emerald-600 font-bold'}>
+                                    ₹{outBal.toLocaleString('en-IN')}
+                                  </strong>
+                                </span>
+                                <span className="text-gray-300">·</span>
+                                <span className="text-gray-500">
+                                  Opening Balance: <strong className="text-gray-800">₹{openBal.toLocaleString('en-IN')}</strong>
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center space-x-2 shrink-0 ml-3">
+                              <button
+                                onClick={() => openModal(item)}
+                                className="px-2.5 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg font-bold transition-all flex items-center gap-1 cursor-pointer"
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteDuplicateRecord(item)}
+                                className="px-2.5 py-1 text-xs bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg font-bold transition-all flex items-center gap-1 cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                Delete
+                              </button>
                             </div>
                           </div>
-                          <div className="flex items-center space-x-2">
-                            <button
-                              onClick={() => openModal(item)}
-                              className="px-2.5 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg font-bold transition-all flex items-center gap-1 cursor-pointer"
-                            >
-                              <Edit className="w-3.5 h-3.5" />
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => handleDeleteDuplicateRecord(item)}
-                              className="px-2.5 py-1 text-xs bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg font-bold transition-all flex items-center gap-1 cursor-pointer"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              Delete
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
@@ -6030,84 +6316,406 @@ export const BusinessDirectoryV2: React.FC = () => {
         </div>
       )}
 
-      {/* ── MERGE SELECTION MODAL ── */}
+      {/* ── MERGE SELECTION MODAL WITH DIFF (BALANCE AND ACTIVE STATUS) ── */}
       {mergeGroup && (
         <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-4 bg-gray-950/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="relative bg-white rounded-2xl max-w-lg w-full shadow-2xl flex flex-col border border-gray-100 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+          <div className="relative bg-white rounded-2xl max-w-3xl w-full shadow-2xl flex flex-col border border-gray-100 animate-in fade-in zoom-in-95 duration-200 overflow-hidden max-h-[90vh]">
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-              <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                <RefreshCw className="w-5 h-5 text-blue-600" />
-                Merge Records
-              </h3>
+              <div>
+                <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <RefreshCw className="w-5 h-5 text-blue-600" />
+                  <span>Merge Duplicate Records</span>
+                </h3>
+                <p className="text-[11px] text-gray-500 mt-0.5">
+                  Select the primary record to keep. Duplicate fields, transactions, and balances will be safely combined.
+                </p>
+              </div>
               <button onClick={() => { setMergeGroup(null); setMergePrimaryId(''); }} className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 space-y-4 text-xs">
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-xs text-blue-800 space-y-2">
+            <div className="p-6 space-y-4 text-xs overflow-y-auto">
+              {/* How Merge Works Info Banner */}
+              <div className="bg-blue-50/80 border border-blue-200 rounded-xl p-3.5 text-xs text-blue-800 space-y-1.5">
                 <p className="font-bold flex items-center gap-1.5 text-blue-900">
                   <Copy className="w-4 h-4 text-blue-600" />
-                  How Merge Works:
+                  Merge Consolidation Rules:
                 </p>
-                <ul className="list-disc pl-4 space-y-1 text-blue-700 text-[11px]">
-                  <li>Select one record to keep as the <strong>Primary</strong> record.</li>
-                  <li>Non-empty fields from duplicate records will be merged into primary.</li>
-                  <li>All outstanding balances will be <strong>summed up</strong>.</li>
-                  <li>All transactions and sales orders will point to the primary record.</li>
-                  <li>Duplicate records will be <strong>permanently deleted</strong>.</li>
-                </ul>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Select Primary Record:</label>
-                <div className="space-y-2.5">
-                  {mergeGroup.items.map((item: DirectoryItem) => (
-                    <label
-                      key={item._id}
-                      className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${
-                        mergePrimaryId === item._id
-                          ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-100'
-                          : 'border-gray-200 bg-white hover:bg-gray-50'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="primaryRecord"
-                        checked={mergePrimaryId === item._id}
-                        onChange={() => setMergePrimaryId(item._id)}
-                        className="text-blue-600 focus:ring-blue-500 cursor-pointer"
-                      />
-                      <div className="text-xs">
-                        <span className="font-bold text-gray-900 block">{item.firmName || item.name}</span>
-                        <span className="text-[11px] text-gray-500 font-mono">
-                          {[item.phone, item.city, item.gstNumber].filter(Boolean).join(' • ')}
-                        </span>
-                      </div>
-                    </label>
-                  ))}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-blue-700">
+                  <div>• <strong>Primary Master:</strong> Selected record is kept with its primary profile.</div>
+                  <div>• <strong>Balances:</strong> Outstanding & opening balances are <strong>summed up</strong>.</div>
+                  <div>• <strong>Transactions:</strong> All sales orders, invoices & receipts point to master.</div>
+                  <div>• <strong>Status:</strong> Combined record will be marked <strong>Active</strong>.</div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+              {/* Side-by-Side Diff Table / Cards */}
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2.5">
+                  Side-by-Side Comparison — Choose Master Record:
+                </label>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {mergeGroup.items.map((item: DirectoryItem, idx: number) => {
+                    const isPrimary = mergePrimaryId === item._id;
+                    const outBal = Number(item.outstandingBalance || item.outstanding || 0);
+                    const openBal = Number(item.openingBalance || 0);
+                    const isActive = (item.status || 'active').toLowerCase() === 'active';
+
+                    return (
+                      <div
+                        key={item._id}
+                        onClick={() => setMergePrimaryId(item._id)}
+                        className={`p-4 border-2 rounded-2xl cursor-pointer transition-all flex flex-col justify-between ${
+                          isPrimary
+                            ? 'border-blue-600 bg-blue-50/40 ring-4 ring-blue-100 shadow-sm'
+                            : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50/50'
+                        }`}
+                      >
+                        <div className="space-y-2.5">
+                          {/* Top Tag & Radio */}
+                          <div className="flex items-center justify-between">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="primaryRecord"
+                                checked={isPrimary}
+                                onChange={() => setMergePrimaryId(item._id)}
+                                className="w-4 h-4 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                              />
+                              <span className="font-bold text-gray-900 text-xs">Record #{idx + 1}</span>
+                            </label>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
+                              isPrimary
+                                ? 'bg-blue-600 text-white shadow-2xs'
+                                : 'bg-gray-100 text-gray-500 border border-gray-200'
+                            }`}>
+                              {isPrimary ? 'Keep As Primary' : 'Will Be Merged'}
+                            </span>
+                          </div>
+
+                          {/* Firm Name & Status */}
+                          <div className="pt-1">
+                            <h4 className="font-bold text-gray-900 text-sm">{item.firmName || item.name}</h4>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className={`inline-flex px-2 py-0.5 text-[10px] font-bold rounded-full ${
+                                isActive ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-gray-100 text-gray-700 border border-gray-200'
+                              }`}>
+                                Status: {isActive ? 'Active' : 'Inactive'}
+                              </span>
+                              {(item.ownerName || item.contactName) && (
+                                <span className="text-[11px] text-gray-600 font-medium truncate">
+                                  Contact: {item.ownerName || item.contactName}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Balances Highlight Diff Box */}
+                          <div className="bg-slate-50 border border-gray-200 rounded-xl p-2.5 space-y-1 text-[11.5px]">
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-500 font-medium">Outstanding Balance:</span>
+                              <span className={`font-bold font-mono ${outBal > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                ₹{outBal.toLocaleString('en-IN')}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-500 font-medium">Opening Balance:</span>
+                              <span className="font-bold font-mono text-gray-800">
+                                ₹{openBal.toLocaleString('en-IN')}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Contact Details */}
+                          <div className="space-y-1 text-[11px] text-gray-600 pt-1">
+                            <div><strong>Phone:</strong> <span className="font-mono">{item.phone || '—'}</span></div>
+                            {item.gstNumber && <div><strong>GSTIN:</strong> <span className="font-mono">{item.gstNumber}</span></div>}
+                            <div><strong>City / District:</strong> {[item.city, item.district].filter(Boolean).join(', ') || '—'}</div>
+                            {(item.preferredTransport || (item as any).transport) && (
+                              <div><strong>Preferred Transport:</strong> {item.preferredTransport || (item as any).transport}</div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Combined Outcome Preview */}
+              {(() => {
+                const totalOut = mergeGroup.items.reduce((acc: number, cur: any) => acc + Number(cur.outstandingBalance || cur.outstanding || 0), 0);
+                const totalOpen = mergeGroup.items.reduce((acc: number, cur: any) => acc + Number(cur.openingBalance || 0), 0);
+                const anyActive = mergeGroup.items.some((cur: any) => (cur.status || 'active').toLowerCase() === 'active');
+                const primaryItem = mergeGroup.items.find((i: any) => i._id === mergePrimaryId) || mergeGroup.items[0];
+
+                return (
+                  <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-4 space-y-2 text-xs">
+                    <p className="font-bold text-emerald-950 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                      <span>Combined Merged Result Preview:</span>
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 text-[11.5px]">
+                      <div className="bg-white p-2.5 rounded-xl border border-emerald-100 shadow-2xs">
+                        <span className="text-gray-500 block text-[10px] uppercase font-bold tracking-wider">Master Firm Name</span>
+                        <span className="font-bold text-gray-900 truncate block mt-0.5">{primaryItem?.firmName || primaryItem?.name}</span>
+                      </div>
+                      <div className="bg-white p-2.5 rounded-xl border border-emerald-100 shadow-2xs">
+                        <span className="text-gray-500 block text-[10px] uppercase font-bold tracking-wider">Total Combined Outstanding</span>
+                        <span className={`font-bold font-mono block mt-0.5 ${totalOut > 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                          ₹{totalOut.toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                      <div className="bg-white p-2.5 rounded-xl border border-emerald-100 shadow-2xs">
+                        <span className="text-gray-500 block text-[10px] uppercase font-bold tracking-wider">Final Status & Opening</span>
+                        <span className="font-bold text-emerald-800 block mt-0.5">
+                          {anyActive ? 'Active' : 'Inactive'} · ₹{totalOpen.toLocaleString('en-IN')} Opening
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100">
                 <button
                   onClick={() => { setMergeGroup(null); setMergePrimaryId(''); }}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs cursor-pointer"
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs cursor-pointer transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleExecuteMerge}
                   disabled={isMerging || !mergePrimaryId}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
-                  <GitMerge className={`w-3.5 h-3.5 ${isMerging ? 'animate-spin' : ''}`} />
+                  <GitMerge className={`w-4 h-4 ${isMerging ? 'animate-spin' : ''}`} />
                   <span>{isMerging ? 'Merging Records...' : 'Confirm & Merge Records'}</span>
                 </button>
               </div>
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── BULK EDIT MODAL ── */}
+      {showBulkEditModal && (
+        <Modal
+          isOpen={showBulkEditModal}
+          onClose={() => setShowBulkEditModal(false)}
+          title={`Bulk Edit ${selectedIds.length} ${activeMainTab.toUpperCase()} Records`}
+          maxWidth="max-w-xl"
+        >
+          <div className="space-y-4 text-left">
+            <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-700 font-medium leading-relaxed">
+              Check the boxes next to the fields you want to update. Any unchecked fields will remain unchanged across the <strong>{selectedIds.length}</strong> selected records.
+            </div>
+
+            <div className="space-y-3">
+              {/* Status */}
+              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80 transition-colors">
+                <input
+                  type="checkbox"
+                  id="bd_bulk_status_check"
+                  checked={bulkEditFields.status}
+                  onChange={e => setBulkEditFields(prev => ({ ...prev, status: e.target.checked }))}
+                  className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                />
+                <div className="flex-1">
+                  <label htmlFor="bd_bulk_status_check" className="block text-xs font-bold text-gray-700 cursor-pointer">
+                    Status
+                  </label>
+                  <select
+                    disabled={!bulkEditFields.status}
+                    value={bulkEditValues.status}
+                    onChange={e => setBulkEditValues(prev => ({ ...prev, status: e.target.value }))}
+                    className="mt-1 w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="lead">Lead</option>
+                    <option value="on-hold">On Hold</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Category */}
+              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80 transition-colors">
+                <input
+                  type="checkbox"
+                  id="bd_bulk_category_check"
+                  checked={bulkEditFields.category}
+                  onChange={e => setBulkEditFields(prev => ({ ...prev, category: e.target.checked }))}
+                  className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                />
+                <div className="flex-1">
+                  <label htmlFor="bd_bulk_category_check" className="block text-xs font-bold text-gray-700 cursor-pointer">
+                    Category / Tag
+                  </label>
+                  <input
+                    type="text"
+                    disabled={!bulkEditFields.category}
+                    placeholder="e.g. VIP, Wholesaler, Retailer, Distributor"
+                    value={bulkEditValues.category}
+                    onChange={e => setBulkEditValues(prev => ({ ...prev, category: e.target.value }))}
+                    className="mt-1 w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
+                  />
+                </div>
+              </div>
+
+              {/* Credit Period */}
+              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80 transition-colors">
+                <input
+                  type="checkbox"
+                  id="bd_bulk_credit_check"
+                  checked={bulkEditFields.creditPeriod}
+                  onChange={e => setBulkEditFields(prev => ({ ...prev, creditPeriod: e.target.checked }))}
+                  className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                />
+                <div className="flex-1">
+                  <label htmlFor="bd_bulk_credit_check" className="block text-xs font-bold text-gray-700 cursor-pointer">
+                    Credit Period (Days)
+                  </label>
+                  <input
+                    type="number"
+                    disabled={!bulkEditFields.creditPeriod}
+                    placeholder="e.g. 30"
+                    value={bulkEditValues.creditPeriod}
+                    onChange={e => setBulkEditValues(prev => ({ ...prev, creditPeriod: e.target.value }))}
+                    className="mt-1 w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
+                  />
+                </div>
+              </div>
+
+              {/* Preferred Transporter */}
+              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80 transition-colors">
+                <input
+                  type="checkbox"
+                  id="bd_bulk_transporter_check"
+                  checked={bulkEditFields.preferredTransporter}
+                  onChange={e => setBulkEditFields(prev => ({ ...prev, preferredTransporter: e.target.checked }))}
+                  className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                />
+                <div className="flex-1">
+                  <label htmlFor="bd_bulk_transporter_check" className="block text-xs font-bold text-gray-700 cursor-pointer">
+                    Preferred Transporter
+                  </label>
+                  <input
+                    type="text"
+                    list="bd_bulk_transporters_list"
+                    disabled={!bulkEditFields.preferredTransporter}
+                    placeholder="Select or enter transporter"
+                    value={bulkEditValues.preferredTransporter}
+                    onChange={e => setBulkEditValues(prev => ({ ...prev, preferredTransporter: e.target.value }))}
+                    className="mt-1 w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
+                  />
+                  <datalist id="bd_bulk_transporters_list">
+                    {allTransporters.map((t: any) => (
+                      <option key={t._id} value={t.firmName || t.name} />
+                    ))}
+                  </datalist>
+                </div>
+              </div>
+
+              {/* Route */}
+              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80 transition-colors">
+                <input
+                  type="checkbox"
+                  id="bd_bulk_route_check"
+                  checked={bulkEditFields.route}
+                  onChange={e => setBulkEditFields(prev => ({ ...prev, route: e.target.checked }))}
+                  className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                />
+                <div className="flex-1">
+                  <label htmlFor="bd_bulk_route_check" className="block text-xs font-bold text-gray-700 cursor-pointer">
+                    Route / Region
+                  </label>
+                  <input
+                    type="text"
+                    list="bd_bulk_routes_list"
+                    disabled={!bulkEditFields.route}
+                    placeholder="Select or enter route"
+                    value={bulkEditValues.route}
+                    onChange={e => setBulkEditValues(prev => ({ ...prev, route: e.target.value }))}
+                    className="mt-1 w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
+                  />
+                  <datalist id="bd_bulk_routes_list">
+                    {allRoutes.map((r: any) => (
+                      <option key={r._id} value={r.name} />
+                    ))}
+                  </datalist>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setShowBulkEditModal(false)}
+                className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkEditParties}
+                disabled={isBulkOperating || !Object.values(bulkEditFields).some(Boolean)}
+                className="px-4 py-2 text-xs font-bold bg-[#785b3a] hover:bg-[#634a2d] text-white rounded-xl shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-2"
+              >
+                {isBulkOperating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
+                <span>Apply to {selectedIds.length} Records</span>
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── BULK DELETE CONFIRMATION MODAL ── */}
+      {showBulkDeleteModal && (
+        <Modal
+          isOpen={showBulkDeleteModal}
+          onClose={() => setShowBulkDeleteModal(false)}
+          title={`Delete ${selectedIds.length} Records`}
+          maxWidth="max-w-md"
+        >
+          <div className="space-y-4 text-left">
+            <div className="flex items-start gap-3 p-3.5 bg-rose-50 border border-rose-100 rounded-2xl">
+              <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div className="text-xs">
+                <h4 className="font-bold text-rose-900 text-sm">Confirm Bulk Deletion</h4>
+                <p className="text-rose-700 mt-1 leading-relaxed">
+                  Are you sure you want to move <strong>{selectedIds.length}</strong> selected {activeMainTab} records to the Recycle Bin?
+                </p>
+                <p className="text-gray-500 mt-1.5 text-[11px]">
+                  You can restore these records anytime from the Recycle Bin.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowBulkDeleteModal(false)}
+                className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkDeleteParties}
+                disabled={isBulkOperating}
+                className="px-4 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-2"
+              >
+                {isBulkOperating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
+                <span>Delete {selectedIds.length} Records</span>
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* Keyframe Animation */}

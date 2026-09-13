@@ -1505,6 +1505,62 @@ exports.bulkDeleteParties = async (req, res) => {
   }
 };
 
+exports.bulkUpdateParties = async (req, res) => {
+  try {
+    const { ids, updates } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ msg: 'No ids provided' });
+    }
+    if (!updates || typeof updates !== 'object') {
+      return res.status(400).json({ msg: 'No updates provided' });
+    }
+
+    const sanitizedUpdates = {};
+    const allowedFields = [
+      'status', 'category', 'creditPeriod', 'creditLimit',
+      'preferredTransporter', 'route', 'tags', 'notes', 'taxNumber', 'priceList'
+    ];
+
+    for (const field of allowedFields) {
+      if (updates[field] !== undefined && updates[field] !== '') {
+        if (field === 'creditPeriod' || field === 'creditLimit') {
+          const num = Number(updates[field]);
+          if (!isNaN(num)) sanitizedUpdates[field] = num;
+        } else {
+          sanitizedUpdates[field] = updates[field];
+        }
+      }
+    }
+
+    if (Object.keys(sanitizedUpdates).length === 0) {
+      return res.status(400).json({ msg: 'No valid fields provided to update' });
+    }
+
+    const result = await Party.updateMany(
+      { _id: { $in: ids }, isDeleted: { $ne: true } },
+      { $set: sanitizedUpdates }
+    );
+
+    // Bulk create activity log
+    ActivityLog.create({
+      action: 'UPDATE',
+      entityType: 'Party',
+      entityName: `Bulk Update (${ids.length} records)`,
+      details: `Bulk updated fields: ${Object.keys(sanitizedUpdates).join(', ')} on ${result.modifiedCount || ids.length} records`,
+      performedBy: req.user ? req.user.fullName : "System",
+      company: req.body.company || (req.user && req.user.company)
+    }).catch(err => console.error("Bulk update activity log failed:", err));
+
+    res.json({
+      msg: `Successfully updated ${result.modifiedCount || ids.length} records`,
+      count: result.modifiedCount || ids.length,
+      updatedFields: Object.keys(sanitizedUpdates)
+    });
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+};
+
 exports.getDeletedParties = async (req, res) => {
   try {
     const filter = { isDeleted: true };
@@ -2043,6 +2099,16 @@ exports.mergeParties = async (req, res) => {
     const duplicateBalance = duplicate.outstandingBalance || duplicate.outstanding || 0;
     primary.outstanding = primaryBalance + duplicateBalance;
     primary.outstandingBalance = primaryBalance + duplicateBalance;
+
+    // Sum opening balance
+    const primaryOpening = Number(primary.openingBalance) || 0;
+    const duplicateOpening = Number(duplicate.openingBalance) || 0;
+    primary.openingBalance = primaryOpening + duplicateOpening;
+
+    // Preserve active status if either record was active
+    if (primary.status === 'inactive' && duplicate.status === 'active') {
+      primary.status = 'active';
+    }
 
     // Save primary record
     await primary.save();

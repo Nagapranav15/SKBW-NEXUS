@@ -12,6 +12,7 @@ router.delete('/:id/permanent', auth, rbac('MANAGE_PARTIES'), partyController.pe
 router.get('/', auth, rbac(['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES']), partyController.getParties);
 router.get('/:id', auth, rbac(['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES']), partyController.getPartyById);
 router.post('/bulk-delete', auth, rbac('MANAGE_PARTIES'), partyController.bulkDeleteParties);
+router.post('/bulk-update', auth, rbac('MANAGE_PARTIES'), partyController.bulkUpdateParties);
 router.post('/import', auth, rbac(['MANAGE_PARTIES', 'CREATE_PARTIES']), partyController.importParties);
 router.post('/', auth, rbac(['MANAGE_PARTIES', 'CREATE_PARTIES']), partyController.createParty);
 router.put('/:id', auth, rbac('MANAGE_PARTIES'), partyController.updateParty);

@@ -15,6 +15,7 @@ import {
 import { showToast } from '../../ui/Toast';
 import * as XLSX from 'xlsx';
 import Modal from '../../ui/Modal';
+import { convertAltToPrimary, convertPrimaryToAlt, formatUomFormula } from '../../../utils/uomConversion';
 
 interface PurchaseInvoiceFormItem {
   skuId: string;
@@ -1843,21 +1844,31 @@ const PurchaseInvoicePage: React.FC = () => {
                             {selectedSku?.altUnit && selectedSku?.altUnitConversion ? (
                               <>
                                 <div className="col-span-2">
-                                  <label className="block text-[9px] font-black text-blue-600 uppercase tracking-wider mb-1">Qty in {selectedSku.altUnit}</label>
+                                  <label className="block text-[9px] font-black text-blue-600 uppercase tracking-wider mb-1">
+                                    Qty in {selectedSku.altUnit}
+                                    <span className="text-[8px] font-normal text-gray-400 ml-1 font-mono">({formatUomFormula(selectedSku)})</span>
+                                  </label>
                                   <input
                                     type="number"
                                     placeholder="0"
                                     onChange={e => {
                                       const val = Number(e.target.value) || 0;
-                                      const conversion = Number(selectedSku.altUnitConversion) || 1;
-                                      handleItemRowChange(idx, 'quantity', String(val * conversion));
+                                      const primaryQty = convertAltToPrimary(val, selectedSku);
+                                      handleItemRowChange(idx, 'quantity', String(primaryQty));
                                     }}
                                     disabled={item.splits && item.splits.length > 0}
                                     className="w-full px-2.5 py-1.5 border border-blue-200 bg-blue-50/15 rounded-lg text-xs text-right font-bold text-blue-800 focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
                                   />
                                 </div>
                                 <div>
-                                  <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Total {unitLabel}</label>
+                                  <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1 flex items-center justify-between">
+                                    <span>Total {unitLabel}</span>
+                                    {Number(item.quantity) > 0 && (
+                                      <span className="text-[8.5px] font-bold text-blue-700 font-mono">
+                                        {convertPrimaryToAlt(Number(item.quantity), selectedSku)} {selectedSku.altUnit}
+                                      </span>
+                                    )}
+                                  </label>
                                   <input
                                     type="number"
                                     value={item.quantity}

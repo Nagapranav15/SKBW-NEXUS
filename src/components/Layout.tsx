@@ -210,7 +210,7 @@ const Layout: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden font-sans">
+    <div className="flex h-screen bg-white overflow-hidden font-sans">
       {/* Sidebar Overlay for Mobile */}
       {sidebarOpen && (
         <div 
@@ -348,7 +348,7 @@ const Layout: React.FC = () => {
           </div>
         </div>
 
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto bg-white">
           <Outlet />
         </main>
       </div>

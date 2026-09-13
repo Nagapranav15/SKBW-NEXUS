@@ -24,13 +24,29 @@ const server = app.listen(PORT, "0.0.0.0", () => {
 server.on("error", (err) => {
   if (err.code === "EADDRINUSE") {
     console.warn(`Port ${PORT} is busy. Trying fallback port 5000...`);
-    app.listen(5000, "0.0.0.0", () => {
+    const fallbackServer = app.listen(5000, "0.0.0.0", () => {
       console.log(`Server running successfully on fallback port 5000 bound to 0.0.0.0`);
+    });
+    fallbackServer.on("error", (fErr) => {
+      console.error("Fallback server listen error:", fErr.message);
     });
   } else {
     console.error("Server listen error:", err.message);
   }
 });
+
+// Graceful shutdown for watch mode and container environments
+const shutdown = () => {
+  try {
+    server.close(() => {
+      process.exit(0);
+    });
+  } catch (_) {
+    process.exit(0);
+  }
+};
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
 
 // Connect to MongoDB asynchronously
 connectDB().catch((err) => {

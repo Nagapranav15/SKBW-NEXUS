@@ -7,6 +7,7 @@ import { getSkusV2, getWarehouseHierarchyV2, getBalancesV2, recordTransferV2, Sk
 import { fetchInventoryLedger } from '../ledger/ledgerService';
 import { showToast } from '../../ui/Toast';
 import Modal from '../../ui/Modal';
+import { convertPrimaryToAlt, formatUomFormula } from '../../../utils/uomConversion';
 
 const StockTransferModule: React.FC = () => {
   const { selectedCompany } = useAuth();
@@ -337,12 +338,24 @@ const StockTransferModule: React.FC = () => {
           {/* Live Stock Indicator at Source */}
           <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl flex items-center justify-between">
             <span className="font-bold text-blue-900 text-xs">Available Stock at Source:</span>
-            <span className="font-black text-blue-700 text-sm">{availableSourceStock} {selectedSku?.unit || 'units'}</span>
+            <div className="text-right">
+              <span className="font-black text-blue-700 text-sm block">{availableSourceStock} {selectedSku?.unit || 'units'}</span>
+              {selectedSku?.altUnit && selectedSku?.altUnitConversion && (
+                <span className="text-[10px] font-bold text-blue-600 font-mono">
+                  ≈ {convertPrimaryToAlt(availableSourceStock, selectedSku)} {selectedSku.altUnit}
+                </span>
+              )}
+            </div>
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-1">
-              Transfer Quantity ({selectedSku?.unit || 'units'}) *
+            <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+              <span>Transfer Quantity ({selectedSku?.unit || 'units'}) *</span>
+              {selectedSku?.altUnit && selectedSku?.altUnitConversion && Number(form.quantity) > 0 && (
+                <span className="text-[10px] font-bold text-blue-600 font-mono">
+                  ≈ {convertPrimaryToAlt(Number(form.quantity), selectedSku)} {selectedSku.altUnit}
+                </span>
+              )}
             </label>
             <input
               type="number"

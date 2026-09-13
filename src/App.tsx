@@ -61,7 +61,7 @@ function App() {
   return (
     <AuthProvider>
       <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-white">
           <ToastContainer />
           <Analytics />
           <Suspense fallback={<LoadingFallback />}>

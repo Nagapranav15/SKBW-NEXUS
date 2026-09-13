@@ -7,6 +7,7 @@ const Sequence = require("../models/sequenceModel");
 const Metadata = require("../models/metadataModel");
 const ActivityLog = require("../models/activityLogModel");
 const User = require("../models/userModel");
+const { validateUomConversion } = require("../utils/uomConversion");
 
 const toObjectId = (id) => {
   if (!id) return null;
@@ -140,9 +141,16 @@ exports.getNextSkuCode = async (req, res, next) => {
 
 exports.createSku = async (req, res, next) => {
   try {
-    const { skuCode, name, category, unit, altUnit, altUnitConversion, paperType, gsm, width, length, brand, title, group, ruleType, pages, booksGbl, openingStock, minStockLevel, reorderLevel, initialLocationId, defaultLocation, status, company } = req.body;
+    const { skuCode, name, category, unit, altUnit, altUnitConversion, altUnitDirection, paperType, gsm, width, length, brand, title, group, ruleType, pages, booksGbl, openingStock, minStockLevel, reorderLevel, initialLocationId, defaultLocation, status, company } = req.body;
     if (!company) {
       return res.status(400).json({ msg: "company is required" });
+    }
+
+    if (altUnit) {
+      const uomCheck = validateUomConversion(unit, altUnit, altUnitConversion);
+      if (!uomCheck.valid) {
+        return res.status(400).json({ msg: uomCheck.error });
+      }
     }
 
     const exists = await SkuV2.findOne({ skuCode, company: toObjectId(company) });
@@ -164,6 +172,7 @@ exports.createSku = async (req, res, next) => {
       unit,
       altUnit,
       altUnitConversion: altUnitConversion ? Number(altUnitConversion) : undefined,
+      altUnitDirection: altUnitDirection || undefined,
       paperType: paperType || "None",
       gsm: gsm ? Number(gsm) : undefined,
       width: width ? Number(width) : undefined,
@@ -261,11 +270,9 @@ exports.updateSku = async (req, res, next) => {
     const { id } = req.params;
     const compId = req.body.company || req.query.companyId;
 
-    let sku;
-    if (compId) {
-      sku = await SkuV2.findOne({ _id: toObjectId(id), company: toObjectId(compId) });
-    } else {
-      sku = await SkuV2.findById(toObjectId(id));
+    let sku = await SkuV2.findById(toObjectId(id) || id);
+    if (!sku && compId) {
+      sku = await SkuV2.findOne({ _id: toObjectId(id) || id, company: toObjectId(compId) || compId });
     }
 
     if (!sku) {
@@ -284,7 +291,7 @@ exports.updateSku = async (req, res, next) => {
       const exists = await SkuV2.findOne({ 
         skuCode: req.body.skuCode, 
         company: sku.company, 
-        _id: { $ne: toObjectId(id) } 
+        _id: { $ne: toObjectId(id) || id } 
       });
       if (exists) {
         return res.status(400).json({ msg: `SKU Code '${req.body.skuCode}' already exists for this company` });
@@ -292,22 +299,42 @@ exports.updateSku = async (req, res, next) => {
       sku.skuCode = req.body.skuCode;
     }
 
-    if (req.body.name !== undefined) sku.name = req.body.name;
-    if (req.body.category !== undefined) sku.category = req.body.category;
-    if (req.body.unit !== undefined) sku.unit = req.body.unit;
-    if (req.body.altUnit !== undefined) sku.altUnit = req.body.altUnit;
+    const targetUnit = req.body.unit !== undefined ? req.body.unit : sku.unit;
+    const targetAltUnit = req.body.altUnit !== undefined ? req.body.altUnit : sku.altUnit;
+    const targetConversion = req.body.altUnitConversion !== undefined ? req.body.altUnitConversion : sku.altUnitConversion;
+
+    if (targetAltUnit) {
+      const uomCheck = validateUomConversion(targetUnit, targetAltUnit, targetConversion);
+      if (!uomCheck.valid) {
+        return res.status(400).json({ msg: uomCheck.error });
+      }
+    }
+
+    if (req.body.name !== undefined && req.body.name !== null) sku.name = req.body.name;
+    if (req.body.category !== undefined && req.body.category !== null) sku.category = req.body.category;
+    if (req.body.unit !== undefined && req.body.unit !== null) sku.unit = req.body.unit;
+    if (req.body.altUnit !== undefined) sku.altUnit = req.body.altUnit || "";
     if (req.body.altUnitConversion !== undefined) sku.altUnitConversion = req.body.altUnitConversion ? Number(req.body.altUnitConversion) : undefined;
-    if (req.body.paperType !== undefined) sku.paperType = req.body.paperType || "None";
-    if (req.body.gsm !== undefined) sku.gsm = req.body.gsm ? Number(req.body.gsm) : undefined;
-    if (req.body.width !== undefined) sku.width = req.body.width ? Number(req.body.width) : undefined;
-    if (req.body.length !== undefined) sku.length = req.body.length ? Number(req.body.length) : undefined;
+    if (req.body.altUnitDirection !== undefined) sku.altUnitDirection = req.body.altUnitDirection || undefined;
+    
+    // Normalize paperType to schema enum ["Reels", "Sheets", "None"]
+    if (req.body.paperType !== undefined) {
+      const pt = String(req.body.paperType || '').trim().toLowerCase();
+      if (pt === 'reels' || pt === 'reel') sku.paperType = 'Reels';
+      else if (pt === 'sheets' || pt === 'sheet') sku.paperType = 'Sheets';
+      else sku.paperType = 'None';
+    }
+
+    if (req.body.gsm !== undefined) sku.gsm = req.body.gsm !== null && req.body.gsm !== '' ? Number(req.body.gsm) : undefined;
+    if (req.body.width !== undefined) sku.width = req.body.width !== null && req.body.width !== '' ? Number(req.body.width) : undefined;
+    if (req.body.length !== undefined) sku.length = req.body.length !== null && req.body.length !== '' ? Number(req.body.length) : undefined;
     if (req.body.brand !== undefined) sku.brand = req.body.brand || "";
     if (req.body.title !== undefined) sku.title = req.body.title || "";
     if (req.body.group !== undefined) sku.group = req.body.group || "";
-    if (req.body.ruleType !== undefined) sku.ruleType = req.body.ruleType;
-    if (req.body.pages !== undefined) sku.pages = req.body.pages ? Number(req.body.pages) : undefined;
-    if (req.body.booksGbl !== undefined) sku.booksGbl = req.body.booksGbl ? Number(req.body.booksGbl) : undefined;
-    if (req.body.openingStock !== undefined) sku.openingStock = req.body.openingStock !== undefined ? Number(req.body.openingStock) : sku.openingStock;
+    if (req.body.ruleType !== undefined) sku.ruleType = req.body.ruleType || "";
+    if (req.body.pages !== undefined) sku.pages = req.body.pages !== null && req.body.pages !== '' ? Number(req.body.pages) : undefined;
+    if (req.body.booksGbl !== undefined) sku.booksGbl = req.body.booksGbl !== null && req.body.booksGbl !== '' ? Number(req.body.booksGbl) : undefined;
+    if (req.body.openingStock !== undefined) sku.openingStock = req.body.openingStock !== undefined && req.body.openingStock !== null && req.body.openingStock !== '' ? Number(req.body.openingStock) : sku.openingStock;
     if (req.body.minStockLevel !== undefined) sku.minStockLevel = req.body.minStockLevel !== '' && req.body.minStockLevel !== null ? Number(req.body.minStockLevel) : undefined;
     if (req.body.reorderLevel !== undefined) sku.reorderLevel = req.body.reorderLevel !== '' && req.body.reorderLevel !== null ? Number(req.body.reorderLevel) : undefined;
     if (req.body.initialLocationId !== undefined) {
@@ -318,7 +345,13 @@ exports.updateSku = async (req, res, next) => {
       sku.initialLocation = req.body.initialLocation;
     }
     if (req.body.defaultLocation !== undefined) sku.defaultLocation = req.body.defaultLocation;
-    if (req.body.status !== undefined) sku.status = req.body.status || "Active";
+    
+    // Normalize status to ["Active", "Inactive"]
+    if (req.body.status !== undefined) {
+      const st = String(req.body.status || '').trim().toLowerCase();
+      sku.status = st === 'inactive' ? 'Inactive' : 'Active';
+    }
+
     if (req.body.bomItems !== undefined) sku.bomItems = req.body.bomItems;
     if (req.body.processSteps !== undefined) sku.processSteps = req.body.processSteps;
 
@@ -414,6 +447,104 @@ exports.deleteSku = async (req, res, next) => {
   }
 };
 
+exports.bulkDeleteSkus = async (req, res, next) => {
+  try {
+    const { ids, companyId } = req.body;
+    if (!companyId) {
+      return res.status(400).json({ msg: "companyId is required" });
+    }
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ msg: "No SKU ids provided" });
+    }
+
+    const companyObjId = toObjectId(companyId);
+    const skuObjIds = ids.map(id => toObjectId(id));
+
+    const result = await SkuV2.updateMany(
+      { _id: { $in: skuObjIds }, company: companyObjId, isDeleted: { $ne: true } },
+      { $set: { isDeleted: true, status: "Inactive" } }
+    );
+
+    ActivityLog.create({
+      action: "BULK_DELETE",
+      entityType: "SkuV2",
+      entityName: `Bulk Delete (${ids.length} items)`,
+      details: `Moved ${result.modifiedCount || ids.length} SKUs to recycle bin during bulk delete.`,
+      performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
+      company: companyObjId
+    }).catch(e => console.error("ActivityLog error:", e));
+
+    res.json({
+      msg: `Successfully moved ${result.modifiedCount || ids.length} items to recycle bin`,
+      count: result.modifiedCount || ids.length
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.bulkUpdateSkus = async (req, res, next) => {
+  try {
+    const { ids, companyId, updates } = req.body;
+    if (!companyId) {
+      return res.status(400).json({ msg: "companyId is required" });
+    }
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ msg: "No SKU ids provided" });
+    }
+    if (!updates || typeof updates !== "object") {
+      return res.status(400).json({ msg: "No updates provided" });
+    }
+
+    const companyObjId = toObjectId(companyId);
+    const skuObjIds = ids.map(id => toObjectId(id));
+
+    const sanitizedUpdates = {};
+    const allowedFields = [
+      "status", "category", "group", "unit", "altUnit",
+      "altUnitConversion", "altUnitDirection", "minStockLevel",
+      "reorderLevel", "warehouseLocation", "leadTimeDays"
+    ];
+
+    for (const field of allowedFields) {
+      if (updates[field] !== undefined && updates[field] !== "") {
+        if (field === "minStockLevel" || field === "reorderLevel" || field === "altUnitConversion" || field === "leadTimeDays") {
+          const num = Number(updates[field]);
+          if (!isNaN(num)) sanitizedUpdates[field] = num;
+        } else {
+          sanitizedUpdates[field] = updates[field];
+        }
+      }
+    }
+
+    if (Object.keys(sanitizedUpdates).length === 0) {
+      return res.status(400).json({ msg: "No valid fields provided to update" });
+    }
+
+    const result = await SkuV2.updateMany(
+      { _id: { $in: skuObjIds }, company: companyObjId, isDeleted: { $ne: true } },
+      { $set: sanitizedUpdates }
+    );
+
+    ActivityLog.create({
+      action: "BULK_UPDATE",
+      entityType: "SkuV2",
+      entityName: `Bulk Update (${ids.length} items)`,
+      details: `Bulk updated fields: ${Object.keys(sanitizedUpdates).join(", ")} on ${result.modifiedCount || ids.length} SKUs`,
+      performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
+      company: companyObjId
+    }).catch(e => console.error("ActivityLog error:", e));
+
+    res.json({
+      msg: `Successfully updated ${result.modifiedCount || ids.length} items`,
+      count: result.modifiedCount || ids.length,
+      updatedFields: Object.keys(sanitizedUpdates)
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.bulkImportSkus = async (req, res, next) => {
   try {
     const { skus, company } = req.body;
@@ -463,6 +594,7 @@ exports.bulkImportSkus = async (req, res, next) => {
         unit: item.unit,
         altUnit: item.altUnit || undefined,
         altUnitConversion: item.altUnitConversion ? Number(item.altUnitConversion) : undefined,
+        altUnitDirection: item.altUnitDirection || undefined,
         gsm: item.gsm ? Number(item.gsm) : undefined,
         width: item.width ? Number(item.width) : undefined,
         length: item.length ? Number(item.length) : undefined,

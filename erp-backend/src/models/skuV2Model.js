@@ -16,6 +16,7 @@ const skuV2Schema = new mongoose.Schema({
   unit: { type: String, required: true },
   altUnit: { type: String, required: false },
   altUnitConversion: { type: Number, required: false },
+  altUnitDirection: { type: String, enum: ['PRIMARY_TO_ALT', 'ALT_TO_PRIMARY'], required: false },
   gsm: { type: Number, required: false },
   width: { type: Number, required: false },
   length: { type: Number, required: false },

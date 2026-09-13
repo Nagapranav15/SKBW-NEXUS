@@ -53,6 +53,8 @@ import {
   deleteSkuV2, 
   updateSkuV2,
   bulkImportSkusV2,
+  bulkDeleteSkusV2,
+  bulkUpdateSkusV2,
   renumberSkusV2,
   getWarehouseHierarchyV2,
   WarehouseLocationV2,
@@ -441,8 +443,26 @@ const SkuMasterV2: React.FC = () => {
     setCustomColumns(prev => prev.filter(c => c !== colName));
   };
 
-  // Selection
+  // Selection & Bulk Operations
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isExporting, setIsExporting] = useState(false);
+  const [showBulkEditModal, setShowBulkEditModal] = useState(false);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [isBulkOperating, setIsBulkOperating] = useState(false);
+  const [bulkEditFields, setBulkEditFields] = useState({
+    status: false,
+    category: false,
+    altUnit: false,
+    unit: false,
+    gsm: false
+  });
+  const [bulkEditValues, setBulkEditValues] = useState({
+    status: 'Active',
+    category: '',
+    altUnit: 'GBL',
+    unit: 'Pcs',
+    gsm: '52'
+  });
 
   // Modals & Popups
   const [showActivityLog, setShowActivityLog] = useState(false);
@@ -649,53 +669,52 @@ const SkuMasterV2: React.FC = () => {
   // ── Build BOMs / Bulk Edit BOM Modal state & handlers ──
   // ── Per-Tab Independent Column Customizer Tool State ──
   const DEFAULT_PRODUCTS_COLUMNS = [
-    { id: 'skuCode', label: 'ID / SKU Code', visible: true },
-    { id: 'name', label: 'Item Name', visible: true },
-    { id: 'category', label: 'Category', visible: true },
-    { id: 'unit', label: 'UOM', visible: true },
-    { id: 'altUnit', label: 'AUOM (Alt Unit)', visible: true },
-    { id: 'altUnitConversion', label: 'Con Rate', visible: true },
+    { id: 'skuCode', label: 'ID / SKU CODE', visible: true },
+    { id: 'name', label: 'ITEM NAME', visible: true },
+    { id: 'category', label: 'CATEGORY', visible: true },
+    { id: 'status', label: 'STATUS', visible: true },
+    { id: 'unit', label: 'PRIMARY UOM', visible: true },
+    { id: 'altUnitConversion', label: 'CON RATE', visible: true },
+    { id: 'altUnit', label: 'SECONDARY UOM', visible: true },
     { id: 'gsm', label: 'GSM', visible: true },
-    { id: 'size', label: 'Size', visible: true },
-    { id: 'pages', label: 'Pages / Sheets', visible: true },
-    { id: 'bom', label: 'BOM Recipe', visible: true },
-    { id: 'openingStock', label: 'Stock', visible: true },
-    { id: 'workOrders', label: 'Work Orders', visible: true },
-    { id: 'dispatchOrders', label: 'Dispatch Orders', visible: true }
+    { id: 'size', label: 'SIZE', visible: true },
+    { id: 'pages', label: 'PAGES / SHEETS', visible: true },
+    { id: 'bom', label: 'BOM RECIPE', visible: true },
+    { id: 'openingStock', label: 'STOCK', visible: false },
+    { id: 'workOrders', label: 'WORK ORDERS', visible: false },
+    { id: 'dispatchOrders', label: 'DISPATCH ORDERS', visible: false }
   ];
 
   const DEFAULT_MATERIALS_COLUMNS = [
-    { id: 'skuCode', label: 'ID / SKU Code', visible: true },
-    { id: 'name', label: 'Item Name', visible: true },
-    { id: 'category', label: 'Category', visible: true },
-    { id: 'unit', label: 'UOM', visible: true },
-    { id: 'altUnit', label: 'AUOM (Alt Unit)', visible: true },
-    { id: 'altUnitConversion', label: 'Con Rate', visible: true },
+    { id: 'skuCode', label: 'ID / SKU CODE', visible: true },
+    { id: 'name', label: 'ITEM NAME', visible: true },
+    { id: 'category', label: 'CATEGORY', visible: true },
+    { id: 'status', label: 'STATUS', visible: true },
+    { id: 'unit', label: 'PRIMARY UOM', visible: true },
     { id: 'gsm', label: 'GSM', visible: true },
-    { id: 'size', label: 'Size', visible: true },
-    { id: 'pages', label: 'Sheets per Ream', visible: true },
-    { id: 'openingStock', label: 'Stock', visible: true },
-    { id: 'workOrders', label: 'Work Orders', visible: true },
-    { id: 'dispatchOrders', label: 'Dispatch Orders', visible: true }
+    { id: 'size', label: 'SIZE', visible: true },
+    { id: 'pages', label: 'SHEETS PER REAM', visible: true },
+    { id: 'openingStock', label: 'STOCK', visible: false },
+    { id: 'workOrders', label: 'WORK ORDERS', visible: false },
+    { id: 'dispatchOrders', label: 'DISPATCH ORDERS', visible: false }
   ];
 
   const DEFAULT_SEMI_COLUMNS = [
-    { id: 'skuCode', label: 'ID / SKU Code', visible: true },
-    { id: 'name', label: 'Item Name', visible: true },
-    { id: 'category', label: 'Category', visible: true },
-    { id: 'unit', label: 'UOM', visible: true },
-    { id: 'altUnit', label: 'AUOM (Alt Unit)', visible: true },
-    { id: 'altUnitConversion', label: 'Con Rate', visible: true },
+    { id: 'skuCode', label: 'ID / SKU CODE', visible: true },
+    { id: 'name', label: 'ITEM NAME', visible: true },
+    { id: 'category', label: 'CATEGORY', visible: true },
+    { id: 'status', label: 'STATUS', visible: true },
+    { id: 'unit', label: 'PRIMARY UOM', visible: true },
     { id: 'gsm', label: 'GSM', visible: true },
-    { id: 'size', label: 'Size', visible: true },
-    { id: 'pages', label: 'Pages / Sheets', visible: true },
-    { id: 'bom', label: 'BOM Recipe', visible: true },
-    { id: 'openingStock', label: 'Stock', visible: true },
-    { id: 'workOrders', label: 'Work Orders', visible: true },
-    { id: 'dispatchOrders', label: 'Dispatch Orders', visible: true }
+    { id: 'size', label: 'SIZE', visible: true },
+    { id: 'pages', label: 'PAGES / SHEETS', visible: true },
+    { id: 'bom', label: 'BOM RECIPE', visible: true },
+    { id: 'openingStock', label: 'STOCK', visible: false },
+    { id: 'workOrders', label: 'WORK ORDERS', visible: false },
+    { id: 'dispatchOrders', label: 'DISPATCH ORDERS', visible: false }
   ];
 
-  const STORAGE_KEY = 'skbw_sku_master_tab_columns_v4';
+  const STORAGE_KEY = 'skbw_sku_master_tab_columns_v8';
 
   // Helper to sanitize column list against current valid defaults
   const sanitizeColumns = (savedList: any[], defaultList: typeof DEFAULT_PRODUCTS_COLUMNS) => {
@@ -711,9 +730,10 @@ const SkuMasterV2: React.FC = () => {
 
   const [tabColumnsMap, setTabColumnsMap] = useState<Record<string, typeof DEFAULT_PRODUCTS_COLUMNS>>(() => {
     try {
-      // Clean up legacy v2 and v3 keys which may contain obsolete column IDs
+      // Clean up legacy keys which may contain obsolete column IDs
       localStorage.removeItem('skbw_sku_master_tab_columns_v2');
       localStorage.removeItem('skbw_sku_master_tab_columns_v3');
+      localStorage.removeItem('skbw_sku_master_tab_columns_v4');
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -1759,37 +1779,59 @@ const SkuMasterV2: React.FC = () => {
   };
 
   const handleExportExcel = () => {
-    if (filteredAndSortedSkus.length === 0) {
+    const targetSkus = selectedIds.length > 0 
+      ? filteredAndSortedSkus.filter(s => selectedIds.includes(s._id!))
+      : filteredAndSortedSkus;
+
+    if (targetSkus.length === 0) {
       showToast('No items available to export', 'error');
       return;
     }
-    const exportData = filteredAndSortedSkus.map(s => ({
-      'Item Code': s.skuCode,
-      'Item Name': s.name,
-      'Category': s.category || s.group || '',
-      'Primary Unit': s.unit,
-      'Alternate Unit': s.altUnit || '—',
-      'Conversion Rate': s.altUnitConversion || '—',
-      'GSM': s.gsm || '—',
-      'Pages': s.pages || '—',
-      'Width': s.width || '—',
-      'Length': s.length || '—',
-      'Opening Stock': s.openingStock || 0,
-      'Min Stock Level': s.minStockLevel || 0,
-      'Status': s.status || 'Active'
-    }));
+    setIsExporting(true);
+    try {
+      const isRawOrSemiTab = activeMainTab === 'materials' || activeMainTab === 'semi';
+      const exportData = targetSkus.map(s => {
+        const base: Record<string, any> = {
+          'Item Code': s.skuCode,
+          'Item Name': s.name,
+          'Category': s.category || s.group || '',
+          'Primary Unit': s.unit || s.altUnit || '—',
+        };
+        if (!isRawOrSemiTab) {
+          base['Conversion Rate'] = s.altUnitConversion || '—';
+          base['Secondary Unit'] = s.altUnit || '—';
+        }
+        base['GSM'] = s.gsm || '—';
+        base['Pages'] = s.pages || '—';
+        base['Width'] = s.width || '—';
+        base['Length'] = s.length || '—';
+        base['Opening Stock'] = s.openingStock || 0;
+        base['Min Stock Level'] = s.minStockLevel || 0;
+        base['Status'] = s.status || 'Active';
+        return base;
+      });
 
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Items');
-    XLSX.writeFile(workbook, `Items_Export_${activeMainTab}_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    showToast(`Exported ${filteredAndSortedSkus.length} items to Excel`, 'success');
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Items');
+      const suffix = selectedIds.length > 0 ? `_selected_${selectedIds.length}` : '';
+      XLSX.writeFile(workbook, `Items_Export_${activeMainTab}${suffix}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      showToast(`Exported ${targetSkus.length} ${selectedIds.length > 0 ? 'selected ' : ''}items to Excel`, 'success');
+    } catch (err) {
+      showToast('Failed to export Excel', 'error');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleExportCSV = handleExportExcel;
 
   const handleExportPDF = () => {
-    if (filteredAndSortedSkus.length === 0) {
+    const targetSkus = selectedIds.length > 0 
+      ? filteredAndSortedSkus.filter(s => selectedIds.includes(s._id!))
+      : filteredAndSortedSkus;
+
+    if (targetSkus.length === 0) {
       showToast('No records available to print PDF', 'info');
       return;
     }
@@ -1801,23 +1843,44 @@ const SkuMasterV2: React.FC = () => {
     }
 
     const tabTitle = getTabLabel(activeMainTab).toUpperCase();
-    const title = `${tabTitle} MASTER REPORT`;
+    const title = `${tabTitle} MASTER REPORT ${selectedIds.length > 0 ? `(${selectedIds.length} SELECTED)` : ''}`;
     const companyName = selectedCompany?.name || 'SKBW ERP';
     const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
-    const tableHeaders = `<th>#</th><th>Item Code</th><th>Item Name</th><th>Category</th><th>UOM</th><th>GSM</th><th>Pages</th><th>In Stock</th><th>Min Stock</th><th>Status</th>`;
+    const isRawOrSemiTab = activeMainTab === 'materials' || activeMainTab === 'semi';
+    const tableHeaders = isRawOrSemiTab
+      ? `<th>#</th><th>Item Code</th><th>Item Name</th><th>Category</th><th>UOM</th><th>GSM</th><th>Pages</th><th>Status</th>`
+      : `<th>#</th><th>Item Code</th><th>Item Name</th><th>Category</th><th>Primary UOM</th><th>Con Rate</th><th>Secondary UOM</th><th>GSM</th><th>Pages</th><th>Status</th>`;
 
-    const tableRowsHtml = filteredAndSortedSkus.map((item, idx) => {
+    const tableRowsHtml = targetSkus.map((item, idx) => {
+      if (isRawOrSemiTab) {
+        return `<tr>
+          <td>${idx + 1}</td>
+          <td><b>${item.skuCode || '—'}</b></td>
+          <td>${item.name || '—'}</td>
+          <td>${item.category || item.group || '—'}</td>
+          <td>${item.unit || '—'}</td>
+          <td>${item.gsm || '—'}</td>
+          <td>${item.pages || '—'}</td>
+          <td>${item.status || 'Active'}</td>
+        </tr>`;
+      }
+      const isAltPcs = (item.altUnit || '').toLowerCase().includes('pc');
+      const isPrimaryPcs = (item.unit || '').toLowerCase().includes('pc');
+      const outerUnit = (isAltPcs && !isPrimaryPcs) ? item.unit : item.altUnit;
+      const innerUnit = (isAltPcs && !isPrimaryPcs) ? item.altUnit : (item.unit || 'Pcs');
+      const conRateStr = item.altUnit && item.altUnitConversion ? `1 ${outerUnit} = ${item.altUnitConversion} ${innerUnit}` : '—';
+
       return `<tr>
         <td>${idx + 1}</td>
         <td><b>${item.skuCode || '—'}</b></td>
         <td>${item.name || '—'}</td>
         <td>${item.category || item.group || '—'}</td>
         <td>${item.unit || '—'}</td>
+        <td>${conRateStr}</td>
+        <td>${item.altUnit || '—'}</td>
         <td>${item.gsm || '—'}</td>
         <td>${item.pages || '—'}</td>
-        <td><b>${Number(item.openingStock ?? 0).toLocaleString('en-IN')}</b></td>
-        <td>${Number(item.minStockLevel ?? 0).toLocaleString('en-IN')}</td>
         <td>${item.status || 'Active'}</td>
       </tr>`;
     }).join('');
@@ -1843,23 +1906,82 @@ const SkuMasterV2: React.FC = () => {
           <div class="header">
             <div>
               <div class="title">${companyName} — ${title}</div>
-              <div class="sub">Generated on ${dateStr} • Total Records: ${filteredAndSortedSkus.length}</div>
+              <div class="sub">Generated on ${dateStr} • Scope: ${selectedIds.length > 0 ? `${selectedIds.length} Selected Items` : 'All Items'}</div>
+            </div>
+            <div style="font-size: 11px; color: #64748b; text-align: right;">
+              <div>SKBW ERP Master Directory</div>
+              <div>Confidential</div>
             </div>
           </div>
+
           <table>
-            <thead><tr>${tableHeaders}</tr></thead>
-            <tbody>${tableRowsHtml}</tbody>
+            <thead>
+              <tr>${tableHeaders}</tr>
+            </thead>
+            <tbody>
+              ${tableRowsHtml}
+            </tbody>
           </table>
-          <div class="summary">Report Total Count: ${filteredAndSortedSkus.length}</div>
+
+          <div class="summary">
+            Total Records: ${targetSkus.length}
+          </div>
+
           <script>
-            window.onload = function() { window.print(); };
+            window.onload = function() { window.print(); }
           </script>
         </body>
       </html>
     `;
 
+    printWin.document.open();
     printWin.document.write(htmlContent);
     printWin.document.close();
+  };
+
+  // Bulk Edit & Bulk Delete Handlers
+  const handleBulkEditSkus = async () => {
+    if (selectedIds.length === 0 || !selectedCompany?._id) return;
+    const updates: any = {};
+    if (bulkEditFields.status) updates.status = bulkEditValues.status;
+    if (bulkEditFields.category) updates.category = bulkEditValues.category;
+    if (bulkEditFields.altUnit) updates.altUnit = bulkEditValues.altUnit;
+    if (bulkEditFields.unit) updates.unit = bulkEditValues.unit;
+    if (bulkEditFields.gsm) updates.gsm = bulkEditValues.gsm;
+
+    if (Object.keys(updates).length === 0) {
+      showToast('Please select at least one field to update', 'warning');
+      return;
+    }
+
+    setIsBulkOperating(true);
+    try {
+      await bulkUpdateSkusV2(selectedIds, selectedCompany._id, updates);
+      showToast(`Successfully updated ${selectedIds.length} items`, 'success');
+      setShowBulkEditModal(false);
+      setSelectedIds([]);
+      loadSkus(false);
+    } catch (err: any) {
+      showToast(err?.response?.data?.msg || err?.message || 'Failed to update items', 'error');
+    } finally {
+      setIsBulkOperating(false);
+    }
+  };
+
+  const handleBulkDeleteSkus = async () => {
+    if (selectedIds.length === 0 || !selectedCompany?._id) return;
+    setIsBulkOperating(true);
+    try {
+      await bulkDeleteSkusV2(selectedIds, selectedCompany._id);
+      showToast(`Moved ${selectedIds.length} items to Recycle Bin`, 'success');
+      setShowBulkDeleteModal(false);
+      setSelectedIds([]);
+      loadSkus(false);
+    } catch (err: any) {
+      showToast(err?.response?.data?.msg || err?.message || 'Failed to delete items', 'error');
+    } finally {
+      setIsBulkOperating(false);
+    }
   };
 
   const handleDownloadSampleCSV = () => {
@@ -2401,7 +2523,7 @@ const SkuMasterV2: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50/60 p-4 md:p-6 space-y-4 font-sans text-gray-800">
+    <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
       
       {/* 1. Header Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs">
@@ -2423,98 +2545,77 @@ const SkuMasterV2: React.FC = () => {
         </div>
       </div>
 
-      {/* ── 4 MAIN TAB NAVIGATION BAR (Products, Materials, Semi, Categories) ── */}
-      <div className="border-b border-gray-200 flex items-center gap-2 pt-2 overflow-x-auto">
-        
-        {/* Tab 1: Products (All Finished Products) */}
-        <button
-          onClick={() => handleMainTabChange('products')}
-          className={`flex items-center gap-2 px-4 py-3 text-xs md:text-sm font-bold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
-            activeMainTab === 'products'
-              ? 'text-teal-700 border-teal-700 bg-transparent'
-              : 'text-slate-500 hover:text-slate-800 border-transparent hover:border-slate-300 bg-transparent'
-          }`}
-        >
-          <Package className={`w-4 h-4 ${activeMainTab === 'products' ? 'text-teal-700' : 'text-slate-400'}`} />
-          <span>Products</span>
-        </button>
+      {/* ── 2. Top Navigation Tabs Bar & Action Toolbar (Exact match to Business Directory / 1st Image!) ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 bg-white px-4 rounded-2xl shadow-2xs relative">
+        {/* Backdrop overlay to close open popovers on outside click */}
+        {(showSortMenu || showColumnPicker || showExportMenu) && (
+          <div
+            className="fixed inset-0 z-40 bg-transparent"
+            onClick={() => {
+              setShowSortMenu(false);
+              setShowColumnPicker(false);
+              setShowExportMenu(false);
+            }}
+          />
+        )}
 
-        {/* Tab 2: Materials (All Raw Materials) */}
-        <button
-          onClick={() => handleMainTabChange('materials')}
-          className={`flex items-center gap-2 px-4 py-3 text-xs md:text-sm font-bold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
-            activeMainTab === 'materials'
-              ? 'text-teal-700 border-teal-700 bg-transparent'
-              : 'text-slate-500 hover:text-slate-800 border-transparent hover:border-slate-300 bg-transparent'
-          }`}
-        >
-          <Layers className={`w-4 h-4 ${activeMainTab === 'materials' ? 'text-teal-700' : 'text-slate-400'}`} />
-          <span>Materials</span>
-        </button>
+        {/* Tab Selection (Scrollable on small screens) */}
+        <div className="flex items-center gap-1 overflow-x-auto py-1 max-w-full">
+          {/* Tab 1: Products (All Finished Products) */}
+          <button
+            onClick={() => handleMainTabChange('products')}
+            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+              activeMainTab === 'products'
+                ? 'border-teal-700 text-teal-700 bg-transparent'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
+            }`}
+          >
+            <Package className={`w-4 h-4 ${activeMainTab === 'products' ? 'text-teal-700' : 'text-slate-400'}`} />
+            <span>Products</span>
+          </button>
 
-        {/* Tab 3: Semi (Only Semi Finished Materials) */}
-        <button
-          onClick={() => handleMainTabChange('semi')}
-          className={`flex items-center gap-2 px-4 py-3 text-xs md:text-sm font-bold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
-            activeMainTab === 'semi'
-              ? 'text-teal-700 border-teal-700 bg-transparent'
-              : 'text-slate-500 hover:text-slate-800 border-transparent hover:border-slate-300 bg-transparent'
-          }`}
-        >
-          <Boxes className={`w-4 h-4 ${activeMainTab === 'semi' ? 'text-teal-700' : 'text-slate-400'}`} />
-          <span>Semi</span>
-        </button>
+          {/* Tab 2: Materials (All Raw Materials) */}
+          <button
+            onClick={() => handleMainTabChange('materials')}
+            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+              activeMainTab === 'materials'
+                ? 'border-teal-700 text-teal-700 bg-transparent'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
+            }`}
+          >
+            <Layers className={`w-4 h-4 ${activeMainTab === 'materials' ? 'text-teal-700' : 'text-slate-400'}`} />
+            <span>Materials</span>
+          </button>
 
-        {/* Tab 4: Categories */}
-        <button
-          onClick={() => handleMainTabChange('categories')}
-          className={`flex items-center gap-2 px-4 py-3 text-xs md:text-sm font-bold transition-all cursor-pointer whitespace-nowrap border-b-2 -mb-[1px] ${
-            activeMainTab === 'categories'
-              ? 'text-teal-700 border-teal-700 bg-transparent'
-              : 'text-slate-500 hover:text-slate-800 border-transparent hover:border-slate-300 bg-transparent'
-          }`}
-        >
-          <Folder className={`w-4 h-4 ${activeMainTab === 'categories' ? 'text-teal-700' : 'text-slate-400'}`} />
-          <span>Categories</span>
-        </button>
-      </div>
+          {/* Tab 3: Semi (Only Semi Finished Materials) */}
+          <button
+            onClick={() => handleMainTabChange('semi')}
+            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+              activeMainTab === 'semi'
+                ? 'border-teal-700 text-teal-700 bg-transparent'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
+            }`}
+          >
+            <Boxes className={`w-4 h-4 ${activeMainTab === 'semi' ? 'text-teal-700' : 'text-slate-400'}`} />
+            <span>Semi</span>
+          </button>
 
-      {/* ── VIEW CONTENT AREA ── */}
-      {activeMainTab !== 'categories' ? (
-        
-        /* ── GOODS / MATERIALS DATA TABLE VIEW ── */
-        <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs relative">
-          
-          {/* Header Control Row (Toolbar matching Makoro Image 2 & 3!) */}
-          <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-gray-100 bg-white rounded-t-2xl relative z-30">
-            
-            {/* Left Counter & Multi-Select Batch Actions */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-bold text-gray-700">
-                Items: <span className="text-blue-600 font-bold">{total}</span>
-              </span>
-              {selectedIds.length > 0 && (
-                <div className="flex items-center gap-2 ml-2">
-                  <span className="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-lg">
-                    {selectedIds.length} selected
-                  </span>
-                  {copiedBom && (
-                    <button
-                      type="button"
-                      onClick={handleBulkPasteBom}
-                      className="px-2.5 py-1 text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 rounded-xl flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
-                      title={`Paste BOM from "${copiedBom.sourceName}" to ${selectedIds.length} selected items`}
-                    >
-                      <ClipboardPaste className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Paste BOM to {selectedIds.length} items</span>
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
+          {/* Tab 4: Categories */}
+          <button
+            onClick={() => handleMainTabChange('categories')}
+            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+              activeMainTab === 'categories'
+                ? 'border-teal-700 text-teal-700 bg-transparent'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
+            }`}
+          >
+            <Folder className={`w-4 h-4 ${activeMainTab === 'categories' ? 'text-teal-700' : 'text-slate-400'}`} />
+            <span>Categories</span>
+          </button>
+        </div>
 
-            {/* Right Action Bar (Search + Icon-Only Action Tools + Add Item Button) matching Business Directory */}
-            <div ref={toolbarActionsRef} className="py-1 flex items-center gap-2 flex-wrap shrink-0 relative z-40">
+        {/* Right Action Bar (Search + Icon-Only Action Tools + Add Item Button) matching Business Directory */}
+        <div ref={toolbarActionsRef} className="py-2 flex items-center gap-2 flex-wrap shrink-0 relative z-40">
               
               {/* 1. Global Search Box */}
               <div className="relative">
@@ -2959,19 +3060,86 @@ const SkuMasterV2: React.FC = () => {
               <div className="relative group">
                 <button
                   type="button"
-                  onClick={() => { setEditSku(null); setShowAddDrawer(true); }}
+                  onClick={() => { 
+                    if (activeMainTab === 'categories') {
+                      handleOpenAddCategoryModal();
+                    } else {
+                      setEditSku(null); 
+                      setShowAddDrawer(true); 
+                    }
+                  }}
                   className="w-8 h-8 rounded-full border border-gray-200 bg-white hover:bg-blue-50 text-blue-600 flex items-center justify-center transition-all shadow-2xs cursor-pointer font-bold shrink-0"
-                  title={`Add New ${getTabLabel(activeMainTab).slice(0, -1)}`}
-                  aria-label={`Add New ${getTabLabel(activeMainTab).slice(0, -1)}`}
+                  title={`Add New ${activeMainTab === 'categories' ? 'Category' : getTabLabel(activeMainTab).slice(0, -1)}`}
+                  aria-label={`Add New ${activeMainTab === 'categories' ? 'Category' : getTabLabel(activeMainTab).slice(0, -1)}`}
                 >
                   <Plus className="w-4 h-4 text-blue-600 stroke-[2.5]" />
                 </button>
                 <div className="absolute top-full mt-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                  Add {getTabLabel(activeMainTab).slice(0, -1)}
+                  Add {activeMainTab === 'categories' ? 'Category' : getTabLabel(activeMainTab).slice(0, -1)}
                 </div>
               </div>
             </div>
           </div>
+
+          {/* ── 2.5 Bulk Selection Bar (Grey Theme) ── */}
+          {selectedIds.length > 0 && activeMainTab !== 'categories' && (
+            <div className="bg-gray-100 border border-gray-200 text-gray-800 px-4 py-2.5 rounded-2xl shadow-xs flex items-center justify-between flex-wrap gap-2 text-xs font-semibold animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                <span><strong className="text-gray-900">{selectedIds.length}</strong> {getTabLabel(activeMainTab).toLowerCase()} selected</span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {copiedBom && (
+                  <button
+                    type="button"
+                    onClick={handleBulkPasteBom}
+                    className="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all"
+                    title={`Paste BOM from "${copiedBom.sourceName}" to ${selectedIds.length} selected items`}
+                  >
+                    <ClipboardPaste className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Paste BOM ({selectedIds.length})</span>
+                  </button>
+                )}
+                <button
+                  onClick={handleExportExcel}
+                  disabled={isExporting}
+                  className="px-3.5 py-1.5 bg-white hover:bg-gray-200/60 text-gray-700 border border-gray-300 font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all disabled:opacity-50"
+                  title={`Export ${selectedIds.length} selected items`}
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{isExporting ? 'Exporting...' : `Export (${selectedIds.length})`}</span>
+                </button>
+                <button
+                  onClick={() => setShowBulkEditModal(true)}
+                  className="px-3.5 py-1.5 bg-gray-800 hover:bg-gray-900 text-white font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
+                  title={`Bulk edit ${selectedIds.length} selected items`}
+                >
+                  <Edit className="w-3.5 h-3.5" />
+                  <span>Bulk Edit ({selectedIds.length})</span>
+                </button>
+                <button
+                  onClick={() => setShowBulkDeleteModal(true)}
+                  className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all"
+                  title={`Delete ${selectedIds.length} selected items`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete ({selectedIds.length})</span>
+                </button>
+                <button
+                  onClick={() => setSelectedIds([])}
+                  className="px-3 py-1.5 bg-transparent hover:bg-black/5 text-gray-600 font-semibold rounded-xl cursor-pointer transition-all ml-1"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── 3. VIEW CONTENT AREA ── */}
+          {activeMainTab !== 'categories' ? (
+            
+            /* ── GOODS / MATERIALS DATA TABLE VIEW ── */
+            <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden relative">
 
           {/* Filter Panel Drawer if toggled */}
           {showFilterPanel && (
@@ -3241,6 +3409,20 @@ const SkuMasterV2: React.FC = () => {
                                   </span>
                                 </td>
                               );
+                            case 'status':
+                              const isItemActive = (sku.status || 'Active').toLowerCase() === 'active';
+                              return (
+                                <td key="status" className="py-3 px-3 whitespace-nowrap">
+                                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                                    isItemActive 
+                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' 
+                                      : 'bg-gray-100 text-gray-600 border border-gray-200/60'
+                                  }`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${isItemActive ? 'bg-emerald-500' : 'bg-gray-400'}`}></span>
+                                    {sku.status || 'Active'}
+                                  </span>
+                                </td>
+                              );
                             case 'group':
                             case 'itemCategory':
                               return (
@@ -3250,16 +3432,16 @@ const SkuMasterV2: React.FC = () => {
                                   </span>
                                 </td>
                               );
-                            case 'unit':
-                              return (
-                                <td key="unit" className="py-3 px-3 text-gray-600 font-medium whitespace-nowrap">
-                                  {sku.unit || 'Pcs'}
-                                </td>
-                              );
                             case 'altUnit':
                               return (
-                                <td key="altUnit" className="py-3 px-3 text-gray-500 whitespace-nowrap">
-                                  {sku.altUnit ? sku.altUnit : '-'}
+                                <td key="altUnit" className="py-3 px-3 whitespace-nowrap">
+                                  {sku.altUnit ? (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-blue-50 text-blue-700">
+                                      {sku.altUnit}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-400">—</span>
+                                  )}
                                 </td>
                               );
                             case 'altUnitConversion':
@@ -3269,7 +3451,23 @@ const SkuMasterV2: React.FC = () => {
                               const innerUnit = (isAltPcs && !isPrimaryPcs) ? sku.altUnit : (sku.unit || 'Pcs');
                               return (
                                 <td key="altUnitConversion" className="py-3 px-3 text-gray-700 font-mono text-[11px] font-semibold whitespace-nowrap">
-                                  {sku.altUnit && sku.altUnitConversion ? `1 ${outerUnit} = ${sku.altUnitConversion} ${innerUnit}` : '-'}
+                                  {sku.altUnit && sku.altUnitConversion ? (
+                                    <span><strong>1 {outerUnit}</strong> = <strong>{sku.altUnitConversion} {innerUnit}</strong></span>
+                                  ) : (
+                                    <span className="text-gray-400">—</span>
+                                  )}
+                                </td>
+                              );
+                            case 'unit':
+                              return (
+                                <td key="unit" className="py-3 px-3 whitespace-nowrap">
+                                  {sku.unit ? (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-gray-50 text-gray-700 border border-gray-200/60">
+                                      {sku.unit}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-400">—</span>
+                                  )}
                                 </td>
                               );
                             case 'gsm':
@@ -5906,6 +6104,216 @@ const SkuMasterV2: React.FC = () => {
                 </div>
               </div>
 
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── BULK EDIT SKUS MODAL (Cream / Beige Theme) ── */}
+      {showBulkEditModal && (
+        <Modal
+          isOpen={showBulkEditModal}
+          onClose={() => setShowBulkEditModal(false)}
+          title={`Bulk Edit ${selectedIds.length} ${getTabLabel(activeMainTab).toUpperCase()} Records`}
+          maxWidth="max-w-xl"
+        >
+          <div className="space-y-4 text-left">
+            <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-700 font-medium leading-relaxed">
+              Check the boxes next to the fields you want to update. Any unchecked fields will remain unchanged across the <strong>{selectedIds.length}</strong> selected items.
+            </div>
+
+            <div className="space-y-3">
+              {/* Status */}
+              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80 transition-colors">
+                <input
+                  type="checkbox"
+                  id="sku_bulk_status_check"
+                  checked={bulkEditFields.status}
+                  onChange={e => setBulkEditFields(prev => ({ ...prev, status: e.target.checked }))}
+                  className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                />
+                <div className="flex-1">
+                  <label htmlFor="sku_bulk_status_check" className="block text-xs font-bold text-gray-700 cursor-pointer">
+                    Status
+                  </label>
+                  <select
+                    disabled={!bulkEditFields.status}
+                    value={bulkEditValues.status}
+                    onChange={e => setBulkEditValues(prev => ({ ...prev, status: e.target.value }))}
+                    className="mt-1 w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Category */}
+              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80 transition-colors">
+                <input
+                  type="checkbox"
+                  id="sku_bulk_category_check"
+                  checked={bulkEditFields.category}
+                  onChange={e => setBulkEditFields(prev => ({ ...prev, category: e.target.checked }))}
+                  className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                />
+                <div className="flex-1">
+                  <label htmlFor="sku_bulk_category_check" className="block text-xs font-bold text-gray-700 cursor-pointer">
+                    Category
+                  </label>
+                  <input
+                    type="text"
+                    list="sku_bulk_cat_list"
+                    disabled={!bulkEditFields.category}
+                    placeholder="Select or enter category"
+                    value={bulkEditValues.category}
+                    onChange={e => setBulkEditValues(prev => ({ ...prev, category: e.target.value }))}
+                    className="mt-1 w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
+                  />
+                  <datalist id="sku_bulk_cat_list">
+                    {categoriesData.map(c => (
+                      <option key={c.id || c.name} value={c.name} />
+                    ))}
+                  </datalist>
+                </div>
+              </div>
+
+              {/* Primary UOM (altUnit) */}
+              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80 transition-colors">
+                <input
+                  type="checkbox"
+                  id="sku_bulk_altunit_check"
+                  checked={bulkEditFields.altUnit}
+                  onChange={e => setBulkEditFields(prev => ({ ...prev, altUnit: e.target.checked }))}
+                  className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                />
+                <div className="flex-1">
+                  <label htmlFor="sku_bulk_altunit_check" className="block text-xs font-bold text-gray-700 cursor-pointer">
+                    Primary UOM (Packaging / Sales Unit)
+                  </label>
+                  <input
+                    type="text"
+                    disabled={!bulkEditFields.altUnit}
+                    placeholder="e.g. GBL, BOX, CTN, PKT, BDL, REAM"
+                    value={bulkEditValues.altUnit}
+                    onChange={e => setBulkEditValues(prev => ({ ...prev, altUnit: e.target.value }))}
+                    className="mt-1 w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
+                  />
+                </div>
+              </div>
+
+              {/* Secondary UOM (unit) */}
+              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80 transition-colors">
+                <input
+                  type="checkbox"
+                  id="sku_bulk_unit_check"
+                  checked={bulkEditFields.unit}
+                  onChange={e => setBulkEditFields(prev => ({ ...prev, unit: e.target.checked }))}
+                  className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                />
+                <div className="flex-1">
+                  <label htmlFor="sku_bulk_unit_check" className="block text-xs font-bold text-gray-700 cursor-pointer">
+                    Secondary UOM (Base Inventory Unit)
+                  </label>
+                  <input
+                    type="text"
+                    disabled={!bulkEditFields.unit}
+                    placeholder="e.g. Pcs, Kg, Sheets"
+                    value={bulkEditValues.unit}
+                    onChange={e => setBulkEditValues(prev => ({ ...prev, unit: e.target.value }))}
+                    className="mt-1 w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
+                  />
+                </div>
+              </div>
+
+              {/* GSM */}
+              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80 transition-colors">
+                <input
+                  type="checkbox"
+                  id="sku_bulk_gsm_check"
+                  checked={bulkEditFields.gsm}
+                  onChange={e => setBulkEditFields(prev => ({ ...prev, gsm: e.target.checked }))}
+                  className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                />
+                <div className="flex-1">
+                  <label htmlFor="sku_bulk_gsm_check" className="block text-xs font-bold text-gray-700 cursor-pointer">
+                    GSM (Paper Weight)
+                  </label>
+                  <input
+                    type="text"
+                    disabled={!bulkEditFields.gsm}
+                    placeholder="e.g. 52, 54, 58, 60, 70"
+                    value={bulkEditValues.gsm}
+                    onChange={e => setBulkEditValues(prev => ({ ...prev, gsm: e.target.value }))}
+                    className="mt-1 w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setShowBulkEditModal(false)}
+                className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkEditSkus}
+                disabled={isBulkOperating || !Object.values(bulkEditFields).some(Boolean)}
+                className="px-4 py-2 text-xs font-bold bg-[#785b3a] hover:bg-[#634a2d] text-white rounded-xl shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-2"
+              >
+                {isBulkOperating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
+                <span>Apply to {selectedIds.length} Items</span>
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── BULK DELETE SKUS CONFIRMATION MODAL ── */}
+      {showBulkDeleteModal && (
+        <Modal
+          isOpen={showBulkDeleteModal}
+          onClose={() => setShowBulkDeleteModal(false)}
+          title={`Delete ${selectedIds.length} Items`}
+          maxWidth="max-w-md"
+        >
+          <div className="space-y-4 text-left">
+            <div className="flex items-start gap-3 p-3.5 bg-rose-50 border border-rose-100 rounded-2xl">
+              <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div className="text-xs">
+                <h4 className="font-bold text-rose-900 text-sm">Confirm Bulk Deletion</h4>
+                <p className="text-rose-700 mt-1 leading-relaxed">
+                  Are you sure you want to move <strong>{selectedIds.length}</strong> selected {getTabLabel(activeMainTab).toLowerCase()} items to the Recycle Bin?
+                </p>
+                <p className="text-gray-500 mt-1.5 text-[11px]">
+                  You can restore these items anytime from the Recycle Bin.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowBulkDeleteModal(false)}
+                className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkDeleteSkus}
+                disabled={isBulkOperating}
+                className="px-4 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-2"
+              >
+                {isBulkOperating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
+                <span>Delete {selectedIds.length} Items</span>
+              </button>
             </div>
           </div>
         </Modal>

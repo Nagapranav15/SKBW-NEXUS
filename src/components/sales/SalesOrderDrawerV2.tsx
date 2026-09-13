@@ -4,6 +4,7 @@ import Modal from '../ui/Modal';
 import { getSkusV2, getBalancesV2, SkuV2 } from '../../api/mfgApiV2';
 import { getParties } from '../../api/partyApi';
 import { createSalesOrderV2, updateSalesOrderV2, getNextSalesOrderNumberV2, SalesOrderV2, SalesOrderItemV2 } from '../../api/salesOrderApiV2';
+import { convertPrimaryToAlt } from '../../utils/uomConversion';
 
 interface SalesOrderDrawerV2Props {
   isOpen: boolean;
@@ -491,6 +492,11 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                           onChange={(e) => updateLineItem(idx, { quantity: Number(e.target.value) })}
                           className="w-full text-right px-2 py-1 bg-white border border-gray-200 rounded-lg font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                         />
+                        {item.altUnit && item.altUnitConversion && item.quantity > 0 && (
+                          <div className="text-[9px] font-bold text-blue-600 font-mono text-right mt-0.5 whitespace-nowrap">
+                            ≈ {convertPrimaryToAlt(item.quantity, { unit: item.uom, altUnit: item.altUnit, altUnitConversion: item.altUnitConversion })} {item.altUnit}
+                          </div>
+                        )}
                       </td>
 
                       {/* Rate */}

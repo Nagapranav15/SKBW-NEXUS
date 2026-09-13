@@ -1258,7 +1258,7 @@ export const StockInventoryV2: React.FC = () => {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-6 bg-slate-50/50 min-h-screen">
+    <div className="p-4 md:p-6 space-y-6 bg-white min-h-screen">
       
       {/* 1. Header & Actions */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs">

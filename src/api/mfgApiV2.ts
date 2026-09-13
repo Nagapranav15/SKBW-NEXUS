@@ -22,6 +22,7 @@ export interface SkuV2 {
   minStockLevel?: number;
   altUnit?: string;
   altUnitConversion?: number;
+  altUnitDirection?: 'PRIMARY_TO_ALT' | 'ALT_TO_PRIMARY';
   status: 'Active' | 'Inactive';
   isDeleted?: boolean;
   createdAt?: string;
@@ -90,6 +91,16 @@ export const deleteSkuV2 = async (id: string, companyId: string, permanent?: boo
   const response = await api.delete(`/v2/skus/${id}`, {
     params: { companyId, permanent }
   });
+  return response.data;
+};
+
+export const bulkDeleteSkusV2 = async (ids: string[], companyId: string): Promise<any> => {
+  const response = await api.post('/v2/skus/bulk-delete', { ids, companyId });
+  return response.data;
+};
+
+export const bulkUpdateSkusV2 = async (ids: string[], companyId: string, updates: any): Promise<any> => {
+  const response = await api.post('/v2/skus/bulk-update', { ids, companyId, updates });
   return response.data;
 };
 
