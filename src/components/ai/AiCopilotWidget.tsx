@@ -26,7 +26,11 @@ interface ChatMessage {
   time: string;
 }
 
-export const AiCopilotWidget: React.FC = () => {
+interface AiCopilotWidgetProps {
+  inline?: boolean;
+}
+
+export const AiCopilotWidget: React.FC<AiCopilotWidgetProps> = ({ inline = false }) => {
   const navigate = useNavigate();
 
   const [isOpen, setIsOpen] = useState(false);
