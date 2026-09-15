@@ -1949,12 +1949,27 @@ const PurchaseInvoicePage: React.FC = () => {
                             </div>
 
                             <div>
-                              <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">Standard Sheets/Ream</label>
+                              <label className="block text-[9px] font-black text-blue-600 uppercase tracking-wider mb-1">Sheets / Ream *</label>
                               <input
-                                type="text"
-                                value={selectedSku?.pages || 500}
-                                disabled
-                                className="w-full px-2.5 py-1.5 border border-gray-155 bg-gray-50 rounded-lg text-xs text-center font-bold text-gray-500 cursor-not-allowed"
+                                type="number"
+                                value={item.sheetsPerReam !== undefined ? item.sheetsPerReam : (selectedSku?.pages || 500)}
+                                onChange={e => {
+                                  const val = Number(e.target.value) || 500;
+                                  const updatedItems = [...invoiceForm.items];
+                                  updatedItems[idx].sheetsPerReam = val;
+
+                                  const currentReams = ((Number(updatedItems[idx].quantity) || 0) / (selectedSku?.pages || 500));
+                                  const totalSheets = (currentReams > 0 ? currentReams : 1) * val;
+                                  updatedItems[idx].quantity = String(totalSheets);
+
+                                  const rwNum = Number(updatedItems[idx].reamWeight) || 0;
+                                  const rkgNum = Number(updatedItems[idx].ratePerKg) || 0;
+                                  if (rwNum > 0 && rkgNum > 0) {
+                                    updatedItems[idx].purchasePrice = String((rwNum * rkgNum) / val);
+                                  }
+                                  setInvoiceForm({ ...invoiceForm, items: updatedItems });
+                                }}
+                                className="w-full px-2.5 py-1.5 border border-blue-200 bg-blue-50/15 rounded-lg text-xs text-center font-bold text-blue-800 focus:ring-2 focus:ring-blue-500"
                               />
                             </div>
                           </>
