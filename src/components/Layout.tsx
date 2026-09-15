@@ -162,12 +162,6 @@ const Layout: React.FC = () => {
       title: 'PARTNERS & DIRECTORY',
       items: [
         { label: 'Business Directory', path: '/directory', icon: Users, permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
-        { label: 'Customers', path: '/party/customers', icon: UserCheck, permission: ['MANAGE_PARTIES', 'VIEW_PARTIES'] },
-        { label: 'Suppliers', path: '/party/vendors', icon: Factory, permission: ['MANAGE_PARTIES', 'VIEW_PARTIES'] },
-        { label: 'Agents', path: '/party/agents', icon: Briefcase, permission: ['MANAGE_PARTIES', 'VIEW_PARTIES'] },
-        { label: 'Regions', path: '/party/routes', icon: Map, permission: ['MANAGE_PARTIES', 'VIEW_PARTIES'] },
-        { label: 'Cities', path: '/party/markets', icon: Building, permission: ['MANAGE_PARTIES', 'VIEW_PARTIES'] },
-        { label: 'Transporters', path: '/party/transporters', icon: Truck, permission: ['MANAGE_PARTIES', 'VIEW_PARTIES'] },
       ]
     },
     {
