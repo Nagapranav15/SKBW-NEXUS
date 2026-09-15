@@ -371,7 +371,7 @@ const WarehouseStructureV2: React.FC = () => {
             </span>
 
             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase shrink-0 ${getLevelBadgeStyle(node.level)}`}>
-              {node.level === 'Storage Location' ? 'Bin' : node.level}
+              {node.level}
             </span>
           </div>
 
@@ -404,7 +404,7 @@ const WarehouseStructureV2: React.FC = () => {
                     handleOpenAddModal(childLevel, node._id!);
                   }}
                   className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                  title={`Add ${node.level === 'Factory' ? 'Floor' : node.level === 'Floor' ? 'Zone' : 'Bin'}`}
+                  title={`Add ${node.level === 'Factory' ? 'Floor' : node.level === 'Floor' ? 'Zone' : 'Storage Location'}`}
                 >
                   <Plus className="w-3.5 h-3.5" />
                 </button>
@@ -523,7 +523,7 @@ const WarehouseStructureV2: React.FC = () => {
           <span className="text-xl font-black text-blue-600 mt-1 block">{floorCount + zoneCount}</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-3xs">
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Storage Racks / Bins</span>
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Storage Locations</span>
           <span className="text-xl font-black text-emerald-600 mt-1 block">{storageBinCount}</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-3xs col-span-2 md:col-span-1">
@@ -580,7 +580,7 @@ const WarehouseStructureV2: React.FC = () => {
                 <option value="Factory">Factory</option>
                 <option value="Floor">Floor</option>
                 <option value="Zone">Zone</option>
-                <option value="Storage Location">Storage Bin</option>
+                <option value="Storage Location">Storage Location</option>
               </select>
               <select
                 value={filterStatus}
@@ -755,7 +755,7 @@ const WarehouseStructureV2: React.FC = () => {
                 <option value="Factory">Factory (Root)</option>
                 <option value="Floor">Floor</option>
                 <option value="Zone">Zone</option>
-                <option value="Storage Location">Storage Bin / Rack</option>
+                <option value="Storage Location">Storage Location</option>
               </select>
             </div>
 

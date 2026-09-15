@@ -1416,6 +1416,14 @@ export const StockInventoryV2: React.FC = () => {
                     {alertsSummary.overstock}
                   </span>
                 </div>
+                <a
+                  href="/inventory-v2/purchases?reorderAll=true"
+                  className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs no-underline"
+                  title="Create a Purchase Batch for all low-stock materials"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Reorder Purchase Batch</span>
+                </a>
               </div>
 
               {/* Action Toolbar Icons & Search */}
@@ -1563,14 +1571,14 @@ export const StockInventoryV2: React.FC = () => {
                         </td>
                         <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              onClick={() => openModal()}
-                              className="px-2 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 rounded-lg text-[10.5px] font-bold transition-all flex items-center gap-1 cursor-pointer"
+                            <a
+                              href={`/inventory-v2/purchases?reorderSkuId=${row.sku._id}`}
+                              className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg text-[10.5px] font-bold transition-all flex items-center gap-1 no-underline cursor-pointer"
                               title="Refill item stock by creating a Purchase Batch from vendor"
                             >
                               <Plus className="w-3 h-3" />
-                              <span>Refill</span>
-                            </button>
+                              <span>Reorder Batch</span>
+                            </a>
                             <button
                               onClick={() => {
                                 setEditingSku(row.sku);

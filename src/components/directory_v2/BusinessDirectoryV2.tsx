@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { 
   Users, 
   Building, 
@@ -1329,94 +1331,167 @@ export const BusinessDirectoryV2: React.FC = () => {
     }
   };
 
+  const getTabLabel = (tab: string) => {
+    switch (tab) {
+      case 'customers': return 'Customers';
+      case 'vendors': return 'Vendors';
+      case 'agents': return 'Agents';
+      case 'transporters': return 'Transporters';
+      case 'regions': return 'Regions';
+      case 'cities': return 'Cities';
+      default: return 'Directory';
+    }
+  };
+
   const handleExportPDF = () => {
-    if (processedItems.length === 0) {
-      showToast('No records available to print PDF', 'info');
+    const targetItems = selectedIds.length > 0 
+      ? processedItems.filter(i => selectedIds.includes(i._id))
+      : processedItems;
+
+    if (targetItems.length === 0) {
+      showToast('No records available to export PDF', 'info');
       return;
     }
 
-    const printWin = window.open('', '_blank');
-    if (!printWin) {
-      showToast('Please allow popups to generate PDF', 'error');
-      return;
-    }
-
-    const title = `${activeMainTab.toUpperCase()} REPORT`;
+    const tabTitle = getTabLabel(activeMainTab).toUpperCase();
+    const title = `${tabTitle} DIRECTORY REPORT ${selectedIds.length > 0 ? `(${selectedIds.length} SELECTED)` : ''}`;
     const companyName = selectedCompany?.name || 'SKBW ERP';
     const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
-    let tableHeaders = '';
-    if (activeMainTab === 'customers') {
-      tableHeaders = `<th>#</th><th>Firm Name</th><th>Contact</th><th>Phone</th><th>City</th><th>Region</th><th>Agent</th><th>Outstanding</th>`;
-    } else if (activeMainTab === 'vendors') {
-      tableHeaders = `<th>#</th><th>Supplier Name</th><th>Type</th><th>Contact</th><th>Phone</th><th>City</th><th>Payable</th>`;
-    } else if (activeMainTab === 'agents') {
-      tableHeaders = `<th>#</th><th>Agent Name</th><th>Phone</th><th>Assigned Regions</th><th>Status</th>`;
-    } else if (activeMainTab === 'transporters') {
-      tableHeaders = `<th>#</th><th>Transporter</th><th>Phone</th><th>Contact</th><th>City</th>`;
-    } else if (activeMainTab === 'regions') {
-      tableHeaders = `<th>#</th><th>Region Name</th><th>Code</th><th>Agent</th><th>Cities</th><th>Customers</th><th>Outstanding</th>`;
-    } else {
-      tableHeaders = `<th>#</th><th>City Name</th><th>District</th><th>State</th><th>Region</th><th>Customers</th><th>Outstanding</th>`;
-    }
+    try {
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
-    const tableRowsHtml = processedItems.map((item, idx) => {
-      let rowCols = '';
-      const outBal = Number(item.outstandingBalance) || Number(item.outstanding) || 0;
+      // Title Header
+      doc.setFontSize(14);
+      doc.setTextColor(29, 78, 216);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${companyName} — ${title}`, 14, 14);
+
+      doc.setFontSize(9);
+      doc.setTextColor(100, 116, 139);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Generated on ${dateStr} • Total Records: ${targetItems.length}`, 14, 20);
+
+      let headers: string[] = [];
+      let rows: (string | number)[][] = [];
+
       if (activeMainTab === 'customers') {
-        rowCols = `<td>${idx+1}</td><td><b>${item.firmName}</b></td><td>${item.contactName || item.ownerName || '—'}</td><td>${item.phone || '—'}</td><td>${item.city || '—'}</td><td>${item.route || '—'}</td><td>${item.agentAssigned || '—'}</td><td>₹${outBal.toLocaleString('en-IN')}</td>`;
+        headers = ['#', 'Firm Name', 'Contact', 'Phone', 'City', 'Region', 'Agent', 'Transport Contact', 'Outstanding'];
+        rows = targetItems.map((item, idx) => {
+          const outBal = Number(item.outstandingBalance) || Number(item.outstanding) || 0;
+          const transportName = item.preferredTransport || (item as any).transport || '';
+          let transportPhone = item.transporterPhone || (item as any).transportPhone || '';
+          if (!transportPhone && transportName && allTransporters?.length) {
+            const matchT = allTransporters.find((t: any) => 
+              (t.firmName || t.name || '').toLowerCase() === transportName.toLowerCase() ||
+              String(t._id) === String(transportName)
+            );
+            if (matchT) transportPhone = matchT.phone || matchT.mobile || '';
+          }
+          const transportStr = transportName ? `${transportName}${transportPhone ? ` (${transportPhone})` : ''}` : '—';
+          return [
+            idx + 1,
+            item.firmName || '—',
+            item.contactName || item.ownerName || '—',
+            item.phone || '—',
+            item.city || '—',
+            item.route || '—',
+            item.agentAssigned || '—',
+            transportStr,
+            `Rs. ${outBal.toLocaleString('en-IN')}`
+          ];
+        });
       } else if (activeMainTab === 'vendors') {
-        rowCols = `<td>${idx+1}</td><td><b>${item.firmName}</b></td><td>${item.vendorType || 'BOARD SUPPLIER'}</td><td>${item.contactName || item.ownerName || '—'}</td><td>${item.phone || '—'}</td><td>${item.city || '—'}</td><td>₹${outBal.toLocaleString('en-IN')}</td>`;
+        headers = ['#', 'Supplier Name', 'Type', 'Contact', 'Phone', 'City', 'Payable'];
+        rows = targetItems.map((item, idx) => {
+          const outBal = Number(item.outstandingBalance) || Number(item.outstanding) || 0;
+          return [
+            idx + 1,
+            item.firmName || '—',
+            item.vendorType || 'BOARD SUPPLIER',
+            item.contactName || item.ownerName || '—',
+            item.phone || '—',
+            item.city || '—',
+            `Rs. ${outBal.toLocaleString('en-IN')}`
+          ];
+        });
       } else if (activeMainTab === 'agents') {
-        rowCols = `<td>${idx+1}</td><td><b>${item.firmName || item.contactName}</b></td><td>${item.phone || '—'}</td><td>${item.route || '—'}</td><td>${item.status || 'active'}</td>`;
+        headers = ['#', 'Agent Name', 'Phone', 'Assigned Regions', 'Status'];
+        rows = targetItems.map((item, idx) => [
+          idx + 1,
+          item.firmName || item.contactName || '—',
+          item.phone || '—',
+          item.route || '—',
+          item.status || 'active'
+        ]);
       } else if (activeMainTab === 'transporters') {
-        rowCols = `<td>${idx+1}</td><td><b>${item.firmName || item.name}</b></td><td>${item.phone || '—'}</td><td>${item.contactName || '—'}</td><td>${item.city || '—'}</td>`;
+        headers = ['#', 'Transporter', 'Phone', 'Contact', 'City'];
+        rows = targetItems.map((item, idx) => [
+          idx + 1,
+          item.firmName || item.name || '—',
+          item.phone || '—',
+          item.contactName || '—',
+          item.city || '—'
+        ]);
       } else if (activeMainTab === 'regions') {
-        rowCols = `<td>${idx+1}</td><td><b>${item.name || item.firmName}</b></td><td>${item.code || '—'}</td><td>${item.assignedAgent || '—'}</td><td>${item.citiesCount || 0}</td><td>${item.customersCount || 0}</td><td>₹${outBal.toLocaleString('en-IN')}</td>`;
+        headers = ['#', 'Region Name', 'Code', 'Agent', 'Cities', 'Customers', 'Outstanding'];
+        rows = targetItems.map((item, idx) => {
+          const outBal = Number(item.outstandingBalance) || Number(item.outstanding) || 0;
+          return [
+            idx + 1,
+            item.name || item.firmName || '—',
+            item.code || '—',
+            item.assignedAgent || '—',
+            item.citiesCount || 0,
+            item.customersCount || 0,
+            `Rs. ${outBal.toLocaleString('en-IN')}`
+          ];
+        });
       } else {
-        rowCols = `<td>${idx+1}</td><td><b>${item.firmName || item.name}</b></td><td>${item.district || '—'}</td><td>${item.state || 'Andhra Pradesh'}</td><td>${item.route || '—'}</td><td>${item.customersCount || 0}</td><td>₹${outBal.toLocaleString('en-IN')}</td>`;
+        headers = ['#', 'City Name', 'District', 'State', 'Region', 'Customers', 'Outstanding'];
+        rows = targetItems.map((item, idx) => {
+          const outBal = Number(item.outstandingBalance) || Number(item.outstanding) || 0;
+          return [
+            idx + 1,
+            item.firmName || item.name || '—',
+            item.district || '—',
+            item.state || 'Andhra Pradesh',
+            item.route || '—',
+            item.customersCount || 0,
+            `Rs. ${outBal.toLocaleString('en-IN')}`
+          ];
+        });
       }
-      return `<tr>${rowCols}</tr>`;
-    }).join('');
 
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>${title} - ${companyName}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; color: #1e293b; }
-            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #6366f1; padding-bottom: 12px; margin-bottom: 20px; }
-            .title { font-size: 20px; font-weight: bold; color: #4338ca; text-transform: uppercase; }
-            .sub { font-size: 12px; color: #64748b; margin-top: 4px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
-            th { background-color: #f1f5f9; color: #334155; text-align: left; padding: 8px 10px; border: 1px solid #cbd5e1; font-size: 11px; text-transform: uppercase; }
-            td { padding: 8px 10px; border: 1px solid #e2e8f0; }
-            tr:nth-child(even) { background-color: #f8fafc; }
-            .summary { margin-top: 20px; font-size: 12px; font-weight: bold; text-align: right; color: #334155; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div>
-              <div class="title">${companyName} — ${title}</div>
-              <div class="sub">Generated on ${dateStr} • Total Records: ${processedItems.length}</div>
-            </div>
-          </div>
-          <table>
-            <thead><tr>${tableHeaders}</tr></thead>
-            <tbody>${tableRowsHtml}</tbody>
-          </table>
-          <div class="summary">Report Total Count: ${processedItems.length}</div>
-          <script>
-            window.onload = function() { window.print(); };
-          </script>
-        </body>
-      </html>
-    `;
+      autoTable(doc, {
+        startY: 25,
+        head: [headers],
+        body: rows,
+        theme: 'grid',
+        headStyles: {
+          fillColor: [37, 99, 235],
+          textColor: [255, 255, 255],
+          fontSize: 8.5,
+          fontStyle: 'bold',
+          halign: 'left'
+        },
+        bodyStyles: {
+          fontSize: 8,
+          textColor: [51, 65, 85]
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252]
+        },
+        margin: { left: 14, right: 14, bottom: 15 }
+      });
 
-    printWin.document.write(htmlContent);
-    printWin.document.close();
+      const fileName = `${companyName.replace(/[^a-zA-Z0-9]/g, '_')}_${tabTitle}_${new Date().toISOString().slice(0, 10)}.pdf`;
+      doc.save(fileName);
+      showToast(`PDF exported successfully! Check downloads: ${fileName}`, 'success');
+    } catch (err: any) {
+      console.error('PDF export error:', err);
+      showToast('Failed to generate PDF download', 'error');
+    }
   };
 
   const fetchActivityLogs = async () => {
@@ -3640,18 +3715,38 @@ export const BusinessDirectoryV2: React.FC = () => {
                         ))}
                       </select>
                     </div>
-                    <div className="col-span-2">
-                      <label className="block text-gray-700 font-semibold mb-1">Preferred Transport</label>
-                      <select
-                        value={form.preferredTransport}
-                        onChange={e => setForm(f => ({ ...f, preferredTransport: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
-                      >
-                        <option value="">Select Transporter</option>
-                        {allTransporters.map((t: any) => (
-                          <option key={t._id} value={t.firmName}>{t.firmName}</option>
-                        ))}
-                      </select>
+                    <div className="grid grid-cols-2 gap-3 col-span-2">
+                      <div>
+                        <label className="block text-gray-700 font-semibold mb-1">Preferred Transport</label>
+                        <select
+                          value={form.preferredTransport}
+                          onChange={e => {
+                            const val = e.target.value;
+                            const matchedT = allTransporters.find((t: any) => (t.firmName || t.name) === val);
+                            setForm(f => ({
+                              ...f,
+                              preferredTransport: val,
+                              transporterPhone: matchedT?.phone || f.transporterPhone || ''
+                            }));
+                          }}
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        >
+                          <option value="">Select Transporter</option>
+                          {allTransporters.map((t: any) => (
+                            <option key={t._id} value={t.firmName || t.name}>{t.firmName || t.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-gray-700 font-semibold mb-1">Transport Contact Phone</label>
+                        <input
+                          type="text"
+                          value={form.transporterPhone || ''}
+                          onChange={e => setForm(f => ({ ...f, transporterPhone: e.target.value }))}
+                          placeholder="Transporter Contact #"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -4772,8 +4867,19 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 <span className="font-mono font-bold text-gray-900 text-xs">₹{(selectedDetails.openingBalance || 0).toLocaleString('en-IN')}</span>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Preferred Transport</span>
-                                <span className="font-bold text-gray-900 text-xs">{selectedDetails.preferredTransport || '—'}</span>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Preferred Transport & Contact</span>
+                                <span className="font-bold text-gray-900 text-xs block">
+                                  {(() => {
+                                    const tName = selectedDetails.preferredTransport;
+                                    if (!tName) return '—';
+                                    let tPhone = selectedDetails.transporterPhone || (selectedDetails as any).transportPhone;
+                                    if (!tPhone && allTransporters?.length) {
+                                      const matchT = allTransporters.find((t: any) => (t.firmName || t.name || '').toLowerCase() === String(tName).toLowerCase());
+                                      if (matchT) tPhone = matchT.phone || matchT.mobile;
+                                    }
+                                    return `${tName}${tPhone ? ` (${tPhone})` : ''}`;
+                                  })()}
+                                </span>
                               </div>
                               <div>
                                 <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Assigned Agent</span>
@@ -6150,7 +6256,18 @@ export const BusinessDirectoryV2: React.FC = () => {
                                     {(item.preferredTransport || (item as any).transport) && (
                                       <>
                                         <span className="text-gray-300">|</span>
-                                        <span className="text-blue-600 font-medium">Transport: {item.preferredTransport || (item as any).transport}</span>
+                                        <span className="text-blue-600 font-medium">
+                                          Transport: {item.preferredTransport || (item as any).transport}
+                                          {(() => {
+                                            const tName = item.preferredTransport || (item as any).transport;
+                                            let tPhone = item.transporterPhone || (item as any).transportPhone;
+                                            if (!tPhone && allTransporters?.length) {
+                                              const matchT = allTransporters.find((t: any) => (t.firmName || t.name || '').toLowerCase() === String(tName).toLowerCase());
+                                              if (matchT) tPhone = matchT.phone || matchT.mobile;
+                                            }
+                                            return tPhone ? ` (${tPhone})` : '';
+                                          })()}
+                                        </span>
                                       </>
                                     )}
                                   </>

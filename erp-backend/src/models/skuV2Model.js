@@ -39,6 +39,8 @@ const skuV2Schema = new mongoose.Schema({
   status: { type: String, required: true, enum: ["Active", "Inactive"], default: "Active" },
   bomItems: { type: Array, default: [] },
   processSteps: { type: Array, default: [] },
+  preferredVendor: { type: String, default: "" },
+  vendorId: { type: mongoose.Schema.Types.ObjectId, ref: "Party", required: false },
   company: { type: mongoose.Schema.Types.ObjectId, ref: "Company", required: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   isDeleted: { type: Boolean, default: false, index: true }

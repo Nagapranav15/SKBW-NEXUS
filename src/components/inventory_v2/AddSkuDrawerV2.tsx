@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, RefreshCw, BookOpen, Layers, Plus, Trash2, AlertCircle, MapPin, Search, ChevronDown, Lock, Package, ArrowLeftRight } from 'lucide-react';
+import { Save, RefreshCw, BookOpen, Layers, Plus, Trash2, AlertCircle, MapPin, Search, ChevronDown, Lock, Package, ArrowLeftRight, Building2 } from 'lucide-react';
 import { createSkuV2, updateSkuV2, SkuV2, getMetadataV2, updateMetadataV2, getSkusV2, getNextSkuCodeV2, getBalancesV2, getWarehouseHierarchyV2, WarehouseLocationV2 } from '../../api/mfgApiV2';
+import { getParties } from '../../api/partyApi';
 import Modal from '../ui/Modal';
 import { BomCopyPasteControls } from './BomCopyPasteControls';
 import { 
@@ -199,6 +200,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     openingStock: '',
     initialLocationId: '',
     recipeYieldQty: '1',
+    preferredVendor: '',
     status: 'Active' as 'Active' | 'Inactive'
   });
 
@@ -208,6 +210,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   const [dynamicLocationText, setDynamicLocationText] = useState<string>('Loading location...');
   const [availableLocations, setAvailableLocations] = useState<{ id: string; name: string }[]>([]);
   const [rawHierarchy, setRawHierarchy] = useState<WarehouseLocationV2[]>([]);
+  const [vendorsList, setVendorsList] = useState<{ id: string; name: string }[]>([]);
   const cachedHierarchyRef = React.useRef<WarehouseLocationV2[] | null>(null);
 
   // Helper to build parent-to-child location path (Factory ➔ Zone ➔ Storage Location)
@@ -222,11 +225,12 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     }
 
     const targetStr = String(locIdOrObj).trim();
-    if (!targetStr) return '';
+    const locMap = new Map<string, WarehouseLocationV2>();
+    allLocations.forEach(loc => {
+      if (loc._id) locMap.set(String(loc._id), loc);
+    });
 
-    const locMap = new Map(allLocations.map(l => [String(l._id), l]));
     let current = locMap.get(targetStr);
-
     if (!current) {
       current = allLocations.find(l => l.name?.toLowerCase() === targetStr.toLowerCase());
     }
@@ -248,23 +252,14 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     return path.join(' ➔ ');
   };
 
-  // Only Storage Locations where inventory can physically be stored (arrow pointed to last storage location)
+  // Storage Locations & Godowns / Factories (Full Hierarchy)
   const storageLocations = React.useMemo(() => {
     if (!rawHierarchy || rawHierarchy.length === 0) {
       return availableLocations;
     }
 
-    // Strictly filter for 'Storage Location' level where items can be stored
-    const storageOnly = rawHierarchy.filter(loc => loc.level === 'Storage Location');
-
-    // Fallback: if no location has level 'Storage Location', use leaf nodes
-    let candidates = storageOnly;
-    if (candidates.length === 0) {
-      const parentIdSet = new Set(rawHierarchy.map(l => l.parentId ? String(l.parentId) : null).filter(Boolean));
-      candidates = rawHierarchy.filter(loc => !parentIdSet.has(String(loc._id)));
-    }
-
-    return candidates
+    return rawHierarchy
+      .filter(loc => loc.level === 'Storage Location' || !rawHierarchy.some(child => String(child.parentId) === String(loc._id)))
       .map(loc => ({
         id: String(loc._id || ''),
         name: buildLocationPath(loc._id, rawHierarchy)
@@ -277,18 +272,30 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     let isMounted = true;
     if (!isOpen || !companyId) return;
 
+    // Fetch suppliers / vendors for materials reorder selection
+    getParties({ company: companyId, type: 'vendor', limit: 1000, light: true })
+      .then(res => {
+        if (!isMounted) return;
+        const rawList = res.data?.parties || (Array.isArray(res.data) ? res.data : []);
+        const list = rawList.map((p: any) => ({
+          id: String(p._id || p.id || ''),
+          name: p.firmName || p.ownerName || p.contactName || p.name || p.companyName || p.tradeName || ''
+        })).filter((v: any) => v.name);
+        setVendorsList(list);
+      })
+      .catch(() => {
+        if (isMounted) setVendorsList([]);
+      });
+
     const fetchLocationData = async () => {
       try {
-        let hierarchy = cachedHierarchyRef.current;
-        if (!hierarchy || hierarchy.length === 0) {
-          hierarchy = await getWarehouseHierarchyV2(companyId).catch(() => []);
-          cachedHierarchyRef.current = hierarchy;
-        }
+        const hierarchy = await getWarehouseHierarchyV2(companyId).catch(() => []);
+        cachedHierarchyRef.current = hierarchy;
         
         if (hierarchy && hierarchy.length > 0) {
           if (isMounted) setRawHierarchy(hierarchy);
           const locOptions = hierarchy.map(loc => ({
-            id: loc._id || '',
+            id: String(loc._id || ''),
             name: buildLocationPath(loc._id, hierarchy || [])
           }));
           if (isMounted) setAvailableLocations(locOptions);
@@ -425,7 +432,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
   // Brand searchable dropdown lists (separated for Finished Goods vs Raw Materials)
   const [existingBrands, setExistingBrands] = useState<string[]>([]);
-  const [fgBrandsList, setFgBrandsList] = useState<string[]>([]);
+  const [fgBrandsList, setFgBrandsList] = useState<string[]>(["Bestfriend", "Classmate", "Navneet", "Happy Days"]);
   const [brandSearch, setBrandSearch] = useState('');
   const [showBrandDropdown, setShowBrandDropdown] = useState(false);
   const [groupSearch, setGroupSearch] = useState('');
@@ -524,6 +531,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         if (data.brands?.length) {
           setBrandsList(data.brands);
           setExistingBrands(data.brands);
+          setFgBrandsList(prev => Array.from(new Set([...prev, ...data.brands])));
         }
         if (data.categoryFields) {
           // Migrate old database 'dimensions' schema to separate 'width' and 'length' fields dynamically on load
@@ -559,16 +567,17 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       
       // Filter brands based on category
       const fgBrands = skus
-        .filter(s => s.category === 'Finished Goods')
+        .filter(s => s.category === 'Finished Goods' || (s.skuCode || '').toUpperCase().startsWith('FG') || !(s.category || '').toLowerCase().includes('raw'))
         .map(s => s.brand)
         .filter((b): b is string => !!b && typeof b === 'string' && b.trim() !== '');
         
       const rawBrands = skus
-        .filter(s => s.category === 'Raw Material')
+        .filter(s => s.category === 'Raw Material' || (s.skuCode || '').toUpperCase().startsWith('RM') || (s.category || '').toLowerCase().includes('raw'))
         .map(s => s.brand)
         .filter((b): b is string => !!b && typeof b === 'string' && b.trim() !== '');
 
-      setFgBrandsList(Array.from(new Set(fgBrands)));
+      const defaultFg = ["Bestfriend", "Classmate", "Navneet", "Happy Days"];
+      setFgBrandsList(prev => Array.from(new Set([...prev, ...fgBrands, ...defaultFg])));
       setExistingBrands(prev => Array.from(new Set([...prev, ...rawBrands])));
     } catch (e) {
       console.error('Failed to load existing brands', e);
@@ -687,6 +696,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           return typeof rawLoc === 'object' ? (rawLoc._id || rawLoc.name || '') : String(rawLoc);
         })(),
         recipeYieldQty: (editSku as any)?.recipeYieldQty !== undefined ? String((editSku as any)?.recipeYieldQty) : ((editSku as any)?.batchYieldQty !== undefined ? String((editSku as any)?.batchYieldQty) : '1'),
+        preferredVendor: (editSku as any)?.preferredVendor || '',
         status: editSku.status || 'Active'
       });
       setHasAltUnit(!!editSku.altUnit);
@@ -741,6 +751,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         openingStock: '',
         initialLocationId: '',
         recipeYieldQty: '1',
+        preferredVendor: '',
         status: 'Active'
       });
       setHasAltUnit(false);
@@ -772,31 +783,37 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   }, [activeSection, form.category]);
 
   const activeFields = React.useMemo(() => {
-    if (categoryFieldsMap[form.category]) return categoryFieldsMap[form.category];
-
-    const matchedCatObj = (createdCategories || []).find(c => c.name === form.category);
-    if (matchedCatObj?.fields?.length) {
-      const fieldsList: string[] = ['altUnit'];
-      matchedCatObj.fields.forEach(f => {
-        const lower = f.toLowerCase();
-        if (lower.includes('page') || lower.includes('sheet')) fieldsList.push('pages');
-        if (lower.includes('size') || lower.includes('width') || lower.includes('length') || lower.includes('dim')) {
-          fieldsList.push('width', 'length');
-        }
-        if (lower.includes('gsm')) fieldsList.push('gsm');
-        if (lower.includes('rule') || lower.includes('ruling')) fieldsList.push('ruleType');
-        if (lower.includes('brand')) fieldsList.push('brand');
-      });
-      return Array.from(new Set(fieldsList));
+    let fieldsList: string[] = [];
+    if (categoryFieldsMap[form.category]) {
+      fieldsList = [...categoryFieldsMap[form.category]];
+    } else {
+      const matchedCatObj = (createdCategories || []).find(c => c.name === form.category);
+      if (matchedCatObj?.fields?.length) {
+        fieldsList = ['altUnit'];
+        matchedCatObj.fields.forEach(f => {
+          const lower = f.toLowerCase();
+          if (lower.includes('page') || lower.includes('sheet')) fieldsList.push('pages');
+          if (lower.includes('size') || lower.includes('width') || lower.includes('length') || lower.includes('dim')) {
+            fieldsList.push('width', 'length');
+          }
+          if (lower.includes('gsm')) fieldsList.push('gsm');
+          if (lower.includes('rule') || lower.includes('ruling')) fieldsList.push('ruleType');
+          if (lower.includes('brand')) fieldsList.push('brand');
+        });
+      } else if (isProductCategory) {
+        fieldsList = ['gsm', 'brand', 'width', 'length', 'ruleType', 'pages', 'altUnit'];
+      } else if (activeSection === 'semi' || form.category === 'Semi Finished') {
+        fieldsList = ['gsm', 'brand', 'width', 'length', 'ruleType', 'group'];
+      } else {
+        fieldsList = ['gsm', 'brand', 'title', 'width', 'length', 'paperType'];
+      }
     }
 
-    if (isProductCategory) {
-      return ['gsm', 'brand', 'width', 'length', 'ruleType', 'pages', 'altUnit'];
+    // Finished Goods / Products must ALWAYS have 'brand' enabled!
+    if (isProductCategory || activeSection === 'products' || form.category === 'Finished Goods') {
+      if (!fieldsList.includes('brand')) fieldsList.push('brand');
     }
-    if (activeSection === 'semi' || form.category === 'Semi Finished') {
-      return ['gsm', 'brand', 'width', 'length', 'ruleType', 'group'];
-    }
-    return ['gsm', 'brand', 'title', 'width', 'length', 'paperType'];
+    return Array.from(new Set(fieldsList));
   }, [categoryFieldsMap, form.category, createdCategories, isProductCategory, activeSection]);
 
   // Auto-generate neat sequential SKU Code (RM-001, FG-001, SM-001) - strictly monotonic, never reusing deleted item IDs
@@ -1024,6 +1041,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           initialLocationId: form.initialLocationId || '',
           initialLocation: form.initialLocationId || '',
           recipeYieldQty: Number(form.recipeYieldQty) || 1,
+          preferredVendor: form.preferredVendor || '',
           status: form.status || 'Active',
           company: companyId,
           bomItems: bomItems.length > 0 ? bomItems : [],
@@ -1183,33 +1201,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                   </div>
                 </div>
 
-                {/* 3. SEPARATE FIELD: CREATED ITEM CATEGORY */}
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-[11px] font-bold text-blue-900 mb-1 flex items-center justify-between">
-                    <span>CREATED ITEM CATEGORY</span>
-                    <span className="text-[10px] text-blue-600 font-semibold">(Your Categories)</span>
-                  </label>
-                  <select
-                    value={form.group}
-                    onChange={e => {
-                      const val = e.target.value;
-                      const matchedCatObj = (createdCategories || []).find(c => c.name === val);
-                      setForm(prev => ({
-                        ...prev,
-                        group: val,
-                        unit: matchedCatObj?.uom || prev.unit
-                      }));
-                    }}
-                    className="w-full px-3 py-2 border-2 border-blue-300 hover:border-blue-400 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-blue-50/40 font-bold text-gray-900 cursor-pointer shadow-2xs transition-all"
-                  >
-                    <option value="" className="text-gray-400 font-normal">-- Select or type category --</option>
-                    {sectionCategories.map(cat => (
-                      <option key={cat} value={cat} className="bg-white text-gray-900 font-semibold py-1">
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+
 
                 {/* 4. PROMINENT ACTIVE / INACTIVE STATUS TOGGLE */}
                 <div className="col-span-2 sm:col-span-1">
@@ -1333,7 +1325,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     )}
 
                     {/* 2. Brand */}
-                    {activeFields.includes('brand') && (
+                    {(isProductCategory || activeFields.includes('brand')) && (
                       <div>
                         <label className="block text-[11px] font-semibold text-gray-600 mb-1">BRAND</label>
                         <div className="relative" ref={brandContainerRef}>
@@ -1446,7 +1438,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       </select>
                     </div>
 
-                    {/* 5. Primary UOM Toggle */}
+                    {/* 5. AUOM Toggle */}
                     {activeFields.includes('altUnit') && (
                       <div className="flex items-end h-full">
                         <label className="flex items-center space-x-2.5 bg-gray-50 border border-gray-200 hover:border-blue-300 hover:bg-blue-50/10 rounded-xl px-3 py-2 w-full cursor-pointer select-none transition-all">
@@ -1463,22 +1455,22 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                             className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 border-gray-300 cursor-pointer"
                           />
                           <div className="text-left">
-                            <span className="block text-[11px] font-bold text-gray-700">Enable Primary UOM</span>
-                            <span className="block text-[9px] text-gray-400 font-medium leading-tight">Packaging / Sales unit</span>
+                            <span className="block text-[11px] font-bold text-gray-700">Enable AUOM</span>
+                            <span className="block text-[9px] text-gray-400 font-medium leading-tight">Alternate packaging / sales unit</span>
                           </div>
                         </label>
                       </div>
                     )}
 
-                    {/* Primary UOM & Conversion Rate if Enabled */}
+                    {/* AUOM & Conversion Rate if Enabled */}
                     {activeFields.includes('altUnit') && hasAltUnit && (() => {
                       const effectiveDirection = getUomDirection(form.unit, form.altUnit, form.altUnitDirection || undefined);
                       const factorNum = Number(form.altUnitConversion) || 0;
                       const isUnitSame = !!(form.unit && form.altUnit && form.unit.trim().toLowerCase() === form.altUnit.trim().toLowerCase());
                       const isFactorInvalid = !!(form.altUnit && form.altUnitConversion && factorNum <= 0);
 
-                      const baseUnitLabel = effectiveDirection === 'PRIMARY_TO_ALT' ? (form.unit || 'Secondary') : (form.altUnit || 'Primary');
-                      const targetUnitLabel = effectiveDirection === 'PRIMARY_TO_ALT' ? (form.altUnit || 'Primary') : (form.unit || 'Secondary');
+                      const baseUnitLabel = effectiveDirection === 'PRIMARY_TO_ALT' ? (form.unit || 'Primary') : (form.altUnit || 'AUOM');
+                      const targetUnitLabel = effectiveDirection === 'PRIMARY_TO_ALT' ? (form.altUnit || 'AUOM') : (form.unit || 'Primary');
                       const inverseFactor = factorNum > 0 ? roundUomQty(1 / factorNum) : 0;
 
                       return (
@@ -1486,7 +1478,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           <div className="flex items-center justify-between">
                             <span className="text-[11px] font-bold text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
                               <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                              Primary Unit of Measurement (Primary UOM)
+                              Alternate Unit of Measurement (AUOM)
                             </span>
                             {form.altUnit && (
                               <button
@@ -1506,7 +1498,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-[11px] font-semibold text-gray-600 mb-1">PRIMARY UOM</label>
+                              <label className="block text-[11px] font-semibold text-gray-600 mb-1">AUOM (ALTERNATE UOM)</label>
                               <select
                                 value={form.altUnit}
                                 onChange={e => {
@@ -1767,329 +1759,137 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
               </div>
             )}
 
-            {/* Group 3: Additional Attributes */}
-            <div className="space-y-4 border-t border-gray-100 pt-4">
-              <h3 className="text-xs font-bold text-gray-900 pb-1.5 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                Inventory & Additional Attributes
-              </h3>
-              <div className="grid grid-cols-2 gap-3">
-                {/* For non-Product categories: Primary Unit & Alternate Unit right here */}
-                {!isProductCategory && (
-                  <>
-                    <div>
-                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">
-                        {isRawOrSemi ? "PRIMARY UOM *" : "PRIMARY UOM (Base) *"}
-                      </label>
-                      <select
-                        value={unitsList.find(u => u.toLowerCase() === (form.unit || '').toLowerCase()) || form.unit || ''}
-                        onChange={e => {
-                          if (e.target.value === '__ADD_NEW__') {
-                            handleAddNewOption('units');
-                          } else {
-                            setForm({ ...form, unit: e.target.value });
-                          }
-                        }}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
-                      >
-                        <option value="">Select Primary Unit</option>
-                        {unitsList.map(unit => (
-                          <option key={unit} value={unit}>{unit}</option>
-                        ))}
-                        <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
-                      </select>
-                    </div>
-
-                    {activeFields.includes('altUnit') && (
-                      <div className="flex items-end h-full">
-                        <label className="flex items-center space-x-2.5 bg-gray-50 border border-gray-200 hover:border-blue-300 hover:bg-blue-50/10 rounded-xl px-3 py-2 w-full cursor-pointer select-none transition-all">
-                          <input
-                            type="checkbox"
-                            checked={hasAltUnit}
-                            onChange={e => {
-                              const checked = e.target.checked;
-                              setHasAltUnit(checked);
-                              if (!checked) {
-                                setForm(prev => ({ ...prev, altUnit: '', altUnitConversion: '' }));
-                              }
-                            }}
-                            className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 border-gray-300 cursor-pointer"
-                          />
-                          <div className="text-left">
-                            <span className="block text-[11px] font-bold text-gray-700">Enable Primary UOM</span>
-                            <span className="block text-[9px] text-gray-400 font-medium leading-tight">Packaging / Sales unit</span>
-                          </div>
-                        </label>
-                      </div>
-                    )}
-
-                    {activeFields.includes('altUnit') && hasAltUnit && (() => {
-                      const effectiveDirection = getUomDirection(form.unit, form.altUnit, form.altUnitDirection || undefined);
-                      const factorNum = Number(form.altUnitConversion) || 0;
-                      const isUnitSame = !!(form.unit && form.altUnit && form.unit.trim().toLowerCase() === form.altUnit.trim().toLowerCase());
-                      const isFactorInvalid = !!(form.altUnit && form.altUnitConversion && factorNum <= 0);
-
-                      const baseUnitLabel = effectiveDirection === 'PRIMARY_TO_ALT' ? (form.unit || 'Secondary') : (form.altUnit || 'Primary');
-                      const targetUnitLabel = effectiveDirection === 'PRIMARY_TO_ALT' ? (form.altUnit || 'Primary') : (form.unit || 'Secondary');
-                      const inverseFactor = factorNum > 0 ? roundUomQty(1 / factorNum) : 0;
-
-                      return (
-                        <div className="col-span-2 space-y-2 bg-gradient-to-br from-blue-50/40 via-indigo-50/20 to-blue-50/40 p-4 rounded-2xl border border-blue-100 shadow-xs animate-in fade-in duration-200">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-bold text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
-                              <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                              Primary Unit of Measurement (Primary UOM)
-                            </span>
-                            {form.altUnit && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const nextDir: UomDirection = effectiveDirection === 'PRIMARY_TO_ALT' ? 'ALT_TO_PRIMARY' : 'PRIMARY_TO_ALT';
-                                  setForm(prev => ({ ...prev, altUnitDirection: nextDir }));
-                                }}
-                                className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 hover:text-blue-900 bg-white hover:bg-blue-100/60 px-2 py-0.5 rounded-md border border-blue-200 shadow-2xs transition-colors"
-                                title="Click to swap conversion direction"
-                              >
-                                <ArrowLeftRight className="w-3 h-3 text-blue-600" />
-                                <span>Swap Direction</span>
-                              </button>
-                            )}
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <label className="block text-[11px] font-semibold text-gray-600 mb-1">PRIMARY UOM</label>
-                              <select
-                                value={form.altUnit}
-                                onChange={e => {
-                                  const val = e.target.value;
-                                  if (val === '__ADD_NEW__') {
-                                    handleAddNewOption('units');
-                                  } else {
-                                    let defaultConversion = form.altUnitConversion;
-                                    const upperVal = val.toUpperCase();
-                                    const upperUnit = (form.unit || '').toUpperCase();
-                                    if ((upperVal === 'GBL' && upperUnit.includes('PC')) || (upperUnit === 'GBL' && upperVal.includes('PC'))) {
-                                      defaultConversion = '200';
-                                    } else if ((upperVal === 'REAM' && upperUnit.includes('PC')) || (upperUnit === 'REAM' && upperVal.includes('PC'))) {
-                                      defaultConversion = '500';
-                                    }
-                                    setForm(prev => ({
-                                      ...prev,
-                                      altUnit: val,
-                                      altUnitConversion: defaultConversion,
-                                      altUnitDirection: '',
-                                      booksGbl: (upperVal === 'GBL' || upperUnit === 'GBL') ? '200' : prev.booksGbl
-                                    }));
-                                  }
-                                }}
-                                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
-                              >
-                                <option value="">Select Primary UOM</option>
-                                {unitsList.map(unit => (
-                                  <option key={unit} value={unit}>{unit}</option>
-                                ))}
-                                <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
-                              </select>
-                            </div>
-                            <div>
-                              <label className="block text-[11px] font-semibold text-gray-600 mb-1">CONVERSION FACTOR</label>
-                              <div className="relative">
-                                <input
-                                  type="number"
-                                  placeholder="e.g. 200"
-                                  min="0.000001"
-                                  step="any"
-                                  value={form.altUnitConversion}
-                                  onChange={e => setForm({ ...form, altUnitConversion: e.target.value })}
-                                  className={`w-full pl-3 pr-20 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-900 font-mono ${
-                                    isFactorInvalid ? 'border-red-400 focus:ring-red-400' : 'border-gray-200'
-                                  }`}
-                                />
-                                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-blue-600 font-mono uppercase select-none">
-                                  {targetUnitLabel}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {isUnitSame && (
-                            <div className="text-[11px] font-semibold text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
-                              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                              Primary UOM and Secondary UOM cannot be identical.
-                            </div>
-                          )}
-
-                          {isFactorInvalid && (
-                            <div className="text-[11px] font-semibold text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
-                              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                              Conversion factor must be greater than 0.
-                            </div>
-                          )}
-
-                          {form.altUnit && form.altUnitConversion && factorNum > 0 && !isUnitSame && (
-                            <div className="bg-white/90 border border-blue-200/80 rounded-xl p-2.5 shadow-2xs space-y-1 text-center">
-                              <div className="text-xs font-bold text-slate-800 flex items-center justify-center gap-2">
-                                <span className="text-gray-500 font-medium text-[11px]">Relationship:</span>
-                                <span className="bg-blue-100 text-blue-900 px-2.5 py-0.5 rounded-md font-mono text-xs font-extrabold border border-blue-200">
-                                  1 {baseUnitLabel} = {form.altUnitConversion} {targetUnitLabel}
-                                </span>
-                              </div>
-                              <div className="text-[10px] text-gray-500 font-mono">
-                                Inverse: 1 {targetUnitLabel} = {inverseFactor} {baseUnitLabel}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </>
-                )}
-
-                {activeFields.includes('group') && (
+            {/* Group 3: Additional Attributes (Hidden for Finished Goods / Products) */}
+            {!isProductCategory && (
+              <div className="space-y-4 border-t border-gray-100 pt-4">
+                <h3 className="text-xs font-bold text-gray-900 pb-1.5 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                  Inventory & Additional Attributes
+                </h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Primary UOM */}
                   <div>
-                    <label className="block text-[11px] font-semibold text-gray-600 mb-1">GROUP</label>
-                    <div className="relative" ref={groupContainerRef}>
-                      <input
-                        type="text"
-                        placeholder="Search or type group..."
-                        value={groupSearch}
-                        onChange={e => {
-                          setGroupSearch(e.target.value);
-                          setForm(prev => ({ ...prev, group: e.target.value }));
-                        }}
-                        onFocus={() => {
-                          setShowGroupDropdown(true);
-                          setGroupAtFocus(form.group);
-                        }}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
-                      />
-                      {showGroupDropdown && (
-                        <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg z-20 divide-y divide-gray-50">
-                          {groupsList
-                            .filter(g => {
-                              if (groupSearch === groupAtFocus) return true;
-                              return g.toLowerCase().includes(groupSearch.toLowerCase());
-                            })
-                            .map(g => (
-                              <button
-                                key={g}
-                                type="button"
-                                onClick={() => {
-                                  setForm(prev => ({ ...prev, group: g }));
-                                  setGroupSearch(g);
-                                  setShowGroupDropdown(false);
-                                }}
-                                className="w-full px-3 py-2 text-left text-xs hover:bg-blue-50 hover:text-blue-600 transition-colors font-semibold text-gray-700 block"
-                              >
-                                {g}
-                              </button>
-                            ))
-                          }
-                          {groupSearch.trim() && !groupsList.some(g => g.toLowerCase() === groupSearch.toLowerCase()) && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newGrp = groupSearch.trim();
-                                if (!groupsList.includes(newGrp)) {
-                                  setGroupsList(prev => [...prev, newGrp]);
-                                }
-                                setForm(prev => ({ ...prev, group: newGrp }));
-                                setShowGroupDropdown(false);
-                              }}
-                              className="w-full px-3 py-2 text-left text-xs hover:bg-green-50 text-green-600 font-bold transition-colors block"
-                            >
-                              + Add Group "{groupSearch.trim()}"
-                            </button>
-                          )}
-                          {groupsList.filter(g => g.toLowerCase().includes(groupSearch.toLowerCase())).length === 0 && !groupSearch.trim() && (
-                            <div className="px-3 py-2 text-xs text-gray-400 italic">No groups found</div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-                {!isProductCategory && activeFields.includes('ruleType') && (
-                  <div>
-                    <label className="block text-[11px] font-semibold text-gray-600 mb-1">RULE TYPE</label>
+                    <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                      {isRawOrSemi ? "PRIMARY UOM *" : "PRIMARY UOM (Base) *"}
+                    </label>
                     <select
-                      value={form.ruleType}
+                      value={unitsList.find(u => u.toLowerCase() === (form.unit || '').toLowerCase()) || form.unit || ''}
                       onChange={e => {
                         if (e.target.value === '__ADD_NEW__') {
-                          handleAddNewOption('ruleTypes');
+                          handleAddNewOption('units');
                         } else {
-                          setForm({ ...form, ruleType: e.target.value });
+                          setForm({ ...form, unit: e.target.value });
                         }
                       }}
                       className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
                     >
-                      <option value="">-- Select Rule Type --</option>
-                      {ruleTypesList.map(rule => (
-                        <option key={rule} value={rule}>{rule}</option>
+                      <option value="">Select Primary Unit</option>
+                      {unitsList.map(unit => (
+                        <option key={unit} value={unit}>{unit}</option>
                       ))}
                       <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
                     </select>
                   </div>
-                )}
-                {!isProductCategory && activeFields.includes('pages') && (
-                  <div>
-                    <label className="block text-[11px] font-semibold text-gray-600 mb-1">
-                      {form.paperType === 'Sheets' ? 'STANDARD SHEETS/REAM' : 'PAGES'}
-                    </label>
-                    <input
-                      type="number"
-                      placeholder={form.paperType === 'Sheets' ? 'e.g. 500' : 'e.g. 112 / 132'}
-                      value={form.pages}
-                      onChange={e => setForm({ ...form, pages: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
-                    />
-                  </div>
-                )}
-                {activeFields.includes('reamWeight') && (
-                  <div>
-                    <label className="block text-[11px] font-semibold text-gray-600 mb-1">REAM WEIGHT (KG)</label>
-                    <input
-                      type="number"
-                      step="any"
-                      placeholder="e.g. 10.37"
-                      value={form.reamWeight}
-                      onChange={e => setForm({ ...form, reamWeight: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
-                    />
-                  </div>
-                )}
-                {activeFields.includes('booksGbl') && (
-                  <div>
-                    <label className="block text-[11px] font-semibold text-gray-600 mb-1">BOOKS / GBL</label>
-                    <input
-                      type="number"
-                      placeholder="e.g. 200 / 240"
-                      value={form.booksGbl}
-                      onChange={e => setForm({ ...form, booksGbl: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
-                    />
-                  </div>
-                )}
-                <div>
-                  <label className="block text-[11px] font-semibold text-gray-600 mb-1">STATUS</label>
-                  <select
-                    value={form.status}
-                    onChange={e => setForm({ ...form, status: e.target.value as any })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                  </select>
+
+                  {/* Attributes for Semi-Finished Goods (Group & Status removed) */}
+                  {(activeSection === 'semi' || form.category === 'Semi Finished') && (
+                    <>
+                      {activeFields.includes('altUnit') && (
+                        <div className="flex items-end h-full">
+                          <label className="flex items-center space-x-2.5 bg-gray-50 border border-gray-200 hover:border-blue-300 hover:bg-blue-50/10 rounded-xl px-3 py-2 w-full cursor-pointer select-none transition-all">
+                            <input
+                              type="checkbox"
+                              checked={hasAltUnit}
+                              onChange={e => {
+                                const checked = e.target.checked;
+                                setHasAltUnit(checked);
+                                if (!checked) {
+                                  setForm(prev => ({ ...prev, altUnit: '', altUnitConversion: '' }));
+                                }
+                              }}
+                              className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 border-gray-300 cursor-pointer"
+                            />
+                            <div className="text-left">
+                              <span className="block text-[11px] font-bold text-gray-700">Enable Primary UOM</span>
+                              <span className="block text-[9px] text-gray-400 font-medium leading-tight">Packaging / Sales unit</span>
+                            </div>
+                          </label>
+                        </div>
+                      )}
+
+                      {activeFields.includes('ruleType') && (
+                        <div>
+                          <label className="block text-[11px] font-semibold text-gray-600 mb-1">RULE TYPE</label>
+                          <select
+                            value={form.ruleType}
+                            onChange={e => {
+                              if (e.target.value === '__ADD_NEW__') {
+                                handleAddNewOption('ruleTypes');
+                              } else {
+                                setForm({ ...form, ruleType: e.target.value });
+                              }
+                            }}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
+                          >
+                            <option value="">-- Select Rule Type --</option>
+                            {ruleTypesList.map(rule => (
+                              <option key={rule} value={rule}>{rule}</option>
+                            ))}
+                            <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
+                          </select>
+                        </div>
+                      )}
+
+                      {activeFields.includes('pages') && (
+                        <div>
+                          <label className="block text-[11px] font-semibold text-gray-600 mb-1">PAGES / SHEETS</label>
+                          <input
+                            type="number"
+                            placeholder="e.g. 112 / 132"
+                            value={form.pages}
+                            onChange={e => setForm({ ...form, pages: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
+                          />
+                        </div>
+                      )}
+
+                      {activeFields.includes('reamWeight') && (
+                        <div>
+                          <label className="block text-[11px] font-semibold text-gray-600 mb-1">REAM WEIGHT (KG)</label>
+                          <input
+                            type="number"
+                            step="any"
+                            placeholder="e.g. 10.37"
+                            value={form.reamWeight}
+                            onChange={e => setForm({ ...form, reamWeight: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
+                          />
+                        </div>
+                      )}
+
+                      {activeFields.includes('booksGbl') && (
+                        <div>
+                          <label className="block text-[11px] font-semibold text-gray-600 mb-1">BOOKS / GBL</label>
+                          <input
+                            type="number"
+                            placeholder="e.g. 200 / 240"
+                            value={form.booksGbl}
+                            onChange={e => setForm({ ...form, booksGbl: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
+                          />
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Stock Levels Section (Available for ALL categories, exact match to user screenshot!) */}
+            {/* Stock Levels Section (Available for ALL categories) */}
             <div className="space-y-3 border-t border-gray-100 pt-4">
               <h3 className="text-xs font-bold text-gray-900 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                Stock Levels
+                Stock Levels & Reorder Configuration
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2129,7 +1929,30 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                   </span>
                 </div>
 
-                {/* 3. Opening Stock Quantity */}
+                {/* 3. Preferred Vendor (Reorder) */}
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 mb-1 flex items-center gap-1">
+                    <Building2 className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Select Preferred Vendor (Reorder)</span>
+                  </label>
+                  <select
+                    value={form.preferredVendor || ''}
+                    onChange={(e) => setForm({ ...form, preferredVendor: e.target.value })}
+                    className="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer"
+                  >
+                    <option value="">-- Select Preferred Vendor --</option>
+                    {vendorsList.map(v => (
+                      <option key={v.id || v.name} value={v.name}>
+                        {v.name}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="block text-[10px] text-gray-400 mt-1 font-medium leading-tight">
+                    Default vendor selected for material reorders
+                  </span>
+                </div>
+
+                {/* 4. Opening Stock Quantity */}
                 <div>
                   <label className="block text-[11px] font-bold text-gray-700 mb-1 flex items-center gap-1">
                     <Layers className="w-3.5 h-3.5 text-blue-600" />
@@ -2147,7 +1970,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                   </span>
                 </div>
 
-                {/* 4. Initial Storage Location / Godown */}
+                {/* 5. Initial Storage Location / Godown */}
                 <div>
                   <label className="block text-[11px] font-bold text-gray-700 mb-1 flex items-center gap-1">
                     <MapPin className="w-3.5 h-3.5 text-blue-600" />
@@ -2280,7 +2103,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
               )}
 
                 {/* BOM is for Finished Goods / Products AND Semi Finished materials */}
-                {(form.category === 'Finished Goods' || form.category === 'Semi Finished' || form.category === 'Products' || form.category === 'Semi' || (form.category || '').toLowerCase().includes('notebook') || (form.category || '').toLowerCase().includes('diary') || (form.category || '').toLowerCase().includes('semi')) && (
+                {(activeSection === 'products' || activeSection === 'semi' || form.category === 'Finished Goods' || form.category === 'Semi Finished' || !(form.category || '').toLowerCase().includes('raw')) && (
                   <div className="space-y-4 border-t border-gray-100 pt-4">
                     {/* BOM Header card banner */}
                     <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-3 flex items-center justify-between">

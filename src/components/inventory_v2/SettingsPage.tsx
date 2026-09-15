@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Settings, Trash2, Plus, RefreshCw, AlertCircle, X } from 'lucide-react';
+import { Settings, Trash2, Plus, RefreshCw, AlertCircle, Scale, AlignLeft, Tag } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getMetadataV2, updateMetadataV2 } from '../../api/mfgApiV2';
 import { showToast } from '../ui/Toast';
@@ -9,6 +9,7 @@ const SettingsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [, setSaving] = useState(false);
   
+  // Retained state to preserve existing data in database
   const [categories, setCategories] = useState<string[]>([]);
   const [units, setUnits] = useState<string[]>([]);
   const [ruleTypes, setRuleTypes] = useState<string[]>([]);
@@ -16,16 +17,10 @@ const SettingsPage: React.FC = () => {
   const [brands, setBrands] = useState<string[]>([]);
   const [categoryFields, setCategoryFields] = useState<Record<string, string[]>>({});
 
-  // Input states for adding new ones
-  const [newCategory, setNewCategory] = useState('');
+  // Input states for adding new units, rule types, and brands
   const [newUnit, setNewUnit] = useState('');
   const [newRuleType, setNewRuleType] = useState('');
-  const [newGroup, setNewGroup] = useState('');
   const [newBrand, setNewBrand] = useState('');
-
-  // Selected category for configuring custom fields modal
-  const [selectedCatForFields, setSelectedCatForFields] = useState<string | null>(null);
-  const [selectedFields, setSelectedFields] = useState<string[]>([]);
 
   useEffect(() => {
     if (selectedCompany?._id) {
@@ -99,25 +94,8 @@ const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleAddItem = (type: 'category' | 'unit' | 'ruleType' | 'group' | 'brand') => {
-    if (type === 'category') {
-      if (!newCategory.trim()) return;
-      if (categories.includes(newCategory.trim())) {
-        showToast('Category already exists', 'error');
-        return;
-      }
-      const updated = [...categories, newCategory.trim()];
-      setCategories(updated);
-      setNewCategory('');
-      
-      // Default fields for new category
-      const updatedFields = {
-        ...categoryFields,
-        [newCategory.trim()]: ['gsm', 'width', 'length']
-      };
-      setCategoryFields(updatedFields);
-      handleSave(updated, units, ruleTypes, groups, brands, updatedFields);
-    } else if (type === 'unit') {
+  const handleAddItem = (type: 'unit' | 'ruleType' | 'brand') => {
+    if (type === 'unit') {
       if (!newUnit.trim()) return;
       if (units.includes(newUnit.trim())) {
         showToast('Unit already exists', 'error');
@@ -127,16 +105,16 @@ const SettingsPage: React.FC = () => {
       setUnits(updated);
       setNewUnit('');
       handleSave(categories, updated, ruleTypes, groups, brands, categoryFields);
-    } else if (type === 'group') {
-      if (!newGroup.trim()) return;
-      if (groups.includes(newGroup.trim())) {
-        showToast('Group already exists', 'error');
+    } else if (type === 'ruleType') {
+      if (!newRuleType.trim()) return;
+      if (ruleTypes.includes(newRuleType.trim())) {
+        showToast('Rule type already exists', 'error');
         return;
       }
-      const updated = [...groups, newGroup.trim()];
-      setGroups(updated);
-      setNewGroup('');
-      handleSave(categories, units, ruleTypes, updated, brands, categoryFields);
+      const updated = [...ruleTypes, newRuleType.trim()];
+      setRuleTypes(updated);
+      setNewRuleType('');
+      handleSave(categories, units, updated, groups, brands, categoryFields);
     } else if (type === 'brand') {
       if (!newBrand.trim()) return;
       if (brands.includes(newBrand.trim())) {
@@ -147,419 +125,294 @@ const SettingsPage: React.FC = () => {
       setBrands(updated);
       setNewBrand('');
       handleSave(categories, units, ruleTypes, groups, updated, categoryFields);
-    } else {
-      if (!newRuleType.trim()) return;
-      if (ruleTypes.includes(newRuleType.trim())) {
-        showToast('Rule type already exists', 'error');
-        return;
-      }
-      const updated = [...ruleTypes, newRuleType.trim()];
-      setRuleTypes(updated);
-      setNewRuleType('');
-      handleSave(categories, units, ruleTypes, groups, brands, categoryFields);
     }
   };
 
-  const handleDeleteItem = (type: 'category' | 'unit' | 'ruleType' | 'group' | 'brand', item: string) => {
-    if (type === 'category') {
-      const updated = categories.filter(c => c !== item);
-      setCategories(updated);
-      const updatedFields = { ...categoryFields };
-      delete updatedFields[item];
-      setCategoryFields(updatedFields);
-      handleSave(updated, units, ruleTypes, groups, brands, updatedFields);
-    } else if (type === 'unit') {
+  const handleDeleteItem = (type: 'unit' | 'ruleType' | 'brand', item: string) => {
+    if (type === 'unit') {
       const updated = units.filter(u => u !== item);
       setUnits(updated);
       handleSave(categories, updated, ruleTypes, groups, brands, categoryFields);
-    } else if (type === 'group') {
-      const updated = groups.filter(g => g !== item);
-      setGroups(updated);
-      handleSave(categories, units, ruleTypes, updated, brands, categoryFields);
+    } else if (type === 'ruleType') {
+      const updated = ruleTypes.filter(r => r !== item);
+      setRuleTypes(updated);
+      handleSave(categories, units, updated, groups, brands, categoryFields);
     } else if (type === 'brand') {
       const updated = brands.filter(b => b !== item);
       setBrands(updated);
       handleSave(categories, units, ruleTypes, groups, updated, categoryFields);
-    } else {
-      const updated = ruleTypes.filter(r => r !== item);
-      setRuleTypes(updated);
-      handleSave(categories, units, updated, groups, brands, categoryFields);
     }
   };
 
-  const openFieldsConfig = (category: string) => {
-    setSelectedCatForFields(category);
-    setSelectedFields(categoryFields[category] || []);
-  };
-
-  const handleSaveFieldsConfig = () => {
-    if (!selectedCatForFields) return;
-    const updatedFields = {
-      ...categoryFields,
-      [selectedCatForFields]: selectedFields
-    };
-    setCategoryFields(updatedFields);
-    setSelectedCatForFields(null);
-    handleSave(categories, units, ruleTypes, groups, brands, updatedFields);
-  };
-
-  const toggleField = (fieldId: string) => {
-    setSelectedFields(prev => 
-      prev.includes(fieldId) 
-        ? prev.filter(f => f !== fieldId) 
-        : [...prev, fieldId]
-    );
-  };
-
-  const fieldsOptions = [
-    { id: 'brand', label: 'Brand' },
-    { id: 'title', label: 'Title (Description)' },
-    { id: 'group', label: 'Group' },
-    { id: 'gsm', label: 'GSM' },
-    { id: 'width', label: 'Width (cm)' },
-    { id: 'length', label: 'Length (cm)' },
-    { id: 'paperType', label: 'Format Reels/Sheets' },
-    { id: 'ruleType', label: 'Rule Type' },
-    { id: 'pages', label: 'Pages' },
-    { id: 'booksGbl', label: 'Books / GBL' },
-    { id: 'altUnit', label: 'Alternative Unit' }
-  ];
-
   if (loading) {
     return (
-      <div className="p-6 flex items-center justify-center min-h-[400px]">
-        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      <div className="p-12 flex flex-col items-center justify-center min-h-[350px] gap-3">
+        <div className="w-8 h-8 border-3 border-teal-600 border-t-transparent rounded-full animate-spin"></div>
+        <span className="text-xs text-slate-500 font-semibold">Loading settings...</span>
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      {/* Title Header */}
-      <div className="flex items-center justify-between">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 text-left">
+      <style>{`
+        @keyframes slideDownFade {
+          from {
+            opacity: 0;
+            transform: translateY(-8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
+
+      {/* Header Banner */}
+      <div 
+        style={{ animation: 'slideDownFade 0.35s ease-out forwards', animationDelay: '0ms' }}
+        className="flex items-center justify-between opacity-0"
+      >
         <div>
-          <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <Settings className="w-5 h-5 text-blue-600" />
-            <span>ERP Custom Fields & Options Settings</span>
+          <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <Settings className="w-5 h-5 text-teal-700" />
+            <span>ERP Item Settings & Specifications</span>
           </h1>
-          <p className="text-xs text-gray-500 mt-1">
-            Manage custom Categories, Stock Groups, Brands, Default Units, and Rule Types used across the Sku Item Master.
+          <p className="text-xs text-gray-500 mt-0.5 font-medium">
+            Manage Default Stocking Units, Rule Types, and Brands used across Sku Items and Finished Goods.
           </p>
         </div>
         <button
           onClick={loadSettings}
-          className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200 bg-white shadow-3xs flex items-center gap-1.5 font-bold text-xs"
+          className="px-3 py-1.5 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors border border-gray-200 bg-white shadow-2xs flex items-center gap-1.5 font-bold text-xs cursor-pointer"
         >
-          <RefreshCw className="w-3.5 h-3.5" />
+          <RefreshCw className="w-3.5 h-3.5 text-teal-700" />
           <span>Refresh</span>
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-        {/* Categories Column */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-[500px]">
-          <div className="p-4 border-b border-gray-150 bg-gray-50/50">
-            <h2 className="text-xs font-bold text-gray-800 uppercase tracking-wider">SKU Categories</h2>
-            <p className="text-[10px] text-gray-400 mt-0.5">Click gear icon to manage fields list.</p>
-          </div>
-          
-          {/* Add input */}
-          <div className="p-3 border-b border-gray-100 flex gap-2">
-            <input
-              type="text"
-              placeholder="Add category..."
-              value={newCategory}
-              onChange={e => setNewCategory(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAddItem('category')}
-              className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-blue-500 bg-white text-gray-800 font-semibold"
-            />
-            <button
-              onClick={() => handleAddItem('category')}
-              className="p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* List */}
-          <div className="flex-1 overflow-y-auto p-3 divide-y divide-gray-50">
-            {categories.map(cat => (
-              <div key={cat} className="py-2 flex items-center justify-between text-xs font-semibold text-gray-700 group">
-                <span className="truncate pr-2">{cat}</span>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => openFieldsConfig(cat)}
-                    className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                    title="Configure fields checklist"
-                  >
-                    <Settings className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteItem('category', cat)}
-                    className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Delete category"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+      {/* 3-Column Grid: Units, Rule Types & Brands */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        {/* Column 1: Default Stocking Units */}
+        <div 
+          style={{ animation: 'slideDownFade 0.35s ease-out forwards', animationDelay: '60ms' }}
+          className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden flex flex-col h-[480px] opacity-0"
+        >
+          <div className="p-4 border-b border-gray-150 bg-slate-50/60 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-teal-50 text-teal-700 flex items-center justify-center">
+                <Scale className="w-4 h-4" />
               </div>
-            ))}
-            {categories.length === 0 && (
-              <div className="text-center py-12 text-gray-400 text-[11px]">No custom categories yet</div>
-            )}
-          </div>
-        </div>
-
-        {/* Stock Groups Column */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-[500px]">
-          <div className="p-4 border-b border-gray-150 bg-gray-50/50">
-            <h2 className="text-xs font-bold text-gray-800 uppercase tracking-wider">Stock Groups</h2>
-            <p className="text-[10px] text-gray-400 mt-0.5">Categorize finished goods brands.</p>
-          </div>
-          
-          {/* Add input */}
-          <div className="p-3 border-b border-gray-100 flex gap-2">
-            <input
-              type="text"
-              placeholder="Add stock group..."
-              value={newGroup}
-              onChange={e => setNewGroup(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAddItem('group')}
-              className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-blue-500 bg-white text-gray-800 font-semibold"
-            />
-            <button
-              onClick={() => handleAddItem('group')}
-              className="p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* List */}
-          <div className="flex-1 overflow-y-auto p-3 divide-y divide-gray-50">
-            {groups.map(g => (
-              <div key={g} className="py-2 flex items-center justify-between text-xs font-semibold text-gray-700 group">
-                <span className="truncate pr-2">{g}</span>
-                <button
-                  onClick={() => handleDeleteItem('group', g)}
-                  className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                  title="Delete stock group"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+              <div>
+                <h2 className="text-xs font-bold text-gray-800 uppercase tracking-wider">Default Units</h2>
+                <p className="text-[10px] text-gray-400 mt-0.5">Stocking units (kg, pcs, Sheets, Reels, bags).</p>
               </div>
-            ))}
-            {groups.length === 0 && (
-              <div className="text-center py-12 text-gray-400 text-[11px]">No custom stock groups yet</div>
-            )}
-          </div>
-        </div>
-
-        {/* Brands Column */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-[500px]">
-          <div className="p-4 border-b border-gray-150 bg-gray-50/50">
-            <h2 className="text-xs font-bold text-gray-800 uppercase tracking-wider">Brands</h2>
-            <p className="text-[10px] text-gray-400 mt-0.5">Manage brand choices whitelist.</p>
+            </div>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
+              {units.length} Units
+            </span>
           </div>
           
-          {/* Add input */}
-          <div className="p-3 border-b border-gray-100 flex gap-2">
+          {/* Add Unit Input */}
+          <div className="p-3 border-b border-gray-100 flex gap-2 bg-white">
             <input
               type="text"
-              placeholder="Add brand..."
-              value={newBrand}
-              onChange={e => setNewBrand(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAddItem('brand')}
-              className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-blue-500 bg-white text-gray-800 font-semibold"
-            />
-            <button
-              onClick={() => handleAddItem('brand')}
-              className="p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* List */}
-          <div className="flex-1 overflow-y-auto p-3 divide-y divide-gray-50">
-            {brands.map(b => (
-              <div key={b} className="py-2 flex items-center justify-between text-xs font-semibold text-gray-700 group">
-                <span className="truncate pr-2">{b}</span>
-                <button
-                  onClick={() => handleDeleteItem('brand', b)}
-                  className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                  title="Delete brand"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
-            {brands.length === 0 && (
-              <div className="text-center py-12 text-gray-400 text-[11px]">No brands yet</div>
-            )}
-          </div>
-        </div>
-
-        {/* Units Column */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-[500px]">
-          <div className="p-4 border-b border-gray-150 bg-gray-50/50">
-            <h2 className="text-xs font-bold text-gray-800 uppercase tracking-wider">Default Units</h2>
-            <p className="text-[10px] text-gray-400 mt-0.5">Specify stocking units (kg, pcs, Sheets, Reels, bags).</p>
-          </div>
-          
-          {/* Add input */}
-          <div className="p-3 border-b border-gray-100 flex gap-2">
-            <input
-              type="text"
-              placeholder="Add unit..."
+              placeholder="Add unit (e.g. Kg, Pcs, Sheets)..."
               value={newUnit}
               onChange={e => setNewUnit(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleAddItem('unit')}
-              className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-blue-500 bg-white text-gray-800 font-semibold"
+              className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-teal-500 bg-white text-gray-800 font-semibold"
             />
             <button
               onClick={() => handleAddItem('unit')}
-              className="p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              className="px-3 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-xl transition-colors font-bold text-xs flex items-center gap-1 cursor-pointer shadow-2xs"
             >
               <Plus className="w-4 h-4" />
+              <span>Add</span>
             </button>
           </div>
 
-          {/* List */}
+          {/* Units List with Staggered slideDownFade Animation */}
           <div className="flex-1 overflow-y-auto p-3 divide-y divide-gray-50">
-            {units.map(unit => (
-              <div key={unit} className="py-2 flex items-center justify-between text-xs font-semibold text-gray-700 group">
-                <span>{unit}</span>
+            {units.map((unit, index) => (
+              <div 
+                key={unit} 
+                style={{ 
+                  animation: 'slideDownFade 0.35s ease-out forwards', 
+                  animationDelay: `${index * 30}ms` 
+                }}
+                className="py-2.5 px-2 flex items-center justify-between text-xs font-semibold text-gray-700 hover:bg-slate-50 rounded-xl transition-all opacity-0 group"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-600"></span>
+                  <span>{unit}</span>
+                </div>
                 <button
                   onClick={() => handleDeleteItem('unit', unit)}
-                  className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                  title="Delete unit"
+                  className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                  title={`Delete unit ${unit}`}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
             ))}
             {units.length === 0 && (
-              <div className="text-center py-12 text-gray-400 text-[11px]">No custom units yet</div>
+              <div className="text-center py-16 text-gray-400 text-xs font-medium">No custom units configured yet</div>
             )}
           </div>
         </div>
 
-        {/* Rule Types Column */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-[500px]">
-          <div className="p-4 border-b border-gray-150 bg-gray-50/50">
-            <h2 className="text-xs font-bold text-gray-800 uppercase tracking-wider">Rule Types</h2>
-            <p className="text-[10px] text-gray-400 mt-0.5">Specify ruling categories (Plain, Single, Square).</p>
+        {/* Column 2: Ruling Types */}
+        <div 
+          style={{ animation: 'slideDownFade 0.35s ease-out forwards', animationDelay: '120ms' }}
+          className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden flex flex-col h-[480px] opacity-0"
+        >
+          <div className="p-4 border-b border-gray-150 bg-slate-50/60 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center">
+                <AlignLeft className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-xs font-bold text-gray-800 uppercase tracking-wider">Rule Types</h2>
+                <p className="text-[10px] text-gray-400 mt-0.5">Ruling specifications (Plain, Single, Four Line, Square).</p>
+              </div>
+            </div>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+              {ruleTypes.length} Types
+            </span>
           </div>
           
-          {/* Add input */}
-          <div className="p-3 border-b border-gray-100 flex gap-2">
+          {/* Add Rule Type Input */}
+          <div className="p-3 border-b border-gray-100 flex gap-2 bg-white">
             <input
               type="text"
-              placeholder="Add rule type..."
+              placeholder="Add rule type (e.g. Single Line, Plain)..."
               value={newRuleType}
               onChange={e => setNewRuleType(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleAddItem('ruleType')}
-              className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-blue-500 bg-white text-gray-800 font-semibold"
+              className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 bg-white text-gray-800 font-semibold"
             />
             <button
               onClick={() => handleAddItem('ruleType')}
-              className="p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors font-bold text-xs flex items-center gap-1 cursor-pointer shadow-2xs"
             >
               <Plus className="w-4 h-4" />
+              <span>Add</span>
             </button>
           </div>
 
-          {/* List */}
+          {/* Rule Types List with Staggered slideDownFade Animation */}
           <div className="flex-1 overflow-y-auto p-3 divide-y divide-gray-50">
-            {ruleTypes.map(rule => (
-              <div key={rule} className="py-2 flex items-center justify-between text-xs font-semibold text-gray-700 group">
-                <span>{rule}</span>
+            {ruleTypes.map((rule, index) => (
+              <div 
+                key={rule} 
+                style={{ 
+                  animation: 'slideDownFade 0.35s ease-out forwards', 
+                  animationDelay: `${index * 30}ms` 
+                }}
+                className="py-2.5 px-2 flex items-center justify-between text-xs font-semibold text-gray-700 hover:bg-slate-50 rounded-xl transition-all opacity-0 group"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                  <span>{rule}</span>
+                </div>
                 <button
                   onClick={() => handleDeleteItem('ruleType', rule)}
-                  className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                  title="Delete rule type"
+                  className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                  title={`Delete rule type ${rule}`}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
             ))}
             {ruleTypes.length === 0 && (
-              <div className="text-center py-12 text-gray-400 text-[11px]">No custom rule types yet</div>
+              <div className="text-center py-16 text-gray-400 text-xs font-medium">No custom rule types configured yet</div>
             )}
           </div>
         </div>
-      </div>
-      
-      <div className="p-4 bg-blue-50/70 border border-blue-100 rounded-2xl flex gap-3 text-xs text-blue-800 font-medium">
-        <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />
-        <div>
-          <span className="font-bold">Pro Tip:</span> Adding options directly to the list updates the dropdown selectors instantly. Re-sync your changes to the Item Master page to register customized items.
-        </div>
-      </div>
 
-      {/* Categories Fields Checklist Overlay Modal */}
-      {selectedCatForFields && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-xs font-sans text-xs">
-          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full border border-gray-150 overflow-hidden animate-in zoom-in-95 duration-150">
-            {/* Header */}
-            <div className="px-5 py-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+        {/* Column 3: Brands */}
+        <div 
+          style={{ animation: 'slideDownFade 0.35s ease-out forwards', animationDelay: '180ms' }}
+          className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden flex flex-col h-[480px] opacity-0"
+        >
+          <div className="p-4 border-b border-gray-150 bg-slate-50/60 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center">
+                <Tag className="w-4 h-4" />
+              </div>
               <div>
-                <span className="font-bold text-gray-800 text-xs block">Configure Category Fields</span>
-                <span className="text-[9px] text-blue-600 font-extrabold uppercase mt-0.5">{selectedCatForFields}</span>
-              </div>
-              <button 
-                type="button"
-                onClick={() => setSelectedCatForFields(null)}
-                className="text-gray-400 hover:text-gray-600 rounded p-1 hover:bg-gray-100"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            
-            {/* Fields List */}
-            <div className="p-5 space-y-3">
-              <span className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-2">
-                Check fields to show in Item Creation Drawer:
-              </span>
-              <div className="space-y-2 bg-gray-50 p-4 rounded-xl border border-gray-100 max-h-60 overflow-y-auto">
-                {fieldsOptions.map(f => {
-                  const isChecked = selectedFields.includes(f.id);
-                  return (
-                    <label key={f.id} className="flex items-center gap-2.5 cursor-pointer hover:text-blue-600 transition-colors py-1">
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => toggleField(f.id)}
-                        className="rounded border-gray-305 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
-                      />
-                      <span className="text-[10px] font-bold text-gray-700">{f.label}</span>
-                    </label>
-                  );
-                })}
+                <h2 className="text-xs font-bold text-gray-800 uppercase tracking-wider">Brands</h2>
+                <p className="text-[10px] text-gray-400 mt-0.5">Product & notebook brands (Classmate, Navneet).</p>
               </div>
             </div>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+              {brands.length} Brands
+            </span>
+          </div>
+          
+          {/* Add Brand Input */}
+          <div className="p-3 border-b border-gray-100 flex gap-2 bg-white">
+            <input
+              type="text"
+              placeholder="Add brand (e.g. Classmate, Navneet)..."
+              value={newBrand}
+              onChange={e => setNewBrand(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAddItem('brand')}
+              className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-800 font-semibold"
+            />
+            <button
+              onClick={() => handleAddItem('brand')}
+              className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors font-bold text-xs flex items-center gap-1 cursor-pointer shadow-2xs"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add</span>
+            </button>
+          </div>
 
-            {/* Actions */}
-            <div className="px-5 py-3.5 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setSelectedCatForFields(null)}
-                className="px-3 py-1.5 border border-gray-200 rounded-lg font-bold hover:bg-gray-100 text-gray-600 transition-colors"
+          {/* Brands List with Staggered slideDownFade Animation */}
+          <div className="flex-1 overflow-y-auto p-3 divide-y divide-gray-50">
+            {brands.map((brand, index) => (
+              <div 
+                key={brand} 
+                style={{ 
+                  animation: 'slideDownFade 0.35s ease-out forwards', 
+                  animationDelay: `${index * 30}ms` 
+                }}
+                className="py-2.5 px-2 flex items-center justify-between text-xs font-semibold text-gray-700 hover:bg-slate-50 rounded-xl transition-all opacity-0 group"
               >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveFieldsConfig}
-                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-sm transition-colors"
-              >
-                Save Configuration
-              </button>
-            </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                  <span className="font-semibold text-gray-900">{brand}</span>
+                </div>
+                <button
+                  onClick={() => handleDeleteItem('brand', brand)}
+                  className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                  title={`Delete brand ${brand}`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+            {brands.length === 0 && (
+              <div className="text-center py-16 text-gray-400 text-xs font-medium">No custom brands configured yet</div>
+            )}
           </div>
         </div>
-      )}
+
+      </div>
+      
+      {/* Informative Alert Footer */}
+      <div 
+        style={{ animation: 'slideDownFade 0.35s ease-out forwards', animationDelay: '240ms' }}
+        className="p-4 bg-teal-50/70 border border-teal-100 rounded-2xl flex gap-3 text-xs text-teal-900 font-medium opacity-0"
+      >
+        <AlertCircle className="w-5 h-5 text-teal-700 shrink-0" />
+        <div>
+          <span className="font-bold">Automatic Synchronization:</span> Units, Rule Types, and Brands added here are instantly available inside Item Master creation drawers, Finished Goods forms, and manufacturing batches.
+        </div>
+      </div>
     </div>
   );
 };

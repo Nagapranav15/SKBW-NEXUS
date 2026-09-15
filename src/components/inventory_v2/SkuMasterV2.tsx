@@ -1,5 +1,8 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { useSearchParams } from 'react-router-dom';
+import SettingsPage from './SettingsPage';
 import { 
   Package, 
   Folder, 
@@ -43,7 +46,9 @@ import {
   History,
   FileText,
   Columns,
-  Eye
+  Eye,
+  ShoppingCart,
+  Settings
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { 
@@ -62,6 +67,7 @@ import {
 } from '../../api/mfgApiV2';
 import { getActivityLogs, createActivityLog } from '../../api/activityLogApi';
 import AddSkuDrawerV2, { SearchableMaterialDropdown } from './AddSkuDrawerV2';
+import { getParties } from '../../api/partyApi';
 import { showToast } from '../ui/Toast';
 import * as XLSX from 'xlsx';
 import Modal from '../ui/Modal';
@@ -183,20 +189,20 @@ const SkuMasterV2: React.FC = () => {
   // Key to force row animation trigger on reload / tab change
   const [animationKey, setAnimationKey] = useState(Date.now());
 
-  // 4 Main Tabs State: 'products' | 'materials' | 'semi' | 'categories' (persisted in URL & localStorage)
-  const [activeMainTab, setActiveMainTab] = useState<'products' | 'materials' | 'semi' | 'categories'>(() => {
+  // 5 Main Tabs State: 'products' | 'materials' | 'semi' | 'categories' | 'settings' (persisted in URL & localStorage)
+  const [activeMainTab, setActiveMainTab] = useState<'products' | 'materials' | 'semi' | 'categories' | 'settings'>(() => {
     const tabFromUrl = searchParams.get('tab') as any;
-    if (tabFromUrl && ['products', 'materials', 'semi', 'categories'].includes(tabFromUrl)) {
+    if (tabFromUrl && ['products', 'materials', 'semi', 'categories', 'settings'].includes(tabFromUrl)) {
       return tabFromUrl;
     }
     const tabFromStorage = localStorage.getItem('skbw_item_master_active_tab') as any;
-    if (tabFromStorage && ['products', 'materials', 'semi', 'categories'].includes(tabFromStorage)) {
+    if (tabFromStorage && ['products', 'materials', 'semi', 'categories', 'settings'].includes(tabFromStorage)) {
       return tabFromStorage;
     }
     return 'products';
   });
 
-  const handleMainTabChange = (tab: 'products' | 'materials' | 'semi' | 'categories') => {
+  const handleMainTabChange = (tab: 'products' | 'materials' | 'semi' | 'categories' | 'settings') => {
     setActiveMainTab(tab);
     setSearchParams({ tab }, { replace: true });
     localStorage.setItem('skbw_item_master_active_tab', tab);
@@ -204,7 +210,7 @@ const SkuMasterV2: React.FC = () => {
 
   useEffect(() => {
     const tabFromUrl = searchParams.get('tab') as any;
-    if (tabFromUrl && ['products', 'materials', 'semi', 'categories'].includes(tabFromUrl) && tabFromUrl !== activeMainTab) {
+    if (tabFromUrl && ['products', 'materials', 'semi', 'categories', 'settings'].includes(tabFromUrl) && tabFromUrl !== activeMainTab) {
       setActiveMainTab(tabFromUrl);
     }
   }, [searchParams]);
@@ -671,6 +677,7 @@ const SkuMasterV2: React.FC = () => {
   const DEFAULT_PRODUCTS_COLUMNS = [
     { id: 'skuCode', label: 'ID / SKU CODE', visible: true },
     { id: 'name', label: 'ITEM NAME', visible: true },
+    { id: 'brand', label: 'BRAND', visible: true },
     { id: 'category', label: 'CATEGORY', visible: true },
     { id: 'status', label: 'STATUS', visible: true },
     { id: 'unit', label: 'PRIMARY UOM', visible: true },
@@ -688,6 +695,7 @@ const SkuMasterV2: React.FC = () => {
   const DEFAULT_MATERIALS_COLUMNS = [
     { id: 'skuCode', label: 'ID / SKU CODE', visible: true },
     { id: 'name', label: 'ITEM NAME', visible: true },
+    { id: 'brand', label: 'BRAND', visible: false },
     { id: 'category', label: 'CATEGORY', visible: true },
     { id: 'status', label: 'STATUS', visible: true },
     { id: 'unit', label: 'PRIMARY UOM', visible: true },
@@ -702,6 +710,7 @@ const SkuMasterV2: React.FC = () => {
   const DEFAULT_SEMI_COLUMNS = [
     { id: 'skuCode', label: 'ID / SKU CODE', visible: true },
     { id: 'name', label: 'ITEM NAME', visible: true },
+    { id: 'brand', label: 'BRAND', visible: true },
     { id: 'category', label: 'CATEGORY', visible: true },
     { id: 'status', label: 'STATUS', visible: true },
     { id: 'unit', label: 'PRIMARY UOM', visible: true },
@@ -714,7 +723,7 @@ const SkuMasterV2: React.FC = () => {
     { id: 'dispatchOrders', label: 'DISPATCH ORDERS', visible: false }
   ];
 
-  const STORAGE_KEY = 'skbw_sku_master_tab_columns_v8';
+  const STORAGE_KEY = 'skbw_sku_master_tab_columns_v10';
 
   // Helper to sanitize column list against current valid defaults
   const sanitizeColumns = (savedList: any[], defaultList: typeof DEFAULT_PRODUCTS_COLUMNS) => {
@@ -823,7 +832,23 @@ const SkuMasterV2: React.FC = () => {
   const [isEditingThresholds, setIsEditingThresholds] = useState<boolean>(false);
   const [tempMinStock, setTempMinStock] = useState<string>('');
   const [tempReorder, setTempReorder] = useState<string>('');
+  const [tempVendor, setTempVendor] = useState<string>('');
   const [isSavingThresholds, setIsSavingThresholds] = useState<boolean>(false);
+  const [modalVendorsList, setModalVendorsList] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    if (!currentCompanyId) return;
+    getParties({ company: currentCompanyId, type: 'vendor', limit: 1000, light: true })
+      .then(res => {
+        const rawList = res.data?.parties || (Array.isArray(res.data) ? res.data : []);
+        const list = rawList.map((p: any) => ({
+          id: String(p._id || p.id || ''),
+          name: p.firmName || p.ownerName || p.contactName || p.name || p.companyName || ''
+        })).filter((v: any) => v.name);
+        setModalVendorsList(list);
+      })
+      .catch(() => setModalVendorsList([]));
+  }, [currentCompanyId]);
 
   // Helper to build parent-to-child location path (Factory ➔ Zone ➔ Storage Location)
   const buildModalLocationPath = (locIdOrObj: any, allLocations: WarehouseLocationV2[]): string => {
@@ -881,14 +906,22 @@ const SkuMasterV2: React.FC = () => {
       await updateSkuV2(selectedSkuDetails._id, {
         minStockLevel: minVal,
         reorderLevel: reorderVal,
+        preferredVendor: tempVendor,
         company: currentCompanyId
       });
       setSelectedSkuDetails(prev => prev ? ({
         ...prev,
         minStockLevel: minVal,
-        reorderLevel: reorderVal
+        reorderLevel: reorderVal,
+        preferredVendor: tempVendor
       }) : null);
-      showToast('Stock threshold levels updated successfully!', 'success');
+      setSkus(prevSkus => prevSkus.map(item => item._id === selectedSkuDetails._id ? {
+        ...item,
+        minStockLevel: minVal,
+        reorderLevel: reorderVal,
+        preferredVendor: tempVendor
+      } : item));
+      showToast('Stock levels and preferred vendor updated successfully!', 'success');
       loadSkus(false);
       setIsEditingThresholds(false);
     } catch (err: any) {
@@ -1791,23 +1824,28 @@ const SkuMasterV2: React.FC = () => {
     try {
       const isRawOrSemiTab = activeMainTab === 'materials' || activeMainTab === 'semi';
       const exportData = targetSkus.map(s => {
+        const hasBom = Array.isArray((s as any).bomItems) && (s as any).bomItems.length > 0;
         const base: Record<string, any> = {
           'Item Code': s.skuCode,
           'Item Name': s.name,
           'Category': s.category || s.group || '',
-          'Primary Unit': s.unit || s.altUnit || '—',
+          'Primary Unit': s.unit || '—',
+          'AUOM / Secondary Unit': s.altUnit || '—',
+          'Conversion Rate': s.altUnitConversion || '—',
+          'Paper Type': s.paperType || 'None',
+          'GSM': s.gsm || '—',
+          'Width': s.width || '—',
+          'Length': s.length || '—',
+          'Pages / Sheets': s.pages || '—',
+          'Ream Weight': (s as any).reamWeight || '—',
+          'Books / GBL': (s as any).booksGbl || '—',
+          'BOM Recipe': hasBom ? 'Defined' : (activeMainTab === 'materials' ? 'N/A' : 'Pending'),
+          'Opening Stock': s.openingStock || 0,
+          'Min Stock Level': s.minStockLevel || 0,
+          'Reorder Level': (s as any).reorderLevel || '—',
+          'Preferred Vendor': (s as any).preferredVendor || '—',
+          'Status': s.status || 'Active'
         };
-        if (!isRawOrSemiTab) {
-          base['Conversion Rate'] = s.altUnitConversion || '—';
-          base['Secondary Unit'] = s.altUnit || '—';
-        }
-        base['GSM'] = s.gsm || '—';
-        base['Pages'] = s.pages || '—';
-        base['Width'] = s.width || '—';
-        base['Length'] = s.length || '—';
-        base['Opening Stock'] = s.openingStock || 0;
-        base['Min Stock Level'] = s.minStockLevel || 0;
-        base['Status'] = s.status || 'Active';
         return base;
       });
 
@@ -1824,7 +1862,16 @@ const SkuMasterV2: React.FC = () => {
     }
   };
 
-  const handleExportCSV = handleExportExcel;
+  const getTabLabel = (tab: string) => {
+    switch (tab) {
+      case 'products': return 'Products';
+      case 'materials': return 'Materials';
+      case 'semi': return 'Semi';
+      case 'categories': return 'Categories';
+      case 'settings': return 'Settings';
+      default: return 'Items';
+    }
+  };
 
   const handleExportPDF = () => {
     const targetSkus = selectedIds.length > 0 
@@ -1832,13 +1879,7 @@ const SkuMasterV2: React.FC = () => {
       : filteredAndSortedSkus;
 
     if (targetSkus.length === 0) {
-      showToast('No records available to print PDF', 'info');
-      return;
-    }
-
-    const printWin = window.open('', '_blank');
-    if (!printWin) {
-      showToast('Please allow popups to generate PDF', 'error');
+      showToast('No records available to export PDF', 'info');
       return;
     }
 
@@ -1847,96 +1888,86 @@ const SkuMasterV2: React.FC = () => {
     const companyName = selectedCompany?.name || 'SKBW ERP';
     const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
-    const isRawOrSemiTab = activeMainTab === 'materials' || activeMainTab === 'semi';
-    const tableHeaders = isRawOrSemiTab
-      ? `<th>#</th><th>Item Code</th><th>Item Name</th><th>Category</th><th>UOM</th><th>GSM</th><th>Pages</th><th>Status</th>`
-      : `<th>#</th><th>Item Code</th><th>Item Name</th><th>Category</th><th>Primary UOM</th><th>Con Rate</th><th>Secondary UOM</th><th>GSM</th><th>Pages</th><th>Status</th>`;
+    try {
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
-    const tableRowsHtml = targetSkus.map((item, idx) => {
-      if (isRawOrSemiTab) {
-        return `<tr>
-          <td>${idx + 1}</td>
-          <td><b>${item.skuCode || '—'}</b></td>
-          <td>${item.name || '—'}</td>
-          <td>${item.category || item.group || '—'}</td>
-          <td>${item.unit || '—'}</td>
-          <td>${item.gsm || '—'}</td>
-          <td>${item.pages || '—'}</td>
-          <td>${item.status || 'Active'}</td>
-        </tr>`;
-      }
-      const isAltPcs = (item.altUnit || '').toLowerCase().includes('pc');
-      const isPrimaryPcs = (item.unit || '').toLowerCase().includes('pc');
-      const outerUnit = (isAltPcs && !isPrimaryPcs) ? item.unit : item.altUnit;
-      const innerUnit = (isAltPcs && !isPrimaryPcs) ? item.altUnit : (item.unit || 'Pcs');
-      const conRateStr = item.altUnit && item.altUnitConversion ? `1 ${outerUnit} = ${item.altUnitConversion} ${innerUnit}` : '—';
+      doc.setFontSize(14);
+      doc.setTextColor(29, 78, 216);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${companyName} — ${title}`, 14, 14);
 
-      return `<tr>
-        <td>${idx + 1}</td>
-        <td><b>${item.skuCode || '—'}</b></td>
-        <td>${item.name || '—'}</td>
-        <td>${item.category || item.group || '—'}</td>
-        <td>${item.unit || '—'}</td>
-        <td>${conRateStr}</td>
-        <td>${item.altUnit || '—'}</td>
-        <td>${item.gsm || '—'}</td>
-        <td>${item.pages || '—'}</td>
-        <td>${item.status || 'Active'}</td>
-      </tr>`;
-    }).join('');
+      doc.setFontSize(9);
+      doc.setTextColor(100, 116, 139);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Generated on ${dateStr} • Total Records: ${targetSkus.length}`, 14, 20);
 
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>${title} - ${companyName}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; color: #1e293b; }
-            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #2563eb; padding-bottom: 12px; margin-bottom: 20px; }
-            .title { font-size: 20px; font-weight: bold; color: #1d4ed8; text-transform: uppercase; }
-            .sub { font-size: 12px; color: #64748b; margin-top: 4px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
-            th { background-color: #f1f5f9; color: #334155; text-align: left; padding: 8px 10px; border: 1px solid #cbd5e1; font-size: 11px; text-transform: uppercase; }
-            td { padding: 8px 10px; border: 1px solid #e2e8f0; }
-            tr:nth-child(even) { background-color: #f8fafc; }
-            .summary { margin-top: 20px; font-size: 12px; font-weight: bold; text-align: right; color: #334155; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div>
-              <div class="title">${companyName} — ${title}</div>
-              <div class="sub">Generated on ${dateStr} • Scope: ${selectedIds.length > 0 ? `${selectedIds.length} Selected Items` : 'All Items'}</div>
-            </div>
-            <div style="font-size: 11px; color: #64748b; text-align: right;">
-              <div>SKBW ERP Master Directory</div>
-              <div>Confidential</div>
-            </div>
-          </div>
+      const isRawOrSemiTab = activeMainTab === 'materials' || activeMainTab === 'semi';
+      const headers = isRawOrSemiTab
+        ? ['#', 'Item Code', 'Item Name', 'Category', 'UOM', 'GSM', 'Pages', 'Status']
+        : ['#', 'Item Code', 'Item Name', 'Category', 'Primary UOM', 'Con Rate', 'Secondary UOM', 'GSM', 'Pages', 'Status'];
 
-          <table>
-            <thead>
-              <tr>${tableHeaders}</tr>
-            </thead>
-            <tbody>
-              ${tableRowsHtml}
-            </tbody>
-          </table>
+      const rows = targetSkus.map((item, idx) => {
+        if (isRawOrSemiTab) {
+          return [
+            idx + 1,
+            item.skuCode || '—',
+            item.name || '—',
+            item.category || item.group || '—',
+            item.unit || '—',
+            item.gsm || '—',
+            item.pages || '—',
+            item.status || 'Active'
+          ];
+        }
+        const isAltPcs = (item.altUnit || '').toLowerCase().includes('pc');
+        const isPrimaryPcs = (item.unit || '').toLowerCase().includes('pc');
+        const outerUnit = (isAltPcs && !isPrimaryPcs) ? item.unit : item.altUnit;
+        const innerUnit = (isAltPcs && !isPrimaryPcs) ? item.altUnit : (item.unit || 'Pcs');
+        const conRateStr = item.altUnit && item.altUnitConversion ? `1 ${outerUnit} = ${item.altUnitConversion} ${innerUnit}` : '—';
 
-          <div class="summary">
-            Total Records: ${targetSkus.length}
-          </div>
+        return [
+          idx + 1,
+          item.skuCode || '—',
+          item.name || '—',
+          item.category || item.group || '—',
+          item.unit || '—',
+          conRateStr,
+          item.altUnit || '—',
+          item.gsm || '—',
+          item.pages || '—',
+          item.status || 'Active'
+        ];
+      });
 
-          <script>
-            window.onload = function() { window.print(); }
-          </script>
-        </body>
-      </html>
-    `;
+      autoTable(doc, {
+        startY: 25,
+        head: [headers],
+        body: rows,
+        theme: 'grid',
+        headStyles: {
+          fillColor: [37, 99, 235],
+          textColor: [255, 255, 255],
+          fontSize: 8.5,
+          fontStyle: 'bold',
+          halign: 'left'
+        },
+        bodyStyles: {
+          fontSize: 8,
+          textColor: [51, 65, 85]
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252]
+        },
+        margin: { left: 14, right: 14, bottom: 15 }
+      });
 
-    printWin.document.open();
-    printWin.document.write(htmlContent);
-    printWin.document.close();
+      const fileName = `${companyName.replace(/[^a-zA-Z0-9]/g, '_')}_${tabTitle}_${new Date().toISOString().slice(0, 10)}.pdf`;
+      doc.save(fileName);
+      showToast(`PDF exported successfully! Check downloads: ${fileName}`, 'success');
+    } catch (err: any) {
+      console.error('PDF export error:', err);
+      showToast('Failed to generate PDF download', 'error');
+    }
   };
 
   // Bulk Edit & Bulk Delete Handlers
@@ -2111,7 +2142,19 @@ const SkuMasterV2: React.FC = () => {
           return '';
         };
 
-        const skuCode = getFieldVal('idskucode', 'skucode', 'itemcode', 'code', 'id', 'productcode', 'skuid') || String(row[0] || '').trim();
+        const explicitSku = getFieldVal(
+          'itemcode', 'idskucode', 'skucode', 'code', 'id', 'itemcodeskucode',
+          'productcode', 'skuid', 'itemid', 'materialcode', 'semicode', 'sku',
+          'item_code', 'sku_code'
+        );
+        let skuCode = explicitSku;
+        if (!skuCode) {
+          const firstColStr = String(row[0] || '').trim();
+          if (firstColStr && !/^\d+$/.test(firstColStr)) {
+            skuCode = firstColStr;
+          }
+        }
+
         const name = getFieldVal('itemname', 'materialname', 'productname', 'name', 'title') || String(row[1] || '').trim();
         if (!name && !skuCode) continue;
 
@@ -2121,7 +2164,7 @@ const SkuMasterV2: React.FC = () => {
         const group = rawCategory || category;
 
         const unit = getFieldVal('uom', 'unit', 'primaryunit', 'baseunit', 'mainunit') || (activeMainTab === 'materials' ? 'Kg' : 'Pcs');
-        const altUnit = getFieldVal('auomaltunit', 'auom', 'altunit', 'secondaryunit', 'alternateunit') || '';
+        const altUnit = getFieldVal('auomaltunit', 'auom', 'altunit', 'secondaryunit', 'alternateunit', 'auomsecondaryunit') || '';
 
         // Extract Con Rate / Conversion Rate
         const rawConRate = getFieldVal('conrate', 'conversionrate', 'altunitconversion', 'conversion', 'rate', 'factor');
@@ -2189,9 +2232,14 @@ const SkuMasterV2: React.FC = () => {
         const openingStock = stockMatch ? Number(stockMatch[1]) : (rawStock ? Number(rawStock) || 0 : 0);
 
         // Extract Min Stock
-        const rawMinStock = getFieldVal('minstocklevel', 'minstock', 'minimumstock', 'reorderlevel', 'lowstockalert');
+        const rawMinStock = getFieldVal('minstocklevel', 'minstock', 'minimumstock', 'lowstockalert');
         const minStockMatch = rawMinStock.match(/(\d+(?:\.\d+)?)/);
         const minStockLevel = minStockMatch ? Number(minStockMatch[1]) : (rawMinStock ? Number(rawMinStock) || undefined : undefined);
+
+        // Extract Reorder Level & Preferred Vendor
+        const rawReorder = getFieldVal('reorderlevel', 'reorder');
+        const reorderLevel = rawReorder ? Number(rawReorder) || undefined : undefined;
+        const preferredVendor = getFieldVal('preferredvendor', 'vendor', 'preferred_vendor', 'supplier', 'preferredsupplier') || '';
 
         // Extract Status
         const rawStatus = getFieldVal('status', 'itemstatus', 'state').toLowerCase();
@@ -2214,6 +2262,8 @@ const SkuMasterV2: React.FC = () => {
           openingStock,
           presentStock: openingStock,
           minStockLevel,
+          reorderLevel,
+          preferredVendor,
           status
         });
       }
@@ -2504,17 +2554,6 @@ const SkuMasterV2: React.FC = () => {
     );
   };
 
-  // Get active tab label text
-  const getTabLabel = (tab: string) => {
-    switch (tab) {
-      case 'products': return 'Products';
-      case 'materials': return 'Materials';
-      case 'semi': return 'Semi';
-      case 'categories': return 'Categories';
-      default: return 'Items';
-    }
-  };
-
   // Default category parameter for Add SKU drawer
   const getDefaultCategoryForDrawer = () => {
     if (activeMainTab === 'products') return 'Finished Goods';
@@ -2611,6 +2650,19 @@ const SkuMasterV2: React.FC = () => {
           >
             <Folder className={`w-4 h-4 ${activeMainTab === 'categories' ? 'text-teal-700' : 'text-slate-400'}`} />
             <span>Categories</span>
+          </button>
+
+          {/* Tab 5: Settings */}
+          <button
+            onClick={() => handleMainTabChange('settings')}
+            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+              activeMainTab === 'settings'
+                ? 'border-teal-700 text-teal-700 bg-transparent'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
+            }`}
+          >
+            <Settings className={`w-4 h-4 ${activeMainTab === 'settings' ? 'text-teal-700' : 'text-slate-400'}`} />
+            <span>Settings</span>
           </button>
         </div>
 
@@ -2724,6 +2776,7 @@ const SkuMasterV2: React.FC = () => {
                             >
                               <option value="name">Item Name</option>
                               <option value="skuCode">SKU Code</option>
+                              <option value="brand">Brand</option>
                               <option value="category">Category</option>
                               <option value="unit">UOM</option>
                               <option value="gsm">GSM</option>
@@ -3136,7 +3189,14 @@ const SkuMasterV2: React.FC = () => {
           )}
 
           {/* ── 3. VIEW CONTENT AREA ── */}
-          {activeMainTab !== 'categories' ? (
+          {activeMainTab === 'settings' ? (
+            <div 
+              style={{ animation: 'slideDownFade 0.35s ease-out forwards' }}
+              className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs p-4 opacity-0"
+            >
+              <SettingsPage />
+            </div>
+          ) : activeMainTab !== 'categories' ? (
             
             /* ── GOODS / MATERIALS DATA TABLE VIEW ── */
             <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden relative">
@@ -3423,6 +3483,18 @@ const SkuMasterV2: React.FC = () => {
                                   </span>
                                 </td>
                               );
+                            case 'brand':
+                              return (
+                                <td key="brand" className="py-3 px-3 whitespace-nowrap">
+                                  {sku.brand ? (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-800 border border-gray-200/80">
+                                      {sku.brand}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-400">—</span>
+                                  )}
+                                </td>
+                              );
                             case 'group':
                             case 'itemCategory':
                               return (
@@ -3498,7 +3570,7 @@ const SkuMasterV2: React.FC = () => {
                                 </td>
                               );
                             case 'bom':
-                              const isBomApplicable = activeMainTab === 'products' || activeMainTab === 'semi' || sku.category === 'Finished Goods' || sku.category === 'Semi Finished' || sku.category === 'Products' || sku.category === 'Semi' || (sku.category || '').toLowerCase().includes('notebook') || (sku.category || '').toLowerCase().includes('diary') || (sku.category || '').toLowerCase().includes('semi');
+                              const isBomApplicable = getItemType(sku) === 'products' || getItemType(sku) === 'semi' || activeMainTab === 'products' || activeMainTab === 'semi' || !(sku.category || '').toLowerCase().includes('raw');
                               const hasBom = isBomApplicable && Array.isArray((sku as any).bomItems) && (sku as any).bomItems.length > 0;
                               return (
                                 <td key="bom" className="py-3 px-3 whitespace-nowrap">
@@ -3842,7 +3914,7 @@ const SkuMasterV2: React.FC = () => {
 
           {/* Category Cards List */}
           <div className="space-y-3">
-            {categoriesData.filter(c => c.type === activeCategorySubTab).map(cat => {
+            {categoriesData.filter(c => c.type === activeCategorySubTab).map((cat, index) => {
               const isExpanded = expandedCategoryIds.includes(cat.id);
               const linkedItemsCount = skus.filter(s => {
                 const cName = cat.name.toLowerCase();
@@ -3855,7 +3927,11 @@ const SkuMasterV2: React.FC = () => {
               return (
                 <div 
                   key={cat.id}
-                  className="bg-white border border-gray-200 hover:border-blue-300 rounded-2xl p-4 shadow-2xs transition-all space-y-3"
+                  style={{
+                    animation: 'slideDownFade 0.35s ease-out forwards',
+                    animationDelay: `${index * 45}ms`
+                  }}
+                  className="bg-white border border-gray-200 hover:border-blue-300 rounded-2xl p-4 shadow-2xs transition-all space-y-3 opacity-0"
                 >
                   <div className="flex items-center justify-between">
                     
@@ -4286,8 +4362,8 @@ const SkuMasterV2: React.FC = () => {
                         <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.brand || 'Bestfriend'}</span>
                       </div>
                       <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">GROUP</span>
-                        <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.group || 'General Product'}</span>
+                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PREFERRED VENDOR</span>
+                        <span className="font-bold text-blue-600 text-xs">{(selectedSkuDetails as any).preferredVendor || '—'}</span>
                       </div>
                     </div>
                   </div>
@@ -4428,6 +4504,7 @@ const SkuMasterV2: React.FC = () => {
                               onClick={() => {
                                 setTempMinStock(hasMinStock ? String(minStockNum) : '');
                                 setTempReorder(hasReorder ? String(reorderNum) : '');
+                                setTempVendor((selectedSkuDetails as any).preferredVendor || '');
                                 setIsEditingThresholds(!isEditingThresholds);
                               }}
                               className="text-[10px] font-bold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-lg border border-amber-200/80 flex items-center gap-1 cursor-pointer"
@@ -4438,6 +4515,16 @@ const SkuMasterV2: React.FC = () => {
                             <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${statusBadge.bg}`}>
                               {statusBadge.label}
                             </span>
+                            {statusBadge.label !== 'Normal' && (
+                              <a
+                                href={`/inventory-v2/purchases?reorderSkuId=${selectedSkuDetails._id}`}
+                                className="text-[10px] font-black text-white bg-amber-600 hover:bg-amber-700 px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-2xs transition-all cursor-pointer no-underline"
+                                title="Create Purchase Batch Reorder for this item"
+                              >
+                                <ShoppingCart className="w-3 h-3" />
+                                <span>Reorder Material</span>
+                              </a>
+                            )}
                           </div>
                         </div>
 
@@ -4446,7 +4533,7 @@ const SkuMasterV2: React.FC = () => {
                             <div className="text-[11px] font-bold text-amber-900 flex items-center justify-between">
                               <span>Set Stock Level Thresholds ({stockUnit})</span>
                             </div>
-                            <div className="grid grid-cols-2 gap-3 text-xs">
+                            <div className="grid grid-cols-3 gap-3 text-xs">
                               <div>
                                 <label className="block text-[10px] font-bold text-gray-600 mb-1">MIN STOCK THRESHOLD</label>
                                 <input
@@ -4466,6 +4553,19 @@ const SkuMasterV2: React.FC = () => {
                                   className="w-full px-2.5 py-1.5 border border-amber-300 rounded-lg text-xs font-bold text-gray-900 bg-white"
                                   placeholder="e.g. 100"
                                 />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-gray-600 mb-1">PREFERRED VENDOR</label>
+                                <select
+                                  value={tempVendor}
+                                  onChange={(e) => setTempVendor(e.target.value)}
+                                  className="w-full px-2.5 py-1.5 border border-amber-300 rounded-lg text-xs font-bold text-gray-900 bg-white cursor-pointer"
+                                >
+                                  <option value="">-- Select Vendor --</option>
+                                  {modalVendorsList.map(v => (
+                                    <option key={v.id || v.name} value={v.name}>{v.name}</option>
+                                  ))}
+                                </select>
                               </div>
                             </div>
                             <div className="flex justify-end gap-2 pt-1">
@@ -4506,7 +4606,7 @@ const SkuMasterV2: React.FC = () => {
                           const stdSheetsVal = selectedSkuDetails.pages || 500;
 
                           return (
-                            <div className={`grid ${isSheetItem ? 'grid-cols-3' : 'grid-cols-2'} gap-3 text-xs bg-slate-50/50 p-3 rounded-xl border border-slate-100`}>
+                            <div className={`grid ${isSheetItem ? 'grid-cols-4' : 'grid-cols-3'} gap-3 text-xs bg-slate-50/50 p-3 rounded-xl border border-slate-100`}>
                               <div>
                                 <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">MIN STOCK THRESHOLD</span>
                                 <span className="font-mono font-bold text-amber-600 text-xs block">
@@ -4517,6 +4617,12 @@ const SkuMasterV2: React.FC = () => {
                                 <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">REORDER LEVEL</span>
                                 <span className="font-mono font-bold text-blue-600 text-xs block">
                                   {reorderDisplay}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PREFERRED VENDOR</span>
+                                <span className="font-bold text-indigo-700 text-xs block truncate">
+                                  {(selectedSkuDetails as any).preferredVendor || '—'}
                                 </span>
                               </div>
                               {isSheetItem && (
@@ -4564,7 +4670,7 @@ const SkuMasterV2: React.FC = () => {
                 </div>
 
                 {/* 3. Bill of Materials (BOM) - Shown for Finished Goods & Semi-Finished Materials! */}
-                {(selectedSkuDetails?.category === 'Finished Goods' || selectedSkuDetails?.category === 'Semi Finished' || selectedSkuDetails?.category === 'Products' || selectedSkuDetails?.category === 'Semi' || (selectedSkuDetails?.category || '').toLowerCase().includes('notebook') || (selectedSkuDetails?.category || '').toLowerCase().includes('diary') || (selectedSkuDetails?.category || '').toLowerCase().includes('semi')) && (
+                {(getItemType(selectedSkuDetails) === 'products' || getItemType(selectedSkuDetails) === 'semi' || activeMainTab === 'products' || activeMainTab === 'semi' || !(selectedSkuDetails?.category || '').toLowerCase().includes('raw')) && (
                   <div className="space-y-3 border-t border-gray-100 pt-4">
                     {/* Yellow Notice Banner */}
                     <div className="bg-amber-50/90 border border-amber-200/90 rounded-xl p-3 flex items-center justify-between text-xs font-semibold text-amber-900 shadow-2xs">

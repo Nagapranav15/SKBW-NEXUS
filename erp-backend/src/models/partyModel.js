@@ -61,6 +61,7 @@ const partySchema = new mongoose.Schema({
   outstanding: { type: Number, default: 0 },
   outstandingBalance: { type: Number, default: 0 },
   preferredTransport: { type: String, default: '' },
+  transporterPhone: { type: String, default: '' },
   gpsLocation: { type: String, default: '' },
   customerPhoto: { type: String, default: '' },
   shopPhoto: { type: String, default: '' },

@@ -790,7 +790,13 @@ const enrichPartyObj = async (party) => {
 exports.getParties = async (req, res) => {
   try {
     const filter = { isDeleted: { $ne: true } };
-    if (req.query.type) filter.type = req.query.type;
+    if (req.query.type) {
+      if (req.query.type === 'vendor') {
+        filter.type = { $in: ['vendor', 'supplier'] };
+      } else {
+        filter.type = req.query.type;
+      }
+    }
 
     const companyId = req.query.company;
     if (companyId) {
@@ -967,7 +973,7 @@ exports.getParties = async (req, res) => {
 
     // List-view projection: only fetch fields needed for table display
     // This reduces network transfer from ~2.2MB to ~22KB per page (100x reduction)
-    const listProjection = 'firmName ownerName contactName phone altPhone city district state pincode route agentAssigned status outstandingBalance outstanding code type company companies tags createdAt preferredTransport assignedMarket email whatsapp gstNumber creditLimit creditDays openingBalance contactPersons isDeleted vendorType doorNo streetName address1 area landmark aadharNumber remarks gpsLocation';
+    const listProjection = 'firmName ownerName contactName phone altPhone city district state pincode route agentAssigned status outstandingBalance outstanding code type company companies tags createdAt preferredTransport transporterPhone assignedMarket email whatsapp gstNumber creditLimit creditDays openingBalance contactPersons isDeleted vendorType doorNo streetName address1 area landmark aadharNumber remarks gpsLocation';
 
     let parties;
     if (req.query.light === 'true') {

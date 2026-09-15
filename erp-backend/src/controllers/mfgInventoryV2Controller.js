@@ -141,7 +141,7 @@ exports.getNextSkuCode = async (req, res, next) => {
 
 exports.createSku = async (req, res, next) => {
   try {
-    const { skuCode, name, category, unit, altUnit, altUnitConversion, altUnitDirection, paperType, gsm, width, length, brand, title, group, ruleType, pages, booksGbl, openingStock, minStockLevel, reorderLevel, initialLocationId, defaultLocation, status, company } = req.body;
+    const { skuCode, name, category, unit, altUnit, altUnitConversion, altUnitDirection, paperType, gsm, width, length, brand, title, group, ruleType, pages, booksGbl, openingStock, minStockLevel, reorderLevel, preferredVendor, initialLocationId, defaultLocation, status, company } = req.body;
     if (!company) {
       return res.status(400).json({ msg: "company is required" });
     }
@@ -186,6 +186,7 @@ exports.createSku = async (req, res, next) => {
       openingStock: openingStock ? Number(openingStock) : 0,
       minStockLevel: minStockLevel !== undefined && minStockLevel !== null && minStockLevel !== '' ? Number(minStockLevel) : undefined,
       reorderLevel: reorderLevel !== undefined && reorderLevel !== null && reorderLevel !== '' ? Number(reorderLevel) : undefined,
+      preferredVendor: preferredVendor || "",
       initialLocationId: typeof assignedLocation === 'object' ? (assignedLocation._id || assignedLocation.name) : String(assignedLocation),
       initialLocation: assignedLocation,
       defaultLocation: typeof assignedLocation === 'object' ? (assignedLocation.name || assignedLocation._id) : String(assignedLocation),
@@ -337,6 +338,7 @@ exports.updateSku = async (req, res, next) => {
     if (req.body.openingStock !== undefined) sku.openingStock = req.body.openingStock !== undefined && req.body.openingStock !== null && req.body.openingStock !== '' ? Number(req.body.openingStock) : sku.openingStock;
     if (req.body.minStockLevel !== undefined) sku.minStockLevel = req.body.minStockLevel !== '' && req.body.minStockLevel !== null ? Number(req.body.minStockLevel) : undefined;
     if (req.body.reorderLevel !== undefined) sku.reorderLevel = req.body.reorderLevel !== '' && req.body.reorderLevel !== null ? Number(req.body.reorderLevel) : undefined;
+    if (req.body.preferredVendor !== undefined) sku.preferredVendor = req.body.preferredVendor || "";
     if (req.body.initialLocationId !== undefined) {
       sku.initialLocationId = req.body.initialLocationId;
       sku.initialLocation = req.body.initialLocationId;
@@ -662,7 +664,10 @@ exports.renumberSkus = async (req, res, next) => {
 
     const companyObjId = toObjectId(companyId);
     const companyQuery = companyObjId ? { $in: [companyObjId, String(companyId)] } : companyId;
-    const allSkus = await SkuV2.find({ company: companyQuery, isDeleted: { $ne: true } }).sort({ createdAt: 1, _id: 1 });
+    
+    // Fetch ALL SKUs for company (active + deleted) to clear unique index collisions
+    const companyAllSkus = await SkuV2.find({ company: companyQuery });
+    const allSkus = companyAllSkus.filter(s => !s.isDeleted).sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
 
     if (!allSkus || allSkus.length === 0) {
       return res.json({ msg: "No SKUs to renumber", updatedCount: 0 });
@@ -675,19 +680,21 @@ exports.renumberSkus = async (req, res, next) => {
     for (const sku of allSkus) {
       const cat = (sku.category || "").trim().toLowerCase();
       const code = (sku.skuCode || "").trim().toUpperCase();
+      const name = (sku.name || "").trim().toLowerCase();
 
-      if (cat.includes("finished") || cat.includes("product") || code.startsWith("FG")) {
-        fgList.push(sku);
-      } else if (cat.includes("semi") || code.startsWith("SM") || code.startsWith("SEM")) {
+      if (cat.includes("semi") || cat.includes("wip") || cat === "semi finished" || cat.includes("sub") || code.startsWith("SM") || code.startsWith("SEM") || code.startsWith("SFG") || name.includes("ruled cut") || name.includes("inner signature") || name.includes("book block")) {
         smList.push(sku);
-      } else {
+      } else if (cat.includes("raw") || cat.includes("material") || cat === "raw material" || cat.includes("reel") || cat.includes("board") || code.startsWith("RM") || name.includes("reel") || name.includes("wire") || name.includes("adhesive") || name.includes("glue")) {
         rmList.push(sku);
+      } else {
+        // Products / Finished Goods (Notebooks, Executive Diaries, Longbooks, Hardbound Register, etc.)
+        fgList.push(sku);
       }
     }
 
-    // Pass 1: Set temporary codes for all active SKUs to avoid unique index conflict during batch update
+    // Pass 1: Set temporary codes for ALL company SKUs to avoid unique index conflict during batch update
     let tempCounter = 1;
-    for (const sku of allSkus) {
+    for (const sku of companyAllSkus) {
       sku.skuCode = `TEMP-RENUMBER-${tempCounter++}-${Date.now()}`;
       await sku.save();
     }

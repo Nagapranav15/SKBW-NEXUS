@@ -526,20 +526,105 @@ const PurchaseInvoicePage: React.FC = () => {
 
   const loadFilterData = async () => {
     try {
-      const [vendorRes, skuRes, locRes] = await Promise.all([
+      const [vendorRes, skuRes, locRes, balRes] = await Promise.all([
         getParties({ company: selectedCompany?._id || '', type: 'vendor', limit: 1000 }),
         getSkusV2(selectedCompany?._id || ''),
-        getWarehouseHierarchyV2(selectedCompany?._id || '')
+        getWarehouseHierarchyV2(selectedCompany?._id || ''),
+        getBalancesV2(selectedCompany?._id || '', undefined, true).catch(() => [])
       ]);
       const vendorList = vendorRes?.data?.parties || (Array.isArray(vendorRes?.data) ? vendorRes.data : []);
       setVendors(vendorList);
       setSkus(skuRes);
       setLocations(locRes);
+      if (balRes) setInventoryBalances(balRes);
     } catch (e) {
       console.error(e);
       showToast('Failed to load filters data', 'error');
     }
   };
+
+  const handleReorderLowStockItems = (targetSkuId?: string) => {
+    const skuStockMap = new Map<string, number>();
+    (inventoryBalances || []).forEach(b => {
+      const sId = typeof b.skuId === 'object' ? b.skuId._id : b.skuId;
+      if (sId) {
+        skuStockMap.set(String(sId), (skuStockMap.get(String(sId)) || 0) + (b.presentStock || 0));
+      }
+    });
+
+    let lowStockSkus = skus.filter(s => {
+      if (targetSkuId && s._id === targetSkuId) return true;
+      const stock = skuStockMap.get(String(s._id)) || 0;
+      const reorderThresh = (s as any).reorderLevel || (s as any).reorderQty || (s as any).minStockLevel || 0;
+      return reorderThresh > 0 && stock <= reorderThresh;
+    });
+
+    if (targetSkuId && lowStockSkus.length === 0) {
+      const foundTarget = skus.find(s => s._id === targetSkuId);
+      if (foundTarget) lowStockSkus = [foundTarget];
+    }
+
+    if (lowStockSkus.length === 0) {
+      showToast('All material stock levels are healthy! No items need reordering.', 'info');
+      return;
+    }
+
+    const firstStorage = locations.find(l => l.level === 'Storage Location')?._id || '';
+
+    const reorderItems = lowStockSkus.map(sku => {
+      const stock = skuStockMap.get(String(sku._id)) || 0;
+      const targetLevel = (sku as any).reorderLevel || (sku as any).reorderQty || (sku as any).minStockLevel || 100;
+      const neededQty = Math.max(targetLevel - stock, targetLevel);
+
+      return {
+        skuId: String(sku._id),
+        brand: sku.brand || '',
+        gsm: String(sku.gsm || ''),
+        width: sku.width ? String(sku.width) : '',
+        length: sku.length ? String(sku.length) : '',
+        reelsCount: '',
+        quantity: String(neededQty),
+        purchasePrice: String((sku as any).purchasePrice || (sku as any).ratePerKg || (sku as any).cost || '45'),
+        reamWeight: (sku as any).reamWeight ? String((sku as any).reamWeight) : '',
+        ratePerKg: (sku as any).ratePerKg ? String((sku as any).ratePerKg) : '',
+        lotNumber: `REORDER-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}`,
+        locationId: firstStorage,
+        splits: [],
+        reels: []
+      };
+    });
+
+    let firstVendorId = '';
+    const firstPref = (lowStockSkus[0] as any)?.preferredVendor;
+    if (firstPref) {
+      const vMatch = vendors.find(v => 
+        v._id === firstPref || 
+        (v.firmName && v.firmName.toLowerCase() === firstPref.toLowerCase()) ||
+        (v.ownerName && v.ownerName.toLowerCase() === firstPref.toLowerCase())
+      );
+      if (vMatch) firstVendorId = vMatch._id;
+    }
+
+    setInvoiceForm({
+      vendorId: firstVendorId,
+      invoiceNumber: `PB-REORDER-${Date.now().toString().slice(-4)}`,
+      invoiceDate: new Date().toISOString().slice(0, 10),
+      purchaseType: lowStockSkus[0]?.category || 'Raw Material',
+      items: reorderItems
+    });
+    setEditingInvoiceId(null);
+    setShowAddModal(true);
+    showToast(`Prepared reorder batch for ${lowStockSkus.length} low-stock material(s)`, 'success');
+  };
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const reorderSkuId = urlParams.get('reorderSkuId');
+    const reorderAll = urlParams.get('reorderAll');
+    if ((reorderSkuId || reorderAll === 'true') && skus.length > 0 && vendors.length > 0) {
+      handleReorderLowStockItems(reorderSkuId || undefined);
+    }
+  }, [skus.length, vendors.length]);
 
   const loadInvoices = async (showLoading = true) => {
     if (showLoading) {
@@ -655,6 +740,26 @@ const PurchaseInvoicePage: React.FC = () => {
         item.length = l;
         item.reamWeight = (selectedSku as any).reamWeight ? String((selectedSku as any).reamWeight) : '';
         item.ratePerKg = '';
+
+        // Auto-select preferred vendor if specified on the SKU and batch vendor is not set
+        const prefVen = (selectedSku as any).preferredVendor;
+        if (prefVen) {
+          const matchingVendor = vendors.find(v => 
+            v._id === prefVen ||
+            (v.firmName && v.firmName.toLowerCase() === prefVen.toLowerCase()) ||
+            (v.ownerName && v.ownerName.toLowerCase() === prefVen.toLowerCase()) ||
+            (v.contactName && v.contactName.toLowerCase() === prefVen.toLowerCase())
+          );
+          if (matchingVendor && !invoiceForm.vendorId) {
+            setInvoiceForm(prev => ({ ...prev, vendorId: matchingVendor._id }));
+          }
+        }
+
+        // Auto-suggest reorder quantity if present and item.quantity is empty
+        const recReorder = (selectedSku as any).reorderLevel || (selectedSku as any).reorderQty || (selectedSku as any).minStockLevel;
+        if (recReorder && !item.quantity) {
+          item.quantity = String(recReorder);
+        }
         
         // Reset Reels if not Reels format
         if (selectedSku.paperType !== 'Reels') {
@@ -1190,6 +1295,15 @@ const PurchaseInvoicePage: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              <button
+                onClick={() => handleReorderLowStockItems()}
+                className="flex items-center space-x-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors font-bold text-sm shadow-xs cursor-pointer"
+                title="Create purchase batch for materials at or below reorder level"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>Reorder Low Stock</span>
+              </button>
 
               <button
                 onClick={handleNewPurchaseClick}
