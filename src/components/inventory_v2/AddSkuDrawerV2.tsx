@@ -422,6 +422,78 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
     return merged;
   }, [form.category, activeSection, defaultCategory, createdCategories, form.group]);
+
+  const [isAddingNewCategory, setIsAddingNewCategory] = useState(false);
+  const [newCategoryInput, setNewCategoryInput] = useState('');
+
+  const availableCategories = React.useMemo(() => {
+    const list: string[] = [];
+    
+    // Default main section category
+    if (activeSection === 'products' || defaultCategory === 'Finished Goods') {
+      list.push('Finished Goods');
+    } else if (activeSection === 'semi' || defaultCategory === 'Semi Finished') {
+      list.push('Semi Finished');
+    } else {
+      list.push('Raw Material');
+    }
+
+    // Include other standard categories
+    ['Finished Goods', 'Raw Material', 'Semi Finished'].forEach(baseCat => {
+      if (!list.includes(baseCat)) list.push(baseCat);
+    });
+
+    // Categories created in Categories Tab
+    (createdCategories || []).forEach(c => {
+      if (c && c.name && !list.includes(c.name)) {
+        list.push(c.name);
+      }
+    });
+
+    // Categories loaded from metadata
+    (categoriesList || []).forEach(cat => {
+      if (cat && !list.includes(cat)) {
+        list.push(cat);
+      }
+    });
+
+    // Current category if not present
+    if (form.category && !list.includes(form.category)) {
+      list.push(form.category);
+    }
+
+    return list;
+  }, [activeSection, defaultCategory, createdCategories, categoriesList, form.category]);
+
+  const handleSaveNewCategory = async () => {
+    const trimmed = newCategoryInput.trim();
+    if (!trimmed) {
+      setIsAddingNewCategory(false);
+      return;
+    }
+    if (!categoriesList.includes(trimmed)) {
+      const updated = [...categoriesList, trimmed];
+      setCategoriesList(updated);
+      try {
+        await updateMetadataV2({
+          companyId,
+          categories: updated,
+          units: unitsList,
+          ruleTypes: ruleTypesList,
+          groups: groupsList,
+          brands: brandsList,
+          categoryFields: categoryFieldsMap
+        });
+        showToast(`Category "${trimmed}" added successfully!`, 'success');
+      } catch (err) {
+        console.error('Failed to save category metadata:', err);
+      }
+    }
+    setForm(prev => ({ ...prev, category: trimmed }));
+    regenerateSkuCode(trimmed);
+    setIsAddingNewCategory(false);
+    setNewCategoryInput('');
+  };
   
   const [isNameManuallyEdited, setIsNameManuallyEdited] = useState(false);
   const lastSpecsRef = React.useRef<string>('');
@@ -1048,10 +1120,17 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           processSteps: processSteps.length > 0 ? processSteps : []
         };
 
-        // Auto-save brand/group to metadata on submission if not already present
+        // Auto-save category/brand/group to metadata on submission if not already present
         let metadataUpdated = false;
+        let updatedCategories = [...categoriesList];
         let updatedGroups = [...groupsList];
         let updatedBrands = [...brandsList];
+
+        if (form.category.trim() && !categoriesList.includes(form.category.trim())) {
+          updatedCategories.push(form.category.trim());
+          setCategoriesList(updatedCategories);
+          metadataUpdated = true;
+        }
 
         if (form.group.trim() && !groupsList.includes(form.group.trim())) {
           updatedGroups.push(form.group.trim());
@@ -1070,7 +1149,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           try {
             await updateMetadataV2({
               companyId,
-              categories: categoriesList,
+              categories: updatedCategories,
               units: unitsList,
               ruleTypes: ruleTypesList,
               groups: updatedGroups,
@@ -1176,29 +1255,85 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     required
                   />
                 </div>
-                {/* 2. CATEGORY (Main Section Type - Locked according to current tab) */}
+                {/* 2. CATEGORY (Dynamic, Selectable & Editable) */}
                 <div className="col-span-2 sm:col-span-1">
                   <label className="block text-[11px] font-semibold text-gray-600 mb-1 flex items-center justify-between">
                     <span>CATEGORY *</span>
-                    <span className="text-[10px] text-gray-400 font-medium flex items-center gap-1">
-                      <Lock className="w-2.5 h-2.5 text-gray-400" /> Locked to current tab
-                    </span>
+                    {!isAddingNewCategory && (
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingNewCategory(true)}
+                        className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-0.5 cursor-pointer"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Add Category</span>
+                      </button>
+                    )}
                   </label>
-                  <div className="relative">
-                    <select
-                      value={form.category}
-                      disabled
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-0 focus:border-gray-200 bg-gray-100/90 font-bold text-gray-700 cursor-not-allowed appearance-none shadow-2xs select-none"
-                      required
-                    >
-                      <option value="Finished Goods">Finished Goods</option>
-                      <option value="Raw Material">Raw Material</option>
-                      <option value="Semi Finished">Semi Finished</option>
-                    </select>
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                      <Lock className="w-3.5 h-3.5" />
+
+                  {isAddingNewCategory ? (
+                    <div className="flex items-center gap-1.5 animate-in fade-in duration-150">
+                      <input
+                        type="text"
+                        placeholder="Enter category name..."
+                        value={newCategoryInput}
+                        onChange={e => setNewCategoryInput(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleSaveNewCategory();
+                          } else if (e.key === 'Escape') {
+                            setIsAddingNewCategory(false);
+                            setNewCategoryInput('');
+                          }
+                        }}
+                        className="flex-1 px-3 py-2 border border-blue-300 rounded-xl text-xs font-bold text-gray-800 bg-white focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSaveNewCategory}
+                        className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+                      >
+                        Add
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setIsAddingNewCategory(false); setNewCategoryInput(''); }}
+                        className="p-2 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-100 cursor-pointer"
+                        title="Cancel"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="relative">
+                      <select
+                        value={form.category}
+                        onChange={e => {
+                          const val = e.target.value;
+                          if (val === '__ADD_NEW__') {
+                            setIsAddingNewCategory(true);
+                          } else {
+                            setForm(prev => ({ ...prev, category: val }));
+                            regenerateSkuCode(val);
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-bold text-gray-800 cursor-pointer appearance-none shadow-2xs pr-8"
+                        required
+                      >
+                        {availableCategories.map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                        <option value="__ADD_NEW__" className="font-bold text-blue-600 bg-blue-50">
+                          + Add New Category...
+                        </option>
+                      </select>
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
 
@@ -1480,20 +1615,6 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                               <span className="w-2 h-2 rounded-full bg-blue-600"></span>
                               Alternate Unit of Measurement (AUOM)
                             </span>
-                            {form.altUnit && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const nextDir: UomDirection = effectiveDirection === 'PRIMARY_TO_ALT' ? 'ALT_TO_PRIMARY' : 'PRIMARY_TO_ALT';
-                                  setForm(prev => ({ ...prev, altUnitDirection: nextDir }));
-                                }}
-                                className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 hover:text-blue-900 bg-white hover:bg-blue-100/60 px-2 py-0.5 rounded-md border border-blue-200 shadow-2xs transition-colors"
-                                title="Click to swap conversion direction"
-                              >
-                                <ArrowLeftRight className="w-3 h-3 text-blue-600" />
-                                <span>Swap Direction</span>
-                              </button>
-                            )}
                           </div>
 
                           <div className="grid grid-cols-2 gap-3">
