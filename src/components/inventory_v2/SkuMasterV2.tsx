@@ -51,6 +51,7 @@ import {
   Settings
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import AiCopilotWidget from '../ai/AiCopilotWidget';
 import { 
   getSkusV2, 
   getBalancesV2,
@@ -2030,27 +2031,40 @@ const SkuMasterV2: React.FC = () => {
     if (activeMainTab === 'products') {
       headers = [
         'ID / SKU Code',
-        'SKU NAME',
-        'PAGES',
-        'BRAND',
-        'RULE TYPE',
+        'Item Name',
+        'Category',
+        'UOM',
+        'GSM',
+        'Pages',
+        'Book Size',
+        'Stock',
+        'Min Stock Level',
+        'Status'
+      ];
+      sampleRows = [
+        ['NB-A4-192', 'Deluxe Spiral Notebook A4', 'Notebooks', 'Pcs', '70', '192', 'A4', '500', '50', 'Active'],
+        ['REG-FS-240', 'Long Book Register Fullscape', 'Registers', 'Pcs', '60', '240', 'Long Notebook', '300', '30', 'Active']
+      ];
+    } else if (activeMainTab === 'semi') {
+      headers = [
+        'ID / SKU Code',
+        'Item Name',
         'Category',
         'UOM',
         'AUOM (Alt Unit)',
         'Con Rate',
         'GSM',
-        'WIDTH (CM)',
-        'LENGTH (CM)',
+        'Size',
+        'Pages / Sheets',
+        'Stock',
         'Min Stock Level',
-        'Reorder Level',
-        'Opening Stock Qty'
+        'Status'
       ];
       sampleRows = [
-        ['FG-001', 'Bestfriend (UR)', '132 P', 'Bestfriend', 'UR', 'Longbooks', 'Pcs', 'PCS', '500', '52', '14.25', '35', '50', '20', '10'],
-        ['FG-002', '142P Bestfriend (UR)', '142 P', 'Bestfriend', 'UR', 'Executive Diaries', 'Pcs', 'PCS', '200', '52', '57', '70', '50', '20', '100'],
-        ['NB-A4-192', 'Deluxe Spiral Notebook A4', '192 P', 'Bestfriend', 'Plain', 'Notebooks', 'Pcs', 'Box', '24', '70', '21', '29.7', '100', '50', '500']
+        ['SFG-001', 'Folded Inner Signature 192P', 'Inner Forms', 'Pcs', 'Bundles', '50', '52', '14.25 x 35 CM', '192 P', '800', '100', 'Active'],
+        ['SFG-002', 'Laminated Printed Covers A4', 'Covers', 'Pcs', 'Bundles', '100', '250', '57 x 70 CM', '0', '1200', '200', 'Active']
       ];
-    } else if (activeMainTab === 'semi') {
+    } else if (activeMainTab === 'categories') {
       headers = [
         'ID / SKU Code',
         'Item Name',
@@ -2068,8 +2082,7 @@ const SkuMasterV2: React.FC = () => {
         'vendor'
       ];
       sampleRows = [
-        ['SFG-001', 'Folded Inner Signature 192P', 'UR', 'Inner Forms', 'Pcs', 'Bundles', '50', '52', '14.25', '35', '100', '50', '800', 'Apex Print Pack'],
-        ['SFG-002', 'Laminated Printed Covers A4', 'Plain', 'Covers', 'Pcs', 'Bundles', '100', '250', '57', '70', '200', '100', '1200', 'Pragati Offset']
+        ['CAT-001', 'Notebook Inner Pages', 'UR', 'Notebooks', 'Pcs', 'Bundles', '100', '52', '14.25', '35', '50', '20', '500', 'Apex Print Pack']
       ];
     } else {
       // Raw materials
@@ -2078,19 +2091,20 @@ const SkuMasterV2: React.FC = () => {
         'Item Name',
         'Category',
         'UOM',
+        'AUOM (Alt Unit)',
+        'Con Rate',
         'GSM',
-        'TITLE',
-        'WIDTH (CM)',
         'Size',
+        'Sheets per Ream',
         'Paper Type',
         'Stock',
         'Min Stock Level',
         'Status'
       ];
       sampleRows = [
-        ['RM-PR-001', 'Maplitho Paper Reel 70 GSM', 'Paper Reels', 'Kg', '70', 'Maplitho Paper Reel', '84', '84 CM', 'Reels', '1500', '300', 'Active'],
-        ['RM-DB-002', 'Duplex Board Grey Back 300 GSM', 'Duplex Cover Board', 'Pcs', '300', 'Duplex Board Grey Back', '57', '57 x 70 CM', 'Sheets', '2500', '500', 'Active'],
-        ['RM-CR-003', 'Craft Paper Reel 80 GSM', 'Paper Reels', 'Kg', '80', 'Craft Paper Reel', '90', '90 CM', 'Reels', '1200', '200', 'Active']
+        ['RM-PR-001', 'Maplitho Paper Reel 70 GSM', 'Paper Reels', 'Kg', 'Reels', '500', '70', '84 CM', '0', 'Reels', '1500', '300', 'Active'],
+        ['RM-DB-002', 'Duplex Board Grey Back 300 GSM', 'Duplex Cover Board', 'Pcs', 'Bundles', '100', '300', '57 x 70 CM', '500', 'Sheets', '2500', '500', 'Active'],
+        ['RM-CR-003', 'Craft Paper Reel 80 GSM', 'Paper Reels', 'Kg', 'Reels', '400', '80', '90 CM', '0', 'Reels', '1200', '200', 'Active']
       ];
     }
 
@@ -2660,7 +2674,7 @@ const SkuMasterV2: React.FC = () => {
     <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
       
       {/* 1. Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs">
+      <div className="flex flex-row items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs relative">
         <div className="flex items-center gap-3.5">
           <div className="p-3 bg-blue-100/80 text-blue-700 rounded-2xl shadow-2xs">
             <Package className="w-6 h-6 stroke-[2.2]" />
@@ -2677,6 +2691,9 @@ const SkuMasterV2: React.FC = () => {
             </p>
           </div>
         </div>
+
+        {/* AI Assistant Button embedded inside right of Item Master box */}
+        <AiCopilotWidget inline />
       </div>
 
       {/* ── 2. Top Navigation Tabs Bar & Action Toolbar (Exact match to Business Directory / 1st Image!) ── */}

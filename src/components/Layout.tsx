@@ -388,8 +388,8 @@ const Layout: React.FC = () => {
         onClose={() => setShowDataManager(false)} 
       />
 
-      {/* Global Bottom-Right AI Assistant Widget */}
-      <AiCopilotWidget />
+      {/* Global Bottom-Right / Top-Right AI Assistant Widget (Embedded inline on SkuMasterV2) */}
+      {!location.pathname.includes('/inventory-v2/skus') && <AiCopilotWidget />}
     </div>
   );
 };
