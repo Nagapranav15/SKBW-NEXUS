@@ -600,7 +600,9 @@ const PurchaseInvoicePage: React.FC = () => {
       const vMatch = vendors.find(v => 
         v._id === firstPref || 
         (v.firmName && v.firmName.toLowerCase() === firstPref.toLowerCase()) ||
-        (v.ownerName && v.ownerName.toLowerCase() === firstPref.toLowerCase())
+        (v.ownerName && v.ownerName.toLowerCase() === firstPref.toLowerCase()) ||
+        (v.name && v.name.toLowerCase() === firstPref.toLowerCase()) ||
+        (v.contactName && v.contactName.toLowerCase() === firstPref.toLowerCase())
       );
       if (vMatch) firstVendorId = vMatch._id;
     }
@@ -609,19 +611,24 @@ const PurchaseInvoicePage: React.FC = () => {
       vendorId: firstVendorId,
       invoiceNumber: `PB-REORDER-${Date.now().toString().slice(-4)}`,
       invoiceDate: new Date().toISOString().slice(0, 10),
+      dueDate: new Date().toISOString().split('T')[0],
       purchaseType: lowStockSkus[0]?.category || 'Raw Material',
       items: reorderItems
     });
     setEditingInvoiceId(null);
-    setShowAddModal(true);
+    setIsEditing(false);
+    setAddError('');
+    setActiveSubPage('new');
     showToast(`Prepared reorder batch for ${lowStockSkus.length} low-stock material(s)`, 'success');
   };
 
+  const reorderTriggeredRef = useRef(false);
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const reorderSkuId = urlParams.get('reorderSkuId');
     const reorderAll = urlParams.get('reorderAll');
-    if ((reorderSkuId || reorderAll === 'true') && skus.length > 0 && vendors.length > 0) {
+    if (!reorderTriggeredRef.current && (reorderSkuId || reorderAll === 'true') && skus.length > 0 && vendors.length > 0) {
+      reorderTriggeredRef.current = true;
       handleReorderLowStockItems(reorderSkuId || undefined);
     }
   }, [skus.length, vendors.length]);
