@@ -2237,11 +2237,6 @@ const SkuMasterV2: React.FC = () => {
         const name = getFieldVal('itemname', 'skuname', 'materialname', 'productname', 'name', 'title') || String(row[1] || '').trim();
         if (!name && !skuCode) continue;
 
-        const defaultTabCat = activeMainTab === 'materials' ? 'Raw Material' : activeMainTab === 'semi' ? 'Semi Finished' : 'Finished Goods';
-        const rawCategory = getFieldVal('category', 'itemcategory', 'group', 'itemgroup', 'categoryname');
-        const category = rawCategory || defaultTabCat;
-        const group = rawCategory || category;
-
         const unit = getFieldVal('uom', 'unit', 'primaryunit', 'baseunit', 'mainunit') || (activeMainTab === 'materials' ? 'Kg' : 'Pcs');
         const altUnit = getFieldVal('auomaltunit', 'auom', 'altunit', 'secondaryunit', 'alternateunit', 'auomsecondaryunit') || '';
 
