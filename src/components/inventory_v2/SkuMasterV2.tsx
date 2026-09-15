@@ -2648,9 +2648,12 @@ const SkuMasterV2: React.FC = () => {
 
   // Default category parameter for Add SKU drawer
   const getDefaultCategoryForDrawer = () => {
-    if (activeMainTab === 'products') return 'Finished Goods';
-    if (activeMainTab === 'semi') return 'Semi Finished';
-    return 'Raw Material';
+    const targetType = activeMainTab === 'products' ? 'products' : activeMainTab === 'semi' ? 'semi' : 'materials';
+    const sectionCats = (categoriesData || []).filter(c => c.type === targetType).map(c => c.name);
+    if (sectionCats.length > 0) return sectionCats[0];
+    if (activeMainTab === 'products') return 'Notebooks';
+    if (activeMainTab === 'semi') return 'Ruled Cut Sheets';
+    return 'Paper Reels';
   };
 
   return (

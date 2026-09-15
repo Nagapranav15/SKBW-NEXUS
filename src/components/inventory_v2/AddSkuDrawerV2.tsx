@@ -427,43 +427,52 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   const [newCategoryInput, setNewCategoryInput] = useState('');
 
   const availableCategories = React.useMemo(() => {
-    const list: string[] = [];
-    
-    // Default main section category
-    if (activeSection === 'products' || defaultCategory === 'Finished Goods') {
-      list.push('Finished Goods');
-    } else if (activeSection === 'semi' || defaultCategory === 'Semi Finished') {
-      list.push('Semi Finished');
-    } else {
-      list.push('Raw Material');
+    let targetType: 'products' | 'materials' | 'semi' = activeSection || 'products';
+    const catLower = (form.category || '').toLowerCase();
+
+    if (catLower === 'semi finished' || catLower === 'semi') {
+      targetType = 'semi';
+    } else if (catLower === 'raw material' || catLower === 'materials' || catLower === 'raw materials') {
+      targetType = 'materials';
+    } else if (catLower === 'finished goods' || catLower === 'products') {
+      targetType = 'products';
     }
 
-    // Include other standard categories
-    ['Finished Goods', 'Raw Material', 'Semi Finished'].forEach(baseCat => {
-      if (!list.includes(baseCat)) list.push(baseCat);
-    });
+    const list: string[] = [];
 
-    // Categories created in Categories Tab
+    // 1. Fetch categories created in the Categories Tab matching target section type
     (createdCategories || []).forEach(c => {
-      if (c && c.name && !list.includes(c.name)) {
-        list.push(c.name);
+      if (c && c.name && (c.type === targetType || (!c.type && targetType === 'products'))) {
+        if (!list.includes(c.name)) {
+          list.push(c.name);
+        }
       }
     });
 
-    // Categories loaded from metadata
-    (categoriesList || []).forEach(cat => {
-      if (cat && !list.includes(cat)) {
-        list.push(cat);
+    // 2. Default fallback section categories if no custom created categories exist
+    if (list.length === 0) {
+      if (targetType === 'products') {
+        ['Notebooks', 'Executive Diaries', 'Longbooks', 'Drawing Books', 'Hardbound Register'].forEach(n => {
+          if (!list.includes(n)) list.push(n);
+        });
+      } else if (targetType === 'materials') {
+        ['Paper Reels', 'Paper Sheets', 'Binding Wire', 'Adhesives', 'Packaging Material', 'Raw Material'].forEach(n => {
+          if (!list.includes(n)) list.push(n);
+        });
+      } else {
+        ['Ruled Cut Sheets', 'Inner Signatures', 'Covers', 'Book Blocks', 'Semi Finished'].forEach(n => {
+          if (!list.includes(n)) list.push(n);
+        });
       }
-    });
+    }
 
-    // Current category if not present
+    // 3. Always include form.category if present so value is preserved
     if (form.category && !list.includes(form.category)) {
       list.push(form.category);
     }
 
     return list;
-  }, [activeSection, defaultCategory, createdCategories, categoriesList, form.category]);
+  }, [activeSection, defaultCategory, createdCategories, form.category]);
 
   const handleSaveNewCategory = async () => {
     const trimmed = newCategoryInput.trim();
