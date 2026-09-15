@@ -426,6 +426,21 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   const [isAddingNewCategory, setIsAddingNewCategory] = useState(false);
   const [newCategoryInput, setNewCategoryInput] = useState('');
 
+  const itemMainType = React.useMemo(() => {
+    const cat = form.category || editSku?.category || '';
+    const catLower = cat.toLowerCase();
+    const codeUpper = (form.skuCode || editSku?.skuCode || '').toUpperCase();
+    if (catLower.includes('semi') || catLower.includes('wip') || catLower === 'semi finished' || codeUpper.startsWith('SM') || codeUpper.startsWith('SF')) {
+      return 'Semi';
+    }
+    if (catLower.includes('raw') || catLower.includes('material') || catLower === 'raw material' || codeUpper.startsWith('RM')) {
+      return 'Materials';
+    }
+    if (activeSection === 'semi') return 'Semi';
+    if (activeSection === 'materials') return 'Materials';
+    return 'Products';
+  }, [form.category, editSku, activeSection, form.skuCode]);
+
   const availableCategories = React.useMemo(() => {
     let targetType: 'products' | 'materials' | 'semi' = activeSection || 'products';
     const catLower = (form.category || '').toLowerCase();
@@ -1332,6 +1347,29 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                     required
                   />
+                </div>
+
+                {/* ITEM TYPE (Locked: Products / Materials / Semi) */}
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block text-[11px] font-semibold text-gray-600 mb-1 flex items-center justify-between">
+                    <span>ITEM TYPE</span>
+                    <span className="text-[10px] text-gray-400 font-semibold flex items-center gap-0.5">
+                      <Lock className="w-3 h-3 text-gray-400" />
+                      Locked
+                    </span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={itemMainType}
+                      readOnly
+                      disabled
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-gray-100/90 text-gray-700 font-extrabold cursor-not-allowed uppercase tracking-wider"
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      <Lock className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
                 </div>
                 {/* 2. CATEGORY (Uneditable when editing, selectable + new category field when creating) */}
                 <div className="col-span-2 sm:col-span-1">
