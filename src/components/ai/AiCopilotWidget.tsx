@@ -407,15 +407,13 @@ export const AiCopilotWidget: React.FC = () => {
         <button
           type="button"
           onClick={handleToggleOpen}
-          className="fixed bottom-6 right-6 z-[90] p-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-full shadow-2xl shadow-blue-500/40 ring-4 ring-blue-500/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-3 group cursor-pointer"
+          className="fixed bottom-6 right-6 z-[90] w-12 h-12 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 text-white shadow-xl shadow-blue-500/30 ring-4 ring-blue-500/20 hover:scale-110 active:scale-95 transition-all flex items-center justify-center group cursor-pointer"
           title="Open AI Assistant"
         >
-          <div className="relative">
-            <Bot className="w-6 h-6 animate-bounce" />
+          <div className="relative flex items-center justify-center">
+            <Bot className="w-5 h-5 group-hover:scale-110 transition-transform" />
             <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-blue-600"></span>
           </div>
-          <span className="text-xs font-black tracking-wide pr-1 hidden sm:inline-block">AI Assistant</span>
-          <Sparkles className="w-4 h-4 text-blue-200 group-hover:rotate-12 transition-transform" />
         </button>
       )}
 
