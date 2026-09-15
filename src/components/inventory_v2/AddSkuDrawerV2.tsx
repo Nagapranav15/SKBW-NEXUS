@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, RefreshCw, BookOpen, Layers, Plus, Trash2, AlertCircle, MapPin, Search, ChevronDown, Lock, Package, ArrowLeftRight, Building2 } from 'lucide-react';
+import { Save, RefreshCw, BookOpen, Layers, Plus, Trash2, AlertCircle, MapPin, Search, ChevronDown, Lock, Package, ArrowLeftRight, Building2, Pencil, Settings2, X } from 'lucide-react';
 import { createSkuV2, updateSkuV2, SkuV2, getMetadataV2, updateMetadataV2, getSkusV2, getNextSkuCodeV2, getBalancesV2, getWarehouseHierarchyV2, WarehouseLocationV2 } from '../../api/mfgApiV2';
 import { getParties } from '../../api/partyApi';
 import Modal from '../ui/Modal';
@@ -584,6 +584,20 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     selectedFields: ['gsm', 'width', 'length']
   });
 
+  const DEFAULT_STANDARDIZED_SHEETS = [
+    { id: '1', name: '23×36" (Double Demy)', w: '58.4', l: '91.4' },
+    { id: '2', name: '20×30" (Crown)', w: '50.8', l: '76.2' },
+    { id: '3', name: '18×23" (Demy)', w: '45.7', l: '58.4' },
+    { id: '4', name: '25×36" (Royal)', w: '63.5', l: '91.4' },
+    { id: '5', name: '30×40" (Double Royal)', w: '76.2', l: '101.6' },
+    { id: '6', name: '46×57 CM', w: '46', l: '57' },
+    { id: '7', name: '58.5×91 CM', w: '58.5', l: '91' }
+  ];
+
+  const [standardizedSheets, setStandardizedSheets] = useState<{ id: string; name: string; w: string; l: string }[]>(DEFAULT_STANDARDIZED_SHEETS);
+  const [showEditSheetsModal, setShowEditSheetsModal] = useState(false);
+  const [sheetForm, setSheetForm] = useState({ id: '', name: '', w: '', l: '' });
+
   // Load custom metadata lists & brands from database
   useEffect(() => {
     if (companyId) {
@@ -604,6 +618,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           setBrandsList(data.brands);
           setExistingBrands(data.brands);
           setFgBrandsList(prev => Array.from(new Set([...prev, ...data.brands])));
+        }
+        if (data.standardizedSheets && Array.isArray(data.standardizedSheets) && data.standardizedSheets.length > 0) {
+          setStandardizedSheets(data.standardizedSheets);
         }
         if (data.categoryFields) {
           // Migrate old database 'dimensions' schema to separate 'width' and 'length' fields dynamically on load
@@ -630,6 +647,58 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       }
     } catch (e) {
       console.error('Failed to load dynamic options metadata', e);
+    }
+  };
+
+  const handleSaveStandardizedSheet = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!sheetForm.name.trim() || !sheetForm.w || !sheetForm.l) {
+      showToast('Please enter sheet name, width, and length', 'warning');
+      return;
+    }
+    let updated: { id: string; name: string; w: string; l: string }[] = [];
+    if (sheetForm.id) {
+      updated = standardizedSheets.map(s => s.id === sheetForm.id ? { ...s, name: sheetForm.name.trim(), w: String(sheetForm.w), l: String(sheetForm.l) } : s);
+    } else {
+      const newSheet = { id: String(Date.now()), name: sheetForm.name.trim(), w: String(sheetForm.w), l: String(sheetForm.l) };
+      updated = [...standardizedSheets, newSheet];
+    }
+    setStandardizedSheets(updated);
+    setSheetForm({ id: '', name: '', w: '', l: '' });
+    try {
+      await updateMetadataV2({
+        companyId,
+        categories: categoriesList,
+        units: unitsList,
+        ruleTypes: ruleTypesList,
+        groups: groupsList,
+        brands: brandsList,
+        categoryFields: categoryFieldsMap,
+        standardizedSheets: updated
+      });
+      showToast('Saved standardized sheet size successfully!', 'success');
+    } catch (err) {
+      console.error('Failed to save standardized sheets metadata:', err);
+    }
+  };
+
+  const handleDeleteStandardizedSheet = async (idToDelete: string) => {
+    const updated = standardizedSheets.filter(s => s.id !== idToDelete);
+    setStandardizedSheets(updated);
+    try {
+      await updateMetadataV2({
+        companyId,
+        categories: categoriesList,
+        units: unitsList,
+        ruleTypes: ruleTypesList,
+        groups: groupsList,
+        brands: brandsList,
+        categoryFields: categoryFieldsMap,
+        standardizedSheets: updated
+      });
+      showToast('Removed sheet size preset', 'info');
+    } catch (err) {
+      console.error('Failed to update standardized sheets metadata:', err);
     }
   };
 
@@ -1255,11 +1324,11 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     required
                   />
                 </div>
-                {/* 2. CATEGORY (Dynamic, Selectable & Editable) */}
+                {/* 2. CATEGORY (Uneditable when editing, selectable + new category field when creating) */}
                 <div className="col-span-2 sm:col-span-1">
                   <label className="block text-[11px] font-semibold text-gray-600 mb-1 flex items-center justify-between">
                     <span>CATEGORY *</span>
-                    {!isAddingNewCategory && (
+                    {!editSku && !isAddingNewCategory && (
                       <button
                         type="button"
                         onClick={() => setIsAddingNewCategory(true)}
@@ -1271,7 +1340,20 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     )}
                   </label>
 
-                  {isAddingNewCategory ? (
+                  {editSku ? (
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={form.category}
+                        readOnly
+                        disabled
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-gray-100/80 text-gray-700 font-bold cursor-not-allowed"
+                      />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                        <Lock className="w-3.5 h-3.5" />
+                      </div>
+                    </div>
+                  ) : isAddingNewCategory ? (
                     <div className="flex items-center gap-1.5 animate-in fade-in duration-150">
                       <input
                         type="text"
@@ -1810,22 +1892,24 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
                   {form.paperType === 'Sheets' && (
                     <div className="col-span-2 space-y-1 bg-amber-50/50 p-2.5 rounded-xl border border-amber-200/60">
-                      <label className="block text-[10.5px] font-bold text-amber-900 flex items-center justify-between">
-                        <span>STANDARDIZED SHEET SIZES</span>
-                        <span className="text-[9.5px] font-semibold text-amber-700">Click to autofill dimensions & ream weight</span>
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[10.5px] font-bold text-amber-900 flex items-center gap-1.5">
+                          <span>STANDARDIZED SHEET SIZES</span>
+                          <span className="text-[9.5px] font-semibold text-amber-700 font-normal">(Click to autofill dimensions & ream weight)</span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setShowEditSheetsModal(true)}
+                          className="text-[10px] font-bold text-amber-800 hover:text-amber-950 underline flex items-center gap-1 cursor-pointer bg-amber-100/80 hover:bg-amber-200/80 px-2 py-0.5 rounded-md transition-colors"
+                        >
+                          <Settings2 className="w-3 h-3" />
+                          <span>Edit Standardized Sheets</span>
+                        </button>
+                      </div>
                       <div className="flex flex-wrap gap-1.5 pt-1">
-                        {[
-                          { name: '23×36" (Double Demy)', w: '58.4', l: '91.4' },
-                          { name: '20×30" (Crown)', w: '50.8', l: '76.2' },
-                          { name: '18×23" (Demy)', w: '45.7', l: '58.4' },
-                          { name: '25×36" (Royal)', w: '63.5', l: '91.4' },
-                          { name: '30×40" (Double Royal)', w: '76.2', l: '101.6' },
-                          { name: '46×57 CM', w: '46', l: '57' },
-                          { name: '58.5×91 CM', w: '58.5', l: '91' },
-                        ].map(preset => (
+                        {standardizedSheets.map(preset => (
                           <button
-                            key={preset.name}
+                            key={preset.id || preset.name}
                             type="button"
                             onClick={() => {
                               const newW = preset.w;
@@ -2573,6 +2657,134 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
               className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-sm transition-colors"
             >
               Save Option
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Edit Standardized Sheets Modal */}
+      <Modal
+        isOpen={showEditSheetsModal}
+        onClose={() => {
+          setShowEditSheetsModal(false);
+          setSheetForm({ id: '', name: '', w: '', l: '' });
+        }}
+        size="max-w-lg"
+        title={
+          <div className="flex items-center gap-2">
+            <Settings2 className="w-4 h-4 text-amber-600" />
+            <span className="font-bold text-gray-900 text-base">Standardized Sheet Sizes</span>
+          </div>
+        }
+      >
+        <div className="space-y-4 text-xs text-left p-1">
+          {/* Add / Edit Form */}
+          <form onSubmit={handleSaveStandardizedSheet} className="bg-amber-50/60 p-3 rounded-xl border border-amber-200/80 space-y-3">
+            <div className="text-[11px] font-bold text-amber-900 flex items-center justify-between">
+              <span>{sheetForm.id ? 'Edit Sheet Size Preset' : 'Add New Sheet Size Preset'}</span>
+              {sheetForm.id && (
+                <button
+                  type="button"
+                  onClick={() => setSheetForm({ id: '', name: '', w: '', l: '' })}
+                  className="text-[10px] text-amber-700 underline font-semibold cursor-pointer"
+                >
+                  Cancel Edit
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-12 gap-2">
+              <div className="col-span-6">
+                <label className="block text-[10px] font-bold text-gray-600 mb-1">PRESET NAME *</label>
+                <input
+                  type="text"
+                  placeholder='e.g. 23×36" (Double Demy)'
+                  value={sheetForm.name}
+                  onChange={e => setSheetForm(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs bg-white font-semibold text-gray-800"
+                />
+              </div>
+              <div className="col-span-3">
+                <label className="block text-[10px] font-bold text-gray-600 mb-1">WIDTH (CM) *</label>
+                <input
+                  type="number"
+                  step="any"
+                  placeholder="e.g. 58.4"
+                  value={sheetForm.w}
+                  onChange={e => setSheetForm(prev => ({ ...prev, w: e.target.value }))}
+                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs bg-white font-semibold text-gray-800"
+                />
+              </div>
+              <div className="col-span-3">
+                <label className="block text-[10px] font-bold text-gray-600 mb-1">LENGTH (CM) *</label>
+                <input
+                  type="number"
+                  step="any"
+                  placeholder="e.g. 91.4"
+                  value={sheetForm.l}
+                  onChange={e => setSheetForm(prev => ({ ...prev, l: e.target.value }))}
+                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs bg-white font-semibold text-gray-800"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end pt-1">
+              <button
+                type="submit"
+                className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg shadow-2xs text-xs cursor-pointer flex items-center gap-1"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>{sheetForm.id ? 'Update Preset' : 'Add Preset'}</span>
+              </button>
+            </div>
+          </form>
+
+          {/* List of Current Presets */}
+          <div className="space-y-2">
+            <span className="block text-[11px] font-bold text-gray-700">Existing Presets</span>
+            <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
+              {standardizedSheets.map(s => (
+                <div key={s.id} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl border border-gray-200/80 hover:bg-white transition-colors">
+                  <div>
+                    <span className="font-bold text-gray-800 text-xs">{s.name}</span>
+                    <span className="ml-2 text-[11px] text-gray-500">({s.w} × {s.l} cm)</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setSheetForm({ id: s.id, name: s.name, w: s.w, l: s.l })}
+                      className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer"
+                      title="Edit Preset"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteStandardizedSheet(s.id)}
+                      className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg cursor-pointer"
+                      title="Delete Preset"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {standardizedSheets.length === 0 && (
+                <div className="p-4 text-center text-gray-400 italic bg-gray-50 rounded-xl">
+                  No standardized sheet presets found.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-3 border-t">
+            <button
+              type="button"
+              onClick={() => {
+                setShowEditSheetsModal(false);
+                setSheetForm({ id: '', name: '', w: '', l: '' });
+              }}
+              className="px-4 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors cursor-pointer"
+            >
+              Close
             </button>
           </div>
         </div>

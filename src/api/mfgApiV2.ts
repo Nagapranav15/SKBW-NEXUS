@@ -232,6 +232,7 @@ export interface MetadataV2 {
   groups?: string[];
   brands?: string[];
   categoryFields?: Record<string, string[]>;
+  standardizedSheets?: { id: string; name: string; w: string; l: string }[];
 }
 
 export const getMetadataV2 = async (companyId: string): Promise<MetadataV2> => {
@@ -249,6 +250,7 @@ export const updateMetadataV2 = async (metadataData: {
   groups?: string[];
   brands?: string[];
   categoryFields?: Record<string, string[]>;
+  standardizedSheets?: { id: string; name: string; w: string; l: string }[];
 }): Promise<MetadataV2> => {
   const response = await api.post('/v2/metadata', metadataData);
   return response.data;
