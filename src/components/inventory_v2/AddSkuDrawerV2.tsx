@@ -1371,11 +1371,11 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     </div>
                   </div>
                 </div>
-                {/* 2. CATEGORY (Uneditable when editing, selectable + new category field when creating) */}
+                {/* 2. CATEGORY (Selectable & Editable whether creating or editing) */}
                 <div className="col-span-2 sm:col-span-1">
                   <label className="block text-[11px] font-semibold text-gray-600 mb-1 flex items-center justify-between">
                     <span>CATEGORY *</span>
-                    {!editSku && !isAddingNewCategory && (
+                    {!isAddingNewCategory && (
                       <button
                         type="button"
                         onClick={() => setIsAddingNewCategory(true)}
@@ -1387,20 +1387,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     )}
                   </label>
 
-                  {editSku ? (
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={form.category}
-                        readOnly
-                        disabled
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-gray-100/80 text-gray-700 font-bold cursor-not-allowed"
-                      />
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                        <Lock className="w-3.5 h-3.5" />
-                      </div>
-                    </div>
-                  ) : isAddingNewCategory ? (
+                  {isAddingNewCategory ? (
                     <div className="flex items-center gap-1.5 animate-in fade-in duration-150">
                       <input
                         type="text"
@@ -1445,7 +1432,6 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                             setIsAddingNewCategory(true);
                           } else {
                             setForm(prev => ({ ...prev, category: val }));
-                            regenerateSkuCode(val);
                           }
                         }}
                         className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-bold text-gray-800 cursor-pointer appearance-none shadow-2xs pr-8"
