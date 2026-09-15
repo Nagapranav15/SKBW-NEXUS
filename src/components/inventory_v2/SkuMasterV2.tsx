@@ -2130,6 +2130,35 @@ const SkuMasterV2: React.FC = () => {
         headerMap[cleanH] = idx;
       });
 
+      // Scan all existing items to find the current highest sequential number per prefix
+      const maxSeqMap: Record<string, number> = {};
+      (skus || []).forEach(s => {
+        if (s.isDeleted) return;
+        const code = String(s.skuCode || '').trim();
+        const match = code.match(/^([A-Za-z]+)[-_]?(\d{1,6})$/);
+        if (match) {
+          const pref = match[1].toUpperCase();
+          const num = parseInt(match[2], 10);
+          if (!isNaN(num) && num < 100000) {
+            maxSeqMap[pref] = Math.max(maxSeqMap[pref] || 0, num);
+          }
+        }
+      });
+
+      // Also check localStorage for tracked max sequence
+      ['RM', 'FG', 'SFG', 'SM', 'NB', 'DB'].forEach(prefix => {
+        try {
+          const key = `skbw_max_sku_seq_${selectedCompany._id}_${prefix}`;
+          const val = localStorage.getItem(key);
+          if (val) {
+            const num = parseInt(val, 10);
+            if (!isNaN(num) && num < 100000) {
+              maxSeqMap[prefix] = Math.max(maxSeqMap[prefix] || 0, num);
+            }
+          }
+        } catch (_) {}
+      });
+
       const itemsToCreate: any[] = [];
       for (let i = 1; i < rawRows.length; i++) {
         const row = rawRows[i];
@@ -2158,6 +2187,26 @@ const SkuMasterV2: React.FC = () => {
           if (firstColStr && !/^\d+$/.test(firstColStr)) {
             skuCode = firstColStr;
           }
+        }
+
+        const defaultPrefix = activeMainTab === 'materials' ? 'RM' : activeMainTab === 'semi' ? 'SFG' : 'FG';
+
+        if (skuCode) {
+          // If explicit SKU code is provided, update sequence tracker for its prefix
+          const match = skuCode.match(/^([A-Za-z]+)[-_]?(\d{1,6})$/);
+          if (match) {
+            const pref = match[1].toUpperCase();
+            const num = parseInt(match[2], 10);
+            if (!isNaN(num) && num < 100000) {
+              maxSeqMap[pref] = Math.max(maxSeqMap[pref] || 0, num);
+            }
+          }
+        } else {
+          // Auto-generate code continuing monotonically from current highest number
+          const pref = defaultPrefix.toUpperCase();
+          const nextSeq = (maxSeqMap[pref] || 0) + 1;
+          maxSeqMap[pref] = nextSeq;
+          skuCode = `${defaultPrefix}-${String(nextSeq).padStart(3, '0')}`;
         }
 
         const name = getFieldVal('itemname', 'skuname', 'materialname', 'productname', 'name', 'title') || String(row[1] || '').trim();
@@ -2257,7 +2306,7 @@ const SkuMasterV2: React.FC = () => {
 
         itemsToCreate.push({
           company: selectedCompany._id,
-          skuCode: skuCode || `SKU-${Date.now()}-${i}`,
+          skuCode: skuCode || `${defaultPrefix}-${Date.now()}-${i}`,
           name: name || skuCode,
           category,
           group,
@@ -2277,8 +2326,17 @@ const SkuMasterV2: React.FC = () => {
           status,
           brand: brand || undefined,
           ruleType: ruleType || undefined,
+          title: title || undefined
         });
       }
+
+      // Save updated sequence counters to localStorage so manual drawer creation seamlessly continues
+      Object.entries(maxSeqMap).forEach(([pref, maxSeq]) => {
+        try {
+          const key = `skbw_max_sku_seq_${selectedCompany._id}_${pref}`;
+          localStorage.setItem(key, String(maxSeq));
+        } catch (_) {}
+      });
 
       if (itemsToCreate.length === 0) {
         showToast('No valid item records parsed from file', 'warning');
