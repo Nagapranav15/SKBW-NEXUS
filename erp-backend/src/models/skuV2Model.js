@@ -46,7 +46,7 @@ const skuV2Schema = new mongoose.Schema({
   isDeleted: { type: Boolean, default: false, index: true }
 }, { timestamps: true, strict: false });
 
-skuV2Schema.index({ skuCode: 1, company: 1 }, { unique: true });
+skuV2Schema.index({ skuCode: 1, company: 1 }, { unique: true, partialFilterExpression: { isDeleted: false } });
 skuV2Schema.index({ company: 1, category: 1 });
 skuV2Schema.index({ company: 1, status: 1 });
 
