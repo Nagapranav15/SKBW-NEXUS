@@ -3098,24 +3098,39 @@ export const BusinessDirectoryV2: React.FC = () => {
                           </td>
                           <td className="py-3 px-3 font-mono font-medium whitespace-nowrap">
                             <div className="inline-flex items-center gap-1.5 leading-none whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                              {item.phone || item.contactPersons?.[0]?.phone ? (
-                                <span className="inline-block min-w-[100px] font-bold text-blue-600 font-mono tabular-nums leading-none whitespace-nowrap">
-                                  {item.phone || item.contactPersons?.[0]?.phone}
-                                </span>
-                              ) : (
-                                <span className="inline-block min-w-[100px] text-gray-400 font-normal font-mono tabular-nums leading-none whitespace-nowrap">—</span>
-                              )}
-                              {(item.phone || item.contactPersons?.[0]?.phone) && (
-                                <a
-                                  href={`https://wa.me/91${(item.phone || item.contactPersons?.[0]?.phone || '').replace(/\D/g, '')}`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  title="Chat on WhatsApp"
-                                  className="inline-flex items-center justify-center shrink-0 text-emerald-500 hover:text-emerald-600 transition-transform hover:scale-110 align-middle -translate-y-[1.5px]"
-                                >
-                                  <WhatsAppIcon />
-                                </a>
-                              )}
+                              {(() => {
+                                const phones: string[] = [];
+                                if (item.phone) phones.push(item.phone);
+                                if (item.altPhone && !phones.includes(item.altPhone)) phones.push(item.altPhone);
+                                if (item.whatsapp && !phones.includes(item.whatsapp)) phones.push(item.whatsapp);
+                                if (Array.isArray(item.contactPersons)) {
+                                  item.contactPersons.forEach((cp: any) => {
+                                    if (cp?.phone && !phones.includes(cp.phone)) phones.push(cp.phone);
+                                  });
+                                }
+                                if (phones.length === 0) return <span className="inline-block min-w-[100px] text-gray-400 font-normal font-mono tabular-nums leading-none whitespace-nowrap">—</span>;
+                                return (
+                                  <div className="inline-flex items-center gap-1.5">
+                                    <span className="font-bold text-blue-600 font-mono tabular-nums leading-none whitespace-nowrap">
+                                      {phones[0]}
+                                    </span>
+                                    <a
+                                      href={`https://wa.me/91${phones[0].replace(/\D/g, '')}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      title="Chat on WhatsApp"
+                                      className="inline-flex items-center justify-center shrink-0 text-emerald-500 hover:text-emerald-600 transition-transform hover:scale-110 align-middle -translate-y-[1.5px]"
+                                    >
+                                      <WhatsAppIcon />
+                                    </a>
+                                    {phones.length > 1 && (
+                                      <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-full" title={`All Numbers (${phones.length}): ${phones.join(', ')}`}>
+                                        +{phones.length - 1} more
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </div>
                           </td>
                           <td className="py-3 px-3 font-bold text-gray-900 text-xs">
@@ -5389,6 +5404,32 @@ export const BusinessDirectoryV2: React.FC = () => {
               if (effectiveTab === 'transporters') {
                 const transName = (name || '').toLowerCase().trim();
                 const transCusts = allCustomers.filter((c: any) => (c.preferredTransport || '').toLowerCase().trim() === transName);
+                const contactPersons: any[] = (selectedDetails as any).contactPersons || [];
+
+                // Collect all phone numbers attached to this transporter
+                const allPhones: { label: string; phone: string; name?: string }[] = [];
+                if (selectedDetails.phone || selectedDetails.mobile) {
+                  allPhones.push({ label: 'Primary Mobile', phone: selectedDetails.phone || selectedDetails.mobile, name: selectedDetails.contactName || selectedDetails.ownerName });
+                }
+                if (selectedDetails.altPhone || selectedDetails.altMobile) {
+                  const altP = selectedDetails.altPhone || selectedDetails.altMobile;
+                  if (!allPhones.some(p => p.phone === altP)) {
+                    allPhones.push({ label: 'Alternate Mobile', phone: altP });
+                  }
+                }
+                if (selectedDetails.whatsapp) {
+                  const waP = selectedDetails.whatsapp;
+                  if (!allPhones.some(p => p.phone === waP)) {
+                    allPhones.push({ label: 'WhatsApp Number', phone: waP });
+                  }
+                }
+                if (Array.isArray(contactPersons)) {
+                  contactPersons.forEach((cp: any, idx: number) => {
+                    if (cp.phone && !allPhones.some(p => p.phone === cp.phone)) {
+                      allPhones.push({ label: cp.designation || cp.role || `Contact Person #${idx + 1}`, phone: cp.phone, name: cp.name });
+                    }
+                  });
+                }
 
                 return (
                   <>
@@ -5425,32 +5466,186 @@ export const BusinessDirectoryV2: React.FC = () => {
                     </div>
 
                     <div className="max-h-[60vh] overflow-y-auto pr-1 space-y-3.5 text-xs">
-                      <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-2.5">
-                        <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
-                              <Truck className="w-3.5 h-3.5" />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                        {/* LEFT COLUMN */}
+                        <div className="space-y-3.5">
+                          {/* TRANSPORTER PROFILE */}
+                          <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-2.5">
+                            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
+                                  <Truck className="w-3.5 h-3.5" />
+                                </div>
+                                <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">TRANSPORTER DETAILS</h4>
+                              </div>
                             </div>
-                            <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">TRANSPORTER PROFILE</h4>
+                            <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs">
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Firm / Agency Name</span>
+                                <span className="font-bold text-gray-900 text-xs block truncate">{name}</span>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Contact Person</span>
+                                <span className="font-bold text-gray-900 text-xs block truncate">{selectedDetails.contactName || selectedDetails.ownerName || contactPersons?.[0]?.name || '—'}</span>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Primary Phone</span>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-mono font-bold text-blue-600 text-xs">{selectedDetails.phone || selectedDetails.mobile || '—'}</span>
+                                  {(selectedDetails.phone || selectedDetails.mobile) && (
+                                    <a href={`https://wa.me/91${(selectedDetails.phone || selectedDetails.mobile).replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="WhatsApp">
+                                      <WhatsAppIcon />
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Alternate Phone</span>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-mono font-bold text-blue-600 text-xs">{selectedDetails.altPhone || selectedDetails.altMobile || '—'}</span>
+                                  {(selectedDetails.altPhone || selectedDetails.altMobile) && (
+                                    <a href={`https://wa.me/91${(selectedDetails.altPhone || selectedDetails.altMobile).replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="WhatsApp">
+                                      <WhatsAppIcon />
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">WhatsApp Number</span>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-mono font-bold text-blue-600 text-xs">{selectedDetails.whatsapp || selectedDetails.phone || '—'}</span>
+                                  {(selectedDetails.whatsapp || selectedDetails.phone) && (
+                                    <a href={`https://wa.me/91${(selectedDetails.whatsapp || selectedDetails.phone).replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="WhatsApp">
+                                      <WhatsAppIcon />
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Email ID</span>
+                                <span className="font-semibold text-gray-800 text-xs block truncate">{selectedDetails.email || '—'}</span>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">GSTIN / Tax ID</span>
+                                <span className="font-mono font-bold text-blue-600 text-xs">{selectedDetails.gstNumber || selectedDetails.gstin || '—'}</span>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Vehicle / Fleet No</span>
+                                <span className="font-mono font-semibold text-gray-900 text-xs">{selectedDetails.vehicleNo || '—'}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* ADDRESS & LOCATION */}
+                          <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-2.5">
+                            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                                  <MapPin className="w-3.5 h-3.5" />
+                                </div>
+                                <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">ADDRESS & LOCATION</h4>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs">
+                              <div className="col-span-2">
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Full Address</span>
+                                <span className="font-bold text-gray-900 text-xs block">{selectedDetails.address1 || selectedDetails.address || '—'}</span>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">City / Location</span>
+                                <span className="font-bold text-gray-900 text-xs">{selectedDetails.city || selectedDetails.assignedMarket || '—'}</span>
+                              </div>
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">State & Pincode</span>
+                                <span className="font-bold text-gray-900 text-xs">{selectedDetails.state || 'Andhra Pradesh'} {selectedDetails.pincode ? `(${selectedDetails.pincode})` : ''}</span>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-y-2.5 gap-x-3 text-xs">
-                          <div>
-                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Firm Name</span>
-                            <span className="font-bold text-gray-900 text-xs block truncate">{name}</span>
-                          </div>
-                          <div>
-                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Contact Person</span>
-                            <span className="font-bold text-gray-900 text-xs block truncate">{selectedDetails.contactName || selectedDetails.contactPersons?.[0]?.name || '—'}</span>
-                          </div>
-                          <div>
-                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Mobile Number</span>
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-mono font-bold text-blue-600 text-xs">{selectedDetails.phone || selectedDetails.contactPersons?.[0]?.phone || '—'}</span>
-                              {(selectedDetails.phone || selectedDetails.contactPersons?.[0]?.phone) && (
-                                <a href={`https://wa.me/91${(selectedDetails.phone || selectedDetails.contactPersons?.[0]?.phone).replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="WhatsApp">
-                                  <WhatsAppIcon />
-                                </a>
+
+                        {/* RIGHT COLUMN: MULTIPLE CONTACT PERSONS & NUMBERS */}
+                        <div className="space-y-3.5">
+                          <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-2.5">
+                            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                                  <Users className="w-3.5 h-3.5" />
+                                </div>
+                                <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">CONTACT NUMBERS & PERSONS</h4>
+                              </div>
+                              <span className="px-2 py-0.5 bg-blue-50 text-blue-700 font-extrabold rounded-md text-[10px]">
+                                {allPhones.length} {allPhones.length === 1 ? 'Number' : 'Numbers'}
+                              </span>
+                            </div>
+
+                            {/* List of Contact Persons if available */}
+                            {contactPersons.length > 0 && (
+                              <div className="space-y-2 mb-3">
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block">Assigned Contact Persons</span>
+                                {contactPersons.map((cp: any, idx: number) => (
+                                  <div key={idx} className="p-2.5 bg-slate-50 hover:bg-blue-50/50 rounded-xl border border-gray-200 transition-colors space-y-1">
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-extrabold text-gray-900 text-xs">{cp.name || `Contact Person #${idx + 1}`}</span>
+                                      {(cp.designation || cp.role) && (
+                                        <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-md">
+                                          {cp.designation || cp.role}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center justify-between gap-2 text-xs">
+                                      {cp.phone ? (
+                                        <div className="flex items-center gap-1.5">
+                                          <Phone className="w-3 h-3 text-blue-600" />
+                                          <span className="font-mono font-bold text-blue-600">{cp.phone}</span>
+                                          <a href={`https://wa.me/91${cp.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="WhatsApp">
+                                            <WhatsAppIcon />
+                                          </a>
+                                        </div>
+                                      ) : (
+                                        <span className="text-gray-400 text-[11px]">No phone listed</span>
+                                      )}
+                                      {cp.email && (
+                                        <span className="text-gray-500 text-[11px] truncate max-w-[150px]">{cp.email}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Complete list of all phone numbers */}
+                            <div className="space-y-2">
+                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block">All Recorded Numbers</span>
+                              {allPhones.length > 0 ? (
+                                allPhones.map((p, idx) => (
+                                  <div key={idx} className="p-2 bg-blue-50/40 rounded-xl border border-blue-100/80 flex items-center justify-between text-xs">
+                                    <div>
+                                      <span className="text-[10px] font-extrabold text-blue-700 uppercase tracking-wider block">{p.label}</span>
+                                      {p.name && <span className="text-[11px] font-semibold text-gray-800 block">{p.name}</span>}
+                                      <span className="font-mono font-bold text-gray-900">{p.phone}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <a
+                                        href={`tel:${p.phone}`}
+                                        className="p-1.5 bg-white hover:bg-blue-100 text-blue-600 rounded-lg border border-blue-200 transition-colors"
+                                        title="Call"
+                                      >
+                                        <Phone className="w-3.5 h-3.5" />
+                                      </a>
+                                      <a
+                                        href={`https://wa.me/91${p.phone.replace(/\D/g, '')}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg border border-emerald-200 transition-colors"
+                                        title="WhatsApp"
+                                      >
+                                        <WhatsAppIcon />
+                                      </a>
+                                    </div>
+                                  </div>
+                                ))
+                              ) : (
+                                <p className="text-xs text-gray-400 italic">No phone numbers found</p>
                               )}
                             </div>
                           </div>

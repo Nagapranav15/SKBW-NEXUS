@@ -2022,69 +2022,74 @@ const SkuMasterV2: React.FC = () => {
     if (activeMainTab === 'products') {
       headers = [
         'ID / SKU Code',
-        'Item Name',
+        'SKU NAME',
+        'PAGES',
+        'BRAND',
+        'RULE TYPE',
         'Category',
         'UOM',
         'AUOM (Alt Unit)',
         'Con Rate',
         'GSM',
-        'Size',
-        'Pages / Sheets',
-        'Stock',
+        'WIDTH (CM)',
+        'LENGTH (CM)',
         'Min Stock Level',
-        'Status'
+        'Reorder Level',
+        'Opening Stock Qty'
       ];
       sampleRows = [
-        ['FG-001', 'Bestfriend (UR)', 'Longbooks', 'Pcs', 'PCS', '500', '52', '14.25 x 35 CM', '132 P', '10', '50', 'Active'],
-        ['FG-002', '142P Bestfriend (UR)', 'Executive Diaries', 'Pcs', 'PCS', '200', '52', '57 x 70 CM', '142 P', '100', '50', 'Active'],
-        ['NB-A4-192', 'Deluxe Spiral Notebook A4', 'Notebooks', 'Pcs', 'Box', '24', '70', '21 x 29.7 CM', '192 P', '500', '100', 'Active']
+        ['FG-001', 'Bestfriend (UR)', '132 P', 'Bestfriend', 'UR', 'Longbooks', 'Pcs', 'PCS', '500', '52', '14.25', '35', '50', '20', '10'],
+        ['FG-002', '142P Bestfriend (UR)', '142 P', 'Bestfriend', 'UR', 'Executive Diaries', 'Pcs', 'PCS', '200', '52', '57', '70', '50', '20', '100'],
+        ['NB-A4-192', 'Deluxe Spiral Notebook A4', '192 P', 'Bestfriend', 'Plain', 'Notebooks', 'Pcs', 'Box', '24', '70', '21', '29.7', '100', '50', '500']
       ];
-    } else if (activeMainTab === 'materials') {
+    } else if (activeMainTab === 'semi') {
+      headers = [
+        'ID / SKU Code',
+        'Item Name',
+        'RULE TYPE',
+        'Category',
+        'UOM',
+        'AUOM (Alt Unit)',
+        'Con Rate',
+        'GSM',
+        'WIDTH (CM)',
+        'LENGTH (CM)',
+        'Min Stock Level',
+        'Reorder Level',
+        'Opening Stock Qty',
+        'vendor'
+      ];
+      sampleRows = [
+        ['SFG-001', 'Folded Inner Signature 192P', 'UR', 'Inner Forms', 'Pcs', 'Bundles', '50', '52', '14.25', '35', '100', '50', '800', 'Apex Print Pack'],
+        ['SFG-002', 'Laminated Printed Covers A4', 'Plain', 'Covers', 'Pcs', 'Bundles', '100', '250', '57', '70', '200', '100', '1200', 'Pragati Offset']
+      ];
+    } else {
+      // Raw materials
       headers = [
         'ID / SKU Code',
         'Item Name',
         'Category',
         'UOM',
-        'AUOM (Alt Unit)',
-        'Con Rate',
         'GSM',
+        'TITLE',
+        'WIDTH (CM)',
         'Size',
-        'Sheets per Ream',
         'Paper Type',
         'Stock',
         'Min Stock Level',
         'Status'
       ];
       sampleRows = [
-        ['RM-PR-001', 'Maplitho Paper Reel 70 GSM', 'Paper Reels', 'Kg', 'Reels', '500', '70', '84 CM', '0', 'Reels', '1500', '300', 'Active'],
-        ['RM-DB-002', 'Duplex Board Grey Back 300 GSM', 'Duplex Cover Board', 'Pcs', 'Bundles', '100', '300', '57 x 70 CM', '500', 'Sheets', '2500', '500', 'Active'],
-        ['RM-CR-003', 'Craft Paper Reel 80 GSM', 'Paper Reels', 'Kg', 'Reels', '400', '80', '90 CM', '0', 'Reels', '1200', '200', 'Active']
-      ];
-    } else {
-      headers = [
-        'ID / SKU Code',
-        'Item Name',
-        'Category',
-        'UOM',
-        'AUOM (Alt Unit)',
-        'Con Rate',
-        'GSM',
-        'Size',
-        'Pages / Sheets',
-        'Stock',
-        'Min Stock Level',
-        'Status'
-      ];
-      sampleRows = [
-        ['SFG-001', 'Folded Inner Signature 192P', 'Inner Forms', 'Pcs', 'Bundles', '50', '52', '14.25 x 35 CM', '192 P', '800', '100', 'Active'],
-        ['SFG-002', 'Laminated Printed Covers A4', 'Covers', 'Pcs', 'Bundles', '100', '250', '57 x 70 CM', '0', '1200', '200', 'Active']
+        ['RM-PR-001', 'Maplitho Paper Reel 70 GSM', 'Paper Reels', 'Kg', '70', 'Maplitho Paper Reel', '84', '84 CM', 'Reels', '1500', '300', 'Active'],
+        ['RM-DB-002', 'Duplex Board Grey Back 300 GSM', 'Duplex Cover Board', 'Pcs', '300', 'Duplex Board Grey Back', '57', '57 x 70 CM', 'Sheets', '2500', '500', 'Active'],
+        ['RM-CR-003', 'Craft Paper Reel 80 GSM', 'Paper Reels', 'Kg', '80', 'Craft Paper Reel', '90', '90 CM', 'Reels', '1200', '200', 'Active']
       ];
     }
 
     const csvContent = '\uFEFF' + [
       headers.join(','),
       ...sampleRows.map(row => row.map(val => {
-        const clean = String(val).replace(/"/g, '""');
+        const clean = String(val ?? '').replace(/"/g, '""');
         return clean.includes(',') || clean.includes('\n') ? `"${clean}"` : clean;
       }).join(','))
     ].join('\n');
@@ -2155,7 +2160,7 @@ const SkuMasterV2: React.FC = () => {
           }
         }
 
-        const name = getFieldVal('itemname', 'materialname', 'productname', 'name', 'title') || String(row[1] || '').trim();
+        const name = getFieldVal('itemname', 'skuname', 'materialname', 'productname', 'name', 'title') || String(row[1] || '').trim();
         if (!name && !skuCode) continue;
 
         const defaultTabCat = activeMainTab === 'materials' ? 'Raw Material' : activeMainTab === 'semi' ? 'Semi Finished' : 'Finished Goods';
@@ -2213,6 +2218,11 @@ const SkuMasterV2: React.FC = () => {
         const pagesMatch = rawPages.match(/(\d+)/);
         const pages = pagesMatch ? Number(pagesMatch[1]) : (rawPages ? Number(rawPages) || undefined : undefined);
 
+        // Extract Brand, Rule Type & Title
+        const brand = getFieldVal('brand', 'brandname');
+        const ruleType = getFieldVal('ruletype', 'rule');
+        const title = getFieldVal('title', 'itemtitle', 'description');
+
         // Extract Paper Type
         const rawPaperType = getFieldVal('papertype', 'papertypeform', 'type', 'materialtype');
         let paperType: 'Reels' | 'Sheets' | 'None' = 'None';
@@ -2227,7 +2237,7 @@ const SkuMasterV2: React.FC = () => {
         }
 
         // Extract Stock
-        const rawStock = getFieldVal('stock', 'openingstock', 'presentstock', 'qty', 'quantity', 'currentstock');
+        const rawStock = getFieldVal('openingstockqty', 'openingstock', 'stock', 'presentstock', 'qty', 'quantity', 'currentstock');
         const stockMatch = rawStock.match(/(\d+(?:\.\d+)?)/);
         const openingStock = stockMatch ? Number(stockMatch[1]) : (rawStock ? Number(rawStock) || 0 : 0);
 
@@ -2264,7 +2274,9 @@ const SkuMasterV2: React.FC = () => {
           minStockLevel,
           reorderLevel,
           preferredVendor,
-          status
+          status,
+          brand: brand || undefined,
+          ruleType: ruleType || undefined,
         });
       }
 
