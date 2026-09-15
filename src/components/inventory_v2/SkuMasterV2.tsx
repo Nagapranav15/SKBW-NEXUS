@@ -1124,6 +1124,14 @@ const SkuMasterV2: React.FC = () => {
         };
       });
       setSkus(formatted);
+
+      // Check if any existing/present items contain legacy timestamp SKU codes (e.g. SKU-1789470761533-1)
+      if (!autoRenumberedRef.current && formatted.some(item => /^SKU-\d{8,}/i.test(item.skuCode || '') || /^TEMP-/i.test(item.skuCode || ''))) {
+        autoRenumberedRef.current = true;
+        setTimeout(() => {
+          handleRenumberSkus(true);
+        }, 200);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -2182,14 +2190,31 @@ const SkuMasterV2: React.FC = () => {
           'item_code', 'sku_code'
         );
         let skuCode = explicitSku;
+
+        // Ignore auto-generated timestamp SKU codes from CSV (e.g. SKU-1789470761533-1) so we auto-assign continuous sequence code
+        if (skuCode && (/^SKU-\d{8,}/i.test(skuCode.trim()) || /^TEMP-/i.test(skuCode.trim()))) {
+          skuCode = '';
+        }
+
         if (!skuCode) {
           const firstColStr = String(row[0] || '').trim();
-          if (firstColStr && !/^\d+$/.test(firstColStr)) {
+          if (firstColStr && !/^\d+$/.test(firstColStr) && !/^SKU-\d{8,}/i.test(firstColStr) && !/^TEMP-/i.test(firstColStr)) {
             skuCode = firstColStr;
           }
         }
 
-        const defaultPrefix = activeMainTab === 'materials' ? 'RM' : activeMainTab === 'semi' ? 'SFG' : 'FG';
+        const defaultTabCat = activeMainTab === 'materials' ? 'Raw Material' : activeMainTab === 'semi' ? 'Semi Finished' : 'Finished Goods';
+        const rawCategory = getFieldVal('category', 'itemcategory', 'group', 'itemgroup', 'categoryname');
+        const category = rawCategory || defaultTabCat;
+        const group = rawCategory || category;
+
+        const catLower = (category || '').toLowerCase();
+        let defaultPrefix = 'FG';
+        if (catLower.includes('semi') || catLower.includes('wip') || catLower.includes('sub') || activeMainTab === 'semi') {
+          defaultPrefix = 'SM';
+        } else if (catLower.includes('raw') || catLower.includes('material') || catLower.includes('reel') || catLower.includes('board') || activeMainTab === 'materials') {
+          defaultPrefix = 'RM';
+        }
 
         if (skuCode) {
           // If explicit SKU code is provided, update sequence tracker for its prefix
@@ -2306,7 +2331,7 @@ const SkuMasterV2: React.FC = () => {
 
         itemsToCreate.push({
           company: selectedCompany._id,
-          skuCode: skuCode || `${defaultPrefix}-${Date.now()}-${i}`,
+          skuCode: skuCode || `${defaultPrefix}-${String(((maxSeqMap[defaultPrefix.toUpperCase()] = (maxSeqMap[defaultPrefix.toUpperCase()] || 0) + 1))).padStart(3, '0')}`,
           name: name || skuCode,
           category,
           group,
@@ -2391,6 +2416,8 @@ const SkuMasterV2: React.FC = () => {
       }).catch(() => {});
 
       await loadSkus(false);
+      // Auto re-sequence SKUs into clean continuous series after import
+      await handleRenumberSkus(true);
     } catch (err: any) {
       console.error('Import failed:', err);
       showToast(err.message || 'Failed to import file', 'error');
@@ -3122,6 +3149,25 @@ const SkuMasterV2: React.FC = () => {
                 </label>
                 <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
                   Import Excel/CSV
+                </div>
+              </div>
+
+              {/* 8. Re-sequence / Renumber Continuous SKU Series */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={() => handleRenumberSkus(false)}
+                  disabled={isRenumbering}
+                  className={`p-2 rounded-xl border text-amber-700 transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
+                    isRenumbering ? 'bg-amber-100 border-amber-300 animate-spin' : 'bg-white hover:bg-amber-50/60 border-gray-200 hover:border-amber-200'
+                  }`}
+                  title="Re-sequence SKU Codes to Continuous Series (FG-001..., SM-001..., RM-001...)"
+                  aria-label="Re-sequence SKU Codes to Continuous Series"
+                >
+                  <RefreshCw className={`w-4 h-4 text-amber-600 ${isRenumbering ? 'animate-spin' : ''}`} />
+                </button>
+                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                  Renumber Continuous Series
                 </div>
               </div>
 
