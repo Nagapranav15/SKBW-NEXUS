@@ -3564,17 +3564,10 @@ const SkuMasterV2: React.FC = () => {
                                 </td>
                               );
                             case 'category':
-                              const genericCats = ['Finished Goods', 'Raw Material', 'Semi Finished', 'Products', 'Materials', 'Semi'];
-                              let dynamicCat = sku.group || (sku.category && !genericCats.includes(sku.category) ? sku.category : null);
-                              if (!dynamicCat) {
-                                const matched = categoriesData.find(c => (sku.name || '').toLowerCase().includes(c.name.toLowerCase()));
-                                if (matched) dynamicCat = matched.name;
-                              }
-                              const fallbackCat = sku.category || (
+                              const catToShow = sku.category || sku.group || (
                                 (sku.skuCode || '').toUpperCase().startsWith('RM') || activeMainTab === 'materials' ? 'Raw Material' :
-                                (sku.skuCode || '').toUpperCase().startsWith('SEM') || activeMainTab === 'semi' ? 'Semi Finished' : 'Finished Goods'
+                                (sku.skuCode || '').toUpperCase().startsWith('SEM') || (sku.skuCode || '').toUpperCase().startsWith('SF') || activeMainTab === 'semi' ? 'Semi Finished' : 'Finished Goods'
                               );
-                              const catToShow = dynamicCat || fallbackCat;
 
                               return (
                                 <td key="category" className="py-3 px-3 whitespace-nowrap">
