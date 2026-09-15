@@ -402,12 +402,12 @@ export const AiCopilotWidget: React.FC = () => {
 
   return (
     <>
-      {/* 1. FLOATING BOTTOM-RIGHT AI TRIGGER BUTTON (FAB) */}
+      {/* 1. FLOATING TOP-RIGHT AI TRIGGER BUTTON (FAB) */}
       {!isOpen && (
         <button
           type="button"
           onClick={handleToggleOpen}
-          className="fixed bottom-6 right-6 z-[90] w-12 h-12 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 text-white shadow-xl shadow-blue-500/30 ring-4 ring-blue-500/20 hover:scale-110 active:scale-95 transition-all flex items-center justify-center group cursor-pointer"
+          className="fixed top-5 right-6 z-[90] w-11 h-11 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 text-white shadow-xl shadow-blue-500/30 ring-4 ring-blue-500/20 hover:scale-110 active:scale-95 transition-all flex items-center justify-center group cursor-pointer"
           title="Open AI Assistant"
         >
           <div className="relative flex items-center justify-center">
@@ -420,7 +420,7 @@ export const AiCopilotWidget: React.FC = () => {
       {/* 2. POPUP WINDOW */}
       {isOpen && (
         <div
-          className={`fixed bottom-6 right-6 w-96 max-w-[calc(100vw-2rem)] h-[520px] max-h-[calc(100vh-6rem)] z-[95] bg-white rounded-3xl border border-slate-200/90 shadow-2xl overflow-hidden flex flex-col ${
+          className={`fixed top-16 right-6 w-96 max-w-[calc(100vw-2rem)] h-[520px] max-h-[calc(100vh-5rem)] z-[95] bg-white rounded-3xl border border-slate-200/90 shadow-2xl overflow-hidden flex flex-col ${
             isClosing ? 'animate-aiClose' : 'animate-aiOpen'
           }`}
         >
