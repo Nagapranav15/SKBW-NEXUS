@@ -1998,7 +1998,7 @@ exports.getMetadata = async (req, res, next) => {
 
 exports.updateMetadata = async (req, res, next) => {
   try {
-    const { companyId, units, categories, ruleTypes, groups, brands, categoryFields } = req.body;
+    const { companyId, units, categories, ruleTypes, groups, brands, categoryFields, categoryCards, standardizedSheets } = req.body;
     if (!companyId) {
       return res.status(400).json({ msg: "companyId is required" });
     }
@@ -2013,6 +2013,8 @@ exports.updateMetadata = async (req, res, next) => {
     if (groups) doc.groups = groups;
     if (brands) doc.brands = brands;
     if (categoryFields) doc.categoryFields = categoryFields;
+    if (categoryCards !== undefined) doc.categoryCards = categoryCards;
+    if (standardizedSheets !== undefined) doc.standardizedSheets = standardizedSheets;
     await doc.save();
     res.json(doc);
   } catch (err) {

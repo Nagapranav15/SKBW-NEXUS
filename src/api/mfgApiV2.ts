@@ -231,6 +231,7 @@ export interface MetadataV2 {
   ruleTypes: string[];
   groups?: string[];
   brands?: string[];
+  categoryCards?: any[];
   categoryFields?: Record<string, string[]>;
   standardizedSheets?: { id: string; name: string; w: string; l: string }[];
 }
@@ -249,6 +250,7 @@ export const updateMetadataV2 = async (metadataData: {
   ruleTypes?: string[];
   groups?: string[];
   brands?: string[];
+  categoryCards?: any[];
   categoryFields?: Record<string, string[]>;
   standardizedSheets?: { id: string; name: string; w: string; l: string }[];
 }): Promise<MetadataV2> => {

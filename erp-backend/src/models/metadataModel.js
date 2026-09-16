@@ -7,6 +7,8 @@ const metadataSchema = new mongoose.Schema({
   ruleTypes: { type: [String], default: ["Plain", "Single Line", "Double Line", "Square Ruled", "Four Line", "Unruled"] },
   groups: { type: [String], default: ["132P Happy days (UR)", "220P Happy days (SR)"] },
   brands: { type: [String], default: ["Happy Days", "Classmate", "Navneet"] },
+  categoryCards: { type: Array, default: [] },
+  standardizedSheets: { type: Array, default: [] },
   categoryFields: {
     type: Map,
     of: [String],

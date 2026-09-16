@@ -64,6 +64,7 @@ import {
   getWarehouseHierarchyV2,
   WarehouseLocationV2,
   getMetadataV2,
+  updateMetadataV2,
   SkuV2 
 } from '../../api/mfgApiV2';
 import { getActivityLogs, createActivityLog } from '../../api/activityLogApi';
@@ -239,37 +240,21 @@ const SkuMasterV2: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const [categoriesData, setCategoriesData] = useState<CategoryCardData[]>(() => {
-    const saved = localStorage.getItem('skbw_erp_categories_cards');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const hasProducts = parsed.some((c: any) => c.type === 'products');
-          const hasMaterials = parsed.some((c: any) => c.type === 'materials');
-          const hasSemi = parsed.some((c: any) => c.type === 'semi');
+  const [categoriesData, setCategoriesData] = useState<CategoryCardData[]>(DEFAULT_CATEGORIES);
 
-          let combined = [...parsed];
-          if (!hasMaterials) {
-            combined = [...combined, ...DEFAULT_CATEGORIES.filter(c => c.type === 'materials')];
-          }
-          if (!hasSemi) {
-            combined = [...combined, ...DEFAULT_CATEGORIES.filter(c => c.type === 'semi')];
-          }
-          if (!hasProducts) {
-            combined = [...combined, ...DEFAULT_CATEGORIES.filter(c => c.type === 'products')];
-          }
-          return combined;
-        }
-      } catch (e) {}
+  const saveCategoriesToDb = async (updatedCards: CategoryCardData[]) => {
+    if (!selectedCompany?._id) return;
+    try {
+      const catNames = Array.from(new Set(updatedCards.map(c => c.name)));
+      await updateMetadataV2({
+        companyId: selectedCompany._id,
+        categoryCards: updatedCards,
+        categories: catNames
+      });
+    } catch (err) {
+      console.error('Failed to save categories to MongoDB:', err);
     }
-    return DEFAULT_CATEGORIES;
-  });
-
-  // Save categories cards to localStorage on update
-  useEffect(() => {
-    localStorage.setItem('skbw_erp_categories_cards', JSON.stringify(categoriesData));
-  }, [categoriesData]);
+  };
 
   // Category modal state
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -289,8 +274,23 @@ const SkuMasterV2: React.FC = () => {
         if (data?.units && Array.isArray(data.units) && data.units.length > 0) {
           setUnitsList(data.units);
         }
+        if (data?.categoryCards && Array.isArray(data.categoryCards) && data.categoryCards.length > 0) {
+          setCategoriesData(data.categoryCards);
+        } else {
+          // If no category cards in MongoDB yet, migrate local storage or DEFAULT_CATEGORIES to MongoDB
+          let initialCards = DEFAULT_CATEGORIES;
+          const savedLocal = localStorage.getItem('skbw_erp_categories_cards');
+          if (savedLocal) {
+            try {
+              const parsed = JSON.parse(savedLocal);
+              if (Array.isArray(parsed) && parsed.length > 0) initialCards = parsed;
+            } catch (e) {}
+          }
+          setCategoriesData(initialCards);
+          saveCategoriesToDb(initialCards);
+        }
       }).catch(err => {
-        console.error('Failed to load settings units in SkuMasterV2:', err);
+        console.error('Failed to load company metadata in SkuMasterV2:', err);
       });
     }
   }, [selectedCompany?._id]);
@@ -2628,13 +2628,15 @@ const SkuMasterV2: React.FC = () => {
       .filter(Boolean);
 
     if (editingCategory) {
-      setCategoriesData(prev => prev.map(c => c.id === editingCategory.id ? {
+      const updatedCards = categoriesData.map(c => c.id === editingCategory.id ? {
         ...c,
         name: categoryForm.name.trim(),
         type: categoryForm.type,
         uom: categoryForm.uom.trim() || 'Pcs',
         fields: fieldsArr.length > 0 ? fieldsArr : ['Type']
-      } : c));
+      } : c);
+      setCategoriesData(updatedCards);
+      saveCategoriesToDb(updatedCards);
       showToast(`Category '${categoryForm.name}' updated`, 'success');
     } else {
       const newCat: CategoryCardData = {
@@ -2644,7 +2646,9 @@ const SkuMasterV2: React.FC = () => {
         uom: categoryForm.uom.trim() || 'Pcs',
         fields: fieldsArr.length > 0 ? fieldsArr : ['Type']
       };
-      setCategoriesData(prev => [...prev, newCat]);
+      const updatedCards = [...categoriesData, newCat];
+      setCategoriesData(updatedCards);
+      saveCategoriesToDb(updatedCards);
       showToast(`Category '${categoryForm.name}' created`, 'success');
     }
     setShowCategoryModal(false);
@@ -2652,7 +2656,9 @@ const SkuMasterV2: React.FC = () => {
 
   const handleDeleteCategory = (id: string, name: string) => {
     if (window.confirm(`Are you sure you want to delete category '${name}'?`)) {
-      setCategoriesData(prev => prev.filter(c => c.id !== id));
+      const updatedCards = categoriesData.filter(c => c.id !== id);
+      setCategoriesData(updatedCards);
+      saveCategoriesToDb(updatedCards);
       showToast(`Category '${name}' deleted`, 'success');
     }
   };
