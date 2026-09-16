@@ -1101,7 +1101,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     if (resolvedSection === 'materials' || form.category === 'Raw Material' || form.category === 'Materials' || matchedCatObj?.type === 'materials') {
       defaultBaseFields = ['gsm', 'title', 'width', 'length', 'paperType', 'pages', 'altUnit'];
     } else if (resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi' || matchedCatObj?.type === 'semi') {
-      defaultBaseFields = ['gsm', 'brand', 'width', 'length', 'ruleType', 'group', 'pages', 'altUnit'];
+      defaultBaseFields = ['gsm', 'title', 'width', 'length', 'ruleType', 'group', 'pages', 'altUnit'];
     } else {
       defaultBaseFields = ['gsm', 'brand', 'width', 'length', 'ruleType', 'pages', 'altUnit'];
     }
@@ -1121,20 +1121,23 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           if (lower.includes('gsm')) fieldsList.push('gsm');
           if (lower.includes('rule') || lower.includes('ruling')) fieldsList.push('ruleType');
           if (lower.includes('brand')) fieldsList.push('brand');
+          if (lower.includes('title') || lower.includes('desc')) fieldsList.push('title');
           if (lower.includes('alt') || lower.includes('auom') || lower.includes('unit')) fieldsList.push('altUnit');
         });
       }
     }
 
-    // Finished Goods / Products and Semi Finished must ALWAYS have 'brand' and 'altUnit' enabled!
-    if (resolvedSection === 'products' || resolvedSection === 'semi' || isProductCategory || form.category === 'Finished Goods' || form.category === 'Semi Finished' || form.category === 'Products' || form.category === 'Semi') {
+    // Finished Goods / Products must ALWAYS have 'brand' and 'altUnit' enabled!
+    if (resolvedSection === 'products' || isProductCategory || form.category === 'Finished Goods' || form.category === 'Products') {
       if (!fieldsList.includes('brand')) fieldsList.push('brand');
       if (!fieldsList.includes('altUnit')) fieldsList.push('altUnit');
     }
 
-    // Materials should NOT have brand
-    if (resolvedSection === 'materials' || form.category === 'Raw Material' || form.category === 'Materials' || matchedCatObj?.type === 'materials') {
+    // Semi and Materials must have 'title' and 'altUnit', but NOT 'brand'
+    if (resolvedSection === 'semi' || resolvedSection === 'materials' || !isProductCategory || form.category === 'Raw Material' || form.category === 'Materials' || form.category === 'Semi Finished' || form.category === 'Semi') {
       fieldsList = fieldsList.filter(f => f !== 'brand');
+      if (!fieldsList.includes('title')) fieldsList.push('title');
+      if (!fieldsList.includes('altUnit')) fieldsList.push('altUnit');
     }
 
     return Array.from(new Set(fieldsList));
@@ -1231,7 +1234,11 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         return parts.filter(Boolean).join(' ');
       } else if (isSemi) {
         const parts: string[] = [];
-        if (formData.brand?.trim()) parts.push(formData.brand.trim());
+        if (formData.title?.trim()) {
+          parts.push(formData.title.trim());
+        } else if (formData.brand?.trim()) {
+          parts.push(formData.brand.trim());
+        }
         if (formData.gsm) parts.push(`${formData.gsm} GSM`);
         let sizeStr = '';
         if (formData.width && formData.length) {
@@ -1957,71 +1964,13 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
             </div>
 
             {/* Group 2: Specifications */}
-            {(activeFields.includes('gsm') || activeFields.includes('brand') || activeFields.includes('title') || activeFields.includes('width') || activeFields.includes('length')) && (
+            {(activeFields.includes('gsm') || activeFields.includes('title') || activeFields.includes('width') || activeFields.includes('length')) && (
               <div className="space-y-4 border-t border-gray-100 pt-4">
                 <h3 className="text-xs font-bold text-gray-900 pb-1.5 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-blue-600"></span>
                   Specifications
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
-                  {activeFields.includes('brand') && !isProductCategory && (
-                    <div className="col-span-2 sm:col-span-1">
-                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">BRAND</label>
-                      <div className="relative" ref={brandContainerRef}>
-                        <input
-                          type="text"
-                          placeholder="Search or type brand..."
-                          value={brandSearch}
-                          onChange={e => {
-                            setBrandSearch(e.target.value);
-                            updateFormField({ brand: e.target.value });
-                          }}
-                          onFocus={() => {
-                            setShowBrandDropdown(true);
-                            setBrandAtFocus(form.brand);
-                          }}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
-                        />
-                        {showBrandDropdown && (
-                          <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg z-20 divide-y divide-gray-50">
-                            {availableBrands
-                              .filter(b => {
-                                if (brandSearch === brandAtFocus || !brandSearch.trim()) return true;
-                                return b.toLowerCase().includes(brandSearch.toLowerCase().trim());
-                              })
-                              .map(b => (
-                                <button
-                                  key={b}
-                                  type="button"
-                                  onClick={() => {
-                                    updateFormField({ brand: b });
-                                    setBrandSearch(b);
-                                    setShowBrandDropdown(false);
-                                  }}
-                                  className="w-full px-3 py-2 text-left text-xs hover:bg-blue-50 hover:text-blue-600 transition-colors font-semibold text-gray-700 block"
-                                >
-                                  {b}
-                                </button>
-                              ))
-                            }
-                            {brandSearch.trim() && !availableBrands.some(b => b.toLowerCase() === brandSearch.trim().toLowerCase()) && (
-                              <button
-                                type="button"
-                                onClick={() => handleAddNewBrand(brandSearch)}
-                                className="w-full px-3 py-2 text-left text-xs hover:bg-green-50 text-green-600 font-bold transition-colors block"
-                              >
-                                + Add Brand "{brandSearch.trim()}"
-                              </button>
-                            )}
-                            {availableBrands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase().trim())).length === 0 && !brandSearch.trim() && (
-                              <div className="px-3 py-2 text-xs text-gray-400 italic">No brands found</div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
                   {activeFields.includes('gsm') && (
                     <div>
                       <label className="block text-[11px] font-semibold text-gray-600 mb-1">GSM</label>
@@ -2040,7 +1989,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       <label className="block text-[11px] font-semibold text-gray-600 mb-1">TITLE (DESCRIPTION)</label>
                       <input
                         type="text"
-                        placeholder="e.g. Premium White Paper Roll"
+                        placeholder={resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi' ? "e.g. Inner Pages Form" : "e.g. Premium White Paper Roll"}
                         value={form.title}
                         onChange={e => updateFormField({ title: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"

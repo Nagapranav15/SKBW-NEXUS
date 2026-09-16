@@ -1925,7 +1925,7 @@ const SkuMasterV2: React.FC = () => {
           'ID / SKU Code': s.skuCode || '',
           'SKU NAME': s.name || '',
           'PAGES': cleanVal(s.pages),
-          'BRAND': cleanVal(s.brand),
+          'TITLE': cleanVal((s as any).title || s.brand),
           'RULE TYPE': cleanVal(s.ruleType),
           'Category': s.category || s.group || 'Semi',
           'UOM': s.unit || 'Ream',
@@ -2078,25 +2078,24 @@ const SkuMasterV2: React.FC = () => {
             idx + 1,
             item.skuCode || '—',
             item.name || '—',
-            item.category || item.group || '—',
-            item.unit || '—',
+            item.category || item.group || (activeMainTab === 'semi' ? 'Semi Finished' : 'Raw Material'),
+            item.unit || (activeMainTab === 'semi' ? 'Ream' : 'Kg'),
             item.gsm || '—',
             item.pages || '—',
             item.status || 'Active'
           ];
         }
-        const isAltPcs = (item.altUnit || '').toLowerCase().includes('pc');
-        const isPrimaryPcs = (item.unit || '').toLowerCase().includes('pc');
-        const outerUnit = (isAltPcs && !isPrimaryPcs) ? item.unit : item.altUnit;
-        const innerUnit = (isAltPcs && !isPrimaryPcs) ? item.altUnit : (item.unit || 'Pcs');
-        const conRateStr = item.altUnit && item.altUnitConversion ? `1 ${outerUnit} = ${item.altUnitConversion} ${innerUnit}` : '—';
+
+        const conRateStr = item.altUnit && item.altUnitConversion
+          ? `1 ${item.unit || 'Pcs'} = ${item.altUnitConversion} ${item.altUnit}`
+          : '—';
 
         return [
           idx + 1,
           item.skuCode || '—',
           item.name || '—',
-          item.category || item.group || '—',
-          item.unit || '—',
+          item.category || 'Finished Goods',
+          item.unit || 'Pcs',
           conRateStr,
           item.altUnit || '—',
           item.gsm || '—',
@@ -2203,7 +2202,7 @@ const SkuMasterV2: React.FC = () => {
         'ID / SKU Code',
         'SKU NAME',
         'PAGES',
-        'BRAND',
+        'TITLE',
         'RULE TYPE',
         'Category',
         'UOM',
@@ -2219,8 +2218,8 @@ const SkuMasterV2: React.FC = () => {
         'Preferred Vendor'
       ];
       sampleRows = [
-        ['SM-001', 'Akshay 52 GSM 14.25 x 35 CM (SR) 192P', '192', 'Akshay', 'Single Line', 'Inner Forms', 'Ream', 'Bundles', '50', '52', '14.25', '35', '100', '50', '800', 'Active', 'Apex Print Pack'],
-        ['SM-002', 'Cover Board 250 GSM 57 x 70 CM', '100', 'Covers', 'Plain', 'Covers', 'Pcs', 'Bundles', '100', '250', '57', '70', '200', '100', '1200', 'Active', 'Sunrise Laminators']
+        ['SM-001', 'Akshay Inner Form 52 GSM 14.25 x 35 CM (SR) 192P', '192', 'Akshay Inner Form', 'Single Line', 'Inner Forms', 'Ream', 'Bundles', '50', '52', '14.25', '35', '100', '50', '800', 'Active', 'Apex Print Pack'],
+        ['SM-002', 'Cover Board 250 GSM 57 x 70 CM', '100', 'Cover Board', 'Plain', 'Covers', 'Pcs', 'Bundles', '100', '250', '57', '70', '200', '100', '1200', 'Active', 'Sunrise Laminators']
       ];
     } else {
       // Raw materials
