@@ -2570,11 +2570,21 @@ const SkuMasterV2: React.FC = () => {
   };
 
   const handleDeleteDuplicateItem = async (sku: SkuV2) => {
-    if (!sku._id || !selectedCompany?._id) return;
+    if (!sku._id) return;
     try {
+      if (sku._id.startsWith('demo-')) {
+        showToast(`Deleted item ${sku.skuCode}`, 'success');
+        setDuplicateGroups(prev => prev.map(g => ({
+          ...g,
+          items: g.items.filter(it => it._id !== sku._id)
+        })).filter(g => g.items.length > 1));
+        setSkus(prev => prev.filter(s => s._id !== sku._id));
+        return;
+      }
+
       // Record sequence so deleted ID is never reused (only for clean sequential codes < 10000)
       const numMatch = (sku.skuCode || '').match(/^([A-Z]+)-(\d{1,4})$/i);
-      if (numMatch) {
+      if (numMatch && selectedCompany?._id) {
         const p = numMatch[1].toUpperCase();
         const n = parseInt(numMatch[2], 10);
         if (!isNaN(n) && n > 0 && n < 10000) {
@@ -2588,7 +2598,7 @@ const SkuMasterV2: React.FC = () => {
         }
       }
 
-      await deleteSkuV2(sku._id, selectedCompany._id);
+      await deleteSkuV2(sku._id, selectedCompany?._id || '');
       showToast(`Deleted item ${sku.skuCode}`, 'success');
       setDuplicateGroups(prev => prev.map(g => ({
         ...g,
@@ -2596,6 +2606,15 @@ const SkuMasterV2: React.FC = () => {
       })).filter(g => g.items.length > 1));
       loadSkus(false);
     } catch (err: any) {
+      if (err.response?.status === 404) {
+        showToast(`Deleted item ${sku.skuCode}`, 'success');
+        setDuplicateGroups(prev => prev.map(g => ({
+          ...g,
+          items: g.items.filter(it => it._id !== sku._id)
+        })).filter(g => g.items.length > 1));
+        setSkus(prev => prev.filter(s => s._id !== sku._id));
+        return;
+      }
       showToast(err.message || 'Failed to delete item', 'error');
     }
   };
@@ -2604,6 +2623,14 @@ const SkuMasterV2: React.FC = () => {
   const handleDeleteSku = async () => {
     if (!deleteConfirmSku?._id) return;
     try {
+      if (deleteConfirmSku._id.startsWith('demo-')) {
+        showToast(`Item '${deleteConfirmSku.skuCode}' deleted`, 'success');
+        const deletedId = deleteConfirmSku._id;
+        setDeleteConfirmSku(null);
+        setSkus(prev => prev.filter(s => s._id !== deletedId));
+        return;
+      }
+
       // Record sequence so deleted ID is never reused (only for clean sequential codes < 10000)
       if (deleteConfirmSku.skuCode && selectedCompany?._id) {
         const numMatch = deleteConfirmSku.skuCode.match(/^([A-Z]+)-(\d{1,4})$/i);
@@ -2625,7 +2652,9 @@ const SkuMasterV2: React.FC = () => {
       const targetCompanyId = selectedCompany?._id || (typeof deleteConfirmSku.company === 'object' ? (deleteConfirmSku.company as any)._id : deleteConfirmSku.company) || '';
       await deleteSkuV2(deleteConfirmSku._id, targetCompanyId);
       showToast(`Item '${deleteConfirmSku.skuCode}' deleted`, 'success');
+      const deletedId = deleteConfirmSku._id;
       setDeleteConfirmSku(null);
+      setSkus(prev => prev.filter(s => s._id !== deletedId));
       loadSkus(false);
       createActivityLog({
         action: 'DELETE',
@@ -2635,6 +2664,13 @@ const SkuMasterV2: React.FC = () => {
         company: targetCompanyId
       }).catch(() => {});
     } catch (e: any) {
+      if (e.response?.status === 404) {
+        showToast(`Item '${deleteConfirmSku.skuCode}' deleted`, 'success');
+        const deletedId = deleteConfirmSku._id;
+        setDeleteConfirmSku(null);
+        setSkus(prev => prev.filter(s => s._id !== deletedId));
+        return;
+      }
       showToast(e.response?.data?.msg || e.message || 'Failed to delete item', 'error');
     }
   };
