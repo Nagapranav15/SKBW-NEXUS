@@ -48,7 +48,8 @@ import {
   Columns,
   Eye,
   ShoppingCart,
-  Settings
+  Settings,
+  RotateCcw
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { 
