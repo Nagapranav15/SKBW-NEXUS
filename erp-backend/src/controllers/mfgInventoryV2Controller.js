@@ -2022,19 +2022,21 @@ exports.updateMetadata = async (req, res, next) => {
       return res.status(400).json({ msg: "companyId is required" });
     }
     const companyObjId = toObjectId(companyId);
-    let doc = await Metadata.findOne({ company: companyObjId });
-    if (!doc) {
-      doc = new Metadata({ company: companyObjId });
-    }
-    if (units) doc.units = units;
-    if (categories) doc.categories = categories;
-    if (ruleTypes) doc.ruleTypes = ruleTypes;
-    if (groups) doc.groups = groups;
-    if (brands) doc.brands = brands;
-    if (categoryFields) doc.categoryFields = categoryFields;
-    if (categoryCards !== undefined) doc.categoryCards = categoryCards;
-    if (standardizedSheets !== undefined) doc.standardizedSheets = standardizedSheets;
-    await doc.save();
+    const updateObj = {};
+    if (units !== undefined) updateObj.units = units;
+    if (categories !== undefined) updateObj.categories = categories;
+    if (ruleTypes !== undefined) updateObj.ruleTypes = ruleTypes;
+    if (groups !== undefined) updateObj.groups = groups;
+    if (brands !== undefined) updateObj.brands = brands;
+    if (categoryFields !== undefined) updateObj.categoryFields = categoryFields;
+    if (categoryCards !== undefined) updateObj.categoryCards = categoryCards;
+    if (standardizedSheets !== undefined) updateObj.standardizedSheets = standardizedSheets;
+
+    const doc = await Metadata.findOneAndUpdate(
+      { company: companyObjId },
+      { $set: updateObj },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
     res.json(doc);
   } catch (err) {
     next(err);

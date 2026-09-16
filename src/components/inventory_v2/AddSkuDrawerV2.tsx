@@ -1131,7 +1131,6 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       if (!fieldsList.includes('brand')) fieldsList.push('brand');
       if (!fieldsList.includes('altUnit')) fieldsList.push('altUnit');
     }
-    }
 
     // Materials should NOT have brand
     if (resolvedSection === 'materials' || form.category === 'Raw Material' || form.category === 'Materials' || matchedCatObj?.type === 'materials') {
