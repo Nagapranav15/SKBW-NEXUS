@@ -180,9 +180,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   const [form, setForm] = useState({
     skuCode: '',
     name: '',
-    category: defaultCategory || (activeSection === 'products' ? 'Finished Goods' : activeSection === 'semi' ? 'Semi Finished' : 'Raw Material'),
+    category: '',
     paperType: 'None' as 'Reels' | 'Sheets' | 'None',
-    unit: (activeSection === 'products' || defaultCategory === 'Finished Goods') ? 'GBL' : 'kg',
+    unit: activeSection === 'products' ? 'Pcs' : activeSection === 'semi' ? 'Ream' : 'Kg',
     altUnit: '',
     altUnitConversion: '',
     altUnitDirection: '' as '' | UomDirection,
@@ -1005,21 +1005,12 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         setProcessSteps([]);
       }
     } else {
-      const fallbackCat = resolvedSection === 'products' ? 'Products' : resolvedSection === 'semi' ? 'Semi' : 'Materials';
-      const initialCat = (defaultCategory && defaultCategory.trim()) ? defaultCategory.trim() : fallbackCat;
-      const matchedInitialCat = (createdCategories || []).find(c => c && c.name?.toLowerCase().trim() === initialCat.toLowerCase().trim());
-      const initialUnit = matchedInitialCat?.uom || (resolvedSection === 'products' ? 'Pcs' : resolvedSection === 'semi' ? 'Ream' : 'Kg');
-
-      if (matchedInitialCat?.uom && !unitsList.some(u => u.toLowerCase() === matchedInitialCat.uom?.toLowerCase())) {
-        setUnitsList(prev => [...prev, matchedInitialCat.uom!]);
-      }
-
       setForm({
         skuCode: '',
         name: '',
-        category: initialCat,
+        category: '',
         paperType: resolvedSection === 'materials' ? 'Reels' : 'None',
-        unit: initialUnit,
+        unit: resolvedSection === 'products' ? 'Pcs' : resolvedSection === 'semi' ? 'Ream' : 'Kg',
         altUnit: '',
         altUnitConversion: '',
         altUnitDirection: '' as '' | UomDirection,

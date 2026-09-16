@@ -4614,7 +4614,7 @@ const SkuMasterV2: React.FC = () => {
         isOpen={showAddDrawer}
         companyId={selectedCompany?._id || ''}
         editSku={editSku}
-        defaultCategory={getDefaultCategoryForDrawer()}
+        defaultCategory=""
         activeSection={
           editSku
             ? (
