@@ -2057,21 +2057,24 @@ const SkuMasterV2: React.FC = () => {
     } else if (activeMainTab === 'semi') {
       headers = [
         'ID / SKU Code',
-        'Item Name',
+        'SKU NAME',
+        'PAGES',
+        'BRAND',
+        'RULE TYPE',
         'Category',
         'UOM',
         'AUOM (Alt Unit)',
         'Con Rate',
         'GSM',
-        'Size',
-        'Pages / Sheets',
-        'Stock',
+        'WIDTH (CM)',
+        'LENGTH (CM)',
         'Min Stock Level',
-        'Status'
+        'Reorder Level',
+        'Opening Stock Qty'
       ];
       sampleRows = [
-        ['SFG-001', 'Folded Inner Signature 192P', 'Inner Forms', 'Pcs', 'Bundles', '50', '52', '14.25 x 35 CM', '192 P', '800', '100', 'Active'],
-        ['SFG-002', 'Laminated Printed Covers A4', 'Covers', 'Pcs', 'Bundles', '100', '250', '57 x 70 CM', '0', '1200', '200', 'Active']
+        ['SM-001', 'Folded Inner Signature 192P', '192 P', 'Happy Days', 'Single Line', 'Inner Forms', 'Pcs', 'Bundles', '50', '52', '14.25', '35', '100', '50', '800'],
+        ['SM-002', 'Laminated Printed Covers A4', '0', 'Classmate', 'Plain', 'Covers', 'Pcs', 'Bundles', '100', '250', '57', '70', '200', '100', '1200']
       ];
     } else if (activeMainTab === 'categories') {
       headers = [
@@ -2097,23 +2100,25 @@ const SkuMasterV2: React.FC = () => {
       // Raw materials
       headers = [
         'ID / SKU Code',
-        'Item Name',
+        'SKU NAME',
+        'PAGES',
+        'BRAND',
+        'RULE TYPE',
         'Category',
         'UOM',
         'AUOM (Alt Unit)',
         'Con Rate',
         'GSM',
-        'Size',
-        'Sheets per Ream',
-        'Paper Type',
-        'Stock',
+        'WIDTH (CM)',
+        'LENGTH (CM)',
         'Min Stock Level',
-        'Status'
+        'Reorder Level',
+        'Opening Stock Qty'
       ];
       sampleRows = [
-        ['RM-PR-001', 'Maplitho Paper Reel 70 GSM', 'Paper Reels', 'Kg', 'Reels', '500', '70', '84 CM', '0', 'Reels', '1500', '300', 'Active'],
-        ['RM-DB-002', 'Duplex Board Grey Back 300 GSM', 'Duplex Cover Board', 'Pcs', 'Bundles', '100', '300', '57 x 70 CM', '500', 'Sheets', '2500', '500', 'Active'],
-        ['RM-CR-003', 'Craft Paper Reel 80 GSM', 'Paper Reels', 'Kg', 'Reels', '400', '80', '90 CM', '0', 'Reels', '1200', '200', 'Active']
+        ['RM-001', 'Maplitho Paper Reel 70 GSM', '0', 'Classmate', 'Plain', 'Paper Reels', 'Kg', 'Reels', '500', '70', '84', '0', '300', '100', '1500'],
+        ['RM-002', 'Duplex Board Grey Back 300 GSM', '0', 'Navneet', 'Plain', 'Duplex Cover Board', 'Pcs', 'Bundles', '100', '300', '57', '70', '500', '200', '2500'],
+        ['RM-003', 'Craft Paper Reel 80 GSM', '0', 'Happy Days', 'Plain', 'Paper Reels', 'Kg', 'Reels', '400', '80', '90', '0', '200', '100', '1200']
       ];
     }
 
