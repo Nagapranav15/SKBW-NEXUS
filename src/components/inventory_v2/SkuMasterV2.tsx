@@ -529,6 +529,7 @@ const SkuMasterV2: React.FC = () => {
     { id: 'b-4', name: 'Hotmelt Binding Adhesive', qty: 0.05, uom: 'Kg', inStock: 2200, notes: 'Glue' }
   ]);
   const [recipeYieldQty, setRecipeYieldQty] = useState<string>('1');
+  const [recipeYieldUnit, setRecipeYieldUnit] = useState<string>('');
   const [buildBatchYieldQty, setBuildBatchYieldQty] = useState<string>('1');
   const [isSavingBom, setIsSavingBom] = useState(false);
 
@@ -542,9 +543,10 @@ const SkuMasterV2: React.FC = () => {
       await updateSkuV2(selectedSkuDetails._id, {
         bomItems: bomRecipeItems,
         recipeYieldQty: Number(recipeYieldQty) || 1,
+        recipeYieldUnit: recipeYieldUnit || selectedSkuDetails.unit || 'Pcs',
         company: selectedCompany?._id
       });
-      setSelectedSkuDetails(prev => prev ? ({ ...prev, bomItems: bomRecipeItems, recipeYieldQty: Number(recipeYieldQty) || 1 }) : null);
+      setSelectedSkuDetails(prev => prev ? ({ ...prev, bomItems: bomRecipeItems, recipeYieldQty: Number(recipeYieldQty) || 1, recipeYieldUnit: recipeYieldUnit || selectedSkuDetails.unit || 'Pcs' }) : null);
       showToast('BOM Recipe saved successfully to database!', 'success');
       loadSkus(false);
     } catch (err: any) {
@@ -1041,6 +1043,7 @@ const SkuMasterV2: React.FC = () => {
   useEffect(() => {
     if (selectedSkuDetails) {
       setRecipeYieldQty(String((selectedSkuDetails as any).recipeYieldQty || (selectedSkuDetails as any).batchYieldQty || '1'));
+      setRecipeYieldUnit((selectedSkuDetails as any).recipeYieldUnit || selectedSkuDetails.unit || 'Pcs');
       
       const pType = selectedSkuDetails.paperType && selectedSkuDetails.paperType !== 'None' ? selectedSkuDetails.paperType : '';
       const gsmStr = selectedSkuDetails.gsm ? `${selectedSkuDetails.gsm} GSM` : '';
@@ -4978,21 +4981,40 @@ const SkuMasterV2: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Recipe Yield Box matching Makoro media_1789142185429.png */}
-                    <div className="border border-gray-200 rounded-lg p-2.5 px-3.5 text-xs text-gray-600 font-medium flex items-center gap-2 bg-white">
-                      <span>This recipe makes</span>
-                      <input
-                        type="number"
-                        min="1"
-                        placeholder="1"
-                        value={recipeYieldQty}
-                        onChange={(e) => setRecipeYieldQty(e.target.value)}
-                        className="w-14 px-1.5 py-0.5 border border-gray-300 rounded font-bold text-gray-900 text-center focus:ring-1 focus:ring-[#064E3B]"
-                      />
-                      <strong className="text-gray-900">{selectedSkuDetails?.unit || 'Pcs'}</strong>
-                      <Pencil className="w-3.5 h-3.5 text-gray-400" />
-                      <span className="text-gray-400 font-normal">(use 1 for per-unit quantities)</span>
-                    </div>
+                    {/* Recipe Yield Box matching Makoro media_1789142185429.png with UOM & AUOM selection */}
+                    {(() => {
+                      const availableYieldUnits = Array.from(new Set([selectedSkuDetails?.unit, selectedSkuDetails?.altUnit].filter(Boolean)));
+                      const activeUnit = recipeYieldUnit || selectedSkuDetails?.unit || 'Pcs';
+
+                      return (
+                        <div className="border border-gray-200 rounded-lg p-2.5 px-3.5 text-xs text-gray-600 font-medium flex items-center gap-2 bg-white">
+                          <span>This recipe makes</span>
+                          <input
+                            type="number"
+                            min="1"
+                            placeholder="1"
+                            value={recipeYieldQty}
+                            onChange={(e) => setRecipeYieldQty(e.target.value)}
+                            className="w-14 px-1.5 py-0.5 border border-gray-300 rounded font-bold text-gray-900 text-center focus:ring-1 focus:ring-[#064E3B]"
+                          />
+                          {availableYieldUnits.length > 1 ? (
+                            <select
+                              value={activeUnit}
+                              onChange={(e) => setRecipeYieldUnit(e.target.value)}
+                              className="px-2 py-0.5 border border-emerald-300 rounded font-bold text-emerald-800 bg-emerald-50/60 cursor-pointer focus:ring-1 focus:ring-emerald-500"
+                            >
+                              {availableYieldUnits.map(u => (
+                                <option key={u} value={u}>{u}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <strong className="text-gray-900">{selectedSkuDetails?.unit || 'Pcs'}</strong>
+                          )}
+                          <Pencil className="w-3.5 h-3.5 text-gray-400" />
+                          <span className="text-gray-400 font-normal">(use 1 for per-unit quantities)</span>
+                        </div>
+                      );
+                    })()}
 
                     {/* Recipe Items Table matching Makoro media_1789142185429.png */}
                     <div className="border border-gray-200 rounded-xl overflow-x-auto shadow-2xs bg-white">

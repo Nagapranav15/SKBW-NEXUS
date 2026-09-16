@@ -2,11 +2,11 @@ const mongoose = require("mongoose");
 
 const metadataSchema = new mongoose.Schema({
   company: { type: mongoose.Schema.Types.ObjectId, ref: "Company", required: true, index: true },
-  units: { type: [String], default: ["kg", "pcs", "Sheets", "Reels", "mtr"] },
-  categories: { type: [String], default: ["Raw Material", "Semi Finished", "Finished Goods"] },
-  ruleTypes: { type: [String], default: ["Plain", "Single Line", "Double Line", "Square Ruled", "Four Line", "Unruled"] },
-  groups: { type: [String], default: ["132P Happy days (UR)", "220P Happy days (SR)"] },
-  brands: { type: [String], default: ["Happy Days", "Classmate", "Navneet"] },
+  units: { type: [String], default: [] },
+  categories: { type: [String], default: ["products", "materials", "semi"] },
+  ruleTypes: { type: [String], default: [] },
+  groups: { type: [String], default: [] },
+  brands: { type: [String], default: [] },
   categoryCards: { type: Array, default: [] },
   standardizedSheets: { type: Array, default: [] },
   categoryFields: {

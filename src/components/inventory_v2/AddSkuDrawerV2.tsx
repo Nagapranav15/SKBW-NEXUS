@@ -624,18 +624,21 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
   // Load custom metadata lists & brands from database
   useEffect(() => {
-    if (companyId) {
+    if (companyId && isOpen) {
       loadMetadata();
       loadExistingBrands();
     }
-  }, [companyId]);
+  }, [companyId, isOpen]);
 
   const loadMetadata = async () => {
     try {
       const data = await getMetadataV2(companyId);
       if (data) {
         if (data.categories?.length) setCategoriesList(data.categories);
-        if (data.units?.length) setUnitsList(data.units);
+        if (Array.isArray(data.units)) {
+          const mergedUnits = Array.from(new Set([...(data.units || []), "GBL", "Pcs", "Kg", "Sheets", "Reels", "Mtr", "Ream", "Gross", "Box", "Pkt"]));
+          setUnitsList(mergedUnits.filter(Boolean));
+        }
         if (data.ruleTypes?.length) setRuleTypesList(data.ruleTypes);
         if (data.groups?.length) setGroupsList(data.groups);
         if (data.brands?.length) {
@@ -948,13 +951,22 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   }, [activeSection, form.category]);
 
   const activeFields = React.useMemo(() => {
+    const matchedCatObj = (createdCategories || []).find(c => c.name === form.category);
+    let defaultBaseFields: string[] = [];
+    if (matchedCatObj?.type === 'materials' || activeSection === 'materials' || form.category === 'Raw Material') {
+      defaultBaseFields = ['gsm', 'brand', 'title', 'width', 'length', 'paperType'];
+    } else if (matchedCatObj?.type === 'semi' || activeSection === 'semi' || form.category === 'Semi Finished') {
+      defaultBaseFields = ['gsm', 'brand', 'width', 'length', 'ruleType', 'group'];
+    } else {
+      defaultBaseFields = ['gsm', 'brand', 'width', 'length', 'ruleType', 'pages', 'altUnit'];
+    }
+
     let fieldsList: string[] = [];
     if (categoryFieldsMap[form.category]) {
       fieldsList = [...categoryFieldsMap[form.category]];
     } else {
-      const matchedCatObj = (createdCategories || []).find(c => c.name === form.category);
+      fieldsList = [...defaultBaseFields];
       if (matchedCatObj?.fields?.length) {
-        fieldsList = ['altUnit'];
         matchedCatObj.fields.forEach(f => {
           const lower = f.toLowerCase();
           if (lower.includes('page') || lower.includes('sheet')) fieldsList.push('pages');
@@ -965,12 +977,6 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           if (lower.includes('rule') || lower.includes('ruling')) fieldsList.push('ruleType');
           if (lower.includes('brand')) fieldsList.push('brand');
         });
-      } else if (isProductCategory) {
-        fieldsList = ['gsm', 'brand', 'width', 'length', 'ruleType', 'pages', 'altUnit'];
-      } else if (activeSection === 'semi' || form.category === 'Semi Finished') {
-        fieldsList = ['gsm', 'brand', 'width', 'length', 'ruleType', 'group'];
-      } else {
-        fieldsList = ['gsm', 'brand', 'title', 'width', 'length', 'paperType'];
       }
     }
 
@@ -2407,20 +2413,37 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         </div>
                       </div>
 
-                      {/* Customizable Batch Size Yield Row */}
-                      <div className="flex items-center gap-2 text-xs text-gray-600 font-medium py-1 border-b border-gray-100">
-                        <span>This recipe makes</span>
-                        <input
-                          type="number"
-                          min="1"
-                          placeholder="1"
-                          value={form.recipeYieldQty || '1'}
-                          onChange={(e) => setForm({ ...form, recipeYieldQty: e.target.value })}
-                          className="w-16 px-2 py-0.5 border border-blue-300 rounded-md text-xs font-extrabold text-blue-700 text-center focus:ring-2 focus:ring-blue-500 bg-blue-50/60"
-                        />
-                        <span className="font-bold text-gray-800 uppercase">{form.unit || 'Pcs'}</span>
-                        <span className="italic text-gray-400 text-[11px]">(use 1 for per-unit quantities)</span>
-                      </div>
+                      {/* Customizable Batch Size Yield Row with UOM & AUOM Select */}
+                      {(() => {
+                        const availableYieldUnits = Array.from(new Set([form.unit, form.altUnit].filter(Boolean)));
+                        return (
+                          <div className="flex items-center gap-2 text-xs text-gray-600 font-medium py-1 border-b border-gray-100">
+                            <span>This recipe makes</span>
+                            <input
+                              type="number"
+                              min="1"
+                              placeholder="1"
+                              value={form.recipeYieldQty || '1'}
+                              onChange={(e) => setForm({ ...form, recipeYieldQty: e.target.value })}
+                              className="w-16 px-2 py-0.5 border border-blue-300 rounded-md text-xs font-extrabold text-blue-700 text-center focus:ring-2 focus:ring-blue-500 bg-blue-50/60"
+                            />
+                            {availableYieldUnits.length > 1 ? (
+                              <select
+                                value={form.recipeYieldUnit || form.unit || 'Pcs'}
+                                onChange={(e) => setForm({ ...form, recipeYieldUnit: e.target.value })}
+                                className="px-2 py-0.5 border border-blue-300 rounded-md text-xs font-extrabold text-blue-800 bg-blue-50/60 cursor-pointer focus:ring-2 focus:ring-blue-500"
+                              >
+                                {availableYieldUnits.map(u => (
+                                  <option key={u} value={u}>{u}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className="font-bold text-gray-800 uppercase">{form.unit || 'Pcs'}</span>
+                            )}
+                            <span className="italic text-gray-400 text-[11px]">(use 1 for per-unit quantities)</span>
+                          </div>
+                        );
+                      })()}
 
                       {/* BOM Table Grid */}
                       {bomItems.length === 0 ? (

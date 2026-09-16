@@ -1995,7 +1995,16 @@ exports.getMetadata = async (req, res, next) => {
     const companyObjId = toObjectId(companyId);
     let doc = await Metadata.findOne({ company: companyObjId });
     if (!doc) {
-      doc = new Metadata({ company: companyObjId });
+      doc = new Metadata({ 
+        company: companyObjId,
+        units: [],
+        categories: ["products", "materials", "semi"],
+        ruleTypes: [],
+        groups: [],
+        brands: [],
+        categoryCards: [],
+        standardizedSheets: []
+      });
       await doc.save();
     }
     res.json(doc);
