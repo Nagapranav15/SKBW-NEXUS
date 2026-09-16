@@ -291,41 +291,41 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100 flex flex-col max-h-[85vh] animate-scaleUp">
         
         {/* Modern Clean Header */}
-        <div className="bg-white p-4.5 px-6 flex items-center justify-between border-b border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100/80">
-              <MapPin className="w-4.5 h-4.5" />
+        <div className="bg-white p-5 px-6 flex items-center justify-between border-b border-gray-100">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100/80 shadow-2xs">
+              <MapPin className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-gray-900 tracking-tight">{title}</h3>
-              <p className="text-[11px] text-gray-400 font-normal">Select a Zone or Loc (Factory & Floor locked)</p>
+              <h3 className="text-sm font-bold text-gray-900 tracking-tight leading-tight">{title}</h3>
+              <p className="text-[11px] text-gray-500 font-medium mt-0.5">Select a Zone or Loc (Factory & Floor locked)</p>
             </div>
           </div>
           <button 
             type="button"
             onClick={onClose}
-            className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition-all cursor-pointer"
+            className="w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition-all cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Search Filter Bar */}
-        <div className="px-6 pt-3 pb-1">
+        <div className="px-6 pt-4 pb-2">
           <div className="relative flex items-center">
-            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 pointer-events-none" />
+            <Search className="w-4 h-4 text-gray-400 absolute left-3 pointer-events-none" />
             <input
               type="text"
               placeholder="Search location, zone, or floor..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-8 py-2 bg-slate-50/80 border border-gray-200 rounded-xl text-xs text-gray-800 placeholder-gray-400 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
+              className="w-full pl-9.5 pr-8 py-2.5 bg-slate-50/80 border border-gray-200 rounded-xl text-xs text-gray-800 placeholder-gray-400 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 text-gray-400 hover:text-gray-600 p-1"
+                className="absolute right-2.5 text-gray-400 hover:text-gray-600 p-1 cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
