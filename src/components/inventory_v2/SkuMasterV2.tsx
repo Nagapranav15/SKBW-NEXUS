@@ -2898,11 +2898,11 @@ const SkuMasterV2: React.FC = () => {
 
   // Default category parameter for Add SKU drawer
   const getDefaultCategoryForDrawer = () => {
-    const targetType = activeMainTab === 'products' ? 'products' : activeMainTab === 'semi' ? 'semi' : 'materials';
+    const targetType = activeMainTab === 'products' ? 'products' : activeMainTab === 'semi' ? 'semi' : activeMainTab === 'categories' ? activeCategorySubTab : 'materials';
     const sectionCats = (categoriesData || []).filter(c => c.type === targetType).map(c => c.name);
     if (sectionCats.length > 0) return sectionCats[0];
-    if (activeMainTab === 'products') return 'Notebooks';
-    if (activeMainTab === 'semi') return 'Ruled Cut Sheets';
+    if (targetType === 'products') return 'Notebooks';
+    if (targetType === 'semi') return 'Ruled Cut Sheets';
     return 'Paper Reels';
   };
 
@@ -4639,7 +4639,14 @@ const SkuMasterV2: React.FC = () => {
         companyId={selectedCompany?._id || ''}
         editSku={editSku}
         defaultCategory={getDefaultCategoryForDrawer()}
-        activeSection={activeMainTab === 'products' ? 'products' : activeMainTab === 'semi' ? 'semi' : 'materials'}
+        activeSection={
+          editSku
+            ? (
+                (editSku.category || '').toLowerCase().includes('semi') || (editSku.skuCode || '').startsWith('SM') ? 'semi' :
+                (editSku.category || '').toLowerCase().includes('raw') || (editSku.category || '').toLowerCase().includes('reel') || (editSku.skuCode || '').startsWith('RM') ? 'materials' : 'products'
+              )
+            : (activeMainTab === 'products' ? 'products' : activeMainTab === 'semi' ? 'semi' : activeMainTab === 'categories' ? activeCategorySubTab : 'materials')
+        }
         existingProductsCount={productsList.length}
         existingMaterialsCount={materialsList.length}
         existingSemiCount={semiList.length}

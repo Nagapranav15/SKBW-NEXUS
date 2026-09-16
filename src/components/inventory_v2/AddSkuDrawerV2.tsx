@@ -428,40 +428,43 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   const [isAddingNewCategory, setIsAddingNewCategory] = useState(false);
   const [newCategoryInput, setNewCategoryInput] = useState('');
 
+  const resolvedSection = React.useMemo<'products' | 'materials' | 'semi'>(() => {
+    if (editSku) {
+      const catLower = (editSku.category || '').toLowerCase().trim();
+      const codeUpper = (editSku.skuCode || '').toUpperCase().trim();
+      if (catLower.includes('semi') || catLower.includes('wip') || codeUpper.startsWith('SM') || codeUpper.startsWith('SF')) {
+        return 'semi';
+      }
+      if (catLower.includes('raw') || catLower.includes('material') || catLower.includes('reel') || codeUpper.startsWith('RM')) {
+        return 'materials';
+      }
+      if (catLower.includes('finish') || catLower.includes('product') || catLower.includes('note') || codeUpper.startsWith('FG')) {
+        return 'products';
+      }
+      const matched = (createdCategories || []).find(c => c && c.name?.toLowerCase().trim() === catLower);
+      if (matched?.type) return matched.type;
+    }
+    if (activeSection === 'semi') return 'semi';
+    if (activeSection === 'materials') return 'materials';
+    return 'products';
+  }, [editSku, activeSection, createdCategories]);
+
   const itemMainType = React.useMemo(() => {
-    const cat = form.category || editSku?.category || '';
-    const catLower = cat.toLowerCase();
-    const codeUpper = (form.skuCode || editSku?.skuCode || '').toUpperCase();
-    if (catLower.includes('semi') || catLower.includes('wip') || catLower === 'semi finished' || codeUpper.startsWith('SM') || codeUpper.startsWith('SF')) {
-      return 'Semi';
-    }
-    if (catLower.includes('raw') || catLower.includes('material') || catLower === 'raw material' || codeUpper.startsWith('RM')) {
-      return 'Materials';
-    }
-    if (activeSection === 'semi') return 'Semi';
-    if (activeSection === 'materials') return 'Materials';
+    if (resolvedSection === 'semi') return 'Semi';
+    if (resolvedSection === 'materials') return 'Materials';
     return 'Products';
-  }, [form.category, editSku, activeSection, form.skuCode]);
+  }, [resolvedSection]);
 
   const availableCategories = React.useMemo(() => {
-    let targetType: 'products' | 'materials' | 'semi' = activeSection || 'products';
-    const catLower = (form.category || '').toLowerCase();
-
-    if (catLower === 'semi finished' || catLower === 'semi') {
-      targetType = 'semi';
-    } else if (catLower === 'raw material' || catLower === 'materials' || catLower === 'raw materials') {
-      targetType = 'materials';
-    } else if (catLower === 'finished goods' || catLower === 'products') {
-      targetType = 'products';
-    }
-
+    const targetType = resolvedSection;
     const list: string[] = [];
 
-    // 1. Fetch categories created in the Categories Tab matching target section type
+    // 1. Fetch categories created in the Categories Tab strictly matching target section type
     (createdCategories || []).forEach(c => {
-      if (c && c.name && (c.type === targetType || (!c.type && targetType === 'products'))) {
-        if (!list.includes(c.name)) {
-          list.push(c.name);
+      if (c && c.name && c.name.trim() && (c.type === targetType || (!c.type && targetType === 'products'))) {
+        const trimmed = c.name.trim();
+        if (!list.includes(trimmed)) {
+          list.push(trimmed);
         }
       }
     });
@@ -483,13 +486,17 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       }
     }
 
-    // 3. Always include form.category if present so value is preserved
-    if (form.category && !list.includes(form.category)) {
-      list.push(form.category);
+    // 3. Include form.category only if valid, non-empty, and matching the section
+    const trimmedFormCat = (form.category || '').trim();
+    if (trimmedFormCat && !list.includes(trimmedFormCat) && trimmedFormCat !== '—' && trimmedFormCat !== '-') {
+      const catObj = (createdCategories || []).find(c => c && c.name?.toLowerCase().trim() === trimmedFormCat.toLowerCase());
+      if (!catObj || catObj.type === targetType) {
+        list.push(trimmedFormCat);
+      }
     }
 
-    return list;
-  }, [activeSection, defaultCategory, createdCategories, form.category]);
+    return list.filter(item => typeof item === 'string' && item.trim().length > 0);
+  }, [resolvedSection, createdCategories, form.category]);
 
   const handleSaveNewCategory = async () => {
     const trimmed = newCategoryInput.trim();
@@ -844,9 +851,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       setForm({
         skuCode: editSku.skuCode || '',
         name: editSku.name || '',
-        category: editSku.category || 'Raw Material',
-        paperType: editSku.paperType || 'None',
-        unit: editSku.unit || ((editSku.category === 'Finished Goods' || activeSection === 'products') ? 'GBL' : 'kg'),
+        category: editSku.category || (resolvedSection === 'products' ? 'Notebooks' : resolvedSection === 'semi' ? 'Ruled Cut Sheets' : 'Paper Reels'),
+        paperType: editSku.paperType || (resolvedSection === 'materials' ? 'Reels' : 'None'),
+        unit: editSku.unit || (resolvedSection === 'products' ? 'Pcs' : resolvedSection === 'semi' ? 'Ream' : 'Kg'),
         altUnit: editSku.altUnit || '',
         altUnitConversion: editSku.altUnitConversion !== undefined ? String(editSku.altUnitConversion) : '',
         altUnitDirection: (editSku.altUnitDirection || '') as '' | UomDirection,
@@ -902,10 +909,11 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       } else {
         setProcessSteps([]);
       }
-      const sectionCat = activeSection === 'products' ? 'Finished Goods' : activeSection === 'semi' ? 'Semi Finished' : 'Raw Material';
-      const initialCat = defaultCategory || sectionCat;
+    } else {
+      const fallbackCat = resolvedSection === 'products' ? 'Notebooks' : resolvedSection === 'semi' ? 'Ruled Cut Sheets' : 'Paper Reels';
+      const initialCat = (defaultCategory && defaultCategory.trim()) ? defaultCategory.trim() : fallbackCat;
       const matchedInitialCat = (createdCategories || []).find(c => c && c.name?.toLowerCase().trim() === initialCat.toLowerCase().trim());
-      const initialUnit = matchedInitialCat?.uom || ((initialCat === 'Finished Goods' || activeSection === 'products') ? 'Pcs' : (activeSection === 'semi' ? 'Pcs' : 'Kg'));
+      const initialUnit = matchedInitialCat?.uom || (resolvedSection === 'products' ? 'Pcs' : resolvedSection === 'semi' ? 'Ream' : 'Kg');
 
       if (matchedInitialCat?.uom && !unitsList.some(u => u.toLowerCase() === matchedInitialCat.uom?.toLowerCase())) {
         setUnitsList(prev => [...prev, matchedInitialCat.uom!]);
@@ -915,7 +923,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         skuCode: '',
         name: '',
         category: initialCat,
-        paperType: initialCat === 'Raw Material' ? 'Reels' : 'None',
+        paperType: resolvedSection === 'materials' ? 'Reels' : 'None',
         unit: initialUnit,
         altUnit: '',
         altUnitConversion: '',
@@ -945,7 +953,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       setBomItems([]);
       setProcessSteps([]);
     }
-  }, [editSku, isOpen, defaultCategory, activeSection]);
+  }, [editSku, isOpen, defaultCategory, resolvedSection, createdCategories]);
 
   // Load custom metadata lists & brands from database
   useEffect(() => {
