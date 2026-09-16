@@ -1099,9 +1099,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     const matchedCatObj = (createdCategories || []).find(c => c.name === form.category);
     let defaultBaseFields: string[] = [];
     if (resolvedSection === 'materials' || form.category === 'Raw Material' || form.category === 'Materials' || matchedCatObj?.type === 'materials') {
-      defaultBaseFields = ['gsm', 'title', 'width', 'length', 'paperType', 'pages'];
+      defaultBaseFields = ['gsm', 'title', 'width', 'length', 'paperType', 'pages', 'altUnit'];
     } else if (resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi' || matchedCatObj?.type === 'semi') {
-      defaultBaseFields = ['gsm', 'brand', 'width', 'length', 'ruleType', 'group', 'pages'];
+      defaultBaseFields = ['gsm', 'brand', 'width', 'length', 'ruleType', 'group', 'pages', 'altUnit'];
     } else {
       defaultBaseFields = ['gsm', 'brand', 'width', 'length', 'ruleType', 'pages', 'altUnit'];
     }
@@ -1121,13 +1121,16 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           if (lower.includes('gsm')) fieldsList.push('gsm');
           if (lower.includes('rule') || lower.includes('ruling')) fieldsList.push('ruleType');
           if (lower.includes('brand')) fieldsList.push('brand');
+          if (lower.includes('alt') || lower.includes('auom') || lower.includes('unit')) fieldsList.push('altUnit');
         });
       }
     }
 
-    // Finished Goods / Products and Semi Finished must ALWAYS have 'brand' enabled!
+    // Finished Goods / Products and Semi Finished must ALWAYS have 'brand' and 'altUnit' enabled!
     if (resolvedSection === 'products' || resolvedSection === 'semi' || isProductCategory || form.category === 'Finished Goods' || form.category === 'Semi Finished' || form.category === 'Products' || form.category === 'Semi') {
       if (!fieldsList.includes('brand')) fieldsList.push('brand');
+      if (!fieldsList.includes('altUnit')) fieldsList.push('altUnit');
+    }
     }
 
     // Materials should NOT have brand
@@ -2124,32 +2127,139 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     </select>
                   </div>
 
+                  {activeFields.includes('altUnit') && (
+                    <div className="flex items-end h-full">
+                      <label className="flex items-center space-x-2.5 bg-gray-50 border border-gray-200 hover:border-blue-300 hover:bg-blue-50/10 rounded-xl px-3 py-2 w-full cursor-pointer select-none transition-all">
+                        <input
+                          type="checkbox"
+                          checked={hasAltUnit}
+                          onChange={e => {
+                            const checked = e.target.checked;
+                            setHasAltUnit(checked);
+                            if (!checked) {
+                              updateFormField({ altUnit: '', altUnitConversion: '' });
+                            }
+                          }}
+                          className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 border-gray-300 cursor-pointer"
+                        />
+                        <div className="text-left">
+                          <span className="block text-[11px] font-bold text-gray-700">Enable AUOM</span>
+                          <span className="block text-[9px] text-gray-400 font-medium leading-tight">Alternate packaging / sales unit</span>
+                        </div>
+                      </label>
+                    </div>
+                  )}
+
+                  {/* AUOM & Conversion Rate if Enabled */}
+                  {activeFields.includes('altUnit') && hasAltUnit && (() => {
+                    const effectiveDirection = getUomDirection(form.unit, form.altUnit, form.altUnitDirection || undefined);
+                    const factorNum = Number(form.altUnitConversion) || 0;
+                    const isUnitSame = !!(form.unit && form.altUnit && form.unit.trim().toLowerCase() === form.altUnit.trim().toLowerCase());
+                    const isFactorInvalid = !!(form.altUnit && form.altUnitConversion && factorNum <= 0);
+
+                    const baseUnitLabel = effectiveDirection === 'PRIMARY_TO_ALT' ? (form.unit || 'Primary') : (form.altUnit || 'AUOM');
+                    const targetUnitLabel = effectiveDirection === 'PRIMARY_TO_ALT' ? (form.altUnit || 'AUOM') : (form.unit || 'Primary');
+                    const inverseFactor = factorNum > 0 ? roundUomQty(1 / factorNum) : 0;
+
+                    return (
+                      <div className="col-span-2 space-y-2 bg-gradient-to-br from-blue-50/40 via-indigo-50/20 to-blue-50/40 p-4 rounded-2xl border border-blue-100 shadow-xs animate-in fade-in duration-200">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-bold text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                            Alternate Unit of Measurement (AUOM)
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-gray-600 mb-1">AUOM (ALTERNATE UOM)</label>
+                            <select
+                              value={form.altUnit}
+                              onChange={e => {
+                                const val = e.target.value;
+                                if (val === '__ADD_NEW__') {
+                                  handleAddNewOption('units');
+                                } else {
+                                  let defaultConversion = form.altUnitConversion;
+                                  const upperVal = val.toUpperCase();
+                                  const upperUnit = (form.unit || '').toUpperCase();
+                                  if ((upperVal === 'GBL' && upperUnit.includes('PC')) || (upperUnit === 'GBL' && upperVal.includes('PC'))) {
+                                    defaultConversion = '200';
+                                  } else if ((upperVal === 'REAM' && upperUnit.includes('PC')) || (upperUnit === 'REAM' && upperVal.includes('PC'))) {
+                                    defaultConversion = '500';
+                                  }
+                                  updateFormField({
+                                    altUnit: val,
+                                    altUnitConversion: defaultConversion,
+                                    altUnitDirection: '',
+                                    booksGbl: (upperVal === 'GBL' || upperUnit === 'GBL') ? '200' : form.booksGbl
+                                  });
+                                }
+                              }}
+                              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
+                            >
+                              <option value="">Select Alternate Unit</option>
+                              {unitsList.map(unit => (
+                                <option key={unit} value={unit}>{unit}</option>
+                              ))}
+                              <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-semibold text-gray-600 mb-1">CONVERSION FACTOR</label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                placeholder="e.g. 200"
+                                min="0.000001"
+                                step="any"
+                                value={form.altUnitConversion}
+                                onChange={e => updateFormField({ altUnitConversion: e.target.value })}
+                                className={`w-full pl-3 pr-20 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-900 font-mono ${
+                                  isFactorInvalid ? 'border-red-400 focus:ring-red-400' : 'border-gray-200'
+                                }`}
+                              />
+                              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-blue-600 font-mono uppercase select-none">
+                                {targetUnitLabel}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {isUnitSame && (
+                          <div className="text-[11px] font-semibold text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            Primary UOM and Secondary UOM cannot be identical.
+                          </div>
+                        )}
+
+                        {isFactorInvalid && (
+                          <div className="text-[11px] font-semibold text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            Conversion factor must be greater than 0.
+                          </div>
+                        )}
+
+                        {form.altUnit && form.altUnitConversion && factorNum > 0 && !isUnitSame && (
+                          <div className="bg-white/90 border border-blue-200/80 rounded-xl p-2.5 shadow-2xs space-y-1 text-center">
+                            <div className="text-xs font-bold text-slate-800 flex items-center justify-center gap-2">
+                              <span className="text-gray-500 font-medium text-[11px]">Relationship:</span>
+                              <span className="bg-blue-100 text-blue-900 px-2.5 py-0.5 rounded-md font-mono text-xs font-extrabold border border-blue-200">
+                                1 {baseUnitLabel} = {form.altUnitConversion} {targetUnitLabel}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-gray-500 font-mono">
+                              Inverse: 1 {targetUnitLabel} = {inverseFactor} {baseUnitLabel}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   {/* Attributes for Semi-Finished Goods (Group & Status removed) */}
                   {(resolvedSection === 'semi' || activeSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi') && (
                     <>
-                      {activeFields.includes('altUnit') && (
-                        <div className="flex items-end h-full">
-                          <label className="flex items-center space-x-2.5 bg-gray-50 border border-gray-200 hover:border-blue-300 hover:bg-blue-50/10 rounded-xl px-3 py-2 w-full cursor-pointer select-none transition-all">
-                            <input
-                              type="checkbox"
-                              checked={hasAltUnit}
-                              onChange={e => {
-                                const checked = e.target.checked;
-                                setHasAltUnit(checked);
-                                if (!checked) {
-                                  updateFormField({ altUnit: '', altUnitConversion: '' });
-                                }
-                              }}
-                              className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 border-gray-300 cursor-pointer"
-                            />
-                            <div className="text-left">
-                              <span className="block text-[11px] font-bold text-gray-700">Enable Primary UOM</span>
-                              <span className="block text-[9px] text-gray-400 font-medium leading-tight">Packaging / Sales unit</span>
-                            </div>
-                          </label>
-                        </div>
-                      )}
-
                       {activeFields.includes('ruleType') && (
                         <div>
                           <label className="block text-[11px] font-semibold text-gray-600 mb-1">RULE TYPE</label>
