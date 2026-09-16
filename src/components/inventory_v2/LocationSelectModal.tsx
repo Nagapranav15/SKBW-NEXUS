@@ -117,7 +117,6 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
     return buildNodes(null, '', 0);
   }, [isOpen, hierarchyToUse, locMap]);
 
-  // Collapsed by default when modal opens (expand only selected item parents if present)
   useEffect(() => {
     if (isOpen) {
       setTempSelectedId(selectedLocationId);
@@ -153,10 +152,9 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
   const handleItemSelect = (node: TreeNode, e: React.MouseEvent) => {
     e.stopPropagation();
     const lvl = node.item.level;
-    // User CANNOT select Factory or Floor!
     if (lvl === 'Factory' || lvl === 'Floor') {
-      setWarningMsg(`Cannot select ${lvl} level. Please expand and select a Zone or Loc.`);
-      setTimeout(() => setWarningMsg(null), 3000);
+      setWarningMsg(`Cannot select ${lvl}. Choose Zone or Loc.`);
+      setTimeout(() => setWarningMsg(null), 2500);
       return;
     }
 
@@ -186,7 +184,7 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
 
   const renderTree = (nodes: TreeNode[], depth = 0) => {
     return (
-      <div className="space-y-1">
+      <div className="space-y-0.5">
         {nodes.map(node => {
           const id = String(node.item._id || node.item.name);
           const isExpanded = !!expandedNodes[id] || (searchQuery.trim().length > 0);
@@ -195,7 +193,6 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
           const isSelectable = level === 'Zone' || level === 'Storage Location' || (level !== 'Factory' && level !== 'Floor');
           const isSelected = tempSelectedId === id || tempSelectedId === node.item.name;
 
-          // Filter by search query if present
           if (searchQuery.trim()) {
             const query = searchQuery.toLowerCase();
             const matchesCurrent = node.item.name.toLowerCase().includes(query);
@@ -217,8 +214,8 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
                     handleItemSelect(node, e);
                   }
                 }}
-                style={{ paddingLeft: `${depth * 20 + 8}px` }}
-                className={`group flex items-center justify-between py-2 px-3 rounded-xl transition-all cursor-pointer ${
+                style={{ paddingLeft: `${depth * 16 + 6}px` }}
+                className={`group flex items-center justify-between py-1.5 px-2 rounded-lg transition-all cursor-pointer ${
                   isSelected 
                     ? 'bg-blue-50/90 border border-blue-200 text-blue-900 shadow-2xs font-semibold' 
                     : isSelectable 
@@ -226,31 +223,28 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
                       : 'hover:bg-slate-50/70 text-gray-700'
                 }`}
               >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  {/* Arrow Collapse / Expand */}
+                <div className="flex items-center gap-1.5 min-w-0">
                   {hasChildren ? (
                     <button 
                       type="button"
                       onClick={(e) => toggleExpand(id, e)}
-                      className="w-5 h-5 flex items-center justify-center rounded-md hover:bg-gray-200/80 text-gray-400 hover:text-gray-700 cursor-pointer transition-colors"
+                      className="w-4 h-4 flex items-center justify-center rounded hover:bg-gray-200 text-gray-400 hover:text-gray-700 cursor-pointer transition-colors"
                     >
                       {isExpanded ? (
-                        <ChevronDown className="w-3.5 h-3.5 text-blue-600 font-bold" />
+                        <ChevronDown className="w-3 h-3 text-blue-600 font-bold" />
                       ) : (
-                        <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                        <ChevronRight className="w-3 h-3 text-gray-400" />
                       )}
                     </button>
                   ) : (
-                    <span className="w-5 inline-block"></span>
+                    <span className="w-4 inline-block"></span>
                   )}
 
-                  {/* Minimal Dot - ONLY shown when selected */}
                   {isSelected && (
-                    <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0 shadow-xs"></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0"></span>
                   )}
 
-                  {/* Level Name */}
-                  <span className={`text-xs truncate ${
+                  <span className={`text-[11px] truncate ${
                     isSelected ? 'font-bold text-blue-800' :
                     level === 'Factory' ? 'font-bold text-gray-900' :
                     level === 'Floor' ? 'font-semibold text-gray-800' :
@@ -260,8 +254,7 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
                   </span>
                 </div>
 
-                {/* Clean Tag Badge */}
-                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md shrink-0 ml-2 border ${
+                <span className={`text-[9px] font-semibold px-1.5 py-0.2 rounded shrink-0 ml-1.5 border ${
                   isSelected ? 'bg-blue-100 text-blue-800 border-blue-200' :
                   level === 'Factory' ? 'bg-purple-50 text-purple-700 border-purple-200/60' :
                   level === 'Floor' ? 'bg-slate-100 text-slate-600 border-slate-200/60' :
@@ -272,10 +265,9 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
                 </span>
               </div>
 
-              {/* Render Children Recursively if Expanded */}
               {isExpanded && hasChildren && (
                 <div className="relative">
-                  <div className="absolute left-5 top-0 bottom-1 w-px bg-slate-200/80"></div>
+                  <div className="absolute left-4 top-0 bottom-1 w-px bg-slate-200/80"></div>
                   {renderTree(node.children, depth + 1)}
                 </div>
               )}
@@ -287,96 +279,96 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fadeIn font-sans">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100 flex flex-col max-h-[85vh] animate-scaleUp">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 bg-slate-900/35 backdrop-blur-xs animate-fadeIn font-sans">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-[340px] overflow-hidden border border-gray-100 flex flex-col max-h-[80vh] animate-scaleUp">
         
-        {/* Modern Clean Header */}
-        <div className="bg-white p-5 px-6 flex items-center justify-between border-b border-gray-100">
-          <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100/80 shadow-2xs">
-              <MapPin className="w-5 h-5" />
+        {/* Compact Clean Header */}
+        <div className="bg-white p-3 px-4 flex items-center justify-between border-b border-gray-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100/80 shadow-2xs">
+              <MapPin className="w-3.5 h-3.5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-gray-900 tracking-tight leading-tight">{title}</h3>
-              <p className="text-[11px] text-gray-500 font-medium mt-0.5">Select a Zone or Loc (Factory & Floor locked)</p>
+              <h3 className="text-xs font-bold text-gray-900 tracking-tight leading-tight">{title}</h3>
+              <p className="text-[10px] text-gray-400 font-normal">Select Zone or Loc (Locked Factory/Floor)</p>
             </div>
           </div>
           <button 
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition-all cursor-pointer"
+            className="w-6 h-6 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition-all cursor-pointer"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
         {/* Search Filter Bar */}
-        <div className="px-6 pt-4 pb-2">
+        <div className="px-3.5 pt-2.5 pb-1">
           <div className="relative flex items-center">
-            <Search className="w-4 h-4 text-gray-400 absolute left-3 pointer-events-none" />
+            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search location, zone, or floor..."
+              placeholder="Search location..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9.5 pr-8 py-2.5 bg-slate-50/80 border border-gray-200 rounded-xl text-xs text-gray-800 placeholder-gray-400 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
+              className="w-full pl-7.5 pr-7 py-1.5 bg-slate-50 border border-gray-200 rounded-lg text-[11px] text-gray-800 placeholder-gray-400 focus:bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 text-gray-400 hover:text-gray-600 p-1 cursor-pointer"
+                className="absolute right-2 text-gray-400 hover:text-gray-600 p-0.5 cursor-pointer"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-3 h-3" />
               </button>
             )}
           </div>
         </div>
 
-        {/* Warning Toast Notification for Invalid Selection */}
+        {/* Warning Toast */}
         {warningMsg && (
-          <div className="bg-amber-50 border-b border-amber-200/80 mx-5 mt-2 rounded-xl p-2.5 px-3.5 text-amber-900 text-xs font-semibold flex items-center gap-2 animate-fadeIn">
-            <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+          <div className="bg-amber-50 border border-amber-200 mx-3.5 mt-1.5 rounded-lg p-1.5 px-2.5 text-amber-900 text-[10px] font-semibold flex items-center gap-1.5 animate-fadeIn">
+            <AlertCircle className="w-3 h-3 text-amber-600 shrink-0" />
             <span>{warningMsg}</span>
           </div>
         )}
 
         {/* Tree Container */}
-        <div className="p-4 px-5 overflow-y-auto flex-1 max-h-[360px] custom-scrollbar">
+        <div className="p-2.5 px-3 overflow-y-auto flex-1 max-h-[260px] custom-scrollbar">
           {treeNodes.length > 0 ? (
             renderTree(treeNodes)
           ) : (
-            <div className="py-12 text-center text-gray-400">
-              <MapPin className="w-7 h-7 mx-auto mb-1.5 text-gray-300" />
-              <p className="text-xs font-medium">No warehouse locations configured</p>
+            <div className="py-8 text-center text-gray-400">
+              <MapPin className="w-5 h-5 mx-auto mb-1 text-gray-300" />
+              <p className="text-[11px] font-medium">No locations configured</p>
             </div>
           )}
         </div>
 
-        {/* Footer & Action Buttons */}
-        <div className="p-4 px-6 bg-slate-50/60 border-t border-gray-100 flex items-center justify-between gap-3 rounded-b-2xl">
-          <div className="min-w-0 flex-1 pr-2">
+        {/* Footer & Compact Action Buttons */}
+        <div className="p-2.5 px-3.5 bg-slate-50/60 border-t border-gray-100 flex items-center justify-between gap-2 rounded-b-2xl">
+          <div className="min-w-0 flex-1 pr-1">
             {selectedPathStr ? (
-              <div className="text-[11px] text-blue-700 font-semibold truncate flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0"></span>
+              <div className="text-[10px] text-blue-700 font-semibold truncate flex items-center gap-1">
+                <span className="w-1 h-1 rounded-full bg-blue-600 shrink-0"></span>
                 <span className="truncate">{selectedPathStr}</span>
               </div>
             ) : (
-              <span className="text-[11px] text-gray-400 italic">No location selected</span>
+              <span className="text-[10px] text-gray-400 italic">No location selected</span>
             )}
           </div>
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 font-semibold text-xs cursor-pointer transition-all shadow-2xs"
+              className="px-2.5 py-1 rounded-lg border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 font-semibold text-[11px] cursor-pointer transition-all shadow-2xs"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleApply}
-              className="px-6 py-2 rounded-xl text-white bg-blue-600 hover:bg-blue-700 font-semibold text-xs cursor-pointer shadow-2xs hover:shadow transition-all shrink-0 whitespace-nowrap min-w-[80px]"
+              className="px-3.5 py-1 rounded-lg text-white bg-blue-600 hover:bg-blue-700 font-bold text-[11px] cursor-pointer shadow-2xs hover:shadow transition-all shrink-0 whitespace-nowrap"
             >
               Apply
             </button>
