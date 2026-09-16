@@ -180,9 +180,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   const [form, setForm] = useState({
     skuCode: '',
     name: '',
-    category: defaultCategory || (activeSection === 'products' ? 'Finished Goods' : activeSection === 'semi' ? 'Semi Finished' : 'Raw Material'),
+    category: '',
     paperType: 'None' as 'Reels' | 'Sheets' | 'None',
-    unit: (activeSection === 'products' || defaultCategory === 'Finished Goods') ? 'GBL' : 'kg',
+    unit: activeSection === 'products' ? 'Pcs' : activeSection === 'semi' ? 'Ream' : 'Kg',
     altUnit: '',
     altUnitConversion: '',
     altUnitDirection: '' as '' | UomDirection,
@@ -493,20 +493,55 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     return list.filter(item => typeof item === 'string' && item.trim().length > 0);
   }, [resolvedSection, createdCategories, form.category]);
 
-  const handleSaveNewCategory = async () => {
-    const trimmed = newCategoryInput.trim();
-    if (!trimmed) {
-      setIsAddingNewCategory(false);
+  // Modal popup for creating a new category matching Categories Tab structure
+  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
+  const [categoryModalForm, setCategoryModalForm] = useState<{
+    name: string;
+    type: 'products' | 'materials' | 'semi';
+    uom: string;
+    fieldsText: string;
+  }>({
+    name: '',
+    type: 'materials',
+    uom: 'Kg',
+    fieldsText: 'Paper Type, GSM, Width (cm), Length (cm), Standard Sheets'
+  });
+
+  const handleOpenAddCategoryModal = () => {
+    const currentType = resolvedSection || 'products';
+    const defaultUom = currentType === 'materials' ? 'Kg' : currentType === 'semi' ? 'Ream' : 'Pcs';
+    const defaultFields = currentType === 'materials'
+      ? 'Paper Type, GSM, Width (cm), Length (cm), Standard Sheets'
+      : currentType === 'semi'
+      ? 'Brand, GSM, Rule Type, Size, Pages'
+      : 'Pages, Size, GSM, Ruling, Brand';
+    
+    setCategoryModalForm({
+      name: '',
+      type: currentType,
+      uom: defaultUom,
+      fieldsText: defaultFields
+    });
+    setShowAddCategoryModal(true);
+  };
+
+  const handleSaveCategoryModal = async () => {
+    if (!categoryModalForm.name.trim()) {
+      showToast('Please enter category name', 'error');
       return;
     }
+    const trimmed = categoryModalForm.name.trim();
+    const fieldsArr = categoryModalForm.fieldsText
+      .split(/[,·]/)
+      .map(f => f.trim())
+      .filter(Boolean);
 
-    const defaultUom = resolvedSection === 'materials' ? 'Kg' : resolvedSection === 'semi' ? 'Ream' : 'Pcs';
     const newCategoryObj = {
       id: `cat-${Date.now()}`,
       name: trimmed,
-      type: resolvedSection,
-      uom: defaultUom,
-      fields: resolvedSection === 'materials' ? ['GSM', 'Width (cm)', 'Brand'] : resolvedSection === 'semi' ? ['GSM', 'Rule Type', 'Size'] : ['Pages', 'Size', 'Ruling']
+      type: categoryModalForm.type,
+      uom: categoryModalForm.uom.trim() || 'Pcs',
+      fields: fieldsArr.length > 0 ? fieldsArr : ['Type']
     };
 
     if (onCategoryCreated) {
@@ -531,22 +566,21 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         brands: brandsList,
         categoryFields: categoryFieldsMap
       });
-      showToast(`Category "${trimmed}" added to ${resolvedSection.toUpperCase()} categories!`, 'success');
+      showToast(`Category "${trimmed}" created in ${categoryModalForm.type.toUpperCase()}!`, 'success');
     } catch (err) {
       console.error('Failed to save category metadata:', err);
     }
 
-    if (!unitsList.some(u => u.toLowerCase() === defaultUom.toLowerCase())) {
-      setUnitsList(prev => [...prev, defaultUom]);
+    if (!unitsList.some(u => u.toLowerCase() === newCategoryObj.uom.toLowerCase())) {
+      setUnitsList(prev => [...prev, newCategoryObj.uom]);
     }
-    setForm(prev => ({
-      ...prev,
+
+    updateFormField({
       category: trimmed,
-      unit: defaultUom
-    }));
+      unit: newCategoryObj.uom
+    });
     regenerateSkuCode(trimmed);
-    setIsAddingNewCategory(false);
-    setNewCategoryInput('');
+    setShowAddCategoryModal(false);
   };
   
   const [isNameManuallyEdited, setIsNameManuallyEdited] = useState(false);
@@ -1005,21 +1039,12 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         setProcessSteps([]);
       }
     } else {
-      const fallbackCat = resolvedSection === 'products' ? 'Products' : resolvedSection === 'semi' ? 'Semi' : 'Materials';
-      const initialCat = (defaultCategory && defaultCategory.trim()) ? defaultCategory.trim() : fallbackCat;
-      const matchedInitialCat = (createdCategories || []).find(c => c && c.name?.toLowerCase().trim() === initialCat.toLowerCase().trim());
-      const initialUnit = matchedInitialCat?.uom || (resolvedSection === 'products' ? 'Pcs' : resolvedSection === 'semi' ? 'Ream' : 'Kg');
-
-      if (matchedInitialCat?.uom && !unitsList.some(u => u.toLowerCase() === matchedInitialCat.uom?.toLowerCase())) {
-        setUnitsList(prev => [...prev, matchedInitialCat.uom!]);
-      }
-
       setForm({
         skuCode: '',
         name: '',
-        category: initialCat,
+        category: '',
         paperType: resolvedSection === 'materials' ? 'Reels' : 'None',
-        unit: initialUnit,
+        unit: resolvedSection === 'products' ? 'Pcs' : resolvedSection === 'semi' ? 'Ream' : 'Kg',
         altUnit: '',
         altUnitConversion: '',
         altUnitDirection: '' as '' | UomDirection,
@@ -1514,92 +1539,53 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                 <div className="col-span-2 sm:col-span-1">
                   <label className="block text-[11px] font-semibold text-gray-600 mb-1 flex items-center justify-between">
                     <span>CATEGORY *</span>
-                    {!isAddingNewCategory && (
-                      <button
-                        type="button"
-                        onClick={() => setIsAddingNewCategory(true)}
-                        className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-0.5 cursor-pointer"
-                      >
-                        <Plus className="w-3 h-3" />
-                        <span>Add Category</span>
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={handleOpenAddCategoryModal}
+                      className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Add Category</span>
+                    </button>
                   </label>
 
-                  {isAddingNewCategory ? (
-                    <div className="flex items-center gap-1.5 animate-in fade-in duration-150">
-                      <input
-                        type="text"
-                        placeholder="Enter category name..."
-                        value={newCategoryInput}
-                        onChange={e => setNewCategoryInput(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleSaveNewCategory();
-                          } else if (e.key === 'Escape') {
-                            setIsAddingNewCategory(false);
-                            setNewCategoryInput('');
-                          }
-                        }}
-                        className="flex-1 px-3 py-2 border border-blue-300 rounded-xl text-xs font-bold text-gray-800 bg-white focus:ring-2 focus:ring-blue-500 shadow-2xs"
-                        autoFocus
-                      />
-                      <button
-                        type="button"
-                        onClick={handleSaveNewCategory}
-                        className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-2xs"
-                      >
-                        Add
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setIsAddingNewCategory(false); setNewCategoryInput(''); }}
-                        className="p-2 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-100 cursor-pointer"
-                        title="Cancel"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="relative">
-                      <select
-                        value={form.category}
-                        onChange={e => {
-                          const val = e.target.value;
-                          if (val === '__ADD_NEW__') {
-                            setIsAddingNewCategory(true);
-                          } else {
-                            const matchedCat = (createdCategories || []).find(c => c && c.name?.toLowerCase().trim() === val.toLowerCase().trim());
-                            const catUom = matchedCat?.uom;
+                  <div className="relative">
+                    <select
+                      value={form.category}
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (val === '__ADD_NEW__') {
+                          handleOpenAddCategoryModal();
+                        } else {
+                          const matchedCat = (createdCategories || []).find(c => c && c.name?.toLowerCase().trim() === val.toLowerCase().trim());
+                          const catUom = matchedCat?.uom;
 
-                            if (catUom && !unitsList.some(u => u.toLowerCase() === catUom.toLowerCase())) {
-                              setUnitsList(prev => [...prev, catUom]);
-                            }
-
-                            setForm(prev => ({
-                              ...prev,
-                              category: val,
-                              ...(catUom ? { unit: catUom } : {})
-                            }));
-                            regenerateSkuCode(val);
+                          if (catUom && !unitsList.some(u => u.toLowerCase() === catUom.toLowerCase())) {
+                            setUnitsList(prev => [...prev, catUom]);
                           }
-                        }}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-bold text-gray-800 cursor-pointer appearance-none shadow-2xs pr-8"
-                        required
-                      >
-                        {availableCategories.map(cat => (
-                          <option key={cat} value={cat}>{cat}</option>
-                        ))}
-                        <option value="__ADD_NEW__" className="font-bold text-blue-600 bg-blue-50">
-                          + Add New Category...
-                        </option>
-                      </select>
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                        <ChevronDown className="w-3.5 h-3.5" />
-                      </div>
+
+                          updateFormField({
+                            category: val,
+                            ...(catUom ? { unit: catUom } : {})
+                          });
+                          regenerateSkuCode(val);
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-bold text-gray-800 cursor-pointer appearance-none shadow-2xs pr-8"
+                      required
+                    >
+                      <option value="" disabled>Select Category</option>
+                      {availableCategories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                      <option value="__ADD_NEW__" className="font-bold text-blue-600 bg-blue-50">
+                        + Add New Category...
+                      </option>
+                    </select>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                      <ChevronDown className="w-3.5 h-3.5" />
                     </div>
-                  )}
+                  </div>
                 </div>
 
 
@@ -2915,6 +2901,104 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           setDynamicLocationText(locPath);
         }}
       />
+
+      {/* Add New Category Modal */}
+      {showAddCategoryModal && (
+        <Modal
+          isOpen={showAddCategoryModal}
+          onClose={() => setShowAddCategoryModal(false)}
+          title="Add New Category"
+        >
+          <div className="space-y-4 text-xs">
+            <div>
+              <label className="block font-semibold text-gray-700 mb-1">Category Name *</label>
+              <input
+                type="text"
+                value={categoryModalForm.name}
+                onChange={(e) => setCategoryModalForm(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="e.g. Notebooks, Paper Reels, Covers"
+                className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500 font-semibold"
+                autoFocus
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">Item Group Type</label>
+                <select
+                  value={categoryModalForm.type}
+                  onChange={(e) => {
+                    const nextType = e.target.value as 'products' | 'materials' | 'semi';
+                    const defaultUom = nextType === 'materials' ? 'Kg' : nextType === 'semi' ? 'Ream' : 'Pcs';
+                    const defaultFields = nextType === 'materials'
+                      ? 'Paper Type, GSM, Width (cm), Length (cm), Standard Sheets'
+                      : nextType === 'semi'
+                      ? 'Brand, GSM, Rule Type, Size, Pages'
+                      : 'Pages, Size, GSM, Ruling, Brand';
+                    setCategoryModalForm(prev => ({
+                      ...prev,
+                      type: nextType,
+                      uom: defaultUom,
+                      fieldsText: defaultFields
+                    }));
+                  }}
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500 font-semibold bg-white cursor-pointer"
+                >
+                  <option value="products">Products</option>
+                  <option value="materials">Materials</option>
+                  <option value="semi">Semi</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">Default UOM</label>
+                <select
+                  value={categoryModalForm.uom}
+                  onChange={(e) => setCategoryModalForm(prev => ({ ...prev, uom: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500 bg-white font-semibold cursor-pointer"
+                >
+                  {Array.from(new Set([
+                    categoryModalForm.uom,
+                    ...unitsList
+                  ])).filter(Boolean).map(u => (
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block font-semibold text-gray-700 mb-1">Field Attributes (comma separated)</label>
+              <input
+                type="text"
+                value={categoryModalForm.fieldsText}
+                onChange={(e) => setCategoryModalForm(prev => ({ ...prev, fieldsText: e.target.value }))}
+                placeholder="Pages, Size, GSM, Ruling"
+                className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500 font-semibold"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3">
+              <button
+                type="button"
+                onClick={() => setShowAddCategoryModal(false)}
+                className="px-4 py-2 border border-gray-300 rounded-xl text-gray-600 hover:bg-gray-100 font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveCategoryModal}
+                className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-semibold cursor-pointer shadow-sm"
+              >
+                Save Category
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </>
   );
 };
