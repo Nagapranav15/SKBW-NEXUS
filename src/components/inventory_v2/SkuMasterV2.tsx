@@ -2105,26 +2105,23 @@ const SkuMasterV2: React.FC = () => {
       // Raw materials
       headers = [
         'ID / SKU Code',
-        'SKU NAME',
-        'PAGES',
-        'BRAND',
-        'RULE TYPE',
+        'Item Name',
         'Category',
         'UOM',
-        'AUOM (Alt Unit)',
-        'Con Rate',
         'GSM',
+        'TITLE',
         'WIDTH (CM)',
-        'LENGTH (CM)',
+        'Size',
+        'Paper Type',
+        'Stock',
         'Min Stock Level',
-        'Reorder Level',
-        'Opening Stock Qty',
+        'Status',
         'vendor'
       ];
       sampleRows = [
-        ['RM-001', 'Maplitho Paper Reel 70 GSM', '0', 'Classmate', 'Plain', 'Paper Reels', 'Kg', 'Reels', '500', '70', '84', '0', '300', '100', '1500', 'Bhavani Paper Mill'],
-        ['RM-002', 'Duplex Board Grey Back 300 GSM', '0', 'Navneet', 'Plain', 'Duplex Cover Board', 'Pcs', 'Bundles', '100', '300', '57', '70', '500', '200', '2500', 'Apex Board Traders'],
-        ['RM-003', 'Craft Paper Reel 80 GSM', '0', 'Happy Days', 'Plain', 'Paper Reels', 'Kg', 'Reels', '400', '80', '90', '0', '200', '100', '1200', 'Sri Balaji Paper Mart']
+        ['RM-001', 'Maplitho Paper Reel 70 GSM', 'Paper Reels', 'Kg', '70', 'Maplitho', '84', '84 CM', 'Reels', '1500', '300', 'Active', 'Bhavani Paper Mill'],
+        ['RM-002', 'Duplex Board Grey Back 300 GSM', 'Duplex Cover Board', 'Pcs', '300', 'Duplex Board', '57', '57 x 70 CM', 'Sheets', '2500', '500', 'Active', 'Apex Board Traders'],
+        ['RM-003', 'Craft Paper Reel 80 GSM', 'Paper Reels', 'Kg', '80', 'Craft Paper', '90', '90 CM', 'Reels', '1200', '200', 'Active', 'Sri Balaji Paper Mart']
       ];
     }
 
