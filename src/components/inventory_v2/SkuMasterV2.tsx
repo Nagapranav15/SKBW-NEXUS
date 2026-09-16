@@ -534,7 +534,7 @@ const SkuMasterV2: React.FC = () => {
     { id: 'b-3', name: 'Book Stitching Wire #24', qty: 0.02, uom: 'Kg', inStock: 180, notes: 'Wire' },
     { id: 'b-4', name: 'Hotmelt Binding Adhesive', qty: 0.05, uom: 'Kg', inStock: 2200, notes: 'Glue' }
   ]);
-  const [recipeYieldQty, setRecipeYieldQty] = useState<string>('1');
+  const [recipeYieldQty, setRecipeYieldQty] = useState<string>('');
   const [recipeYieldUnit, setRecipeYieldUnit] = useState<string>('');
   const [buildBatchYieldQty, setBuildBatchYieldQty] = useState<string>('1');
   const [isSavingBom, setIsSavingBom] = useState(false);
@@ -1048,7 +1048,7 @@ const SkuMasterV2: React.FC = () => {
 
   useEffect(() => {
     if (selectedSkuDetails) {
-      setRecipeYieldQty(String((selectedSkuDetails as any).recipeYieldQty || (selectedSkuDetails as any).batchYieldQty || '1'));
+      setRecipeYieldQty((selectedSkuDetails as any).recipeYieldQty !== undefined ? String((selectedSkuDetails as any).recipeYieldQty) : ((selectedSkuDetails as any).batchYieldQty !== undefined ? String((selectedSkuDetails as any).batchYieldQty) : ''));
       setRecipeYieldUnit((selectedSkuDetails as any).recipeYieldUnit || selectedSkuDetails.unit || 'Pcs');
       
       const pType = selectedSkuDetails.paperType && selectedSkuDetails.paperType !== 'None' ? selectedSkuDetails.paperType : '';
@@ -5099,9 +5099,7 @@ const SkuMasterV2: React.FC = () => {
                           <input
                             type="number"
                             min="1"
-                            placeholder="1"
-                            value={recipeYieldQty || '1'}
-                            onFocus={(e) => e.target.select()}
+                            value={recipeYieldQty || ''}
                             onChange={(e) => setRecipeYieldQty(e.target.value)}
                             className="w-14 px-1.5 py-0.5 border border-gray-300 rounded font-bold text-gray-900 text-center focus:ring-1 focus:ring-[#064E3B]"
                           />

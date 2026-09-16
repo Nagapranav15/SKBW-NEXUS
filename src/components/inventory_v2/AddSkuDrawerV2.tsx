@@ -199,7 +199,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     reorderLevel: '',
     openingStock: '',
     initialLocationId: '',
-    recipeYieldQty: '1',
+    recipeYieldQty: '',
     preferredVendor: '',
     status: 'Active' as 'Active' | 'Inactive'
   });
@@ -863,7 +863,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                          '';
           return typeof rawLoc === 'object' ? (rawLoc._id || rawLoc.name || '') : String(rawLoc);
         })(),
-        recipeYieldQty: (editSku as any)?.recipeYieldQty !== undefined ? String((editSku as any)?.recipeYieldQty) : ((editSku as any)?.batchYieldQty !== undefined ? String((editSku as any)?.batchYieldQty) : '1'),
+        recipeYieldQty: (editSku as any)?.recipeYieldQty !== undefined ? String((editSku as any)?.recipeYieldQty) : ((editSku as any)?.batchYieldQty !== undefined ? String((editSku as any)?.batchYieldQty) : ''),
         preferredVendor: (editSku as any)?.preferredVendor || '',
         status: editSku.status || 'Active'
       });
@@ -918,7 +918,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         reorderLevel: '',
         openingStock: '',
         initialLocationId: '',
-        recipeYieldQty: '1',
+        recipeYieldQty: '',
         preferredVendor: '',
         status: 'Active'
       });
@@ -2422,9 +2422,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                             <input
                               type="number"
                               min="1"
-                              placeholder="1"
-                              value={form.recipeYieldQty || '1'}
-                              onFocus={(e) => e.target.select()}
+                              value={form.recipeYieldQty || ''}
                               onChange={(e) => setForm({ ...form, recipeYieldQty: e.target.value })}
                               className="w-16 px-2 py-0.5 border border-blue-300 rounded-md text-xs font-extrabold text-blue-700 text-center focus:ring-2 focus:ring-blue-500 bg-blue-50/60"
                             />
