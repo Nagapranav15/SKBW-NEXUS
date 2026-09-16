@@ -47,56 +47,74 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
   const [warningMsg, setWarningMsg] = useState<string | null>(null);
 
   const hierarchyToUse = useMemo(() => {
-    return rawHierarchy && rawHierarchy.length > 0 ? rawHierarchy : DEFAULT_DEMO_HIERARCHY;
+    return Array.isArray(rawHierarchy) && rawHierarchy.length > 0 ? rawHierarchy : DEFAULT_DEMO_HIERARCHY;
   }, [rawHierarchy]);
 
   // Build Location Map & Paths
   const locMap = useMemo(() => {
     const map = new Map<string, WarehouseLocationV2>();
     hierarchyToUse.forEach(item => {
-      if (item._id) map.set(String(item._id), item);
-      map.set(item.name.toLowerCase().trim(), item);
+      if (item && item._id) map.set(String(item._id), item);
     });
     return map;
   }, [hierarchyToUse]);
 
   const getFullPath = (item: WarehouseLocationV2): string => {
-    const parts: string[] = [item.name.trim()];
+    if (!item) return '';
+    const parts: string[] = [(item.name || '').trim()];
     let currentParentId = item.parentId ? String(item.parentId) : null;
     let guard = 0;
-    while (currentParentId && guard < 10) {
+    const visited = new Set<string>();
+    if (item._id) visited.add(String(item._id));
+
+    while (currentParentId && guard < 8) {
+      if (visited.has(currentParentId)) break;
+      visited.add(currentParentId);
+
       const parent = locMap.get(currentParentId);
       if (!parent) break;
-      parts.unshift(parent.name.trim());
+      parts.unshift((parent.name || '').trim());
       currentParentId = parent.parentId ? String(parent.parentId) : null;
       guard++;
     }
     return parts.join(' ➔ ');
   };
 
-  // Build Tree Nodes
+  // Build Safe Tree Nodes with cycle protection
   const treeNodes = useMemo(() => {
-    const buildNodes = (parentId: string | null, parentPath: string): TreeNode[] => {
+    if (!isOpen) return [];
+
+    const visitedIds = new Set<string>();
+
+    const buildNodes = (parentId: string | null, parentPath: string, depth: number): TreeNode[] => {
+      if (depth > 6) return [];
+
       const children = hierarchyToUse.filter(item => {
+        if (!item || !item.name) return false;
+        const itemId = String(item._id || item.name);
+        if (visitedIds.has(itemId)) return false;
+
         if (!parentId) {
-          return item.parentId === null || item.parentId === '' || !locMap.has(String(item.parentId));
+          return !item.parentId || !locMap.has(String(item.parentId));
         }
         return String(item.parentId) === String(parentId);
       });
 
       return children.map(item => {
-        const currentPath = parentPath ? `${parentPath} ➔ ${item.name}` : item.name;
         const itemId = String(item._id || item.name);
+        visitedIds.add(itemId);
+        const currentPath = parentPath ? `${parentPath} ➔ ${item.name}` : item.name;
+        
         return {
           item,
           path: currentPath,
-          children: buildNodes(itemId, currentPath)
+          children: buildNodes(itemId, currentPath, depth + 1)
         };
       });
     };
 
-    return buildNodes(null, '');
-  }, [hierarchyToUse, locMap]);
+    return buildNodes(null, '', 0);
+  }, [isOpen, hierarchyToUse, locMap]);
 
   // Expand top-level nodes by default when modal opens
   useEffect(() => {
@@ -105,10 +123,11 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
       setWarningMsg(null);
       const initialExpanded: Record<string, boolean> = {};
       hierarchyToUse.forEach(item => {
-        const itemId = String(item._id || item.name);
-        // Expand Factory and Floor levels by default
-        if (item.level === 'Factory' || item.level === 'Floor') {
-          initialExpanded[itemId] = true;
+        if (item) {
+          const itemId = String(item._id || item.name);
+          if (item.level === 'Factory' || item.level === 'Floor') {
+            initialExpanded[itemId] = true;
+          }
         }
       });
       setExpandedNodes(initialExpanded);
@@ -143,7 +162,7 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
       return;
     }
 
-    const locObj = locMap.get(tempSelectedId) || locMap.get(tempSelectedId.toLowerCase().trim());
+    const locObj = locMap.get(tempSelectedId) || hierarchyToUse.find(l => l.name?.toLowerCase().trim() === tempSelectedId.toLowerCase().trim());
     if (locObj) {
       const fullPath = getFullPath(locObj);
       onSelectLocation(String(locObj._id || locObj.name), fullPath);
@@ -159,8 +178,8 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
         {nodes.map(node => {
           const id = String(node.item._id || node.item.name);
           const isExpanded = !!expandedNodes[id];
-          const hasChildren = node.children && node.children.length > 0;
-          const level = node.item.level;
+          const hasChildren = Array.isArray(node.children) && node.children.length > 0;
+          const level = node.item.level || 'Zone';
           const isSelectable = level === 'Zone' || level === 'Storage Location' || (level !== 'Factory' && level !== 'Floor');
           const isSelected = tempSelectedId === id || tempSelectedId === node.item.name;
 
@@ -183,6 +202,7 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
                 {/* Arrow Collapse / Expand */}
                 {hasChildren ? (
                   <button 
+                    type="button"
                     onClick={(e) => toggleExpand(id, e)}
                     className="p-1 rounded-md hover:bg-gray-200 text-gray-500 cursor-pointer transition-colors"
                   >
