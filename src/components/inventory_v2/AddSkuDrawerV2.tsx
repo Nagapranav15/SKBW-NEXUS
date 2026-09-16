@@ -4,6 +4,7 @@ import { createSkuV2, updateSkuV2, SkuV2, getMetadataV2, updateMetadataV2, getSk
 import { getParties } from '../../api/partyApi';
 import Modal from '../ui/Modal';
 import { BomCopyPasteControls } from './BomCopyPasteControls';
+import { LocationSelectModal } from './LocationSelectModal';
 import { 
   formatUomFormula, 
   formatUomConversionSummary, 
@@ -211,6 +212,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   const [availableLocations, setAvailableLocations] = useState<{ id: string; name: string }[]>([]);
   const [rawHierarchy, setRawHierarchy] = useState<WarehouseLocationV2[]>([]);
   const [vendorsList, setVendorsList] = useState<{ id: string; name: string }[]>([]);
+  const [showLocationModal, setShowLocationModal] = useState(false);
   const cachedHierarchyRef = React.useRef<WarehouseLocationV2[] | null>(null);
 
   // Helper to build parent-to-child location path (Factory ➔ Zone ➔ Storage Location)
@@ -2190,25 +2192,37 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     <MapPin className="w-3.5 h-3.5 text-blue-600" />
                     <span>Initial Location / Godown (Hierarchy)</span>
                   </label>
-                  <select
-                    value={form.initialLocationId || ''}
-                    onChange={(e) => setForm({ ...form, initialLocationId: e.target.value })}
-                    className="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer"
-                  >
-                    <option value="">-- Select Storage Location --</option>
-                    {storageLocations.map(loc => (
-                      <option key={loc.id} value={loc.id}>
-                        {loc.name}
-                      </option>
-                    ))}
-                    {form.initialLocationId && !storageLocations.some(l => l.id === form.initialLocationId || l.name === form.initialLocationId) && (
-                      <option value={form.initialLocationId}>
-                        {buildLocationPath(form.initialLocationId, rawHierarchy) || form.initialLocationId}
-                      </option>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowLocationModal(true)}
+                      className="flex-1 px-3.5 py-2 border border-gray-200 hover:border-blue-400 rounded-xl text-xs font-semibold text-gray-800 bg-white hover:bg-blue-50/20 text-left flex items-center justify-between shadow-2xs transition-all cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0 group-hover:scale-110 transition-transform" />
+                        <span className="truncate">
+                          {form.initialLocationId ? (
+                            buildLocationPath(form.initialLocationId, rawHierarchy) || form.initialLocationId
+                          ) : (
+                            <span className="text-gray-400 font-normal">-- Select Location (Zone / Loc) --</span>
+                          )}
+                        </span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    </button>
+                    {form.initialLocationId && (
+                      <button
+                        type="button"
+                        onClick={() => setForm(prev => ({ ...prev, initialLocationId: '', defaultLocation: '' }))}
+                        className="px-2.5 py-2 text-gray-400 hover:text-rose-600 border border-gray-200 rounded-xl hover:bg-rose-50 font-bold text-xs cursor-pointer transition-all"
+                        title="Clear location"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
                     )}
-                  </select>
+                  </div>
                   <span className="block text-[10px] text-gray-400 mt-1 font-medium leading-tight">
-                    Target storage location for opening stock
+                    Target storage location (Zone & Loc only)
                   </span>
                 </div>
               </div>
@@ -2814,6 +2828,18 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           </div>
         </div>
       </Modal>
+
+      {/* Location Tree Selector Modal */}
+      <LocationSelectModal
+        isOpen={showLocationModal}
+        onClose={() => setShowLocationModal(false)}
+        rawHierarchy={rawHierarchy}
+        selectedLocationId={form.initialLocationId}
+        onSelectLocation={(locId, locPath) => {
+          setForm(prev => ({ ...prev, initialLocationId: locId, defaultLocation: locPath }));
+          setDynamicLocationText(locPath);
+        }}
+      />
     </>
   );
 };
