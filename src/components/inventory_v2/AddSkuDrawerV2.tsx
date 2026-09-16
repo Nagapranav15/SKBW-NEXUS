@@ -1073,10 +1073,10 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   const activeFields = React.useMemo(() => {
     const matchedCatObj = (createdCategories || []).find(c => c.name === form.category);
     let defaultBaseFields: string[] = [];
-    if (matchedCatObj?.type === 'materials' || activeSection === 'materials' || form.category === 'Raw Material') {
-      defaultBaseFields = ['gsm', 'brand', 'title', 'width', 'length', 'paperType'];
-    } else if (matchedCatObj?.type === 'semi' || activeSection === 'semi' || form.category === 'Semi Finished') {
-      defaultBaseFields = ['gsm', 'brand', 'width', 'length', 'ruleType', 'group'];
+    if (resolvedSection === 'materials' || form.category === 'Raw Material' || form.category === 'Materials' || matchedCatObj?.type === 'materials') {
+      defaultBaseFields = ['gsm', 'title', 'width', 'length', 'paperType', 'pages'];
+    } else if (resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi' || matchedCatObj?.type === 'semi') {
+      defaultBaseFields = ['gsm', 'brand', 'width', 'length', 'ruleType', 'group', 'pages'];
     } else {
       defaultBaseFields = ['gsm', 'brand', 'width', 'length', 'ruleType', 'pages', 'altUnit'];
     }
@@ -1100,12 +1100,18 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       }
     }
 
-    // Finished Goods / Products must ALWAYS have 'brand' enabled!
-    if (isProductCategory || activeSection === 'products' || form.category === 'Finished Goods') {
+    // Finished Goods / Products and Semi Finished must ALWAYS have 'brand' enabled!
+    if (resolvedSection === 'products' || resolvedSection === 'semi' || isProductCategory || form.category === 'Finished Goods' || form.category === 'Semi Finished' || form.category === 'Products' || form.category === 'Semi') {
       if (!fieldsList.includes('brand')) fieldsList.push('brand');
     }
+
+    // Materials should NOT have brand
+    if (resolvedSection === 'materials' || form.category === 'Raw Material' || form.category === 'Materials' || matchedCatObj?.type === 'materials') {
+      fieldsList = fieldsList.filter(f => f !== 'brand');
+    }
+
     return Array.from(new Set(fieldsList));
-  }, [categoryFieldsMap, form.category, createdCategories, isProductCategory, activeSection]);
+  }, [categoryFieldsMap, form.category, createdCategories, isProductCategory, activeSection, resolvedSection]);
 
   // Auto-generate neat sequential SKU Code (RM-001, FG-001, SM-001) - strictly monotonic, never reusing deleted item IDs
   const regenerateSkuCode = async (targetCategory?: string) => {
@@ -1178,12 +1184,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
     // Helper to compile Sku Name dynamically from specification inputs
     const compileSkuName = (formData: typeof form): string => {
-      if (formData.category === 'Raw Material') {
-        if (!formData.brand && !formData.title && !formData.gsm && !formData.width && !formData.length) {
-          return '';
-        }
+      if (resolvedSection === 'materials' || formData.category === 'Raw Material' || formData.category === 'Materials') {
         const parts: string[] = [];
-        if (formData.brand?.trim()) parts.push(formData.brand.trim());
         if (formData.title?.trim()) parts.push(formData.title.trim());
         const formatType = formData.paperType === 'Reels' ? 'Reel' : formData.paperType === 'Sheets' ? 'Sheet' : '';
         if (formatType) parts.push(formatType);
@@ -1195,11 +1197,34 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           sizeStr = `${formData.width} CM`;
         }
         if (sizeStr) parts.push(sizeStr);
+        if (formData.pages && formData.paperType === 'Sheets') parts.push(`(${formData.pages} Sheets/Ream)`);
         return parts.join(' ');
-      } else if (formData.category === 'Finished Goods' || isProductCategory) {
+      } else if (resolvedSection === 'semi' || formData.category === 'Semi Finished' || formData.category === 'Semi') {
+        const parts: string[] = [];
+        if (formData.brand?.trim()) parts.push(formData.brand.trim());
+        if (formData.gsm) parts.push(`${formData.gsm} GSM`);
+        let sizeStr = '';
+        if (formData.width && formData.length) {
+          sizeStr = `${formData.width} x ${formData.length} CM`;
+        } else if (formData.width) {
+          sizeStr = `${formData.width} CM`;
+        }
+        if (sizeStr) parts.push(sizeStr);
+        if (formData.ruleType?.trim()) {
+          const clean = formData.ruleType.trim();
+          const wrapped = (clean.startsWith('(') && clean.endsWith(')')) ? clean : `(${clean})`;
+          parts.push(wrapped);
+        }
+        if (formData.pages) parts.push(`${formData.pages}P`);
+        if (parts.length > 0) return parts.join(' ');
+        if (formData.group) return formData.group;
+        return '';
+      } else {
+        // Finished Goods / Products
         const parts: string[] = [];
         if (formData.pages) parts.push(`${formData.pages}P`);
         if (formData.brand?.trim()) parts.push(formData.brand.trim());
+        if (formData.title?.trim()) parts.push(formData.title.trim());
         if (formData.ruleType) {
           const clean = formData.ruleType.trim();
           if (clean) {
@@ -1207,39 +1232,14 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
             parts.push(wrapped);
           }
         }
-        if (parts.length > 0) {
-          return parts.join(' ');
-        }
-        if (formData.group) return formData.group;
-        return '';
-      } else {
-        const active = categoryFieldsMap[formData.category] || [];
-        const parts: string[] = [];
-        if (active.includes('brand') && formData.brand?.trim()) parts.push(formData.brand.trim());
-        if (active.includes('title') && formData.title?.trim()) parts.push(formData.title.trim());
-        if (active.includes('gsm') && formData.gsm) parts.push(`${formData.gsm}GSM`);
-        
+        if (formData.gsm) parts.push(`${formData.gsm} GSM`);
         let sizeStr = '';
-        const hasWidth = active.includes('width');
-        const hasLength = active.includes('length');
-        if (hasWidth && hasLength && formData.width && formData.length) {
-          const sep = formData.category === 'Semi Finished' ? ' * ' : 'x';
-          sizeStr = `${formData.width}${sep}${formData.length}CM`;
-        } else if (hasWidth && formData.width) {
-          sizeStr = `${formData.width}CM`;
-        } else if (hasLength && formData.length) {
-          sizeStr = `${formData.length}CM`;
+        if (formData.width && formData.length) {
+          sizeStr = `${formData.width} x ${formData.length} CM`;
+        } else if (formData.width) {
+          sizeStr = `${formData.width} CM`;
         }
         if (sizeStr) parts.push(sizeStr);
-
-        if (active.includes('ruleType') && formData.ruleType) {
-          const clean = formData.ruleType.trim();
-          if (clean) {
-            const wrapped = (clean.startsWith('(') && clean.endsWith(')')) ? clean : `(${clean})`;
-            parts.push(wrapped);
-          }
-        }
-        
         if (parts.length > 0) return parts.join(' ');
         if (formData.group) return formData.group;
         return '';

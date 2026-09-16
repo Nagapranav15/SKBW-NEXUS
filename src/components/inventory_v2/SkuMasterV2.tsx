@@ -154,9 +154,9 @@ interface CategoryCardData {
 }
 
 const DEFAULT_CATEGORIES: CategoryCardData[] = [
-  { id: 'cat-products', name: 'Products', type: 'products', uom: 'Pcs', fields: ['Pages', 'Size', 'Brand'] },
-  { id: 'cat-materials', name: 'Materials', type: 'materials', uom: 'Kg', fields: ['GSM', 'Width (cm)', 'Brand'] },
-  { id: 'cat-semi', name: 'Semi', type: 'semi', uom: 'Ream', fields: ['GSM', 'Rule Type', 'Size'] }
+  { id: 'cat-products', name: 'Products', type: 'products', uom: 'Pcs', fields: ['Pages', 'Size', 'Rule Type', 'Brand'] },
+  { id: 'cat-materials', name: 'Materials', type: 'materials', uom: 'Kg', fields: ['Paper Type', 'GSM', 'Width (cm)', 'Length (cm)', 'Standard Sheets'] },
+  { id: 'cat-semi', name: 'Semi', type: 'semi', uom: 'Ream', fields: ['Brand', 'GSM', 'Rule Type', 'Size'] }
 ];
 
 // BOM Recipe Item interface
