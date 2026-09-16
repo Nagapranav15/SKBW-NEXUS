@@ -515,7 +515,16 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         console.error('Failed to save category metadata:', err);
       }
     }
-    setForm(prev => ({ ...prev, category: trimmed }));
+    const matchedCreated = (createdCategories || []).find(c => c && c.name?.toLowerCase().trim() === trimmed.toLowerCase().trim());
+    const catUom = matchedCreated?.uom;
+    if (catUom && !unitsList.some(u => u.toLowerCase() === catUom.toLowerCase())) {
+      setUnitsList(prev => [...prev, catUom]);
+    }
+    setForm(prev => ({
+      ...prev,
+      category: trimmed,
+      ...(catUom ? { unit: catUom } : {})
+    }));
     regenerateSkuCode(trimmed);
     setIsAddingNewCategory(false);
     setNewCategoryInput('');
@@ -893,15 +902,21 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       } else {
         setProcessSteps([]);
       }
-    } else {
       const sectionCat = activeSection === 'products' ? 'Finished Goods' : activeSection === 'semi' ? 'Semi Finished' : 'Raw Material';
       const initialCat = defaultCategory || sectionCat;
+      const matchedInitialCat = (createdCategories || []).find(c => c && c.name?.toLowerCase().trim() === initialCat.toLowerCase().trim());
+      const initialUnit = matchedInitialCat?.uom || ((initialCat === 'Finished Goods' || activeSection === 'products') ? 'Pcs' : (activeSection === 'semi' ? 'Pcs' : 'Kg'));
+
+      if (matchedInitialCat?.uom && !unitsList.some(u => u.toLowerCase() === matchedInitialCat.uom?.toLowerCase())) {
+        setUnitsList(prev => [...prev, matchedInitialCat.uom!]);
+      }
+
       setForm({
         skuCode: '',
         name: '',
         category: initialCat,
         paperType: initialCat === 'Raw Material' ? 'Reels' : 'None',
-        unit: (initialCat === 'Finished Goods' || activeSection === 'products') ? 'GBL' : 'kg',
+        unit: initialUnit,
         altUnit: '',
         altUnitConversion: '',
         altUnitDirection: '' as '' | UomDirection,
@@ -1439,7 +1454,19 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           if (val === '__ADD_NEW__') {
                             setIsAddingNewCategory(true);
                           } else {
-                            setForm(prev => ({ ...prev, category: val }));
+                            const matchedCat = (createdCategories || []).find(c => c && c.name?.toLowerCase().trim() === val.toLowerCase().trim());
+                            const catUom = matchedCat?.uom;
+
+                            if (catUom && !unitsList.some(u => u.toLowerCase() === catUom.toLowerCase())) {
+                              setUnitsList(prev => [...prev, catUom]);
+                            }
+
+                            setForm(prev => ({
+                              ...prev,
+                              category: val,
+                              ...(catUom ? { unit: catUom } : {})
+                            }));
+                            regenerateSkuCode(val);
                           }
                         }}
                         className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-bold text-gray-800 cursor-pointer appearance-none shadow-2xs pr-8"
