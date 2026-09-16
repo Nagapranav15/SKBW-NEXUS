@@ -4490,46 +4490,63 @@ const SkuMasterV2: React.FC = () => {
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-                  {/* CARD 1: 🏷️ General & Classification */}
-                  <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-2xs space-y-3">
-                    <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
-                          <Tag className="w-4 h-4" />
-                        </div>
-                        <h4 className="font-bold text-gray-900 text-xs">General & Classification</h4>
-                      </div>
-                      <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
-                        (selectedSkuDetails.status || 'Active') === 'Active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'
-                      }`}>
-                        {selectedSkuDetails.status || 'Active'}
-                      </span>
-                    </div>
+                    {/* CARD 1: 🏷️ General & Classification */}
+                    {(() => {
+                      const isRawOrSemiDetail = 
+                        (selectedSkuDetails.category || '').toLowerCase().includes('raw') ||
+                        (selectedSkuDetails.category || '').toLowerCase().includes('material') ||
+                        (selectedSkuDetails.category || '').toLowerCase().includes('semi') ||
+                        (selectedSkuDetails.category || '').toLowerCase().includes('wip') ||
+                        (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('RM') ||
+                        (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SEM') ||
+                        (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SF') ||
+                        (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SM') ||
+                        activeMainTab === 'materials' || activeMainTab === 'semi';
 
-                    <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs">
-                      <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">CATEGORY</span>
-                        <span className="font-bold text-gray-900 text-xs">
-                          {selectedSkuDetails.category || (
-                            (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('RM') ? 'Raw Material' :
-                            (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SEM') ? 'Semi Finished' : 'Finished Goods'
-                          )}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">SKU CODE</span>
-                        <span className="font-mono font-bold text-blue-600 text-xs">{selectedSkuDetails.skuCode}</span>
-                      </div>
-                      <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">BRAND</span>
-                        <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.brand || 'Bestfriend'}</span>
-                      </div>
-                      <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PREFERRED VENDOR</span>
-                        <span className="font-bold text-blue-600 text-xs">{(selectedSkuDetails as any).preferredVendor || '—'}</span>
-                      </div>
-                    </div>
-                  </div>
+                      return (
+                        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-2xs space-y-3">
+                          <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                                <Tag className="w-4 h-4" />
+                              </div>
+                              <h4 className="font-bold text-gray-900 text-xs">General & Classification</h4>
+                            </div>
+                            <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                              (selectedSkuDetails.status || 'Active') === 'Active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'
+                            }`}>
+                              {selectedSkuDetails.status || 'Active'}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs">
+                            <div>
+                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">CATEGORY</span>
+                              <span className="font-bold text-gray-900 text-xs">
+                                {selectedSkuDetails.category || (
+                                  (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('RM') ? 'Raw Material' :
+                                  (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SEM') ? 'Semi Finished' : 'Finished Goods'
+                                )}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">SKU CODE</span>
+                              <span className="font-mono font-bold text-blue-600 text-xs">{selectedSkuDetails.skuCode}</span>
+                            </div>
+                            <div>
+                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">BRAND</span>
+                              <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.brand || 'Bestfriend'}</span>
+                            </div>
+                            {isRawOrSemiDetail && (
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PREFERRED VENDOR</span>
+                                <span className="font-bold text-blue-600 text-xs">{(selectedSkuDetails as any).preferredVendor || '—'}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                   {/* CARD 2: 📐 Specifications & Paper Format */}
                   <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-2xs space-y-3">
@@ -4767,9 +4784,19 @@ const SkuMasterV2: React.FC = () => {
                         {(() => {
                           const isSheetItem = selectedSkuDetails.paperType === 'Sheets' || (selectedSkuDetails.name || '').toLowerCase().includes('sheet');
                           const stdSheetsVal = selectedSkuDetails.pages || 500;
+                          const isRawOrSemiDetail = 
+                            (selectedSkuDetails.category || '').toLowerCase().includes('raw') ||
+                            (selectedSkuDetails.category || '').toLowerCase().includes('material') ||
+                            (selectedSkuDetails.category || '').toLowerCase().includes('semi') ||
+                            (selectedSkuDetails.category || '').toLowerCase().includes('wip') ||
+                            (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('RM') ||
+                            (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SEM') ||
+                            (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SF') ||
+                            (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SM') ||
+                            activeMainTab === 'materials' || activeMainTab === 'semi';
 
                           return (
-                            <div className={`grid ${isSheetItem ? 'grid-cols-4' : 'grid-cols-3'} gap-3 text-xs bg-slate-50/50 p-3 rounded-xl border border-slate-100`}>
+                            <div className={`grid ${isSheetItem && isRawOrSemiDetail ? 'grid-cols-4' : isSheetItem || isRawOrSemiDetail ? 'grid-cols-3' : 'grid-cols-2'} gap-3 text-xs bg-slate-50/50 p-3 rounded-xl border border-slate-100`}>
                               <div>
                                 <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">MIN STOCK THRESHOLD</span>
                                 <span className="font-mono font-bold text-amber-600 text-xs block">
@@ -4782,12 +4809,14 @@ const SkuMasterV2: React.FC = () => {
                                   {reorderDisplay}
                                 </span>
                               </div>
-                              <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PREFERRED VENDOR</span>
-                                <span className="font-bold text-indigo-700 text-xs block truncate">
-                                  {(selectedSkuDetails as any).preferredVendor || '—'}
-                                </span>
-                              </div>
+                              {isRawOrSemiDetail && (
+                                <div>
+                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PREFERRED VENDOR</span>
+                                  <span className="font-bold text-indigo-700 text-xs block truncate">
+                                    {(selectedSkuDetails as any).preferredVendor || '—'}
+                                  </span>
+                                </div>
+                              )}
                               {isSheetItem && (
                                 <div>
                                   <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">STD. SHEETS / REAM</span>
