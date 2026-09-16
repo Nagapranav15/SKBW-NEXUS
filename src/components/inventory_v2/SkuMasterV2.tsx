@@ -2057,9 +2057,7 @@ const SkuMasterV2: React.FC = () => {
     } else if (activeMainTab === 'semi') {
       headers = [
         'ID / SKU Code',
-        'SKU NAME',
-        'PAGES',
-        'BRAND',
+        'Item Name',
         'RULE TYPE',
         'Category',
         'UOM',
@@ -2070,11 +2068,12 @@ const SkuMasterV2: React.FC = () => {
         'LENGTH (CM)',
         'Min Stock Level',
         'Reorder Level',
-        'Opening Stock Qty'
+        'Opening Stock Qty',
+        'vendor'
       ];
       sampleRows = [
-        ['SM-001', 'Folded Inner Signature 192P', '192 P', 'Happy Days', 'Single Line', 'Inner Forms', 'Pcs', 'Bundles', '50', '52', '14.25', '35', '100', '50', '800'],
-        ['SM-002', 'Laminated Printed Covers A4', '0', 'Classmate', 'Plain', 'Covers', 'Pcs', 'Bundles', '100', '250', '57', '70', '200', '100', '1200']
+        ['SM-001', 'Folded Inner Signature 192P', 'Single Line', 'Inner Forms', 'Pcs', 'Bundles', '50', '52', '14.25', '35', '100', '50', '800', 'Apex Print Pack'],
+        ['SM-002', 'Laminated Printed Covers A4', 'Plain', 'Covers', 'Pcs', 'Bundles', '100', '250', '57', '70', '200', '100', '1200', 'Sunrise Laminators']
       ];
     } else if (activeMainTab === 'categories') {
       headers = [
