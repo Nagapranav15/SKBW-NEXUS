@@ -1366,17 +1366,17 @@ const SkuMasterV2: React.FC = () => {
 
   // Products List (Only database finished products)
   const productsList = useMemo(() => {
-    return skus.length > 0 ? skus.filter(item => getItemType(item) === 'products') : DEMO_FINISHED_PRODUCTS;
+    return skus.filter(item => getItemType(item) === 'products');
   }, [skus]);
 
   // Materials List (Only database raw materials)
   const materialsList = useMemo(() => {
-    return skus.length > 0 ? skus.filter(item => getItemType(item) === 'materials') : DEMO_RAW_MATERIALS;
+    return skus.filter(item => getItemType(item) === 'materials');
   }, [skus]);
 
   // Semi List (Only database semi-finished materials)
   const semiList = useMemo(() => {
-    return skus.length > 0 ? skus.filter(item => getItemType(item) === 'semi') : DEMO_SEMI_MATERIALS;
+    return skus.filter(item => getItemType(item) === 'semi');
   }, [skus]);
 
   // Combined Raw Materials and Semi-Finished Materials ONLY (excluding Finished Goods) for BOM Recipe selection
