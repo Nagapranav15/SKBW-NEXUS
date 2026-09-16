@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { MapPin, X, ChevronDown, ChevronRight, AlertCircle } from 'lucide-react';
+import { MapPin, X, ChevronDown, ChevronRight, AlertCircle, Check, Building2, Layers } from 'lucide-react';
 import { WarehouseLocationV2 } from '../../api/mfgApiV2';
 
 interface LocationSelectModalProps {
@@ -149,12 +149,12 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
     setExpandedNodes(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const handleCheckboxClick = (node: TreeNode, e: React.MouseEvent) => {
+  const handleItemSelect = (node: TreeNode, e: React.MouseEvent) => {
     e.stopPropagation();
     const lvl = node.item.level;
     // User CANNOT select Factory or Floor!
     if (lvl === 'Factory' || lvl === 'Floor') {
-      setWarningMsg(`Cannot select ${lvl} level. Please expand and select a Zone or Loc (Storage Location).`);
+      setWarningMsg(`Cannot select ${lvl} level. Please expand and select a Zone or Loc.`);
       setTimeout(() => setWarningMsg(null), 3500);
       return;
     }
@@ -195,11 +195,16 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
             <div key={id} className="select-none">
               <div 
                 onClick={(e) => {
-                  if (hasChildren) toggleExpand(id, e);
-                  if (isSelectable) handleCheckboxClick(node, e);
+                  if (hasChildren && !isSelectable) {
+                    toggleExpand(id, e);
+                  } else if (isSelectable) {
+                    handleItemSelect(node, e);
+                  } else {
+                    handleItemSelect(node, e);
+                  }
                 }}
                 style={{ paddingLeft: `${depth * 18 + 6}px` }}
-                className={`flex items-center gap-2 py-1.5 px-2 rounded-lg transition-all cursor-pointer ${
+                className={`group flex items-center justify-between py-1.5 px-2 rounded-lg transition-all cursor-pointer ${
                   isSelected 
                     ? 'bg-blue-50/90 border border-blue-200 text-blue-900 shadow-2xs font-semibold' 
                     : isSelectable 
@@ -207,60 +212,66 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
                       : 'hover:bg-slate-50/80 text-gray-700'
                 }`}
               >
-                {/* Arrow Collapse / Expand */}
-                {hasChildren ? (
-                  <button 
-                    type="button"
-                    onClick={(e) => toggleExpand(id, e)}
-                    className="p-0.5 rounded hover:bg-gray-200 text-gray-500 cursor-pointer transition-colors"
-                  >
-                    {isExpanded ? (
-                      <ChevronDown className="w-3.5 h-3.5 text-blue-600" />
-                    ) : (
-                      <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
-                    )}
-                  </button>
-                ) : (
-                  <span className="w-4.5 inline-block"></span>
-                )}
-
-                {/* Standard ERP Styled Checkbox */}
-                <div 
-                  onClick={(e) => handleCheckboxClick(node, e)}
-                  className={`w-4 h-4 rounded flex items-center justify-center transition-all ${
-                    !isSelectable 
-                      ? 'bg-gray-100 border border-gray-300 opacity-40 cursor-not-allowed' 
-                      : isSelected 
-                        ? 'bg-blue-600 border border-blue-600 text-white shadow-2xs cursor-pointer' 
-                        : 'border border-gray-300 bg-white hover:border-blue-500 cursor-pointer'
-                  }`}
-                  title={!isSelectable ? `Cannot select ${level}. Select a Zone or Loc instead.` : `Select ${node.item.name}`}
-                >
-                  {isSelected && (
-                    <svg className="w-3 h-3 text-white stroke-[3]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
+                <div className="flex items-center gap-2 min-w-0">
+                  {/* Arrow Collapse / Expand */}
+                  {hasChildren ? (
+                    <button 
+                      type="button"
+                      onClick={(e) => toggleExpand(id, e)}
+                      className="p-0.5 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-700 cursor-pointer transition-colors"
+                    >
+                      {isExpanded ? (
+                        <ChevronDown className="w-3.5 h-3.5 text-blue-600 font-bold" />
+                      ) : (
+                        <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                      )}
+                    </button>
+                  ) : (
+                    <span className="w-4.5 inline-block"></span>
                   )}
-                </div>
 
-                {/* Level Label & Badge */}
-                <div className="flex items-center gap-1.5">
-                  <span className={`text-xs ${
+                  {/* Minimal Selection Dot / Level Indicator */}
+                  {isSelectable ? (
+                    <div 
+                      onClick={(e) => handleItemSelect(node, e)}
+                      className={`w-3.5 h-3.5 rounded-full flex items-center justify-center transition-all shrink-0 ${
+                        isSelected 
+                          ? 'border-2 border-blue-600 bg-blue-600' 
+                          : 'border border-gray-300 bg-white group-hover:border-blue-400'
+                      }`}
+                    >
+                      {isSelected && <span className="w-1 h-1 rounded-full bg-white"></span>}
+                    </div>
+                  ) : level === 'Factory' ? (
+                    <Building2 className="w-3.5 h-3.5 text-purple-600 shrink-0 opacity-80" />
+                  ) : (
+                    <Layers className="w-3.5 h-3.5 text-slate-500 shrink-0 opacity-80" />
+                  )}
+
+                  {/* Level Label */}
+                  <span className={`text-xs truncate ${
                     level === 'Factory' ? 'font-bold text-gray-900' :
                     level === 'Floor' ? 'font-semibold text-gray-800' :
-                    level === 'Zone' ? 'font-semibold text-blue-800' : 'font-medium text-gray-700'
+                    level === 'Zone' ? 'font-semibold text-blue-900' : 'font-medium text-gray-700'
                   }`}>
                     {node.item.name}
                   </span>
-                  
-                  <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${
-                    level === 'Factory' ? 'bg-purple-50 text-purple-700 border border-purple-200/70' :
-                    level === 'Floor' ? 'bg-slate-100 text-slate-700 border border-slate-200/70' :
-                    level === 'Zone' ? 'bg-blue-50 text-blue-700 border border-blue-200/70 font-semibold' :
-                    'bg-emerald-50 text-emerald-700 border border-emerald-200/70 font-semibold'
+                </div>
+
+                {/* Level Badge & Active Check */}
+                <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                  <span className={`text-[9.5px] font-semibold px-1.5 py-0.2 rounded ${
+                    level === 'Factory' ? 'bg-purple-50 text-purple-700 border border-purple-200/60' :
+                    level === 'Floor' ? 'bg-slate-100 text-slate-700 border border-slate-200/60' :
+                    level === 'Zone' ? 'bg-blue-50 text-blue-700 border border-blue-200/60 font-semibold' :
+                    'bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-semibold'
                   }`}>
                     {level === 'Storage Location' ? 'Loc' : level}
                   </span>
+
+                  {isSelected && (
+                    <Check className="w-3.5 h-3.5 text-blue-600 font-bold ml-1" />
+                  )}
                 </div>
               </div>
 
