@@ -69,7 +69,7 @@ import {
   SkuV2 
 } from '../../api/mfgApiV2';
 import { getActivityLogs, createActivityLog } from '../../api/activityLogApi';
-import AddSkuDrawerV2, { SearchableMaterialDropdown } from './AddSkuDrawerV2';
+import AddSkuDrawerV2, { SearchableMaterialDropdown, normalizeAndDeduplicateUnits } from './AddSkuDrawerV2';
 import { getParties } from '../../api/partyApi';
 import { showToast } from '../ui/Toast';
 import * as XLSX from 'xlsx';
@@ -259,7 +259,9 @@ const SkuMasterV2: React.FC = () => {
     if (selectedCompany?._id) {
       getMetadataV2(selectedCompany._id).then(data => {
         if (data?.units && Array.isArray(data.units) && data.units.length > 0) {
-          setUnitsList(data.units);
+          setUnitsList(normalizeAndDeduplicateUnits(data.units));
+        } else {
+          setUnitsList(["Pcs", "Kg", "Ream", "GBL", "Sheets", "Reels", "Mtr", "Gross", "Box", "Pkt"]);
         }
         if (data?.categoryCards && Array.isArray(data.categoryCards) && data.categoryCards.length > 0) {
           setCategoriesData(data.categoryCards);
@@ -4559,10 +4561,10 @@ const SkuMasterV2: React.FC = () => {
                   onChange={(e) => setCategoryForm(prev => ({ ...prev, uom: e.target.value }))}
                   className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500 bg-white"
                 >
-                  {Array.from(new Set([
+                  {normalizeAndDeduplicateUnits([
                     categoryForm.uom,
                     ...unitsList
-                  ])).filter(Boolean).map(u => (
+                  ]).map(u => (
                     <option key={u} value={u}>
                       {u}
                     </option>

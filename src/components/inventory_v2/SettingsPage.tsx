@@ -4,6 +4,21 @@ import { useAuth } from '../../context/AuthContext';
 import { getMetadataV2, updateMetadataV2 } from '../../api/mfgApiV2';
 import { showToast } from '../ui/Toast';
 
+const normalizeAndDeduplicateUnits = (units: string[]): string[] => {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const u of units) {
+    if (!u || !u.trim()) continue;
+    const clean = u.trim();
+    const key = clean.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(clean);
+    }
+  }
+  return result;
+};
+
 const SettingsPage: React.FC = () => {
   const { selectedCompany } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -34,7 +49,10 @@ const SettingsPage: React.FC = () => {
       const data = await getMetadataV2(selectedCompany?._id || '');
       if (data) {
         setCategories(data.categories || []);
-        setUnits(data.units || []);
+        const dbUnits = data.units && data.units.length > 0
+          ? data.units
+          : ["Pcs", "Kg", "Ream", "GBL", "Sheets", "Reels", "Mtr", "Gross", "Box", "Pkt"];
+        setUnits(normalizeAndDeduplicateUnits(dbUnits));
         setRuleTypes(data.ruleTypes || []);
         setGroups(data.groups || []);
         setBrands(data.brands || []);
@@ -79,7 +97,7 @@ const SettingsPage: React.FC = () => {
       await updateMetadataV2({
         companyId: selectedCompany?._id || '',
         categories: updatedCats,
-        units: updatedUnits,
+        units: normalizeAndDeduplicateUnits(updatedUnits),
         ruleTypes: updatedRules,
         groups: updatedGroups,
         brands: updatedBrands,
@@ -96,32 +114,35 @@ const SettingsPage: React.FC = () => {
 
   const handleAddItem = (type: 'unit' | 'ruleType' | 'brand') => {
     if (type === 'unit') {
-      if (!newUnit.trim()) return;
-      if (units.includes(newUnit.trim())) {
+      const trimmed = newUnit.trim();
+      if (!trimmed) return;
+      if (units.some(u => u.toLowerCase() === trimmed.toLowerCase())) {
         showToast('Unit already exists', 'error');
         return;
       }
-      const updated = [...units, newUnit.trim()];
+      const updated = normalizeAndDeduplicateUnits([...units, trimmed]);
       setUnits(updated);
       setNewUnit('');
       handleSave(categories, updated, ruleTypes, groups, brands, categoryFields);
     } else if (type === 'ruleType') {
-      if (!newRuleType.trim()) return;
-      if (ruleTypes.includes(newRuleType.trim())) {
+      const trimmed = newRuleType.trim();
+      if (!trimmed) return;
+      if (ruleTypes.some(r => r.toLowerCase() === trimmed.toLowerCase())) {
         showToast('Rule type already exists', 'error');
         return;
       }
-      const updated = [...ruleTypes, newRuleType.trim()];
+      const updated = [...ruleTypes, trimmed];
       setRuleTypes(updated);
       setNewRuleType('');
       handleSave(categories, units, updated, groups, brands, categoryFields);
     } else if (type === 'brand') {
-      if (!newBrand.trim()) return;
-      if (brands.includes(newBrand.trim())) {
+      const trimmed = newBrand.trim();
+      if (!trimmed) return;
+      if (brands.some(b => b.toLowerCase() === trimmed.toLowerCase())) {
         showToast('Brand already exists', 'error');
         return;
       }
-      const updated = [...brands, newBrand.trim()];
+      const updated = [...brands, trimmed];
       setBrands(updated);
       setNewBrand('');
       handleSave(categories, units, ruleTypes, groups, updated, categoryFields);

@@ -389,11 +389,37 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     }
   }, [isOpen, editSku, customColumns, customColumnValues]);
 
+export const normalizeAndDeduplicateUnits = (units: string[]): string[] => {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const u of units) {
+    if (!u || !u.trim()) continue;
+    const clean = u.trim();
+    const key = clean.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(clean);
+    }
+  }
+  return result;
+};
+
   const [categoriesList, setCategoriesList] = useState<string[]>([]);
-  const [unitsList, setUnitsList] = useState<string[]>(["Pcs", "Kg", "Ream", "GBL", "Sheets", "Gross", "Box", "Pkt", "Mtr"]);
+  const [unitsList, setUnitsList] = useState<string[]>(["Pcs", "Kg", "Ream", "GBL", "Sheets", "Reels", "Mtr", "Gross", "Box", "Pkt"]);
   const [ruleTypesList, setRuleTypesList] = useState<string[]>(["Plain", "Single Line", "Double Line", "Square Ruled", "Four Line", "Unruled"]);
   const [groupsList, setGroupsList] = useState<string[]>([]);
   const [brandsList, setBrandsList] = useState<string[]>([]);
+
+  const displayUnits = React.useMemo(() => {
+    const list = [...unitsList];
+    if (form.unit && !list.some(u => u.toLowerCase() === form.unit.trim().toLowerCase())) {
+      list.push(form.unit.trim());
+    }
+    if (form.altUnit && !list.some(u => u.toLowerCase() === form.altUnit.trim().toLowerCase())) {
+      list.push(form.altUnit.trim());
+    }
+    return normalizeAndDeduplicateUnits(list);
+  }, [unitsList, form.unit, form.altUnit]);
 
   const sectionCategories = React.useMemo(() => {
     let targetType: 'products' | 'materials' | 'semi' = 'products';
@@ -760,8 +786,11 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       if (data) {
         if (data.categories?.length) setCategoriesList(data.categories);
         if (Array.isArray(data.units)) {
-          const mergedUnits = Array.from(new Set([...(data.units || []), "GBL", "Pcs", "Kg", "Sheets", "Reels", "Mtr", "Ream", "Gross", "Box", "Pkt"]));
-          setUnitsList(mergedUnits.filter(Boolean));
+          if (data.units.length > 0) {
+            setUnitsList(normalizeAndDeduplicateUnits(data.units));
+          } else {
+            setUnitsList(["Pcs", "Kg", "Ream", "GBL", "Sheets", "Reels", "Mtr", "Gross", "Box", "Pkt"]);
+          }
         }
         if (data.ruleTypes?.length) setRuleTypesList(data.ruleTypes);
         if (data.groups?.length) setGroupsList(data.groups);
@@ -1809,7 +1838,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         {isRawOrSemi ? "PRIMARY UOM *" : "PRIMARY UOM (Base) *"}
                       </label>
                       <select
-                        value={unitsList.find(u => u.toLowerCase() === (form.unit || '').toLowerCase()) || form.unit || ''}
+                        value={displayUnits.find(u => u.toLowerCase() === (form.unit || '').trim().toLowerCase()) || form.unit || ''}
                         onChange={e => {
                           if (e.target.value === '__ADD_NEW__') {
                             handleAddNewOption('units');
@@ -1820,7 +1849,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
                       >
                         <option value="">Select Primary Unit</option>
-                        {unitsList.map(unit => (
+                        {displayUnits.map(unit => (
                           <option key={unit} value={unit}>{unit}</option>
                         ))}
                         <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
@@ -1875,7 +1904,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                             <div>
                               <label className="block text-[11px] font-semibold text-gray-600 mb-1">AUOM (ALTERNATE UOM)</label>
                               <select
-                                value={form.altUnit}
+                                value={displayUnits.find(u => u.toLowerCase() === (form.altUnit || '').trim().toLowerCase()) || form.altUnit || ''}
                                 onChange={e => {
                                   const val = e.target.value;
                                   if (val === '__ADD_NEW__') {
@@ -1900,8 +1929,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                 }}
                                 className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
                               >
-                                <option value="">Select Primary UOM</option>
-                                {unitsList.map(unit => (
+                                <option value="">Select Alternate Unit</option>
+                                {displayUnits.map(unit => (
                                   <option key={unit} value={unit}>{unit}</option>
                                 ))}
                                 <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
@@ -2057,7 +2086,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       {isRawOrSemi ? "PRIMARY UOM *" : "PRIMARY UOM (Base) *"}
                     </label>
                     <select
-                      value={unitsList.find(u => u.toLowerCase() === (form.unit || '').toLowerCase()) || form.unit || ''}
+                      value={displayUnits.find(u => u.toLowerCase() === (form.unit || '').trim().toLowerCase()) || form.unit || ''}
                       onChange={e => {
                         if (e.target.value === '__ADD_NEW__') {
                           handleAddNewOption('units');
@@ -2068,7 +2097,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
                     >
                       <option value="">Select Primary Unit</option>
-                      {unitsList.map(unit => (
+                      {displayUnits.map(unit => (
                         <option key={unit} value={unit}>{unit}</option>
                       ))}
                       <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
@@ -2122,7 +2151,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           <div>
                             <label className="block text-[11px] font-semibold text-gray-600 mb-1">AUOM (ALTERNATE UOM)</label>
                             <select
-                              value={form.altUnit}
+                              value={displayUnits.find(u => u.toLowerCase() === (form.altUnit || '').trim().toLowerCase()) || form.altUnit || ''}
                               onChange={e => {
                                 const val = e.target.value;
                                 if (val === '__ADD_NEW__') {
@@ -2147,7 +2176,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                               className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
                             >
                               <option value="">Select Alternate Unit</option>
-                              {unitsList.map(unit => (
+                              {displayUnits.map(unit => (
                                 <option key={unit} value={unit}>{unit}</option>
                               ))}
                               <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
@@ -3073,10 +3102,10 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                   onChange={(e) => setCategoryModalForm(prev => ({ ...prev, uom: e.target.value }))}
                   className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500 bg-white font-semibold cursor-pointer"
                 >
-                  {Array.from(new Set([
+                  {normalizeAndDeduplicateUnits([
                     categoryModalForm.uom,
-                    ...unitsList
-                  ])).filter(Boolean).map(u => (
+                    ...displayUnits
+                  ]).map(u => (
                     <option key={u} value={u}>
                       {u}
                     </option>
