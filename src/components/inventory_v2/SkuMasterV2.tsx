@@ -5062,7 +5062,8 @@ const SkuMasterV2: React.FC = () => {
                             type="number"
                             min="1"
                             placeholder="1"
-                            value={recipeYieldQty === '1' ? '' : recipeYieldQty}
+                            value={recipeYieldQty || '1'}
+                            onFocus={(e) => e.target.select()}
                             onChange={(e) => setRecipeYieldQty(e.target.value)}
                             className="w-14 px-1.5 py-0.5 border border-gray-300 rounded font-bold text-gray-900 text-center focus:ring-1 focus:ring-[#064E3B]"
                           />

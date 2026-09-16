@@ -2423,7 +2423,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                               type="number"
                               min="1"
                               placeholder="1"
-                              value={form.recipeYieldQty === '1' ? '' : (form.recipeYieldQty || '')}
+                              value={form.recipeYieldQty || '1'}
+                              onFocus={(e) => e.target.select()}
                               onChange={(e) => setForm({ ...form, recipeYieldQty: e.target.value })}
                               className="w-16 px-2 py-0.5 border border-blue-300 rounded-md text-xs font-extrabold text-blue-700 text-center focus:ring-2 focus:ring-blue-500 bg-blue-50/60"
                             />
