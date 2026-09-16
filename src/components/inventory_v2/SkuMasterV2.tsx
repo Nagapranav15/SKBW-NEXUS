@@ -63,6 +63,7 @@ import {
   renumberSkusV2,
   getWarehouseHierarchyV2,
   WarehouseLocationV2,
+  getMetadataV2,
   SkuV2 
 } from '../../api/mfgApiV2';
 import { getActivityLogs, createActivityLog } from '../../api/activityLogApi';
@@ -279,6 +280,22 @@ const SkuMasterV2: React.FC = () => {
     uom: 'Pcs',
     fieldsText: ''
   });
+
+  const [unitsList, setUnitsList] = useState<string[]>([
+    "Pcs", "Kg", "Sheets", "Reels", "Mtr", "Ream", "Gross", "Box", "Pkt", "GBL", "Bundles", "pcs", "kg"
+  ]);
+
+  useEffect(() => {
+    if (selectedCompany?._id) {
+      getMetadataV2(selectedCompany._id).then(data => {
+        if (data?.units && Array.isArray(data.units) && data.units.length > 0) {
+          setUnitsList(prev => Array.from(new Set([...data.units, ...prev])));
+        }
+      }).catch(err => {
+        console.error('Failed to load settings units in SkuMasterV2:', err);
+      });
+    }
+  }, [selectedCompany?._id]);
 
   // Expanded Category IDs
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<string[]>([]);
@@ -2585,7 +2602,7 @@ const SkuMasterV2: React.FC = () => {
     setCategoryForm({
       name: '',
       type: activeCategorySubTab,
-      uom: 'Pcs',
+      uom: unitsList[0] || 'Pcs',
       fieldsText: 'Pages, Size, Ruling'
     });
     setShowCategoryModal(true);
@@ -4255,13 +4272,20 @@ const SkuMasterV2: React.FC = () => {
 
               <div>
                 <label className="block font-semibold text-gray-700 mb-1">Default UOM</label>
-                <input
-                  type="text"
+                <select
                   value={categoryForm.uom}
                   onChange={(e) => setCategoryForm(prev => ({ ...prev, uom: e.target.value }))}
-                  placeholder="e.g. Pcs, Kg, Ream"
-                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
-                />
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500 bg-white"
+                >
+                  {Array.from(new Set([
+                    categoryForm.uom,
+                    ...unitsList
+                  ])).filter(Boolean).map(u => (
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
