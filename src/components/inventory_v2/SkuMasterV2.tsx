@@ -4735,12 +4735,12 @@ const SkuMasterV2: React.FC = () => {
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-3 gap-x-4 text-xs">
                       <div>
                         <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PRIMARY STOCKING UNIT</span>
-                        <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.unit || (getItemType(selectedSkuDetails) === 'materials' ? 'Kg' : 'GBL')}</span>
+                        <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.unit || 'Pcs'}</span>
                       </div>
                       <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">ALTERNATE UNIT</span>
-                        <span className="font-bold text-gray-900 text-xs">
-                          {getItemType(selectedSkuDetails) === 'materials' || selectedSkuDetails.category === 'Raw Material' ? 'None (Raw Material)' : (selectedSkuDetails.altUnit || 'PCS')}
+                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">SECONDARY UOM (AUOM)</span>
+                        <span className="font-bold text-blue-700 text-xs">
+                          {selectedSkuDetails.altUnit || '—'}
                         </span>
                       </div>
                       <div>
@@ -4754,13 +4754,7 @@ const SkuMasterV2: React.FC = () => {
                     <div className="bg-[#faf5ff] p-3 rounded-xl border border-[#f3e8ff] text-center space-y-0.5">
                       <div className="text-[10px] font-black text-blue-600 uppercase tracking-wider">CONVERSION FORMULA</div>
                       <div className="font-extrabold text-xs text-blue-950">
-                        {getItemType(selectedSkuDetails) === 'materials' || selectedSkuDetails.category === 'Raw Material' ? (
-                          selectedSkuDetails.paperType === 'Sheets' ? (
-                            `Formula: 1 Ream = ${selectedSkuDetails.pages || 500} Sheets`
-                          ) : (
-                            `Direct Unit Tracking (${selectedSkuDetails.unit || 'Kg'}) • No AUOM Conversion`
-                          )
-                        ) : selectedSkuDetails.altUnit && selectedSkuDetails.altUnitConversion ? (() => {
+                        {selectedSkuDetails.altUnit && selectedSkuDetails.altUnitConversion ? (() => {
                           const isAltPcs = (selectedSkuDetails.altUnit || '').toLowerCase().includes('pc');
                           const isPrimaryPcs = (selectedSkuDetails.unit || '').toLowerCase().includes('pc');
                           const outerUnit = (isAltPcs && !isPrimaryPcs) ? selectedSkuDetails.unit : selectedSkuDetails.altUnit;
@@ -4769,7 +4763,7 @@ const SkuMasterV2: React.FC = () => {
                         })() : selectedSkuDetails.paperType === 'Sheets' ? (
                           `Formula: 1 Ream = ${selectedSkuDetails.pages || 500} Sheets`
                         ) : (
-                          `Formula: 1 ${selectedSkuDetails.unit || 'GBL'} = ${selectedSkuDetails.pages || selectedSkuDetails.booksGbl || 122} PCS`
+                          `Direct Unit Tracking (${selectedSkuDetails.unit || 'Pcs'})`
                         )}
                       </div>
                     </div>
