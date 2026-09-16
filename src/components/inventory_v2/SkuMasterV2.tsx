@@ -2693,6 +2693,13 @@ const SkuMasterV2: React.FC = () => {
     return 'Paper Reels';
   };
 
+  const dynamicTotalCount = useMemo(() => {
+    if (activeMainTab === 'categories') {
+      return categoriesData.filter(c => c.type === activeCategorySubTab).length;
+    }
+    return filteredAndSortedSkus.length;
+  }, [activeMainTab, activeCategorySubTab, categoriesData, filteredAndSortedSkus]);
+
   return (
     <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
       
@@ -2705,8 +2712,8 @@ const SkuMasterV2: React.FC = () => {
           <div>
             <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
               <span>Item Master</span>
-              <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-bold">
-                {skus.length} Total
+              <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-bold transition-all">
+                {dynamicTotalCount} Total
               </span>
             </h1>
             <p className="text-xs text-gray-500 font-medium">
