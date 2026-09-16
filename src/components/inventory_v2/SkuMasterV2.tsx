@@ -717,6 +717,7 @@ const SkuMasterV2: React.FC = () => {
     { id: 'gsm', label: 'GSM', visible: true },
     { id: 'size', label: 'SIZE', visible: true },
     { id: 'pages', label: 'SHEETS PER REAM', visible: true },
+    { id: 'preferredVendor', label: 'PREFERRED VENDOR', visible: true },
     { id: 'openingStock', label: 'STOCK', visible: false },
     { id: 'workOrders', label: 'WORK ORDERS', visible: false },
     { id: 'dispatchOrders', label: 'DISPATCH ORDERS', visible: false }
@@ -732,13 +733,14 @@ const SkuMasterV2: React.FC = () => {
     { id: 'gsm', label: 'GSM', visible: true },
     { id: 'size', label: 'SIZE', visible: true },
     { id: 'pages', label: 'PAGES / SHEETS', visible: true },
+    { id: 'preferredVendor', label: 'PREFERRED VENDOR', visible: true },
     { id: 'bom', label: 'BOM RECIPE', visible: true },
     { id: 'openingStock', label: 'STOCK', visible: false },
     { id: 'workOrders', label: 'WORK ORDERS', visible: false },
     { id: 'dispatchOrders', label: 'DISPATCH ORDERS', visible: false }
   ];
 
-  const STORAGE_KEY = 'skbw_sku_master_tab_columns_v10';
+  const STORAGE_KEY = 'skbw_sku_master_tab_columns_v12';
 
   // Helper to sanitize column list against current valid defaults
   const sanitizeColumns = (savedList: any[], defaultList: typeof DEFAULT_PRODUCTS_COLUMNS) => {
@@ -1855,9 +1857,13 @@ const SkuMasterV2: React.FC = () => {
           'Opening Stock': s.openingStock || 0,
           'Min Stock Level': s.minStockLevel || 0,
           'Reorder Level': (s as any).reorderLevel || '—',
-          'Preferred Vendor': (s as any).preferredVendor || '—',
           'Status': s.status || 'Active'
         };
+        if (activeMainTab !== 'materials' && activeMainTab !== 'semi') {
+          delete base['Preferred Vendor'];
+        } else {
+          base['Preferred Vendor'] = (s as any).preferredVendor || '—';
+        }
         return base;
       });
 
@@ -2112,12 +2118,13 @@ const SkuMasterV2: React.FC = () => {
         'LENGTH (CM)',
         'Min Stock Level',
         'Reorder Level',
-        'Opening Stock Qty'
+        'Opening Stock Qty',
+        'vendor'
       ];
       sampleRows = [
-        ['RM-001', 'Maplitho Paper Reel 70 GSM', '0', 'Classmate', 'Plain', 'Paper Reels', 'Kg', 'Reels', '500', '70', '84', '0', '300', '100', '1500'],
-        ['RM-002', 'Duplex Board Grey Back 300 GSM', '0', 'Navneet', 'Plain', 'Duplex Cover Board', 'Pcs', 'Bundles', '100', '300', '57', '70', '500', '200', '2500'],
-        ['RM-003', 'Craft Paper Reel 80 GSM', '0', 'Happy Days', 'Plain', 'Paper Reels', 'Kg', 'Reels', '400', '80', '90', '0', '200', '100', '1200']
+        ['RM-001', 'Maplitho Paper Reel 70 GSM', '0', 'Classmate', 'Plain', 'Paper Reels', 'Kg', 'Reels', '500', '70', '84', '0', '300', '100', '1500', 'Bhavani Paper Mill'],
+        ['RM-002', 'Duplex Board Grey Back 300 GSM', '0', 'Navneet', 'Plain', 'Duplex Cover Board', 'Pcs', 'Bundles', '100', '300', '57', '70', '500', '200', '2500', 'Apex Board Traders'],
+        ['RM-003', 'Craft Paper Reel 80 GSM', '0', 'Happy Days', 'Plain', 'Paper Reels', 'Kg', 'Reels', '400', '80', '90', '0', '200', '100', '1200', 'Sri Balaji Paper Mart']
       ];
     }
 
@@ -3806,6 +3813,18 @@ const SkuMasterV2: React.FC = () => {
                                   <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-200">
                                     {getDispatchOrderCount(sku)}
                                   </span>
+                                </td>
+                              );
+                            case 'preferredVendor':
+                              return (
+                                <td key="preferredVendor" className="py-3 px-3 whitespace-nowrap">
+                                  {(sku as any).preferredVendor ? (
+                                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60 shadow-2xs">
+                                      {(sku as any).preferredVendor}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-400">—</span>
+                                  )}
                                 </td>
                               );
                             default:
