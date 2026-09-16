@@ -1961,6 +1961,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                   <span className="w-2 h-2 rounded-full bg-blue-600"></span>
                   Specifications
                 </h3>
+                <div className="grid grid-cols-2 gap-3">
                   {activeFields.includes('brand') && !isProductCategory && (
                     <div className="col-span-2 sm:col-span-1">
                       <label className="block text-[11px] font-semibold text-gray-600 mb-1">BRAND</label>
