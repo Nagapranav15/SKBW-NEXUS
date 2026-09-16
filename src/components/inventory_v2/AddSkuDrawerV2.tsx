@@ -29,8 +29,8 @@ interface AddSkuDrawerV2Props {
   customColumnTypes?: { [colName: string]: string };
   customColumnValues?: { [key: string]: any };
   setCustomColumnValues?: React.Dispatch<React.SetStateAction<{ [key: string]: any }>>;
-  customColumnOptions?: { [colName: string]: { label: string; color: string }[] };
   createdCategories?: { id?: string; name: string; type?: 'products' | 'materials' | 'semi'; uom?: string }[];
+  onCategoryCreated?: (newCategory: { id: string; name: string; type: 'products' | 'materials' | 'semi'; uom: string; fields: string[] }) => void;
 }
 
 export const SearchableMaterialDropdown: React.FC<{
@@ -174,7 +174,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   customColumnValues = {},
   setCustomColumnValues,
   customColumnOptions = {},
-  createdCategories = []
+  createdCategories = [],
+  onCategoryCreated
 }) => {
   const [form, setForm] = useState({
     skuCode: '',
@@ -504,33 +505,50 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       setIsAddingNewCategory(false);
       return;
     }
-    if (!categoriesList.includes(trimmed)) {
-      const updated = [...categoriesList, trimmed];
-      setCategoriesList(updated);
-      try {
-        await updateMetadataV2({
-          companyId,
-          categories: updated,
-          units: unitsList,
-          ruleTypes: ruleTypesList,
-          groups: groupsList,
-          brands: brandsList,
-          categoryFields: categoryFieldsMap
-        });
-        showToast(`Category "${trimmed}" added successfully!`, 'success');
-      } catch (err) {
-        console.error('Failed to save category metadata:', err);
-      }
+
+    const defaultUom = resolvedSection === 'materials' ? 'Kg' : resolvedSection === 'semi' ? 'Ream' : 'Pcs';
+    const newCategoryObj = {
+      id: `cat-${Date.now()}`,
+      name: trimmed,
+      type: resolvedSection,
+      uom: defaultUom,
+      fields: resolvedSection === 'materials' ? ['GSM', 'Width (cm)', 'Brand'] : resolvedSection === 'semi' ? ['GSM', 'Rule Type', 'Size'] : ['Pages', 'Size', 'Ruling']
+    };
+
+    if (onCategoryCreated) {
+      onCategoryCreated(newCategoryObj);
     }
-    const matchedCreated = (createdCategories || []).find(c => c && c.name?.toLowerCase().trim() === trimmed.toLowerCase().trim());
-    const catUom = matchedCreated?.uom;
-    if (catUom && !unitsList.some(u => u.toLowerCase() === catUom.toLowerCase())) {
-      setUnitsList(prev => [...prev, catUom]);
+
+    const updated = categoriesList.includes(trimmed) ? categoriesList : [...categoriesList, trimmed];
+    setCategoriesList(updated);
+
+    try {
+      const updatedCategoryCards = [
+        ...(createdCategories as any || []).filter((c: any) => c && c.name && c.name.toLowerCase().trim() !== trimmed.toLowerCase()),
+        newCategoryObj
+      ];
+      await updateMetadataV2({
+        companyId,
+        categories: updated,
+        categoryCards: updatedCategoryCards,
+        units: unitsList,
+        ruleTypes: ruleTypesList,
+        groups: groupsList,
+        brands: brandsList,
+        categoryFields: categoryFieldsMap
+      });
+      showToast(`Category "${trimmed}" added to ${resolvedSection.toUpperCase()} categories!`, 'success');
+    } catch (err) {
+      console.error('Failed to save category metadata:', err);
+    }
+
+    if (!unitsList.some(u => u.toLowerCase() === defaultUom.toLowerCase())) {
+      setUnitsList(prev => [...prev, defaultUom]);
     }
     setForm(prev => ({
       ...prev,
       category: trimmed,
-      ...(catUom ? { unit: catUom } : {})
+      unit: defaultUom
     }));
     regenerateSkuCode(trimmed);
     setIsAddingNewCategory(false);
@@ -791,14 +809,34 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       let updatedGroups = [...groupsList];
       let updatedFieldsMap = { ...categoryFieldsMap };
 
+      let updatedCategoryCards = [...(createdCategories as any || [])];
+
       if (field === 'categories') {
+        const defaultUom = resolvedSection === 'materials' ? 'Kg' : resolvedSection === 'semi' ? 'Ream' : 'Pcs';
+        const newCategoryObj = {
+          id: `cat-${Date.now()}`,
+          name: cleanVal,
+          type: resolvedSection,
+          uom: defaultUom,
+          fields: modalConfig.selectedFields && modalConfig.selectedFields.length > 0 ? modalConfig.selectedFields : (resolvedSection === 'materials' ? ['GSM', 'Width (cm)', 'Brand'] : resolvedSection === 'semi' ? ['GSM', 'Rule Type', 'Size'] : ['Pages', 'Size', 'Ruling'])
+        };
+
+        if (onCategoryCreated) {
+          onCategoryCreated(newCategoryObj);
+        }
+
+        updatedCategoryCards = [
+          ...updatedCategoryCards.filter((c: any) => c && c.name && c.name.toLowerCase().trim() !== cleanVal.toLowerCase()),
+          newCategoryObj
+        ];
+
         if (!updatedCategories.includes(cleanVal)) {
           updatedCategories.push(cleanVal);
           setCategoriesList(updatedCategories);
         }
         updatedFieldsMap[cleanVal] = modalConfig.selectedFields;
         setCategoryFieldsMap(updatedFieldsMap);
-        setForm(prev => ({ ...prev, category: cleanVal }));
+        setForm(prev => ({ ...prev, category: cleanVal, unit: defaultUom }));
       } else if (field === 'units') {
         if (!updatedUnits.includes(cleanVal)) {
           updatedUnits.push(cleanVal);
@@ -822,6 +860,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       await updateMetadataV2({
         companyId,
         categories: updatedCategories,
+        categoryCards: updatedCategoryCards,
         units: updatedUnits,
         ruleTypes: updatedRuleTypes,
         groups: updatedGroups,

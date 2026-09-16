@@ -4661,6 +4661,14 @@ const SkuMasterV2: React.FC = () => {
         setCustomColumnValues={setCustomColumnValues}
         customColumnOptions={customColumnOptions}
         createdCategories={categoriesData}
+        onCategoryCreated={(newCat) => {
+          const updatedCards = [
+            ...categoriesData.filter(c => c.name.toLowerCase().trim() !== newCat.name.toLowerCase().trim()),
+            newCat
+          ];
+          setCategoriesData(updatedCards);
+          saveCategoriesToDb(updatedCards);
+        }}
       />
 
       {/* ── DELETE CONFIRMATION MODAL ── */}
