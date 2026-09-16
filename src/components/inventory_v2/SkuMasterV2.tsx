@@ -51,7 +51,6 @@ import {
   Settings
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import AiCopilotWidget from '../ai/AiCopilotWidget';
 import { 
   getSkusV2, 
   getBalancesV2,
@@ -1395,17 +1394,6 @@ const SkuMasterV2: React.FC = () => {
     return true;
   };
 
-  // Listen to AI Copilot action to open Add SKU drawer
-  useEffect(() => {
-    const handleAiAction = (e: any) => {
-      if (e.detail?.action === 'open-add-sku') {
-        setEditSku(null);
-        setShowAddDrawer(true);
-      }
-    };
-    window.addEventListener('erp-ai-action', handleAiAction);
-    return () => window.removeEventListener('erp-ai-action', handleAiAction);
-  }, []);
 
   const bomProductSkus = useMemo(() => {
     return skus.filter(isBomProductItem);
@@ -2691,9 +2679,6 @@ const SkuMasterV2: React.FC = () => {
             </p>
           </div>
         </div>
-
-        {/* AI Assistant Button embedded inside right of Item Master box */}
-        <AiCopilotWidget inline />
       </div>
 
       {/* ── 2. Top Navigation Tabs Bar & Action Toolbar (Exact match to Business Directory / 1st Image!) ── */}
