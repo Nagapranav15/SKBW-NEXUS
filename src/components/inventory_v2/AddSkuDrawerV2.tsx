@@ -572,6 +572,68 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   const [brandAtFocus, setBrandAtFocus] = useState<string | null>(null);
   const [groupAtFocus, setGroupAtFocus] = useState<string | null>(null);
 
+  const availableBrands = React.useMemo(() => {
+    let sourceList: string[] = [];
+    if (resolvedSection === 'materials') {
+      sourceList = [...existingBrands, 'BILT', 'ITC', 'Century', 'JK Paper', 'Star', 'TNPL', ...brandsList];
+    } else {
+      sourceList = [...fgBrandsList, ...brandsList, 'Classmate', 'Navneet', 'Happy Days', 'Bestfriend', 'Akshay'];
+    }
+
+    const uniqueMap = new Map<string, string>();
+    sourceList.forEach(item => {
+      if (typeof item === 'string' && item.trim()) {
+        const trimmed = item.trim();
+        const key = trimmed.toLowerCase();
+        if (!uniqueMap.has(key)) {
+          uniqueMap.set(key, trimmed);
+        } else {
+          // If existing entry is ALL UPPERCASE and current is Title Case, prefer Title Case
+          const existing = uniqueMap.get(key)!;
+          if (existing === existing.toUpperCase() && trimmed !== trimmed.toUpperCase()) {
+            uniqueMap.set(key, trimmed);
+          }
+        }
+      }
+    });
+
+    return Array.from(uniqueMap.values()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  }, [resolvedSection, existingBrands, fgBrandsList, brandsList]);
+
+  const handleAddNewBrand = async (newBrandInput: string) => {
+    const trimmed = newBrandInput.trim();
+    if (!trimmed) return;
+
+    if (resolvedSection === 'materials') {
+      setExistingBrands(prev => Array.from(new Set([...prev, trimmed])));
+    } else {
+      setFgBrandsList(prev => Array.from(new Set([...prev, trimmed])));
+    }
+
+    const updatedBrands = Array.from(new Set([...brandsList, trimmed]));
+    setBrandsList(updatedBrands);
+    setForm(prev => ({ ...prev, brand: trimmed }));
+    setBrandSearch(trimmed);
+    setShowBrandDropdown(false);
+
+    try {
+      await updateMetadataV2({
+        companyId,
+        categories: categoriesList,
+        categoryCards: createdCategories as any,
+        units: unitsList,
+        ruleTypes: ruleTypesList,
+        groups: groupsList,
+        brands: updatedBrands,
+        categoryFields: categoryFieldsMap,
+        standardizedSheets
+      });
+      showToast(`Brand "${trimmed}" saved to brands list!`, 'success');
+    } catch (err) {
+      console.error('Failed to save brand to metadata:', err);
+    }
+  };
+
   // BOM Recipe Materials State (Empty by default)
   const [bomItems, setBomItems] = useState<{ id: string; name: string; qty: string; uom: string; inStock: number; notes: string }[]>([]);
 
@@ -1656,8 +1718,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       </div>
                     )}
 
-                    {/* 2. Brand - Only for Finished Goods */}
-                    {isProductCategory && (
+                    {/* 2. Brand */}
+                    {activeFields.includes('brand') && (
                       <div>
                         <label className="block text-[11px] font-semibold text-gray-600 mb-1">BRAND</label>
                         <div className="relative" ref={brandContainerRef}>
@@ -1677,10 +1739,10 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           />
                           {showBrandDropdown && (
                             <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg z-20 divide-y divide-gray-50">
-                              {fgBrandsList
+                              {availableBrands
                                 .filter(b => {
-                                  if (brandSearch === brandAtFocus) return true;
-                                  return b.toLowerCase().includes(brandSearch.toLowerCase());
+                                  if (brandSearch === brandAtFocus || !brandSearch.trim()) return true;
+                                  return b.toLowerCase().includes(brandSearch.toLowerCase().trim());
                                 })
                                 .map(b => (
                                   <button
@@ -1697,23 +1759,16 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                   </button>
                                 ))
                               }
-                              {brandSearch.trim() && !fgBrandsList.some(b => b.toLowerCase() === brandSearch.toLowerCase()) && (
+                              {brandSearch.trim() && !availableBrands.some(b => b.toLowerCase() === brandSearch.trim().toLowerCase()) && (
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    const newBrand = brandSearch.trim();
-                                    if (!fgBrandsList.includes(newBrand)) {
-                                      setFgBrandsList(prev => [...prev, newBrand]);
-                                    }
-                                    setForm(prev => ({ ...prev, brand: newBrand }));
-                                    setShowBrandDropdown(false);
-                                  }}
+                                  onClick={() => handleAddNewBrand(brandSearch)}
                                   className="w-full px-3 py-2 text-left text-xs hover:bg-green-50 text-green-600 font-bold transition-colors block"
                                 >
                                   + Add Brand "{brandSearch.trim()}"
                                 </button>
                               )}
-                              {fgBrandsList.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase())).length === 0 && !brandSearch.trim() && (
+                              {availableBrands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase().trim())).length === 0 && !brandSearch.trim() && (
                                 <div className="px-3 py-2 text-xs text-gray-400 italic">No brands found</div>
                               )}
                             </div>
