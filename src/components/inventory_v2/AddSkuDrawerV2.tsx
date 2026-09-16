@@ -590,8 +590,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
   // Category specific field visibility mapping
   const [categoryFieldsMap, setCategoryFieldsMap] = useState<Record<string, string[]>>({
-    "Raw Material": ["gsm", "brand", "title", "width", "length", "paperType"],
-    "Semi Finished": ["gsm", "brand", "width", "length", "ruleType", "group"],
+    "Raw Material": ["gsm", "brand", "title", "width", "length", "paperType", "altUnit"],
+    "Semi Finished": ["gsm", "brand", "width", "length", "ruleType", "group", "altUnit"],
     "Finished Goods": ["gsm", "brand", "width", "length", "ruleType", "pages", "altUnit"]
   });
 
@@ -659,13 +659,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
               if (!updated.includes('width')) updated.push('width');
               if (!updated.includes('length')) updated.push('length');
             }
-            // Guarantee altUnit is excluded for Raw Material & Semi Finished, and included for Finished Goods
-            if (["Raw Material", "Semi Finished"].includes(cat)) {
-              updated = updated.filter(f => f !== 'altUnit');
-            } else if (cat === "Finished Goods") {
-              if (!updated.includes('altUnit')) {
-                updated.push('altUnit');
-              }
+            // Guarantee altUnit is included for all categories
+            if (!updated.includes('altUnit')) {
+              updated.push('altUnit');
             }
             migratedFields[cat] = updated;
           });

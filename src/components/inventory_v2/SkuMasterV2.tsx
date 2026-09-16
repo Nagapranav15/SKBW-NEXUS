@@ -733,6 +733,8 @@ const SkuMasterV2: React.FC = () => {
     { id: 'category', label: 'CATEGORY', visible: true },
     { id: 'status', label: 'STATUS', visible: true },
     { id: 'unit', label: 'PRIMARY UOM', visible: true },
+    { id: 'altUnitConversion', label: 'CON RATE', visible: true },
+    { id: 'altUnit', label: 'SECONDARY UOM', visible: true },
     { id: 'gsm', label: 'GSM', visible: true },
     { id: 'size', label: 'SIZE', visible: true },
     { id: 'pages', label: 'SHEETS PER REAM', visible: true },
@@ -749,6 +751,8 @@ const SkuMasterV2: React.FC = () => {
     { id: 'category', label: 'CATEGORY', visible: true },
     { id: 'status', label: 'STATUS', visible: true },
     { id: 'unit', label: 'PRIMARY UOM', visible: true },
+    { id: 'altUnitConversion', label: 'CON RATE', visible: true },
+    { id: 'altUnit', label: 'SECONDARY UOM', visible: true },
     { id: 'gsm', label: 'GSM', visible: true },
     { id: 'size', label: 'SIZE', visible: true },
     { id: 'pages', label: 'PAGES / SHEETS', visible: true },
@@ -759,7 +763,7 @@ const SkuMasterV2: React.FC = () => {
     { id: 'dispatchOrders', label: 'DISPATCH ORDERS', visible: false }
   ];
 
-  const STORAGE_KEY = 'skbw_sku_master_tab_columns_v12';
+  const STORAGE_KEY = 'skbw_sku_master_tab_columns_v13';
 
   // Helper to sanitize column list against current valid defaults
   const sanitizeColumns = (savedList: any[], defaultList: typeof DEFAULT_PRODUCTS_COLUMNS) => {
