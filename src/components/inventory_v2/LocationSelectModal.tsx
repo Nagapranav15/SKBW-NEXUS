@@ -311,21 +311,21 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
         </div>
 
         {/* Search Filter Bar */}
-        <div className="px-5 pt-3.5 pb-1">
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+        <div className="px-6 pt-3 pb-1">
+          <div className="relative flex items-center">
+            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 pointer-events-none" />
             <input
               type="text"
               placeholder="Search location, zone, or floor..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8.5 pr-3 py-1.5 bg-slate-50 border border-gray-200 rounded-xl text-xs text-gray-800 placeholder-gray-400 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
+              className="w-full pl-9 pr-8 py-2 bg-slate-50/80 border border-gray-200 rounded-xl text-xs text-gray-800 placeholder-gray-400 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-2 text-gray-400 hover:text-gray-600 text-xs"
+                className="absolute right-2.5 text-gray-400 hover:text-gray-600 p-1"
               >
                 <X className="w-3.5 h-3.5" />
               </button>

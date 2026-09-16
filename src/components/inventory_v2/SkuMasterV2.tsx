@@ -1885,6 +1885,69 @@ const SkuMasterV2: React.FC = () => {
     }
   };
 
+  const getExportDataForSkus = (targetSkus: SkuV2[]) => {
+    const cleanVal = (v: any) => {
+      if (v === undefined || v === null || v === '' || v === '—' || String(v).includes('â€')) return '';
+      return v;
+    };
+
+    return targetSkus.map(s => {
+      if (activeMainTab === 'products') {
+        return {
+          'ID / SKU Code': s.skuCode || '',
+          'SKU NAME': s.name || '',
+          'PAGES': cleanVal(s.pages),
+          'BRAND': cleanVal(s.brand),
+          'RULE TYPE': cleanVal(s.ruleType),
+          'Category': s.category || s.group || 'Finished Goods',
+          'UOM': s.unit || 'Pcs',
+          'AUOM (Alt Unit)': cleanVal(s.altUnit),
+          'Con Rate': cleanVal(s.altUnitConversion),
+          'GSM': cleanVal(s.gsm),
+          'WIDTH (CM)': cleanVal(s.width),
+          'LENGTH (CM)': cleanVal(s.length),
+          'Min Stock Level': s.minStockLevel || 0,
+          'Reorder Level': cleanVal((s as any).reorderLevel),
+          'Opening Stock Qty': s.openingStock || 0
+        };
+      } else if (activeMainTab === 'semi') {
+        return {
+          'ID / SKU Code': s.skuCode || '',
+          'Item Name': s.name || '',
+          'RULE TYPE': cleanVal(s.ruleType),
+          'Category': s.category || s.group || 'Semi Finished',
+          'UOM': s.unit || 'Pcs',
+          'AUOM (Alt Unit)': cleanVal(s.altUnit),
+          'Con Rate': cleanVal(s.altUnitConversion),
+          'GSM': cleanVal(s.gsm),
+          'WIDTH (CM)': cleanVal(s.width),
+          'LENGTH (CM)': cleanVal(s.length),
+          'Min Stock Level': s.minStockLevel || 0,
+          'Reorder Level': cleanVal((s as any).reorderLevel),
+          'Opening Stock Qty': s.openingStock || 0,
+          'vendor': cleanVal((s as any).preferredVendor)
+        };
+      } else {
+        // Raw Materials
+        return {
+          'ID / SKU Code': s.skuCode || '',
+          'Item Name': s.name || '',
+          'Category': s.category || s.group || 'Raw Material',
+          'UOM': s.unit || 'Kg',
+          'GSM': cleanVal(s.gsm),
+          'TITLE': cleanVal((s as any).title || s.name),
+          'WIDTH (CM)': cleanVal(s.width),
+          'Size': formatSize(s),
+          'Paper Type': s.paperType || 'None',
+          'Stock': s.openingStock || 0,
+          'Min Stock Level': s.minStockLevel || 0,
+          'Status': s.status || 'Active',
+          'vendor': cleanVal((s as any).preferredVendor)
+        };
+      }
+    });
+  };
+
   const handleExportExcel = () => {
     const targetSkus = selectedIds.length > 0 
       ? filteredAndSortedSkus.filter(s => selectedIds.includes(s._id!))
@@ -1896,37 +1959,7 @@ const SkuMasterV2: React.FC = () => {
     }
     setIsExporting(true);
     try {
-      const isRawOrSemiTab = activeMainTab === 'materials' || activeMainTab === 'semi';
-      const exportData = targetSkus.map(s => {
-        const hasBom = Array.isArray((s as any).bomItems) && (s as any).bomItems.length > 0;
-        const base: Record<string, any> = {
-          'Item Code': s.skuCode,
-          'Item Name': s.name,
-          'Category': s.category || s.group || '',
-          'Primary Unit': s.unit || '—',
-          'AUOM / Secondary Unit': s.altUnit || '—',
-          'Conversion Rate': s.altUnitConversion || '—',
-          'Paper Type': s.paperType || 'None',
-          'GSM': s.gsm || '—',
-          'Width': s.width || '—',
-          'Length': s.length || '—',
-          'Pages / Sheets': s.pages || '—',
-          'Ream Weight': (s as any).reamWeight || '—',
-          'Books / GBL': (s as any).booksGbl || '—',
-          'BOM Recipe': hasBom ? 'Defined' : (activeMainTab === 'materials' ? 'N/A' : 'Pending'),
-          'Opening Stock': s.openingStock || 0,
-          'Min Stock Level': s.minStockLevel || 0,
-          'Reorder Level': (s as any).reorderLevel || '—',
-          'Status': s.status || 'Active'
-        };
-        if (activeMainTab !== 'materials' && activeMainTab !== 'semi') {
-          delete base['Preferred Vendor'];
-        } else {
-          base['Preferred Vendor'] = (s as any).preferredVendor || '—';
-        }
-        return base;
-      });
-
+      const exportData = getExportDataForSkus(targetSkus);
       const worksheet = XLSX.utils.json_to_sheet(exportData);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Items');
@@ -1935,6 +1968,46 @@ const SkuMasterV2: React.FC = () => {
       showToast(`Exported ${targetSkus.length} ${selectedIds.length > 0 ? 'selected ' : ''}items to Excel`, 'success');
     } catch (err) {
       showToast('Failed to export Excel', 'error');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportCSV = () => {
+    const targetSkus = selectedIds.length > 0 
+      ? filteredAndSortedSkus.filter(s => selectedIds.includes(s._id!))
+      : filteredAndSortedSkus;
+
+    if (targetSkus.length === 0) {
+      showToast('No items available to export', 'error');
+      return;
+    }
+    setIsExporting(true);
+    try {
+      const exportData = getExportDataForSkus(targetSkus);
+      if (exportData.length === 0) return;
+
+      const headers = Object.keys(exportData[0]);
+      const csvContent = '\uFEFF' + [
+        headers.join(','),
+        ...exportData.map(row => headers.map(h => {
+          const clean = String((row as any)[h] ?? '').replace(/"/g, '""');
+          return clean.includes(',') || clean.includes('\n') ? `"${clean}"` : clean;
+        }).join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      const suffix = selectedIds.length > 0 ? `_selected_${selectedIds.length}` : '';
+      link.setAttribute('download', `Items_Export_${activeMainTab}${suffix}_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast(`Exported ${targetSkus.length} ${selectedIds.length > 0 ? 'selected ' : ''}items to CSV`, 'success');
+    } catch (err) {
+      showToast('Failed to export CSV', 'error');
     } finally {
       setIsExporting(false);
     }
@@ -2268,7 +2341,19 @@ const SkuMasterV2: React.FC = () => {
             const cleanK = alias.toLowerCase().replace(/[^a-z0-9]/g, '');
             const idx = headerMap[cleanK];
             if (idx !== undefined && row[idx] !== undefined && row[idx] !== null) {
-              const valStr = String(row[idx]).trim();
+              let valStr = String(row[idx]).trim();
+              if (
+                valStr === '—' || 
+                valStr === '–' || 
+                valStr === '-' || 
+                valStr.includes('â€') || 
+                valStr.toLowerCase() === 'n/a' || 
+                valStr.toLowerCase() === 'none' || 
+                valStr.toLowerCase() === 'null' ||
+                valStr.toLowerCase() === 'undefined'
+              ) {
+                return '';
+              }
               if (valStr !== '') return valStr;
             }
           }
@@ -2330,7 +2415,13 @@ const SkuMasterV2: React.FC = () => {
 
         const unit = getFieldVal('uom', 'unit', 'primaryunit', 'baseunit', 'mainunit') || (activeMainTab === 'materials' ? 'Kg' : 'Pcs');
         let altUnit = getFieldVal('auomaltunit', 'auom', 'altunit', 'secondaryunit', 'alternateunit', 'auomsecondaryunit') || '';
-        if (altUnit.toLowerCase().trim() === unit.toLowerCase().trim()) {
+        if (
+          !altUnit || 
+          altUnit.toLowerCase().trim() === unit.toLowerCase().trim() ||
+          altUnit === '—' ||
+          altUnit === '-' ||
+          altUnit.includes('â€')
+        ) {
           altUnit = '';
         }
 
@@ -3236,7 +3327,14 @@ const SkuMasterV2: React.FC = () => {
                   </div>
                 )}
                 {showExportMenu && (
-                  <div className="absolute right-0 mt-1.5 w-44 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs text-left">
+                  <div className="absolute right-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs text-left">
+                    <button
+                      onClick={() => { handleExportCSV(); setShowExportMenu(false); }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-xl font-semibold hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 text-gray-700 cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Export CSV (.csv)</span>
+                    </button>
                     <button
                       onClick={() => { handleExportExcel(); setShowExportMenu(false); }}
                       className="w-full text-left px-2.5 py-1.5 rounded-xl font-semibold hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 text-gray-700 cursor-pointer"
@@ -3775,11 +3873,13 @@ const SkuMasterV2: React.FC = () => {
                                 </td>
                               );
                             case 'altUnit':
+                              const cleanAlt = (sku.altUnit || '').trim();
+                              const isInvalidAlt = !cleanAlt || cleanAlt === '—' || cleanAlt === '–' || cleanAlt === '-' || cleanAlt.includes('â€') || cleanAlt.toLowerCase() === 'n/a' || cleanAlt.toLowerCase() === 'none' || cleanAlt.toLowerCase() === (sku.unit || '').toLowerCase();
                               return (
                                 <td key="altUnit" className="py-3 px-3 whitespace-nowrap">
-                                  {sku.altUnit ? (
+                                  {!isInvalidAlt ? (
                                     <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-blue-50 text-blue-700">
-                                      {sku.altUnit}
+                                      {cleanAlt}
                                     </span>
                                   ) : (
                                     <span className="text-gray-400">—</span>
@@ -3787,13 +3887,14 @@ const SkuMasterV2: React.FC = () => {
                                 </td>
                               );
                             case 'altUnitConversion':
+                              const isAltValid = sku.altUnit && !['—', '–', '-', 'n/a', 'none', ''].includes(sku.altUnit.trim().toLowerCase()) && !sku.altUnit.includes('â€');
                               const isAltPcs = (sku.altUnit || '').toLowerCase().includes('pc');
                               const isPrimaryPcs = (sku.unit || '').toLowerCase().includes('pc');
                               const outerUnit = (isAltPcs && !isPrimaryPcs) ? sku.unit : sku.altUnit;
                               const innerUnit = (isAltPcs && !isPrimaryPcs) ? sku.altUnit : (sku.unit || 'Pcs');
                               return (
                                 <td key="altUnitConversion" className="py-3 px-3 text-gray-700 font-mono text-[11px] font-semibold whitespace-nowrap">
-                                  {sku.altUnit && sku.altUnitConversion ? (
+                                  {isAltValid && sku.altUnitConversion ? (
                                     <span><strong>1 {outerUnit}</strong> = <strong>{sku.altUnitConversion} {innerUnit}</strong></span>
                                   ) : (
                                     <span className="text-gray-400">—</span>
