@@ -1183,112 +1183,124 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     }
   }, [isOpen, form.category, !editSku, activeSection]);
 
-    // Helper to compile Sku Name dynamically from specification inputs
-    const compileSkuName = (formData: typeof form): string => {
-      if (resolvedSection === 'materials' || formData.category === 'Raw Material' || formData.category === 'Materials') {
-        const parts: string[] = [];
-        if (formData.title?.trim()) parts.push(formData.title.trim());
-        const formatType = formData.paperType === 'Reels' ? 'Reel' : formData.paperType === 'Sheets' ? 'Sheet' : '';
-        if (formatType) parts.push(formatType);
-        if (formData.gsm) parts.push(`${formData.gsm} GSM`);
-        let sizeStr = '';
-        if (formData.width && formData.length) {
-          sizeStr = `${formData.width} x ${formData.length} CM`;
-        } else if (formData.width) {
-          sizeStr = `${formData.width} CM`;
-        }
-        if (sizeStr) parts.push(sizeStr);
-        if (formData.pages && formData.paperType === 'Sheets') parts.push(`(${formData.pages} Sheets/Ream)`);
-        return parts.join(' ');
-      } else if (resolvedSection === 'semi' || formData.category === 'Semi Finished' || formData.category === 'Semi') {
-        const parts: string[] = [];
-        if (formData.brand?.trim()) parts.push(formData.brand.trim());
-        if (formData.gsm) parts.push(`${formData.gsm} GSM`);
-        let sizeStr = '';
-        if (formData.width && formData.length) {
-          sizeStr = `${formData.width} x ${formData.length} CM`;
-        } else if (formData.width) {
-          sizeStr = `${formData.width} CM`;
-        }
-        if (sizeStr) parts.push(sizeStr);
-        if (formData.ruleType?.trim()) {
-          const clean = formData.ruleType.trim();
-          const wrapped = (clean.startsWith('(') && clean.endsWith(')')) ? clean : `(${clean})`;
-          parts.push(wrapped);
-        }
-        if (formData.pages) parts.push(`${formData.pages}P`);
-        if (parts.length > 0) return parts.join(' ');
-        if (formData.group) return formData.group;
-        return '';
-      } else {
-        // Finished Goods / Products
-        const parts: string[] = [];
-        if (formData.pages) parts.push(`${formData.pages}P`);
-        if (formData.brand?.trim()) parts.push(formData.brand.trim());
-        if (formData.title?.trim()) parts.push(formData.title.trim());
-        if (formData.ruleType) {
-          const clean = formData.ruleType.trim();
-          if (clean) {
-            const wrapped = (clean.startsWith('(') && clean.endsWith(')')) ? clean : `(${clean})`;
-            parts.push(wrapped);
-          }
-        }
-        if (formData.gsm) parts.push(`${formData.gsm} GSM`);
-        let sizeStr = '';
-        if (formData.width && formData.length) {
-          sizeStr = `${formData.width} x ${formData.length} CM`;
-        } else if (formData.width) {
-          sizeStr = `${formData.width} CM`;
-        }
-        if (sizeStr) parts.push(sizeStr);
-        if (parts.length > 0) return parts.join(' ');
-        if (formData.group) return formData.group;
-        return '';
+  // Helper to compile Sku Name dynamically from specification inputs
+  const compileSkuName = (formData: typeof form): string => {
+    const isMat = resolvedSection === 'materials' || formData.category === 'Raw Material' || formData.category === 'Materials' || (formData.skuCode || '').startsWith('RM');
+    const isSemi = resolvedSection === 'semi' || formData.category === 'Semi Finished' || formData.category === 'Semi' || (formData.skuCode || '').startsWith('SM');
+
+    if (isMat) {
+      const parts: string[] = [];
+      if (formData.title?.trim()) parts.push(formData.title.trim());
+      const formatType = formData.paperType === 'Reels' ? 'Reel' : formData.paperType === 'Sheets' ? 'Sheet' : '';
+      if (formatType) parts.push(formatType);
+      if (formData.gsm) parts.push(`${formData.gsm} GSM`);
+      let sizeStr = '';
+      if (formData.width && formData.length) {
+        sizeStr = `${formData.width} x ${formData.length} CM`;
+      } else if (formData.width) {
+        sizeStr = `${formData.width} CM`;
       }
-    };
+      if (sizeStr) parts.push(sizeStr);
+      if (formData.pages && formData.paperType === 'Sheets') parts.push(`(${formData.pages} Sheets/Ream)`);
+      return parts.filter(Boolean).join(' ');
+    } else if (isSemi) {
+      const parts: string[] = [];
+      if (formData.brand?.trim()) parts.push(formData.brand.trim());
+      if (formData.gsm) parts.push(`${formData.gsm} GSM`);
+      let sizeStr = '';
+      if (formData.width && formData.length) {
+        sizeStr = `${formData.width} x ${formData.length} CM`;
+      } else if (formData.width) {
+        sizeStr = `${formData.width} CM`;
+      }
+      if (sizeStr) parts.push(sizeStr);
+      if (formData.ruleType?.trim()) {
+        const clean = formData.ruleType.trim();
+        const wrapped = (clean.startsWith('(') && clean.endsWith(')')) ? clean : `(${clean})`;
+        parts.push(wrapped);
+      }
+      if (formData.pages) parts.push(`${formData.pages}P`);
+      if (formData.group && !parts.some(p => p.toLowerCase() === formData.group.toLowerCase())) {
+        parts.push(formData.group);
+      }
+      return parts.filter(Boolean).join(' ');
+    } else {
+      // Products (Finished Goods)
+      const parts: string[] = [];
+      if (formData.pages) parts.push(`${formData.pages}P`);
+      if (formData.brand?.trim()) parts.push(formData.brand.trim());
+      if (formData.title?.trim()) parts.push(formData.title.trim());
+      if (formData.ruleType?.trim()) {
+        const clean = formData.ruleType.trim();
+        const wrapped = (clean.startsWith('(') && clean.endsWith(')')) ? clean : `(${clean})`;
+        parts.push(wrapped);
+      }
+      if (formData.gsm) parts.push(`${formData.gsm} GSM`);
+      let sizeStr = '';
+      if (formData.width && formData.length) {
+        sizeStr = `${formData.width} x ${formData.length} CM`;
+      } else if (formData.width) {
+        sizeStr = `${formData.width} CM`;
+      }
+      if (sizeStr) parts.push(sizeStr);
+      return parts.filter(Boolean).join(' ');
+    }
+  };
 
-    // Compile Sku Name dynamically from other inputs
-    useEffect(() => {
-      if (isNameManuallyEdited) return;
-
-      // In edit mode, check if any specification changed from initial load
-      if (editSku && lastSpecsRef.current) {
-        const currentSpecs = JSON.stringify({
-          cat: form.category || '',
-          pages: form.pages || '',
-          brand: form.brand || '',
-          ruleType: form.ruleType || '',
-          gsm: form.gsm || '',
-          width: form.width || '',
-          length: form.length || '',
-          paperType: form.paperType || '',
-          title: form.title || '',
-          group: form.group || ''
-        });
-        if (currentSpecs === lastSpecsRef.current) {
-          return;
+  const updateFormField = (updates: Partial<typeof form>) => {
+    setForm(prev => {
+      const nextForm = { ...prev, ...updates };
+      if (!isNameManuallyEdited) {
+        const nextCompiled = compileSkuName(nextForm);
+        if (nextCompiled) {
+          nextForm.name = nextCompiled;
         }
       }
+      return nextForm;
+    });
+  };
 
-      const compiled = compileSkuName(form);
-      if (compiled && compiled !== form.name) {
-        setForm(prev => ({ ...prev, name: compiled }));
+  // Compile Sku Name dynamically from other inputs
+  useEffect(() => {
+    if (isNameManuallyEdited) return;
+
+    if (editSku && lastSpecsRef.current) {
+      const currentSpecs = JSON.stringify({
+        cat: form.category || '',
+        pages: form.pages || '',
+        brand: form.brand || '',
+        ruleType: form.ruleType || '',
+        gsm: form.gsm || '',
+        width: form.width || '',
+        length: form.length || '',
+        paperType: form.paperType || '',
+        title: form.title || '',
+        group: form.group || ''
+      });
+      if (currentSpecs === lastSpecsRef.current) {
+        return;
       }
-    }, [
-      form.category,
-      form.paperType,
-      form.ruleType,
-      form.gsm,
-      form.width,
-      form.length,
-      form.pages,
-      form.brand,
-      form.title,
-      form.group,
-      isNameManuallyEdited,
-      editSku,
-      categoryFieldsMap
-    ]);
+    }
+
+    const compiled = compileSkuName(form);
+    if (compiled && compiled !== form.name) {
+      setForm(prev => ({ ...prev, name: compiled }));
+    }
+  }, [
+    form.category,
+    form.paperType,
+    form.ruleType,
+    form.gsm,
+    form.width,
+    form.length,
+    form.pages,
+    form.brand,
+    form.title,
+    form.group,
+    isNameManuallyEdited,
+    editSku,
+    resolvedSection
+  ]);
 
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -1686,484 +1698,442 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                   </div>
                   <input
                     type="text"
-                    placeholder="e.g. 111P AKSHAY (SR)"
+                    placeholder={
+                      resolvedSection === 'materials'
+                        ? 'e.g. Maplitho Reel 70 GSM 64 CM'
+                        : resolvedSection === 'semi'
+                        ? 'e.g. Classmate 52 GSM 18 x 24 CM (Single Line) 192P'
+                        : 'e.g. 192P Classmate Longbook (Single Line) 70 GSM 21 x 29.7 CM'
+                    }
                     value={form.name}
                     onChange={e => {
-                      setForm({ ...form, name: e.target.value });
+                      setForm(prev => ({ ...prev, name: e.target.value }));
                       setIsNameManuallyEdited(true);
                     }}
                     className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                     required
                   />
                 </div>
-
-                {/* For Product categories: Pages, Brand, Rule Type, Primary Unit, Alternate Units right below SKU Name */}
-                {isProductCategory && (
-                  <>
-                    {/* 1. Pages */}
-                    {activeFields.includes('pages') && (
-                      <div>
-                        <label className="block text-[11px] font-semibold text-gray-600 mb-1">
-                          {form.paperType === 'Sheets' ? 'STANDARD SHEETS/REAM' : 'PAGES'}
-                        </label>
-                        <input
-                          type="number"
-                          placeholder={form.paperType === 'Sheets' ? 'e.g. 500' : 'e.g. 112 / 132'}
-                          value={form.pages}
-                          onChange={e => setForm({ ...form, pages: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
-                        />
-                      </div>
-                    )}
-
-                    {/* 2. Brand */}
-                    {activeFields.includes('brand') && (
-                      <div>
-                        <label className="block text-[11px] font-semibold text-gray-600 mb-1">BRAND</label>
-                        <div className="relative" ref={brandContainerRef}>
-                          <input
-                            type="text"
-                            placeholder="Search or type brand..."
-                            value={brandSearch}
-                            onChange={e => {
-                              setBrandSearch(e.target.value);
-                              setForm(prev => ({ ...prev, brand: e.target.value }));
-                            }}
-                            onFocus={() => {
-                              setShowBrandDropdown(true);
-                              setBrandAtFocus(form.brand);
-                            }}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
-                          />
-                          {showBrandDropdown && (
-                            <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg z-20 divide-y divide-gray-50">
-                              {availableBrands
-                                .filter(b => {
-                                  if (brandSearch === brandAtFocus || !brandSearch.trim()) return true;
-                                  return b.toLowerCase().includes(brandSearch.toLowerCase().trim());
-                                })
-                                .map(b => (
-                                  <button
-                                    key={b}
-                                    type="button"
-                                    onClick={() => {
-                                      setForm(prev => ({ ...prev, brand: b }));
-                                      setBrandSearch(b);
-                                      setShowBrandDropdown(false);
-                                    }}
-                                    className="w-full px-3 py-2 text-left text-xs hover:bg-blue-50 hover:text-blue-600 transition-colors font-semibold text-gray-700 block"
-                                  >
-                                    {b}
-                                  </button>
-                                ))
-                              }
-                              {brandSearch.trim() && !availableBrands.some(b => b.toLowerCase() === brandSearch.trim().toLowerCase()) && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleAddNewBrand(brandSearch)}
-                                  className="w-full px-3 py-2 text-left text-xs hover:bg-green-50 text-green-600 font-bold transition-colors block"
-                                >
-                                  + Add Brand "{brandSearch.trim()}"
-                                </button>
-                              )}
-                              {availableBrands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase().trim())).length === 0 && !brandSearch.trim() && (
-                                <div className="px-3 py-2 text-xs text-gray-400 italic">No brands found</div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 3. Rule Type */}
-                    {activeFields.includes('ruleType') && (
-                      <div>
-                        <label className="block text-[11px] font-semibold text-gray-600 mb-1">RULE TYPE</label>
-                        <select
-                          value={form.ruleType}
-                          onChange={e => {
-                            if (e.target.value === '__ADD_NEW__') {
-                              handleAddNewOption('ruleTypes');
-                            } else {
-                              setForm({ ...form, ruleType: e.target.value });
-                            }
-                          }}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
-                        >
-                          <option value="">-- Select Rule Type --</option>
-                          {ruleTypesList.map(rule => (
-                            <option key={rule} value={rule}>{rule}</option>
-                          ))}
-                          <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
-                        </select>
-                      </div>
-                    )}
-
-                    {/* 4. Primary UOM (Base Unit) */}
-                    <div>
-                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">
-                        {isRawOrSemi ? "PRIMARY UOM *" : "PRIMARY UOM (Base) *"}
-                      </label>
-                      <select
-                        value={unitsList.find(u => u.toLowerCase() === (form.unit || '').toLowerCase()) || form.unit || ''}
-                        onChange={e => {
-                          if (e.target.value === '__ADD_NEW__') {
-                            handleAddNewOption('units');
-                          } else {
-                            setForm({ ...form, unit: e.target.value });
-                          }
-                        }}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
-                      >
-                        <option value="">Select Primary Unit</option>
-                        {unitsList.map(unit => (
-                          <option key={unit} value={unit}>{unit}</option>
-                        ))}
-                        <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
-                      </select>
-                    </div>
-
-                    {/* 5. AUOM Toggle */}
-                    {activeFields.includes('altUnit') && (
-                      <div className="flex items-end h-full">
-                        <label className="flex items-center space-x-2.5 bg-gray-50 border border-gray-200 hover:border-blue-300 hover:bg-blue-50/10 rounded-xl px-3 py-2 w-full cursor-pointer select-none transition-all">
-                          <input
-                            type="checkbox"
-                            checked={hasAltUnit}
-                            onChange={e => {
-                              const checked = e.target.checked;
-                              setHasAltUnit(checked);
-                              if (!checked) {
-                                setForm(prev => ({ ...prev, altUnit: '', altUnitConversion: '' }));
-                              }
-                            }}
-                            className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 border-gray-300 cursor-pointer"
-                          />
-                          <div className="text-left">
-                            <span className="block text-[11px] font-bold text-gray-700">Enable AUOM</span>
-                            <span className="block text-[9px] text-gray-400 font-medium leading-tight">Alternate packaging / sales unit</span>
-                          </div>
-                        </label>
-                      </div>
-                    )}
-
-                    {/* AUOM & Conversion Rate if Enabled */}
-                    {activeFields.includes('altUnit') && hasAltUnit && (() => {
-                      const effectiveDirection = getUomDirection(form.unit, form.altUnit, form.altUnitDirection || undefined);
-                      const factorNum = Number(form.altUnitConversion) || 0;
-                      const isUnitSame = !!(form.unit && form.altUnit && form.unit.trim().toLowerCase() === form.altUnit.trim().toLowerCase());
-                      const isFactorInvalid = !!(form.altUnit && form.altUnitConversion && factorNum <= 0);
-
-                      const baseUnitLabel = effectiveDirection === 'PRIMARY_TO_ALT' ? (form.unit || 'Primary') : (form.altUnit || 'AUOM');
-                      const targetUnitLabel = effectiveDirection === 'PRIMARY_TO_ALT' ? (form.altUnit || 'AUOM') : (form.unit || 'Primary');
-                      const inverseFactor = factorNum > 0 ? roundUomQty(1 / factorNum) : 0;
-
-                      return (
-                        <div className="col-span-2 space-y-2 bg-gradient-to-br from-blue-50/40 via-indigo-50/20 to-blue-50/40 p-4 rounded-2xl border border-blue-100 shadow-xs animate-in fade-in duration-200">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-bold text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
-                              <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                              Alternate Unit of Measurement (AUOM)
-                            </span>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <label className="block text-[11px] font-semibold text-gray-600 mb-1">AUOM (ALTERNATE UOM)</label>
-                              <select
-                                value={form.altUnit}
-                                onChange={e => {
-                                  const val = e.target.value;
-                                  if (val === '__ADD_NEW__') {
-                                    handleAddNewOption('units');
-                                  } else {
-                                    let defaultConversion = form.altUnitConversion;
-                                    const upperVal = val.toUpperCase();
-                                    const upperUnit = (form.unit || '').toUpperCase();
-                                    if ((upperVal === 'GBL' && upperUnit.includes('PC')) || (upperUnit === 'GBL' && upperVal.includes('PC'))) {
-                                      defaultConversion = '200';
-                                    } else if ((upperVal === 'REAM' && upperUnit.includes('PC')) || (upperUnit === 'REAM' && upperVal.includes('PC'))) {
-                                      defaultConversion = '500';
-                                    }
-                                    setForm(prev => ({
-                                      ...prev,
-                                      altUnit: val,
-                                      altUnitConversion: defaultConversion,
-                                      altUnitDirection: '',
-                                      booksGbl: (upperVal === 'GBL' || upperUnit === 'GBL') ? '200' : prev.booksGbl
-                                    }));
-                                  }
-                                }}
-                                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
-                              >
-                                <option value="">Select Primary UOM</option>
-                                {unitsList.map(unit => (
-                                  <option key={unit} value={unit}>{unit}</option>
-                                ))}
-                                <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
-                              </select>
-                            </div>
-                            <div>
-                              <label className="block text-[11px] font-semibold text-gray-600 mb-1">CONVERSION FACTOR</label>
-                              <div className="relative">
-                                <input
-                                  type="number"
-                                  placeholder="e.g. 200"
-                                  min="0.000001"
-                                  step="any"
-                                  value={form.altUnitConversion}
-                                  onChange={e => setForm({ ...form, altUnitConversion: e.target.value })}
-                                  className={`w-full pl-3 pr-20 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-900 font-mono ${
-                                    isFactorInvalid ? 'border-red-400 focus:ring-red-400' : 'border-gray-200'
-                                  }`}
-                                />
-                                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-blue-600 font-mono uppercase select-none">
-                                  {targetUnitLabel}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {isUnitSame && (
-                            <div className="text-[11px] font-semibold text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
-                              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                              Primary UOM and Secondary UOM cannot be identical.
-                            </div>
-                          )}
-
-                          {isFactorInvalid && (
-                            <div className="text-[11px] font-semibold text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
-                              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                              Conversion factor must be greater than 0.
-                            </div>
-                          )}
-
-                          {form.altUnit && form.altUnitConversion && factorNum > 0 && !isUnitSame && (
-                            <div className="bg-white/90 border border-blue-200/80 rounded-xl p-2.5 shadow-2xs space-y-1 text-center">
-                              <div className="text-xs font-bold text-slate-800 flex items-center justify-center gap-2">
-                                <span className="text-gray-500 font-medium text-[11px]">Relationship:</span>
-                                <span className="bg-blue-100 text-blue-900 px-2.5 py-0.5 rounded-md font-mono text-xs font-extrabold border border-blue-200">
-                                  1 {baseUnitLabel} = {form.altUnitConversion} {targetUnitLabel}
-                                </span>
-                              </div>
-                              <div className="text-[10px] text-gray-500 font-mono">
-                                Inverse: 1 {targetUnitLabel} = {inverseFactor} {baseUnitLabel}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </>
-                )}
               </div>
             </div>
 
             {/* Group 2: Specifications */}
-            {(activeFields.includes('gsm') || activeFields.includes('brand') || activeFields.includes('title') || activeFields.includes('width') || activeFields.includes('length')) && (
-              <div className="space-y-4 border-t border-gray-100 pt-4">
-                <h3 className="text-xs font-bold text-gray-900 pb-1.5 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                  Specifications
-                </h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {activeFields.includes('gsm') && (
-                    <div>
-                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">GSM</label>
-                      <input
-                        type="number"
-                        placeholder="e.g. 70"
-                        value={form.gsm}
-                        onChange={e => setForm({ ...form, gsm: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
-                      />
+            <div className="space-y-4 border-t border-gray-100 pt-4">
+              <h3 className="text-xs font-bold text-gray-900 pb-1.5 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                Specifications
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                {/* 1. Format Category (for Materials / Paper) */}
+                {(resolvedSection === 'materials' || activeFields.includes('paperType')) && (
+                  <div className="col-span-2 bg-gray-50/70 p-3 rounded-xl border border-gray-100 flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-gray-600">FORMAT / PAPER TYPE</span>
+                    <div className="flex items-center gap-4">
+                      <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
+                        <input
+                          type="radio"
+                          name="paperType"
+                          value="Reels"
+                          checked={form.paperType === 'Reels'}
+                          onChange={() => updateFormField({ paperType: 'Reels', length: '' })}
+                          className="text-blue-600 focus:ring-blue-500"
+                        />
+                        Reels
+                      </label>
+                      <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
+                        <input
+                          type="radio"
+                          name="paperType"
+                          value="Sheets"
+                          checked={form.paperType === 'Sheets'}
+                          onChange={() => updateFormField({ paperType: 'Sheets' })}
+                          className="text-blue-600 focus:ring-blue-500"
+                        />
+                        Sheets
+                      </label>
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  {activeFields.includes('title') && (
-                    <div className="col-span-2">
-                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">TITLE (DESCRIPTION)</label>
+                {/* 2. Brand (for Products & Semi) */}
+                {(resolvedSection === 'products' || resolvedSection === 'semi' || activeFields.includes('brand')) && (
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="block text-[11px] font-semibold text-gray-600 mb-1">BRAND</label>
+                    <div className="relative" ref={brandContainerRef}>
                       <input
                         type="text"
-                        placeholder="e.g. Premium White Paper Roll"
-                        value={form.title}
-                        onChange={e => setForm({ ...form, title: e.target.value })}
+                        placeholder="Search or type brand..."
+                        value={brandSearch}
+                        onChange={e => {
+                          setBrandSearch(e.target.value);
+                          updateFormField({ brand: e.target.value });
+                        }}
+                        onFocus={() => {
+                          setShowBrandDropdown(true);
+                          setBrandAtFocus(form.brand);
+                        }}
                         className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                       />
+                      {showBrandDropdown && (
+                        <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg z-20 divide-y divide-gray-50">
+                          {availableBrands
+                            .filter(b => {
+                              if (brandSearch === brandAtFocus || !brandSearch.trim()) return true;
+                              return b.toLowerCase().includes(brandSearch.toLowerCase().trim());
+                            })
+                            .map(b => (
+                              <button
+                                key={b}
+                                type="button"
+                                onClick={() => {
+                                  updateFormField({ brand: b });
+                                  setBrandSearch(b);
+                                  setShowBrandDropdown(false);
+                                }}
+                                className="w-full px-3 py-2 text-left text-xs hover:bg-blue-50 hover:text-blue-600 transition-colors font-semibold text-gray-700 block"
+                              >
+                                {b}
+                              </button>
+                            ))
+                          }
+                          {brandSearch.trim() && !availableBrands.some(b => b.toLowerCase() === brandSearch.trim().toLowerCase()) && (
+                            <button
+                              type="button"
+                              onClick={() => handleAddNewBrand(brandSearch)}
+                              className="w-full px-3 py-2 text-left text-xs hover:bg-green-50 text-green-600 font-bold transition-colors block"
+                            >
+                              + Add Brand "{brandSearch.trim()}"
+                            </button>
+                          )}
+                          {availableBrands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase().trim())).length === 0 && !brandSearch.trim() && (
+                            <div className="px-3 py-2 text-xs text-gray-400 italic">No brands found</div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  {form.paperType === 'Sheets' && (
-                    <div className="col-span-2 sm:col-span-1">
-                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">
-                        STANDARD SHEETS / REAM *
-                      </label>
-                      <input
-                        type="number"
-                        placeholder="e.g. 500"
-                        value={form.pages}
-                        onChange={e => setForm({ ...form, pages: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-bold text-gray-800"
-                      />
-                    </div>
-                  )}
-
-                  {activeFields.includes('width') && (
-                    <div>
-                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">WIDTH (CM)</label>
-                      <input
-                        type="number"
-                        step="any"
-                        placeholder="e.g. 57"
-                        value={form.width}
-                        onChange={e => setForm({ ...form, width: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
-                      />
-                    </div>
-                  )}
-
-                  {activeFields.includes('length') && form.paperType !== 'Reels' && (
-                    <div>
-                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">LENGTH (CM)</label>
-                      <input
-                        type="number"
-                        step="any"
-                        placeholder="e.g. 70"
-                        value={form.length}
-                        onChange={e => setForm({ ...form, length: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Group 3: Additional Attributes (Hidden for Finished Goods / Products) */}
-            {!isProductCategory && (
-              <div className="space-y-4 border-t border-gray-100 pt-4">
-                <h3 className="text-xs font-bold text-gray-900 pb-1.5 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                  Inventory & Additional Attributes
-                </h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {/* Primary UOM */}
-                  <div>
+                {/* 3. Title / Description (for Materials and Products) */}
+                {(resolvedSection === 'materials' || activeFields.includes('title')) && (
+                  <div className="col-span-2 sm:col-span-1">
                     <label className="block text-[11px] font-semibold text-gray-600 mb-1">
-                      {isRawOrSemi ? "PRIMARY UOM *" : "PRIMARY UOM (Base) *"}
+                      {resolvedSection === 'materials' ? 'PAPER / MATERIAL TITLE' : 'TITLE (DESCRIPTION)'}
                     </label>
+                    <input
+                      type="text"
+                      placeholder={resolvedSection === 'materials' ? 'e.g. Maplitho / Cream Wove / Kraft' : 'e.g. Spiral Notebook'}
+                      value={form.title}
+                      onChange={e => updateFormField({ title: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
+                    />
+                  </div>
+                )}
+
+                {/* 4. GSM */}
+                {(activeFields.includes('gsm') || resolvedSection === 'materials' || resolvedSection === 'semi') && (
+                  <div>
+                    <label className="block text-[11px] font-semibold text-gray-600 mb-1">GSM</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 70"
+                      value={form.gsm}
+                      onChange={e => updateFormField({ gsm: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
+                    />
+                  </div>
+                )}
+
+                {/* 5. Rule Type (for Products & Semi) */}
+                {(resolvedSection === 'products' || resolvedSection === 'semi' || activeFields.includes('ruleType')) && (
+                  <div>
+                    <label className="block text-[11px] font-semibold text-gray-600 mb-1">RULE TYPE</label>
                     <select
-                      value={unitsList.find(u => u.toLowerCase() === (form.unit || '').toLowerCase()) || form.unit || ''}
+                      value={form.ruleType}
                       onChange={e => {
                         if (e.target.value === '__ADD_NEW__') {
-                          handleAddNewOption('units');
+                          handleAddNewOption('ruleTypes');
                         } else {
-                          setForm({ ...form, unit: e.target.value });
+                          updateFormField({ ruleType: e.target.value });
                         }
                       }}
                       className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
                     >
-                      <option value="">Select Primary Unit</option>
-                      {unitsList.map(unit => (
-                        <option key={unit} value={unit}>{unit}</option>
+                      <option value="">-- Select Rule Type --</option>
+                      {ruleTypesList.map(rule => (
+                        <option key={rule} value={rule}>{rule}</option>
                       ))}
                       <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
                     </select>
                   </div>
+                )}
 
-                  {/* Attributes for Semi-Finished Goods (Group & Status removed) */}
-                  {(activeSection === 'semi' || form.category === 'Semi Finished') && (
-                    <>
-                      {activeFields.includes('altUnit') && (
-                        <div className="flex items-end h-full">
-                          <label className="flex items-center space-x-2.5 bg-gray-50 border border-gray-200 hover:border-blue-300 hover:bg-blue-50/10 rounded-xl px-3 py-2 w-full cursor-pointer select-none transition-all">
-                            <input
-                              type="checkbox"
-                              checked={hasAltUnit}
-                              onChange={e => {
-                                const checked = e.target.checked;
-                                setHasAltUnit(checked);
-                                if (!checked) {
-                                  setForm(prev => ({ ...prev, altUnit: '', altUnitConversion: '' }));
-                                }
-                              }}
-                              className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 border-gray-300 cursor-pointer"
-                            />
-                            <div className="text-left">
-                              <span className="block text-[11px] font-bold text-gray-700">Enable Primary UOM</span>
-                              <span className="block text-[9px] text-gray-400 font-medium leading-tight">Packaging / Sales unit</span>
-                            </div>
-                          </label>
-                        </div>
-                      )}
+                {/* 6. Pages (for Products & Semi) */}
+                {(resolvedSection === 'products' || resolvedSection === 'semi' || (activeFields.includes('pages') && form.paperType !== 'Sheets')) && (
+                  <div>
+                    <label className="block text-[11px] font-semibold text-gray-600 mb-1">PAGES / SHEETS</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 192 / 132"
+                      value={form.pages}
+                      onChange={e => updateFormField({ pages: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
+                    />
+                  </div>
+                )}
 
-                      {activeFields.includes('ruleType') && (
+                {/* 7. Standard Sheets per Ream (when Paper Type is Sheets) */}
+                {(form.paperType === 'Sheets' || (resolvedSection === 'materials' && form.paperType === 'Sheets')) && (
+                  <div>
+                    <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                      STANDARD SHEETS / REAM *
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 500"
+                      value={form.pages}
+                      onChange={e => updateFormField({ pages: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-bold text-gray-800"
+                    />
+                  </div>
+                )}
+
+                {/* 8. Width (CM) */}
+                {(activeFields.includes('width') || resolvedSection === 'materials' || resolvedSection === 'semi') && (
+                  <div>
+                    <label className="block text-[11px] font-semibold text-gray-600 mb-1">WIDTH (CM)</label>
+                    <input
+                      type="number"
+                      step="any"
+                      placeholder="e.g. 64"
+                      value={form.width}
+                      onChange={e => updateFormField({ width: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
+                    />
+                  </div>
+                )}
+
+                {/* 9. Length (CM) */}
+                {(form.paperType !== 'Reels') && (activeFields.includes('length') || resolvedSection === 'materials' || resolvedSection === 'semi') && (
+                  <div>
+                    <label className="block text-[11px] font-semibold text-gray-600 mb-1">LENGTH (CM)</label>
+                    <input
+                      type="number"
+                      step="any"
+                      placeholder="e.g. 90"
+                      value={form.length}
+                      onChange={e => updateFormField({ length: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
+                    />
+                  </div>
+                )}
+
+                {/* 10. Semi Group / Description */}
+                {(resolvedSection === 'semi' || activeFields.includes('group')) && (
+                  <div className="col-span-2">
+                    <label className="block text-[11px] font-semibold text-gray-600 mb-1">GROUP / ITEM SPECIFICATION</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Ruled Cut Sheets / Inner Signatures"
+                      value={form.group}
+                      onChange={e => updateFormField({ group: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Group 3: Units & Inventory Attributes */}
+            <div className="space-y-4 border-t border-gray-100 pt-4">
+              <h3 className="text-xs font-bold text-gray-900 pb-1.5 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                Units & Inventory Attributes
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                {/* Primary UOM */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                    PRIMARY UOM *
+                  </label>
+                  <select
+                    value={unitsList.find(u => u.toLowerCase() === (form.unit || '').toLowerCase()) || form.unit || ''}
+                    onChange={e => {
+                      if (e.target.value === '__ADD_NEW__') {
+                        handleAddNewOption('units');
+                      } else {
+                        updateFormField({ unit: e.target.value });
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
+                  >
+                    <option value="">Select Primary Unit</option>
+                    {unitsList.map(unit => (
+                      <option key={unit} value={unit}>{unit}</option>
+                    ))}
+                    <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
+                  </select>
+                </div>
+
+                {/* AUOM Toggle for Products & Semi */}
+                {(resolvedSection === 'products' || resolvedSection === 'semi' || activeFields.includes('altUnit')) && (
+                  <div className="flex items-end h-full">
+                    <label className="flex items-center space-x-2.5 bg-gray-50 border border-gray-200 hover:border-blue-300 hover:bg-blue-50/10 rounded-xl px-3 py-2 w-full cursor-pointer select-none transition-all">
+                      <input
+                        type="checkbox"
+                        checked={hasAltUnit}
+                        onChange={e => {
+                          const checked = e.target.checked;
+                          setHasAltUnit(checked);
+                          if (!checked) {
+                            updateFormField({ altUnit: '', altUnitConversion: '' });
+                          }
+                        }}
+                        className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 border-gray-300 cursor-pointer"
+                      />
+                      <div className="text-left">
+                        <span className="block text-[11px] font-bold text-gray-700">Enable AUOM</span>
+                        <span className="block text-[9px] text-gray-400 font-medium leading-tight">Alternate packaging / sales unit</span>
+                      </div>
+                    </label>
+                  </div>
+                )}
+
+                {/* AUOM & Conversion Rate if Enabled */}
+                {hasAltUnit && (() => {
+                  const effectiveDirection = getUomDirection(form.unit, form.altUnit, form.altUnitDirection || undefined);
+                  const factorNum = Number(form.altUnitConversion) || 0;
+                  const isUnitSame = !!(form.unit && form.altUnit && form.unit.trim().toLowerCase() === form.altUnit.trim().toLowerCase());
+                  const isFactorInvalid = !!(form.altUnit && form.altUnitConversion && factorNum <= 0);
+
+                  const baseUnitLabel = effectiveDirection === 'PRIMARY_TO_ALT' ? (form.unit || 'Primary') : (form.altUnit || 'AUOM');
+                  const targetUnitLabel = effectiveDirection === 'PRIMARY_TO_ALT' ? (form.altUnit || 'AUOM') : (form.unit || 'Primary');
+                  const inverseFactor = factorNum > 0 ? roundUomQty(1 / factorNum) : 0;
+
+                  return (
+                    <div className="col-span-2 space-y-2 bg-gradient-to-br from-blue-50/40 via-indigo-50/20 to-blue-50/40 p-4 rounded-2xl border border-blue-100 shadow-xs animate-in fade-in duration-200">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                          Alternate Unit of Measurement (AUOM)
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-[11px] font-semibold text-gray-600 mb-1">RULE TYPE</label>
+                          <label className="block text-[11px] font-semibold text-gray-600 mb-1">AUOM (ALTERNATE UOM)</label>
                           <select
-                            value={form.ruleType}
+                            value={form.altUnit}
                             onChange={e => {
-                              if (e.target.value === '__ADD_NEW__') {
-                                handleAddNewOption('ruleTypes');
+                              const val = e.target.value;
+                              if (val === '__ADD_NEW__') {
+                                handleAddNewOption('units');
                               } else {
-                                setForm({ ...form, ruleType: e.target.value });
+                                let defaultConversion = form.altUnitConversion;
+                                const upperVal = val.toUpperCase();
+                                const upperUnit = (form.unit || '').toUpperCase();
+                                if ((upperVal === 'GBL' && upperUnit.includes('PC')) || (upperUnit === 'GBL' && upperVal.includes('PC'))) {
+                                  defaultConversion = '200';
+                                } else if ((upperVal === 'REAM' && upperUnit.includes('PC')) || (upperUnit === 'REAM' && upperVal.includes('PC'))) {
+                                  defaultConversion = '500';
+                                }
+                                updateFormField({
+                                  altUnit: val,
+                                  altUnitConversion: defaultConversion,
+                                  altUnitDirection: '',
+                                  booksGbl: (upperVal === 'GBL' || upperUnit === 'GBL') ? '200' : form.booksGbl
+                                });
                               }
                             }}
                             className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
                           >
-                            <option value="">-- Select Rule Type --</option>
-                            {ruleTypesList.map(rule => (
-                              <option key={rule} value={rule}>{rule}</option>
+                            <option value="">Select Secondary Unit</option>
+                            {unitsList.map(unit => (
+                              <option key={unit} value={unit}>{unit}</option>
                             ))}
                             <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
                           </select>
                         </div>
-                      )}
-
-                      {activeFields.includes('pages') && (
                         <div>
-                          <label className="block text-[11px] font-semibold text-gray-600 mb-1">PAGES / SHEETS</label>
-                          <input
-                            type="number"
-                            placeholder="e.g. 112 / 132"
-                            value={form.pages}
-                            onChange={e => setForm({ ...form, pages: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
-                          />
+                          <label className="block text-[11px] font-semibold text-gray-600 mb-1">CONVERSION FACTOR</label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              placeholder="e.g. 200"
+                              min="0.000001"
+                              step="any"
+                              value={form.altUnitConversion}
+                              onChange={e => updateFormField({ altUnitConversion: e.target.value })}
+                              className={`w-full pl-3 pr-20 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-900 font-mono ${
+                                isFactorInvalid ? 'border-red-400 focus:ring-red-400' : 'border-gray-200'
+                              }`}
+                            />
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-blue-600 font-mono uppercase select-none">
+                              {targetUnitLabel}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {isUnitSame && (
+                        <div className="text-[11px] font-semibold text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          Primary UOM and Secondary UOM cannot be identical.
                         </div>
                       )}
 
-                      {activeFields.includes('reamWeight') && (
-                        <div>
-                          <label className="block text-[11px] font-semibold text-gray-600 mb-1">REAM WEIGHT (KG)</label>
-                          <input
-                            type="number"
-                            step="any"
-                            placeholder="e.g. 10.37"
-                            value={form.reamWeight}
-                            onChange={e => setForm({ ...form, reamWeight: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
-                          />
+                      {isFactorInvalid && (
+                        <div className="text-[11px] font-semibold text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          Conversion factor must be greater than 0.
                         </div>
                       )}
 
-                      {activeFields.includes('booksGbl') && (
-                        <div>
-                          <label className="block text-[11px] font-semibold text-gray-600 mb-1">BOOKS / GBL</label>
-                          <input
-                            type="number"
-                            placeholder="e.g. 200 / 240"
-                            value={form.booksGbl}
-                            onChange={e => setForm({ ...form, booksGbl: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
-                          />
+                      {form.altUnit && form.altUnitConversion && factorNum > 0 && !isUnitSame && (
+                        <div className="bg-white/90 border border-blue-200/80 rounded-xl p-2.5 shadow-2xs space-y-1 text-center">
+                          <div className="text-xs font-bold text-slate-800 flex items-center justify-center gap-2">
+                            <span className="text-gray-500 font-medium text-[11px]">Relationship:</span>
+                            <span className="bg-blue-100 text-blue-900 px-2.5 py-0.5 rounded-md font-mono text-xs font-extrabold border border-blue-200">
+                              1 {baseUnitLabel} = {form.altUnitConversion} {targetUnitLabel}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-gray-500 font-mono">
+                            Inverse: 1 {targetUnitLabel} = {inverseFactor} {baseUnitLabel}
+                          </div>
                         </div>
                       )}
-                    </>
-                  )}
-                </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Semi Specific: Ream Weight & Books / GBL */}
+                {resolvedSection === 'semi' && (
+                  <>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">REAM WEIGHT (KG)</label>
+                      <input
+                        type="number"
+                        step="any"
+                        placeholder="e.g. 10.37"
+                        value={form.reamWeight}
+                        onChange={e => updateFormField({ reamWeight: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">BOOKS / GBL</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 200"
+                        value={form.booksGbl}
+                        onChange={e => updateFormField({ booksGbl: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
+                      />
+                    </div>
+                  </>
+                )}
               </div>
-            )}
+            </div>
 
             {/* Stock Levels Section (Available for ALL categories) */}
             <div className="space-y-3 border-t border-gray-100 pt-4">
