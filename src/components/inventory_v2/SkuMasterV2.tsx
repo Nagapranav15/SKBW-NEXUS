@@ -1155,8 +1155,30 @@ const SkuMasterV2: React.FC = () => {
         const ledgerStock = balanceMap.get(itemId) || 0;
         const initialStock = Number(item.openingStock) || 0;
         const liveStock = hasBalance ? (ledgerStock + initialStock) : initialStock;
+        
+        let cleanAltUnit = (item.altUnit || '').trim();
+        const cleanUnit = (item.unit || '').trim();
+        if (
+          !cleanAltUnit ||
+          cleanAltUnit === '—' ||
+          cleanAltUnit === '–' ||
+          cleanAltUnit === '-' ||
+          cleanAltUnit.includes('â') ||
+          cleanAltUnit.includes('€') ||
+          cleanAltUnit.includes('\uFFFD') ||
+          cleanAltUnit.toLowerCase() === 'n/a' ||
+          cleanAltUnit.toLowerCase() === 'none' ||
+          cleanAltUnit.toLowerCase() === 'null' ||
+          cleanAltUnit.toLowerCase() === 'undefined' ||
+          cleanAltUnit.toLowerCase() === cleanUnit.toLowerCase()
+        ) {
+          cleanAltUnit = '';
+        }
+
         return {
           ...item,
+          altUnit: cleanAltUnit,
+          altUnitConversion: cleanAltUnit ? item.altUnitConversion : undefined,
           name: formatSkuName(item.name),
           openingStock: liveStock,
           presentStock: liveStock
@@ -3872,9 +3894,21 @@ const SkuMasterV2: React.FC = () => {
                                   </span>
                                 </td>
                               );
-                            case 'altUnit':
+                            case 'altUnit': {
                               const cleanAlt = (sku.altUnit || '').trim();
-                              const isInvalidAlt = !cleanAlt || cleanAlt === '—' || cleanAlt === '–' || cleanAlt === '-' || cleanAlt.includes('â€') || cleanAlt.toLowerCase() === 'n/a' || cleanAlt.toLowerCase() === 'none' || cleanAlt.toLowerCase() === (sku.unit || '').toLowerCase();
+                              const cleanPrimary = (sku.unit || '').trim().toLowerCase();
+                              const isInvalidAlt = 
+                                !cleanAlt || 
+                                cleanAlt === '—' || 
+                                cleanAlt === '–' || 
+                                cleanAlt === '-' || 
+                                cleanAlt.includes('â') || 
+                                cleanAlt.includes('€') || 
+                                cleanAlt.includes('\uFFFD') || 
+                                cleanAlt.toLowerCase() === 'n/a' || 
+                                cleanAlt.toLowerCase() === 'none' || 
+                                cleanAlt.toLowerCase() === cleanPrimary;
+
                               return (
                                 <td key="altUnit" className="py-3 px-3 whitespace-nowrap">
                                   {!isInvalidAlt ? (
@@ -3886,21 +3920,38 @@ const SkuMasterV2: React.FC = () => {
                                   )}
                                 </td>
                               );
-                            case 'altUnitConversion':
-                              const isAltValid = sku.altUnit && !['—', '–', '-', 'n/a', 'none', ''].includes(sku.altUnit.trim().toLowerCase()) && !sku.altUnit.includes('â€');
-                              const isAltPcs = (sku.altUnit || '').toLowerCase().includes('pc');
-                              const isPrimaryPcs = (sku.unit || '').toLowerCase().includes('pc');
-                              const outerUnit = (isAltPcs && !isPrimaryPcs) ? sku.unit : sku.altUnit;
-                              const innerUnit = (isAltPcs && !isPrimaryPcs) ? sku.altUnit : (sku.unit || 'Pcs');
+                            }
+                            case 'altUnitConversion': {
+                              const cleanAlt = (sku.altUnit || '').trim();
+                              const cleanPrimary = (sku.unit || '').trim().toLowerCase();
+                              const isInvalidAlt = 
+                                !cleanAlt || 
+                                cleanAlt === '—' || 
+                                cleanAlt === '–' || 
+                                cleanAlt === '-' || 
+                                cleanAlt.includes('â') || 
+                                cleanAlt.includes('€') || 
+                                cleanAlt.includes('\uFFFD') || 
+                                cleanAlt.toLowerCase() === 'n/a' || 
+                                cleanAlt.toLowerCase() === 'none' || 
+                                cleanAlt.toLowerCase() === cleanPrimary;
+
+                              const isAltPcs = cleanAlt.toLowerCase().includes('pc');
+                              const isPrimaryPcs = cleanPrimary.includes('pc');
+                              const outerUnit = (isAltPcs && !isPrimaryPcs) ? sku.unit : cleanAlt;
+                              const innerUnit = (isAltPcs && !isPrimaryPcs) ? cleanAlt : (sku.unit || 'Pcs');
+                              const hasValidConRate = !!sku.altUnitConversion && Number(sku.altUnitConversion) > 0;
+
                               return (
                                 <td key="altUnitConversion" className="py-3 px-3 text-gray-700 font-mono text-[11px] font-semibold whitespace-nowrap">
-                                  {isAltValid && sku.altUnitConversion ? (
+                                  {!isInvalidAlt && hasValidConRate ? (
                                     <span><strong>1 {outerUnit}</strong> = <strong>{sku.altUnitConversion} {innerUnit}</strong></span>
                                   ) : (
                                     <span className="text-gray-400">—</span>
                                   )}
                                 </td>
                               );
+                            }
                             case 'unit':
                               return (
                                 <td key="unit" className="py-3 px-3 whitespace-nowrap">
