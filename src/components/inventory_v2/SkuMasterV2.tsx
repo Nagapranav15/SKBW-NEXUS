@@ -2034,19 +2034,25 @@ const SkuMasterV2: React.FC = () => {
     if (activeMainTab === 'products') {
       headers = [
         'ID / SKU Code',
-        'Item Name',
+        'SKU NAME',
+        'PAGES',
+        'BRAND',
+        'RULE TYPE',
         'Category',
         'UOM',
+        'AUOM (Alt Unit)',
+        'Con Rate',
         'GSM',
-        'Pages',
-        'Book Size',
-        'Stock',
+        'WIDTH (CM)',
+        'LENGTH (CM)',
         'Min Stock Level',
-        'Status'
+        'Reorder Level',
+        'Opening Stock Qty'
       ];
       sampleRows = [
-        ['NB-A4-192', 'Deluxe Spiral Notebook A4', 'Notebooks', 'Pcs', '70', '192', 'A4', '500', '50', 'Active'],
-        ['REG-FS-240', 'Long Book Register Fullscape', 'Registers', 'Pcs', '60', '240', 'Long Notebook', '300', '30', 'Active']
+        ['FG-001', 'Bestfriend (UR)', '132 P', 'Bestfriend', 'UR', 'Longbooks', 'Pcs', 'PCS', '500', '52', '14.25', '35', '50', '20', '10'],
+        ['FG-002', '142P Bestfriend (UR)', '142 P', 'Bestfriend', 'UR', 'Executive Diaries', 'Pcs', 'PCS', '200', '52', '57', '70', '50', '20', '100'],
+        ['NB-A4-192', 'Deluxe Spiral Notebook A4', '192 P', 'Bestfriend', 'Plain', 'Notebooks', 'Pcs', 'Box', '24', '70', '21', '29.7', '100', '50', '500']
       ];
     } else if (activeMainTab === 'semi') {
       headers = [
