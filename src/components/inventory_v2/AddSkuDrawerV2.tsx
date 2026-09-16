@@ -197,7 +197,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     name: '',
     category: '',
     paperType: 'None' as 'Reels' | 'Sheets' | 'None',
-    unit: activeSection === 'products' ? 'Pcs' : activeSection === 'semi' ? 'Ream' : 'Kg',
+    unit: '',
     altUnit: '',
     altUnitConversion: '',
     altUnitDirection: '' as '' | UomDirection,
@@ -602,8 +602,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     }
 
     updateFormField({
-      category: trimmed,
-      unit: newCategoryObj.uom
+      category: trimmed
     });
     regenerateSkuCode(trimmed);
     setShowAddCategoryModal(false);
@@ -955,7 +954,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         }
         updatedFieldsMap[cleanVal] = modalConfig.selectedFields;
         setCategoryFieldsMap(updatedFieldsMap);
-        setForm(prev => ({ ...prev, category: cleanVal, unit: defaultUom }));
+        setForm(prev => ({ ...prev, category: cleanVal }));
       } else if (field === 'units') {
         if (!updatedUnits.includes(cleanVal)) {
           updatedUnits.push(cleanVal);
@@ -1011,7 +1010,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         name: editSku.name || '',
         category: editSku.category || (resolvedSection === 'products' ? 'Products' : resolvedSection === 'semi' ? 'Semi' : 'Materials'),
         paperType: editSku.paperType || (resolvedSection === 'materials' ? 'Reels' : 'None'),
-        unit: editSku.unit || (resolvedSection === 'products' ? 'Pcs' : resolvedSection === 'semi' ? 'Ream' : 'Kg'),
+        unit: editSku.unit || '',
         altUnit: editSku.altUnit || '',
         altUnitConversion: editSku.altUnitConversion !== undefined ? String(editSku.altUnitConversion) : '',
         altUnitDirection: (editSku.altUnitDirection || '') as '' | UomDirection,
@@ -1073,7 +1072,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         name: '',
         category: '',
         paperType: resolvedSection === 'materials' ? 'Reels' : 'None',
-        unit: resolvedSection === 'products' ? 'Pcs' : resolvedSection === 'semi' ? 'Ream' : 'Kg',
+        unit: '',
         altUnit: '',
         altUnitConversion: '',
         altUnitDirection: '' as '' | UomDirection,
@@ -1372,6 +1371,11 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         return;
       }
 
+      if (!form.unit || !form.unit.trim()) {
+        setErrorMsg('Please select a Primary UOM (Unit)');
+        return;
+      }
+
       if (form.altUnit) {
         const uomCheck = validateUomConversion(form.unit, form.altUnit, form.altUnitConversion);
         if (!uomCheck.valid) {
@@ -1603,8 +1607,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           }
 
                           updateFormField({
-                            category: val,
-                            ...(catUom ? { unit: catUom } : {})
+                            category: val
                           });
                           regenerateSkuCode(val);
                         }
@@ -1847,8 +1850,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           }
                         }}
                         className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
+                        required
                       >
-                        <option value="">Select Primary Unit</option>
+                        <option value="">Select Units</option>
                         {displayUnits.map(unit => (
                           <option key={unit} value={unit}>{unit}</option>
                         ))}
@@ -1929,7 +1933,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                 }}
                                 className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
                               >
-                                <option value="">Select Alternate Unit</option>
+                                <option value="">Select Units</option>
                                 {displayUnits.map(unit => (
                                   <option key={unit} value={unit}>{unit}</option>
                                 ))}
@@ -2095,8 +2099,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         }
                       }}
                       className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
+                      required
                     >
-                      <option value="">Select Primary Unit</option>
+                      <option value="">Select Units</option>
                       {displayUnits.map(unit => (
                         <option key={unit} value={unit}>{unit}</option>
                       ))}
@@ -2175,7 +2180,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                               }}
                               className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
                             >
-                              <option value="">Select Alternate Unit</option>
+                              <option value="">Select Units</option>
                               {displayUnits.map(unit => (
                                 <option key={unit} value={unit}>{unit}</option>
                               ))}
