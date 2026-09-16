@@ -302,24 +302,24 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
           </button>
         </div>
 
-        {/* Search Filter Bar */}
+        {/* Sweet Minimalist Search Pill */}
         <div className="px-3.5 pt-2.5 pb-1">
-          <div className="relative flex items-center">
-            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 pointer-events-none" />
+          <div className="flex items-center gap-2 px-2.5 py-1.5 bg-slate-100/70 hover:bg-slate-100/90 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 border border-slate-200/60 rounded-xl transition-all shadow-2xs">
+            <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             <input
               type="text"
-              placeholder="Search location..."
+              placeholder="Search location or zone..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-7.5 pr-7 py-1.5 bg-slate-50 border border-gray-200 rounded-lg text-[11px] text-gray-800 placeholder-gray-400 focus:bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
+              className="w-full bg-transparent text-[11px] font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2 text-gray-400 hover:text-gray-600 p-0.5 cursor-pointer"
+                className="w-4 h-4 rounded-full bg-slate-200/70 hover:bg-slate-300 text-slate-500 flex items-center justify-center shrink-0 transition-colors cursor-pointer"
               >
-                <X className="w-3 h-3" />
+                <X className="w-2.5 h-2.5" />
               </button>
             )}
           </div>
