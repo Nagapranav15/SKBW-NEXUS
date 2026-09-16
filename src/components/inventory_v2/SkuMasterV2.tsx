@@ -1907,23 +1907,7 @@ const SkuMasterV2: React.FC = () => {
           'PAGES': cleanVal(s.pages),
           'BRAND': cleanVal(s.brand),
           'RULE TYPE': cleanVal(s.ruleType),
-          'Category': s.category || s.group || 'Finished Goods',
-          'UOM': s.unit || 'Pcs',
-          'AUOM (Alt Unit)': cleanVal(s.altUnit),
-          'Con Rate': cleanVal(s.altUnitConversion),
-          'GSM': cleanVal(s.gsm),
-          'WIDTH (CM)': cleanVal(s.width),
-          'LENGTH (CM)': cleanVal(s.length),
-          'Min Stock Level': s.minStockLevel || 0,
-          'Reorder Level': cleanVal((s as any).reorderLevel),
-          'Opening Stock Qty': s.openingStock || 0
-        };
-      } else if (activeMainTab === 'semi') {
-        return {
-          'ID / SKU Code': s.skuCode || '',
-          'Item Name': s.name || '',
-          'RULE TYPE': cleanVal(s.ruleType),
-          'Category': s.category || s.group || 'Semi Finished',
+          'Category': s.category || s.group || 'Products',
           'UOM': s.unit || 'Pcs',
           'AUOM (Alt Unit)': cleanVal(s.altUnit),
           'Con Rate': cleanVal(s.altUnitConversion),
@@ -1933,24 +1917,47 @@ const SkuMasterV2: React.FC = () => {
           'Min Stock Level': s.minStockLevel || 0,
           'Reorder Level': cleanVal((s as any).reorderLevel),
           'Opening Stock Qty': s.openingStock || 0,
-          'vendor': cleanVal((s as any).preferredVendor)
+          'Status': s.status || 'Active',
+          'Preferred Vendor': cleanVal((s as any).preferredVendor)
+        };
+      } else if (activeMainTab === 'semi') {
+        return {
+          'ID / SKU Code': s.skuCode || '',
+          'SKU NAME': s.name || '',
+          'PAGES': cleanVal(s.pages),
+          'BRAND': cleanVal(s.brand),
+          'RULE TYPE': cleanVal(s.ruleType),
+          'Category': s.category || s.group || 'Semi',
+          'UOM': s.unit || 'Ream',
+          'AUOM (Alt Unit)': cleanVal(s.altUnit),
+          'Con Rate': cleanVal(s.altUnitConversion),
+          'GSM': cleanVal(s.gsm),
+          'WIDTH (CM)': cleanVal(s.width),
+          'LENGTH (CM)': cleanVal(s.length),
+          'Min Stock Level': s.minStockLevel || 0,
+          'Reorder Level': cleanVal((s as any).reorderLevel),
+          'Opening Stock Qty': s.openingStock || 0,
+          'Status': s.status || 'Active',
+          'Preferred Vendor': cleanVal((s as any).preferredVendor)
         };
       } else {
         // Raw Materials
         return {
           'ID / SKU Code': s.skuCode || '',
-          'Item Name': s.name || '',
-          'Category': s.category || s.group || 'Raw Material',
-          'UOM': s.unit || 'Kg',
-          'GSM': cleanVal(s.gsm),
+          'SKU NAME': s.name || '',
           'TITLE': cleanVal((s as any).title || s.name),
-          'WIDTH (CM)': cleanVal(s.width),
-          'Size': formatSize(s),
+          'Category': s.category || s.group || 'Materials',
           'Paper Type': s.paperType || 'None',
-          'Stock': s.openingStock || 0,
+          'GSM': cleanVal(s.gsm),
+          'WIDTH (CM)': cleanVal(s.width),
+          'LENGTH (CM)': cleanVal(s.length),
+          'STANDARD SHEETS / REAM': cleanVal(s.pages),
+          'UOM': s.unit || 'Kg',
+          'Opening Stock Qty': s.openingStock || 0,
           'Min Stock Level': s.minStockLevel || 0,
+          'Reorder Level': cleanVal((s as any).reorderLevel),
           'Status': s.status || 'Active',
-          'vendor': cleanVal((s as any).preferredVendor)
+          'Preferred Vendor': cleanVal((s as any).preferredVendor)
         };
       }
     });
@@ -2099,33 +2106,21 @@ const SkuMasterV2: React.FC = () => {
       });
 
       autoTable(doc, {
-        startY: 25,
         head: [headers],
         body: rows,
-        theme: 'grid',
-        headStyles: {
-          fillColor: [37, 99, 235],
-          textColor: [255, 255, 255],
-          fontSize: 8.5,
-          fontStyle: 'bold',
-          halign: 'left'
-        },
-        bodyStyles: {
-          fontSize: 8,
-          textColor: [51, 65, 85]
-        },
-        alternateRowStyles: {
-          fillColor: [248, 250, 252]
-        },
-        margin: { left: 14, right: 14, bottom: 15 }
+        startY: 25,
+        theme: 'striped',
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [29, 78, 216], textColor: [255, 255, 255], fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        margin: { left: 14, right: 14 }
       });
 
-      const fileName = `${companyName.replace(/[^a-zA-Z0-9]/g, '_')}_${tabTitle}_${new Date().toISOString().slice(0, 10)}.pdf`;
-      doc.save(fileName);
-      showToast(`PDF exported successfully! Check downloads: ${fileName}`, 'success');
-    } catch (err: any) {
+      doc.save(`${companyName.replace(/\s+/g, '_')}_${tabTitle}_${new Date().toISOString().slice(0, 10)}.pdf`);
+      showToast(`Exported PDF for ${targetSkus.length} ${selectedIds.length > 0 ? 'selected ' : ''}items`, 'success');
+    } catch (err) {
       console.error('PDF export error:', err);
-      showToast('Failed to generate PDF download', 'error');
+      showToast('Failed to export PDF', 'error');
     }
   };
 
@@ -2194,17 +2189,21 @@ const SkuMasterV2: React.FC = () => {
         'LENGTH (CM)',
         'Min Stock Level',
         'Reorder Level',
-        'Opening Stock Qty'
+        'Opening Stock Qty',
+        'Status',
+        'Preferred Vendor'
       ];
       sampleRows = [
-        ['FG-001', 'Bestfriend (UR)', '132 P', 'Bestfriend', 'UR', 'Longbooks', 'Pcs', 'Box', '500', '52', '14.25', '35', '50', '20', '10'],
-        ['FG-002', '142P Bestfriend (UR)', '142 P', 'Bestfriend', 'UR', 'Executive Diaries', 'Pcs', 'Box', '200', '52', '57', '70', '50', '20', '100'],
-        ['NB-A4-192', 'Deluxe Spiral Notebook A4', '192 P', 'Bestfriend', 'Plain', 'Notebooks', 'Pcs', 'Box', '24', '70', '21', '29.7', '100', '50', '500']
+        ['FG-001', 'Bestfriend (UR)', '132', 'Bestfriend', 'UR', 'Longbooks', 'Pcs', 'Box', '500', '52', '14.25', '35', '50', '20', '10', 'Active', ''],
+        ['FG-002', '142P Bestfriend (UR)', '142', 'Bestfriend', 'UR', 'Executive Diaries', 'Pcs', 'Box', '200', '52', '57', '70', '50', '20', '100', 'Active', ''],
+        ['FG-003', 'Deluxe Spiral Notebook A4', '192', 'Bestfriend', 'Plain', 'Notebooks', 'Pcs', 'Box', '24', '70', '21', '29.7', '100', '50', '500', 'Active', '']
       ];
     } else if (activeMainTab === 'semi') {
       headers = [
         'ID / SKU Code',
-        'Item Name',
+        'SKU NAME',
+        'PAGES',
+        'BRAND',
         'RULE TYPE',
         'Category',
         'UOM',
@@ -2216,53 +2215,36 @@ const SkuMasterV2: React.FC = () => {
         'Min Stock Level',
         'Reorder Level',
         'Opening Stock Qty',
-        'vendor'
+        'Status',
+        'Preferred Vendor'
       ];
       sampleRows = [
-        ['SM-001', 'Folded Inner Signature 192P', 'Single Line', 'Inner Forms', 'Pcs', 'Bundles', '50', '52', '14.25', '35', '100', '50', '800', 'Apex Print Pack'],
-        ['SM-002', 'Laminated Printed Covers A4', 'Plain', 'Covers', 'Pcs', 'Bundles', '100', '250', '57', '70', '200', '100', '1200', 'Sunrise Laminators']
-      ];
-    } else if (activeMainTab === 'categories') {
-      headers = [
-        'ID / SKU Code',
-        'Item Name',
-        'RULE TYPE',
-        'Category',
-        'UOM',
-        'AUOM (Alt Unit)',
-        'Con Rate',
-        'GSM',
-        'WIDTH (CM)',
-        'LENGTH (CM)',
-        'Min Stock Level',
-        'Reorder Level',
-        'Opening Stock Qty',
-        'vendor'
-      ];
-      sampleRows = [
-        ['CAT-001', 'Notebook Inner Pages', 'UR', 'Notebooks', 'Pcs', 'Bundles', '100', '52', '14.25', '35', '50', '20', '500', 'Apex Print Pack']
+        ['SM-001', 'Akshay 52 GSM 14.25 x 35 CM (SR) 192P', '192', 'Akshay', 'Single Line', 'Inner Forms', 'Ream', 'Bundles', '50', '52', '14.25', '35', '100', '50', '800', 'Active', 'Apex Print Pack'],
+        ['SM-002', 'Cover Board 250 GSM 57 x 70 CM', '100', 'Covers', 'Plain', 'Covers', 'Pcs', 'Bundles', '100', '250', '57', '70', '200', '100', '1200', 'Active', 'Sunrise Laminators']
       ];
     } else {
       // Raw materials
       headers = [
         'ID / SKU Code',
-        'Item Name',
-        'Category',
-        'UOM',
-        'GSM',
+        'SKU NAME',
         'TITLE',
-        'WIDTH (CM)',
-        'Size',
+        'Category',
         'Paper Type',
-        'Stock',
+        'GSM',
+        'WIDTH (CM)',
+        'LENGTH (CM)',
+        'STANDARD SHEETS / REAM',
+        'UOM',
+        'Opening Stock Qty',
         'Min Stock Level',
+        'Reorder Level',
         'Status',
-        'vendor'
+        'Preferred Vendor'
       ];
       sampleRows = [
-        ['RM-001', 'Maplitho Paper Reel 70 GSM', 'Paper Reels', 'Kg', '70', 'Maplitho', '84', '84 CM', 'Reels', '1500', '300', 'Active', 'Bhavani Paper Mill'],
-        ['RM-002', 'Duplex Board Grey Back 300 GSM', 'Duplex Cover Board', 'Pcs', '300', 'Duplex Board', '57', '57 x 70 CM', 'Sheets', '2500', '500', 'Active', 'Apex Board Traders'],
-        ['RM-003', 'Craft Paper Reel 80 GSM', 'Paper Reels', 'Kg', '80', 'Craft Paper', '90', '90 CM', 'Reels', '1200', '200', 'Active', 'Sri Balaji Paper Mart']
+        ['RM-001', 'Maplitho Reel 70 GSM 84 CM', 'Maplitho', 'Paper Reels', 'Reels', '70', '84', '', '', 'Kg', '1500', '300', '100', 'Active', 'Bhavani Paper Mill'],
+        ['RM-002', 'Duplex Board Sheet 300 GSM 57 x 70 CM (500 Sheets)', 'Duplex Board', 'Duplex Cover Board', 'Sheets', '300', '57', '70', '500', 'Kg', '2500', '500', '200', 'Active', 'Apex Board Traders'],
+        ['RM-003', 'Craft Paper Reel 80 GSM 90 CM', 'Craft Paper', 'Paper Reels', 'Reels', '80', '90', '', '', 'Kg', '1200', '200', '50', 'Active', 'Sri Balaji Paper Mart']
       ];
     }
 
@@ -2369,7 +2351,7 @@ const SkuMasterV2: React.FC = () => {
         };
 
         const explicitSku = getFieldVal(
-          'itemcode', 'idskucode', 'skucode', 'code', 'id', 'itemcodeskucode',
+          'idskucode', 'skucode', 'itemcode', 'code', 'id', 'itemcodeskucode',
           'productcode', 'skuid', 'itemid', 'materialcode', 'semicode', 'sku',
           'item_code', 'sku_code'
         );
@@ -2418,11 +2400,11 @@ const SkuMasterV2: React.FC = () => {
           skuCode = `${defaultPrefix}-${String(nextSeq).padStart(3, '0')}`;
         }
 
-        const name = getFieldVal('itemname', 'skuname', 'materialname', 'productname', 'name', 'title') || String(row[1] || '').trim();
+        const name = getFieldVal('skuname', 'itemname', 'name', 'materialname', 'productname', 'title') || String(row[1] || '').trim();
         if (!name && !skuCode) continue;
 
-        const unit = getFieldVal('uom', 'unit', 'primaryunit', 'baseunit', 'mainunit') || (activeMainTab === 'materials' ? 'Kg' : 'Pcs');
-        let altUnit = getFieldVal('auomaltunit', 'auom', 'altunit', 'secondaryunit', 'alternateunit', 'auomsecondaryunit') || '';
+        const unit = getFieldVal('uom', 'unit', 'primaryuom', 'primaryunit', 'baseunit', 'mainunit') || (activeMainTab === 'materials' ? 'Kg' : activeMainTab === 'semi' ? 'Ream' : 'Pcs');
+        let altUnit = getFieldVal('auomaltunit', 'auom', 'altunit', 'secondaryuom', 'secondaryunit', 'alternateunit', 'auomsecondaryunit') || '';
         if (
           !altUnit || 
           altUnit.toLowerCase().trim() === unit.toLowerCase().trim() ||
@@ -2459,8 +2441,8 @@ const SkuMasterV2: React.FC = () => {
         const gsm = gsmMatch ? Number(gsmMatch[1]) : (rawGsm ? Number(rawGsm) || 0 : undefined);
 
         // Extract Dimensions / Size
-        let width = Number(getFieldVal('width', 'widthcm', 'widthmm', 'breadth')) || undefined;
-        let length = Number(getFieldVal('length', 'lengthcm', 'lengthmm', 'height')) || undefined;
+        let width = Number(getFieldVal('widthcm', 'width', 'widthmm', 'breadth', 'w')) || undefined;
+        let length = Number(getFieldVal('lengthcm', 'length', 'lengthmm', 'height', 'l')) || undefined;
         const rawSize = getFieldVal('size', 'dimensions', 'dimension', 'booksize', 'cutsize');
         if ((!width || !length) && rawSize) {
           const dimMatch = rawSize.match(/(\d+(?:\.\d+)?)\s*[xX\*]\s*(\d+(?:\.\d+)?)/);
@@ -2475,15 +2457,15 @@ const SkuMasterV2: React.FC = () => {
           }
         }
 
-        // Extract Pages / Sheets
-        const rawPages = getFieldVal('pagessheets', 'pages', 'sheetsperream', 'sheets', 'reamsheets', 'bookpages', 'sheetcount');
+        // Extract Pages / Standard Sheets
+        const rawPages = getFieldVal('pages', 'standardsheetsream', 'standardsheets', 'sheetsperream', 'sheetsream', 'pagessheets', 'sheets', 'reamsheets', 'bookpages', 'sheetcount');
         const pagesMatch = rawPages.match(/(\d+)/);
         const pages = pagesMatch ? Number(pagesMatch[1]) : (rawPages ? Number(rawPages) || undefined : undefined);
 
         // Extract Brand, Rule Type & Title
-        const brand = getFieldVal('brand', 'brandname');
-        const ruleType = getFieldVal('ruletype', 'rule');
-        const title = getFieldVal('title', 'itemtitle', 'description');
+        const brand = getFieldVal('brand', 'brandname', 'make');
+        const ruleType = getFieldVal('ruletype', 'rule', 'ruling');
+        const title = getFieldVal('title', 'itemtitle', 'description', 'itemdescription');
 
         // Extract Paper Type
         const rawPaperType = getFieldVal('papertype', 'papertypeform', 'type', 'materialtype');
