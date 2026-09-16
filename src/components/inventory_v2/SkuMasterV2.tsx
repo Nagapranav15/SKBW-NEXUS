@@ -729,7 +729,6 @@ const SkuMasterV2: React.FC = () => {
   const DEFAULT_MATERIALS_COLUMNS = [
     { id: 'skuCode', label: 'ID / SKU CODE', visible: true },
     { id: 'name', label: 'ITEM NAME', visible: true },
-    { id: 'brand', label: 'BRAND', visible: false },
     { id: 'category', label: 'CATEGORY', visible: true },
     { id: 'status', label: 'STATUS', visible: true },
     { id: 'unit', label: 'PRIMARY UOM', visible: true },
@@ -747,7 +746,6 @@ const SkuMasterV2: React.FC = () => {
   const DEFAULT_SEMI_COLUMNS = [
     { id: 'skuCode', label: 'ID / SKU CODE', visible: true },
     { id: 'name', label: 'ITEM NAME', visible: true },
-    { id: 'brand', label: 'BRAND', visible: true },
     { id: 'category', label: 'CATEGORY', visible: true },
     { id: 'status', label: 'STATUS', visible: true },
     { id: 'unit', label: 'PRIMARY UOM', visible: true },
@@ -763,7 +761,7 @@ const SkuMasterV2: React.FC = () => {
     { id: 'dispatchOrders', label: 'DISPATCH ORDERS', visible: false }
   ];
 
-  const STORAGE_KEY = 'skbw_sku_master_tab_columns_v13';
+  const STORAGE_KEY = 'skbw_sku_master_tab_columns_v14';
 
   // Helper to sanitize column list against current valid defaults
   const sanitizeColumns = (savedList: any[], defaultList: typeof DEFAULT_PRODUCTS_COLUMNS) => {
@@ -4668,10 +4666,12 @@ const SkuMasterV2: React.FC = () => {
                               <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">SKU CODE</span>
                               <span className="font-mono font-bold text-blue-600 text-xs">{selectedSkuDetails.skuCode}</span>
                             </div>
-                            <div>
-                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">BRAND</span>
-                              <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.brand || 'Bestfriend'}</span>
-                            </div>
+                            {!isRawOrSemiDetail && (
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">BRAND</span>
+                                <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.brand || 'Bestfriend'}</span>
+                              </div>
+                            )}
                             {isRawOrSemiDetail && (
                               <div>
                                 <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PREFERRED VENDOR</span>

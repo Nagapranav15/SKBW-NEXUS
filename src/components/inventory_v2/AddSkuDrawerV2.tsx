@@ -592,8 +592,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
   // Category specific field visibility mapping
   const [categoryFieldsMap, setCategoryFieldsMap] = useState<Record<string, string[]>>({
-    "Raw Material": ["gsm", "brand", "title", "width", "length", "paperType", "altUnit"],
-    "Semi Finished": ["gsm", "brand", "width", "length", "ruleType", "group", "altUnit"],
+    "Raw Material": ["gsm", "title", "width", "length", "paperType", "altUnit"],
+    "Semi Finished": ["gsm", "width", "length", "ruleType", "group", "altUnit"],
     "Finished Goods": ["gsm", "brand", "width", "length", "ruleType", "pages", "altUnit"]
   });
 
@@ -664,6 +664,10 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
             // Guarantee altUnit is included for all categories
             if (!updated.includes('altUnit')) {
               updated.push('altUnit');
+            }
+            // Brand is only for Finished Goods
+            if (["Raw Material", "Semi Finished"].includes(cat)) {
+              updated = updated.filter(f => f !== 'brand');
             }
             migratedFields[cat] = updated;
           });
@@ -1578,8 +1582,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       </div>
                     )}
 
-                    {/* 2. Brand */}
-                    {(isProductCategory || activeFields.includes('brand')) && (
+                    {/* 2. Brand - Only for Finished Goods */}
+                    {isProductCategory && (
                       <div>
                         <label className="block text-[11px] font-semibold text-gray-600 mb-1">BRAND</label>
                         <div className="relative" ref={brandContainerRef}>
@@ -1846,71 +1850,6 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         onChange={e => setForm({ ...form, gsm: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                       />
-                    </div>
-                  )}
-                  {/* Skip Brand for Product categories as it's right below SKU Name */}
-                  {!isProductCategory && activeFields.includes('brand') && (
-                    <div>
-                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">BRAND</label>
-                      <div className="relative" ref={brandContainerRef}>
-                        <input
-                          type="text"
-                          placeholder="Search or type brand..."
-                          value={brandSearch}
-                          onChange={e => {
-                            setBrandSearch(e.target.value);
-                            setForm(prev => ({ ...prev, brand: e.target.value }));
-                          }}
-                          onFocus={() => {
-                            setShowBrandDropdown(true);
-                            setBrandAtFocus(form.brand);
-                          }}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
-                        />
-                        {showBrandDropdown && (
-                          <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg z-20 divide-y divide-gray-50">
-                            {existingBrands
-                              .filter(b => {
-                                if (brandSearch === brandAtFocus) return true;
-                                return b.toLowerCase().includes(brandSearch.toLowerCase());
-                              })
-                              .map(b => (
-                                <button
-                                  key={b}
-                                  type="button"
-                                  onClick={() => {
-                                    setForm(prev => ({ ...prev, brand: b }));
-                                    setBrandSearch(b);
-                                    setShowBrandDropdown(false);
-                                  }}
-                                  className="w-full px-3 py-2 text-left text-xs hover:bg-blue-50 hover:text-blue-600 transition-colors font-semibold text-gray-700 block"
-                                >
-                                  {b}
-                                </button>
-                              ))
-                            }
-                            {brandSearch.trim() && !existingBrands.some(b => b.toLowerCase() === brandSearch.toLowerCase()) && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const newBrand = brandSearch.trim();
-                                  if (!existingBrands.includes(newBrand)) {
-                                    setExistingBrands(prev => [...prev, newBrand]);
-                                  }
-                                  setForm(prev => ({ ...prev, brand: newBrand }));
-                                  setShowBrandDropdown(false);
-                                }}
-                                className="w-full px-3 py-2 text-left text-xs hover:bg-green-50 text-green-600 font-bold transition-colors block"
-                              >
-                                + Add Brand "{brandSearch.trim()}"
-                              </button>
-                            )}
-                            {existingBrands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase())).length === 0 && !brandSearch.trim() && (
-                              <div className="px-3 py-2 text-xs text-gray-400 italic">No brands found</div>
-                            )}
-                          </div>
-                        )}
-                      </div>
                     </div>
                   )}
 
