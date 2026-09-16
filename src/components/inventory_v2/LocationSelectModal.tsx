@@ -203,8 +203,8 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
                     handleItemSelect(node, e);
                   }
                 }}
-                style={{ paddingLeft: `${depth * 16 + 4}px` }}
-                className={`flex items-center justify-between py-1.5 px-2 rounded-lg transition-all cursor-pointer ${
+                style={{ paddingLeft: `${depth * 18 + 6}px` }}
+                className={`flex items-center justify-between py-2 px-2.5 rounded-xl transition-all cursor-pointer ${
                   isSelected 
                     ? 'bg-blue-50/90 text-blue-900 font-semibold' 
                     : isSelectable 
@@ -212,22 +212,22 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
                       : 'hover:bg-slate-50/80 text-gray-700'
                 }`}
               >
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-2.5 min-w-0">
                   {/* Arrow Collapse / Expand */}
                   {hasChildren ? (
                     <button 
                       type="button"
                       onClick={(e) => toggleExpand(id, e)}
-                      className="p-0.5 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-700 cursor-pointer transition-colors"
+                      className="p-1 rounded-md hover:bg-gray-200 text-gray-400 hover:text-gray-700 cursor-pointer transition-colors"
                     >
                       {isExpanded ? (
-                        <ChevronDown className="w-3.5 h-3.5 text-blue-600" />
+                        <ChevronDown className="w-3.5 h-3.5 text-blue-600 font-bold" />
                       ) : (
                         <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
                       )}
                     </button>
                   ) : (
-                    <span className="w-4.5 inline-block"></span>
+                    <span className="w-5 inline-block"></span>
                   )}
 
                   {/* Minimal Dot - ONLY shown when selected */}
@@ -247,8 +247,8 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
                 </div>
 
                 {/* Subtle Muted Level Label */}
-                <span className={`text-[10px] font-medium px-1.5 py-0.2 rounded shrink-0 ml-2 ${
-                  isSelected ? 'text-blue-700 font-semibold' : 'text-gray-400'
+                <span className={`text-[10px] font-medium px-2 py-0.5 rounded shrink-0 ml-2 ${
+                  isSelected ? 'text-blue-700 font-semibold bg-blue-100/50' : 'text-gray-400'
                 }`}>
                   {level === 'Storage Location' ? 'Loc' : level}
                 </span>
@@ -257,7 +257,7 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
               {/* Render Children Recursively if Expanded */}
               {isExpanded && hasChildren && (
                 <div className="relative">
-                  <div className="absolute left-4.5 top-0 bottom-1 w-px bg-gray-200/80"></div>
+                  <div className="absolute left-5 top-0 bottom-1 w-px bg-gray-200/80"></div>
                   {renderTree(node.children, depth + 1)}
                 </div>
               )}
@@ -270,18 +270,18 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fadeIn font-sans">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-gray-200 flex flex-col max-h-[85vh] animate-scaleUp">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-200 flex flex-col max-h-[85vh] animate-scaleUp">
         
-        {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-4 px-5 flex items-center justify-between text-white shadow-sm">
+        {/* Pure Clean White Header */}
+        <div className="bg-white p-4.5 px-6 flex items-center justify-between border-b border-gray-100">
           <div>
-            <h3 className="text-sm font-bold tracking-tight">{title}</h3>
-            <p className="text-[11px] text-blue-100 font-normal">Select a Zone or Loc (Factory & Floor locked)</p>
+            <h3 className="text-sm font-bold text-gray-900 tracking-tight">{title}</h3>
+            <p className="text-[11px] text-gray-400 font-normal mt-0.5">Select a Zone or Loc (Factory & Floor locked)</p>
           </div>
           <button 
             type="button"
             onClick={onClose}
-            className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all cursor-pointer"
+            className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition-all cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -289,14 +289,14 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
 
         {/* Warning Toast Notification for Invalid Selection */}
         {warningMsg && (
-          <div className="bg-amber-50 border-b border-amber-200/80 p-2 px-4 text-amber-900 text-xs font-semibold flex items-center gap-2 animate-fadeIn">
+          <div className="bg-amber-50 border-b border-amber-200/80 p-2 px-5 text-amber-900 text-xs font-semibold flex items-center gap-2 animate-fadeIn">
             <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
             <span>{warningMsg}</span>
           </div>
         )}
 
         {/* Tree Container */}
-        <div className="p-3.5 overflow-y-auto flex-1 max-h-[380px] custom-scrollbar">
+        <div className="p-4 overflow-y-auto flex-1 max-h-[380px] custom-scrollbar">
           {treeNodes.length > 0 ? (
             renderTree(treeNodes)
           ) : (
@@ -307,19 +307,19 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
           )}
         </div>
 
-        {/* Action Buttons */}
-        <div className="p-3 px-4 bg-gray-50/80 border-t border-gray-100 flex items-center justify-end gap-2 rounded-b-2xl">
+        {/* Action Buttons with Spacing */}
+        <div className="p-4 px-6 bg-white border-t border-gray-100 flex items-center justify-end gap-3 rounded-b-2xl">
           <button
             type="button"
             onClick={onClose}
-            className="px-3.5 py-1.5 rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 font-semibold text-xs cursor-pointer transition-all shadow-2xs"
+            className="px-4 py-2 rounded-xl border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 font-semibold text-xs cursor-pointer transition-all shadow-2xs"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={handleApply}
-            className="px-4.5 py-1.5 rounded-lg text-white bg-blue-600 hover:bg-blue-700 font-bold text-xs cursor-pointer shadow-2xs transition-all"
+            className="px-6 py-2 rounded-xl text-white bg-blue-600 hover:bg-blue-700 font-semibold text-xs cursor-pointer shadow-2xs transition-all shrink-0 whitespace-nowrap min-w-[80px]"
           >
             Apply
           </button>
