@@ -154,23 +154,9 @@ interface CategoryCardData {
 }
 
 const DEFAULT_CATEGORIES: CategoryCardData[] = [
-  // Products Categories (Book Manufacturing)
-  { id: 'fg-1', name: 'Notebooks', type: 'products', uom: 'Pcs', fields: ['Pages', 'Size', 'Ruling'] },
-  { id: 'fg-2', name: 'Executive Diaries', type: 'products', uom: 'Pcs', fields: ['Cover Type', 'Size', 'GSM'] },
-  { id: 'fg-3', name: 'Longbooks', type: 'products', uom: 'Pcs', fields: ['Pages', 'Size', 'Rule Type'] },
-  { id: 'fg-4', name: 'Drawing Books', type: 'products', uom: 'Pcs', fields: ['Pages', 'Size', 'Paper GSM'] },
-  { id: 'fg-5', name: 'Hardbound Register', type: 'products', uom: 'Pcs', fields: ['Pages', 'Size', 'Binding'] },
-  
-  // Materials Categories (Paper Reels, Boards & Accessories)
-  { id: 'rm-1', name: 'Paper Reels', type: 'materials', uom: 'Kg', fields: ['GSM', 'Width (cm)', 'Brand'] },
-  { id: 'rm-2', name: 'Duplex Cover Board', type: 'materials', uom: 'Pcs', fields: ['GSM', 'Size'] },
-  { id: 'rm-3', name: 'Stitching Wire & Thread', type: 'materials', uom: 'Kg', fields: ['Gauge', 'Type'] },
-  { id: 'rm-4', name: 'Binding Glue & Adhesives', type: 'materials', uom: 'Kg', fields: ['Grade', 'Viscosity'] },
-
-  // Semi Categories (Cut Sheets, Ruled Stock & Inner Blocks)
-  { id: 'sfg-1', name: 'Ruled Cut Sheets', type: 'semi', uom: 'Ream', fields: ['GSM', 'Rule Type', 'Size'] },
-  { id: 'sfg-2', name: 'Printed Inner Signatures', type: 'semi', uom: 'Set', fields: ['Title', 'Pages'] },
-  { id: 'sfg-3', name: 'Folded Book Blocks', type: 'semi', uom: 'Pcs', fields: ['Form Factor', 'Pages'] }
+  { id: 'cat-products', name: 'Products', type: 'products', uom: 'Pcs', fields: ['Pages', 'Size', 'Brand'] },
+  { id: 'cat-materials', name: 'Materials', type: 'materials', uom: 'Kg', fields: ['GSM', 'Width (cm)', 'Brand'] },
+  { id: 'cat-semi', name: 'Semi', type: 'semi', uom: 'Ream', fields: ['GSM', 'Rule Type', 'Size'] }
 ];
 
 // BOM Recipe Item interface
@@ -2901,9 +2887,9 @@ const SkuMasterV2: React.FC = () => {
     const targetType = activeMainTab === 'products' ? 'products' : activeMainTab === 'semi' ? 'semi' : activeMainTab === 'categories' ? activeCategorySubTab : 'materials';
     const sectionCats = (categoriesData || []).filter(c => c.type === targetType).map(c => c.name);
     if (sectionCats.length > 0) return sectionCats[0];
-    if (targetType === 'products') return 'Notebooks';
-    if (targetType === 'semi') return 'Ruled Cut Sheets';
-    return 'Paper Reels';
+    if (targetType === 'products') return 'Products';
+    if (targetType === 'semi') return 'Semi';
+    return 'Materials';
   };
 
   const dynamicTotalCount = useMemo(() => {

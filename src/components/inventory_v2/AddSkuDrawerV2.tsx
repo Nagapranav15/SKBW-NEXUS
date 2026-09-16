@@ -389,11 +389,11 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     }
   }, [isOpen, editSku, customColumns, customColumnValues]);
 
-  const [categoriesList, setCategoriesList] = useState<string[]>(["Raw Material", "Semi Finished", "Finished Goods"]);
-  const [unitsList, setUnitsList] = useState<string[]>(["GBL", "Pcs", "Kg", "Sheets", "Reels", "Mtr", "Ream", "Gross", "Box", "Pkt", "pcs", "kg"]);
-  const [ruleTypesList, setRuleTypesList] = useState<string[]>(["Plain", "Single Line", "Double Line", "Square Ruled", "Four Line", "Unruled", "UR"]);
-  const [groupsList, setGroupsList] = useState<string[]>(["132P Happy days (UR)", "220P Happy days (SR)"]);
-  const [brandsList, setBrandsList] = useState<string[]>(["Happy Days", "Classmate", "Navneet"]);
+  const [categoriesList, setCategoriesList] = useState<string[]>([]);
+  const [unitsList, setUnitsList] = useState<string[]>(["Pcs", "Kg", "Ream", "GBL", "Sheets", "Gross", "Box", "Pkt", "Mtr"]);
+  const [ruleTypesList, setRuleTypesList] = useState<string[]>(["Plain", "Single Line", "Double Line", "Square Ruled", "Four Line", "Unruled"]);
+  const [groupsList, setGroupsList] = useState<string[]>([]);
+  const [brandsList, setBrandsList] = useState<string[]>([]);
 
   const sectionCategories = React.useMemo(() => {
     let targetType: 'products' | 'materials' | 'semi' = 'products';
@@ -470,20 +470,14 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       }
     });
 
-    // 2. Default fallback section categories if no custom created categories exist
+    // 2. Base section default if no categories created yet
     if (list.length === 0) {
       if (targetType === 'products') {
-        ['Notebooks', 'Executive Diaries', 'Longbooks', 'Drawing Books', 'Hardbound Register'].forEach(n => {
-          if (!list.includes(n)) list.push(n);
-        });
+        list.push('Products');
       } else if (targetType === 'materials') {
-        ['Paper Reels', 'Paper Sheets', 'Binding Wire', 'Adhesives', 'Packaging Material', 'Raw Material'].forEach(n => {
-          if (!list.includes(n)) list.push(n);
-        });
+        list.push('Materials');
       } else {
-        ['Ruled Cut Sheets', 'Inner Signatures', 'Covers', 'Book Blocks', 'Semi Finished'].forEach(n => {
-          if (!list.includes(n)) list.push(n);
-        });
+        list.push('Semi');
       }
     }
 
@@ -563,8 +557,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   const [hasAltUnit, setHasAltUnit] = useState(false);
 
   // Brand searchable dropdown lists (separated for Finished Goods vs Raw Materials)
+  // Brand searchable dropdown lists (separated for Finished Goods vs Raw Materials)
   const [existingBrands, setExistingBrands] = useState<string[]>([]);
-  const [fgBrandsList, setFgBrandsList] = useState<string[]>(["Bestfriend", "Classmate", "Navneet", "Happy Days"]);
+  const [fgBrandsList, setFgBrandsList] = useState<string[]>([]);
   const [brandSearch, setBrandSearch] = useState('');
   const [showBrandDropdown, setShowBrandDropdown] = useState(false);
   const [groupSearch, setGroupSearch] = useState('');
@@ -573,12 +568,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   const [groupAtFocus, setGroupAtFocus] = useState<string | null>(null);
 
   const availableBrands = React.useMemo(() => {
-    let sourceList: string[] = [];
-    if (resolvedSection === 'materials') {
-      sourceList = [...existingBrands, 'BILT', 'ITC', 'Century', 'JK Paper', 'Star', 'TNPL', ...brandsList];
-    } else {
-      sourceList = [...fgBrandsList, ...brandsList, 'Classmate', 'Navneet', 'Happy Days', 'Bestfriend', 'Akshay'];
-    }
+    const sourceList = resolvedSection === 'materials' 
+      ? [...existingBrands, ...brandsList] 
+      : [...fgBrandsList, ...brandsList];
 
     const uniqueMap = new Map<string, string>();
     sourceList.forEach(item => {
@@ -831,20 +823,22 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     try {
       const skus = await getSkusV2(companyId);
       
-      // Filter brands based on category
-      const fgBrands = skus
-        .filter(s => s.category === 'Finished Goods' || (s.skuCode || '').toUpperCase().startsWith('FG') || !(s.category || '').toLowerCase().includes('raw'))
-        .map(s => s.brand)
-        .filter((b): b is string => !!b && typeof b === 'string' && b.trim() !== '');
-        
-      const rawBrands = skus
-        .filter(s => s.category === 'Raw Material' || (s.skuCode || '').toUpperCase().startsWith('RM') || (s.category || '').toLowerCase().includes('raw'))
-        .map(s => s.brand)
-        .filter((b): b is string => !!b && typeof b === 'string' && b.trim() !== '');
+      const fgBrands: string[] = [];
+      const rawBrands: string[] = [];
 
-      const defaultFg = ["Bestfriend", "Classmate", "Navneet", "Happy Days"];
-      setFgBrandsList(prev => Array.from(new Set([...prev, ...fgBrands, ...defaultFg])));
-      setExistingBrands(prev => Array.from(new Set([...prev, ...rawBrands])));
+      skus.forEach(s => {
+        const b = s.brand?.trim();
+        if (!b) return;
+        const isRaw = s.category === 'Raw Material' || s.category === 'Materials' || (s.skuCode || '').toUpperCase().startsWith('RM') || (s.category || '').toLowerCase().includes('raw') || (s.category || '').toLowerCase().includes('material');
+        if (isRaw) {
+          rawBrands.push(b);
+        } else {
+          fgBrands.push(b);
+        }
+      });
+
+      setFgBrandsList(Array.from(new Set(fgBrands)));
+      setExistingBrands(Array.from(new Set(rawBrands)));
     } catch (e) {
       console.error('Failed to load existing brands', e);
     }
@@ -952,7 +946,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       setForm({
         skuCode: editSku.skuCode || '',
         name: editSku.name || '',
-        category: editSku.category || (resolvedSection === 'products' ? 'Notebooks' : resolvedSection === 'semi' ? 'Ruled Cut Sheets' : 'Paper Reels'),
+        category: editSku.category || (resolvedSection === 'products' ? 'Products' : resolvedSection === 'semi' ? 'Semi' : 'Materials'),
         paperType: editSku.paperType || (resolvedSection === 'materials' ? 'Reels' : 'None'),
         unit: editSku.unit || (resolvedSection === 'products' ? 'Pcs' : resolvedSection === 'semi' ? 'Ream' : 'Kg'),
         altUnit: editSku.altUnit || '',
@@ -1011,7 +1005,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         setProcessSteps([]);
       }
     } else {
-      const fallbackCat = resolvedSection === 'products' ? 'Notebooks' : resolvedSection === 'semi' ? 'Ruled Cut Sheets' : 'Paper Reels';
+      const fallbackCat = resolvedSection === 'products' ? 'Products' : resolvedSection === 'semi' ? 'Semi' : 'Materials';
       const initialCat = (defaultCategory && defaultCategory.trim()) ? defaultCategory.trim() : fallbackCat;
       const matchedInitialCat = (createdCategories || []).find(c => c && c.name?.toLowerCase().trim() === initialCat.toLowerCase().trim());
       const initialUnit = matchedInitialCat?.uom || (resolvedSection === 'products' ? 'Pcs' : resolvedSection === 'semi' ? 'Ream' : 'Kg');
