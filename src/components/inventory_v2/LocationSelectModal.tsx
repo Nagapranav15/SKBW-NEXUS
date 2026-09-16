@@ -116,23 +116,31 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
     return buildNodes(null, '', 0);
   }, [isOpen, hierarchyToUse, locMap]);
 
-  // Expand top-level nodes by default when modal opens
+  // Collapsed by default when modal opens (expand only selected item parents if present)
   useEffect(() => {
     if (isOpen) {
       setTempSelectedId(selectedLocationId);
       setWarningMsg(null);
       const initialExpanded: Record<string, boolean> = {};
-      hierarchyToUse.forEach(item => {
-        if (item) {
-          const itemId = String(item._id || item.name);
-          if (item.level === 'Factory' || item.level === 'Floor') {
-            initialExpanded[itemId] = true;
+
+      // If an item is already selected, expand its ancestry so the user sees where it is
+      if (selectedLocationId) {
+        const target = locMap.get(selectedLocationId) || hierarchyToUse.find(l => l.name?.toLowerCase().trim() === selectedLocationId.toLowerCase().trim());
+        if (target && target.parentId) {
+          let pId: string | null = String(target.parentId);
+          let g = 0;
+          while (pId && g < 8) {
+            initialExpanded[pId] = true;
+            const parent = locMap.get(pId);
+            pId = parent?.parentId ? String(parent.parentId) : null;
+            g++;
           }
         }
-      });
+      }
+
       setExpandedNodes(initialExpanded);
     }
-  }, [isOpen, selectedLocationId, hierarchyToUse]);
+  }, [isOpen, selectedLocationId, hierarchyToUse, locMap]);
 
   if (!isOpen) return null;
 
@@ -174,7 +182,7 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
 
   const renderTree = (nodes: TreeNode[], depth = 0) => {
     return (
-      <div className="space-y-1">
+      <div className="space-y-0.5">
         {nodes.map(node => {
           const id = String(node.item._id || node.item.name);
           const isExpanded = !!expandedNodes[id];
@@ -190,13 +198,13 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
                   if (hasChildren) toggleExpand(id, e);
                   if (isSelectable) handleCheckboxClick(node, e);
                 }}
-                style={{ paddingLeft: `${depth * 20 + 8}px` }}
-                className={`flex items-center gap-2.5 py-2 px-3 rounded-xl transition-all cursor-pointer ${
+                style={{ paddingLeft: `${depth * 18 + 6}px` }}
+                className={`flex items-center gap-2 py-1.5 px-2 rounded-lg transition-all cursor-pointer ${
                   isSelected 
-                    ? 'bg-blue-50/90 border border-blue-300 text-blue-900 shadow-2xs font-bold' 
+                    ? 'bg-blue-50/90 border border-blue-200 text-blue-900 shadow-2xs font-semibold' 
                     : isSelectable 
-                      ? 'hover:bg-gray-50 text-gray-800' 
-                      : 'hover:bg-gray-50/70 text-gray-500 opacity-90'
+                      ? 'hover:bg-slate-50 text-gray-800' 
+                      : 'hover:bg-slate-50/80 text-gray-700'
                 }`}
               >
                 {/* Arrow Collapse / Expand */}
@@ -204,52 +212,52 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
                   <button 
                     type="button"
                     onClick={(e) => toggleExpand(id, e)}
-                    className="p-1 rounded-md hover:bg-gray-200 text-gray-500 cursor-pointer transition-colors"
+                    className="p-0.5 rounded hover:bg-gray-200 text-gray-500 cursor-pointer transition-colors"
                   >
                     {isExpanded ? (
-                      <ChevronDown className="w-4 h-4 text-blue-600 font-bold" />
+                      <ChevronDown className="w-3.5 h-3.5 text-blue-600" />
                     ) : (
-                      <ChevronRight className="w-4 h-4 text-gray-400" />
+                      <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
                     )}
                   </button>
                 ) : (
-                  <span className="w-6 inline-block"></span>
+                  <span className="w-4.5 inline-block"></span>
                 )}
 
-                {/* Custom Styled Checkbox */}
+                {/* Standard ERP Styled Checkbox */}
                 <div 
                   onClick={(e) => handleCheckboxClick(node, e)}
-                  className={`w-5 h-5 rounded-md flex items-center justify-center transition-all ${
+                  className={`w-4 h-4 rounded flex items-center justify-center transition-all ${
                     !isSelectable 
                       ? 'bg-gray-100 border border-gray-300 opacity-40 cursor-not-allowed' 
                       : isSelected 
                         ? 'bg-blue-600 border border-blue-600 text-white shadow-2xs cursor-pointer' 
-                        : 'border-2 border-blue-400/80 bg-white hover:border-blue-600 cursor-pointer'
+                        : 'border border-gray-300 bg-white hover:border-blue-500 cursor-pointer'
                   }`}
                   title={!isSelectable ? `Cannot select ${level}. Select a Zone or Loc instead.` : `Select ${node.item.name}`}
                 >
                   {isSelected && (
-                    <svg className="w-3.5 h-3.5 text-white stroke-[3]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-3 h-3 text-white stroke-[3]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
                   )}
                 </div>
 
                 {/* Level Label & Badge */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <span className={`text-xs ${
-                    level === 'Factory' ? 'font-extrabold text-gray-900 text-sm' :
-                    level === 'Floor' ? 'font-bold text-gray-800' :
-                    level === 'Zone' ? 'font-bold text-blue-700' : 'font-medium text-gray-700'
+                    level === 'Factory' ? 'font-bold text-gray-900' :
+                    level === 'Floor' ? 'font-semibold text-gray-800' :
+                    level === 'Zone' ? 'font-semibold text-blue-800' : 'font-medium text-gray-700'
                   }`}>
                     {node.item.name}
                   </span>
                   
-                  <span className={`text-[9.5px] font-bold px-2 py-0.5 rounded-full ${
-                    level === 'Factory' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
-                    level === 'Floor' ? 'bg-slate-100 text-slate-700 border border-slate-200' :
-                    level === 'Zone' ? 'bg-blue-100 text-blue-800 border border-blue-300 font-extrabold' :
-                    'bg-emerald-50 text-emerald-700 border border-emerald-200 font-extrabold'
+                  <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${
+                    level === 'Factory' ? 'bg-purple-50 text-purple-700 border border-purple-200/70' :
+                    level === 'Floor' ? 'bg-slate-100 text-slate-700 border border-slate-200/70' :
+                    level === 'Zone' ? 'bg-blue-50 text-blue-700 border border-blue-200/70 font-semibold' :
+                    'bg-emerald-50 text-emerald-700 border border-emerald-200/70 font-semibold'
                   }`}>
                     {level === 'Storage Location' ? 'Loc' : level}
                   </span>
@@ -259,7 +267,7 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
               {/* Render Children Recursively if Expanded */}
               {isExpanded && hasChildren && (
                 <div className="relative">
-                  <div className="absolute left-6 top-0 bottom-2 w-px bg-blue-100/80"></div>
+                  <div className="absolute left-5 top-0 bottom-1 w-px bg-gray-200"></div>
                   {renderTree(node.children, depth + 1)}
                 </div>
               )}
@@ -271,62 +279,62 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn font-sans">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100 flex flex-col max-h-[90vh] animate-scaleUp">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fadeIn font-sans">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-200 flex flex-col max-h-[85vh] animate-scaleUp">
         
-        {/* Modern Blue Header matching Screenshot */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-5 px-6 flex items-center justify-between text-white shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center shadow-inner">
-              <MapPin className="w-6 h-6 text-white stroke-[2.5]" />
+        {/* Modern Blue Header matching ERP */}
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-4 px-5 flex items-center justify-between text-white shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center">
+              <MapPin className="w-4.5 h-4.5 text-white" />
             </div>
             <div>
-              <h3 className="text-xl font-extrabold tracking-tight">{title}</h3>
-              <p className="text-xs text-blue-100 font-medium">Select a Zone or Loc (Factory & Floor locked)</p>
+              <h3 className="text-sm font-bold tracking-tight">{title}</h3>
+              <p className="text-[11px] text-blue-100 font-normal">Select a Zone or Loc (Factory & Floor locked)</p>
             </div>
           </div>
           <button 
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all cursor-pointer"
+            className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Warning Toast Notification for Invalid Selection */}
         {warningMsg && (
-          <div className="bg-amber-50 border-b border-amber-200/80 p-3 px-5 text-amber-900 text-xs font-semibold flex items-center gap-2 animate-fadeIn">
-            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+          <div className="bg-amber-50 border-b border-amber-200/80 p-2.5 px-4 text-amber-900 text-xs font-semibold flex items-center gap-2 animate-fadeIn">
+            <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
             <span>{warningMsg}</span>
           </div>
         )}
 
         {/* Tree Container */}
-        <div className="p-5 overflow-y-auto flex-1 max-h-[420px] custom-scrollbar">
+        <div className="p-4 overflow-y-auto flex-1 max-h-[380px] custom-scrollbar">
           {treeNodes.length > 0 ? (
             renderTree(treeNodes)
           ) : (
-            <div className="py-12 text-center text-gray-400">
-              <MapPin className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+            <div className="py-10 text-center text-gray-400">
+              <MapPin className="w-7 h-7 mx-auto mb-1.5 text-gray-300" />
               <p className="text-xs font-semibold">No warehouse locations configured</p>
             </div>
           )}
         </div>
 
-        {/* Action Buttons matching Screenshot */}
-        <div className="p-4 px-6 bg-gray-50/80 border-t border-gray-100 flex items-center justify-end gap-3 rounded-b-3xl">
+        {/* Action Buttons matching ERP */}
+        <div className="p-3.5 px-5 bg-gray-50/90 border-t border-gray-100 flex items-center justify-end gap-2.5 rounded-b-2xl">
           <button
             type="button"
             onClick={onClose}
-            className="px-6 py-2.5 rounded-xl border border-gray-200 text-gray-700 bg-white hover:bg-gray-100 font-semibold text-xs cursor-pointer transition-all shadow-2xs"
+            className="px-4 py-2 rounded-xl border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 font-semibold text-xs cursor-pointer transition-all shadow-2xs"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={handleApply}
-            className="px-8 py-2.5 rounded-xl text-white bg-blue-600 hover:bg-blue-700 font-extrabold text-xs cursor-pointer shadow-md hover:shadow-lg transition-all"
+            className="px-5 py-2 rounded-xl text-white bg-blue-600 hover:bg-blue-700 font-bold text-xs cursor-pointer shadow-2xs transition-all"
           >
             Apply
           </button>
