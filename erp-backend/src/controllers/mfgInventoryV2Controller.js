@@ -390,22 +390,21 @@ exports.updateSku = async (req, res, next) => {
 exports.deleteSku = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { companyId, permanent } = req.query;
-
-    if (!companyId) {
-      return res.status(400).json({ msg: "companyId query parameter is required" });
-    }
+    const { permanent } = req.query;
 
     const skuObjId = toObjectId(id) || id;
-    const companyObjId = toObjectId(companyId) || companyId;
 
-    let sku = await SkuV2.findOne({ _id: skuObjId, company: { $in: [toObjectId(companyId), companyId].filter(Boolean) } });
+    // Find SKU by ID directly (works across all companies and ID formats)
+    let sku = await SkuV2.findById(skuObjId);
     if (!sku) {
-      sku = await SkuV2.findById(skuObjId);
+      sku = await SkuV2.findOne({ _id: id });
     }
+
     if (!sku) {
       return res.status(404).json({ msg: "SKU not found" });
     }
+
+    const companyObjId = sku.company || req.query.companyId;
 
     // Permanently record sequence number in Sequence collection so this SKU ID is never reused
     const numMatch = (sku.skuCode || '').match(/^([A-Z]+)-(\d{1,4})$/i);
@@ -414,7 +413,7 @@ exports.deleteSku = async (req, res, next) => {
       const n = parseInt(numMatch[2], 10);
       if (!isNaN(n) && n > 0 && n < 10000) {
         await Sequence.findOneAndUpdate(
-          { prefix: `${companyId}_SKU_${p}` },
+          { prefix: `${companyObjId}_SKU_${p}` },
           { $max: { sequence: n } },
           { upsert: true }
         ).catch(() => {});
@@ -422,13 +421,13 @@ exports.deleteSku = async (req, res, next) => {
     }
 
     if (permanent === "true") {
-      const count = await InventoryLedgerV2.countDocuments({ skuId: skuObjId, company: companyObjId });
+      const count = await InventoryLedgerV2.countDocuments({ skuId: sku._id });
       if (count > 0) {
         return res.status(400).json({ 
           msg: `Cannot permanently delete SKU '${sku.skuCode}' because it has active inventory ledger history.` 
         });
       }
-      await SkuV2.deleteOne({ _id: skuObjId });
+      await SkuV2.deleteOne({ _id: sku._id });
 
       ActivityLog.create({
         action: "PERMANENT_DELETE",

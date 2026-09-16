@@ -2622,7 +2622,8 @@ const SkuMasterV2: React.FC = () => {
         }
       }
 
-      await deleteSkuV2(deleteConfirmSku._id, selectedCompany?._id || '');
+      const targetCompanyId = selectedCompany?._id || (typeof deleteConfirmSku.company === 'object' ? (deleteConfirmSku.company as any)._id : deleteConfirmSku.company) || '';
+      await deleteSkuV2(deleteConfirmSku._id, targetCompanyId);
       showToast(`Item '${deleteConfirmSku.skuCode}' deleted`, 'success');
       setDeleteConfirmSku(null);
       loadSkus(false);
@@ -2631,10 +2632,10 @@ const SkuMasterV2: React.FC = () => {
         entityType: 'SkuV2',
         entityName: deleteConfirmSku.skuCode,
         details: `Deleted item '${deleteConfirmSku.name}' (${deleteConfirmSku.skuCode}). Code is retired.`,
-        company: selectedCompany?._id
+        company: targetCompanyId
       }).catch(() => {});
-    } catch (e) {
-      showToast('Failed to delete item', 'error');
+    } catch (e: any) {
+      showToast(e.response?.data?.msg || e.message || 'Failed to delete item', 'error');
     }
   };
 
