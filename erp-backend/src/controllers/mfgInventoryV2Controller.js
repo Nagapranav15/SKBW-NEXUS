@@ -396,10 +396,13 @@ exports.deleteSku = async (req, res, next) => {
       return res.status(400).json({ msg: "companyId query parameter is required" });
     }
 
-    const skuObjId = toObjectId(id);
-    const companyObjId = toObjectId(companyId);
+    const skuObjId = toObjectId(id) || id;
+    const companyObjId = toObjectId(companyId) || companyId;
 
-    const sku = await SkuV2.findOne({ _id: skuObjId, company: companyObjId });
+    let sku = await SkuV2.findOne({ _id: skuObjId, company: { $in: [toObjectId(companyId), companyId].filter(Boolean) } });
+    if (!sku) {
+      sku = await SkuV2.findById(skuObjId);
+    }
     if (!sku) {
       return res.status(404).json({ msg: "SKU not found" });
     }

@@ -505,6 +505,11 @@ const SkuMasterV2: React.FC = () => {
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [activityLogLoading, setActivityLogLoading] = useState(false);
 
+  // Recycle Bin Modal State
+  const [showRecycleBinModal, setShowRecycleBinModal] = useState(false);
+  const [recycledSkus, setRecycledSkus] = useState<SkuV2[]>([]);
+  const [loadingRecycleBin, setLoadingRecycleBin] = useState(false);
+
   // Add SKU Modal
   const [showAddDrawer, setShowAddDrawer] = useState(false);
   const [editSku, setEditSku] = useState<SkuV2 | null>(null);
@@ -1745,6 +1750,44 @@ const SkuMasterV2: React.FC = () => {
       showToast('Failed to fetch activity logs', 'error');
     } finally {
       setActivityLogLoading(false);
+    }
+  };
+
+  const fetchRecycleBinSkus = async () => {
+    if (!selectedCompany?._id) return;
+    setLoadingRecycleBin(true);
+    try {
+      const data = await getSkusV2(selectedCompany._id, undefined, undefined, undefined, true);
+      setRecycledSkus(data || []);
+    } catch (err) {
+      console.error('Failed to fetch recycle bin items:', err);
+    } finally {
+      setLoadingRecycleBin(false);
+    }
+  };
+
+  const handleRestoreSku = async (sku: SkuV2) => {
+    if (!sku._id || !selectedCompany?._id) return;
+    try {
+      await updateSkuV2(sku._id, { isDeleted: false, status: 'Active', company: selectedCompany._id });
+      showToast(`Restored item '${sku.skuCode}' to active inventory`, 'success');
+      fetchRecycleBinSkus();
+      loadSkus(false);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to restore item', 'error');
+    }
+  };
+
+  const handlePermanentDeleteSku = async (sku: SkuV2) => {
+    if (!sku._id || !selectedCompany?._id) return;
+    if (!window.confirm(`Permanently delete '${sku.skuCode}' (${sku.name})? This action CANNOT be undone.`)) return;
+    try {
+      await deleteSkuV2(sku._id, selectedCompany._id, true);
+      showToast(`Permanently deleted item '${sku.skuCode}'`, 'success');
+      fetchRecycleBinSkus();
+      loadSkus(false);
+    } catch (err: any) {
+      showToast(err.response?.data?.msg || err.message || 'Failed to permanently delete item', 'error');
     }
   };
 
@@ -3249,6 +3292,25 @@ const SkuMasterV2: React.FC = () => {
                 </div>
               </div>
 
+              {/* 8.5 Recycle Bin Icon Button */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={() => {
+                    fetchRecycleBinSkus();
+                    setShowRecycleBinModal(true);
+                  }}
+                  className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100/80 border border-rose-200 text-rose-700 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  title="Recycle Bin (View / Restore Deleted Items)"
+                  aria-label="Recycle Bin"
+                >
+                  <Trash2 className="w-4 h-4 text-rose-600" />
+                </button>
+                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                  Recycle Bin
+                </div>
+              </div>
+
               {/* 9. Find Duplicates Icon Button */}
               <div className="relative group">
                 <button
@@ -3738,8 +3800,15 @@ const SkuMasterV2: React.FC = () => {
                                 </td>
                               );
                             case 'bom':
-                              const isBomApplicable = getItemType(sku) === 'products' || getItemType(sku) === 'semi' || activeMainTab === 'products' || activeMainTab === 'semi' || !(sku.category || '').toLowerCase().includes('raw');
-                              const hasBom = isBomApplicable && Array.isArray((sku as any).bomItems) && (sku as any).bomItems.length > 0;
+                              const isBomApplicable = activeMainTab !== 'materials' && getItemType(sku) !== 'materials' && !(sku.category || '').toLowerCase().includes('raw');
+                              if (!isBomApplicable) {
+                                return (
+                                  <td key="bom" className="py-3 px-3 text-center text-gray-400 font-bold whitespace-nowrap">
+                                    —
+                                  </td>
+                                );
+                              }
+                              const hasBom = Array.isArray((sku as any).bomItems) && (sku as any).bomItems.length > 0;
                               return (
                                 <td key="bom" className="py-3 px-3 whitespace-nowrap">
                                   <div className="flex items-center gap-1.5">
@@ -4993,7 +5062,7 @@ const SkuMasterV2: React.FC = () => {
                             type="number"
                             min="1"
                             placeholder="1"
-                            value={recipeYieldQty}
+                            value={recipeYieldQty === '1' ? '' : recipeYieldQty}
                             onChange={(e) => setRecipeYieldQty(e.target.value)}
                             className="w-14 px-1.5 py-0.5 border border-gray-300 rounded font-bold text-gray-900 text-center focus:ring-1 focus:ring-[#064E3B]"
                           />
@@ -6653,7 +6722,110 @@ const SkuMasterV2: React.FC = () => {
                 className="px-4 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-2"
               >
                 {isBulkOperating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
-                <span>Delete {selectedIds.length} Items</span>
+                <span>Move to Recycle Bin</span>
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── RECYCLE BIN MODAL ── */}
+      {showRecycleBinModal && (
+        <Modal
+          isOpen={showRecycleBinModal}
+          onClose={() => setShowRecycleBinModal(false)}
+          title={`Recycle Bin (${recycledSkus.length} Items)`}
+          maxWidth="max-w-4xl"
+        >
+          <div className="space-y-4 text-left">
+            <div className="flex items-center justify-between p-3.5 bg-rose-50 border border-rose-100 rounded-2xl">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold">
+                  <Trash2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-rose-900 text-sm">Recycle Bin Repository</h4>
+                  <p className="text-[11px] text-rose-700">
+                    Deleted items stay safely stored in the Recycle Bin. You can restore them anytime or permanently remove them.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={fetchRecycleBinSkus}
+                disabled={loadingRecycleBin}
+                className="px-3 py-1.5 bg-white hover:bg-rose-100/60 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingRecycleBin ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
+              </button>
+            </div>
+
+            {loadingRecycleBin ? (
+              <div className="py-12 text-center text-xs font-bold text-gray-400 animate-pulse">
+                Loading deleted items...
+              </div>
+            ) : recycledSkus.length === 0 ? (
+              <div className="py-12 text-center space-y-2 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
+                <Trash2 className="w-8 h-8 text-gray-300 mx-auto" />
+                <p className="text-xs font-bold text-gray-600">Recycle Bin is Empty</p>
+                <p className="text-[11px] text-gray-400">No deleted items in this company.</p>
+              </div>
+            ) : (
+              <div className="max-h-[60vh] overflow-y-auto border border-gray-200 rounded-2xl divide-y divide-gray-100 bg-white">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="bg-gray-50/80 text-gray-500 font-bold text-[11px] sticky top-0 bg-white z-10 border-b border-gray-200">
+                    <tr>
+                      <th className="py-2.5 px-3">SKU CODE</th>
+                      <th className="py-2.5 px-3">ITEM NAME</th>
+                      <th className="py-2.5 px-3">CATEGORY</th>
+                      <th className="py-2.5 px-3">UOM</th>
+                      <th className="py-2.5 px-3 text-right">ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 font-medium text-gray-800">
+                    {recycledSkus.map(sku => (
+                      <tr key={sku._id} className="hover:bg-rose-50/30 transition-colors">
+                        <td className="py-2.5 px-3 font-mono font-bold text-rose-600">{sku.skuCode}</td>
+                        <td className="py-2.5 px-3 font-bold text-gray-900">{sku.name}</td>
+                        <td className="py-2.5 px-3 text-gray-600">{sku.category || '—'}</td>
+                        <td className="py-2.5 px-3 text-gray-600">{sku.unit}</td>
+                        <td className="py-2.5 px-3 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleRestoreSku(sku)}
+                              className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
+                              title="Restore to active inventory"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              <span>Restore</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handlePermanentDeleteSku(sku)}
+                              className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
+                              title="Delete permanently from database"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Delete</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setShowRecycleBinModal(false)}
+                className="px-4 py-2 text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl cursor-pointer"
+              >
+                Close
               </button>
             </div>
           </div>

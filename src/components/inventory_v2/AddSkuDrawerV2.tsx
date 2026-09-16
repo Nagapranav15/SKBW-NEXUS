@@ -2320,8 +2320,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                 </div>
               )}
 
-                {/* BOM is for Finished Goods / Products AND Semi Finished materials */}
-                {(activeSection === 'products' || activeSection === 'semi' || form.category === 'Finished Goods' || form.category === 'Semi Finished' || !(form.category || '').toLowerCase().includes('raw')) && (
+                {/* BOM is for Finished Goods / Products AND Semi Finished materials (NO BOM for Raw Materials) */}
+                {activeSection !== 'materials' && (activeSection === 'products' || activeSection === 'semi' || form.category === 'Finished Goods' || form.category === 'Semi Finished' || !(form.category || '').toLowerCase().includes('raw')) && (
                   <div className="space-y-4 border-t border-gray-100 pt-4">
                     {/* BOM Header card banner */}
                     <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-3 flex items-center justify-between">
@@ -2423,7 +2423,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                               type="number"
                               min="1"
                               placeholder="1"
-                              value={form.recipeYieldQty || '1'}
+                              value={form.recipeYieldQty === '1' ? '' : (form.recipeYieldQty || '')}
                               onChange={(e) => setForm({ ...form, recipeYieldQty: e.target.value })}
                               className="w-16 px-2 py-0.5 border border-blue-300 rounded-md text-xs font-extrabold text-blue-700 text-center focus:ring-2 focus:ring-blue-500 bg-blue-50/60"
                             />
