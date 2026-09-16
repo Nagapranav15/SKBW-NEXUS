@@ -264,7 +264,17 @@ const SkuMasterV2: React.FC = () => {
         if (data?.categoryCards && Array.isArray(data.categoryCards) && data.categoryCards.length > 0) {
           setCategoriesData(data.categoryCards);
         } else {
-          setCategoriesData(DEFAULT_CATEGORIES);
+          // If no category cards in MongoDB yet, migrate local storage or DEFAULT_CATEGORIES to MongoDB
+          let initialCards = DEFAULT_CATEGORIES;
+          const savedLocal = localStorage.getItem('skbw_erp_categories_cards');
+          if (savedLocal) {
+            try {
+              const parsed = JSON.parse(savedLocal);
+              if (Array.isArray(parsed) && parsed.length > 0) initialCards = parsed;
+            } catch (e) {}
+          }
+          setCategoriesData(initialCards);
+          saveCategoriesToDb(initialCards);
         }
       }).catch(err => {
         console.error('Failed to load company metadata in SkuMasterV2:', err);
@@ -4614,7 +4624,7 @@ const SkuMasterV2: React.FC = () => {
         isOpen={showAddDrawer}
         companyId={selectedCompany?._id || ''}
         editSku={editSku}
-        defaultCategory=""
+        defaultCategory={getDefaultCategoryForDrawer()}
         activeSection={
           editSku
             ? (
