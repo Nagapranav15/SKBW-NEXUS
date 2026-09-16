@@ -151,6 +151,10 @@ exports.createSku = async (req, res, next) => {
       if (!uomCheck.valid) {
         return res.status(400).json({ msg: uomCheck.error });
       }
+      if (uomCheck.isRedundant) {
+        altUnit = "";
+        altUnitConversion = undefined;
+      }
     }
 
     const exists = await SkuV2.findOne({ skuCode, company: toObjectId(company) });
@@ -309,6 +313,10 @@ exports.updateSku = async (req, res, next) => {
       const uomCheck = validateUomConversion(targetUnit, targetAltUnit, targetConversion);
       if (!uomCheck.valid) {
         return res.status(400).json({ msg: uomCheck.error });
+      }
+      if (uomCheck.isRedundant) {
+        sku.altUnit = "";
+        sku.altUnitConversion = undefined;
       }
     }
 

@@ -585,17 +585,23 @@ const SkuMasterV2: React.FC = () => {
 
       const yieldQty = existingItems.length === 0 && copiedBom.basis ? Number(copiedBom.basis) || 1 : ((targetSku as any).recipeYieldQty || 1);
 
-      await updateSkuV2(targetSku._id, {
+      const patchData: any = {
         bomItems: updatedBomItems,
         recipeYieldQty: yieldQty,
         company: selectedCompany?._id
-      });
+      };
+      if ((targetSku.altUnit || '').toLowerCase().trim() === (targetSku.unit || '').toLowerCase().trim()) {
+        patchData.altUnit = '';
+        patchData.altUnitConversion = null;
+      }
+
+      await updateSkuV2(targetSku._id, patchData);
 
       showToast(`Pasted BOM from "${copiedBom.sourceName}" to "${targetSku.name || targetSku.skuCode}"!`, 'success');
       loadSkus(false);
     } catch (err: any) {
       console.error('Failed to paste BOM:', err);
-      showToast(err.message || 'Failed to paste BOM', 'error');
+      showToast(err.response?.data?.msg || err.message || 'Failed to paste BOM', 'error');
     }
   };
 
@@ -617,11 +623,16 @@ const SkuMasterV2: React.FC = () => {
           inStock: l.inStock ?? 0,
           notes: l.notes || ''
         }));
-        await updateSkuV2(targetSku._id, {
+        const patchData: any = {
           bomItems: items,
           recipeYieldQty: Number(copiedBom.basis) || 1,
           company: selectedCompany?._id
-        });
+        };
+        if ((targetSku.altUnit || '').toLowerCase().trim() === (targetSku.unit || '').toLowerCase().trim()) {
+          patchData.altUnit = '';
+          patchData.altUnitConversion = null;
+        }
+        await updateSkuV2(targetSku._id, patchData);
       }
       showToast(`Successfully pasted BOM to ${targets.length} products!`, 'success');
       loadSkus(false);
@@ -2056,8 +2067,8 @@ const SkuMasterV2: React.FC = () => {
         'Opening Stock Qty'
       ];
       sampleRows = [
-        ['FG-001', 'Bestfriend (UR)', '132 P', 'Bestfriend', 'UR', 'Longbooks', 'Pcs', 'PCS', '500', '52', '14.25', '35', '50', '20', '10'],
-        ['FG-002', '142P Bestfriend (UR)', '142 P', 'Bestfriend', 'UR', 'Executive Diaries', 'Pcs', 'PCS', '200', '52', '57', '70', '50', '20', '100'],
+        ['FG-001', 'Bestfriend (UR)', '132 P', 'Bestfriend', 'UR', 'Longbooks', 'Pcs', 'Box', '500', '52', '14.25', '35', '50', '20', '10'],
+        ['FG-002', '142P Bestfriend (UR)', '142 P', 'Bestfriend', 'UR', 'Executive Diaries', 'Pcs', 'Box', '200', '52', '57', '70', '50', '20', '100'],
         ['NB-A4-192', 'Deluxe Spiral Notebook A4', '192 P', 'Bestfriend', 'Plain', 'Notebooks', 'Pcs', 'Box', '24', '70', '21', '29.7', '100', '50', '500']
       ];
     } else if (activeMainTab === 'semi') {
@@ -2269,7 +2280,10 @@ const SkuMasterV2: React.FC = () => {
         if (!name && !skuCode) continue;
 
         const unit = getFieldVal('uom', 'unit', 'primaryunit', 'baseunit', 'mainunit') || (activeMainTab === 'materials' ? 'Kg' : 'Pcs');
-        const altUnit = getFieldVal('auomaltunit', 'auom', 'altunit', 'secondaryunit', 'alternateunit', 'auomsecondaryunit') || '';
+        let altUnit = getFieldVal('auomaltunit', 'auom', 'altunit', 'secondaryunit', 'alternateunit', 'auomsecondaryunit') || '';
+        if (altUnit.toLowerCase().trim() === unit.toLowerCase().trim()) {
+          altUnit = '';
+        }
 
         // Extract Con Rate / Conversion Rate
         const rawConRate = getFieldVal('conrate', 'conversionrate', 'altunitconversion', 'conversion', 'rate', 'factor');
