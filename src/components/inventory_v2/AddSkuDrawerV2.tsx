@@ -1184,7 +1184,10 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
     // Helper to compile Sku Name dynamically from specification inputs
     const compileSkuName = (formData: typeof form): string => {
-      if (resolvedSection === 'materials' || formData.category === 'Raw Material' || formData.category === 'Materials') {
+      const isMat = resolvedSection === 'materials' || formData.category === 'Raw Material' || formData.category === 'Materials' || (formData.skuCode || '').startsWith('RM');
+      const isSemi = resolvedSection === 'semi' || formData.category === 'Semi Finished' || formData.category === 'Semi' || (formData.skuCode || '').startsWith('SM');
+
+      if (isMat) {
         const parts: string[] = [];
         if (formData.title?.trim()) parts.push(formData.title.trim());
         const formatType = formData.paperType === 'Reels' ? 'Reel' : formData.paperType === 'Sheets' ? 'Sheet' : '';
@@ -1198,8 +1201,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         }
         if (sizeStr) parts.push(sizeStr);
         if (formData.pages && formData.paperType === 'Sheets') parts.push(`(${formData.pages} Sheets/Ream)`);
-        return parts.join(' ');
-      } else if (resolvedSection === 'semi' || formData.category === 'Semi Finished' || formData.category === 'Semi') {
+        return parts.filter(Boolean).join(' ');
+      } else if (isSemi) {
         const parts: string[] = [];
         if (formData.brand?.trim()) parts.push(formData.brand.trim());
         if (formData.gsm) parts.push(`${formData.gsm} GSM`);
@@ -1216,21 +1219,20 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           parts.push(wrapped);
         }
         if (formData.pages) parts.push(`${formData.pages}P`);
-        if (parts.length > 0) return parts.join(' ');
-        if (formData.group) return formData.group;
-        return '';
+        if (formData.group && !parts.some(p => p.toLowerCase() === formData.group.toLowerCase())) {
+          parts.push(formData.group);
+        }
+        return parts.filter(Boolean).join(' ');
       } else {
         // Finished Goods / Products
         const parts: string[] = [];
         if (formData.pages) parts.push(`${formData.pages}P`);
         if (formData.brand?.trim()) parts.push(formData.brand.trim());
         if (formData.title?.trim()) parts.push(formData.title.trim());
-        if (formData.ruleType) {
+        if (formData.ruleType?.trim()) {
           const clean = formData.ruleType.trim();
-          if (clean) {
-            const wrapped = (clean.startsWith('(') && clean.endsWith(')')) ? clean : `(${clean})`;
-            parts.push(wrapped);
-          }
+          const wrapped = (clean.startsWith('(') && clean.endsWith(')')) ? clean : `(${clean})`;
+          parts.push(wrapped);
         }
         if (formData.gsm) parts.push(`${formData.gsm} GSM`);
         let sizeStr = '';
@@ -1240,10 +1242,21 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           sizeStr = `${formData.width} CM`;
         }
         if (sizeStr) parts.push(sizeStr);
-        if (parts.length > 0) return parts.join(' ');
-        if (formData.group) return formData.group;
-        return '';
+        return parts.filter(Boolean).join(' ');
       }
+    };
+
+    const updateFormField = (updates: Partial<typeof form>) => {
+      setForm(prev => {
+        const nextForm = { ...prev, ...updates };
+        if (!isNameManuallyEdited) {
+          const nextCompiled = compileSkuName(nextForm);
+          if (nextCompiled) {
+            nextForm.name = nextCompiled;
+          }
+        }
+        return nextForm;
+      });
     };
 
     // Compile Sku Name dynamically from other inputs
@@ -1286,7 +1299,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       form.group,
       isNameManuallyEdited,
       editSku,
-      categoryFieldsMap
+      resolvedSection
     ]);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -1631,7 +1644,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           name="paperType"
                           value="Reels"
                           checked={form.paperType === 'Reels'}
-                          onChange={() => setForm({ ...form, paperType: 'Reels', length: '' })}
+                          onChange={() => updateFormField({ paperType: 'Reels', length: '' })}
                           className="text-blue-600 focus:ring-blue-500"
                         />
                         Reels
@@ -1642,7 +1655,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           name="paperType"
                           value="Sheets"
                           checked={form.paperType === 'Sheets'}
-                          onChange={() => setForm({ ...form, paperType: 'Sheets' })}
+                          onChange={() => updateFormField({ paperType: 'Sheets' })}
                           className="text-blue-600 focus:ring-blue-500"
                         />
                         Sheets
@@ -1685,7 +1698,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     placeholder="e.g. 111P AKSHAY (SR)"
                     value={form.name}
                     onChange={e => {
-                      setForm({ ...form, name: e.target.value });
+                      setForm(prev => ({ ...prev, name: e.target.value }));
                       setIsNameManuallyEdited(true);
                     }}
                     className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
@@ -1706,7 +1719,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           type="number"
                           placeholder={form.paperType === 'Sheets' ? 'e.g. 500' : 'e.g. 112 / 132'}
                           value={form.pages}
-                          onChange={e => setForm({ ...form, pages: e.target.value })}
+                          onChange={e => updateFormField({ pages: e.target.value })}
                           className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                         />
                       </div>
@@ -1723,7 +1736,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                             value={brandSearch}
                             onChange={e => {
                               setBrandSearch(e.target.value);
-                              setForm(prev => ({ ...prev, brand: e.target.value }));
+                              updateFormField({ brand: e.target.value });
                             }}
                             onFocus={() => {
                               setShowBrandDropdown(true);
@@ -1743,7 +1756,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                     key={b}
                                     type="button"
                                     onClick={() => {
-                                      setForm(prev => ({ ...prev, brand: b }));
+                                      updateFormField({ brand: b });
                                       setBrandSearch(b);
                                       setShowBrandDropdown(false);
                                     }}
@@ -1781,7 +1794,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                             if (e.target.value === '__ADD_NEW__') {
                               handleAddNewOption('ruleTypes');
                             } else {
-                              setForm({ ...form, ruleType: e.target.value });
+                              updateFormField({ ruleType: e.target.value });
                             }
                           }}
                           className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
@@ -1806,7 +1819,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           if (e.target.value === '__ADD_NEW__') {
                             handleAddNewOption('units');
                           } else {
-                            setForm({ ...form, unit: e.target.value });
+                            updateFormField({ unit: e.target.value });
                           }
                         }}
                         className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
@@ -1970,7 +1983,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         type="number"
                         placeholder="e.g. 70"
                         value={form.gsm}
-                        onChange={e => setForm({ ...form, gsm: e.target.value })}
+                        onChange={e => updateFormField({ gsm: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                       />
                     </div>
@@ -1983,7 +1996,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         type="text"
                         placeholder="e.g. Premium White Paper Roll"
                         value={form.title}
-                        onChange={e => setForm({ ...form, title: e.target.value })}
+                        onChange={e => updateFormField({ title: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                       />
                     </div>
@@ -1998,7 +2011,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         type="number"
                         placeholder="e.g. 500"
                         value={form.pages}
-                        onChange={e => setForm({ ...form, pages: e.target.value })}
+                        onChange={e => updateFormField({ pages: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-bold text-gray-800"
                       />
                     </div>
@@ -2012,7 +2025,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         step="any"
                         placeholder="e.g. 57"
                         value={form.width}
-                        onChange={e => setForm({ ...form, width: e.target.value })}
+                        onChange={e => updateFormField({ width: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                       />
                     </div>
@@ -2026,7 +2039,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         step="any"
                         placeholder="e.g. 70"
                         value={form.length}
-                        onChange={e => setForm({ ...form, length: e.target.value })}
+                        onChange={e => updateFormField({ length: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                       />
                     </div>
