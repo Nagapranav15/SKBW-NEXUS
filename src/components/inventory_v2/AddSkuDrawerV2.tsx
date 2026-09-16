@@ -33,6 +33,21 @@ interface AddSkuDrawerV2Props {
   onCategoryCreated?: (newCategory: { id: string; name: string; type: 'products' | 'materials' | 'semi'; uom: string; fields: string[] }) => void;
 }
 
+export const normalizeAndDeduplicateUnits = (units: string[]): string[] => {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const u of units) {
+    if (!u || !u.trim()) continue;
+    const clean = u.trim();
+    const key = clean.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(clean);
+    }
+  }
+  return result;
+};
+
 export const SearchableMaterialDropdown: React.FC<{
   value: string;
   materials: SkuV2[];
@@ -388,21 +403,6 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       setFormCustomValues(initial);
     }
   }, [isOpen, editSku, customColumns, customColumnValues]);
-
-export const normalizeAndDeduplicateUnits = (units: string[]): string[] => {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const u of units) {
-    if (!u || !u.trim()) continue;
-    const clean = u.trim();
-    const key = clean.toLowerCase();
-    if (!seen.has(key)) {
-      seen.add(key);
-      result.push(clean);
-    }
-  }
-  return result;
-};
 
   const [categoriesList, setCategoriesList] = useState<string[]>([]);
   const [unitsList, setUnitsList] = useState<string[]>(["Pcs", "Kg", "Ream", "GBL", "Sheets", "Reels", "Mtr", "Gross", "Box", "Pkt"]);
