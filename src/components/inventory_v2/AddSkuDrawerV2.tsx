@@ -1961,7 +1961,64 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                   <span className="w-2 h-2 rounded-full bg-blue-600"></span>
                   Specifications
                 </h3>
-                <div className="grid grid-cols-2 gap-3">
+                  {activeFields.includes('brand') && !isProductCategory && (
+                    <div className="col-span-2 sm:col-span-1">
+                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">BRAND</label>
+                      <div className="relative" ref={brandContainerRef}>
+                        <input
+                          type="text"
+                          placeholder="Search or type brand..."
+                          value={brandSearch}
+                          onChange={e => {
+                            setBrandSearch(e.target.value);
+                            updateFormField({ brand: e.target.value });
+                          }}
+                          onFocus={() => {
+                            setShowBrandDropdown(true);
+                            setBrandAtFocus(form.brand);
+                          }}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
+                        />
+                        {showBrandDropdown && (
+                          <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg z-20 divide-y divide-gray-50">
+                            {availableBrands
+                              .filter(b => {
+                                if (brandSearch === brandAtFocus || !brandSearch.trim()) return true;
+                                return b.toLowerCase().includes(brandSearch.toLowerCase().trim());
+                              })
+                              .map(b => (
+                                <button
+                                  key={b}
+                                  type="button"
+                                  onClick={() => {
+                                    updateFormField({ brand: b });
+                                    setBrandSearch(b);
+                                    setShowBrandDropdown(false);
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-xs hover:bg-blue-50 hover:text-blue-600 transition-colors font-semibold text-gray-700 block"
+                                >
+                                  {b}
+                                </button>
+                              ))
+                            }
+                            {brandSearch.trim() && !availableBrands.some(b => b.toLowerCase() === brandSearch.trim().toLowerCase()) && (
+                              <button
+                                type="button"
+                                onClick={() => handleAddNewBrand(brandSearch)}
+                                className="w-full px-3 py-2 text-left text-xs hover:bg-green-50 text-green-600 font-bold transition-colors block"
+                              >
+                                + Add Brand "{brandSearch.trim()}"
+                              </button>
+                            )}
+                            {availableBrands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase().trim())).length === 0 && !brandSearch.trim() && (
+                              <div className="px-3 py-2 text-xs text-gray-400 italic">No brands found</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {activeFields.includes('gsm') && (
                     <div>
                       <label className="block text-[11px] font-semibold text-gray-600 mb-1">GSM</label>
@@ -2053,7 +2110,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         if (e.target.value === '__ADD_NEW__') {
                           handleAddNewOption('units');
                         } else {
-                          setForm({ ...form, unit: e.target.value });
+                          updateFormField({ unit: e.target.value });
                         }
                       }}
                       className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
@@ -2067,7 +2124,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                   </div>
 
                   {/* Attributes for Semi-Finished Goods (Group & Status removed) */}
-                  {(activeSection === 'semi' || form.category === 'Semi Finished') && (
+                  {(resolvedSection === 'semi' || activeSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi') && (
                     <>
                       {activeFields.includes('altUnit') && (
                         <div className="flex items-end h-full">
@@ -2079,7 +2136,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                 const checked = e.target.checked;
                                 setHasAltUnit(checked);
                                 if (!checked) {
-                                  setForm(prev => ({ ...prev, altUnit: '', altUnitConversion: '' }));
+                                  updateFormField({ altUnit: '', altUnitConversion: '' });
                                 }
                               }}
                               className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 border-gray-300 cursor-pointer"
@@ -2101,7 +2158,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                               if (e.target.value === '__ADD_NEW__') {
                                 handleAddNewOption('ruleTypes');
                               } else {
-                                setForm({ ...form, ruleType: e.target.value });
+                                updateFormField({ ruleType: e.target.value });
                               }
                             }}
                             className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
@@ -2122,7 +2179,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                             type="number"
                             placeholder="e.g. 112 / 132"
                             value={form.pages}
-                            onChange={e => setForm({ ...form, pages: e.target.value })}
+                            onChange={e => updateFormField({ pages: e.target.value })}
                             className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                           />
                         </div>
@@ -2136,7 +2193,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                             step="any"
                             placeholder="e.g. 10.37"
                             value={form.reamWeight}
-                            onChange={e => setForm({ ...form, reamWeight: e.target.value })}
+                            onChange={e => updateFormField({ reamWeight: e.target.value })}
                             className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                           />
                         </div>
@@ -2149,7 +2206,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                             type="number"
                             placeholder="e.g. 200 / 240"
                             value={form.booksGbl}
-                            onChange={e => setForm({ ...form, booksGbl: e.target.value })}
+                            onChange={e => updateFormField({ booksGbl: e.target.value })}
                             className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                           />
                         </div>
