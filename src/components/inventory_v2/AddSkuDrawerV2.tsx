@@ -1071,32 +1071,33 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   }, [activeSection, form.category]);
 
   const activeFields = React.useMemo(() => {
-    const matchedCatObj = (createdCategories || []).find(c => c.name === form.category);
-    let defaultBaseFields: string[] = [];
-    if (resolvedSection === 'materials' || form.category === 'Raw Material' || form.category === 'Materials' || matchedCatObj?.type === 'materials') {
-      defaultBaseFields = ['gsm', 'title', 'width', 'length', 'paperType', 'pages'];
-    } else if (resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi' || matchedCatObj?.type === 'semi') {
-      defaultBaseFields = ['gsm', 'brand', 'width', 'length', 'ruleType', 'group', 'pages'];
-    } else {
-      defaultBaseFields = ['gsm', 'brand', 'width', 'length', 'ruleType', 'pages', 'altUnit'];
-    }
-
+    const matchedCatObj = (createdCategories || []).find(c => c && c.name?.toLowerCase().trim() === (form.category || '').toLowerCase().trim());
+    
     let fieldsList: string[] = [];
-    if (categoryFieldsMap[form.category]) {
+
+    if (matchedCatObj && Array.isArray(matchedCatObj.fields) && matchedCatObj.fields.length > 0) {
+      matchedCatObj.fields.forEach(f => {
+        const lower = f.toLowerCase().trim();
+        if (lower.includes('page') || lower.includes('sheet') || lower.includes('standard sheet')) fieldsList.push('pages');
+        if (lower.includes('size') || lower.includes('width') || lower.includes('length') || lower.includes('dim')) {
+          fieldsList.push('width', 'length');
+        }
+        if (lower.includes('gsm')) fieldsList.push('gsm');
+        if (lower.includes('rule') || lower.includes('ruling')) fieldsList.push('ruleType');
+        if (lower.includes('brand')) fieldsList.push('brand');
+        if (lower.includes('paper type') || lower.includes('format')) fieldsList.push('paperType');
+        if (lower.includes('title') || lower.includes('name')) fieldsList.push('title');
+        if (lower.includes('group')) fieldsList.push('group');
+      });
+    } else if (categoryFieldsMap[form.category]) {
       fieldsList = [...categoryFieldsMap[form.category]];
     } else {
-      fieldsList = [...defaultBaseFields];
-      if (matchedCatObj?.fields?.length) {
-        matchedCatObj.fields.forEach(f => {
-          const lower = f.toLowerCase();
-          if (lower.includes('page') || lower.includes('sheet')) fieldsList.push('pages');
-          if (lower.includes('size') || lower.includes('width') || lower.includes('length') || lower.includes('dim')) {
-            fieldsList.push('width', 'length');
-          }
-          if (lower.includes('gsm')) fieldsList.push('gsm');
-          if (lower.includes('rule') || lower.includes('ruling')) fieldsList.push('ruleType');
-          if (lower.includes('brand')) fieldsList.push('brand');
-        });
+      if (resolvedSection === 'materials' || form.category === 'Materials' || form.category === 'Raw Material') {
+        fieldsList = ['gsm', 'title', 'width', 'length', 'paperType', 'pages'];
+      } else if (resolvedSection === 'semi' || form.category === 'Semi' || form.category === 'Semi Finished') {
+        fieldsList = ['gsm', 'brand', 'width', 'length', 'ruleType', 'group', 'pages'];
+      } else {
+        fieldsList = ['gsm', 'brand', 'width', 'length', 'ruleType', 'pages', 'altUnit'];
       }
     }
 
@@ -1575,6 +1576,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-bold text-gray-800 cursor-pointer appearance-none shadow-2xs pr-8"
                         required
                       >
+                        {!form.category && (
+                          <option value="" disabled>Select Category</option>
+                        )}
                         {availableCategories.map(cat => (
                           <option key={cat} value={cat}>{cat}</option>
                         ))}
