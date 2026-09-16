@@ -281,15 +281,13 @@ const SkuMasterV2: React.FC = () => {
     fieldsText: ''
   });
 
-  const [unitsList, setUnitsList] = useState<string[]>([
-    "Pcs", "Kg", "Sheets", "Reels", "Mtr", "Ream", "Gross", "Box", "Pkt", "GBL", "Bundles", "pcs", "kg"
-  ]);
+  const [unitsList, setUnitsList] = useState<string[]>([]);
 
   useEffect(() => {
     if (selectedCompany?._id) {
       getMetadataV2(selectedCompany._id).then(data => {
         if (data?.units && Array.isArray(data.units) && data.units.length > 0) {
-          setUnitsList(prev => Array.from(new Set([...data.units, ...prev])));
+          setUnitsList(data.units);
         }
       }).catch(err => {
         console.error('Failed to load settings units in SkuMasterV2:', err);
