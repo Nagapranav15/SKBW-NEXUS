@@ -59,12 +59,12 @@ const Dashboard: React.FC = () => {
   }
 
   const stats = [
-    { title: 'Customers', value: dashData?.stats?.customersCount || 0, icon: Users, color: 'text-blue-600 bg-blue-50', path: '/party/customers' },
-    { title: 'Vendors', value: dashData?.stats?.vendorsCount || 0, icon: Building2, color: 'text-green-600 bg-green-50', path: '/party/vendors' },
-    { title: 'Agents', value: dashData?.stats?.agentsCount || 0, icon: UserCheck, color: 'text-indigo-600 bg-indigo-50', path: '/party/agents' },
-    { title: 'Regions', value: dashData?.stats?.routesCount || 0, icon: Compass, color: 'text-orange-600 bg-orange-50', path: '/party/routes' },
-    { title: 'Markets', value: dashData?.stats?.marketsCount || 0, icon: MapPin, color: 'text-teal-600 bg-teal-50', path: '/party/markets' },
-    { title: 'Transporters', value: dashData?.stats?.transportersCount || 0, icon: Truck, color: 'text-red-600 bg-red-50', path: '/party/transporters' },
+    { title: 'Customers', value: dashData?.stats?.customersCount || 0, icon: Users, color: 'text-blue-600 bg-blue-50', path: '/directory?tab=customers' },
+    { title: 'Vendors', value: dashData?.stats?.vendorsCount || 0, icon: Building2, color: 'text-green-600 bg-green-50', path: '/directory?tab=vendors' },
+    { title: 'Agents', value: dashData?.stats?.agentsCount || 0, icon: UserCheck, color: 'text-indigo-600 bg-indigo-50', path: '/directory?tab=agents' },
+    { title: 'Regions', value: dashData?.stats?.routesCount || 0, icon: Compass, color: 'text-orange-600 bg-orange-50', path: '/directory?tab=regions' },
+    { title: 'Markets', value: dashData?.stats?.marketsCount || 0, icon: MapPin, color: 'text-teal-600 bg-teal-50', path: '/directory?tab=cities' },
+    { title: 'Transporters', value: dashData?.stats?.transportersCount || 0, icon: Truck, color: 'text-red-600 bg-red-50', path: '/directory?tab=transporters' },
     { title: 'Items', value: dashData?.stats?.totalItems || 0, icon: Package, color: 'text-purple-600 bg-purple-50', path: '/inventory-v2/skus' }
   ];
 
@@ -198,7 +198,7 @@ const Dashboard: React.FC = () => {
                 <p className="text-sm text-gray-600">Add new product/SKU</p>
               </button>
               
-              <button onClick={() => navigate('/party')} className="p-4 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors text-left">
+              <button onClick={() => navigate('/directory?tab=customers')} className="p-4 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors text-left">
                 <Users className="w-8 h-8 text-orange-600 mb-2" />
                 <h3 className="font-semibold text-gray-900 mb-1">Add Customer</h3>
                 <p className="text-sm text-gray-600">Add new customer</p>

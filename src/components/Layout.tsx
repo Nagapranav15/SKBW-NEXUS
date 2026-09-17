@@ -75,27 +75,27 @@ const Layout: React.FC = () => {
             break;
           case 'c':
             e.preventDefault();
-            handleNavigate('/party/customers');
+            handleNavigate('/directory?tab=customers');
             break;
           case 'v':
             e.preventDefault();
-            handleNavigate('/party/vendors');
+            handleNavigate('/directory?tab=vendors');
             break;
           case 'a':
             e.preventDefault();
-            handleNavigate('/party/agents');
+            handleNavigate('/directory?tab=agents');
             break;
           case 'r':
             e.preventDefault();
-            handleNavigate('/party/routes');
+            handleNavigate('/directory?tab=regions');
             break;
           case 'y':
             e.preventDefault();
-            handleNavigate('/party/markets');
+            handleNavigate('/directory?tab=cities');
             break;
           case 't':
             e.preventDefault();
-            handleNavigate('/party/transporters');
+            handleNavigate('/directory?tab=transporters');
             break;
           case 'g':
             e.preventDefault();
