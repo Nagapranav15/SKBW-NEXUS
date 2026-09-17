@@ -2130,8 +2130,6 @@ const PurchaseInvoicePage: React.FC = () => {
                                 </div>
                               </div>
                             )}
-                          </div>
-                        )}
                       </div>
 
                       {/* Inline Reels List inside card (matches handwritten sketch) */}
