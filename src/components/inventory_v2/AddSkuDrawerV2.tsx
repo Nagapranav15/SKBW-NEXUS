@@ -2407,7 +2407,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                   uom: item.uom,
                                   inStock: item.inStock,
                                   notes: item.notes
-                                }))
+                                })),
+                                copiedAt: Date.now()
                               };
                             }}
                             onPaste={(copied, mode) => {

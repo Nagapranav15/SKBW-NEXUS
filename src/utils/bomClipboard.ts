@@ -20,7 +20,7 @@ export interface CopiedBomPayload {
   basis?: number | string; // batch yield qty / recipe makes (e.g. 1, 100)
   basisUnit?: string;
   lines: CopiedBomMaterialLine[];
-  copiedAt: number;
+  copiedAt?: number;
 }
 
 const STORAGE_KEY = 'skbw_copied_bom_v1';
