@@ -302,12 +302,21 @@ const SkuMasterV2: React.FC = () => {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
 
-  // Sorting & Filtering
+  // Sorting & Filtering (Default strictly to natural Ascending order FG-001, FG-002, ...)
   const [sortRules, setSortRules] = useState<{ field: string; order: 'asc' | 'desc' }[]>(() => {
-    const saved = localStorage.getItem('skbw_erp_sort_rules_skus_v2');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
-    }
+    try {
+      const saved = localStorage.getItem('skbw_erp_sort_rules_skus_v2');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // If it was previously saved as skuCode desc, reset to asc
+          if (parsed[0]?.field === 'skuCode' && parsed[0]?.order === 'desc') {
+            return [{ field: 'skuCode', order: 'asc' }];
+          }
+          return parsed;
+        }
+      }
+    } catch (e) {}
     return [{ field: 'skuCode', order: 'asc' }];
   });
 
@@ -320,7 +329,7 @@ const SkuMasterV2: React.FC = () => {
       } else if (existing.order === 'asc') {
         updated = [{ field: fieldId, order: 'desc' }];
       } else {
-        updated = [];
+        updated = [{ field: 'skuCode', order: 'asc' }];
       }
       localStorage.setItem('skbw_erp_sort_rules_skus_v2', JSON.stringify(updated));
       return updated;
