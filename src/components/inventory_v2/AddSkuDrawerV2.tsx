@@ -1756,30 +1756,6 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       </div>
                     )}
 
-                    {/* 3. Rule Type */}
-                    {activeFields.includes('ruleType') && (
-                      <div>
-                        <label className="block text-[11px] font-semibold text-gray-600 mb-1">RULE TYPE</label>
-                        <select
-                          value={form.ruleType}
-                          onChange={e => {
-                            if (e.target.value === '__ADD_NEW__') {
-                              handleAddNewOption('ruleTypes');
-                            } else {
-                              updateFormField({ ruleType: e.target.value });
-                            }
-                          }}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
-                        >
-                          <option value="">-- Select Rule Type --</option>
-                          {ruleTypesList.map(rule => (
-                            <option key={rule} value={rule}>{rule}</option>
-                          ))}
-                          <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
-                        </select>
-                      </div>
-                    )}
-
                     {/* 4. Primary UOM (Base Unit) */}
                     <div>
                       <label className="block text-[11px] font-semibold text-gray-600 mb-1">
@@ -1942,7 +1918,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
             </div>
 
             {/* Group 2: Specifications */}
-            {(activeFields.includes('gsm') || activeFields.includes('title') || activeFields.includes('width') || activeFields.includes('length')) && (
+            {(activeFields.includes('gsm') || activeFields.includes('ruleType') || activeFields.includes('title') || activeFields.includes('width') || activeFields.includes('length')) && (
               <div className="space-y-4 border-t border-gray-100 pt-4">
                 <h3 className="text-xs font-bold text-gray-900 pb-1.5 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-blue-600"></span>
@@ -1959,6 +1935,29 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         onChange={e => updateFormField({ gsm: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                       />
+                    </div>
+                  )}
+
+                  {activeFields.includes('ruleType') && (
+                    <div>
+                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">RULE TYPE</label>
+                      <select
+                        value={form.ruleType}
+                        onChange={e => {
+                          if (e.target.value === '__ADD_NEW__') {
+                            handleAddNewOption('ruleTypes');
+                          } else {
+                            updateFormField({ ruleType: e.target.value });
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
+                      >
+                        <option value="">-- Select Rule Type --</option>
+                        {ruleTypesList.map(rule => (
+                          <option key={rule} value={rule}>{rule}</option>
+                        ))}
+                        <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
+                      </select>
                     </div>
                   )}
 
@@ -2187,28 +2186,6 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                   {/* Attributes for Semi-Finished Goods (Group & Status removed) */}
                   {(resolvedSection === 'semi' || activeSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi') && (
                     <>
-                      {activeFields.includes('ruleType') && (
-                        <div>
-                          <label className="block text-[11px] font-semibold text-gray-600 mb-1">RULE TYPE</label>
-                          <select
-                            value={form.ruleType}
-                            onChange={e => {
-                              if (e.target.value === '__ADD_NEW__') {
-                                handleAddNewOption('ruleTypes');
-                              } else {
-                                updateFormField({ ruleType: e.target.value });
-                              }
-                            }}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
-                          >
-                            <option value="">-- Select Rule Type --</option>
-                            {ruleTypesList.map(rule => (
-                              <option key={rule} value={rule}>{rule}</option>
-                            ))}
-                            <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
-                          </select>
-                        </div>
-                      )}
 
                       {activeFields.includes('pages') && (
                         <div>
