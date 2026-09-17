@@ -5,13 +5,15 @@ import { getParties } from '../../api/partyApi';
 import Modal from '../ui/Modal';
 import { BomCopyPasteControls } from './BomCopyPasteControls';
 import { LocationSelectModal } from './LocationSelectModal';
+import { showToast } from '../ui/Toast';
 import { 
   formatUomFormula, 
   formatUomConversionSummary, 
   validateUomConversion, 
   getUomDirection, 
   roundUomQty, 
-  UomDirection 
+  UomDirection,
+  normalizeAndDeduplicateUnits
 } from '../../utils/uomConversion';
 
 interface AddSkuDrawerV2Props {
@@ -33,20 +35,6 @@ interface AddSkuDrawerV2Props {
   onCategoryCreated?: (newCategory: { id: string; name: string; type: 'products' | 'materials' | 'semi'; uom: string; fields: string[] }) => void;
 }
 
-export const normalizeAndDeduplicateUnits = (units: string[]): string[] => {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const u of units) {
-    if (!u || !u.trim()) continue;
-    const clean = u.trim();
-    const key = clean.toLowerCase();
-    if (!seen.has(key)) {
-      seen.add(key);
-      result.push(clean);
-    }
-  }
-  return result;
-};
 
 export const SearchableMaterialDropdown: React.FC<{
   value: string;
@@ -1399,7 +1387,6 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         if (form.brand.trim() && !brandsList.includes(form.brand.trim())) {
           updatedBrands.push(form.brand.trim());
           setBrandsList(updatedBrands);
-          setExistingBrands(prev => Array.from(new Set([...prev, form.brand.trim()])));
           metadataUpdated = true;
         }
 
@@ -2820,7 +2807,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           : modalConfig.selectedFields.filter(x => x !== f.id);
                         setModalConfig(prev => ({ ...prev, selectedFields: newFields }));
                       }}
-                      className="rounded border-gray-305 text-blue-605 focus:ring-blue-500 w-3.5 h-3.5"
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
                     />
                     <span className="text-[10px] font-semibold text-gray-700">{f.label}</span>
                   </label>

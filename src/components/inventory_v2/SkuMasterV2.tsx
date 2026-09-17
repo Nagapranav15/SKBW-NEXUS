@@ -68,8 +68,8 @@ import {
   updateMetadataV2,
   SkuV2 
 } from '../../api/mfgApiV2';
-import { getActivityLogs, createActivityLog } from '../../api/activityLogApi';
-import AddSkuDrawerV2, { SearchableMaterialDropdown, normalizeAndDeduplicateUnits } from './AddSkuDrawerV2';
+import AddSkuDrawerV2, { SearchableMaterialDropdown } from './AddSkuDrawerV2';
+import { normalizeAndDeduplicateUnits } from '../../utils/uomConversion';
 import { getParties } from '../../api/partyApi';
 import { showToast } from '../ui/Toast';
 import * as XLSX from 'xlsx';

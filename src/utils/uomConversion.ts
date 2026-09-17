@@ -306,3 +306,22 @@ export function formatUomConversionSummary(sku?: SkuUomLike | null): string {
     return `${formula} (1 ${primary} = ${inverse} ${alt})`;
   }
 }
+
+/**
+ * Normalizes and deduplicates an array of unit strings (case-insensitive deduplication).
+ */
+export function normalizeAndDeduplicateUnits(units: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const u of units) {
+    if (!u || !u.trim()) continue;
+    const clean = u.trim();
+    const key = clean.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(clean);
+    }
+  }
+  return result;
+}
+

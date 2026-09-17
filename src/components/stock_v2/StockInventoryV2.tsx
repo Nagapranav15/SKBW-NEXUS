@@ -65,7 +65,7 @@ interface MaterialLotItem {
 }
 
 // Helper to determine accurate item type group: 'products' | 'materials' | 'semi'
-export const getSkuCategoryGroup = (item: SkuV2): 'products' | 'materials' | 'semi' => {
+const getSkuCategoryGroup = (item: SkuV2): 'products' | 'materials' | 'semi' => {
   const cat = (item.category || '').trim().toLowerCase();
   const name = (item.name || '').trim().toLowerCase();
   const code = (item.skuCode || '').trim().toUpperCase();
