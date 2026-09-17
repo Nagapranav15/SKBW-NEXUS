@@ -76,6 +76,8 @@ export const getSkuCategoryGroup = (item: SkuV2): 'products' | 'materials' | 'se
     cat.includes('wip') || 
     cat === 'semi finished' || 
     cat.includes('sub') || 
+    code.startsWith('SM') || 
+    code.startsWith('SFG') || 
     code.startsWith('SEM') || 
     code.startsWith('SF') ||
     name.includes('ruled cut') ||
@@ -105,7 +107,7 @@ export const getSkuCategoryGroup = (item: SkuV2): 'products' | 'materials' | 'se
   }
 
   if (code.startsWith('FG')) return 'products';
-  if (code.startsWith('SF') || code.startsWith('SEM')) return 'semi';
+  if (code.startsWith('SF') || code.startsWith('SEM') || code.startsWith('SM') || code.startsWith('SFG')) return 'semi';
   return 'materials';
 };
 

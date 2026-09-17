@@ -1373,15 +1373,51 @@ const SkuMasterV2: React.FC = () => {
 
   // Helper to determine Item Type of SKU
   const getItemType = (item: SkuV2): 'products' | 'materials' | 'semi' => {
-    const cat = (item.category || '').toLowerCase();
+    const cat = (item.category || '').toLowerCase().trim();
     const name = (item.name || '').toLowerCase();
-    const code = (item.skuCode || '').toUpperCase();
-    if (cat.includes('semi') || cat.includes('wip') || cat === 'semi finished' || cat.includes('sub') || code.startsWith('SEM') || code.startsWith('SF') || name.includes('ruled cut') || name.includes('inner signature') || name.includes('book block')) {
+    const code = (item.skuCode || '').toUpperCase().trim();
+
+    // 1. Check against dynamic categories configured in Categories tab
+    const matchedCat = (categoriesData || []).find(c => c.name.toLowerCase().trim() === cat);
+    if (matchedCat) {
+      return matchedCat.type;
+    }
+
+    // 2. Semi-finished / WIP
+    if (
+      cat.includes('semi') || 
+      cat.includes('wip') || 
+      cat === 'semi finished' || 
+      cat.includes('sub') || 
+      code.startsWith('SM-') || 
+      code.startsWith('SM') || 
+      code.startsWith('SEM') || 
+      code.startsWith('SFG') || 
+      code.startsWith('SF') || 
+      name.includes('ruled cut') || 
+      name.includes('inner signature') || 
+      name.includes('book block')
+    ) {
       return 'semi';
     }
-    if (cat.includes('raw') || cat.includes('material') || cat === 'raw material' || cat.includes('reel') || cat.includes('board') || code.startsWith('RM') || name.includes('reel') || name.includes('wire') || name.includes('adhesive') || name.includes('glue')) {
+
+    // 3. Raw Materials
+    if (
+      cat.includes('raw') || 
+      cat.includes('material') || 
+      cat === 'raw material' || 
+      cat.includes('reel') || 
+      cat.includes('board') || 
+      code.startsWith('RM-') || 
+      code.startsWith('RM') || 
+      name.includes('reel') || 
+      name.includes('wire') || 
+      name.includes('adhesive') || 
+      name.includes('glue')
+    ) {
       return 'materials';
     }
+
     return 'products';
   };
 

@@ -11,7 +11,7 @@ sequenceSchema.statics.getNextSequence = async function(prefix, session) {
   const InventoryLedger = mongoose.model("InventoryLedger");
   const PurchaseInvoiceV2 = mongoose.model("PurchaseInvoiceV2");
 
-  const opts = { new: true, upsert: true };
+  const opts = { returnDocument: 'after', upsert: true };
   if (session) opts.session = session;
 
   let seqDoc = await this.findOneAndUpdate(

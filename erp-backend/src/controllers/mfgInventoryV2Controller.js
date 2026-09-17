@@ -2068,7 +2068,7 @@ exports.updateMetadata = async (req, res, next) => {
     const doc = await Metadata.findOneAndUpdate(
       { company: companyObjId },
       { $set: updateObj },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
+      { returnDocument: 'after', upsert: true, setDefaultsOnInsert: true }
     );
     res.json(doc);
   } catch (err) {
