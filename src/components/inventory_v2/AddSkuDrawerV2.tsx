@@ -593,7 +593,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     updateFormField({
       category: trimmed
     });
-    regenerateSkuCode(trimmed);
+    if (!editSku) {
+      regenerateSkuCode(trimmed);
+    }
     setShowAddCategoryModal(false);
   };
   
@@ -1084,6 +1086,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
   // Auto-generate neat sequential SKU Code (RM-001, FG-001, SM-001) - strictly monotonic, never reusing deleted item IDs
   const regenerateSkuCode = async (targetCategory?: string) => {
+    if (editSku) return; // NEVER overwrite or change SKU Code when editing an existing SKU!
+
     let prefix: 'RM' | 'FG' | 'SM' = 'RM';
 
     const cat = targetCategory || form.category || defaultCategory || (activeSection === 'products' ? 'Finished Goods' : activeSection === 'semi' ? 'Semi Finished' : 'Raw Material');
@@ -1146,7 +1150,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   };
 
   useEffect(() => {
-    if (!editSku && isOpen) {
+    if (!editSku && isOpen && !form.skuCode) {
       regenerateSkuCode();
     }
   }, [isOpen, form.category, !editSku, activeSection]);
@@ -1519,7 +1523,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           updateFormField({
                             category: val
                           });
-                          regenerateSkuCode(val);
+                          if (!editSku) {
+                            regenerateSkuCode(val);
+                          }
                         }
                       }}
                       className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-bold text-gray-800 cursor-pointer appearance-none shadow-2xs pr-8"

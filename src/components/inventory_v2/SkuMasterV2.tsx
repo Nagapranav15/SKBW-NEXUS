@@ -1187,14 +1187,6 @@ const SkuMasterV2: React.FC = () => {
         };
       });
       setSkus(formatted);
-
-      // Check if any existing/present items contain legacy timestamp SKU codes (e.g. SKU-1789470761533-1)
-      if (!autoRenumberedRef.current && formatted.some(item => /^SKU-\d{8,}/i.test(item.skuCode || '') || /^TEMP-/i.test(item.skuCode || ''))) {
-        autoRenumberedRef.current = true;
-        setTimeout(() => {
-          handleRenumberSkus(true);
-        }, 200);
-      }
     } catch (e) {
       console.error(e);
     } finally {
