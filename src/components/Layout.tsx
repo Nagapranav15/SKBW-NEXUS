@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { 
   Menu, 
@@ -42,6 +42,26 @@ const Layout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, hasPermission, hasRole, selectedCompany } = useAuth();
+
+  // Sliding indicator refs and state
+  const navRef = useRef<HTMLElement | null>(null);
+  const itemRefs = useRef<Record<string, HTMLElement>>({});
+  const hasMountedRef = useRef(false);
+  const [indicatorStyle, setIndicatorStyle] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    height: number;
+    visible: boolean;
+    animate: boolean;
+  }>({
+    top: 0,
+    left: 0,
+    width: 0,
+    height: 0,
+    visible: false,
+    animate: false,
+  });
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -130,13 +150,85 @@ const Layout: React.FC = () => {
     }
   };
 
-  const isActive = (path: string) => {
+  const isActive = (path?: string) => {
+    if (!path) return false;
     if (path.includes('?')) {
       const [pathName, searchPart] = path.split('?');
       return location.pathname === pathName && location.search.includes(searchPart);
     }
+    if (path === '/directory') {
+      return location.pathname === '/directory' || location.pathname.startsWith('/party');
+    }
+    if (path === '/inventory-v2/skus') {
+      return location.pathname === '/inventory-v2/skus' || location.pathname === '/items';
+    }
+    if (path === '/sales/orders') {
+      return location.pathname.startsWith('/sales/orders') || location.pathname.startsWith('/sales/quotes') || location.pathname.startsWith('/sales/pending');
+    }
+    if (path === '/dashboard') {
+      return location.pathname === '/dashboard' || location.pathname === '/';
+    }
     return location.pathname === path;
   };
+
+  // Measure and reposition sliding indicator box
+  useEffect(() => {
+    const updateIndicator = (animate = true) => {
+      const navEl = navRef.current;
+      if (!navEl) return;
+
+      const activeKey = Object.keys(itemRefs.current).find((key) => {
+        return isActive(key);
+      });
+
+      if (!activeKey || !itemRefs.current[activeKey]) {
+        setIndicatorStyle((prev) => ({ ...prev, visible: false }));
+        return;
+      }
+
+      const activeEl = itemRefs.current[activeKey];
+      const navRect = navEl.getBoundingClientRect();
+      const itemRect = activeEl.getBoundingClientRect();
+
+      const top = itemRect.top - navRect.top + navEl.scrollTop;
+      const left = itemRect.left - navRect.left + navEl.scrollLeft;
+      const width = itemRect.width;
+      const height = itemRect.height;
+
+      setIndicatorStyle({
+        top,
+        left,
+        width,
+        height,
+        visible: true,
+        animate,
+      });
+    };
+
+    // Position immediately on first mount without animation, then glide smoothly on route changes
+    const shouldAnimate = hasMountedRef.current;
+    updateIndicator(shouldAnimate);
+    hasMountedRef.current = true;
+
+    // Track size changes during sidebar expand/collapse
+    let timer: NodeJS.Timeout | null = null;
+    const resizeObserver = new ResizeObserver(() => {
+      updateIndicator(true);
+    });
+
+    if (navRef.current) {
+      resizeObserver.observe(navRef.current);
+    }
+
+    timer = setTimeout(() => {
+      updateIndicator(true);
+    }, 320);
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      resizeObserver.disconnect();
+    };
+  }, [location.pathname, location.search, sidebarOpen]);
 
   const handleLogout = () => {
     setShowLogoutConfirm(true);
@@ -175,27 +267,28 @@ const Layout: React.FC = () => {
   const renderNavItem = (item: { label: string; path?: string; icon: any; permission?: any; action?: () => void }) => {
     if (item.permission && !hasPermission(item.permission)) return null;
     const active = item.path ? isActive(item.path) : false;
+    const itemKey = item.path || item.label;
 
     return (
       <button
         key={item.label}
+        ref={(el) => {
+          if (el) itemRefs.current[itemKey] = el;
+          else delete itemRefs.current[itemKey];
+        }}
         onClick={() => {
           if (item.action) item.action();
           else if (item.path) handleNavigate(item.path);
         }}
-        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-all duration-150 relative group cursor-pointer ${
+        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs relative z-10 group cursor-pointer transition-colors duration-200 ${
           active
-            ? 'bg-blue-50/80 text-blue-700 font-extrabold shadow-2xs'
+            ? 'text-blue-700 font-extrabold'
             : 'text-gray-600 hover:bg-gray-50/80 hover:text-gray-900 font-bold'
         }`}
         title={!sidebarOpen ? item.label : undefined}
       >
-        {/* Left active border line accent matching Makoro screenshot */}
-        {active && (
-          <div className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-blue-600 rounded-r-full" />
-        )}
         <div className={`flex items-center space-x-3 ${!sidebarOpen ? 'mx-auto' : ''}`}>
-          <item.icon className={`w-4 h-4 shrink-0 ${active ? 'text-blue-600 stroke-[2.2]' : 'text-gray-400 group-hover:text-gray-600'}`} />
+          <item.icon className={`w-4 h-4 shrink-0 transition-colors duration-200 ${active ? 'text-blue-600 stroke-[2.2]' : 'text-gray-400 group-hover:text-gray-600'}`} />
           {sidebarOpen && <span className="truncate">{item.label}</span>}
         </div>
       </button>
@@ -250,7 +343,25 @@ const Layout: React.FC = () => {
         </div>
 
         {/* Navigation Sections Scroll area */}
-        <nav className="flex-1 p-3 space-y-1.5 overflow-y-auto custom-scrollbar">
+        <nav ref={navRef} className="flex-1 p-3 space-y-1.5 overflow-y-auto custom-scrollbar relative">
+          {/* Sliding active highlighted box */}
+          <div
+            className="absolute pointer-events-none rounded-xl bg-blue-50/90 border border-blue-200/50 shadow-2xs z-0"
+            style={{
+              top: `${indicatorStyle.top}px`,
+              left: `${indicatorStyle.left}px`,
+              width: `${indicatorStyle.width}px`,
+              height: `${indicatorStyle.height}px`,
+              opacity: indicatorStyle.visible ? 1 : 0,
+              transition: indicatorStyle.animate
+                ? 'top 300ms cubic-bezier(0.25, 1, 0.5, 1), left 250ms cubic-bezier(0.25, 1, 0.5, 1), width 250ms cubic-bezier(0.25, 1, 0.5, 1), height 250ms ease, opacity 180ms ease'
+                : 'none',
+            }}
+          >
+            {/* Left active border line accent */}
+            <div className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-blue-600 rounded-r-full shadow-xs shadow-blue-500/30" />
+          </div>
+
           {/* Top Standalone Dashboard Item */}
           {renderNavItem({
             label: 'Dashboard',
