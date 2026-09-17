@@ -4635,12 +4635,12 @@ const SkuMasterV2: React.FC = () => {
             </div>
 
             <div>
-              <label className="block font-semibold text-gray-700 mb-1">Field Attributes (comma separated)</label>
+              <label className="block font-semibold text-gray-700 mb-1">Field Attributes / Notes (optional)</label>
               <input
                 type="text"
                 value={categoryForm.fieldsText}
                 onChange={(e) => setCategoryForm(prev => ({ ...prev, fieldsText: e.target.value }))}
-                placeholder="Pages, Size, GSM, Ruling"
+                placeholder="e.g. Type, Specifications, Notes"
                 className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
               />
             </div>

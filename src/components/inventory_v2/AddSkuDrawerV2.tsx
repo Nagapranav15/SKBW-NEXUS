@@ -1071,52 +1071,16 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   }, [activeSection, form.category]);
 
   const activeFields = React.useMemo(() => {
-    const matchedCatObj = (createdCategories || []).find(c => c.name === form.category);
-    let defaultBaseFields: string[] = [];
-    if (resolvedSection === 'materials' || form.category === 'Raw Material' || form.category === 'Materials' || matchedCatObj?.type === 'materials') {
-      defaultBaseFields = ['gsm', 'title', 'width', 'length', 'paperType', 'pages', 'altUnit'];
-    } else if (resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi' || matchedCatObj?.type === 'semi') {
-      defaultBaseFields = ['gsm', 'title', 'width', 'length', 'ruleType', 'group', 'pages', 'altUnit'];
+    // Field attributes are purely category notes and do NOT affect or restrict any fields when adding/editing an item.
+    if (resolvedSection === 'materials' || form.category === 'Raw Material' || form.category === 'Materials' || (!isProductCategory && resolvedSection !== 'semi')) {
+      return ['gsm', 'title', 'width', 'length', 'paperType', 'pages', 'reamWeight', 'booksGbl', 'altUnit'];
+    } else if (resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi') {
+      return ['gsm', 'title', 'width', 'length', 'ruleType', 'group', 'pages', 'reamWeight', 'booksGbl', 'altUnit'];
     } else {
-      defaultBaseFields = ['gsm', 'brand', 'width', 'length', 'ruleType', 'pages', 'altUnit'];
+      // Products / Finished Goods
+      return ['gsm', 'brand', 'title', 'width', 'length', 'ruleType', 'pages', 'reamWeight', 'booksGbl', 'altUnit'];
     }
-
-    let fieldsList: string[] = [];
-    if (categoryFieldsMap[form.category]) {
-      fieldsList = [...categoryFieldsMap[form.category]];
-    } else {
-      fieldsList = [...defaultBaseFields];
-      if (matchedCatObj?.fields?.length) {
-        matchedCatObj.fields.forEach(f => {
-          const lower = f.toLowerCase();
-          if (lower.includes('page') || lower.includes('sheet')) fieldsList.push('pages');
-          if (lower.includes('size') || lower.includes('width') || lower.includes('length') || lower.includes('dim')) {
-            fieldsList.push('width', 'length');
-          }
-          if (lower.includes('gsm')) fieldsList.push('gsm');
-          if (lower.includes('rule') || lower.includes('ruling')) fieldsList.push('ruleType');
-          if (lower.includes('brand')) fieldsList.push('brand');
-          if (lower.includes('title') || lower.includes('desc')) fieldsList.push('title');
-          if (lower.includes('alt') || lower.includes('auom') || lower.includes('unit')) fieldsList.push('altUnit');
-        });
-      }
-    }
-
-    // Finished Goods / Products must ALWAYS have 'brand' and 'altUnit' enabled!
-    if (resolvedSection === 'products' || isProductCategory || form.category === 'Finished Goods' || form.category === 'Products') {
-      if (!fieldsList.includes('brand')) fieldsList.push('brand');
-      if (!fieldsList.includes('altUnit')) fieldsList.push('altUnit');
-    }
-
-    // Semi and Materials must have 'title' and 'altUnit', but NOT 'brand'
-    if (resolvedSection === 'semi' || resolvedSection === 'materials' || !isProductCategory || form.category === 'Raw Material' || form.category === 'Materials' || form.category === 'Semi Finished' || form.category === 'Semi') {
-      fieldsList = fieldsList.filter(f => f !== 'brand');
-      if (!fieldsList.includes('title')) fieldsList.push('title');
-      if (!fieldsList.includes('altUnit')) fieldsList.push('altUnit');
-    }
-
-    return Array.from(new Set(fieldsList));
-  }, [categoryFieldsMap, form.category, createdCategories, isProductCategory, activeSection, resolvedSection]);
+  }, [resolvedSection, form.category, isProductCategory]);
 
   // Auto-generate neat sequential SKU Code (RM-001, FG-001, SM-001) - strictly monotonic, never reusing deleted item IDs
   const regenerateSkuCode = async (targetCategory?: string) => {
@@ -3043,12 +3007,12 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
             </div>
 
             <div>
-              <label className="block font-semibold text-gray-700 mb-1">Field Attributes (comma separated)</label>
+              <label className="block font-semibold text-gray-700 mb-1">Field Attributes / Notes (optional)</label>
               <input
                 type="text"
                 value={categoryModalForm.fieldsText}
                 onChange={(e) => setCategoryModalForm(prev => ({ ...prev, fieldsText: e.target.value }))}
-                placeholder="Pages, Size, GSM, Ruling"
+                placeholder="e.g. Type, Specifications, Notes"
                 className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500 font-semibold"
               />
             </div>
