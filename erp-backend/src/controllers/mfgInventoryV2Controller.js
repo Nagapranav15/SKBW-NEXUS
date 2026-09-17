@@ -2143,6 +2143,9 @@ exports.getMetadata = async (req, res, next) => {
       return res.status(400).json({ msg: "companyId query parameter is required" });
     }
     const companyObjId = toObjectId(companyId);
+    if (!companyObjId) {
+      return res.status(400).json({ msg: "Invalid companyId" });
+    }
     let doc = await Metadata.findOne({ company: companyObjId });
     if (!doc) {
       doc = new Metadata({ 
@@ -2170,6 +2173,9 @@ exports.updateMetadata = async (req, res, next) => {
       return res.status(400).json({ msg: "companyId is required" });
     }
     const companyObjId = toObjectId(companyId);
+    if (!companyObjId) {
+      return res.status(400).json({ msg: "Invalid companyId" });
+    }
     const updateObj = {};
     if (units !== undefined) updateObj.units = units;
     if (categories !== undefined) updateObj.categories = categories;

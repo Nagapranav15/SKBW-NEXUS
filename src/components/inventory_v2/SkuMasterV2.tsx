@@ -273,10 +273,10 @@ const SkuMasterV2: React.FC = () => {
       }
 
       getMetadataV2(companyId).then(data => {
-        if (data?.units && Array.isArray(data.units) && data.units.length > 0) {
+        if (data?.units && Array.isArray(data.units)) {
           setUnitsList(normalizeAndDeduplicateUnits(data.units));
         } else {
-          setUnitsList(["Pcs", "Kg", "Ream", "GBL", "Sheets", "Reels", "Mtr", "Gross", "Box", "Pkt"]);
+          setUnitsList([]);
         }
         if (data?.categoryCards !== undefined && Array.isArray(data.categoryCards)) {
           setCategoriesData(data.categoryCards);
@@ -289,6 +289,7 @@ const SkuMasterV2: React.FC = () => {
       });
     } else {
       setCategoriesData([]);
+      setUnitsList([]);
     }
   }, [selectedCompany?._id]);
 

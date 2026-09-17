@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const metadataSchema = new mongoose.Schema({
-  company: { type: mongoose.Schema.Types.ObjectId, ref: "Company", required: true, index: true },
+  company: { type: mongoose.Schema.Types.ObjectId, ref: "Company", required: true, unique: true, index: true },
   units: { type: [String], default: [] },
   categories: { type: [String], default: ["products", "materials", "semi"] },
   ruleTypes: { type: [String], default: [] },

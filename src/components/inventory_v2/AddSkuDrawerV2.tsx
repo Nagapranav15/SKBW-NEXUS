@@ -375,7 +375,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   }, [isOpen, editSku, customColumns, customColumnValues]);
 
   const [categoriesList, setCategoriesList] = useState<string[]>([]);
-  const [unitsList, setUnitsList] = useState<string[]>(["Pcs", "Kg", "Ream", "GBL", "Sheets", "Reels", "Mtr", "Gross", "Box", "Pkt"]);
+  const [unitsList, setUnitsList] = useState<string[]>([]);
   const [ruleTypesList, setRuleTypesList] = useState<string[]>(["Plain", "Single Line", "Double Line", "Square Ruled", "Four Line", "Unruled"]);
   const [groupsList, setGroupsList] = useState<string[]>([]);
   const [brandsList, setBrandsList] = useState<string[]>([]);
@@ -686,11 +686,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       if (data) {
         if (data.categories?.length) setCategoriesList(data.categories);
         if (Array.isArray(data.units)) {
-          if (data.units.length > 0) {
-            setUnitsList(normalizeAndDeduplicateUnits(data.units));
-          } else {
-            setUnitsList(["Pcs", "Kg", "Ream", "GBL", "Sheets", "Reels", "Mtr", "Gross", "Box", "Pkt"]);
-          }
+          setUnitsList(normalizeAndDeduplicateUnits(data.units));
         }
         if (data.ruleTypes?.length) setRuleTypesList(data.ruleTypes);
         if (data.groups?.length) setGroupsList(data.groups);

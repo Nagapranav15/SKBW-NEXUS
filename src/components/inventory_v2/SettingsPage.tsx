@@ -49,9 +49,7 @@ const SettingsPage: React.FC = () => {
       const data = await getMetadataV2(selectedCompany?._id || '');
       if (data) {
         setCategories(data.categories || []);
-        const dbUnits = data.units && data.units.length > 0
-          ? data.units
-          : ["Pcs", "Kg", "Ream", "GBL", "Sheets", "Reels", "Mtr", "Gross", "Box", "Pkt"];
+        const dbUnits = Array.isArray(data.units) ? data.units : [];
         setUnits(normalizeAndDeduplicateUnits(dbUnits));
         setRuleTypes(data.ruleTypes || []);
         setGroups(data.groups || []);
