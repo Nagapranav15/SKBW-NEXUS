@@ -1635,8 +1635,11 @@ const SkuMasterV2: React.FC = () => {
             case 'name':
               itemVal = item.name || item.firmName || '';
               break;
+            case 'brand':
+              itemVal = item.brand || '';
+              break;
             case 'category':
-              itemVal = item.category || item.group || '';
+              itemVal = item.category || item.itemCategory || item.group || '';
               break;
             case 'unit':
             case 'uom':
@@ -1644,6 +1647,10 @@ const SkuMasterV2: React.FC = () => {
               break;
             case 'gsm':
               itemVal = Number(item.gsm) || 0;
+              isNumeric = true;
+              break;
+            case 'pages':
+              itemVal = Number(item.pages) || 0;
               isNumeric = true;
               break;
             case 'openingStock':
@@ -1659,6 +1666,10 @@ const SkuMasterV2: React.FC = () => {
               itemVal = Number(item.rate !== undefined ? item.rate : item.price !== undefined ? item.price : item.unitPrice) || 0;
               isNumeric = true;
               break;
+            case 'hsn':
+            case 'hsnCode':
+              itemVal = item.hsn || item.hsnCode || '';
+              break;
             default:
               itemVal = (item as any)[rule.field] !== undefined ? (item as any)[rule.field] : '';
               if (typeof itemVal === 'number') isNumeric = true;
@@ -1673,7 +1684,7 @@ const SkuMasterV2: React.FC = () => {
               if (isNumeric && !isNaN(Number(targetStr))) {
                 return Number(itemVal) === Number(targetStr);
               }
-              return valStr === targetStr || valStr.includes(targetStr) || (cleanTarget.length >= 2 && valStr.includes(cleanTarget));
+              return valStr === targetStr;
             case 'contains':
               return valStr.includes(targetStr) || (cleanTarget.length >= 2 && valStr.includes(cleanTarget));
             case 'greater_than':
@@ -1704,7 +1715,7 @@ const SkuMasterV2: React.FC = () => {
             const comp = String(fieldA).localeCompare(String(fieldB), undefined, { numeric: true, sensitivity: 'base' });
             if (comp !== 0) return rule.order === 'asc' ? comp : -comp;
             continue;
-          } else if (rule.field === 'size') {
+          } else if (rule.field === 'size' || rule.field === 'dimensions') {
             fieldA = (a.width || 0) * (a.length || 0);
             fieldB = (b.width || 0) * (b.length || 0);
           } else if (rule.field === 'workOrders') {
@@ -1714,8 +1725,20 @@ const SkuMasterV2: React.FC = () => {
             fieldA = getDispatchOrderCount(a);
             fieldB = getDispatchOrderCount(b);
           } else if (rule.field === 'category') {
-            fieldA = a.group || a.category || '';
-            fieldB = b.group || b.category || '';
+            fieldA = a.category || a.itemCategory || a.group || '';
+            fieldB = b.category || b.itemCategory || b.group || '';
+          } else if (rule.field === 'pages') {
+            fieldA = Number(a.pages) || 0;
+            fieldB = Number(b.pages) || 0;
+          } else if (rule.field === 'gsm') {
+            fieldA = Number(a.gsm) || 0;
+            fieldB = Number(b.gsm) || 0;
+          } else if (rule.field === 'openingStock' || rule.field === 'stock') {
+            fieldA = Number(a.openingStock !== undefined ? a.openingStock : a.stock !== undefined ? a.stock : a.currentStock) || 0;
+            fieldB = Number(b.openingStock !== undefined ? b.openingStock : b.stock !== undefined ? b.stock : b.currentStock) || 0;
+          } else if (rule.field === 'rate' || rule.field === 'price') {
+            fieldA = Number(a.rate !== undefined ? a.rate : a.price !== undefined ? a.price : a.unitPrice) || 0;
+            fieldB = Number(b.rate !== undefined ? b.rate : b.price !== undefined ? b.price : b.unitPrice) || 0;
           } else if (rule.field === 'altUnitConversion') {
             fieldA = a.altUnitConversion || 0;
             fieldB = b.altUnitConversion || 0;
@@ -1746,6 +1769,9 @@ const SkuMasterV2: React.FC = () => {
       list.sort((a, b) => {
         const codeA = a.skuCode || a.code || '';
         const codeB = b.skuCode || b.code || '';
+        if (!codeA && !codeB) return (a.name || '').localeCompare(b.name || '');
+        if (!codeA) return 1;
+        if (!codeB) return -1;
         return codeA.localeCompare(codeB, undefined, { numeric: true, sensitivity: 'base' });
       });
     }
