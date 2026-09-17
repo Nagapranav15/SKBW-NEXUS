@@ -37,7 +37,7 @@ async function syncWarehouseDefaults() {
 
       if (!factory) {
         factory = await WarehouseLocationV2.create({
-          name: "SKBW Factory",
+          name: "SKBW",
           level: "Factory",
           parentId: null,
           capacity: 1000000,
@@ -104,13 +104,13 @@ async function syncWarehouseDefaults() {
         },
         {
           $set: {
-            initialLocation: "SKBW Factory",
-            defaultLocation: "SKBW Factory",
+            initialLocation: "SKBW",
+            defaultLocation: "SKBW",
             initialLocationId: String(storageLoc._id)
           }
         }
       );
-      console.log(` Updated ${updateResult.modifiedCount} SKUs to default location 'SKBW Factory'.`);
+      console.log(` Updated ${updateResult.modifiedCount} SKUs to default location 'SKBW'.`);
 
       // Find SKUs with opening stock that do not yet have ledger records
       const skusWithStock = await SkuV2.find({
@@ -151,7 +151,7 @@ async function syncWarehouseDefaults() {
               floorId: floor._id,
               zoneId: zone._id,
               locationId: storageLoc._id,
-              remarks: "Synchronized opening stock into SKBW Factory",
+              remarks: "Synchronized opening stock into SKBW",
               company: companyObjId,
               status: "Posted"
             });
@@ -165,7 +165,7 @@ async function syncWarehouseDefaults() {
               qtyIn: qty,
               qtyOut: 0,
               balanceAfter: qty,
-              remarks: "Synchronized opening stock into SKBW Factory",
+              remarks: "Synchronized opening stock into SKBW",
               company: companyObjId
             });
           }

@@ -981,20 +981,25 @@ const SkuMasterV2: React.FC = () => {
         let resolvedLiveStock: number | null = null;
 
         // 1. Resolve Initial Assigned Location
-        const directLoc = (selectedSkuDetails as any)?.initialLocationId || 
-                         (selectedSkuDetails as any)?.initialLocation || 
+        const directLoc = (selectedSkuDetails as any)?.initialLocation || 
+                         (selectedSkuDetails as any)?.defaultLocation ||
+                         (selectedSkuDetails as any)?.initialLocationId || 
                          (selectedSkuDetails as any)?.locationId || 
                          (selectedSkuDetails as any)?.warehouseLocation || 
                          (selectedSkuDetails as any)?.location || 
                          (selectedSkuDetails as any)?.locationName || 
-                         (selectedSkuDetails as any)?.defaultLocation ||
-                         'Main Warehouse - Bay A1';
+                         'SKBW';
         if (directLoc) {
-          const locPath = buildModalLocationPath(directLoc, hierarchy);
-          if (locPath) {
-            initialLocStr = locPath;
+          const directStr = typeof directLoc === 'object' ? (directLoc.name || 'SKBW') : String(directLoc).trim();
+          if (directStr.toLowerCase().includes('skbw') || directStr === 'Main Warehouse - Bay A1' || !directStr) {
+            initialLocStr = 'SKBW';
           } else {
-            initialLocStr = typeof directLoc === 'object' ? (directLoc.name || 'Main Warehouse - Bay A1') : String(directLoc);
+            const locPath = buildModalLocationPath(directLoc, hierarchy);
+            if (locPath) {
+              initialLocStr = locPath.toLowerCase().includes('skbw') ? 'SKBW' : locPath;
+            } else {
+              initialLocStr = directStr;
+            }
           }
         }
 
@@ -2536,8 +2541,8 @@ const SkuMasterV2: React.FC = () => {
           minStockLevel,
           reorderLevel,
           preferredVendor,
-          initialLocation: 'SKBW Factory',
-          defaultLocation: 'SKBW Factory',
+          initialLocation: 'SKBW',
+          defaultLocation: 'SKBW',
           status,
           brand: brand || undefined,
           ruleType: ruleType || undefined,

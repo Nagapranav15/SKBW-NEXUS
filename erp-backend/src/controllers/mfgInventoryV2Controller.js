@@ -94,9 +94,9 @@ async function ensureDefaultWarehouseLocations(companyId) {
     return { factory, floor, zone, storageLoc, all: locations };
   }
 
-  // Create default hierarchy: SKBW Factory -> Ground Floor -> Main Storage Zone -> Bay A1
+  // Create default hierarchy: SKBW -> Ground Floor -> Main Storage Zone -> Bay A1
   const factory = await WarehouseLocationV2.create({
-    name: "SKBW Factory",
+    name: "SKBW",
     level: "Factory",
     parentId: null,
     capacity: 1000000,
@@ -224,7 +224,7 @@ exports.createSku = async (req, res, next) => {
     }
 
     const defaultStructure = await ensureDefaultWarehouseLocations(company);
-    const assignedLocation = initialLocationId || req.body.initialLocation || defaultLocation || "SKBW Factory";
+    const assignedLocation = initialLocationId || req.body.initialLocation || defaultLocation || "SKBW";
     const assignedLocationId = initialLocationId || (defaultStructure?.storageLoc?._id || defaultStructure?.factory?._id);
 
     const newSku = new SkuV2({
@@ -251,8 +251,8 @@ exports.createSku = async (req, res, next) => {
       reorderLevel: reorderLevel !== undefined && reorderLevel !== null && reorderLevel !== '' ? Number(reorderLevel) : undefined,
       preferredVendor: preferredVendor || "",
       initialLocationId: typeof assignedLocationId === 'object' ? String(assignedLocationId._id || assignedLocationId) : String(assignedLocationId),
-      initialLocation: typeof assignedLocation === 'object' ? (assignedLocation.name || "SKBW Factory") : String(assignedLocation),
-      defaultLocation: typeof assignedLocation === 'object' ? (assignedLocation.name || "SKBW Factory") : String(assignedLocation),
+      initialLocation: typeof assignedLocation === 'object' ? (assignedLocation.name || "SKBW") : String(assignedLocation),
+      defaultLocation: typeof assignedLocation === 'object' ? (assignedLocation.name || "SKBW") : String(assignedLocation),
       status: status || "Active",
       bomItems: req.body.bomItems || [],
       processSteps: req.body.processSteps || [],
@@ -292,7 +292,7 @@ exports.createSku = async (req, res, next) => {
           floorId: defaultStructure.floor._id,
           zoneId: defaultStructure.zone._id,
           locationId: defaultStructure.storageLoc._id,
-          remarks: "Initial opening stock assigned during item creation in SKBW Factory",
+          remarks: "Initial opening stock assigned during item creation in SKBW",
           company: toObjectId(company),
           status: "Posted"
         });
@@ -306,7 +306,7 @@ exports.createSku = async (req, res, next) => {
           qtyIn: newSku.openingStock,
           qtyOut: 0,
           balanceAfter: newSku.openingStock,
-          remarks: "Initial opening stock assigned during item creation in SKBW Factory",
+          remarks: "Initial opening stock assigned during item creation in SKBW",
           company: toObjectId(company),
           userId: req.user?.id ? toObjectId(req.user.id) : undefined
         });
@@ -319,7 +319,7 @@ exports.createSku = async (req, res, next) => {
       action: "CREATE",
       entityType: "SkuV2",
       entityName: newSku.skuCode,
-      details: `Created SKU '${newSku.name}' (${newSku.skuCode}) with initial location SKBW Factory.`,
+      details: `Created SKU '${newSku.name}' (${newSku.skuCode}) with initial location SKBW.`,
       performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
       company: newSku.company
     }).catch(e => console.error("ActivityLog error:", e));
@@ -685,8 +685,8 @@ exports.bulkImportSkus = async (req, res, next) => {
         title: item.title || "",
         preferredVendor: item.preferredVendor || "",
         initialLocationId: defaultStorageLocId,
-        initialLocation: "SKBW Factory",
-        defaultLocation: "SKBW Factory",
+        initialLocation: "SKBW",
+        defaultLocation: "SKBW",
         reorderLevel: item.reorderLevel !== undefined && item.reorderLevel !== null && item.reorderLevel !== '' ? Number(item.reorderLevel) : undefined,
         status: item.status || "Active",
         company: companyObjId,
@@ -710,7 +710,7 @@ exports.bulkImportSkus = async (req, res, next) => {
       createdCount = result.upsertedCount || 0;
       modifiedCount = result.modifiedCount || 0;
 
-      // Ensure opening stock ledger entries exist in SKBW Factory
+      // Ensure opening stock ledger entries exist in SKBW
       if (defaultStructure) {
         const importedSkus = await SkuV2.find({ 
           company: companyObjId, 
@@ -738,7 +738,7 @@ exports.bulkImportSkus = async (req, res, next) => {
               floorId: defaultStructure.floor._id,
               zoneId: defaultStructure.zone._id,
               locationId: defaultStructure.storageLoc._id,
-              remarks: "Imported initial opening stock in SKBW Factory",
+              remarks: "Imported initial opening stock in SKBW",
               company: companyObjId,
               status: "Posted"
             }).catch(e => console.error("Error creating opening stock ledger on import:", e));
@@ -752,7 +752,7 @@ exports.bulkImportSkus = async (req, res, next) => {
               qtyIn: s.openingStock,
               qtyOut: 0,
               balanceAfter: s.openingStock,
-              remarks: "Imported initial opening stock in SKBW Factory",
+              remarks: "Imported initial opening stock in SKBW",
               company: companyObjId,
               userId: req.user?.id ? toObjectId(req.user.id) : undefined
             }).catch(e => console.error("Error creating InventoryLedgerV2 on import:", e));
@@ -768,7 +768,7 @@ exports.bulkImportSkus = async (req, res, next) => {
         action: "IMPORT",
         entityType: "SkuV2",
         entityName: "Bulk Import",
-        details: `Bulk imported ${totalProcessed} SKUs (${createdCount} created, ${modifiedCount} updated) with default location SKBW Factory.`,
+        details: `Bulk imported ${totalProcessed} SKUs (${createdCount} created, ${modifiedCount} updated) with default location SKBW.`,
         performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
         company: companyObjId
       }).catch(e => console.error("ActivityLog error:", e));
