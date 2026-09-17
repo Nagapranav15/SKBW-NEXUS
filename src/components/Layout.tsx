@@ -280,15 +280,15 @@ const Layout: React.FC = () => {
           if (item.action) item.action();
           else if (item.path) handleNavigate(item.path);
         }}
-        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs relative z-10 group cursor-pointer transition-colors duration-200 ${
+        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs relative z-10 group cursor-pointer transition-colors duration-150 ${
           active
-            ? 'text-blue-700 font-extrabold'
-            : 'text-gray-600 hover:bg-gray-50/80 hover:text-gray-900 font-bold'
+            ? 'text-blue-600 font-semibold'
+            : 'text-gray-600 hover:text-gray-900 font-medium'
         }`}
         title={!sidebarOpen ? item.label : undefined}
       >
-        <div className={`flex items-center space-x-3 ${!sidebarOpen ? 'mx-auto' : ''}`}>
-          <item.icon className={`w-4 h-4 shrink-0 transition-colors duration-200 ${active ? 'text-blue-600 stroke-[2.2]' : 'text-gray-400 group-hover:text-gray-600'}`} />
+        <div className={`flex items-center space-x-2.5 ${!sidebarOpen ? 'mx-auto' : ''}`}>
+          <item.icon className={`w-4 h-4 shrink-0 transition-colors duration-150 ${active ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
           {sidebarOpen && <span className="truncate">{item.label}</span>}
         </div>
       </button>
@@ -305,29 +305,29 @@ const Layout: React.FC = () => {
         />
       )}
 
-      {/* Sidebar (Makoro Minimalist Vibe with Electric Blue Accents) */}
+      {/* Sidebar (Minimalist & Clean) */}
       <div className={`
         fixed inset-y-0 left-0 z-50 md:relative md:z-0
         ${sidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64 md:translate-x-0 md:w-16'}
-        bg-white border-r border-gray-200/80 shadow-xs transition-all duration-300 flex flex-col h-full overflow-hidden
+        bg-white border-r border-gray-150 shadow-2xs transition-all duration-300 flex flex-col h-full overflow-hidden
       `}>
         {/* Brand Header */}
-        <div className="p-4 border-b border-gray-100 flex items-center justify-between shrink-0">
-          <div className="flex items-center space-x-3 overflow-hidden">
+        <div className="p-3.5 border-b border-gray-100 flex items-center justify-between shrink-0">
+          <div className="flex items-center space-x-2.5 overflow-hidden">
             {/* Logo Avatar Badge */}
-            <div className="w-9 h-9 rounded-full border border-gray-200 bg-white flex items-center justify-center font-bold text-gray-900 shrink-0 shadow-2xs">
+            <div className="w-8 h-8 rounded-lg border border-gray-200/80 bg-slate-50 flex items-center justify-center font-bold text-gray-900 shrink-0">
               {selectedCompany?.logo ? (
-                <img src={selectedCompany.logo} alt={selectedCompany.name} className="w-full h-full object-cover rounded-full" />
+                <img src={selectedCompany.logo} alt={selectedCompany.name} className="w-full h-full object-cover rounded-lg" />
               ) : (
-                <span className="text-sm font-black text-blue-600">M</span>
+                <span className="text-xs font-black text-blue-600">M</span>
               )}
             </div>
             {sidebarOpen && (
               <div className="truncate">
-                <h2 className="font-extrabold text-gray-900 text-xs tracking-wider uppercase truncate">
+                <h2 className="font-bold text-gray-900 text-xs tracking-wide uppercase truncate">
                   {selectedCompany?.name || 'SKBW CORE'}
                 </h2>
-                <p className="text-[10px] text-gray-400 font-semibold truncate">ERP Management System</p>
+                <p className="text-[10px] text-gray-400 font-medium truncate">ERP Management System</p>
               </div>
             )}
           </div>
@@ -335,18 +335,18 @@ const Layout: React.FC = () => {
           {/* Collapse / Expand Toggle Button */}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="w-7 h-7 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-500 transition-all cursor-pointer shrink-0"
+            className="w-6 h-6 rounded-md border border-gray-200/70 hover:bg-gray-50 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-all cursor-pointer shrink-0"
             title={sidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}
           >
-            {sidebarOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            {sidebarOpen ? <ChevronLeft className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
           </button>
         </div>
 
         {/* Navigation Sections Scroll area */}
-        <nav ref={navRef} className="flex-1 p-3 space-y-1.5 overflow-y-auto custom-scrollbar relative">
-          {/* Sliding active highlighted box */}
+        <nav ref={navRef} className="flex-1 p-2.5 space-y-1 overflow-y-auto custom-scrollbar relative">
+          {/* Minimal Smooth Sliding active highlighted pill */}
           <div
-            className="absolute pointer-events-none rounded-xl bg-blue-50/90 border border-blue-200/50 shadow-2xs z-0"
+            className="absolute pointer-events-none rounded-lg bg-blue-50/80 border border-blue-100/50 z-0"
             style={{
               top: `${indicatorStyle.top}px`,
               left: `${indicatorStyle.left}px`,
@@ -354,13 +354,10 @@ const Layout: React.FC = () => {
               height: `${indicatorStyle.height}px`,
               opacity: indicatorStyle.visible ? 1 : 0,
               transition: indicatorStyle.animate
-                ? 'top 300ms cubic-bezier(0.25, 1, 0.5, 1), left 250ms cubic-bezier(0.25, 1, 0.5, 1), width 250ms cubic-bezier(0.25, 1, 0.5, 1), height 250ms ease, opacity 180ms ease'
+                ? 'top 220ms cubic-bezier(0.2, 0, 0, 1), left 200ms cubic-bezier(0.2, 0, 0, 1), width 200ms cubic-bezier(0.2, 0, 0, 1), height 200ms ease, opacity 150ms ease'
                 : 'none',
             }}
-          >
-            {/* Left active border line accent */}
-            <div className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-blue-600 rounded-r-full shadow-xs shadow-blue-500/30" />
-          </div>
+          />
 
           {/* Top Standalone Dashboard Item */}
           {renderNavItem({
@@ -375,13 +372,13 @@ const Layout: React.FC = () => {
             if (visibleItems.length === 0) return null;
 
             return (
-              <div key={idx} className="pt-2">
+              <div key={idx} className="pt-1.5">
                 {sidebarOpen ? (
-                  <div className="px-3 pt-2 pb-1 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                  <div className="px-3 pt-2 pb-0.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
                     {section.title}
                   </div>
                 ) : (
-                  <div className="my-2 border-t border-gray-100" />
+                  <div className="my-1.5 border-t border-gray-100" />
                 )}
                 <div className="space-y-0.5">
                   {visibleItems.map(item => renderNavItem(item))}
