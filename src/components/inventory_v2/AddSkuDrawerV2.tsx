@@ -396,17 +396,18 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     if (editSku) {
       const catLower = (editSku.category || '').toLowerCase().trim();
       const codeUpper = (editSku.skuCode || '').toUpperCase().trim();
-      if (catLower.includes('semi') || catLower.includes('wip') || codeUpper.startsWith('SM') || codeUpper.startsWith('SF')) {
+      const matched = (createdCategories || []).find(c => c && c.name?.toLowerCase().trim() === catLower);
+      if (matched?.type) return matched.type;
+
+      if (catLower.includes('semi') || catLower.includes('wip') || codeUpper.startsWith('SM') || codeUpper.startsWith('SF') || codeUpper.startsWith('SEM')) {
         return 'semi';
       }
       if (catLower.includes('raw') || catLower.includes('material') || catLower.includes('reel') || codeUpper.startsWith('RM')) {
         return 'materials';
       }
-      if (catLower.includes('finish') || catLower.includes('product') || catLower.includes('note') || codeUpper.startsWith('FG')) {
+      if (catLower.includes('finish') || catLower.includes('product') || codeUpper.startsWith('FG')) {
         return 'products';
       }
-      const matched = (createdCategories || []).find(c => c && c.name?.toLowerCase().trim() === catLower);
-      if (matched?.type) return matched.type;
     }
     if (activeSection === 'semi') return 'semi';
     if (activeSection === 'materials') return 'materials';
@@ -1011,11 +1012,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
     let prefix: 'RM' | 'FG' | 'SM' = 'RM';
 
-    const cat = targetCategory || form.category || defaultCategory || (activeSection === 'products' ? 'Finished Goods' : activeSection === 'semi' ? 'Semi Finished' : 'Raw Material');
-
-    if (cat === 'Finished Goods' || activeSection === 'products') {
+    if (resolvedSection === 'products') {
       prefix = 'FG';
-    } else if (cat === 'Semi Finished' || activeSection === 'semi') {
+    } else if (resolvedSection === 'semi') {
       prefix = 'SM';
     } else {
       prefix = 'RM';
@@ -1356,14 +1355,14 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                   <span className="font-bold text-gray-900 text-base">
                     {editSku ? 'Edit SKU Item' : 'Add New SKU Item'}
                   </span>
-                  <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-md flex items-center gap-1 ${
+                  <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-md flex items-center gap-1 uppercase tracking-wider ${
                     itemMainType === 'Materials'
                       ? 'bg-amber-50 text-amber-700 border border-amber-200'
                       : itemMainType === 'Semi'
                         ? 'bg-purple-50 text-purple-700 border border-purple-200'
                         : 'bg-blue-50 text-blue-700 border border-blue-200'
                   }`}>
-                    {form.category || itemMainType}
+                    {itemMainType}
                   </span>
                 </div>
               </div>
