@@ -14,7 +14,9 @@ const inventoryLedgerV2Schema = new mongoose.Schema({
       "Bundle Creation", 
       "Sales Dispatch", 
       "Location Transfer", 
-      "Stock Adjustment"
+      "Stock Adjustment",
+      "OPENING_BALANCE",
+      "Opening Stock"
     ] 
   },
   referenceId: { type: String, required: true, index: true },
@@ -32,7 +34,7 @@ const inventoryLedgerV2Schema = new mongoose.Schema({
   }],
   company: { type: mongoose.Schema.Types.ObjectId, ref: "Company", required: true },
   remarks: { type: String, default: "" },
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 
 inventoryLedgerV2Schema.index({ skuId: 1, locationId: 1, company: 1 });

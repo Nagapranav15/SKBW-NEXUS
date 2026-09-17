@@ -2189,7 +2189,6 @@ const SkuMasterV2: React.FC = () => {
       headers = [
         'ID / SKU Code',
         'SKU NAME',
-        'PAGES',
         'TITLE',
         'RULE TYPE',
         'Category',
@@ -2206,8 +2205,8 @@ const SkuMasterV2: React.FC = () => {
         'Preferred Vendor'
       ];
       sampleRows = [
-        ['SM-001', 'Akshay Inner Form 52 GSM 14.25 x 35 CM (SR) 192P', '192', 'Akshay Inner Form', 'Single Line', 'Inner Forms', 'Ream', 'Bundles', '50', '52', '14.25', '35', '100', '50', '800', 'Active', 'Apex Print Pack'],
-        ['SM-002', 'Cover Board 250 GSM 57 x 70 CM', '100', 'Cover Board', 'Plain', 'Covers', 'Pcs', 'Bundles', '100', '250', '57', '70', '200', '100', '1200', 'Active', 'Sunrise Laminators']
+        ['SM-001', 'Akshay Inner Form 52 GSM 14.25 x 35 CM (SR)', 'Akshay Inner Form', 'Single Line', 'Inner Forms', 'Ream', 'Bundles', '50', '52', '14.25', '35', '100', '50', '800', 'Active', 'Apex Print Pack'],
+        ['SM-002', 'Cover Board 250 GSM 57 x 70 CM', 'Cover Board', 'Plain', 'Covers', 'Pcs', 'Bundles', '100', '250', '57', '70', '200', '100', '1200', 'Active', 'Sunrise Laminators']
       ];
     } else {
       // Raw materials
@@ -2537,6 +2536,8 @@ const SkuMasterV2: React.FC = () => {
           minStockLevel,
           reorderLevel,
           preferredVendor,
+          initialLocation: 'SKBW Factory',
+          defaultLocation: 'SKBW Factory',
           status,
           brand: brand || undefined,
           ruleType: ruleType || undefined,

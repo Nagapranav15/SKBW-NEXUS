@@ -81,6 +81,63 @@ exports.getSkus = async (req, res, next) => {
   }
 };
 
+async function ensureDefaultWarehouseLocations(companyId) {
+  const companyObjId = toObjectId(companyId);
+  if (!companyObjId) return null;
+
+  let locations = await WarehouseLocationV2.find({ company: companyObjId });
+  if (locations.length > 0) {
+    const factory = locations.find(l => l.level === "Factory") || locations[0];
+    const floor = locations.find(l => l.level === "Floor" && (!factory || String(l.parentId) === String(factory._id))) || locations[0];
+    const zone = locations.find(l => l.level === "Zone" && (!floor || String(l.parentId) === String(floor._id))) || locations[0];
+    const storageLoc = locations.find(l => l.level === "Storage Location" && (!zone || String(l.parentId) === String(zone._id))) || locations[locations.length - 1];
+    return { factory, floor, zone, storageLoc, all: locations };
+  }
+
+  // Create default hierarchy: SKBW Factory -> Ground Floor -> Main Storage Zone -> Bay A1
+  const factory = await WarehouseLocationV2.create({
+    name: "SKBW Factory",
+    level: "Factory",
+    parentId: null,
+    capacity: 1000000,
+    unit: "kg",
+    status: "Active",
+    company: companyObjId
+  });
+
+  const floor = await WarehouseLocationV2.create({
+    name: "Ground Floor",
+    level: "Floor",
+    parentId: factory._id,
+    capacity: 500000,
+    unit: "kg",
+    status: "Active",
+    company: companyObjId
+  });
+
+  const zone = await WarehouseLocationV2.create({
+    name: "Main Storage Zone",
+    level: "Zone",
+    parentId: floor._id,
+    capacity: 250000,
+    unit: "kg",
+    status: "Active",
+    company: companyObjId
+  });
+
+  const storageLoc = await WarehouseLocationV2.create({
+    name: "Bay A1",
+    level: "Storage Location",
+    parentId: zone._id,
+    capacity: 100000,
+    unit: "kg",
+    status: "Active",
+    company: companyObjId
+  });
+
+  return { factory, floor, zone, storageLoc, all: [factory, floor, zone, storageLoc] };
+}
+
 exports.getNextSkuCode = async (req, res, next) => {
   try {
     const { companyId, prefix = "FG" } = req.query;
@@ -91,17 +148,16 @@ exports.getNextSkuCode = async (req, res, next) => {
     const cleanPrefix = String(prefix).trim().toUpperCase();
     const companyObjId = toObjectId(companyId);
 
-    // 1. Query active SKUs for this company to determine the current highest sequential number
-    const activeCompanySkus = await SkuV2.find({ 
-      company: companyObjId,
-      isDeleted: { $ne: true }
-    }).select("skuCode");
+    // 1. Query ALL SKUs (active AND deleted) for this company to determine current highest sequential number
+    const allCompanySkus = await SkuV2.find({ 
+      company: companyObjId 
+    }).select("skuCode isDeleted");
 
     let maxNum = 0;
     // Standard sequence regex: e.g. FG-001, RM-006, SM-002 (1 to 4 digits, <= 9999)
     const seqRegex = new RegExp(`^${cleanPrefix}-(\\d{1,4})$`, "i");
 
-    for (const s of activeCompanySkus) {
+    for (const s of allCompanySkus) {
       const code = (s.skuCode || "").trim();
       const match = code.match(seqRegex);
       if (match) {
@@ -120,7 +176,7 @@ exports.getNextSkuCode = async (req, res, next) => {
       }
     }
 
-    // 3. Ensure the generated code does not collide with ANY existing SKU for this company (active or soft-deleted)
+    // 3. Ensure the generated code does not collide with ANY existing SKU for this company (active or deleted)
     let nextNum = maxNum + 1;
     let nextCode = `${cleanPrefix}-${String(nextNum).padStart(3, "0")}`;
 
@@ -167,7 +223,9 @@ exports.createSku = async (req, res, next) => {
       return res.status(400).json({ msg: `SKU Code '${skuCode}' already exists for this company` });
     }
 
-    const assignedLocation = initialLocationId || req.body.initialLocation || defaultLocation || "Main Warehouse - Bay A1";
+    const defaultStructure = await ensureDefaultWarehouseLocations(company);
+    const assignedLocation = initialLocationId || req.body.initialLocation || defaultLocation || "SKBW Factory";
+    const assignedLocationId = initialLocationId || (defaultStructure?.storageLoc?._id || defaultStructure?.factory?._id);
 
     const newSku = new SkuV2({
       skuCode,
@@ -188,12 +246,13 @@ exports.createSku = async (req, res, next) => {
       pages: pages ? Number(pages) : undefined,
       booksGbl: booksGbl ? Number(booksGbl) : undefined,
       openingStock: openingStock ? Number(openingStock) : 0,
+      presentStock: openingStock ? Number(openingStock) : 0,
       minStockLevel: minStockLevel !== undefined && minStockLevel !== null && minStockLevel !== '' ? Number(minStockLevel) : undefined,
       reorderLevel: reorderLevel !== undefined && reorderLevel !== null && reorderLevel !== '' ? Number(reorderLevel) : undefined,
       preferredVendor: preferredVendor || "",
-      initialLocationId: typeof assignedLocation === 'object' ? (assignedLocation._id || assignedLocation.name) : String(assignedLocation),
-      initialLocation: assignedLocation,
-      defaultLocation: typeof assignedLocation === 'object' ? (assignedLocation.name || assignedLocation._id) : String(assignedLocation),
+      initialLocationId: typeof assignedLocationId === 'object' ? String(assignedLocationId._id || assignedLocationId) : String(assignedLocationId),
+      initialLocation: typeof assignedLocation === 'object' ? (assignedLocation.name || "SKBW Factory") : String(assignedLocation),
+      defaultLocation: typeof assignedLocation === 'object' ? (assignedLocation.name || "SKBW Factory") : String(assignedLocation),
       status: status || "Active",
       bomItems: req.body.bomItems || [],
       processSteps: req.body.processSteps || [],
@@ -217,40 +276,40 @@ exports.createSku = async (req, res, next) => {
       }
     }
 
-    if (newSku.openingStock > 0 && req.body.initialLocationId) {
+    if (newSku.openingStock > 0 && defaultStructure) {
       try {
-        const targetLoc = await WarehouseLocationV2.findById(toObjectId(req.body.initialLocationId));
-        if (targetLoc) {
-          await InventoryLedger.create({
-            transactionNumber: `IL-OPEN-${Date.now()}`,
-            transactionType: "Opening Stock",
-            skuId: newSku._id,
-            quantity: newSku.openingStock,
-            unit: newSku.unit || "kg",
-            direction: "IN",
-            referenceType: "OpeningStock",
-            referenceId: `OPEN-${newSku.skuCode}`,
-            batchNumber: `OPEN-${newSku.skuCode}`,
-            locationId: targetLoc._id,
-            remarks: "Initial opening stock assigned during item creation",
-            company: toObjectId(company),
-            status: "Posted"
-          });
+        await InventoryLedger.create({
+          transactionNumber: `IL-OPEN-${Date.now()}-${String(newSku._id).slice(-4)}`,
+          transactionType: "Opening Stock",
+          skuId: newSku._id,
+          quantity: newSku.openingStock,
+          unit: newSku.unit || "kg",
+          direction: "IN",
+          referenceType: "OpeningStock",
+          referenceId: `OPEN-${newSku.skuCode}`,
+          batchNumber: `OPEN-${newSku.skuCode}`,
+          warehouseId: defaultStructure.factory._id,
+          floorId: defaultStructure.floor._id,
+          zoneId: defaultStructure.zone._id,
+          locationId: defaultStructure.storageLoc._id,
+          remarks: "Initial opening stock assigned during item creation in SKBW Factory",
+          company: toObjectId(company),
+          status: "Posted"
+        });
 
-          await InventoryLedgerV2.create({
-            timestamp: new Date(),
-            transactionType: "OPENING_BALANCE",
-            referenceId: `OPEN-${newSku.skuCode}`,
-            skuId: newSku._id,
-            locationId: targetLoc._id,
-            qtyIn: newSku.openingStock,
-            qtyOut: 0,
-            balanceAfter: newSku.openingStock,
-            remarks: "Initial opening stock assigned during item creation",
-            company: toObjectId(company),
-            userId: req.user?.id ? toObjectId(req.user.id) : undefined
-          });
-        }
+        await InventoryLedgerV2.create({
+          timestamp: new Date(),
+          transactionType: "OPENING_BALANCE",
+          referenceId: `OPEN-${newSku.skuCode}`,
+          skuId: newSku._id,
+          locationId: defaultStructure.storageLoc._id,
+          qtyIn: newSku.openingStock,
+          qtyOut: 0,
+          balanceAfter: newSku.openingStock,
+          remarks: "Initial opening stock assigned during item creation in SKBW Factory",
+          company: toObjectId(company),
+          userId: req.user?.id ? toObjectId(req.user.id) : undefined
+        });
       } catch (e) {
         console.error("Error creating opening stock ledger entry:", e);
       }
@@ -260,9 +319,9 @@ exports.createSku = async (req, res, next) => {
       action: "CREATE",
       entityType: "SkuV2",
       entityName: newSku.skuCode,
-      details: `SKU Item '${newSku.name}' (${newSku.skuCode}) was created.`,
+      details: `Created SKU '${newSku.name}' (${newSku.skuCode}) with initial location SKBW Factory.`,
       performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
-      company: toObjectId(company)
+      company: newSku.company
     }).catch(e => console.error("ActivityLog error:", e));
     res.status(201).json(newSku);
   } catch (err) {
@@ -569,6 +628,9 @@ exports.bulkImportSkus = async (req, res, next) => {
     }
 
     const companyObjId = toObjectId(company);
+    const defaultStructure = await ensureDefaultWarehouseLocations(companyObjId);
+    const defaultStorageLocId = String(defaultStructure?.storageLoc?._id || defaultStructure?.factory?._id);
+
     const bulkOps = [];
     const skipped = [];
 
@@ -622,6 +684,9 @@ exports.bulkImportSkus = async (req, res, next) => {
         minStockLevel: item.minStockLevel !== undefined && item.minStockLevel !== null && item.minStockLevel !== '' ? Number(item.minStockLevel) : undefined,
         title: item.title || "",
         preferredVendor: item.preferredVendor || "",
+        initialLocationId: defaultStorageLocId,
+        initialLocation: "SKBW Factory",
+        defaultLocation: "SKBW Factory",
         reorderLevel: item.reorderLevel !== undefined && item.reorderLevel !== null && item.reorderLevel !== '' ? Number(item.reorderLevel) : undefined,
         status: item.status || "Active",
         company: companyObjId,
@@ -644,6 +709,56 @@ exports.bulkImportSkus = async (req, res, next) => {
       const result = await SkuV2.bulkWrite(bulkOps);
       createdCount = result.upsertedCount || 0;
       modifiedCount = result.modifiedCount || 0;
+
+      // Ensure opening stock ledger entries exist in SKBW Factory
+      if (defaultStructure) {
+        const importedSkus = await SkuV2.find({ 
+          company: companyObjId, 
+          skuCode: { $in: skus.map(s => s.skuCode) },
+          openingStock: { $gt: 0 }
+        });
+
+        for (const s of importedSkus) {
+          const ledgerExists = await InventoryLedger.findOne({ 
+            skuId: s._id, 
+            referenceType: "OpeningStock" 
+          });
+          if (!ledgerExists) {
+            await InventoryLedger.create({
+              transactionNumber: `IL-OPEN-${Date.now()}-${String(s._id).slice(-4)}`,
+              transactionType: "Opening Stock",
+              skuId: s._id,
+              quantity: s.openingStock,
+              unit: s.unit || "kg",
+              direction: "IN",
+              referenceType: "OpeningStock",
+              referenceId: `OPEN-${s.skuCode}`,
+              batchNumber: `OPEN-${s.skuCode}`,
+              warehouseId: defaultStructure.factory._id,
+              floorId: defaultStructure.floor._id,
+              zoneId: defaultStructure.zone._id,
+              locationId: defaultStructure.storageLoc._id,
+              remarks: "Imported initial opening stock in SKBW Factory",
+              company: companyObjId,
+              status: "Posted"
+            }).catch(e => console.error("Error creating opening stock ledger on import:", e));
+
+            await InventoryLedgerV2.create({
+              timestamp: new Date(),
+              transactionType: "OPENING_BALANCE",
+              referenceId: `OPEN-${s.skuCode}`,
+              skuId: s._id,
+              locationId: defaultStructure.storageLoc._id,
+              qtyIn: s.openingStock,
+              qtyOut: 0,
+              balanceAfter: s.openingStock,
+              remarks: "Imported initial opening stock in SKBW Factory",
+              company: companyObjId,
+              userId: req.user?.id ? toObjectId(req.user.id) : undefined
+            }).catch(e => console.error("Error creating InventoryLedgerV2 on import:", e));
+          }
+        }
+      }
     }
 
     const totalProcessed = createdCount + modifiedCount;
@@ -653,7 +768,7 @@ exports.bulkImportSkus = async (req, res, next) => {
         action: "IMPORT",
         entityType: "SkuV2",
         entityName: "Bulk Import",
-        details: `Bulk imported ${totalProcessed} SKUs (${createdCount} created, ${modifiedCount} updated).`,
+        details: `Bulk imported ${totalProcessed} SKUs (${createdCount} created, ${modifiedCount} updated) with default location SKBW Factory.`,
         performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
         company: companyObjId
       }).catch(e => console.error("ActivityLog error:", e));
@@ -679,19 +794,20 @@ exports.renumberSkus = async (req, res, next) => {
     const companyObjId = toObjectId(companyId);
     const companyQuery = companyObjId ? { $in: [companyObjId, String(companyId)] } : companyId;
     
-    // Fetch ALL SKUs for company (active + deleted) to clear unique index collisions
+    // Fetch ALL SKUs for company (active + deleted)
     const companyAllSkus = await SkuV2.find({ company: companyQuery });
     
-    // Prefix deleted SKUs so they never collide
+    // Collect all numbers ever used by deleted items so they are NEVER reused
     const deletedSkus = companyAllSkus.filter(s => s.isDeleted);
-    const deletedOps = deletedSkus.map((s, idx) => ({
-      updateOne: {
-        filter: { _id: s._id },
-        update: { $set: { skuCode: `DEL-${idx + 1}-${Date.now()}-${String(s._id).slice(-4)}` } }
+    const usedNumbersByPrefix = { FG: new Set(), SM: new Set(), RM: new Set() };
+    for (const s of deletedSkus) {
+      const match = (s.skuCode || '').match(/^([A-Z]+)-(\d+)/i);
+      if (match) {
+        const pref = match[1].toUpperCase();
+        if (usedNumbersByPrefix[pref]) {
+          usedNumbersByPrefix[pref].add(parseInt(match[2], 10));
+        }
       }
-    }));
-    if (deletedOps.length > 0) {
-      await SkuV2.bulkWrite(deletedOps);
     }
 
     const getSkuNum = (sku) => {
@@ -727,7 +843,7 @@ exports.renumberSkus = async (req, res, next) => {
       } else if (cat.includes("raw") || cat.includes("material") || cat === "raw material" || cat.includes("reel") || cat.includes("board") || code.startsWith("RM") || name.includes("reel") || name.includes("wire") || name.includes("adhesive") || name.includes("glue")) {
         rmList.push(sku);
       } else {
-        // Products / Finished Goods (Notebooks, Executive Diaries, Longbooks, Hardbound Register, etc.)
+        // Products / Finished Goods
         fgList.push(sku);
       }
     }
@@ -747,34 +863,31 @@ exports.renumberSkus = async (req, res, next) => {
       await SkuV2.bulkWrite(tempOps);
     }
 
-    // Pass 2: Set clean continuous series numbers via bulkWrite
+    // Pass 2: Set clean continuous series numbers via bulkWrite skipping any number ever used by a deleted SKU
     const updateOps = [];
-    fgList.forEach((sku, i) => {
-      updateOps.push({
-        updateOne: {
-          filter: { _id: sku._id },
-          update: { $set: { skuCode: `FG-${String(i + 1).padStart(3, "0")}` } }
-        }
-      });
-    });
 
-    smList.forEach((sku, i) => {
-      updateOps.push({
-        updateOne: {
-          filter: { _id: sku._id },
-          update: { $set: { skuCode: `SM-${String(i + 1).padStart(3, "0")}` } }
+    function assignContinuousCodes(list, prefix) {
+      let counter = 1;
+      let maxAssigned = 0;
+      list.forEach((sku) => {
+        while (usedNumbersByPrefix[prefix] && usedNumbersByPrefix[prefix].has(counter)) {
+          counter++;
         }
+        updateOps.push({
+          updateOne: {
+            filter: { _id: sku._id },
+            update: { $set: { skuCode: `${prefix}-${String(counter).padStart(3, "0")}` } }
+          }
+        });
+        if (counter > maxAssigned) maxAssigned = counter;
+        counter++;
       });
-    });
+      return maxAssigned;
+    }
 
-    rmList.forEach((sku, i) => {
-      updateOps.push({
-        updateOne: {
-          filter: { _id: sku._id },
-          update: { $set: { skuCode: `RM-${String(i + 1).padStart(3, "0")}` } }
-        }
-      });
-    });
+    const maxFg = assignContinuousCodes(fgList, "FG");
+    const maxSm = assignContinuousCodes(smList, "SM");
+    const maxRm = assignContinuousCodes(rmList, "RM");
 
     let updatedCount = 0;
     if (updateOps.length > 0) {
@@ -786,26 +899,26 @@ exports.renumberSkus = async (req, res, next) => {
       action: "UPDATE",
       entityType: "SkuV2",
       entityName: "Renumber Series",
-      details: `Renumbered ${updatedCount} SKUs into continuous series (FG-001..., SM-001..., RM-001...).`,
+      details: `Renumbered ${updatedCount} SKUs into continuous series without reusing deleted SKU numbers.`,
       performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
       company: companyObjId
     }).catch(e => console.error("ActivityLog error:", e));
 
-    // Update persistent sequence counters to reflect the new continuous counts
+    // Update persistent sequence counters to reflect the maximum numbers
     if (companyId) {
       await Sequence.findOneAndUpdate(
         { prefix: `${companyId}_SKU_FG` },
-        { sequence: fgList.length },
+        { $max: { sequence: maxFg } },
         { upsert: true }
       ).catch(() => {});
       await Sequence.findOneAndUpdate(
         { prefix: `${companyId}_SKU_SM` },
-        { sequence: smList.length },
+        { $max: { sequence: maxSm } },
         { upsert: true }
       ).catch(() => {});
       await Sequence.findOneAndUpdate(
         { prefix: `${companyId}_SKU_RM` },
-        { sequence: rmList.length },
+        { $max: { sequence: maxRm } },
         { upsert: true }
       ).catch(() => {});
     }
@@ -831,7 +944,9 @@ exports.getWarehouseHierarchy = async (req, res, next) => {
       return res.status(400).json({ msg: "companyId query parameter is required" });
     }
 
-    const locations = await WarehouseLocationV2.find({ company: toObjectId(companyId) }).lean();
+    const companyObjId = toObjectId(companyId);
+    await ensureDefaultWarehouseLocations(companyObjId);
+    const locations = await WarehouseLocationV2.find({ company: companyObjId }).lean();
     res.json(locations);
   } catch (err) {
     next(err);

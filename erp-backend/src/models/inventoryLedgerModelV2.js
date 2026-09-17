@@ -5,7 +5,7 @@ const inventoryLedgerSchema = new mongoose.Schema({
   transactionType: { 
     type: String, 
     required: true, 
-    enum: ["Purchase", "Processing", "Production", "Transfer", "Adjustment", "Sale", "Opening Balance"],
+    enum: ["Purchase", "Processing", "Production", "Transfer", "Adjustment", "Sale", "Opening Balance", "Opening Stock", "Stock Adjustment", "Location Transfer"],
     index: true
   },
   skuId: { type: mongoose.Schema.Types.ObjectId, ref: 'SkuV2', required: true, index: true },
@@ -26,7 +26,7 @@ const inventoryLedgerSchema = new mongoose.Schema({
     width: { type: Number },
     weight: { type: Number }
   }],
-  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   status: { type: String, required: true, enum: ["Posted", "Pending", "Cancelled"], default: "Posted" },
   company: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true, index: true }
 }, { timestamps: true });
