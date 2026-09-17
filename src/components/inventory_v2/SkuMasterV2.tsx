@@ -1842,9 +1842,22 @@ const SkuMasterV2: React.FC = () => {
         }
       });
 
-      fgList.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
-      smList.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
-      rmList.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+      const getSkuNum = (sku: SkuV2) => {
+        const m = (sku.skuCode || '').match(/(\d+)/);
+        return m ? parseInt(m[1], 10) : 999999;
+      };
+      const naturalSort = (a: SkuV2, b: SkuV2) => {
+        const numA = getSkuNum(a);
+        const numB = getSkuNum(b);
+        if (numA !== numB && numA !== 999999 && numB !== 999999) {
+          return numA - numB;
+        }
+        return (a.createdAt || '').localeCompare(b.createdAt || '');
+      };
+
+      fgList.sort(naturalSort);
+      smList.sort(naturalSort);
+      rmList.sort(naturalSort);
 
       let clientUpdatesCount = 0;
 
@@ -2323,6 +2336,8 @@ const SkuMasterV2: React.FC = () => {
       });
 
       const itemsToCreate: any[] = [];
+      const dynamicCategoriesToCreate: { name: string; type: 'products' | 'materials' | 'semi'; uom: string }[] = [];
+
       for (let i = 1; i < rawRows.length; i++) {
         const row = rawRows[i];
         if (!row || row.length === 0 || !row.some(Boolean)) continue;
@@ -2372,15 +2387,37 @@ const SkuMasterV2: React.FC = () => {
 
         const defaultTabCat = activeMainTab === 'materials' ? 'Raw Material' : activeMainTab === 'semi' ? 'Semi Finished' : 'Finished Goods';
         const rawCategory = getFieldVal('category', 'itemcategory', 'group', 'itemgroup', 'categoryname');
-        const category = rawCategory || defaultTabCat;
+        const category = (rawCategory || defaultTabCat).trim();
         const group = rawCategory || category;
 
         const catLower = (category || '').toLowerCase();
         let defaultPrefix = 'FG';
+        let targetSection: 'products' | 'materials' | 'semi' = 'products';
+
         if (catLower.includes('semi') || catLower.includes('wip') || catLower.includes('sub') || activeMainTab === 'semi') {
           defaultPrefix = 'SM';
-        } else if (catLower.includes('raw') || catLower.includes('material') || catLower.includes('reel') || catLower.includes('board') || activeMainTab === 'materials') {
+          targetSection = 'semi';
+        } else if (catLower.includes('raw') || catLower.includes('material') || catLower.includes('reel') || catLower.includes('board') || catLower.includes('paper') || activeMainTab === 'materials') {
           defaultPrefix = 'RM';
+          targetSection = 'materials';
+        } else {
+          defaultPrefix = 'FG';
+          targetSection = 'products';
+        }
+
+        const unit = getFieldVal('uom', 'unit', 'primaryuom', 'primaryunit', 'baseunit', 'mainunit') || (targetSection === 'materials' ? 'Kg' : targetSection === 'semi' ? 'Ream' : 'Pcs');
+
+        // Dynamic category registration if category is new
+        if (category) {
+          const existsInCatData = categoriesData.some(c => c.name.toLowerCase().trim() === catLower);
+          const alreadyQueued = dynamicCategoriesToCreate.some(c => c.name.toLowerCase().trim() === catLower);
+          if (!existsInCatData && !alreadyQueued) {
+            dynamicCategoriesToCreate.push({
+              name: category,
+              type: targetSection,
+              uom: unit
+            });
+          }
         }
 
         if (skuCode) {
@@ -2404,7 +2441,6 @@ const SkuMasterV2: React.FC = () => {
         const name = getFieldVal('skuname', 'itemname', 'name', 'materialname', 'productname', 'title') || String(row[1] || '').trim();
         if (!name && !skuCode) continue;
 
-        const unit = getFieldVal('uom', 'unit', 'primaryuom', 'primaryunit', 'baseunit', 'mainunit') || (activeMainTab === 'materials' ? 'Kg' : activeMainTab === 'semi' ? 'Ream' : 'Pcs');
         let altUnit = getFieldVal('auomaltunit', 'auom', 'altunit', 'secondaryuom', 'secondaryunit', 'alternateunit', 'auomsecondaryunit') || '';
         if (
           !altUnit || 
@@ -2524,6 +2560,20 @@ const SkuMasterV2: React.FC = () => {
           ruleType: ruleType || undefined,
           title: title || undefined
         });
+      }
+
+      // Save dynamically discovered new categories into MongoDB and state
+      if (dynamicCategoriesToCreate.length > 0) {
+        const newCategoryCards: CategoryCardData[] = dynamicCategoriesToCreate.map(dc => ({
+          id: `cat_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+          name: dc.name,
+          type: dc.type,
+          uom: dc.uom,
+          fields: ['Type']
+        }));
+        const updatedCatCards = [...categoriesData, ...newCategoryCards];
+        setCategoriesData(updatedCatCards);
+        await saveCategoriesToDb(updatedCatCards);
       }
 
       // Save updated sequence counters to localStorage so manual drawer creation seamlessly continues

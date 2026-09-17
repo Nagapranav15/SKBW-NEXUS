@@ -620,6 +620,9 @@ exports.bulkImportSkus = async (req, res, next) => {
         openingStock: item.openingStock !== undefined ? Number(item.openingStock) : 0,
         presentStock: item.openingStock !== undefined ? Number(item.openingStock) : 0,
         minStockLevel: item.minStockLevel !== undefined && item.minStockLevel !== null && item.minStockLevel !== '' ? Number(item.minStockLevel) : undefined,
+        title: item.title || "",
+        preferredVendor: item.preferredVendor || "",
+        reorderLevel: item.reorderLevel !== undefined && item.reorderLevel !== null && item.reorderLevel !== '' ? Number(item.reorderLevel) : undefined,
         status: item.status || "Active",
         company: companyObjId,
         createdBy: req.user?.id ? toObjectId(req.user.id) : undefined
@@ -678,7 +681,33 @@ exports.renumberSkus = async (req, res, next) => {
     
     // Fetch ALL SKUs for company (active + deleted) to clear unique index collisions
     const companyAllSkus = await SkuV2.find({ company: companyQuery });
-    const allSkus = companyAllSkus.filter(s => !s.isDeleted).sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
+    
+    // Prefix deleted SKUs so they never collide
+    const deletedSkus = companyAllSkus.filter(s => s.isDeleted);
+    const deletedOps = deletedSkus.map((s, idx) => ({
+      updateOne: {
+        filter: { _id: s._id },
+        update: { $set: { skuCode: `DEL-${idx + 1}-${Date.now()}-${String(s._id).slice(-4)}` } }
+      }
+    }));
+    if (deletedOps.length > 0) {
+      await SkuV2.bulkWrite(deletedOps);
+    }
+
+    const getSkuNum = (sku) => {
+      const m = (sku.skuCode || '').match(/(\d+)/);
+      return m ? parseInt(m[1], 10) : 999999;
+    };
+    const sortFn = (a, b) => {
+      const numA = getSkuNum(a);
+      const numB = getSkuNum(b);
+      if (numA !== numB && numA !== 999999 && numB !== 999999) {
+        return numA - numB;
+      }
+      return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+    };
+
+    const allSkus = companyAllSkus.filter(s => !s.isDeleted).sort(sortFn);
 
     if (!allSkus || allSkus.length === 0) {
       return res.json({ msg: "No SKUs to renumber", updatedCount: 0 });
@@ -703,8 +732,12 @@ exports.renumberSkus = async (req, res, next) => {
       }
     }
 
-    // Pass 1: Set temporary codes for ALL company SKUs using bulkWrite to avoid unique index conflict
-    const tempOps = companyAllSkus.map((sku, idx) => ({
+    fgList.sort(sortFn);
+    smList.sort(sortFn);
+    rmList.sort(sortFn);
+
+    // Pass 1: Set temporary codes for active company SKUs using bulkWrite to avoid unique index conflict
+    const tempOps = allSkus.map((sku, idx) => ({
       updateOne: {
         filter: { _id: sku._id },
         update: { $set: { skuCode: `TEMP-RENUMBER-${idx + 1}-${Date.now()}-${String(sku._id).slice(-4)}` } }
