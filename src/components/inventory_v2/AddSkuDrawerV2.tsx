@@ -1056,14 +1056,6 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     }
   }, [editSku, isOpen, defaultCategory, resolvedSection, createdCategories]);
 
-  // Load custom metadata lists & brands from database
-  useEffect(() => {
-    if (companyId) {
-      loadMetadata();
-      loadExistingBrands();
-    }
-  }, [companyId]);
-
   const isProductCategory = React.useMemo(() => {
     if (activeSection === 'products' || form.category === 'Finished Goods' || form.category === 'Products') return true;
     if (activeSection === 'materials' || activeSection === 'semi') return false;
