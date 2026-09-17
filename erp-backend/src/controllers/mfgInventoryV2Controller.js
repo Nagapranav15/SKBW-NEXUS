@@ -278,8 +278,9 @@ exports.createSku = async (req, res, next) => {
 
     if (newSku.openingStock > 0 && defaultStructure) {
       try {
+        const trxNo = await Sequence.getNextSequence("IL");
         await InventoryLedger.create({
-          transactionNumber: `IL-OPEN-${Date.now()}-${String(newSku._id).slice(-4)}`,
+          transactionNumber: trxNo,
           transactionType: "Opening Stock",
           skuId: newSku._id,
           quantity: newSku.openingStock,
@@ -724,8 +725,9 @@ exports.bulkImportSkus = async (req, res, next) => {
             referenceType: "OpeningStock" 
           });
           if (!ledgerExists) {
+            const trxNo = await Sequence.getNextSequence("IL");
             await InventoryLedger.create({
-              transactionNumber: `IL-OPEN-${Date.now()}-${String(s._id).slice(-4)}`,
+              transactionNumber: trxNo,
               transactionType: "Opening Stock",
               skuId: s._id,
               quantity: s.openingStock,
@@ -1732,34 +1734,68 @@ exports.getDashboardStats = async (req, res, next) => {
 const migrateLedgerTransactionNumbers = async (companyId) => {
   try {
     const query = companyId ? { company: companyId } : {};
-    const entries = await InventoryLedger.find(query).sort({ createdAt: 1 });
-    if (entries && entries.length > 0) {
-      let index = 1;
-      for (const entry of entries) {
-        const oldNo = entry.transactionNumber;
-        if (!oldNo || !/^TRX-[A-Z]{3}-\d{3}$/i.test(oldNo)) {
-          const monthShort = entry.createdAt ? new Date(entry.createdAt).toLocaleString('en-US', { month: 'short' }).toUpperCase() : 'AUG';
-          const newNo = `TRX-${monthShort}-${String(index).padStart(3, '0')}`;
-          index++;
-          entry.transactionNumber = newNo;
-          await entry.save();
-        }
+    
+    // Find only unmigrated entries that do not have a standardized TRX-MMM-XXX number
+    const unmigrated = await InventoryLedger.find({
+      ...query,
+      $or: [
+        { transactionNumber: { $exists: false } },
+        { transactionNumber: null },
+        { transactionNumber: { $not: /^TRX-[A-Z]{3}-\d+$/i } }
+      ]
+    }).sort({ createdAt: 1 });
+
+    if (!unmigrated || unmigrated.length === 0) return;
+
+    // Fetch all existing transaction numbers across all ledgers to guarantee zero collisions
+    const allExisting = await InventoryLedger.find({}, { transactionNumber: 1 }).lean();
+    const usedNumbers = new Set(allExisting.map(e => e.transactionNumber).filter(Boolean));
+
+    // Determine current highest sequence number per month
+    const monthCounters = {};
+    for (const no of usedNumbers) {
+      const match = String(no).match(/^TRX-([A-Z]{3})-(\d+)$/i);
+      if (match) {
+        const m = match[1].toUpperCase();
+        const num = parseInt(match[2], 10);
+        monthCounters[m] = Math.max(monthCounters[m] || 0, num);
       }
     }
 
-    const v2Entries = await InventoryLedgerV2.find(query).sort({ createdAt: 1 });
-    if (v2Entries && v2Entries.length > 0) {
-      let v2Index = 1;
-      for (const entry of v2Entries) {
-        const oldNo = entry.transactionNumber;
-        if (!oldNo || !/^TRX-[A-Z]{3}-\d{3}$/i.test(oldNo)) {
-          const monthShort = entry.createdAt ? new Date(entry.createdAt).toLocaleString('en-US', { month: 'short' }).toUpperCase() : 'AUG';
-          const newNo = `TRX-${monthShort}-${String(v2Index).padStart(3, '0')}`;
-          v2Index++;
-          entry.transactionNumber = newNo;
-          await entry.save();
-        }
+    for (const entry of unmigrated) {
+      const monthShort = entry.createdAt
+        ? new Date(entry.createdAt).toLocaleString('en-US', { month: 'short' }).toUpperCase()
+        : new Date().toLocaleString('en-US', { month: 'short' }).toUpperCase();
+
+      let nextNum = (monthCounters[monthShort] || 0) + 1;
+      let newNo = `TRX-${monthShort}-${String(nextNum).padStart(3, '0')}`;
+      while (usedNumbers.has(newNo)) {
+        nextNum++;
+        newNo = `TRX-${monthShort}-${String(nextNum).padStart(3, '0')}`;
       }
+
+      monthCounters[monthShort] = nextNum;
+      usedNumbers.add(newNo);
+
+      await InventoryLedger.updateOne(
+        { _id: entry._id },
+        { $set: { transactionNumber: newNo } }
+      );
+    }
+
+    // Sync persistent Sequence model counter if current month has a higher sequence
+    const curMonth = new Date().toLocaleString('en-US', { month: 'short' }).toUpperCase();
+    if (monthCounters[curMonth]) {
+      await Sequence.findOneAndUpdate(
+        { prefix: "IL" },
+        { $max: { sequence: monthCounters[curMonth] } },
+        { upsert: true }
+      ).catch(() => {});
+      await Sequence.findOneAndUpdate(
+        { prefix: "TRX" },
+        { $max: { sequence: monthCounters[curMonth] } },
+        { upsert: true }
+      ).catch(() => {});
     }
   } catch (err) {
     console.error("Error migrating ledger transaction numbers:", err);

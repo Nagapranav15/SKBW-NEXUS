@@ -2065,24 +2065,31 @@ const PurchaseInvoicePage: React.FC = () => {
                           </span>
                         </div>
 
-                                    {(item as any).splits.slice(0, 3).map((split: any, i: number) => {
-                                      const locName = locations.find(l => l._id === split.locationId)?.name || 'Godown';
-                                      const qtyVal = Number(split.quantity) || 0;
-                                      return (
-                                        <li key={i}>
-                                          {locName}: {selectedSku?.paperType === 'Sheets' 
-                                            ? `${(qtyVal / (selectedSku?.pages || 500)).toLocaleString('en-IN', { maximumFractionDigits: 2 })} Reams` 
-                                            : `${qtyVal.toLocaleString()} ${selectedSku?.unit || 'KG'}`}
-                                        </li>
-                                      );
-                                    })}
-                                    {(item as any).splits.length > 3 && (
-                                      <li className="italic text-gray-400 font-medium">+ {(item as any).splits.length - 3} more...</li>
-                                    )}
-                                  </ul>
-                                </div>
-                              </div>
-                            ) : (
+                        {(item as any).splits && (item as any).splits.length > 0 ? (
+                          <div className="flex items-center gap-2">
+                            <div className="flex flex-col">
+                              <label className="text-[9px] font-black text-blue-600 uppercase tracking-wider flex items-center justify-between">
+                                <span>Split Storage ({(item as any).splits.length} locations):</span>
+                              </label>
+                              <ul className="text-[11px] text-gray-600 space-y-0.5">
+                                {(item as any).splits.slice(0, 3).map((split: any, i: number) => {
+                                  const locName = locations.find(l => l._id === split.locationId)?.name || 'Godown';
+                                  const qtyVal = Number(split.quantity) || 0;
+                                  return (
+                                    <li key={i}>
+                                      {locName}: {selectedSku?.paperType === 'Sheets' 
+                                        ? `${(qtyVal / (selectedSku?.pages || 500)).toLocaleString('en-IN', { maximumFractionDigits: 2 })} Reams` 
+                                        : `${qtyVal.toLocaleString()} ${selectedSku?.unit || 'KG'}`}
+                                    </li>
+                                  );
+                                })}
+                                {(item as any).splits.length > 3 && (
+                                  <li className="italic text-gray-400 font-medium">+ {(item as any).splits.length - 3} more...</li>
+                                )}
+                              </ul>
+                            </div>
+                          </div>
+                        ) : (
                               <div className="flex items-center gap-2">
                                 <div className="flex flex-col">
                                   <label className="text-[9px] font-black text-gray-400 uppercase tracking-wider flex justify-between items-center">
