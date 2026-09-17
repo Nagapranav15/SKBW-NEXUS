@@ -89,7 +89,6 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
                 
                 let totalReelsCount = 0;
                 let totalReamsCount = 0;
-                let totalSheetsCount = 0;
                 let totalKgWeight = 0;
 
                 inv.items?.forEach((item) => {
@@ -100,7 +99,6 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
                     const reamWeight = item.reamWeight || resolvedSku?.reamWeight || getFallbackReamWeight(resolvedSku) || 0;
                     const itemReams = (item.quantity || 0) / stdSheets;
                     totalReamsCount += itemReams;
-                    totalSheetsCount += item.quantity || 0;
                     totalKgWeight += itemReams * reamWeight;
                   } else {
                     totalReelsCount += item.reels?.length || 0;
@@ -199,7 +197,7 @@ const getFallbackReamWeight = (sku: any): number => {
 
   // Fallback to name parsing if fields are zero
   if ((w === 0 || l === 0) && sku.name) {
-    const match = sku.name.match(/(\d+(?:\.\d+)?)\s*[xX\*]\s*(\d+(?:\.\d+)?)/i);
+    const match = sku.name.match(/(\d+(?:\.\d+)?)\s*[xX*]\s*(\d+(?:\.\d+)?)/i);
     if (match) {
       if (w === 0) w = Number(match[1]) || 0;
       if (l === 0) l = Number(match[2]) || 0;
@@ -416,7 +414,7 @@ const PurchaseInvoicePage: React.FC = () => {
       } else {
         setActivityLogs(backendLogs);
       }
-    } catch (err) {
+    } catch {
       showToast('Failed to fetch activity logs', 'error');
     } finally {
       setActivityLogLoading(false);
@@ -449,7 +447,7 @@ const PurchaseInvoicePage: React.FC = () => {
       // Filter draft or cancelled invoices as Recycle Bin items
       const cancelledInvoices = invoices.filter(inv => inv.status === 'Draft' || inv.status === 'Cancelled');
       setRecycleBinItems(cancelledInvoices);
-    } catch (err) {
+    } catch {
       showToast('Failed to load Recycle Bin', 'error');
     } finally {
       setRecycleBinLoading(false);
@@ -476,7 +474,7 @@ const PurchaseInvoicePage: React.FC = () => {
         details: `Purchase Batch '${inv.invoiceNumber}' was restored from Recycle Bin`,
         company: selectedCompany?._id
       });
-    } catch (err) {
+    } catch {
       showToast('Failed to restore purchase batch', 'error');
     }
   };
@@ -737,7 +735,7 @@ const PurchaseInvoicePage: React.FC = () => {
         let w = selectedSku.width ? String(selectedSku.width) : '';
         let l = selectedSku.length ? String(selectedSku.length) : '';
         if (!w || !l) {
-          const match = selectedSku.name.match(/(\d+(?:\.\d+)?)\s*[xX\*]\s*(\d+(?:\.\d+)?)/i);
+          const match = selectedSku.name.match(/(\d+(?:\.\d+)?)\s*[xX*]\s*(\d+(?:\.\d+)?)/i);
           if (match) {
             if (!w) w = match[1];
             if (!l) l = match[2];
@@ -1002,7 +1000,7 @@ const PurchaseInvoicePage: React.FC = () => {
           width: (() => {
             let w = selectedSku?.width ? String(selectedSku.width) : '';
             if (!w && selectedSku?.name) {
-              const match = selectedSku.name.match(/(\d+(?:\.\d+)?)\s*[xX\*]\s*(\d+(?:\.\d+)?)/i);
+              const match = selectedSku.name.match(/(\d+(?:\.\d+)?)\s*[xX*]\s*(\d+(?:\.\d+)?)/i);
               if (match) w = match[1];
             }
             return w;
@@ -1010,7 +1008,7 @@ const PurchaseInvoicePage: React.FC = () => {
           length: (() => {
             let l = selectedSku?.length ? String(selectedSku.length) : '';
             if (!l && selectedSku?.name) {
-              const match = selectedSku.name.match(/(\d+(?:\.\d+)?)\s*[xX\*]\s*(\d+(?:\.\d+)?)/i);
+              const match = selectedSku.name.match(/(\d+(?:\.\d+)?)\s*[xX*]\s*(\d+(?:\.\d+)?)/i);
               if (match) l = match[2];
             }
             return l;
@@ -2067,26 +2065,6 @@ const PurchaseInvoicePage: React.FC = () => {
                           </span>
                         </div>
 
-                        {true && (
-                          <div className="flex items-center gap-3">
-                            {(item as any).splits && (item as any).splits.length > 0 ? (
-                              <div className="bg-blue-50/50 border border-blue-150 rounded-lg p-2.5 space-y-1.5 min-w-[240px]">
-                                <div className="flex justify-between items-center gap-4">
-                                  <span className="text-[10px] font-black text-blue-800 uppercase tracking-wider">Multi-Location Split</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setTempSplits((item as any).splits || []);
-                                      setSplittingItemIdx(idx);
-                                    }}
-                                    className="text-[10px] text-blue-600 hover:text-blue-800 font-extrabold cursor-pointer hover:underline"
-                                  >
-                                    Edit Split
-                                  </button>
-                                </div>
-                                <div className="text-[10px] text-gray-600 font-bold">
-                                  Allocated across {(item as any).splits.length} locations:
-                                  <ul className="list-disc pl-3 mt-1 space-y-0.5 font-bold text-gray-700">
                                     {(item as any).splits.slice(0, 3).map((split: any, i: number) => {
                                       const locName = locations.find(l => l._id === split.locationId)?.name || 'Godown';
                                       const qtyVal = Number(split.quantity) || 0;
@@ -2409,7 +2387,6 @@ const PurchaseInvoicePage: React.FC = () => {
 
             let totalReelsCount = 0;
             let totalReamsCount = 0;
-            let totalSheetsCount = 0;
             let totalKgWeight = 0;
 
             selectedInvoice.items?.forEach(item => {
@@ -2418,7 +2395,6 @@ const PurchaseInvoicePage: React.FC = () => {
                 const stdSheets = resolvedSku?.pages || 500;
                 const reamWeight = item.reamWeight || resolvedSku?.reamWeight || getFallbackReamWeight(resolvedSku) || 0;
                 const itemReams = (item.quantity || 0) / stdSheets;
-                totalSheetsCount += item.quantity || 0;
                 totalReamsCount += itemReams;
                 totalKgWeight += itemReams * reamWeight;
               } else {

@@ -125,7 +125,7 @@ export const importDataFromJSON = (file: File): Promise<boolean> => {
         for (const config of importConfigs) {
           const list = (importedData[config.key] || []) as any[];
           for (const item of list) {
-            const { _id, __v, createdAt, updatedAt, ...itemData } = item;
+            const { _id: _unusedId, __v: _unusedV, createdAt: _unusedC, updatedAt: _unusedU, ...itemData } = item;
             await api.post(config.endpoint, itemData).catch(() => {});
           }
         }
