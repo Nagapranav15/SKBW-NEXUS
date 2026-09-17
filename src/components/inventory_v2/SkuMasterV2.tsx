@@ -227,7 +227,7 @@ const SkuMasterV2: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const [categoriesData, setCategoriesData] = useState<CategoryCardData[]>(DEFAULT_CATEGORIES);
+  const [categoriesData, setCategoriesData] = useState<CategoryCardData[]>([]);
 
   const saveCategoriesToDb = async (updatedCards: CategoryCardData[]) => {
     if (!selectedCompany?._id) return;
@@ -238,6 +238,7 @@ const SkuMasterV2: React.FC = () => {
         categoryCards: updatedCards,
         categories: catNames
       });
+      localStorage.setItem(`skbw_erp_categories_cards_${selectedCompany._id}`, JSON.stringify(updatedCards));
     } catch (err) {
       console.error('Failed to save categories to MongoDB:', err);
     }
@@ -257,30 +258,37 @@ const SkuMasterV2: React.FC = () => {
 
   useEffect(() => {
     if (selectedCompany?._id) {
-      getMetadataV2(selectedCompany._id).then(data => {
+      const companyId = selectedCompany._id;
+      // Load company-isolated categories from cache
+      const cached = localStorage.getItem(`skbw_erp_categories_cards_${companyId}`);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) {
+            setCategoriesData(parsed);
+          }
+        } catch (e) {}
+      } else {
+        setCategoriesData([]);
+      }
+
+      getMetadataV2(companyId).then(data => {
         if (data?.units && Array.isArray(data.units) && data.units.length > 0) {
           setUnitsList(normalizeAndDeduplicateUnits(data.units));
         } else {
           setUnitsList(["Pcs", "Kg", "Ream", "GBL", "Sheets", "Reels", "Mtr", "Gross", "Box", "Pkt"]);
         }
-        if (data?.categoryCards && Array.isArray(data.categoryCards) && data.categoryCards.length > 0) {
+        if (data?.categoryCards !== undefined && Array.isArray(data.categoryCards)) {
           setCategoriesData(data.categoryCards);
+          localStorage.setItem(`skbw_erp_categories_cards_${companyId}`, JSON.stringify(data.categoryCards));
         } else {
-          // If no category cards in MongoDB yet, migrate local storage or DEFAULT_CATEGORIES to MongoDB
-          let initialCards = DEFAULT_CATEGORIES;
-          const savedLocal = localStorage.getItem('skbw_erp_categories_cards');
-          if (savedLocal) {
-            try {
-              const parsed = JSON.parse(savedLocal);
-              if (Array.isArray(parsed) && parsed.length > 0) initialCards = parsed;
-            } catch (e) {}
-          }
-          setCategoriesData(initialCards);
-          saveCategoriesToDb(initialCards);
+          setCategoriesData([]);
         }
       }).catch(err => {
         console.error('Failed to load company metadata in SkuMasterV2:', err);
       });
+    } else {
+      setCategoriesData([]);
     }
   }, [selectedCompany?._id]);
 
@@ -2923,9 +2931,7 @@ const SkuMasterV2: React.FC = () => {
     const targetType = activeMainTab === 'products' ? 'products' : activeMainTab === 'semi' ? 'semi' : activeMainTab === 'categories' ? activeCategorySubTab : 'materials';
     const sectionCats = (categoriesData || []).filter(c => c.type === targetType).map(c => c.name);
     if (sectionCats.length > 0) return sectionCats[0];
-    if (targetType === 'products') return 'Products';
-    if (targetType === 'semi') return 'Semi';
-    return 'Materials';
+    return '';
   };
 
   const dynamicTotalCount = useMemo(() => {
