@@ -1829,86 +1829,14 @@ const SkuMasterV2: React.FC = () => {
     }
     setIsRenumbering(true);
     try {
-      // 1. Call backend API
-      const res = await renumberSkusV2(selectedCompany._id).catch(() => null);
+      // Execute fast atomic backend bulk renumbering
+      const res = await renumberSkusV2(selectedCompany._id);
       
-      // 2. Fetch fresh SKUs to check if any legacy codes remain
-      const freshSkus = await getSkusV2(selectedCompany._id).catch(() => []);
-      
-      // 3. Fallback: If any legacy codes remain, perform sequential update via updateSkuV2
-      const fgList: SkuV2[] = [];
-      const smList: SkuV2[] = [];
-      const rmList: SkuV2[] = [];
-
-      (freshSkus || []).forEach(sku => {
-        const type = getItemType(sku);
-        if (type === 'products') {
-          fgList.push(sku);
-        } else if (type === 'semi') {
-          smList.push(sku);
-        } else {
-          rmList.push(sku);
-        }
-      });
-
-      const getSkuNum = (sku: SkuV2) => {
-        const m = (sku.skuCode || '').match(/(\d+)/);
-        return m ? parseInt(m[1], 10) : 999999;
-      };
-      const naturalSort = (a: SkuV2, b: SkuV2) => {
-        const numA = getSkuNum(a);
-        const numB = getSkuNum(b);
-        if (numA !== numB && numA !== 999999 && numB !== 999999) {
-          return numA - numB;
-        }
-        return (a.createdAt || '').localeCompare(b.createdAt || '');
-      };
-
-      fgList.sort(naturalSort);
-      smList.sort(naturalSort);
-      rmList.sort(naturalSort);
-
-      let clientUpdatesCount = 0;
-
-      // Renumber FG
-      for (let i = 0; i < fgList.length; i++) {
-        const targetCode = `FG-${String(i + 1).padStart(3, '0')}`;
-        if (fgList[i]._id && fgList[i].skuCode !== targetCode) {
-          await updateSkuV2(fgList[i]._id!, { skuCode: targetCode }).catch(console.error);
-          clientUpdatesCount++;
-        }
-      }
-
-      // Renumber SM
-      for (let i = 0; i < smList.length; i++) {
-        const targetCode = `SM-${String(i + 1).padStart(3, '0')}`;
-        if (smList[i]._id && smList[i].skuCode !== targetCode) {
-          await updateSkuV2(smList[i]._id!, { skuCode: targetCode }).catch(console.error);
-          clientUpdatesCount++;
-        }
-      }
-
-      // Renumber RM
-      for (let i = 0; i < rmList.length; i++) {
-        const targetCode = `RM-${String(i + 1).padStart(3, '0')}`;
-        if (rmList[i]._id && rmList[i].skuCode !== targetCode) {
-          await updateSkuV2(rmList[i]._id!, { skuCode: targetCode }).catch(console.error);
-          clientUpdatesCount++;
-        }
-      }
-
-      try {
-        if (selectedCompany?._id) {
-          localStorage.setItem(`skbw_max_sku_seq_${selectedCompany._id}_FG`, String(fgList.length));
-          localStorage.setItem(`skbw_max_sku_seq_${selectedCompany._id}_SM`, String(smList.length));
-          localStorage.setItem(`skbw_max_sku_seq_${selectedCompany._id}_RM`, String(rmList.length));
-        }
-      } catch (_) {}
+      await loadSkus(false);
 
       if (!silent) {
-        showToast(res?.msg || `Renumbered ${fgList.length + smList.length + rmList.length} SKUs into continuous series!`, "success");
+        showToast(res?.msg || "Renumbered SKUs into continuous series successfully!", "success");
       }
-      loadSkus(false);
     } catch (err: any) {
       console.error('Renumbering error:', err);
       if (!silent) showToast(err.response?.data?.msg || "Failed to re-sequence SKUs", "error");
@@ -2346,6 +2274,7 @@ const SkuMasterV2: React.FC = () => {
 
       const itemsToCreate: any[] = [];
       const dynamicCategoriesToCreate: { name: string; type: 'products' | 'materials' | 'semi'; uom: string }[] = [];
+      const dynamicBrandsToCreate: string[] = [];
 
       for (let i = 1; i < rawRows.length; i++) {
         const row = rawRows[i];
@@ -2513,6 +2442,14 @@ const SkuMasterV2: React.FC = () => {
         const ruleType = getFieldVal('ruletype', 'rule', 'ruling');
         const title = getFieldVal('title', 'itemtitle', 'description', 'itemdescription');
 
+        if (brand && brand.trim()) {
+          const brandTrimmed = brand.trim();
+          const brandLower = brandTrimmed.toLowerCase();
+          if (!dynamicBrandsToCreate.some(b => b.toLowerCase() === brandLower)) {
+            dynamicBrandsToCreate.push(brandTrimmed);
+          }
+        }
+
         // Extract Paper Type
         const rawPaperType = getFieldVal('papertype', 'papertypeform', 'type', 'materialtype');
         let paperType: 'Reels' | 'Sheets' | 'None' = 'None';
@@ -2585,6 +2522,31 @@ const SkuMasterV2: React.FC = () => {
         await saveCategoriesToDb(updatedCatCards);
       }
 
+      // Save dynamically discovered new brands to MongoDB metadata
+      if (dynamicBrandsToCreate.length > 0) {
+        try {
+          const meta = await getMetadataV2(selectedCompany._id).catch(() => null);
+          const existingBrands = Array.isArray(meta?.brands) ? meta.brands : [];
+          const brandSet = new Set(existingBrands.map((b: string) => b.trim().toLowerCase()));
+          const toAdd = dynamicBrandsToCreate.filter(b => !brandSet.has(b.toLowerCase()));
+          if (toAdd.length > 0) {
+            const mergedBrands = [...existingBrands, ...toAdd];
+            await updateMetadataV2({
+              companyId: selectedCompany._id,
+              categories: meta?.categories,
+              units: meta?.units,
+              ruleTypes: meta?.ruleTypes,
+              groups: meta?.groups,
+              brands: mergedBrands,
+              categoryFields: meta?.categoryFields,
+              standardizedSheets: meta?.standardizedSheets
+            });
+          }
+        } catch (brandErr) {
+          console.warn('Failed to sync imported brands to metadata:', brandErr);
+        }
+      }
+
       // Save updated sequence counters to localStorage so manual drawer creation seamlessly continues
       Object.entries(maxSeqMap).forEach(([pref, maxSeq]) => {
         try {
@@ -2602,7 +2564,7 @@ const SkuMasterV2: React.FC = () => {
       let createdCount = 0;
       let updatedCount = 0;
 
-      // Try bulk import first for instant upsert
+      // Instant fast bulk import in single atomic batch
       let bulkSucceeded = false;
       try {
         const bulkRes = await bulkImportSkusV2(itemsToCreate, selectedCompany._id);
@@ -2646,8 +2608,6 @@ const SkuMasterV2: React.FC = () => {
       }).catch(() => {});
 
       await loadSkus(false);
-      // Auto re-sequence SKUs into clean continuous series after import
-      await handleRenumberSkus(true);
     } catch (err: any) {
       console.error('Import failed:', err);
       showToast(err.message || 'Failed to import file', 'error');

@@ -615,10 +615,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
   const [hasAltUnit, setHasAltUnit] = useState(false);
 
-  // Brand searchable dropdown lists (separated for Finished Goods vs Raw Materials)
-  // Brand searchable dropdown lists (separated for Finished Goods vs Raw Materials)
-  const [existingBrands, setExistingBrands] = useState<string[]>([]);
-  const [fgBrandsList, setFgBrandsList] = useState<string[]>([]);
+  // Brand searchable dropdown list (strictly synced with Categories/Settings metadata brands)
   const [brandSearch, setBrandSearch] = useState('');
   const [showBrandDropdown, setShowBrandDropdown] = useState(false);
   const [groupSearch, setGroupSearch] = useState('');
@@ -627,39 +624,23 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   const [groupAtFocus, setGroupAtFocus] = useState<string | null>(null);
 
   const availableBrands = React.useMemo(() => {
-    const sourceList = resolvedSection === 'materials' 
-      ? [...existingBrands, ...brandsList] 
-      : [...fgBrandsList, ...brandsList];
-
     const uniqueMap = new Map<string, string>();
-    sourceList.forEach(item => {
+    (brandsList || []).forEach(item => {
       if (typeof item === 'string' && item.trim()) {
         const trimmed = item.trim();
         const key = trimmed.toLowerCase();
         if (!uniqueMap.has(key)) {
           uniqueMap.set(key, trimmed);
-        } else {
-          // If existing entry is ALL UPPERCASE and current is Title Case, prefer Title Case
-          const existing = uniqueMap.get(key)!;
-          if (existing === existing.toUpperCase() && trimmed !== trimmed.toUpperCase()) {
-            uniqueMap.set(key, trimmed);
-          }
         }
       }
     });
 
     return Array.from(uniqueMap.values()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
-  }, [resolvedSection, existingBrands, fgBrandsList, brandsList]);
+  }, [brandsList]);
 
   const handleAddNewBrand = async (newBrandInput: string) => {
     const trimmed = newBrandInput.trim();
     if (!trimmed) return;
-
-    if (resolvedSection === 'materials') {
-      setExistingBrands(prev => Array.from(new Set([...prev, trimmed])));
-    } else {
-      setFgBrandsList(prev => Array.from(new Set([...prev, trimmed])));
-    }
 
     const updatedBrands = Array.from(new Set([...brandsList, trimmed]));
     setBrandsList(updatedBrands);
@@ -775,7 +756,6 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   useEffect(() => {
     if (companyId && isOpen) {
       loadMetadata();
-      loadExistingBrands();
     }
   }, [companyId, isOpen]);
 
@@ -793,10 +773,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         }
         if (data.ruleTypes?.length) setRuleTypesList(data.ruleTypes);
         if (data.groups?.length) setGroupsList(data.groups);
-        if (data.brands?.length) {
+        if (Array.isArray(data.brands)) {
           setBrandsList(data.brands);
-          setExistingBrands(data.brands);
-          setFgBrandsList(prev => Array.from(new Set([...prev, ...data.brands])));
         }
         if (data.standardizedSheets && Array.isArray(data.standardizedSheets) && data.standardizedSheets.length > 0) {
           setStandardizedSheets(data.standardizedSheets);
@@ -878,31 +856,6 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       showToast('Removed sheet size preset', 'info');
     } catch (err) {
       console.error('Failed to update standardized sheets metadata:', err);
-    }
-  };
-
-  const loadExistingBrands = async () => {
-    try {
-      const skus = await getSkusV2(companyId);
-      
-      const fgBrands: string[] = [];
-      const rawBrands: string[] = [];
-
-      skus.forEach(s => {
-        const b = s.brand?.trim();
-        if (!b) return;
-        const isRaw = s.category === 'Raw Material' || s.category === 'Materials' || (s.skuCode || '').toUpperCase().startsWith('RM') || (s.category || '').toLowerCase().includes('raw') || (s.category || '').toLowerCase().includes('material');
-        if (isRaw) {
-          rawBrands.push(b);
-        } else {
-          fgBrands.push(b);
-        }
-      });
-
-      setFgBrandsList(Array.from(new Set(fgBrands)));
-      setExistingBrands(Array.from(new Set(rawBrands)));
-    } catch (e) {
-      console.error('Failed to load existing brands', e);
     }
   };
 
