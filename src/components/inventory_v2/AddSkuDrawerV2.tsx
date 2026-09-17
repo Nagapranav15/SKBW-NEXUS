@@ -211,12 +211,13 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     pages: '',
     reamWeight: '',
     booksGbl: '',
-    defaultLocation: 'Main Warehouse - Bay A1',
+    defaultLocation: 'SKBW',
     minStockLevel: '500',
     reorderLevel: '',
     openingStock: '',
     initialLocationId: '',
     recipeYieldQty: '',
+    recipeYieldUnit: '',
     preferredVendor: '',
     status: 'Active' as 'Active' | 'Inactive'
   });
@@ -977,7 +978,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         pages: (editSku as any).pages !== undefined ? String((editSku as any).pages) : '',
         reamWeight: (editSku as any).reamWeight !== undefined ? String((editSku as any).reamWeight) : '',
         booksGbl: (editSku as any).booksGbl !== undefined ? String((editSku as any).booksGbl) : '',
-        defaultLocation: (editSku as any).defaultLocation || 'Main Warehouse - Bay A1',
+        defaultLocation: (editSku as any).defaultLocation || 'SKBW',
         minStockLevel: (editSku as any).minStockLevel !== undefined && (editSku as any).minStockLevel !== null ? String((editSku as any).minStockLevel) : ((editSku as any).minStock !== undefined ? String((editSku as any).minStock) : ''),
         reorderLevel: (editSku as any).reorderLevel !== undefined && (editSku as any).reorderLevel !== null ? String((editSku as any).reorderLevel) : ((editSku as any).reorderQty !== undefined ? String((editSku as any).reorderQty) : ''),
         openingStock: (editSku as any)?.openingStock !== undefined ? String((editSku as any)?.openingStock) : '',
@@ -992,6 +993,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           return typeof rawLoc === 'object' ? (rawLoc._id || rawLoc.name || '') : String(rawLoc);
         })(),
         recipeYieldQty: (editSku as any)?.recipeYieldQty !== undefined ? String((editSku as any)?.recipeYieldQty) : ((editSku as any)?.batchYieldQty !== undefined ? String((editSku as any)?.batchYieldQty) : ''),
+        recipeYieldUnit: (editSku as any)?.recipeYieldUnit || editSku.unit || '',
         preferredVendor: (editSku as any)?.preferredVendor || '',
         status: editSku.status || 'Active'
       });
@@ -1010,12 +1012,23 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         group: editSku.group || ''
       });
       if ((editSku as any).bomItems && Array.isArray((editSku as any).bomItems)) {
-        setBomItems((editSku as any).bomItems);
+        setBomItems((editSku as any).bomItems.map((b: any, idx: number) => ({
+          id: b.id || b._id || `bom_${idx}_${Date.now()}`,
+          name: b.name || b.itemName || b.skuName || '',
+          qty: String(b.qty ?? b.quantity ?? ''),
+          uom: b.uom || b.unit || 'Kg',
+          inStock: Number(b.inStock ?? 0),
+          notes: b.notes || ''
+        })));
       } else {
         setBomItems([]);
       }
       if ((editSku as any).processSteps && Array.isArray((editSku as any).processSteps)) {
-        setProcessSteps((editSku as any).processSteps);
+        setProcessSteps((editSku as any).processSteps.map((s: any, idx: number) => ({
+          id: s.id || s._id || `step_${idx}_${Date.now()}`,
+          stepName: s.stepName || s.name || s.step || '',
+          machine: s.machine || s.machineName || s.workCenter || ''
+        })));
       } else {
         setProcessSteps([]);
       }
@@ -1039,12 +1052,13 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         pages: '',
         reamWeight: '',
         booksGbl: '',
-        defaultLocation: 'Main Warehouse - Bay A1',
+        defaultLocation: 'SKBW',
         minStockLevel: '',
         reorderLevel: '',
         openingStock: '',
         initialLocationId: '',
         recipeYieldQty: '',
+        recipeYieldUnit: '',
         preferredVendor: '',
         status: 'Active'
       });
@@ -2611,7 +2625,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                   <td className="py-2 px-2">
                                     <SearchableMaterialDropdown
                                       value={item.name}
-                                      materials={rawMaterialsList}
+                                      materials={allSkusList && allSkusList.length > 0 ? allSkusList : rawMaterialsList}
                                       onChange={(selectedName, matchedSku) => {
                                         updateBomItem(item.id, 'name', selectedName);
                                         if (matchedSku) {
