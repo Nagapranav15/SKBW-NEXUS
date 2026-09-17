@@ -433,18 +433,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       }
     });
 
-    // 2. Base section default if no categories created yet
-    if (list.length === 0) {
-      if (targetType === 'products') {
-        list.push('Products');
-      } else if (targetType === 'materials') {
-        list.push('Materials');
-      } else {
-        list.push('Semi');
-      }
-    }
-
-    // 3. Include form.category only if valid, non-empty, and matching the section
+    // 2. Include form.category only if valid, non-empty, and matching the section
     const trimmedFormCat = (form.category || '').trim();
     if (trimmedFormCat && !list.includes(trimmedFormCat) && trimmedFormCat !== '—' && trimmedFormCat !== '-') {
       const catObj = (createdCategories || []).find(c => c && c.name?.toLowerCase().trim() === trimmedFormCat.toLowerCase());
@@ -1371,8 +1360,14 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                   <span className="font-bold text-gray-900 text-base">
                     {editSku ? 'Edit SKU Item' : 'Add New SKU Item'}
                   </span>
-                  <span className="bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-semibold px-2.5 py-0.5 rounded-md flex items-center gap-1">
-                    {form.category || 'Finished Goods'}
+                  <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-md flex items-center gap-1 ${
+                    itemMainType === 'Materials'
+                      ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                      : itemMainType === 'Semi'
+                        ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                        : 'bg-blue-50 text-blue-700 border border-blue-200'
+                  }`}>
+                    {form.category || itemMainType}
                   </span>
                 </div>
               </div>

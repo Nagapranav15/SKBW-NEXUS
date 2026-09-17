@@ -294,6 +294,7 @@ const SkuMasterV2: React.FC = () => {
 
   // Expanded Category IDs
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<string[]>([]);
+  const [categorySearchQuery, setCategorySearchQuery] = useState('');
 
   // Core SKU data states
   const [skus, setSkus] = useState<SkuV2[]>([]);
@@ -4310,200 +4311,280 @@ const SkuMasterV2: React.FC = () => {
       ) : (
 
         /* ── CATEGORIES TAB VIEW ── */
-        <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs p-5 space-y-5">
+        <div className="space-y-4 text-left animate-in fade-in duration-200">
           
-          {/* Header Count & Actions Bar */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-2 border-b border-gray-100">
-            <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-              {activeCategorySubTab === 'products' ? 'Product Categories:' : activeCategorySubTab === 'materials' ? 'Material Categories:' : 'Semi Categories:'} 
-              <span className="text-blue-600 font-bold ml-1">
-                {categoriesData.filter(c => c.type === activeCategorySubTab).length}
-              </span>
-            </h2>
+          {/* Top Categories Toolbar & Section Navigation */}
+          <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            
+            {/* Left: Section Header & Cute Segmented Subtabs */}
+            <div className="flex flex-col md:flex-row md:items-center gap-4">
+              <div>
+                <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <span>Categories Master</span>
+                  <span className="bg-blue-50 text-blue-700 border border-blue-200/80 text-[11px] font-bold px-2 py-0.5 rounded-full">
+                    {categoriesData.length} Total
+                  </span>
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Configure structural categories, default UOMs, and variant attribute fields
+                </p>
+              </div>
 
-            <div className="flex items-center gap-2">
+              {/* Subtabs Segmented Buttons with cute badges */}
+              <div className="bg-slate-100/90 p-1 rounded-xl inline-flex items-center gap-1 border border-slate-200/80 shadow-2xs self-start md:self-auto">
+                <button
+                  onClick={() => setActiveCategorySubTab('products')}
+                  className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-2 ${
+                    activeCategorySubTab === 'products'
+                      ? 'bg-white text-blue-700 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                  }`}
+                >
+                  <Package className={`w-3.5 h-3.5 ${activeCategorySubTab === 'products' ? 'text-blue-600' : 'text-slate-400'}`} />
+                  <span>Products</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                    activeCategorySubTab === 'products' ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-600'
+                  }`}>
+                    {categoriesData.filter(c => c.type === 'products').length}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveCategorySubTab('materials')}
+                  className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-2 ${
+                    activeCategorySubTab === 'materials'
+                      ? 'bg-white text-amber-800 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                  }`}
+                >
+                  <Layers className={`w-3.5 h-3.5 ${activeCategorySubTab === 'materials' ? 'text-amber-600' : 'text-slate-400'}`} />
+                  <span>Materials</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                    activeCategorySubTab === 'materials' ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-600'
+                  }`}>
+                    {categoriesData.filter(c => c.type === 'materials').length}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveCategorySubTab('semi')}
+                  className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-2 ${
+                    activeCategorySubTab === 'semi'
+                      ? 'bg-white text-purple-700 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                  }`}
+                >
+                  <Boxes className={`w-3.5 h-3.5 ${activeCategorySubTab === 'semi' ? 'text-purple-600' : 'text-slate-400'}`} />
+                  <span>Semi</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                    activeCategorySubTab === 'semi' ? 'bg-purple-100 text-purple-800' : 'bg-slate-200 text-slate-600'
+                  }`}>
+                    {categoriesData.filter(c => c.type === 'semi').length}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Right: Search & Add Category Button */}
+            <div className="flex items-center gap-2.5 self-end sm:self-auto">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  value={categorySearchQuery}
+                  onChange={(e) => setCategorySearchQuery(e.target.value)}
+                  placeholder={`Search ${activeCategorySubTab}...`}
+                  className="pl-8 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl w-36 sm:w-48 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+                />
+                {categorySearchQuery && (
+                  <button 
+                    onClick={() => setCategorySearchQuery('')}
+                    className="absolute right-2 top-2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
               <button 
                 onClick={handleOpenAddCategoryModal}
-                className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full transition-all shadow-sm cursor-pointer"
-                title="Add Category"
+                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs hover:shadow-md flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add {activeCategorySubTab === 'products' ? 'Product' : activeCategorySubTab === 'materials' ? 'Material' : 'Semi'} Category</span>
               </button>
             </div>
           </div>
 
-          {/* Item Categories Sub-header & Subtabs */}
-          <div className="space-y-3">
-            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">
-              ITEM CATEGORIES
-            </span>
+          {/* Cards Grid / Empty State */}
+          {(() => {
+            const currentSubTabCats = categoriesData.filter(c => c.type === activeCategorySubTab);
+            const filtered = currentSubTabCats.filter(c => {
+              if (!categorySearchQuery) return true;
+              const q = categorySearchQuery.toLowerCase().trim();
+              return c.name.toLowerCase().includes(q) || (c.uom && c.uom.toLowerCase().includes(q)) || (c.fields && c.fields.some(f => f.toLowerCase().includes(q)));
+            });
 
-            {/* Subtabs Segmented Buttons */}
-            <div className="bg-gray-100/80 p-1 rounded-xl inline-flex gap-1 border border-gray-200 overflow-x-auto">
-              <button
-                onClick={() => setActiveCategorySubTab('products')}
-                className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap ${
-                  activeCategorySubTab === 'products'
-                    ? 'bg-white text-blue-700 shadow-2xs font-bold'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Products
-              </button>
-
-              <button
-                onClick={() => setActiveCategorySubTab('materials')}
-                className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap ${
-                  activeCategorySubTab === 'materials'
-                    ? 'bg-white text-blue-700 shadow-2xs font-bold'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Materials
-              </button>
-
-              <button
-                onClick={() => setActiveCategorySubTab('semi')}
-                className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap ${
-                  activeCategorySubTab === 'semi'
-                    ? 'bg-white text-blue-700 shadow-2xs font-bold'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Semi
-              </button>
-            </div>
-          </div>
-
-          {/* Select all bar */}
-          <div className="bg-gray-50 border border-gray-200/80 rounded-xl px-4 py-2.5 flex items-center gap-2 text-xs font-semibold text-gray-600">
-            <input type="checkbox" className="rounded border-gray-300 text-blue-600" />
-            <span>Select all</span>
-          </div>
-
-          {/* Category Cards List */}
-          <div className="space-y-3">
-            {categoriesData.filter(c => c.type === activeCategorySubTab).map((cat, index) => {
-              const isExpanded = expandedCategoryIds.includes(cat.id);
-              const linkedItemsCount = skus.filter(s => {
-                const cName = cat.name.toLowerCase();
-                const sGroup = (s.group || '').toLowerCase();
-                const sCat = (s.category || '').toLowerCase();
-                const sName = (s.name || '').toLowerCase();
-                return sGroup === cName || sCat === cName || (sCat === 'finished goods' && sName.includes(cName)) || (sCat === 'raw material' && sName.includes(cName));
-              }).length;
-
+            if (filtered.length === 0) {
               return (
-                <div 
-                  key={cat.id}
-                  style={{
-                    animation: 'slideDownFade 0.35s ease-out forwards',
-                    animationDelay: `${index * 45}ms`
-                  }}
-                  className="bg-white border border-gray-200 hover:border-blue-300 rounded-2xl p-4 shadow-2xs transition-all space-y-3 opacity-0"
-                >
-                  <div className="flex items-center justify-between">
-                    
-                    {/* Left Details */}
-                    <div className="flex items-center gap-3">
-                      <input type="checkbox" className="rounded border-gray-300 text-blue-600" />
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span 
-                            onClick={() => {
-                              handleMainTabChange(cat.type === 'products' ? 'products' : cat.type === 'semi' ? 'semi' : 'materials');
-                              setCategoryFilter(cat.name);
-                            }}
-                            className="font-bold text-gray-900 text-sm hover:text-blue-600 cursor-pointer transition-colors"
-                            title={`View all ${cat.name} items`}
-                          >
-                            {cat.name}
-                          </span>
-                          <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-semibold px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
-                            <Paperclip className="w-3 h-3" />
-                            {cat.uom}
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-400 font-normal mt-0.5">
-                          {cat.fields.join(' · ')}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Right Metadata & Action Buttons */}
-                    <div className="flex items-center gap-4">
-                      <span className="text-xs text-gray-400 font-medium hidden sm:inline-block">
-                        {cat.fields.length} {cat.fields.length === 1 ? 'field' : 'fields'}
-                      </span>
-
-                      {/* Linked Items Green Pill Badge - Click to Filter */}
-                      <button
-                        onClick={() => {
-                          handleMainTabChange(cat.type === 'products' ? 'products' : cat.type === 'semi' ? 'semi' : 'materials');
-                          setCategoryFilter(cat.name);
-                        }}
-                        className="text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1 rounded-lg shadow-2xs cursor-pointer transition-all"
-                        title={`Filter items by category '${cat.name}'`}
-                      >
-                        {linkedItemsCount} {cat.type === 'products' ? 'product' : 'material'}{linkedItemsCount === 1 ? '' : 's'}
-                      </button>
-
-                      <div className="flex items-center gap-1">
-                        <button 
-                          onClick={() => handleOpenEditCategoryModal(cat)}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-all cursor-pointer"
-                          title="Edit category"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-
-                        <button 
-                          onClick={() => handleDeleteCategory(cat.id, cat.name)}
-                          className="p-1.5 text-gray-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-all cursor-pointer"
-                          title="Delete category"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-
-                        <button 
-                          onClick={() => toggleExpandCategory(cat.id)}
-                          className="p-1.5 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-100 transition-all cursor-pointer"
-                          title="Expand details"
-                        >
-                          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </div>
-
+                <div className="py-14 px-6 text-center flex flex-col items-center justify-center space-y-4 rounded-2xl border-2 border-dashed border-gray-200/90 bg-white shadow-2xs">
+                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-xs transition-transform hover:scale-105 ${
+                    activeCategorySubTab === 'products'
+                      ? 'bg-blue-50 border border-blue-100 text-blue-600'
+                      : activeCategorySubTab === 'materials'
+                        ? 'bg-amber-50 border border-amber-100 text-amber-600'
+                        : 'bg-purple-50 border border-purple-100 text-purple-600'
+                  }`}>
+                    {activeCategorySubTab === 'products' ? (
+                      <Package className="w-8 h-8" />
+                    ) : activeCategorySubTab === 'materials' ? (
+                      <Layers className="w-8 h-8" />
+                    ) : (
+                      <Boxes className="w-8 h-8" />
+                    )}
                   </div>
-
-                  {/* Expanded Content */}
-                  {isExpanded && (
-                    <div className="pt-3 border-t border-gray-100 text-xs text-gray-600 space-y-2 animate-fade-in bg-gray-50/50 p-3 rounded-xl">
-                      <p className="font-semibold text-gray-800">Fields / Variant Attributes:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {cat.fields.map(field => (
-                          <span key={field} className="bg-white border border-gray-200 px-2.5 py-1 rounded-md text-gray-700 font-medium">
-                            {field}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
+                  <div className="max-w-md space-y-1.5">
+                    <h3 className="text-sm font-bold text-gray-900">
+                      {categorySearchQuery ? 'No matching categories found' : `No ${activeCategorySubTab === 'products' ? 'Product' : activeCategorySubTab === 'materials' ? 'Material' : 'Semi'} Categories Yet`}
+                    </h3>
+                    <p className="text-xs text-gray-500 leading-relaxed">
+                      {categorySearchQuery 
+                        ? `We couldn't find any categories matching "${categorySearchQuery}".`
+                        : `Create your first category to organize your ${activeCategorySubTab === 'products' ? 'finished products' : activeCategorySubTab === 'materials' ? 'raw materials' : 'semi-finished items'} with customized variant attributes and default measurement units.`}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleOpenAddCategoryModal}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs hover:shadow-md flex items-center gap-1.5 cursor-pointer mt-1"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Create {activeCategorySubTab === 'products' ? 'Product' : activeCategorySubTab === 'materials' ? 'Material' : 'Semi'} Category</span>
+                  </button>
                 </div>
               );
-            })}
-          </div>
+            }
 
-          {/* Bottom Dashed Add Category Dropzone */}
-          <div
-            onClick={handleOpenAddCategoryModal}
-            className="border-2 border-dashed border-gray-200 hover:border-blue-400 rounded-2xl p-4 text-center text-blue-600 font-semibold text-xs hover:bg-blue-50/40 cursor-pointer transition-all flex items-center justify-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            <span>+ Add {activeCategorySubTab === 'products' ? 'product' : activeCategorySubTab === 'materials' ? 'material' : 'semi'} category</span>
-          </div>
+            return (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                  {filtered.map((cat, index) => {
+                    const linkedItemsCount = skus.filter(s => {
+                      const cName = cat.name.toLowerCase();
+                      const sGroup = (s.group || '').toLowerCase();
+                      const sCat = (s.category || '').toLowerCase();
+                      const sName = (s.name || '').toLowerCase();
+                      return sGroup === cName || sCat === cName || (sCat === 'finished goods' && sName.includes(cName)) || (sCat === 'raw material' && sName.includes(cName));
+                    }).length;
+
+                    return (
+                      <div 
+                        key={cat.id}
+                        style={{
+                          animation: 'slideDownFade 0.3s ease-out forwards',
+                          animationDelay: `${index * 35}ms`
+                        }}
+                        className="bg-white border border-gray-200/80 hover:border-blue-300 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all space-y-3 opacity-0 group"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          
+                          {/* Left: Avatar Icon + Category Name + UOM */}
+                          <div className="flex items-start gap-3">
+                            <div className={`p-2.5 rounded-xl border shrink-0 transition-transform group-hover:scale-105 ${
+                              cat.type === 'products' 
+                                ? 'bg-blue-50 text-blue-600 border-blue-100' 
+                                : cat.type === 'materials' 
+                                  ? 'bg-amber-50 text-amber-600 border-amber-100' 
+                                  : 'bg-purple-50 text-purple-600 border-purple-100'
+                            }`}>
+                              {cat.type === 'products' ? <Package className="w-4 h-4" /> : cat.type === 'materials' ? <Layers className="w-4 h-4" /> : <Boxes className="w-4 h-4" />}
+                            </div>
+
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span 
+                                  onClick={() => {
+                                    handleMainTabChange(cat.type === 'products' ? 'products' : cat.type === 'semi' ? 'semi' : 'materials');
+                                    setCategoryFilter(cat.name);
+                                  }}
+                                  className="font-bold text-gray-900 text-sm hover:text-blue-600 cursor-pointer transition-colors"
+                                  title={`View all ${cat.name} items`}
+                                >
+                                  {cat.name}
+                                </span>
+                                <span className="bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
+                                  <Paperclip className="w-2.5 h-2.5" />
+                                  {cat.uom || 'Unit'}
+                                </span>
+                              </div>
+
+                              {/* Variant Attribute Tags */}
+                              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                                {cat.fields && cat.fields.length > 0 ? (
+                                  cat.fields.map(field => (
+                                    <span key={field} className="text-[10px] font-semibold bg-slate-50 text-slate-600 border border-slate-200/70 px-2 py-0.5 rounded-md">
+                                      {field}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="text-[10px] text-gray-400 italic">No custom fields</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Right: Item Count Badge & Actions */}
+                          <div className="flex items-center gap-2 shrink-0">
+                            {/* Linked Items Pill */}
+                            <button
+                              onClick={() => {
+                                handleMainTabChange(cat.type === 'products' ? 'products' : cat.type === 'semi' ? 'semi' : 'materials');
+                                setCategoryFilter(cat.name);
+                              }}
+                              className="text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 border border-emerald-200/80 px-2.5 py-1 rounded-lg shadow-2xs cursor-pointer transition-all flex items-center gap-1.5"
+                              title={`Filter items by category '${cat.name}'`}
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              <span>{linkedItemsCount} {cat.type === 'products' ? 'product' : 'material'}{linkedItemsCount === 1 ? '' : 's'}</span>
+                            </button>
+
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-0.5">
+                              <button 
+                                onClick={() => handleOpenEditCategoryModal(cat)}
+                                className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-all cursor-pointer"
+                                title="Edit category"
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button 
+                                onClick={() => handleDeleteCategory(cat.id, cat.name)}
+                                className="p-1.5 text-gray-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-all cursor-pointer"
+                                title="Delete category"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Bottom Dashed Add Category Dropzone */}
+                <div
+                  onClick={handleOpenAddCategoryModal}
+                  className="border-2 border-dashed border-gray-200 hover:border-blue-400 rounded-2xl p-3.5 text-center text-blue-600 font-semibold text-xs hover:bg-blue-50/40 cursor-pointer transition-all flex items-center justify-center gap-2 shadow-2xs hover:shadow-xs"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ Add {activeCategorySubTab === 'products' ? 'Product' : activeCategorySubTab === 'materials' ? 'Material' : 'Semi'} Category</span>
+                </div>
+              </div>
+            );
+          })()}
 
         </div>
 
