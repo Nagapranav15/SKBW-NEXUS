@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, RefreshCw, BookOpen, Layers, Plus, Trash2, AlertCircle, MapPin, Search, ChevronDown, ChevronRight, Lock, Package, ArrowLeftRight, Building2, Pencil, Settings2, X } from 'lucide-react';
+import { Save, RefreshCw, BookOpen, Layers, Plus, Trash2, AlertCircle, MapPin, Search, ChevronDown, ChevronRight, Lock, Package, Building2, Pencil, Settings2, X } from 'lucide-react';
 import { createSkuV2, updateSkuV2, SkuV2, getMetadataV2, updateMetadataV2, getSkusV2, getNextSkuCodeV2, getBalancesV2, getWarehouseHierarchyV2, WarehouseLocationV2 } from '../../api/mfgApiV2';
 import { getParties } from '../../api/partyApi';
 import Modal from '../ui/Modal';
@@ -7,8 +7,6 @@ import { BomCopyPasteControls } from './BomCopyPasteControls';
 import { LocationSelectModal } from './LocationSelectModal';
 import { showToast } from '../ui/Toast';
 import { 
-  formatUomFormula, 
-  formatUomConversionSummary, 
   validateUomConversion, 
   getUomDirection, 
   roundUomQty, 
@@ -30,6 +28,7 @@ interface AddSkuDrawerV2Props {
   customColumns?: string[];
   customColumnTypes?: { [colName: string]: string };
   customColumnValues?: { [key: string]: any };
+  customColumnOptions?: { [colName: string]: { label: string; color: string }[] };
   setCustomColumnValues?: React.Dispatch<React.SetStateAction<{ [key: string]: any }>>;
   createdCategories?: { id?: string; name: string; type?: 'products' | 'materials' | 'semi'; uom?: string }[];
   onCategoryCreated?: (newCategory: { id: string; name: string; type: 'products' | 'materials' | 'semi'; uom: string; fields: string[] }) => void;
@@ -167,9 +166,6 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   editSku,
   defaultCategory,
   activeSection,
-  existingProductsCount,
-  existingMaterialsCount,
-  existingSemiCount,
   onClose,
   onSaveSuccess,
   customColumns = [],
@@ -259,21 +255,6 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     return path.join(' ➔ ');
   };
 
-  // Storage Locations & Godowns / Factories (Full Hierarchy)
-  const storageLocations = React.useMemo(() => {
-    if (!rawHierarchy || rawHierarchy.length === 0) {
-      return availableLocations;
-    }
-
-    return rawHierarchy
-      .filter(loc => loc.level === 'Storage Location' || !rawHierarchy.some(child => String(child.parentId) === String(loc._id)))
-      .map(loc => ({
-        id: String(loc._id || ''),
-        name: buildLocationPath(loc._id, rawHierarchy)
-      }))
-      .filter(l => l.id && l.name)
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [rawHierarchy, availableLocations]);
 
   useEffect(() => {
     let isMounted = true;
@@ -410,39 +391,6 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     return normalizeAndDeduplicateUnits(list);
   }, [unitsList, form.unit, form.altUnit]);
 
-  const sectionCategories = React.useMemo(() => {
-    let targetType: 'products' | 'materials' | 'semi' = 'products';
-    const catLower = (form.category || '').toLowerCase();
-
-    if (catLower === 'semi finished' || catLower === 'semi') {
-      targetType = 'semi';
-    } else if (catLower === 'raw material' || catLower === 'materials' || catLower === 'raw materials') {
-      targetType = 'materials';
-    } else if (catLower === 'finished goods' || catLower === 'products') {
-      targetType = 'products';
-    } else if (activeSection === 'semi' || defaultCategory === 'Semi Finished') {
-      targetType = 'semi';
-    } else if (activeSection === 'materials' || defaultCategory === 'Raw Material') {
-      targetType = 'materials';
-    }
-
-    const createdList = (createdCategories || [])
-      .filter(c => c.type === targetType)
-      .map(c => c.name);
-
-    const merged = Array.from(new Set(createdList))
-      .filter(name => !['Finished Goods', 'Raw Material', 'Semi Finished'].includes(name));
-
-    // If existing item has a group that isn't in list, preserve it
-    if (form.group && !merged.includes(form.group) && !['Finished Goods', 'Raw Material', 'Semi Finished'].includes(form.group)) {
-      merged.push(form.group);
-    }
-
-    return merged;
-  }, [form.category, activeSection, defaultCategory, createdCategories, form.group]);
-
-  const [isAddingNewCategory, setIsAddingNewCategory] = useState(false);
-  const [newCategoryInput, setNewCategoryInput] = useState('');
 
   const resolvedSection = React.useMemo<'products' | 'materials' | 'semi'>(() => {
     if (editSku) {
@@ -609,10 +557,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   // Brand searchable dropdown list (strictly synced with Categories/Settings metadata brands)
   const [brandSearch, setBrandSearch] = useState('');
   const [showBrandDropdown, setShowBrandDropdown] = useState(false);
-  const [groupSearch, setGroupSearch] = useState('');
-  const [showGroupDropdown, setShowGroupDropdown] = useState(false);
   const [brandAtFocus, setBrandAtFocus] = useState<string | null>(null);
-  const [groupAtFocus, setGroupAtFocus] = useState<string | null>(null);
 
   const availableBrands = React.useMemo(() => {
     const uniqueMap = new Map<string, string>();
@@ -694,15 +639,11 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   };
 
   const brandContainerRef = useRef<HTMLDivElement>(null);
-  const groupContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (brandContainerRef.current && !brandContainerRef.current.contains(e.target as Node)) {
         setShowBrandDropdown(false);
-      }
-      if (groupContainerRef.current && !groupContainerRef.current.contains(e.target as Node)) {
-        setShowGroupDropdown(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -940,11 +881,6 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   useEffect(() => {
     setBrandSearch(form.brand);
   }, [form.brand]);
-
-  // Sync groupSearch with form.group
-  useEffect(() => {
-    setGroupSearch(form.group);
-  }, [form.group]);
 
   // Update form state if editSku is provided or changes
   useEffect(() => {
