@@ -568,6 +568,7 @@ const SkuMasterV2: React.FC = () => {
   const [recipeYieldUnit, setRecipeYieldUnit] = useState<string>('');
   const [buildBatchYieldQty, setBuildBatchYieldQty] = useState<string>('1');
   const [isSavingBom, setIsSavingBom] = useState(false);
+  const [isEditingItemBom, setIsEditingItemBom] = useState(false);
 
   const handleSaveBomRecipe = async () => {
     if (!selectedSkuDetails?._id) {
@@ -584,6 +585,7 @@ const SkuMasterV2: React.FC = () => {
       });
       setSelectedSkuDetails(prev => prev ? ({ ...prev, bomItems: bomRecipeItems, recipeYieldQty: Number(recipeYieldQty) || 1, recipeYieldUnit: recipeYieldUnit || selectedSkuDetails.unit || 'Pcs' }) : null);
       showToast('BOM Recipe saved successfully to database!', 'success');
+      setIsEditingItemBom(false);
       loadSkus(false);
     } catch (err: any) {
       console.error('Failed to save BOM recipe:', err);
@@ -5372,16 +5374,16 @@ const SkuMasterV2: React.FC = () => {
                       </span>
                     </div>
 
-                    {/* Header row matching Makoro Screenshot media_1789142185429.png */}
+                    {/* Header row */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-start gap-2.5">
-                        <div className="p-2 bg-[#064E3B] text-white rounded-lg shrink-0 shadow-2xs">
-                          <ClipboardList className="w-4 h-4 text-white" />
+                        <div className="p-2 bg-blue-100 text-blue-700 rounded-xl shrink-0 shadow-2xs">
+                          <ClipboardList className="w-4 h-4 text-blue-700" />
                         </div>
                         <div>
                           <h4 className="font-bold text-gray-900 text-sm">Bill of Materials</h4>
                           <p className="text-[11px] text-gray-500">
-                            Enter the quantities for one <strong>batch</strong>. Work orders scale consumption by (qty ÷ batch size × units produced).
+                            Quantities for one <strong>batch</strong>. Work orders scale consumption by (qty ÷ batch size × units produced).
                           </p>
                         </div>
                       </div>
@@ -5407,6 +5409,7 @@ const SkuMasterV2: React.FC = () => {
                             };
                           }}
                           onPaste={(copied, mode) => {
+                            setIsEditingItemBom(true);
                             if (mode === 'replace') {
                               setBomRecipeItems(copied.lines.map((l, i) => ({
                                 id: `b-paste-${Date.now()}-${i}`,
@@ -5440,150 +5443,194 @@ const SkuMasterV2: React.FC = () => {
                           onToast={showToast}
                         />
 
-                        <button 
-                          onClick={handleAddBomItem}
-                          className="px-3.5 py-1.5 border border-[#064E3B] text-[#064E3B] hover:bg-emerald-50/40 font-medium rounded-md text-xs flex items-center gap-1 cursor-pointer transition-all shadow-2xs"
-                        >
-                          <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> Add Item
-                        </button>
+                        {!isEditingItemBom ? (
+                          <button 
+                            type="button"
+                            onClick={() => setIsEditingItemBom(true)}
+                            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
+                          >
+                            <Edit className="w-3.5 h-3.5" /> Edit BOM
+                          </button>
+                        ) : (
+                          <button 
+                            type="button"
+                            onClick={handleAddBomItem}
+                            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all shadow-2xs"
+                          >
+                            <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> Add Item
+                          </button>
+                        )}
                       </div>
                     </div>
 
-                    {/* Recipe Yield Box matching Makoro media_1789142185429.png with UOM & AUOM selection */}
+                    {/* Recipe Yield Box */}
                     {(() => {
                       const availableYieldUnits = Array.from(new Set([selectedSkuDetails?.unit, selectedSkuDetails?.altUnit].filter(Boolean)));
                       const activeUnit = recipeYieldUnit || selectedSkuDetails?.unit || 'Pcs';
 
                       return (
-                        <div className="border border-gray-200 rounded-lg p-2.5 px-3.5 text-xs text-gray-600 font-medium flex items-center gap-2 bg-white">
+                        <div className="border border-gray-200 rounded-xl p-2.5 px-3.5 text-xs text-gray-700 font-medium flex items-center gap-2 bg-gray-50/60">
                           <span>This recipe makes</span>
-                          <input
-                            type="number"
-                            min="1"
-                            value={recipeYieldQty || ''}
-                            onChange={(e) => setRecipeYieldQty(e.target.value)}
-                            className="w-14 px-1.5 py-0.5 border border-gray-300 rounded font-bold text-gray-900 text-center focus:ring-1 focus:ring-[#064E3B]"
-                          />
-                          {availableYieldUnits.length > 1 ? (
-                            <select
-                              value={activeUnit}
-                              onChange={(e) => setRecipeYieldUnit(e.target.value)}
-                              className="px-2 py-0.5 border border-emerald-300 rounded font-bold text-emerald-800 bg-emerald-50/60 cursor-pointer focus:ring-1 focus:ring-emerald-500"
-                            >
-                              {availableYieldUnits.map(u => (
-                                <option key={u} value={u}>{u}</option>
-                              ))}
-                            </select>
+                          {isEditingItemBom ? (
+                            <>
+                              <input
+                                type="number"
+                                min="1"
+                                value={recipeYieldQty || ''}
+                                onChange={(e) => setRecipeYieldQty(e.target.value)}
+                                className="w-16 px-2 py-1 border border-blue-300 rounded-lg font-bold text-gray-900 text-center bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                              />
+                              {availableYieldUnits.length > 1 ? (
+                                <select
+                                  value={activeUnit}
+                                  onChange={(e) => setRecipeYieldUnit(e.target.value)}
+                                  className="px-2.5 py-1 border border-blue-300 rounded-lg font-bold text-blue-800 bg-blue-50 cursor-pointer focus:ring-2 focus:ring-blue-500"
+                                >
+                                  {availableYieldUnits.map(u => (
+                                    <option key={u} value={u}>{u}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <strong className="text-gray-900">{selectedSkuDetails?.unit || 'Pcs'}</strong>
+                              )}
+                              <span className="text-gray-400 font-normal">(use 1 for per-unit quantities)</span>
+                            </>
                           ) : (
-                            <strong className="text-gray-900">{selectedSkuDetails?.unit || 'Pcs'}</strong>
+                            <>
+                              <strong className="text-blue-900 font-extrabold bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md font-mono">
+                                {recipeYieldQty || '1'} {activeUnit}
+                              </strong>
+                              <span className="text-gray-400 font-normal">(quantities are configured per batch)</span>
+                            </>
                           )}
-                          <Pencil className="w-3.5 h-3.5 text-gray-400" />
-                          <span className="text-gray-400 font-normal">(use 1 for per-unit quantities)</span>
                         </div>
                       );
                     })()}
 
-                    {/* Recipe Items Table matching Makoro media_1789142185429.png */}
+                    {/* Recipe Items Table */}
                     <div className="border border-gray-200 rounded-xl overflow-x-auto shadow-2xs bg-white">
-                      <table className="w-full text-left text-xs border-collapse min-w-[640px]">
-                        <thead className="bg-gray-50/80 text-gray-500 font-bold text-[11px] border-b border-gray-200">
-                          <tr>
-                            <th className="py-2.5 px-3 min-w-[200px]">Item</th>
-                            <th className="py-2.5 px-3 text-center w-20">Qty</th>
-                            <th className="py-2.5 px-3 w-16">UoM</th>
-                            <th className="py-2.5 px-3 w-20">In Stock</th>
-                            <th className="py-2.5 px-3 w-20 font-bold">Runs</th>
-                            <th className="py-2.5 px-3 min-w-[160px]">Notes</th>
-                            <th className="py-2.5 px-3 text-right w-10"></th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 text-gray-800">
-                          {bomRecipeItems.map((b) => {
-                            const qtyNum = Number(b.qty);
-                            const inStockNum = Number(b.inStock) || 0;
-                            const runs = (qtyNum > 0) ? Math.floor(inStockNum / qtyNum) : null;
+                      {bomRecipeItems.length === 0 && !isEditingItemBom ? (
+                        <div className="text-center py-10 text-gray-400 text-xs space-y-2">
+                          <ClipboardList className="w-8 h-8 mx-auto text-gray-300" />
+                          <p className="font-semibold text-gray-600">No Bill of Materials configured yet</p>
+                          <p className="text-[11px]">Click "Edit BOM" above to add ingredients and raw material ratios.</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsEditingItemBom(true);
+                              handleAddBomItem();
+                            }}
+                            className="mt-1 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                          >
+                            <Plus className="w-3.5 h-3.5" /> Configure BOM Now
+                          </button>
+                        </div>
+                      ) : (
+                        <table className="w-full text-left text-xs border-collapse min-w-[640px]">
+                          <thead className="bg-gray-50/80 text-gray-500 font-bold text-[11px] border-b border-gray-200">
+                            <tr>
+                              <th className="py-2.5 px-3 min-w-[220px]">Item</th>
+                              <th className="py-2.5 px-3 text-center w-24">Qty</th>
+                              <th className="py-2.5 px-3 w-16">UoM</th>
+                              <th className="py-2.5 px-3 w-20">In Stock</th>
+                              <th className="py-2.5 px-3 w-20 font-bold">Runs</th>
+                              <th className="py-2.5 px-3 min-w-[160px]">Notes</th>
+                              {isEditingItemBom && <th className="py-2.5 px-3 text-right w-10"></th>}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 text-gray-800">
+                            {bomRecipeItems.map((b, idx) => {
+                              const qtyNum = Number(b.qty);
+                              const inStockNum = Number(b.inStock) || 0;
+                              const runs = (qtyNum > 0) ? Math.floor(inStockNum / qtyNum) : null;
 
-                            return (
-                              <tr key={b.id} className="hover:bg-gray-50/50">
-                                <td className="py-2 px-3">
-                                  <div className="relative">
-                                    <input
-                                      type="text"
-                                      list={`item-materials-${b.id}`}
-                                      value={b.name}
-                                      onChange={(e) => {
-                                        const val = e.target.value;
-                                        const matched = rawAndSemiMaterials.find(m => (m.name || '').toLowerCase() === val.toLowerCase());
-                                        setBomRecipeItems(prev => prev.map(item => {
-                                          if (item.id === b.id) {
-                                            return {
-                                              ...item,
-                                              name: val,
-                                              uom: matched?.unit || item.uom || 'Kg',
-                                              inStock: (matched as any)?.openingStock ?? item.inStock ?? 0
-                                            };
-                                          }
-                                          return item;
-                                        }));
-                                      }}
-                                      placeholder="Material name..."
-                                      className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-gray-800 focus:outline-none focus:border-[#064E3B] bg-white"
-                                    />
-                                    <datalist id={`item-materials-${b.id}`}>
-                                      {rawAndSemiMaterials.map((m) => (
-                                        <option key={m._id} value={m.name}>
-                                          {m.skuCode} ({m.unit || 'Kg'})
-                                        </option>
-                                      ))}
-                                    </datalist>
-                                  </div>
-                                </td>
-                                <td className="py-2 px-3 text-center w-20">
-                                  <input
-                                    type="number"
-                                    step="any"
-                                    placeholder="Qty"
-                                    value={b.qty === 0 || b.qty === undefined ? '' : b.qty}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      setBomRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, qty: val === '' ? ('' as any) : Number(val) } : item));
-                                    }}
-                                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-semibold text-center focus:outline-none focus:border-[#064E3B]"
-                                  />
-                                </td>
-                                <td className="py-2 px-3 text-gray-600 font-medium whitespace-nowrap w-16">{b.uom}</td>
-                                <td className="py-2 px-3 text-gray-600 font-mono whitespace-nowrap w-20">{b.inStock ?? 0}</td>
-                                <td className="py-2 px-3 font-bold text-gray-900 whitespace-nowrap w-20">
-                                  {runs !== null ? runs.toLocaleString() : '—'}
-                                </td>
-                                <td className="py-2 px-3 min-w-[160px]">
-                                  <input
-                                    type="text"
-                                    placeholder="Optional"
-                                    value={b.notes || ''}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      setBomRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, notes: val } : item));
-                                    }}
-                                    className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-600 focus:outline-none focus:border-[#064E3B]"
-                                  />
-                                </td>
-                                <td className="py-2 px-3 text-right w-10">
-                                  <button
-                                    onClick={() => handleDeleteBomItem(b.id)}
-                                    className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-md transition-all cursor-pointer"
-                                    title="Remove material"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                              return (
+                                <tr key={b.id} className="hover:bg-gray-50/50">
+                                  <td className="py-2 px-3">
+                                    {isEditingItemBom ? (
+                                      <div className="relative" style={{ zIndex: 100 - idx }}>
+                                        <SearchableMaterialDropdown
+                                          value={b.name}
+                                          materials={rawAndSemiMaterials}
+                                          onChange={(selectedName, matchedSku) => {
+                                            setBomRecipeItems(prev => prev.map(item => {
+                                              if (item.id === b.id) {
+                                                return {
+                                                  ...item,
+                                                  name: selectedName,
+                                                  uom: matchedSku?.unit || item.uom || 'Kg',
+                                                  inStock: (matchedSku as any)?.openingStock ?? item.inStock ?? 0
+                                                };
+                                              }
+                                              return item;
+                                            }));
+                                          }}
+                                        />
+                                      </div>
+                                    ) : (
+                                      <div className="font-bold text-gray-900 text-xs">
+                                        {b.name || '—'}
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td className="py-2 px-3 text-center w-24">
+                                    {isEditingItemBom ? (
+                                      <input
+                                        type="number"
+                                        step="any"
+                                        placeholder="Qty"
+                                        value={b.qty === 0 || b.qty === undefined ? '' : b.qty}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          setBomRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, qty: val === '' ? ('' as any) : Number(val) } : item));
+                                        }}
+                                        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold font-mono text-center focus:outline-none focus:border-blue-500 bg-white"
+                                      />
+                                    ) : (
+                                      <span className="font-mono font-bold text-gray-900">{b.qty !== undefined && b.qty !== '' ? b.qty : '—'}</span>
+                                    )}
+                                  </td>
+                                  <td className="py-2 px-3 text-gray-600 font-semibold whitespace-nowrap w-16">{b.uom}</td>
+                                  <td className="py-2 px-3 text-gray-600 font-mono whitespace-nowrap w-20">{b.inStock ?? 0}</td>
+                                  <td className="py-2 px-3 font-bold text-gray-900 whitespace-nowrap w-20">
+                                    {runs !== null ? runs.toLocaleString() : '—'}
+                                  </td>
+                                  <td className="py-2 px-3 min-w-[160px]">
+                                    {isEditingItemBom ? (
+                                      <input
+                                        type="text"
+                                        placeholder="Optional"
+                                        value={b.notes || ''}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          setBomRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, notes: val } : item));
+                                        }}
+                                        className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-600 focus:outline-none focus:border-blue-500 bg-white"
+                                      />
+                                    ) : (
+                                      <span className="text-gray-500 italic">{b.notes || '—'}</span>
+                                    )}
+                                  </td>
+                                  {isEditingItemBom && (
+                                    <td className="py-2 px-3 text-right w-10">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteBomItem(b.id)}
+                                        className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-md transition-all cursor-pointer"
+                                        title="Remove material"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </td>
+                                  )}
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      )}
 
-                      {/* Bottom Summary Bar matching Makoro media_1789142185429.png */}
+                      {/* Bottom Summary Bar */}
                       <div className="p-3 bg-white border-t border-gray-100 flex items-center justify-between">
                         <div className="flex items-center gap-10 text-xs">
                           <div>
@@ -5603,15 +5650,45 @@ const SkuMasterV2: React.FC = () => {
                             </div>
                           </div>
                         </div>
-
-                        <button
-                          onClick={handleSaveBomRecipe}
-                          disabled={isSavingBom}
-                          className="px-4 py-1.5 bg-[#064E3B] hover:bg-[#0B6B63] text-white font-medium rounded-md text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer disabled:opacity-50"
-                        >
-                          {isSavingBom ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                          <span>Save recipe</span>
-                        </button>
+                        <div className="flex items-center gap-2">
+                          {isEditingItemBom ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (selectedSkuDetails) {
+                                    const defaultBom = (selectedSkuDetails as any).bomItems || [];
+                                    setBomRecipeItems(defaultBom);
+                                    setRecipeYieldQty(String(selectedSkuDetails.recipeYieldQty || '1'));
+                                    setRecipeYieldUnit(selectedSkuDetails.recipeYieldUnit || selectedSkuDetails.unit || 'Pcs');
+                                  }
+                                  setIsEditingItemBom(false);
+                                }}
+                                className="px-3.5 py-1.5 border border-gray-300 text-gray-700 hover:bg-gray-100 font-semibold rounded-xl text-xs cursor-pointer transition-all"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleSaveBomRecipe}
+                                disabled={isSavingBom}
+                                className="px-4 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all disabled:opacity-50"
+                              >
+                                {isSavingBom ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                                <span>Save recipe</span>
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setIsEditingItemBom(true)}
+                              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                              <span>Edit BOM</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
