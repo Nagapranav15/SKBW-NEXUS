@@ -41,6 +41,7 @@ interface ItemStockDetailsDrawerProps {
   sku: SkuV2 | null;
   companyId: string;
   allLocations?: WarehouseLocationV2[];
+  initialTab?: ItemDrawerTab;
   onOpenTransfer?: (sku: SkuV2, fromLocId?: string) => void;
   onOpenAdjustment?: (sku: SkuV2, locId?: string) => void;
   onOpenItemMaster?: (sku: SkuV2) => void;
@@ -52,13 +53,21 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
   sku,
   companyId,
   allLocations = [],
+  initialTab = 'overview',
   onOpenTransfer,
   onOpenAdjustment,
   onOpenItemMaster
 }) => {
-  const [activeTab, setActiveTab] = useState<ItemDrawerTab>('overview');
+  const [activeTab, setActiveTab] = useState<ItemDrawerTab>(initialTab || 'overview');
   const [loading, setLoading] = useState(false);
   const [detailsData, setDetailsData] = useState<SkuStockDetailsResponse | null>(null);
+
+  // Set active tab to initialTab when drawer opens
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab(initialTab || 'overview');
+    }
+  }, [isOpen, initialTab]);
 
   // Fetch real-time live SKU details whenever SKU opens
   useEffect(() => {

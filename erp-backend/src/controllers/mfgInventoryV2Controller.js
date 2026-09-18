@@ -1577,7 +1577,7 @@ exports.getBalances = async (req, res, next) => {
       {
         $lookup: {
           localField: "skuId",
-          from: "skuv2",
+          from: SkuV2.collection.name,
           foreignField: "_id",
           as: "sku"
         }
@@ -1586,7 +1586,7 @@ exports.getBalances = async (req, res, next) => {
       {
         $lookup: {
           localField: "locationId",
-          from: "warehouselocationv2",
+          from: WarehouseLocationV2.collection.name,
           foreignField: "_id",
           as: "location"
         }
@@ -1634,7 +1634,7 @@ exports.getDashboardStats = async (req, res, next) => {
       },
       {
         $lookup: {
-          from: "skuv2",
+          from: SkuV2.collection.name,
           localField: "_id.skuId",
           foreignField: "_id",
           as: "sku"
@@ -1690,7 +1690,7 @@ exports.getDashboardStats = async (req, res, next) => {
       },
       {
         $lookup: {
-          from: "skuv2",
+          from: SkuV2.collection.name,
           localField: "_id",
           foreignField: "_id",
           as: "sku"
@@ -2406,7 +2406,7 @@ exports.getSkuStockDetails = async (req, res, next) => {
       { $match: { onHand: { $gt: 0.0001 } } },
       {
         $lookup: {
-          from: "warehouselocationv2",
+          from: WarehouseLocationV2.collection.name,
           localField: "locationId",
           foreignField: "_id",
           as: "location"
@@ -2415,26 +2415,30 @@ exports.getSkuStockDetails = async (req, res, next) => {
       { $unwind: { path: "$location", preserveNullAndEmptyArrays: true } }
     ]);
 
-    const populatedLocations = await Promise.all(
+    let populatedLocations = await Promise.all(
       locationBalances.map(async (lb) => {
+        let locDoc = lb.location;
+        if (!locDoc && lb.locationId) {
+          locDoc = await WarehouseLocationV2.findById(lb.locationId).lean();
+        }
         let zone = null, floor = null, warehouse = null;
-        if (lb.location && lb.location.parentId) {
-          zone = await WarehouseLocationV2.findById(lb.location.parentId);
+        if (locDoc && locDoc.parentId) {
+          zone = await WarehouseLocationV2.findById(locDoc.parentId).lean();
           if (zone && zone.parentId) {
-            floor = await WarehouseLocationV2.findById(zone.parentId);
+            floor = await WarehouseLocationV2.findById(zone.parentId).lean();
             if (floor && floor.parentId) {
-              warehouse = await WarehouseLocationV2.findById(floor.parentId);
+              warehouse = await WarehouseLocationV2.findById(floor.parentId).lean();
             }
           }
         }
         return {
           locationId: lb.locationId,
-          locationName: lb.location ? lb.location.name : 'Unknown Location',
-          locationCode: lb.location ? lb.location.code : '',
+          locationName: locDoc ? locDoc.name : 'Main Storage',
+          locationCode: locDoc ? locDoc.code : '',
           zoneName: zone ? zone.name : '',
           floorName: floor ? floor.name : '',
           warehouseName: warehouse ? warehouse.name : '',
-          hierarchyPath: [warehouse?.name, floor?.name, zone?.name, lb.location?.name].filter(Boolean).join(' → '),
+          hierarchyPath: [warehouse?.name, floor?.name, zone?.name, locDoc?.name].filter(Boolean).join(' → '),
           onHand: lb.onHand,
           reserved: 0,
           available: lb.onHand,
@@ -2443,6 +2447,45 @@ exports.getSkuStockDetails = async (req, res, next) => {
         };
       })
     );
+
+    // If no active ledger balances, check if SKU has an assigned initial/default location
+    if (populatedLocations.length === 0) {
+      const assignedLocId = sku.initialLocationId || sku.initialLocation || sku.defaultLocation;
+      if (assignedLocId) {
+        let locDoc = null;
+        if (mongoose.Types.ObjectId.isValid(String(assignedLocId))) {
+          locDoc = await WarehouseLocationV2.findById(assignedLocId).lean();
+        } else {
+          locDoc = await WarehouseLocationV2.findOne({ name: String(assignedLocId).trim(), company: companyObjId }).lean();
+        }
+        if (locDoc) {
+          let zone = null, floor = null, warehouse = null;
+          if (locDoc.parentId) {
+            zone = await WarehouseLocationV2.findById(locDoc.parentId).lean();
+            if (zone && zone.parentId) {
+              floor = await WarehouseLocationV2.findById(zone.parentId).lean();
+              if (floor && floor.parentId) {
+                warehouse = await WarehouseLocationV2.findById(floor.parentId).lean();
+              }
+            }
+          }
+          populatedLocations.push({
+            locationId: locDoc._id,
+            locationName: locDoc.name,
+            locationCode: locDoc.code || '',
+            zoneName: zone ? zone.name : '',
+            floorName: floor ? floor.name : '',
+            warehouseName: warehouse ? warehouse.name : '',
+            hierarchyPath: [warehouse?.name, floor?.name, zone?.name, locDoc.name].filter(Boolean).join(' → '),
+            onHand: 0,
+            reserved: 0,
+            available: 0,
+            unitCost: Number(sku.costPrice || sku.rate || 0),
+            stockValue: 0
+          });
+        }
+      }
+    }
 
     // 2. Batch Balances & Cost Layers
     const batchBalances = await InventoryLedger.aggregate([
@@ -2466,7 +2509,7 @@ exports.getSkuStockDetails = async (req, res, next) => {
       { $match: { onHand: { $gt: 0.0001 } } },
       {
         $lookup: {
-          from: "warehouselocationv2",
+          from: WarehouseLocationV2.collection.name,
           localField: "locationId",
           foreignField: "_id",
           as: "location"
