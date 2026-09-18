@@ -16,7 +16,6 @@ const SalesQuotes = lazy(() => import('./components/sales/SalesQuotes'));
 const SalesOrders = lazy(() => import('./components/sales/SalesOrders'));
 const PendingOrders = lazy(() => import('./components/sales/PendingOrders'));
 const DeliveryChallan = lazy(() => import('./components/sales/DeliveryChallan'));
-const DigitalDispatch = lazy(() => import('./components/sales/DigitalDispatch'));
 const SalesReports = lazy(() => import('./components/sales/SalesReports'));
 const TransactionTools = lazy(() => import('./components/TransactionTools'));
 const AnalyzerDashboard = lazy(() => import('./components/AnalyzerDashboard'));
@@ -24,15 +23,11 @@ const AnalyzerDashboard = lazy(() => import('./components/AnalyzerDashboard'));
 // Inventory V2 (Beta) sub-pages
 const DashboardV2 = lazy(() => import('./components/inventory_v2/DashboardV2'));
 const SkuMasterV2 = lazy(() => import('./components/inventory_v2/SkuMasterV2'));
-const InventoryLedgerPage = lazy(() => import('./components/inventory_v2/ledger/InventoryLedgerPage'));
 const WarehouseStructureV2 = lazy(() => import('./components/inventory_v2/WarehouseStructureV2'));
 const TestingTransactionsV2 = lazy(() => import('./components/inventory_v2/TestingTransactionsV2'));
 const PurchaseInvoicePage = lazy(() => import('./components/inventory_v2/purchases/PurchaseInvoicePage'));
 const InventoryBalanceV2 = lazy(() => import('./components/inventory_v2/InventoryBalanceV2'));
-const BatchStockV2 = lazy(() => import('./components/inventory_v2/BatchStockV2'));
 const SettingsPage = lazy(() => import('./components/inventory_v2/SettingsPage'));
-const BomRecipeMaster = lazy(() => import('./components/inventory_v2/conversions/BomRecipeMaster'));
-const StockTransferModule = lazy(() => import('./components/inventory_v2/conversions/StockTransferModule'));
 
 // Premium Micro-Loading Indicator
 const LoadingFallback = () => (
@@ -94,26 +89,21 @@ function App() {
                 <Route path="sales/orders" element={<SalesOrders />} />
                 <Route path="sales/pending" element={<PendingOrders />} />
                 <Route path="sales/delivery-challan" element={<DeliveryChallan />} />
-                <Route path="sales/digital-dispatch" element={
-                  <ProtectedRoute requiredPermission="MANAGE_DISPATCH">
-                    <DigitalDispatch />
-                  </ProtectedRoute>
-                } />
                 <Route path="sales/reports" element={<SalesReports />} />
                 <Route path="transactions" element={<TransactionTools />} />
                 <Route path="analyzer" element={<AnalyzerDashboard />} />
 
-                {/* Manufacturing Inventory (Beta) sub-routes */}
+                {/* Manufacturing Inventory sub-routes */}
                 <Route path="inventory-v2" element={<Navigate to="/inventory-v2/dashboard" replace />} />
                 <Route path="inventory-v2/dashboard" element={<DashboardV2 />} />
                 <Route path="inventory-v2/skus" element={<SkuMasterV2 />} />
-                <Route path="inventory-v2/ledger" element={<InventoryLedgerPage />} />
-                <Route path="inventory-v2/warehouse" element={<WarehouseStructureV2 />} />
+                <Route path="inventory-v2/warehouse" element={<Navigate to="/stock-inventory" replace />} />
                 <Route path="inventory-v2/purchases" element={<PurchaseInvoicePage />} />
-                <Route path="inventory-v2/batch-stock" element={<BatchStockV2 />} />
+                <Route path="inventory-v2/ledger" element={<Navigate to="/stock-inventory" replace />} />
+                <Route path="inventory-v2/batch-stock" element={<Navigate to="/stock-inventory" replace />} />
+                <Route path="inventory-v2/conversions/*" element={<Navigate to="/stock-inventory" replace />} />
+                <Route path="sales/digital-dispatch" element={<Navigate to="/sales/orders" replace />} />
                 <Route path="inventory-v2/testing-transactions" element={<TestingTransactionsV2 />} />
-                <Route path="inventory-v2/conversions/bom" element={<BomRecipeMaster />} />
-                <Route path="inventory-v2/conversions/transfer" element={<StockTransferModule />} />
                 <Route path="inventory-v2/settings" element={<SettingsPage />} />
                 <Route path="inventory-v2/balances" element={<InventoryBalanceV2 />} />
               </Route>

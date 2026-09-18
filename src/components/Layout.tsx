@@ -7,30 +7,12 @@ import {
   Users, 
   Package, 
   LogOut, 
-  Building2,
-  FileText,
-  RefreshCw,
-  Settings,
   Layers,
-  BookOpen,
-  ClipboardList,
-  Truck,
-  UserCheck,
-  Factory,
-  Briefcase,
-  Map,
-  Building,
   Receipt,
   ShoppingBag,
-  Clock,
-  FileCheck,
-  BarChart2,
-  LineChart,
-  CreditCard,
-  Database,
-  ChevronLeft,
-  ChevronRight,
-  Boxes
+  Settings,
+  ChevronLeft, 
+  ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DataManager from './DataManager';
@@ -241,12 +223,6 @@ const Layout: React.FC = () => {
       items: [
         { label: 'Item Master', path: '/inventory-v2/skus', icon: Package, permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
         { label: 'Stock & Inventory', path: '/stock-inventory', icon: Layers, permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
-        { label: 'Batch Stock', path: '/inventory-v2/batch-stock', icon: Boxes, permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
-        { label: 'Stock Ledger', path: '/inventory-v2/ledger?mode=stock', icon: BookOpen, permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
-        { label: 'Warehouse Setup', path: '/inventory-v2/warehouse', icon: Building2, permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
-        { label: 'BOM / Recipes', path: '/inventory-v2/conversions/bom', icon: ClipboardList, permission: ['MANAGE_INVENTORY', 'MANAGE_ITEMS'] },
-        { label: 'Stock Transfers', path: '/inventory-v2/conversions/transfer', icon: RefreshCw, permission: ['MANAGE_INVENTORY', 'MANAGE_ITEMS'] },
-        { label: 'Digital Dispatch', path: '/sales/digital-dispatch', icon: Truck, permission: 'MANAGE_DISPATCH' },
       ]
     },
     {
