@@ -184,6 +184,24 @@ export const recordTransferV2 = async (transferData: {
   return response.data;
 };
 
+export const createInventoryLedgerEntryV2 = async (entryData: {
+  transactionType: string;
+  skuId: string;
+  quantity: number;
+  unit: string;
+  direction: 'IN' | 'OUT';
+  referenceType: string;
+  referenceId: string;
+  locationId: string;
+  remarks?: string;
+  status?: string;
+  company: string;
+  batchNumber?: string;
+}): Promise<any> => {
+  const response = await api.post('/v2/inventory-ledger', entryData);
+  return response.data;
+};
+
 // ── BALANCES API ─────────────────────────────────────────────────────────────
 
 export const getBalancesV2 = async (

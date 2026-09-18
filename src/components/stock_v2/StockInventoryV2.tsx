@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { 
   Boxes, 
   Package, 
+  Box,
   Search, 
   Plus, 
   X, 
@@ -10,17 +11,32 @@ import {
   RefreshCw, 
   ChevronLeft, 
   ChevronRight,
-  Layers,
-  CheckCircle2,
-  Warehouse,
-  BarChart3,
-  FileText,
-  AlertTriangle,
-  Upload,
-  Download,
-  History,
-  Filter
+  Layers, 
+  CheckCircle2, 
+  Warehouse, 
+  BarChart3, 
+  FileText, 
+  AlertTriangle, 
+  Upload, 
+  Download, 
+  History, 
+  Filter,
+  ArrowRightLeft,
+  SlidersHorizontal,
+  DollarSign,
+  TrendingUp,
+  MapPin,
+  Tag,
+  Hash,
+  ChevronDown,
+  Eye,
+  Sliders,
+  Sparkles,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Printer
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { useAuth } from '../../context/AuthContext';
 import Modal from '../ui/Modal';
 import { showToast } from '../ui/Toast';
@@ -34,15 +50,18 @@ import {
   createWarehouseLocationV2,
   updateWarehouseLocationV2,
   deleteWarehouseLocationV2,
-  SkuV2,
-  LedgerEntryV2,
-  WarehouseLocationV2
+  SkuV2, 
+  LedgerEntryV2, 
+  WarehouseLocationV2 
 } from '../../api/mfgApiV2';
 import { getParties } from '../../api/partyApi';
 import { createPurchaseInvoiceV2, updatePurchaseInvoiceV2, getPurchaseInvoicesV2, cancelPurchaseInvoiceV2 } from '../inventory_v2/purchases/purchaseService';
 import WarehouseStructureV2 from '../inventory_v2/WarehouseStructureV2';
+import ItemStockDetailsDrawer from './ItemStockDetailsDrawer';
+import StockTransferModal from './StockTransferModal';
+import StockAdjustmentModal from './StockAdjustmentModal';
 
-export type StockTabType = 'batches' | 'alerts' | 'manager' | 'ledger' | 'warehouse';
+export type StockTabType = 'overview' | 'products' | 'materials' | 'semi' | 'batches' | 'transfers' | 'adjustments' | 'warehouse';
 
 interface MaterialLotItem {
   id: string;
@@ -65,13 +84,11 @@ interface MaterialLotItem {
   reels?: { weight: number; width?: string; locationId?: string }[];
 }
 
-// Helper to determine accurate item type group: 'products' | 'materials' | 'semi'
 const getSkuCategoryGroup = (item: SkuV2): 'products' | 'materials' | 'semi' => {
   const cat = (item.category || '').trim().toLowerCase();
   const name = (item.name || '').trim().toLowerCase();
   const code = (item.skuCode || '').trim().toUpperCase();
 
-  // Semi-finished / WIP
   if (
     cat.includes('semi') || 
     cat.includes('wip') || 
@@ -88,34 +105,34 @@ const getSkuCategoryGroup = (item: SkuV2): 'products' | 'materials' | 'semi' => 
     return 'semi';
   }
 
-  // Products / Finished Goods
   if (
     cat.includes('finish') || 
-    cat.includes('product')
+    cat.includes('product') ||
+    code.startsWith('FG')
   ) {
     return 'products';
   }
 
-  // Materials / Raw Material / Paper Reels
   if (
     cat.includes('raw') || 
     cat.includes('material') || 
     cat.includes('reel') || 
-    cat.includes('board') || 
+    cat.includes('paper') ||
+    cat.includes('board') ||
+    cat.includes('ink') ||
+    cat.includes('wire') ||
     code.startsWith('RM')
   ) {
     return 'materials';
   }
 
-  if (code.startsWith('FG')) return 'products';
-  if (code.startsWith('SF') || code.startsWith('SEM') || code.startsWith('SM') || code.startsWith('SFG')) return 'semi';
-  return 'materials';
+  return 'products';
 };
 
 export const StockInventoryV2: React.FC = () => {
   const { selectedCompany } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<StockTabType>('batches');
+  const [activeTab, setActiveTab] = useState<StockTabType>('overview');
   const [animationKey, setAnimationKey] = useState<number>(Date.now());
 
   // Fast On-Demand Data State
@@ -128,69 +145,39 @@ export const StockInventoryV2: React.FC = () => {
   const [limit] = useState(50);
   const [totalRecords, setTotalRecords] = useState(0);
 
-  // Dynamic Backend Dropdown Lists
+  // Filter States
+  const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
+  const [brandFilter, setBrandFilter] = useState<string>('ALL');
+  const [warehouseFilter, setWarehouseFilter] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+
+  // Dropdowns & Auxiliary Data
   const [allSuppliers, setAllSuppliers] = useState<any[]>([]);
   const [allSkus, setAllSkus] = useState<SkuV2[]>([]);
   const [allLocations, setAllLocations] = useState<WarehouseLocationV2[]>([]);
   const [auxLoaded, setAuxLoaded] = useState(false);
+  const [ledgerEntries, setLedgerEntries] = useState<LedgerEntryV2[]>([]);
+  const [balancesList, setBalancesList] = useState<any[]>([]);
 
-  // Add SKU / Edit SKU Drawer State
+  // Modals & Drawers States
+  const [selectedDrawerSku, setSelectedDrawerSku] = useState<SkuV2 | null>(null);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferInitialSku, setTransferInitialSku] = useState<SkuV2 | null>(null);
+  const [transferInitialLocId, setTransferInitialLocId] = useState<string | undefined>(undefined);
+
+  const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
+  const [adjustmentInitialSku, setAdjustmentInitialSku] = useState<SkuV2 | null>(null);
+  const [adjustmentInitialLocId, setAdjustmentInitialLocId] = useState<string | undefined>(undefined);
+
   const [isAddSkuOpen, setIsAddSkuOpen] = useState(false);
   const [editingSku, setEditingSku] = useState<SkuV2 | null>(null);
 
-  // Custom Confirmation Dialog Modal State
-  const [confirmModal, setConfirmModal] = useState<{
-    isOpen: boolean;
-    type: 'cancel_batch' | 'delete_location' | null;
-    item: any;
-    title: string;
-    message: string;
-    confirmText: string;
-    onConfirm: () => Promise<void>;
-  }>({
-    isOpen: false,
-    type: null,
-    item: null,
-    title: '',
-    message: '',
-    confirmText: '',
-    onConfirm: async () => {}
-  });
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const addMenuRef = useRef<HTMLDivElement>(null);
 
-  // Warehouse Hierarchy Specific States
-  const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
-  const [selectedNode, setSelectedNode] = useState<WarehouseLocationV2 | null>(null);
-
-  // Dynamic Live Backend Location Stock Details
-  const [nodeDetails, setNodeDetails] = useState<{
-    storedSkus: { sku: SkuV2; quantity: number }[];
-    recentMovements: any[];
-    totalQty: number;
-  } | null>(null);
-  const [nodeLoading, setNodeLoading] = useState(false);
-
-  useEffect(() => {
-    if (selectedNode?._id && selectedCompany?._id && activeTab === 'warehouse') {
-      setNodeLoading(true);
-      getLocationDetailsV2(selectedNode._id, selectedCompany._id)
-        .then(res => setNodeDetails(res))
-        .catch(err => {
-          console.error(err);
-          setNodeDetails(null);
-        })
-        .finally(() => setNodeLoading(false));
-    } else {
-      setNodeDetails(null);
-    }
-  }, [selectedNode?._id, selectedCompany?._id, activeTab]);
-
-  // Modal State for New Purchase Batch & Warehouse Locations
-  const [showModal, setShowModal] = useState(false);
-  const [modalType, setModalType] = useState<'batch' | 'location'>('batch');
-  const [editingItem, setEditingItem] = useState<any | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-
-  // Purchase Batch Form State
+  // Purchase Batch Modal & Form State
+  const [showBatchModal, setShowBatchModal] = useState(false);
+  const [isSavingBatch, setIsSavingBatch] = useState(false);
   const [batchForm, setBatchForm] = useState({
     batchNumber: 'PB-SEP-001',
     purchaseDate: new Date().toISOString().split('T')[0],
@@ -219,15 +206,35 @@ export const StockInventoryV2: React.FC = () => {
     }
   ]);
 
-  // Location Form State for Warehouse Setup
-  const [locationForm, setLocationForm] = useState({
-    name: '',
-    level: 'Factory' as 'Factory' | 'Floor' | 'Zone' | 'Storage Location',
-    parentId: '',
-    capacity: '1000',
-    unit: 'Kg',
-    status: 'Active' as 'Active' | 'Maintenance' | 'Full'
+  // Confirmation Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    type: 'cancel_batch' | 'delete_location' | null;
+    item: any;
+    title: string;
+    message: string;
+    confirmText: string;
+    onConfirm: () => Promise<void>;
+  }>({
+    isOpen: false,
+    type: null,
+    item: null,
+    title: '',
+    message: '',
+    confirmText: '',
+    onConfirm: async () => {}
   });
+
+  // Close Add Menu on outside click
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) {
+        setShowAddMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
 
   // Debounce Search
   useEffect(() => {
@@ -235,59 +242,23 @@ export const StockInventoryV2: React.FC = () => {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Sequential Batch Number Generator (e.g. PB-SEP-001, PB-SEP-002...)
-  const generateNextBatchNumber = useCallback((dateStr?: string): string => {
-    const targetDate = dateStr ? new Date(dateStr) : new Date();
-    const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-    const validDate = !isNaN(targetDate.getTime()) ? targetDate : new Date();
-    const monthAbbr = monthNames[validDate.getMonth()];
-    const prefix = `PB-${monthAbbr}-`;
-
-    let maxNum = 0;
-
-    (items || []).forEach(item => {
-      const bNum = String(item?.batchNumber || item?.invoiceNumber || item?.rawInvoice?.invoiceNumber || '').trim().toUpperCase();
-      if (bNum.startsWith(prefix)) {
-        const numPart = bNum.substring(prefix.length);
-        const parsed = parseInt(numPart, 10);
-        if (!isNaN(parsed) && parsed > maxNum) {
-          maxNum = parsed;
-        }
-      } else if (bNum.startsWith('PB-')) {
-        const parts = bNum.split('-');
-        const lastPart = parts[parts.length - 1];
-        const parsed = parseInt(lastPart, 10);
-        if (!isNaN(parsed) && parsed > maxNum) {
-          maxNum = parsed;
-        }
-      }
-    });
-
-    const nextNum = maxNum + 1;
-    return `${prefix}${String(nextNum).padStart(3, '0')}`;
-  }, [items]);
-
-  // Category Unit Cost Calculator (from InventoryBalanceV2)
-  const getCategoryCost = (category?: string) => {
-    if (!category) return 45;
-    if (category === 'Raw Material' || category === 'Paper Reels') return 45;
-    if (category === 'Semi Finished' || category === 'Cover Board') return 25;
-    return 60;
-  };
-
-  // Load auxiliary lists from backend for dropdowns
+  // Load auxiliary lists from backend
   const loadAuxiliaryData = useCallback(async (force = false) => {
     if (!selectedCompany?._id || (auxLoaded && !force)) return;
     try {
-      const [supRes, skusRes, locsRes, balancesRes] = await Promise.all([
+      const [supRes, skusRes, locsRes, balancesRes, ledgerRes] = await Promise.all([
         getParties({ company: selectedCompany._id, type: 'vendor', limit: 1000, light: true }),
         getSkusV2(selectedCompany._id),
         getWarehouseHierarchyV2(selectedCompany._id),
-        getBalancesV2(selectedCompany._id).catch(() => [])
+        getBalancesV2(selectedCompany._id).catch(() => []),
+        getLedgerV2({ companyId: selectedCompany._id }).catch(() => [])
       ]);
 
       const vendors = supRes.data?.parties || supRes.data || [];
       setAllSuppliers(vendors);
+      setAllLocations(locsRes || []);
+      setBalancesList(balancesRes || []);
+      setLedgerEntries(ledgerRes || []);
 
       const balanceMap = new Map<string, number>();
       if (Array.isArray(balancesRes)) {
@@ -300,10 +271,6 @@ export const StockInventoryV2: React.FC = () => {
           }
         });
       }
-
-      // Filter balances to ONLY include items present in Item Master
-      const validSkuMap = new Map((skusRes || []).map((s: SkuV2) => [String(s._id), s]));
-      const validSkuCodeSet = new Set((skusRes || []).map((s: SkuV2) => (s.skuCode || '').toUpperCase().trim()));
 
       const formattedSkus: SkuV2[] = (skusRes || []).map((s: SkuV2) => {
         const sId = String(s._id);
@@ -318,2357 +285,1138 @@ export const StockInventoryV2: React.FC = () => {
       });
 
       setAllSkus(formattedSkus);
-      setAllLocations(locsRes || []);
       setAuxLoaded(true);
     } catch (err) {
-      console.error('Failed to load backend dropdown lists:', err);
+      console.error('Failed to load backend inventory lists:', err);
     }
   }, [selectedCompany?._id, auxLoaded]);
 
-  // Reset auxiliary state when company changes
-  useEffect(() => {
-    setAuxLoaded(false);
-  }, [selectedCompany?._id]);
-
-  // Load auxiliary data on mount or company change
   useEffect(() => {
     if (selectedCompany?._id) {
-      loadAuxiliaryData();
+      loadAuxiliaryData(true);
     }
   }, [selectedCompany?._id, loadAuxiliaryData]);
 
-  // Fast Server-Side Data Loading for Active Tab
-  const loadStockData = useCallback(async () => {
-    if (!selectedCompany?._id) return;
-    setLoading(true);
-    try {
-      loadAuxiliaryData(true);
-      const validSkuMap = new Map(allSkus.map(s => [String(s._id), s]));
-      const validSkuCodeSet = new Set(allSkus.map(s => (s.skuCode || '').toUpperCase().trim()));
-
-      if (activeTab === 'batches') {
-        const [invoicesRes, balances] = await Promise.all([
-          getPurchaseInvoicesV2({ companyId: selectedCompany._id, limit: 100 }).catch(() => ({ invoices: [], total: 0, page: 1, limit: 100 })),
-          getBalancesV2(selectedCompany._id, undefined, true).catch(() => [])
-        ]);
-
-        const rawInvoices = invoicesRes.invoices || [];
-        const invoiceFormatted = rawInvoices.map((inv: any) => {
-          const supplierName = typeof inv.vendorId === 'object' && inv.vendorId !== null
-            ? (inv.vendorId.firmName || inv.vendorId.ownerName || 'Supplier') 
-            : 'Supplier';
-          const firstItem = inv.items?.[0] || {};
-          const resolvedSku = typeof firstItem.skuId === 'object' ? firstItem.skuId : null;
-          const firstLoc = typeof firstItem.locationId === 'object' ? firstItem.locationId : null;
-
-          return {
-            _id: inv._id,
-            batchNumber: inv.invoiceNumber,
-            skuCode: resolvedSku?.skuCode || firstItem.skuCode || 'RM-LOT',
-            skuName: resolvedSku?.name || firstItem.skuName || `${inv.items?.length || 1} Material Lots`,
-            category: resolvedSku?.category || inv.purchaseType || 'Raw Material',
-            locationName: firstLoc?.name || firstItem.locationName || 'Main Warehouse',
-            quantity: inv.items?.reduce((sum: number, it: any) => sum + (it.quantity || 0), 0) || 0,
-            unit: resolvedSku?.unit || 'Kg',
-            date: inv.createdAt ? new Date(inv.createdAt).toLocaleDateString('en-IN') : new Date().toISOString().split('T')[0],
-            status: inv.status === 'Posted' ? 'Active' : inv.status || 'Active',
-            supplierName,
-            grandTotal: inv.grandTotal || 0,
-            lotsCount: inv.items?.length || 1,
-            rawInvoice: inv
-          };
-        });
-
-        const balancesFormatted = (balances || []).map((b: any, idx: number) => {
-          const qty = Number(b.onHand ?? b.quantity ?? b.balance ?? 0);
-          return {
-            _id: b._id || `bal-${idx}`,
-            batchNumber: b.batchNumber || b.batchNo || `PB-${100 + idx}`,
-            skuCode: b.skuCode || b.sku?.skuCode || '',
-            skuName: b.skuName || b.sku?.name || b.name || '',
-            category: b.category || b.sku?.category || 'Raw Material',
-            locationName: b.locationName || b.location?.name || 'Main Warehouse',
-            quantity: qty,
-            unit: b.unit || b.sku?.unit || 'Kg',
-            date: b.createdAt || b.date || new Date().toISOString().split('T')[0],
-            status: qty > 0 ? 'Active' : 'Depleted'
-          };
-        });
-
-        const combined: any[] = [...invoiceFormatted];
-        const existingNumbers = new Set(invoiceFormatted.map((i: any) => i.batchNumber));
-        for (const bal of balancesFormatted) {
-          if (!existingNumbers.has(bal.batchNumber)) {
-            combined.push(bal);
-            existingNumbers.add(bal.batchNumber);
-          }
-        }
-
-        // Clean inventory: ONLY include items present in Item Master
-        const cleanedCombined = validSkuMap.size > 0 
-          ? combined.filter(item => {
-              if (!item.skuCode && !item.skuName) return true;
-              const code = (item.skuCode || '').toUpperCase().trim();
-              return validSkuCodeSet.has(code) || (item.rawInvoice && item.rawInvoice.items?.some((it: any) => {
-                const itCode = (it.skuCode || '').toUpperCase().trim();
-                const itId = String(it.skuId?._id || it.skuId || '');
-                return validSkuCodeSet.has(itCode) || validSkuMap.has(itId);
-              }));
-            })
-          : combined;
-
-        setItems(cleanedCombined);
-        setTotalRecords(cleanedCombined.length);
-      } else if (activeTab === 'manager') {
-        const balances = await getBalancesV2(selectedCompany._id);
-        const formatted = (balances || []).map((b: any, idx: number) => {
-          const onHand = Number(b.onHand ?? b.quantity ?? 0);
-          const reservedQty = Math.round(onHand * 0.1);
-          const availableQty = Math.max(0, onHand - reservedQty);
-          const cost = getCategoryCost(b.sku?.category);
-          const totalVal = onHand * cost;
-          const minStock = Number(b.sku?.minStockLevel || 100);
-
-          return {
-            _id: b._id || `bal-${idx}`,
-            skuId: b.sku?._id,
-            skuCode: b.sku?.skuCode || '',
-            name: b.sku?.name || '',
-            category: b.sku?.category || 'Raw Material',
-            locationName: b.location?.name || 'Main Warehouse',
-            unit: b.sku?.unit || 'Kg',
-            onHand,
-            reservedQty,
-            availableQty,
-            cost,
-            totalVal,
-            status: onHand <= 0 ? 'Out of Stock' : onHand <= minStock ? 'Low Stock' : 'Normal'
-          };
-        });
-
-        // Clean inventory: ONLY include items present in Item Master
-        const cleanedManager = validSkuMap.size > 0
-          ? formatted.filter(b => {
-              const bId = String(b.skuId || '');
-              const bCode = (b.skuCode || '').toUpperCase().trim();
-              return validSkuMap.has(bId) || validSkuCodeSet.has(bCode);
-            })
-          : formatted;
-
-        setItems(cleanedManager);
-        setTotalRecords(cleanedManager.length);
-      } else if (activeTab === 'ledger') {
-        const ledgerRes = await getLedgerV2({ companyId: selectedCompany._id });
-        const formatted = (ledgerRes || []).map((l: LedgerEntryV2) => ({
-          _id: l._id,
-          timestamp: l.timestamp || l.createdAt || new Date().toISOString(),
-          transactionType: l.transactionType || 'PURCHASE_RECEIPT',
-          skuId: l.skuId?._id,
-          skuName: l.skuId?.name || '',
-          skuCode: l.skuId?.skuCode || '',
-          locationName: l.locationId?.name || 'Main Warehouse',
-          qtyIn: l.qtyIn || 0,
-          qtyOut: l.qtyOut || 0,
-          balanceAfter: l.balanceAfter || 0,
-          batchNumber: l.batchNumber || '—',
-          remarks: l.remarks || 'Stock movement recorded'
-        }));
-
-        // Clean inventory: ONLY include items present in Item Master
-        const cleanedLedger = validSkuMap.size > 0
-          ? formatted.filter(l => {
-              const lId = String(l.skuId || '');
-              const lCode = (l.skuCode || '').toUpperCase().trim();
-              return validSkuMap.has(lId) || validSkuCodeSet.has(lCode);
-            })
-          : formatted;
-
-        setItems(cleanedLedger);
-        setTotalRecords(cleanedLedger.length);
-      } else {
-        // Warehouse Setup / Hierarchy Data
-        const locsRes = await getWarehouseHierarchyV2(selectedCompany._id);
-        setAllLocations(locsRes || []);
-        setItems(locsRes || []);
-        setTotalRecords((locsRes || []).length);
-
-        if ((locsRes || []).length > 0 && !selectedNode) {
-          const rootNode = (locsRes || []).find(l => l.level === 'Factory') || (locsRes || [])[0];
-          setSelectedNode(rootNode);
-        }
-      }
-    } catch (err: any) {
-      console.error('Failed to load stock inventory data:', err);
-      showToast(err.message || 'Failed to load stock inventory data', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedCompany?._id, activeTab, debouncedSearch, selectedNode]);
-
-  useEffect(() => {
-    loadStockData();
-  }, [loadStockData]);
-
-  // Tab Switch Handler
-  const handleTabChange = (tab: StockTabType) => {
-    setActiveTab(tab);
-    setPage(1);
-    setSelectedIds([]);
-    setAnimationKey(Date.now());
+  // Helper unit cost
+  const getCategoryCost = (category?: string) => {
+    if (!category) return 45;
+    if (category === 'Raw Material' || category === 'Paper Reels') return 45;
+    if (category === 'Semi Finished' || category === 'Cover Board') return 25;
+    return 60;
   };
 
-  // Filtered & Paginated Items in Memory
-  const filteredItems = useMemo(() => {
-    const q = debouncedSearch.toLowerCase();
-    if (!q) return items;
-    return items.filter(item => {
-      return (
-        (item.name || item.skuName || '').toLowerCase().includes(q) ||
-        (item.skuCode || item.batchNumber || '').toLowerCase().includes(q) ||
-        (item.category || item.locationName || '').toLowerCase().includes(q)
-      );
+  // Main KPI Aggregations across all SKUs
+  const kpiStats = useMemo(() => {
+    let totalItemsCount = allSkus.length;
+    let totalStockVal = 0;
+    let fgValue = 0;
+    let fgQty = 0;
+    let rmValue = 0;
+    let rmKg = 0;
+    let semiValue = 0;
+    let semiPcs = 0;
+    let lowStockCount = 0;
+    let outOfStockCount = 0;
+
+    allSkus.forEach(sku => {
+      const group = getSkuCategoryGroup(sku);
+      const stock = Number(sku.presentStock ?? sku.openingStock) || 0;
+      const rate = Number((sku as any)?.avgRate || (sku as any)?.rate || (sku as any)?.costPrice || getCategoryCost(sku.category));
+      const val = stock * rate;
+      totalStockVal += val;
+
+      if (group === 'products') {
+        fgValue += val;
+        fgQty += stock;
+      } else if (group === 'materials') {
+        rmValue += val;
+        rmKg += stock;
+      } else if (group === 'semi') {
+        semiValue += val;
+        semiPcs += stock;
+      }
+
+      const reorder = Number(sku.reorderLevel) || 10;
+      if (stock === 0) {
+        outOfStockCount++;
+      } else if (stock <= reorder) {
+        lowStockCount++;
+      }
     });
-  }, [items, debouncedSearch]);
-
-  const totalPages = Math.ceil(filteredItems.length / limit) || 1;
-  const paginatedItems = useMemo(() => {
-    const start = (page - 1) * limit;
-    return filteredItems.slice(start, start + limit);
-  }, [filteredItems, page, limit]);
-
-  // Stock Alerts Module Dynamic Computations
-  const stockAlertsData = useMemo(() => {
-    return allSkus.map(sku => {
-      const currentQty = sku.presentStock || 0;
-      const minQty = sku.minStockLevel ? Number(sku.minStockLevel) : 0;
-      const reorderQty = sku.reorderLevel ? Number(sku.reorderLevel) : 0;
-      const maxQty = (sku as any).maxStockLevel ? Number((sku as any).maxStockLevel) : 0;
-
-      let status: 'Out of Stock' | 'Low Stock' | 'Overstock' | 'Normal' = 'Normal';
-      if (currentQty === 0) {
-        status = 'Out of Stock';
-      } else if (minQty > 0 && currentQty <= minQty) {
-        status = 'Low Stock';
-      } else if (reorderQty > 0 && currentQty <= reorderQty) {
-        status = 'Low Stock';
-      } else if (maxQty > 0 && currentQty > maxQty) {
-        status = 'Overstock';
-      }
-
-      let toOrder = 0;
-      if (status === 'Out of Stock' || status === 'Low Stock') {
-        const targetLevel = minQty || reorderQty || 100;
-        toOrder = Math.max(0, targetLevel - currentQty);
-      }
-
-      const cat = (sku.category || '').toLowerCase();
-      const typeLabel = cat.includes('goods') || cat.includes('product') ? 'Product' : cat.includes('semi') ? 'Semi' : 'Material';
-
-      return {
-        sku,
-        id: sku._id || sku.skuCode,
-        name: sku.name,
-        skuCode: sku.skuCode,
-        category: sku.category,
-        typeLabel,
-        uom: sku.unit || 'Pcs',
-        currentQty,
-        minQty,
-        reorderQty,
-        maxQty,
-        toOrder,
-        status
-      };
-    });
-  }, [allSkus]);
-
-  const alertsSummary = useMemo(() => {
-    const needsReorder = stockAlertsData.filter(d => d.status === 'Low Stock').length;
-    const outOfStock = stockAlertsData.filter(d => d.status === 'Out of Stock').length;
-    const overstock = stockAlertsData.filter(d => d.status === 'Overstock').length;
-    const totalAlerts = needsReorder + outOfStock;
-    return { needsReorder, outOfStock, overstock, totalAlerts };
-  }, [stockAlertsData]);
-
-  const filteredAlerts = useMemo(() => {
-    const q = debouncedSearch.toLowerCase();
-    if (!q) return stockAlertsData;
-    return stockAlertsData.filter(d =>
-      (d.name || '').toLowerCase().includes(q) ||
-      (d.skuCode || '').toLowerCase().includes(q) ||
-      (d.category || '').toLowerCase().includes(q) ||
-      (d.typeLabel || '').toLowerCase().includes(q)
-    );
-  }, [stockAlertsData, debouncedSearch]);
-
-  // Warehouse Hierarchy Calculations (Matching Screenshot)
-  const totalLocationsCount = allLocations.length;
-  const factoryCount = allLocations.filter(l => l.level === 'Factory').length;
-  const floorAndZoneCount = allLocations.filter(l => l.level === 'Floor' || l.level === 'Zone').length;
-  const storageBinCount = allLocations.filter(l => l.level === 'Storage Location').length;
-  const avgOccupancy = storageBinCount > 0 
-    ? Math.round(allLocations.filter(l => l.level === 'Storage Location').reduce((sum, b) => sum + (b.occupiedPercent || 0), 0) / storageBinCount)
-    : 25;
-
-  // Toggle tree node expansion
-  const toggleNode = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setExpandedNodes(prev => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  // Open Pop-Up Modal for Creating New Location or Purchase Batch
-  const openLocationModal = (level: 'Factory' | 'Floor' | 'Zone' | 'Storage Location', parentId?: string, editItem?: WarehouseLocationV2) => {
-    setModalType('location');
-    if (editItem) {
-      setEditingItem(editItem);
-      setLocationForm({
-        name: editItem.name,
-        level: editItem.level,
-        parentId: editItem.parentId || '',
-        capacity: String(editItem.capacity || 1000),
-        unit: editItem.unit || 'Kg',
-        status: editItem.status || 'Active'
-      });
-    } else {
-      setEditingItem(null);
-      setLocationForm({
-        name: '',
-        level,
-        parentId: parentId || (selectedNode ? selectedNode._id! : ''),
-        capacity: '1000',
-        unit: 'Kg',
-        status: 'Active'
-      });
-    }
-    setShowModal(true);
-  };
-
-  // Lot Handlers for New Purchase Batch
-  const handleAddLot = () => {
-    const defaultPaperType = batchForm.purchaseType === 'Semi' ? 'Sheet' : batchForm.purchaseType === 'Products' ? 'General' : 'Reel';
-    setLots(prev => [
-      ...prev,
-      {
-        id: `lot-${Date.now()}-${prev.length + 1}`,
-        skuId: '',
-        skuCode: '',
-        skuName: '',
-        brand: '',
-        gsm: '',
-        paperType: defaultPaperType,
-        totalKg: 0,
-        ratePerKg: 0,
-        locationId: '',
-        locationName: ''
-      }
-    ]);
-  };
-
-  const handleRemoveLot = (id: string) => {
-    if (lots.length <= 1) return;
-    setLots(prev => prev.filter(l => l.id !== id));
-  };
-
-  const updateLotField = (id: string, field: keyof MaterialLotItem, value: any) => {
-    setLots(prev => prev.map(l => l.id === id ? { ...l, [field]: value } : l));
-  };
-
-  // Lot Calculations
-  const lotCalculations = useMemo(() => {
-    const totalLots = lots.length;
-    const totalQty = lots.reduce((acc, l) => acc + (Number(l.totalKg) || 0), 0);
-    const materialTotal = lots.reduce((acc, l) => acc + ((Number(l.totalKg) || 0) * (Number(l.ratePerKg) || 0)), 0);
-    const otherChargesTotal = 
-      (Number(batchForm.freightCharges) || 0) + 
-      (Number(batchForm.craneCharges) || 0) + 
-      (Number(batchForm.loadingCharges) || 0) + 
-      (Number(batchForm.otherCharges) || 0);
-    const grandTotal = materialTotal + otherChargesTotal;
 
     return {
-      totalLots,
-      totalQty,
-      materialTotal,
-      otherChargesTotal,
-      grandTotal
+      totalItemsCount,
+      totalStockVal,
+      fgValue,
+      fgQty,
+      rmValue,
+      rmKg,
+      semiValue,
+      semiPcs,
+      lowStockCount,
+      outOfStockCount,
+      totalAlerts: lowStockCount + outOfStockCount
     };
-  }, [lots, batchForm]);
+  }, [allSkus]);
 
-  const openModal = (item?: any) => {
-    loadAuxiliaryData(true);
-    if (activeTab === 'warehouse') {
-      openLocationModal('Factory');
-      return;
-    }
-
-    setModalType('batch');
-    if (item) {
-      setEditingItem(item);
-      const rawInv = item.rawInvoice || item;
-      let loadedPurchaseType = rawInv.purchaseType || item.category || 'Materials';
-      const pLower = loadedPurchaseType.toLowerCase();
-      if (pLower.includes('semi') || pLower.includes('wip') || pLower.includes('sub')) {
-        loadedPurchaseType = 'Semi';
-      } else if (pLower.includes('finish') || pLower.includes('product')) {
-        loadedPurchaseType = 'Products';
-      } else {
-        loadedPurchaseType = 'Materials';
-      }
-
-      setBatchForm({
-        batchNumber: item.batchNumber || rawInv.invoiceNumber || '',
-        purchaseDate: rawInv.createdAt ? new Date(rawInv.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-        supplierId: typeof rawInv.vendorId === 'object' && rawInv.vendorId !== null ? rawInv.vendorId._id : (rawInv.vendorId || item.supplierId || ''),
-        supplierName: typeof rawInv.vendorId === 'object' && rawInv.vendorId !== null ? (rawInv.vendorId.firmName || rawInv.vendorId.contactName) : (item.supplierName || ''),
-        purchaseType: loadedPurchaseType,
-        freightCharges: Number(rawInv.freight) || 0,
-        craneCharges: Number(rawInv.craneCharges) || 0,
-        loadingCharges: 0,
-        otherCharges: Number(rawInv.otherCharges) || 0,
-        remarks: rawInv.remarks || ''
-      });
-
-      const rawItems: any[] = rawInv.items || [];
-      if (rawItems.length > 0) {
-        const loadedLots: MaterialLotItem[] = rawItems.map((it: any, idx: number) => {
-          const skuObj = typeof it.skuId === 'object' && it.skuId !== null ? it.skuId : allSkus.find(s => s._id === it.skuId);
-          const locObj = typeof it.locationId === 'object' && it.locationId !== null ? it.locationId : allLocations.find(l => l._id === it.locationId);
-          
-          const sId = skuObj?._id || (typeof it.skuId === 'string' ? it.skuId : '');
-          const skuNameLower = (skuObj?.name || it.skuName || '').toLowerCase();
-          const isReel = (skuObj as any)?.paperType === 'Reels' || (skuObj as any)?.paperType === 'Reel' || skuNameLower.includes('reel');
-          const isSheet = (skuObj as any)?.paperType === 'Sheets' || (skuObj as any)?.paperType === 'Sheet' || (skuObj as any)?.paperType === 'Board' || skuNameLower.includes('sheet') || skuNameLower.includes('board');
-          const detectedType = isReel ? 'Reel' : isSheet ? 'Sheet' : 'General';
-
-          return {
-            id: `lot-edit-${idx + 1}`,
-            skuId: sId,
-            skuCode: skuObj?.skuCode || it.skuCode || '',
-            skuName: skuObj?.name || it.skuName || '',
-            brand: it.brand || skuObj?.brand || '',
-            gsm: String(it.gsm || skuObj?.gsm || ''),
-            paperType: detectedType,
-            width: String(it.width || skuObj?.width || '64'),
-            reelsCount: Array.isArray(it.reels) ? it.reels.length : (it.reelsCount || 0),
-            reamWeight: String(it.reamWeight || ''),
-            reamsCount: it.reamsCount || (it.reamWeight ? Math.round((it.quantity || 0) / Number(it.reamWeight)) : 0),
-            totalKg: Number(it.quantity) || 0,
-            ratePerKg: Number(it.purchasePrice || it.ratePerKg) || 0,
-            locationId: locObj?._id || (typeof it.locationId === 'string' ? it.locationId : ''),
-            locationName: locObj?.name || it.locationName || '',
-            reels: (it.reels || []).map((r: any) => ({
-              weight: Number(r.weight) || 0,
-              width: String(r.width || '64'),
-              locationId: typeof r.locationId === 'object' && r.locationId !== null ? r.locationId._id : (r.locationId || '')
-            }))
-          };
-        });
-        setLots(loadedLots);
-      } else {
-        setLots([{
-          id: 'lot-1',
-          skuId: item.skuId || '',
-          skuCode: item.skuCode || '',
-          skuName: item.skuName || '',
-          brand: item.brand || '',
-          gsm: String(item.gsm || ''),
-          paperType: 'General',
-          totalKg: Number(item.quantity) || 0,
-          ratePerKg: 0,
-          locationId: item.locationId || '',
-          locationName: item.locationName || '',
-          reels: []
-        }]);
-      }
-    } else {
-      setEditingItem(null);
-      const todayStr = new Date().toISOString().split('T')[0];
-      setBatchForm({
-        batchNumber: generateNextBatchNumber(todayStr),
-        purchaseDate: todayStr,
-        supplierId: '',
-        supplierName: '',
-        purchaseType: 'Materials',
-        freightCharges: 0,
-        craneCharges: 0,
-        loadingCharges: 0,
-        otherCharges: 0,
-        remarks: ''
-      });
-      setLots([{
-        id: 'lot-1',
-        skuId: '',
-        skuCode: '',
-        skuName: '',
-        brand: '',
-        gsm: '',
-        paperType: 'Reel',
-        totalKg: 0,
-        ratePerKg: 0,
-        locationId: '',
-        locationName: '',
-        reels: []
-      }]);
-    }
-    setShowModal(true);
-  };
-
-
-  // Save Warehouse Location Handler
-  const handleSaveLocation = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedCompany?._id) return;
-
-    if (!locationForm.name.trim()) {
-      showToast('Location name is required', 'error');
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      if (editingItem?._id) {
-        const updated = await updateWarehouseLocationV2(editingItem._id, {
-          name: locationForm.name.trim(),
-          level: locationForm.level,
-          parentId: locationForm.parentId || null,
-          capacity: Number(locationForm.capacity) || undefined,
-          unit: locationForm.unit,
-          status: locationForm.status,
-          company: selectedCompany._id
-        });
-        showToast(`Updated location '${updated.name}'`, 'success');
-        setSelectedNode(updated);
-      } else {
-        const created = await createWarehouseLocationV2({
-          name: locationForm.name.trim(),
-          level: locationForm.level,
-          parentId: locationForm.parentId || null,
-          capacity: Number(locationForm.capacity) || undefined,
-          unit: locationForm.unit,
-          status: locationForm.status,
-          company: selectedCompany._id
-        });
-        showToast(`Created location '${created.name}'`, 'success');
-        setSelectedNode(created);
-        if (created.parentId) {
-          setExpandedNodes(prev => ({ ...prev, [created.parentId!]: true }));
-        }
-      }
-
-      setShowModal(false);
-      loadStockData();
-    } catch (err: any) {
-      showToast(err.message || 'Failed to save location', 'error');
-    } finally {
-      setIsSaving(false);
-    }
-  };  // Save New Purchase Batch (100% Exact Copy of Purchase Invoice Page Logic!)
-  const handleSavePurchaseBatch = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!selectedCompany?._id) return;
-
-    setIsSaving(true);
-    try {
-      // 1. Ensure dropdown lists (Suppliers, SKUs, Locations) are loaded
-      let skusList = allSkus;
-      if (skusList.length === 0) {
-        skusList = await getSkusV2(selectedCompany._id) || [];
-        setAllSkus(skusList);
-      }
-
-      let locsList = allLocations;
-      if (locsList.length === 0) {
-        locsList = await getWarehouseHierarchyV2(selectedCompany._id) || [];
-        setAllLocations(locsList);
-      }
-
-      let suppliersList = allSuppliers;
-      if (suppliersList.length === 0) {
-        const supRes = await getParties({ company: selectedCompany._id, type: 'vendor', limit: 1000, light: true });
-        suppliersList = supRes.data?.parties || supRes.data || [];
-        setAllSuppliers(suppliersList);
-      }
-
-      const activeSupplierId = batchForm.supplierId || suppliersList[0]?._id || '';
-
-      if (lots.length === 0) {
-        showToast('Please add at least one material lot', 'error');
-        setIsSaving(false);
-        return;
-      }
-
-      const firstStorage = locsList.find(loc => loc.level === 'Storage Location') || locsList[0];
-      const finalInvoiceNumber = batchForm.batchNumber || generateNextBatchNumber(batchForm.purchaseDate);
-
-      // 2. Validate and format each material lot
-      const validatedItems: any[] = [];
-      for (let i = 0; i < lots.length; i++) {
-        const lot = lots[i];
-        let targetSku = skusList.find(s => s._id === lot.skuId);
-        if (!targetSku) {
-          showToast(`Please select a valid SKU for Lot #${i + 1}`, 'error');
-          setIsSaving(false);
-          return;
-        }
-
-        let targetLoc = locsList.find(loc => loc._id === lot.locationId) || firstStorage;
-        if (!targetLoc?._id) {
-          showToast(`Please select a destination storage location for Lot #${i + 1}`, 'error');
-          setIsSaving(false);
-          return;
-        }
-
-        const isReel = lot.paperType === 'Reel' || (targetSku as any)?.paperType === 'Reels' || (targetSku as any)?.paperType === 'Reel';
-        const isSheet = lot.paperType === 'Sheet' || lot.paperType === 'Board' || (targetSku as any)?.paperType === 'Sheets' || (targetSku as any)?.paperType === 'Sheet' || (targetSku?.name || '').toLowerCase().includes('sheet');
-
-        if (isReel) {
-          const reelsList = lot.reels || [];
-          let reelsArr: any[] = [];
-          if (reelsList.length > 0) {
-            reelsArr = reelsList.map((r: any, rIdx: number) => ({
-              reelNumber: r.reelNumber || `${finalInvoiceNumber}-R${String(rIdx + 1).padStart(2, '0')}`,
-              gsm: Number(lot.gsm) || Number(targetSku?.gsm) || 0,
-              width: Number(r.width) || Number(lot.width) || Number(targetSku?.width) || 0,
-              weight: Number(r.weight) || 0,
-              locationId: r.locationId || targetLoc?._id || ''
-            }));
-          } else {
-            const reelsCount = lot.reelsCount || 1;
-            const avgWeight = Math.round((Number(lot.totalKg) || 100) / reelsCount);
-            reelsArr = Array.from({ length: reelsCount }).map((_, rIdx) => ({
-              reelNumber: `${finalInvoiceNumber}-R${String(rIdx + 1).padStart(2, '0')}`,
-              gsm: Number(lot.gsm) || Number(targetSku?.gsm) || 0,
-              width: Number(lot.width) || Number(targetSku?.width) || 0,
-              weight: avgWeight,
-              locationId: targetLoc?._id || ''
-            }));
-          }
-
-          const totalWeight = reelsArr.reduce((s, r) => s + (Number(r.weight) || 0), 0) || Number(lot.totalKg) || 100;
-          const price = Number(lot.ratePerKg) || 0;
-
-          validatedItems.push({
-            skuId: targetSku._id,
-            quantity: totalWeight,
-            unit: targetSku.unit || 'Kg',
-            purchasePrice: price,
-            totalPrice: totalWeight * price,
-            lotNumber: finalInvoiceNumber,
-            locationId: targetLoc._id,
-            reels: reelsArr,
-            gsm: Number(lot.gsm) || targetSku.gsm || undefined,
-            brand: lot.brand || targetSku.brand || undefined
-          });
-        } else if (isSheet) {
-          const reams = Number(lot.reamsCount) || 0;
-          const rw = Number(lot.reamWeight) || 0;
-          const rkg = Number(lot.ratePerKg) || 0;
-          const stdSheets = (targetSku as any)?.pages || (targetSku as any)?.standardSheets || 500;
-
-          const totalSheets = reams > 0 ? (reams * stdSheets) : (Number(lot.totalKg) || 100);
-          const totalWeight = reams > 0 && rw > 0 ? Number((reams * rw).toFixed(2)) : (Number(lot.totalKg) || 100);
-          const totalCost = Number((totalWeight * rkg).toFixed(2));
-          const ratePerSheet = totalSheets > 0 && totalCost > 0 ? Number((totalCost / totalSheets).toFixed(4)) : rkg;
-
-          const skuUnitLower = (targetSku.unit || '').toLowerCase();
-          const isKgUnit = skuUnitLower === 'kg';
-          const invQuantity = isKgUnit ? totalWeight : totalSheets;
-          const invPrice = isKgUnit ? rkg : ratePerSheet;
-
-          validatedItems.push({
-            skuId: targetSku._id,
-            quantity: invQuantity,
-            unit: targetSku.unit || 'PCS',
-            purchasePrice: invPrice,
-            totalPrice: totalCost,
-            lotNumber: finalInvoiceNumber,
-            locationId: targetLoc._id,
-            reels: [],
-            reamWeight: rw || undefined,
-            ratePerKg: rkg || undefined,
-            gsm: Number(lot.gsm) || targetSku.gsm || undefined,
-            brand: lot.brand || targetSku.brand || undefined
-          });
-        } else {
-          // General Material
-          const qty = Number(lot.totalKg) || 100;
-          const price = Number(lot.ratePerKg) || 50;
-
-          validatedItems.push({
-            skuId: targetSku._id,
-            quantity: qty,
-            unit: targetSku.unit || 'Kg',
-            purchasePrice: price,
-            totalPrice: qty * price,
-            lotNumber: finalInvoiceNumber,
-            locationId: targetLoc._id,
-            reels: [],
-            reamWeight: lot.reamWeight ? Number(lot.reamWeight) : undefined,
-            ratePerKg: price,
-            gsm: Number(lot.gsm) || targetSku.gsm || undefined,
-            brand: lot.brand || targetSku.brand || undefined
-          });
-        }
-      }
-
-      // 3. Compute Totals & Charges
-      const matSubtotal = validatedItems.reduce((sum, item) => sum + item.totalPrice, 0);
-      const freight = Number(batchForm.freightCharges) || 0;
-      const crane = Number(batchForm.craneCharges) || 0;
-      const loading = Number(batchForm.loadingCharges) || 0;
-      const other = Number(batchForm.otherCharges) || 0;
-      const grandTotal = matSubtotal + freight + crane + loading + other;
-
-      // 4. Save to Backend via createPurchaseInvoiceV2
-      const invoicePayload = {
-        invoiceNumber: finalInvoiceNumber,
-        vendorId: activeSupplierId,
-        items: validatedItems,
-        taxAmount: 0,
-        freight,
-        craneCharges: crane,
-        otherCharges: loading + other,
-        subTotal: matSubtotal,
-        grandTotal,
-        company: selectedCompany._id,
-        status: 'Posted',
-        purchaseType: batchForm.purchaseType || 'Materials',
-        remarks: batchForm.remarks || ''
-      };
-
-      const existingId = editingItem?.rawInvoice?._id || editingItem?._id;
-      const isExistingInvoice = existingId && typeof existingId === 'string' && !existingId.startsWith('bal-') && !existingId.startsWith('mock-');
-
-      try {
-        if (isExistingInvoice) {
-          await updatePurchaseInvoiceV2(existingId, invoicePayload);
-          showToast(`Purchase Batch '${finalInvoiceNumber}' updated successfully!`, 'success');
-        } else {
-          await createPurchaseInvoiceV2(invoicePayload);
-          showToast(`Purchase Batch '${finalInvoiceNumber}' created successfully!`, 'success');
-        }
-      } catch (invoiceErr: any) {
-        console.error('Purchase batch save/update error:', invoiceErr);
-        const errMsg = invoiceErr.response?.data?.msg || invoiceErr.message || 'Failed to save purchase batch';
-        showToast(`Error: ${errMsg}`, 'error');
-        setIsSaving(false);
-        return;
-      }
-
-      setShowModal(false);
-      setEditingItem(null);
-      
-      // 5. Reload live Stock & Purchase Batch data
-      loadStockData();
-      loadAuxiliaryData(true);
-    } catch (err: any) {
-      console.error('Failed to create purchase batch:', err);
-      showToast(err.message || 'Failed to save purchase batch', 'error');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // Delete Node / Location Handler
-  const handleDeleteLocation = (id: string) => {
-    const targetLoc = allLocations.find(l => l._id === id);
-    const locName = targetLoc?.name || 'location node';
-
-    setConfirmModal({
-      isOpen: true,
-      type: 'delete_location',
-      item: id,
-      title: 'Delete Warehouse Location',
-      message: `Are you sure you want to delete '${locName}'? This action cannot be undone.`,
-      confirmText: 'Yes, Delete Location',
-      onConfirm: async () => {
-        try {
-          await deleteWarehouseLocationV2(id, selectedCompany!._id);
-          showToast('Location deleted successfully', 'success');
-          if (selectedNode?._id === id) setSelectedNode(null);
-          loadStockData();
-        } catch (err: any) {
-          showToast(err.message || 'Failed to delete location', 'error');
-        } finally {
-          setConfirmModal(prev => ({ ...prev, isOpen: false }));
-        }
-      }
+  // Unique Dropdown Options
+  const availableCategories = useMemo(() => {
+    const set = new Set<string>();
+    allSkus.forEach(s => {
+      if (s.category) set.add(s.category);
     });
-  };
+    return Array.from(set).sort();
+  }, [allSkus]);
 
-  // Cancel Purchase Batch Handler
-  const handleCancelPurchaseBatch = (item: any) => {
-    const rawInv = item.rawInvoice || item;
-    const invId = rawInv._id || item._id;
-    const invNum = item.batchNumber || rawInv.invoiceNumber || 'Batch';
-
-    if (item.status === 'Cancelled' || rawInv.status === 'Cancelled') {
-      showToast('This purchase batch is already cancelled.', 'warning');
-      return;
-    }
-
-    setConfirmModal({
-      isOpen: true,
-      type: 'cancel_batch',
-      item,
-      title: 'Cancel Purchase Batch',
-      message: `Are you sure you want to cancel purchase batch '${invNum}'? This will mark the batch as Cancelled and remove its stock from Stock and Stock Ledger modules.`,
-      confirmText: 'Yes, Cancel Batch',
-      onConfirm: async () => {
-        try {
-          if (invId && typeof invId === 'string' && !invId.startsWith('bal-') && !invId.startsWith('mock-')) {
-            await cancelPurchaseInvoiceV2(invId, selectedCompany!._id);
-            showToast(`Purchase batch '${invNum}' cancelled successfully!`, 'success');
-          } else {
-            showToast(`Batch '${invNum}' has no saved invoice record to cancel.`, 'warning');
-          }
-          loadStockData();
-          loadAuxiliaryData(true);
-        } catch (err: any) {
-          console.error('Failed to cancel purchase batch:', err);
-          showToast(err.response?.data?.msg || err.message || 'Failed to cancel purchase batch', 'error');
-        } finally {
-          setConfirmModal(prev => ({ ...prev, isOpen: false }));
-        }
-      }
+  const availableBrands = useMemo(() => {
+    const set = new Set<string>();
+    allSkus.forEach(s => {
+      if (s.brand) set.add(s.brand);
     });
-  };
+    return Array.from(set).sort();
+  }, [allSkus]);
 
-  // Render Tree Node recursively
-  // Cute & Minimal Level Badge Helper
-  const getLevelChip = (level: string) => {
-    switch (level) {
-      case 'Factory':
-        return 'bg-violet-100 text-violet-700 font-extrabold border border-violet-200/60';
-      case 'Floor':
-        return 'bg-sky-100 text-sky-700 font-extrabold border border-sky-200/60';
-      case 'Zone':
-        return 'bg-pink-100 text-pink-700 font-extrabold border border-pink-200/60';
-      default:
-        return 'bg-emerald-100 text-emerald-700 font-extrabold border border-emerald-200/60';
-    }
-  };
+  // Primary Filtered List for active tab & dropdown filters
+  const filteredSkus = useMemo(() => {
+    return allSkus.filter(sku => {
+      const group = getSkuCategoryGroup(sku);
 
-  const getKey = (id: any, fallback: string | number): string => {
-    if (typeof id === 'string' && id.trim() && id !== '[object Object]') return id;
-    if (typeof id === 'number') return String(id);
-    if (id && typeof id === 'object') {
-      if (typeof id.$oid === 'string' && id.$oid) return id.$oid;
-      if (typeof id._id === 'string' && id._id) return id._id;
-      if (typeof id.toString === 'function') {
-        const str = id.toString();
-        if (str && str !== '[object Object]') return str;
+      // Main Tab Filter
+      if (activeTab === 'products' && group !== 'products') return false;
+      if (activeTab === 'materials' && group !== 'materials') return false;
+      if (activeTab === 'semi' && group !== 'semi') return false;
+
+      // Category Dropdown Filter
+      if (categoryFilter !== 'ALL' && sku.category !== categoryFilter) return false;
+
+      // Brand Dropdown Filter
+      if (brandFilter !== 'ALL' && sku.brand !== brandFilter) return false;
+
+      // Stock Status Filter
+      const stock = Number(sku.presentStock ?? sku.openingStock) || 0;
+      const reorder = Number(sku.reorderLevel) || 10;
+      if (statusFilter === 'IN_STOCK' && stock <= 0) return false;
+      if (statusFilter === 'LOW_STOCK' && (stock <= 0 || stock > reorder)) return false;
+      if (statusFilter === 'OUT_OF_STOCK' && stock > 0) return false;
+      if (statusFilter === 'ALERTS' && stock > reorder) return false;
+
+      // Search Query
+      if (debouncedSearch.trim()) {
+        const query = debouncedSearch.toLowerCase().trim();
+        const matchesCode = (sku.skuCode || '').toLowerCase().includes(query);
+        const matchesName = (sku.name || '').toLowerCase().includes(query);
+        const matchesCat = (sku.category || '').toLowerCase().includes(query);
+        const matchesBrand = (sku.brand || '').toLowerCase().includes(query);
+        if (!matchesCode && !matchesName && !matchesCat && !matchesBrand) return false;
       }
-    }
-    return String(fallback);
+
+      return true;
+    });
+  }, [allSkus, activeTab, categoryFilter, brandFilter, statusFilter, debouncedSearch]);
+
+  // Filtered Stock Transfers
+  const transferEntries = useMemo(() => {
+    return ledgerEntries.filter(e => e.transactionType === 'Location Transfer' || e.transactionType === 'Transfer');
+  }, [ledgerEntries]);
+
+  // Filtered Stock Adjustments
+  const adjustmentEntries = useMemo(() => {
+    return ledgerEntries.filter(e => e.transactionType === 'Stock Adjustment' || e.transactionType === 'Adjustment');
+  }, [ledgerEntries]);
+
+  // Format Currency
+  const formatCurrency = (val: number) => {
+    return `₹${val.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
   };
 
-  // Helper: Resolve full location hierarchy path (e.g. SKBW > Ground > Zone A > Lower Left Rack)
-  const resolveLocationPath = (locId: string): string => {
-    const locMap = new Map(allLocations.map(l => [l._id, l]));
-    const chain: string[] = [];
-    let curr = locMap.get(locId);
-    let depth = 0;
-    while (curr && depth < 6) {
-      chain.unshift(curr.name);
-      curr = curr.parentId ? locMap.get(curr.parentId) : undefined;
-      depth++;
-    }
-    return chain.length > 0 ? chain.join(' > ') : 'Storage Area';
+  // Reset Filters Handler
+  const handleResetFilters = () => {
+    setSearch('');
+    setCategoryFilter('ALL');
+    setBrandFilter('ALL');
+    setWarehouseFilter('ALL');
+    setStatusFilter('ALL');
+    setSelectedIds([]);
   };
 
-  // Render Ultra-Clean & Minimal Tree Node recursively
-  const renderTreeNode = (node: WarehouseLocationV2, idx: number = 0) => {
-    const isExpanded = !!expandedNodes[node._id!];
-    const isSelected = selectedNode?._id === node._id;
-    const children = allLocations.filter(l => l.parentId === node._id);
-    const hasChildren = children.length > 0;
+  // Export to Excel / CSV
+  const handleExportExcel = () => {
+    const exportData = filteredSkus.map(s => ({
+      'SKU Code': s.skuCode,
+      'Item Name': s.name,
+      'Category': s.category || 'General',
+      'Brand': s.brand || '-',
+      'Pages': s.pages || '-',
+      'Ruling': s.ruleType || '-',
+      'GSM': s.gsm ? `${s.gsm} GSM` : '-',
+      'Available Stock': Number(s.presentStock ?? s.openingStock) || 0,
+      'Unit': s.unit || 'Pcs',
+      'AUOM': s.altUnit ? `${s.altUnit} (1:${s.altUnitConversion})` : '-',
+      'Estimated Value': formatCurrency((Number(s.presentStock ?? s.openingStock) || 0) * (Number((s as any).avgRate) || getCategoryCost(s.category)))
+    }));
 
-    const childTypeLabel = 
-      node.level === 'Factory' ? 'floors' :
-      node.level === 'Floor' ? 'zones' :
-      node.level === 'Zone' ? 'bins' : 'items';
-
-    const nodeKey = getKey(node._id, `node-${node.name}-${idx}`);
-
-    return (
-      <div key={nodeKey} className="space-y-0.5">
-        <div
-          onClick={() => {
-            setSelectedNode(node);
-            if (hasChildren && !isExpanded) {
-              setExpandedNodes(prev => ({ ...prev, [node._id!]: true }));
-            }
-          }}
-          className={`group flex items-center justify-between px-3 py-2 rounded-xl cursor-pointer transition-all ${
-            isSelected 
-              ? 'bg-blue-600 text-white font-bold shadow-xs' 
-              : 'hover:bg-blue-50/60 text-gray-800'
-          }`}
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            {hasChildren ? (
-              <button
-                type="button"
-                onClick={(e) => toggleNode(node._id!, e)}
-                className={`p-0.5 rounded transition-transform ${isSelected ? 'text-white' : 'text-blue-400 group-hover:text-blue-700'}`}
-              >
-                <ChevronRight className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
-              </button>
-            ) : (
-              <span className="w-4" />
-            )}
-
-            <span className="text-sm select-none">
-              {node.level === 'Factory' ? '🏭' : node.level === 'Floor' ? '🏢' : node.level === 'Zone' ? '📂' : '📦'}
-            </span>
-
-            <span className={`text-xs truncate ${isSelected ? 'font-bold text-white' : 'font-semibold text-gray-900'}`}>
-              {node.name}
-            </span>
-
-            {hasChildren && (
-              <span className={`text-[11px] font-normal ${isSelected ? 'text-blue-200' : 'text-gray-400'}`}>
-                ({children.length} {childTypeLabel})
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Children Render with subtle indentation */}
-        {hasChildren && isExpanded && (
-          <div className="pl-3.5 space-y-0.5 border-l-2 border-blue-100 ml-4">
-            {children.map(child => renderTreeNode(child))}
-          </div>
-        )}
-      </div>
-    );
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Stock Inventory');
+    XLSX.writeFile(wb, `Stock_Inventory_${new Date().toISOString().split('T')[0]}.xlsx`);
+    showToast('Exported inventory to Excel successfully!', 'success');
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-6 bg-white min-h-screen">
-      
-      {/* 1. Header & Actions */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs">
-        <div className="flex items-center gap-3.5">
-          <div className="p-3 bg-blue-100/80 text-blue-700 rounded-2xl shadow-2xs">
-            <Boxes className="w-6 h-6 stroke-[2.2]" />
+    <div className="flex flex-col h-full w-full bg-[#F4F6F8] overflow-hidden">
+      {/* ── TOP HEADER BAR ── */}
+      <header className="bg-white border-b border-gray-200/80 px-6 py-3 shrink-0 flex items-center justify-between shadow-2xs z-10">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl shadow-xs">
+            <Boxes className="w-5 h-5 stroke-[2.2]" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
-              <span>Stock & Inventory</span>
-              <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-bold">
-                {totalRecords} Total
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-extrabold text-slate-900 tracking-tight">Stock & Inventory</h1>
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">
+                {kpiStats.totalItemsCount} Total Items
               </span>
-            </h1>
-            <p className="text-xs text-gray-500 font-medium mt-0.5">
-              Unified stock management for Purchase Batches, Stock Manager, Stock Ledger & Warehouse Setup.
+            </div>
+            <p className="text-[11px] text-gray-500 font-medium">
+              Live multi-warehouse tracking, batch costing, movements audit, and stock reconciliation.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 shrink-0">
+        {/* Action Controls */}
+        <div className="flex items-center gap-2.5">
           <button
-            onClick={() => openModal()}
-            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm transition-all cursor-pointer"
+            type="button"
+            onClick={() => loadAuxiliaryData(true)}
+            className="p-2 border border-gray-200 text-gray-600 hover:bg-gray-100 rounded-xl transition-all cursor-pointer shadow-2xs"
+            title="Refresh inventory balances"
           >
-            <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span>{activeTab === 'warehouse' ? '+ New Factory / Storage' : '+ Add New Purchase Batch'}</span>
+            <RefreshCw className="w-4 h-4" />
           </button>
 
           <button
-            onClick={() => loadStockData()}
-            className="p-2.5 text-gray-600 hover:bg-gray-100 rounded-xl border border-gray-200 transition-all cursor-pointer"
-            title="Refresh Data"
+            type="button"
+            onClick={handleExportExcel}
+            className="px-3 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-blue-600' : ''}`} />
-          </button>
-        </div>
-      </div>
-
-      {/* 2. Top Navigation Tabs Bar */}
-      <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 rounded-2xl shadow-2xs overflow-x-auto">
-        <div className="flex items-center gap-1">
-          {/* Tab 1: Purchase Batches */}
-          <button
-            onClick={() => handleTabChange('batches')}
-            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
-              activeTab === 'batches'
-                ? 'border-teal-700 text-teal-700 bg-transparent'
-                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
-            }`}
-          >
-            <Package className={`w-4 h-4 ${activeTab === 'batches' ? 'text-teal-700' : 'text-slate-400'}`} />
-            <span>Purchase Batches</span>
+            <Download className="w-3.5 h-3.5 text-gray-500" /> Export Excel
           </button>
 
-          {/* Tab 2: Stock Manager */}
-          <button
-            onClick={() => handleTabChange('manager')}
-            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
-              activeTab === 'manager'
-                ? 'border-teal-700 text-teal-700 bg-transparent'
-                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
-            }`}
-          >
-            <BarChart3 className={`w-4 h-4 ${activeTab === 'manager' ? 'text-teal-700' : 'text-slate-400'}`} />
-            <span>Stock Manager</span>
-          </button>
+          {/* + Add New Dropdown */}
+          <div className="relative" ref={addMenuRef}>
+            <button
+              type="button"
+              onClick={() => setShowAddMenu(prev => !prev)}
+              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add New</span>
+              <ChevronDown className="w-3.5 h-3.5 ml-0.5" />
+            </button>
 
-          {/* Tab 3: Stock Ledger */}
-          <button
-            onClick={() => handleTabChange('ledger')}
-            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
-              activeTab === 'ledger'
-                ? 'border-teal-700 text-teal-700 bg-transparent'
-                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
-            }`}
-          >
-            <FileText className={`w-4 h-4 ${activeTab === 'ledger' ? 'text-teal-700' : 'text-slate-400'}`} />
-            <span>Stock Ledger</span>
-          </button>
+            {showAddMenu && (
+              <div className="absolute right-0 mt-1.5 w-56 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 py-1.5 divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100">
+                <div className="p-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAddMenu(false);
+                      setTransferInitialSku(null);
+                      setShowTransferModal(true);
+                    }}
+                    className="w-full px-3 py-2 text-left text-xs font-bold text-gray-800 hover:bg-blue-50 hover:text-blue-900 rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer"
+                  >
+                    <ArrowRightLeft className="w-4 h-4 text-blue-600" />
+                    <span>New Stock Transfer</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAddMenu(false);
+                      setAdjustmentInitialSku(null);
+                      setShowAdjustmentModal(true);
+                    }}
+                    className="w-full px-3 py-2 text-left text-xs font-bold text-gray-800 hover:bg-amber-50 hover:text-amber-900 rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer"
+                  >
+                    <SlidersHorizontal className="w-4 h-4 text-amber-600" />
+                    <span>Stock Adjustment</span>
+                  </button>
+                </div>
 
-          {/* Tab 4: Warehouse Setup */}
-          <button
-            onClick={() => handleTabChange('warehouse')}
-            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
-              activeTab === 'warehouse'
-                ? 'border-teal-700 text-teal-700 bg-transparent'
-                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
-            }`}
-          >
-            <Warehouse className={`w-4 h-4 ${activeTab === 'warehouse' ? 'text-teal-700' : 'text-slate-400'}`} />
-            <span>Warehouse Setup</span>
-          </button>
-
-          {/* Tab 5: Stock Alerts (MOVED TO END OF ALL MODULE TABS AS INSTRUCTED!) */}
-          <button
-            onClick={() => handleTabChange('alerts')}
-            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
-              activeTab === 'alerts'
-                ? 'border-teal-700 text-teal-700 bg-transparent'
-                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
-            }`}
-          >
-            <AlertTriangle className={`w-4 h-4 ${activeTab === 'alerts' ? 'text-teal-700' : 'text-slate-400'}`} />
-            <span>Stock Alerts</span>
-            {alertsSummary.totalAlerts > 0 && (
-              <span className="bg-amber-100 text-amber-800 text-[10.5px] font-black px-2 py-0.5 rounded-full border border-amber-200">
-                {alertsSummary.totalAlerts}
-              </span>
+                <div className="p-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAddMenu(false);
+                      setShowBatchModal(true);
+                    }}
+                    className="w-full px-3 py-2 text-left text-xs font-bold text-gray-800 hover:bg-blue-50 hover:text-blue-900 rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer"
+                  >
+                    <Layers className="w-4 h-4 text-blue-600" />
+                    <span>Add Purchase Batch</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAddMenu(false);
+                      setEditingSku(null);
+                      setIsAddSkuOpen(true);
+                    }}
+                    className="w-full px-3 py-2 text-left text-xs font-bold text-gray-800 hover:bg-purple-50 hover:text-purple-900 rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer"
+                  >
+                    <Package className="w-4 h-4 text-purple-600" />
+                    <span>Add New Item (SKU)</span>
+                  </button>
+                </div>
+              </div>
             )}
-          </button>
-        </div>
-
-        {/* Global Toolbar Search Box */}
-        <div className="py-2 flex items-center gap-2">
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={`Search ${activeTab}...`}
-              className="pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl w-44 md:w-56 focus:outline-none focus:border-blue-500 shadow-2xs font-medium"
-            />
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* 3. STOCK ALERTS MODULE VIEW (Dynamic, 100% screenshot match!) */}
-      {activeTab === 'alerts' ? (
-        <div key={animationKey} className="space-y-4">
-          <div className="bg-white border border-gray-200/90 rounded-2xl p-4 shadow-2xs space-y-4">
-            {/* Top Toolbar & Summary Header */}
-            <div 
-              style={{ animation: 'slideDownFade 0.35s ease-out forwards', animationDelay: '0ms' }}
-              className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-gray-100 pb-3 opacity-0"
-            >
-              {/* Counter Summary Pills */}
-              <div className="flex items-center gap-6 text-xs font-semibold text-gray-700">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-gray-500 font-medium">Needs Reorder:</span>
-                  <span className="font-extrabold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                    {alertsSummary.needsReorder}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-gray-500 font-medium">Out of Stock:</span>
-                  <span className="font-extrabold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
-                    {alertsSummary.outOfStock}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-gray-500 font-medium">Overstock:</span>
-                  <span className="font-extrabold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-md border border-gray-200">
-                    {alertsSummary.overstock}
-                  </span>
-                </div>
-                <a
-                  href="/inventory-v2/purchases?reorderAll=true"
-                  className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs no-underline"
-                  title="Create a Purchase Batch for all low-stock materials"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Reorder Purchase Batch</span>
-                </a>
+      {/* ── SCROLLABLE BODY ── */}
+      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+        
+        {/* ── TOP KPI DRILLDOWN CARDS ── */}
+        <div className="grid grid-cols-6 gap-3">
+          {/* Card 1: Total Items */}
+          <div 
+            onClick={() => setActiveTab('overview')}
+            className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+              activeTab === 'overview'
+                ? 'bg-white border-blue-600 ring-2 ring-blue-500/20 shadow-md'
+                : 'bg-white/90 border-gray-200/90 hover:border-blue-400 hover:shadow-xs'
+            }`}
+          >
+            <div className="flex items-center justify-between text-gray-500 text-[11px] font-bold uppercase tracking-wider">
+              <span>Total Items</span>
+              <Package className="w-4 h-4 text-blue-600" />
+            </div>
+            <div className="mt-2">
+              <div className="text-xl font-black text-slate-900">{kpiStats.totalItemsCount.toLocaleString('en-IN')}</div>
+              <div className="text-[10.5px] font-medium text-blue-600 mt-0.5 flex items-center gap-1">
+                <span>View All Inventory</span>
               </div>
+            </div>
+          </div>
 
-              {/* Action Toolbar Icons & Search */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  type="button"
-                  title="Filter"
-                  className="p-2 border border-gray-200 hover:bg-gray-50 rounded-xl text-gray-600 transition-colors cursor-pointer"
-                >
-                  <Filter className="w-4 h-4 text-emerald-600" />
-                </button>
-                <button
-                  type="button"
-                  title="Export"
-                  className="p-2 border border-gray-200 hover:bg-gray-50 rounded-xl text-gray-600 transition-colors cursor-pointer"
-                >
-                  <Upload className="w-4 h-4 text-blue-600" />
-                </button>
-                <button
-                  type="button"
-                  title="History"
-                  className="p-2 border border-gray-200 hover:bg-gray-50 rounded-xl text-gray-600 transition-colors cursor-pointer"
-                >
-                  <History className="w-4 h-4 text-gray-500" />
-                </button>
+          {/* Card 2: Total Stock Value */}
+          <div className="p-3.5 rounded-2xl bg-gradient-to-br from-blue-900 via-indigo-950 to-slate-900 text-white border border-blue-800/60 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between text-blue-200 text-[11px] font-bold uppercase tracking-wider">
+              <span>Total Stock Value</span>
+              <DollarSign className="w-4 h-4 text-blue-300" />
+            </div>
+            <div className="mt-2">
+              <div className="text-lg font-black text-white">{formatCurrency(kpiStats.totalStockVal)}</div>
+              <div className="text-[10px] text-blue-300/80 font-mono mt-0.5">
+                Weighted average cost
+              </div>
+            </div>
+          </div>
 
-                {/* Search box */}
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+          {/* Card 3: Finished Goods */}
+          <div 
+            onClick={() => setActiveTab('products')}
+            className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+              activeTab === 'products'
+                ? 'bg-white border-blue-600 ring-2 ring-blue-500/20 shadow-md'
+                : 'bg-white/90 border-gray-200/90 hover:border-blue-400 hover:shadow-xs'
+            }`}
+          >
+            <div className="flex items-center justify-between text-gray-500 text-[11px] font-bold uppercase tracking-wider">
+              <span>Finished Goods</span>
+              <div className="w-2 h-2 rounded-full bg-blue-600"></div>
+            </div>
+            <div className="mt-2">
+              <div className="text-base font-black text-slate-900">{formatCurrency(kpiStats.fgValue)}</div>
+              <div className="text-[10.5px] font-mono font-bold text-blue-600 mt-0.5">
+                {kpiStats.fgQty.toLocaleString('en-IN')} Pcs
+              </div>
+            </div>
+          </div>
+
+          {/* Card 4: Raw Materials */}
+          <div 
+            onClick={() => setActiveTab('materials')}
+            className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+              activeTab === 'materials'
+                ? 'bg-white border-amber-600 ring-2 ring-amber-500/20 shadow-md'
+                : 'bg-white/90 border-gray-200/90 hover:border-amber-400 hover:shadow-xs'
+            }`}
+          >
+            <div className="flex items-center justify-between text-gray-500 text-[11px] font-bold uppercase tracking-wider">
+              <span>Raw Materials</span>
+              <div className="w-2 h-2 rounded-full bg-amber-500"></div>
+            </div>
+            <div className="mt-2">
+              <div className="text-base font-black text-slate-900">{formatCurrency(kpiStats.rmValue)}</div>
+              <div className="text-[10.5px] font-mono font-bold text-amber-600 mt-0.5">
+                {kpiStats.rmKg.toLocaleString('en-IN')} KG
+              </div>
+            </div>
+          </div>
+
+          {/* Card 5: Semi Finished */}
+          <div 
+            onClick={() => setActiveTab('semi')}
+            className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+              activeTab === 'semi'
+                ? 'bg-white border-purple-600 ring-2 ring-purple-500/20 shadow-md'
+                : 'bg-white/90 border-gray-200/90 hover:border-purple-400 hover:shadow-xs'
+            }`}
+          >
+            <div className="flex items-center justify-between text-gray-500 text-[11px] font-bold uppercase tracking-wider">
+              <span>Semi Finished</span>
+              <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+            </div>
+            <div className="mt-2">
+              <div className="text-base font-black text-slate-900">{formatCurrency(kpiStats.semiValue)}</div>
+              <div className="text-[10.5px] font-mono font-bold text-purple-600 mt-0.5">
+                {kpiStats.semiPcs.toLocaleString('en-IN')} Pcs
+              </div>
+            </div>
+          </div>
+
+          {/* Card 6: Low / Out of Stock */}
+          <div 
+            onClick={() => setStatusFilter(prev => prev === 'ALERTS' ? 'ALL' : 'ALERTS')}
+            className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+              statusFilter === 'ALERTS'
+                ? 'bg-rose-50 border-rose-600 ring-2 ring-rose-500/20 shadow-md'
+                : 'bg-white/90 border-gray-200/90 hover:border-rose-400 hover:shadow-xs'
+            }`}
+          >
+            <div className="flex items-center justify-between text-gray-500 text-[11px] font-bold uppercase tracking-wider">
+              <span>Stock Alerts</span>
+              <AlertTriangle className="w-4 h-4 text-rose-600" />
+            </div>
+            <div className="mt-2">
+              <div className="text-lg font-black text-rose-700">
+                {kpiStats.lowStockCount} <span className="text-xs font-normal text-gray-400">/ {kpiStats.outOfStockCount} out</span>
+              </div>
+              <div className="text-[10.5px] font-bold text-rose-600 mt-0.5">
+                {statusFilter === 'ALERTS' ? '✓ Showing Alerts' : 'Click to filter alerts'}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── MAIN TABS & ACTION BAR ── */}
+        <div className="bg-white rounded-2xl border border-gray-200/80 p-3 shadow-2xs space-y-3">
+          
+          {/* Main Navigation Tabs */}
+          <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+              {[
+                { id: 'overview', label: 'Stock Overview', icon: Boxes },
+                { id: 'products', label: 'Finished Goods', icon: Package },
+                { id: 'materials', label: 'Raw Materials', icon: Layers },
+                { id: 'semi', label: 'Semi Finished', icon: Box },
+                { id: 'transfers', label: 'Stock Transfers', count: transferEntries.length, icon: ArrowRightLeft },
+                { id: 'adjustments', label: 'Adjustments', count: adjustmentEntries.length, icon: SlidersHorizontal },
+                { id: 'warehouse', label: 'Warehouse Setup', icon: Warehouse }
+              ].map(tab => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveTab(tab.id as StockTabType);
+                      setPage(1);
+                    }}
+                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-gray-600 hover:bg-gray-100/80 hover:text-gray-900'
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    <span>{tab.label}</span>
+                    {tab.count !== undefined && (
+                      <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                        isActive ? 'bg-blue-900/40 text-blue-100' : 'bg-gray-200 text-gray-700'
+                      }`}>
+                        {tab.count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="text-xs text-gray-400 font-semibold shrink-0">
+              Showing <strong>{filteredSkus.length}</strong> items
+            </div>
+          </div>
+
+          {/* Filter Toolbar */}
+          {activeTab !== 'warehouse' && (
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+              <div className="flex flex-wrap items-center gap-2.5 flex-1">
+                {/* Search Bar */}
+                <div className="relative min-w-[240px] max-w-xs flex-1">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
                     type="text"
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search name, party, bat..."
-                    className="pl-8 pr-3 py-1.5 text-xs bg-gray-50/80 border border-gray-200 rounded-xl w-48 md:w-60 focus:outline-none focus:border-blue-500 font-medium"
+                    onChange={e => setSearch(e.target.value)}
+                    placeholder="Search SKU code, name, brand..."
+                    className="w-full pl-8 pr-3 py-1.5 text-xs bg-gray-50/80 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 transition-all"
                   />
-                </div>
-
-                <button
-                  type="button"
-                  title="Import"
-                  className="p-2 border border-gray-200 hover:bg-gray-50 rounded-xl text-gray-600 transition-colors cursor-pointer"
-                >
-                  <Download className="w-4 h-4 text-gray-500" />
-                </button>
-
-                {/* Replace plus button with ++ dashed circular button from image 2 */}
-                <button
-                  type="button"
-                  onClick={() => openModal()}
-                  className="w-8 h-8 rounded-full border border-dashed border-teal-700 hover:border-teal-800 hover:bg-teal-50 text-teal-700 font-extrabold text-xs flex items-center justify-center transition-all cursor-pointer shadow-2xs"
-                  title="Create New Purchase Batch to Refill Stock from Vendor"
-                >
-                  ++
-                </button>
-              </div>
-            </div>
-
-            {/* Stock Alerts Table */}
-            <div className="overflow-x-auto rounded-xl border border-gray-200/80">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                    <th className="py-3 px-4">NAME</th>
-                    <th className="py-3 px-3">TYPE</th>
-                    <th className="py-3 px-3">UOM</th>
-                    <th className="py-3 px-3 text-right">CURRENT QTY</th>
-                    <th className="py-3 px-3 text-right">MIN</th>
-                    <th className="py-3 px-3 text-right">REORDER AT</th>
-                    <th className="py-3 px-3 text-right">MAX</th>
-                    <th className="py-3 px-3 text-right">TO ORDER</th>
-                    <th className="py-3 px-3 text-center">STATUS</th>
-                    <th className="py-3 px-3 text-right">ACTIONS</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 font-medium text-gray-800">
-                  {filteredAlerts.length === 0 ? (
-                    <tr>
-                      <td colSpan={10} className="py-12 text-center text-gray-400 italic">
-                        No stock alert records found matching criteria.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredAlerts.map((row, index) => (
-                      <tr
-                        key={row.id}
-                        style={{
-                          animation: 'slideDownFade 0.35s ease-out forwards',
-                          animationDelay: `${index * 35}ms`
-                        }}
-                        className="hover:bg-blue-50/20 transition-all cursor-pointer opacity-0"
-                        onClick={() => {
-                          setEditingSku(row.sku);
-                          setIsAddSkuOpen(true);
-                        }}
-                      >
-                        <td className="py-3 px-4 font-bold text-gray-900 flex items-center gap-2">
-                          <span className="text-gray-400">
-                            {row.typeLabel === 'Product' ? '📦' : '🧵'}
-                          </span>
-                          <span className="truncate max-w-xs">{row.name}</span>
-                          {row.currentQty === 0 && (
-                            <span className="text-[10px] bg-gray-100 text-gray-500 border border-gray-200 px-1.5 py-0.2 rounded font-semibold">
-                              Not stocked
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3 px-3">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                            row.typeLabel === 'Product'
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : 'bg-amber-50 text-amber-800 border-amber-200'
-                          }`}>
-                            {row.typeLabel}
-                          </span>
-                        </td>
-                        <td className="py-3 px-3 text-gray-600 font-medium">{row.uom}</td>
-                        <td className="py-3 px-3 text-right font-mono font-extrabold text-gray-900">
-                          {row.currentQty.toLocaleString('en-IN')}
-                        </td>
-                        <td className="py-3 px-3 text-right font-mono text-gray-600">
-                          {row.minQty ? row.minQty.toLocaleString('en-IN') : '—'}
-                        </td>
-                        <td className="py-3 px-3 text-right font-mono text-gray-600">
-                          {row.reorderQty ? row.reorderQty.toLocaleString('en-IN') : '—'}
-                        </td>
-                        <td className="py-3 px-3 text-right font-mono text-gray-600">
-                          {row.maxQty ? row.maxQty.toLocaleString('en-IN') : '—'}
-                        </td>
-                        <td className="py-3 px-3 text-right font-mono font-black text-gray-900">
-                          {row.toOrder > 0 ? row.toOrder.toLocaleString('en-IN') : '—'}
-                        </td>
-                        <td className="py-3 px-3 text-center">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10.5px] font-extrabold border ${
-                            row.status === 'Out of Stock'
-                              ? 'bg-rose-50 text-rose-700 border-rose-200'
-                              : row.status === 'Low Stock'
-                              ? 'bg-amber-50 text-amber-800 border-amber-200'
-                              : row.status === 'Overstock'
-                              ? 'bg-purple-50 text-purple-700 border-purple-200'
-                              : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          }`}>
-                            {row.status}
-                          </span>
-                        </td>
-                        <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-end gap-1.5">
-                            <a
-                              href={`/inventory-v2/purchases?reorderSkuId=${row.sku._id}`}
-                              className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg text-[10.5px] font-bold transition-all flex items-center gap-1 no-underline cursor-pointer"
-                              title="Refill item stock by creating a Purchase Batch from vendor"
-                            >
-                              <Plus className="w-3 h-3" />
-                              <span>Reorder Batch</span>
-                            </a>
-                            <button
-                              onClick={() => {
-                                setEditingSku(row.sku);
-                                setIsAddSkuOpen(true);
-                              }}
-                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                              title="Edit Stock Levels"
-                            >
-                              <Edit className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      ) : activeTab === 'warehouse' ? (
-        <div key={animationKey} className="space-y-5">
-          <WarehouseStructureV2 isEmbedded={true} />
-        </div>
-      ) : (
-        /* 4. Table Layout for Batches, Manager, and Ledger */
-        <div className="bg-white border border-gray-200 rounded-2xl shadow-2xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                  <th className="py-3 px-3 w-8 text-center">
-                    <input
-                      type="checkbox"
-                      checked={paginatedItems.length > 0 && selectedIds.length === paginatedItems.length}
-                      onChange={(e) => {
-                        if (e.target.checked) setSelectedIds(paginatedItems.map(i => i._id));
-                        else setSelectedIds([]);
-                      }}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                    />
-                  </th>
-
-                  {activeTab === 'batches' && (
-                    <>
-                      <th className="py-3 px-3 whitespace-nowrap">BATCH / SKU CODE</th>
-                      <th className="py-3 px-3 whitespace-nowrap">ITEM NAME</th>
-                      <th className="py-3 px-3 whitespace-nowrap">CATEGORY</th>
-                      <th className="py-3 px-3 whitespace-nowrap">LOCATION</th>
-                      <th className="py-3 px-3 whitespace-nowrap">QUANTITY</th>
-                      <th className="py-3 px-3 whitespace-nowrap">UOM</th>
-                      <th className="py-3 px-3 whitespace-nowrap">STATUS</th>
-                    </>
-                  )}
-
-                  {activeTab === 'manager' && (
-                    <>
-                      <th className="py-3 px-3 whitespace-nowrap">SKU CODE & ITEM</th>
-                      <th className="py-3 px-3 whitespace-nowrap">CATEGORY</th>
-                      <th className="py-3 px-3 whitespace-nowrap">LOCATION</th>
-                      <th className="py-3 px-3 whitespace-nowrap">AVAILABLE QTY</th>
-                      <th className="py-3 px-3 whitespace-nowrap">RESERVED</th>
-                      <th className="py-3 px-3 whitespace-nowrap">ON HAND QTY</th>
-                      <th className="py-3 px-3 whitespace-nowrap">TOTAL VALUE</th>
-                      <th className="py-3 px-3 whitespace-nowrap">STATUS</th>
-                    </>
-                  )}
-
-                  {activeTab === 'ledger' && (
-                    <>
-                      <th className="py-3 px-3 whitespace-nowrap">TIMESTAMP</th>
-                      <th className="py-3 px-3 whitespace-nowrap">TYPE</th>
-                      <th className="py-3 px-3 whitespace-nowrap">ITEM NAME</th>
-                      <th className="py-3 px-3 whitespace-nowrap">LOCATION</th>
-                      <th className="py-3 px-3 whitespace-nowrap">QTY IN</th>
-                      <th className="py-3 px-3 whitespace-nowrap">QTY OUT</th>
-                      <th className="py-3 px-3 whitespace-nowrap">BALANCE AFTER</th>
-                    </>
-                  )}
-
-                  <th className="py-3 px-3 text-right whitespace-nowrap">ACTIONS</th>
-                </tr>
-              </thead>
-
-              <tbody key={animationKey} className="divide-y divide-gray-100 text-xs text-gray-700">
-                {loading ? (
-                  <tr>
-                    <td colSpan={12} className="py-12 text-center text-gray-400 whitespace-nowrap">
-                      <div className="inline-flex items-center gap-2">
-                        <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
-                        <span>Fetching live stock data from backend...</span>
-                      </div>
-                    </td>
-                  </tr>
-                ) : paginatedItems.length === 0 ? (
-                  <tr>
-                    <td colSpan={12} className="py-12 text-center text-gray-400 whitespace-nowrap">
-                      <div className="flex flex-col items-center gap-2">
-                        <Boxes className="w-8 h-8 text-gray-300" />
-                        <p className="font-semibold text-gray-600">No {activeTab} records found in database</p>
-                        <p className="text-[11px]">Click "+ Add New Purchase Batch" above to record a lot delivery</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedItems.map((item, index) => {
-                    const rowId = getKey(item._id, `item-${item.batchNumber || item.skuCode || 'row'}-${index}`);
-                    const isSelected = selectedIds.includes(rowId);
-
-                    return (
-                      <tr
-                        key={rowId}
-                        style={{
-                          animation: 'slideDownFade 0.35s ease-out forwards',
-                          animationDelay: `${index * 35}ms`
-                        }}
-                        className={`hover:bg-blue-50/20 transition-all cursor-pointer opacity-0 whitespace-nowrap ${isSelected ? 'bg-blue-50/30' : ''}`}
-                      >
-                        <td className="py-3 px-3 text-center" onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={(e) => {
-                              if (e.target.checked) setSelectedIds(prev => [...prev, rowId]);
-                              else setSelectedIds(prev => prev.filter(id => id !== rowId));
-                            }}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                          />
-                        </td>
-
-                        {activeTab === 'batches' && (
-                          <>
-                            <td className="py-3 px-3 font-mono font-bold text-blue-700">{item.batchNumber}</td>
-                            <td className="py-3 px-3 font-semibold text-gray-900">
-                              <div className="flex items-center gap-2">
-                                <span>📦</span>
-                                <span>{item.skuName}</span>
-                              </div>
-                            </td>
-                            <td className="py-3 px-3 text-gray-600 font-medium">{item.category}</td>
-                            <td className="py-3 px-3 text-gray-600 font-medium">{item.locationName}</td>
-                            <td className="py-3 px-3 font-mono font-semibold text-gray-900">
-                              {(item.quantity || 0).toLocaleString('en-IN')}
-                            </td>
-                            <td className="py-3 px-3 text-gray-600 font-medium">{item.unit}</td>
-                            <td className="py-3 px-3">
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
-                                item.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-50 text-gray-600 border-gray-200'
-                              }`}>
-                                {item.status}
-                              </span>
-                            </td>
-                          </>
-                        )}
-
-                        {activeTab === 'manager' && (
-                          <>
-                            <td className="py-3 px-3 font-semibold text-gray-900">
-                              <div>
-                                <div className="font-bold text-gray-900 flex items-center gap-1.5">
-                                  <span>📊</span>
-                                  <span>{item.name}</span>
-                                </div>
-                                <div className="text-[10px] font-mono text-gray-400">{item.skuCode}</div>
-                              </div>
-                            </td>
-                            <td className="py-3 px-3 text-gray-600 font-medium">{item.category}</td>
-                            <td className="py-3 px-3 text-gray-600 font-medium">{item.locationName}</td>
-                            <td className="py-3 px-3 font-mono font-bold text-emerald-700">
-                              {(item.availableQty || 0).toLocaleString('en-IN')} {item.unit}
-                            </td>
-                            <td className="py-3 px-3 font-mono text-gray-500">
-                              {(item.reservedQty || 0).toLocaleString('en-IN')} {item.unit}
-                            </td>
-                            <td className="py-3 px-3 font-mono font-bold text-gray-900">
-                              {(item.onHand || 0).toLocaleString('en-IN')} {item.unit}
-                            </td>
-                            <td className="py-3 px-3 font-mono font-semibold text-emerald-700">
-                              ₹{(item.totalVal || 0).toLocaleString('en-IN')}
-                            </td>
-                            <td className="py-3 px-3">
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                                item.status === 'Normal' ? 'bg-emerald-100 text-emerald-800' : item.status === 'Low Stock' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
-                              }`}>
-                                {item.status}
-                              </span>
-                            </td>
-                          </>
-                        )}
-
-                        {activeTab === 'ledger' && (
-                          <>
-                            <td className="py-3 px-3 font-mono text-gray-500 text-[11px]">
-                              {new Date(item.timestamp).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
-                            </td>
-                            <td className="py-3 px-3">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-blue-50 text-blue-700 border border-blue-200">
-                                {item.transactionType}
-                              </span>
-                            </td>
-                            <td className="py-3 px-3 font-semibold text-gray-900">{item.skuName}</td>
-                            <td className="py-3 px-3 text-gray-600 font-medium">{item.locationName}</td>
-                            <td className="py-3 px-3 font-mono text-emerald-600 font-bold">
-                              {item.qtyIn > 0 ? `+${item.qtyIn}` : '—'}
-                            </td>
-                            <td className="py-3 px-3 font-mono text-rose-600 font-bold">
-                              {item.qtyOut > 0 ? `-${item.qtyOut}` : '—'}
-                            </td>
-                            <td className="py-3 px-3 font-mono font-semibold text-gray-900">{item.balanceAfter}</td>
-                          </>
-                        )}
-
-                        <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              onClick={() => openModal(item)}
-                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                              title="Edit Record"
-                            >
-                              <Edit className="w-3.5 h-3.5" />
-                            </button>
-                            {activeTab === 'batches' ? (
-                              <button
-                                onClick={() => handleCancelPurchaseBatch(item)}
-                                className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                                title="Cancel Purchase Batch"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => handleDeleteLocation(item._id)}
-                                className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                                title="Delete Record"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="p-3 bg-gray-50/80 border-t border-gray-200 flex items-center justify-between text-xs text-gray-500 font-semibold">
-            <span>Showing {paginatedItems.length} of {filteredItems.length} records</span>
-            <div className="flex items-center gap-2">
-              <button
-                disabled={page <= 1}
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                className="px-2.5 py-1 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 flex items-center gap-1 cursor-pointer"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-                <span>Previous</span>
-              </button>
-              <span>Page {page} of {totalPages}</span>
-              <button
-                disabled={page >= totalPages}
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                className="px-2.5 py-1 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 flex items-center gap-1 cursor-pointer"
-              >
-                <span>Next</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 5. POP-UP DIALOG BOX MODALS */}
-      {showModal && (
-        <Modal
-          isOpen={showModal}
-          onClose={() => setShowModal(false)}
-          maxWidth={modalType === 'location' ? 'max-w-md' : 'max-w-4xl'}
-          hideCloseButton
-          padding="p-0"
-        >
-          {modalType === 'location' ? (
-            <form onSubmit={handleSaveLocation} className="p-5 space-y-4 bg-white text-slate-800">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <h3 className="text-base font-bold text-gray-900">
-                  {editingItem ? 'Edit' : 'Add'} Warehouse Location Node
-                </h3>
-                <button type="button" onClick={() => setShowModal(false)} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-xl cursor-pointer">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="space-y-3 text-xs">
-                <div>
-                  <label className="block text-gray-700 font-bold mb-1">Location Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={locationForm.name}
-                    onChange={e => setLocationForm(f => ({ ...f, name: e.target.value }))}
-                    placeholder="e.g. Ground Floor or Rack A-1"
-                    className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-gray-700 font-semibold mb-1">Hierarchy Level</label>
-                  <select
-                    value={locationForm.level}
-                    onChange={e => setLocationForm(f => ({ ...f, level: e.target.value as any }))}
-                    className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
-                  >
-                    <option value="Factory">Factory</option>
-                    <option value="Floor">Floor</option>
-                    <option value="Zone">Zone</option>
-                    <option value="Storage Location">Storage Location</option>
-                  </select>
-                </div>
-
-                {locationForm.level !== 'Factory' && (
-                  <div>
-                    <label className="block text-gray-700 font-semibold mb-1">Parent Location *</label>
-                    <select
-                      required
-                      value={locationForm.parentId}
-                      onChange={e => setLocationForm(f => ({ ...f, parentId: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
-                    >
-                      <option value="">Select Parent Location</option>
-                      {allLocations.map((loc: WarehouseLocationV2, idx: number) => (
-                        <option key={getKey(loc._id, `loc-opt-${idx}`)} value={getKey(loc._id, `loc-val-${idx}`)}>{loc.name} ({loc.level})</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-3">
-                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 border border-gray-200 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-50 cursor-pointer">
-                  Cancel
-                </button>
-                <button type="submit" disabled={isSaving} className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer">
-                  Save Location
-                </button>
-              </div>
-            </form>
-          ) : (
-            <form onSubmit={handleSavePurchaseBatch} className="flex flex-col h-full max-h-[85vh] bg-white rounded-2xl overflow-hidden text-slate-800">
-              {/* FIXED MODAL HEADER */}
-              <div className="shrink-0 px-6 py-4 border-b border-gray-100 bg-white flex items-center justify-between z-10">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-                    <Package className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-base font-bold text-gray-900">
-                        {editingItem ? 'Edit Purchase Batch' : 'New Purchase Batch'}
-                      </h3>
-                      {editingItem && batchForm.batchNumber && (
-                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                          {batchForm.batchNumber}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-500 font-medium">
-                      {editingItem ? 'Update details for this supplier lot delivery' : 'Record a new supplier materials lot delivery'}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* SCROLLABLE FORM BODY */}
-              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6 text-xs bg-white">
-                
-                {/* 1. BATCH GENERAL DETAILS */}
-                <div className="space-y-3">
-                  <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-                    1. Purchase Batch Details
-                  </h4>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block text-xs font-semibold text-gray-700">Batch No.</label>
-                        <span className="text-[10px] text-gray-400 font-medium">(Auto)</span>
-                      </div>
-                      <input
-                        type="text"
-                        value={batchForm.batchNumber}
-                        onChange={e => setBatchForm(f => ({ ...f, batchNumber: e.target.value }))}
-                        placeholder="e.g. PB-SEP-001"
-                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-2xs transition-all"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">Purchase Date *</label>
-                      <input
-                        type="date"
-                        required
-                        value={batchForm.purchaseDate}
-                        onChange={e => {
-                          const newDate = e.target.value;
-                          setBatchForm(f => {
-                            const isAutoGenerated = !f.batchNumber || f.batchNumber.startsWith('PB-');
-                            return {
-                              ...f,
-                              purchaseDate: newDate,
-                              batchNumber: isAutoGenerated ? generateNextBatchNumber(newDate) : f.batchNumber
-                            };
-                          });
-                        }}
-                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-2xs transition-all"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">Supplier *</label>
-                      <select
-                        required
-                        value={batchForm.supplierId}
-                        onChange={e => {
-                          const sel = allSuppliers.find(s => s._id === e.target.value);
-                          setBatchForm(f => ({ ...f, supplierId: e.target.value, supplierName: sel?.firmName || sel?.contactName || '' }));
-                        }}
-                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-2xs transition-all"
-                      >
-                        <option value="">Select party...</option>
-                        {allSuppliers.map((s: any) => (
-                          <option key={s._id} value={s._id}>{s.firmName || s.contactName}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">Purchase Type</label>
-                      <select
-                        value={batchForm.purchaseType}
-                        onChange={e => {
-                          const newType = e.target.value;
-                          setBatchForm(f => ({ ...f, purchaseType: newType }));
-                          setLots(prevLots => prevLots.map(lot => {
-                            if (!lot.skuId) {
-                              return { ...lot, paperType: newType === 'Semi' ? 'Sheet' : 'Reel' };
-                            }
-                            const curSku = allSkus.find(s => s._id === lot.skuId);
-                            if (curSku) {
-                              const grp = getSkuCategoryGroup(curSku);
-                              const isMatch = (newType === 'Products' && grp === 'products') ||
-                                              (newType === 'Semi' && grp === 'semi') ||
-                                              (newType === 'Materials' && grp === 'materials');
-                              if (!isMatch) {
-                                return {
-                                  ...lot,
-                                  skuId: '',
-                                  skuCode: '',
-                                  skuName: '',
-                                  brand: '',
-                                  gsm: '',
-                                  paperType: newType === 'Semi' ? 'Sheet' : 'Reel',
-                                  totalKg: 0,
-                                  ratePerKg: 0,
-                                  reels: []
-                                };
-                              }
-                            }
-                            return lot;
-                          }));
-                        }}
-                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-2xs transition-all"
-                      >
-                        <option value="Materials">Materials</option>
-                        <option value="Semi">Semi-Finished</option>
-                        <option value="Products">Finished Products</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. MATERIAL LOTS */}
-                <div className="space-y-3 pt-2 border-t border-gray-100">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-                      Material Lots
-                    </h4>
+                  {search && (
                     <button
                       type="button"
-                      onClick={handleAddLot}
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                      onClick={() => setSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                     >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Add Material Lot</span>
+                      <X className="w-3 h-3" />
                     </button>
-                  </div>
+                  )}
+                </div>
 
-                  {lots.map((lot, idx) => {
-                    const lotSubtotal = (Number(lot.totalKg) || 0) * (Number(lot.ratePerKg) || 0);
+                {/* Category Dropdown */}
+                <select
+                  value={categoryFilter}
+                  onChange={e => setCategoryFilter(e.target.value)}
+                  className="px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 focus:outline-none focus:border-blue-500 cursor-pointer"
+                >
+                  <option value="ALL">All Categories</option>
+                  {availableCategories.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
 
-                    return (
-                      <div key={getKey(lot.id, `lot-card-${idx}`)} className="bg-white p-4 rounded-2xl border border-gray-200 space-y-3.5 shadow-2xs relative">
-                        <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
-                          <div className="flex items-center gap-2.5">
-                            <span className="px-2.5 py-0.5 bg-blue-50 text-blue-700 font-bold rounded-md text-[10.5px] uppercase border border-blue-100">
-                              Lot #{idx + 1}
+                {/* Brand Dropdown */}
+                <select
+                  value={brandFilter}
+                  onChange={e => setBrandFilter(e.target.value)}
+                  className="px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 focus:outline-none focus:border-blue-500 cursor-pointer"
+                >
+                  <option value="ALL">All Brands</option>
+                  {availableBrands.map(b => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
+
+                {/* Status Dropdown */}
+                <select
+                  value={statusFilter}
+                  onChange={e => setStatusFilter(e.target.value)}
+                  className="px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 focus:outline-none focus:border-blue-500 cursor-pointer"
+                >
+                  <option value="ALL">All Stock Statuses</option>
+                  <option value="IN_STOCK">In Stock (&gt; 0)</option>
+                  <option value="LOW_STOCK">Low Stock (≤ Reorder)</option>
+                  <option value="OUT_OF_STOCK">Out of Stock (0)</option>
+                  <option value="ALERTS">All Alerts</option>
+                </select>
+
+                {/* Reset Filters */}
+                {(search || categoryFilter !== 'ALL' || brandFilter !== 'ALL' || statusFilter !== 'ALL') && (
+                  <button
+                    type="button"
+                    onClick={handleResetFilters}
+                    className="text-xs font-bold text-rose-600 hover:text-rose-700 px-2 py-1 rounded-lg hover:bg-rose-50 transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" /> Reset
+                  </button>
+                )}
+              </div>
+
+              {/* Quick Summary Counts */}
+              <div className="flex items-center gap-2 text-[11px] font-semibold text-gray-500">
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span> In Stock: {filteredSkus.filter(s => (Number(s.presentStock ?? s.openingStock) || 0) > 0).length}
+                </span>
+                <span>•</span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-rose-500"></span> Alerts: {filteredSkus.filter(s => (Number(s.presentStock ?? s.openingStock) || 0) <= (Number(s.reorderLevel) || 10)).length}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── TAB CONTENT RENDERING ── */}
+        
+        {/* 1. Warehouse Hierarchy Tab */}
+        {activeTab === 'warehouse' && (
+          <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-2xs">
+            <WarehouseStructureV2 />
+          </div>
+        )}
+
+        {/* 2. Stock Transfers Tab */}
+        {activeTab === 'transfers' && (
+          <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden">
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">Stock Transfers Log</h3>
+                <p className="text-xs text-gray-500">Chronological history of all inter-location movements.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setTransferInitialSku(null);
+                  setShowTransferModal(true);
+                }}
+                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" /> New Transfer
+              </button>
+            </div>
+
+            {transferEntries.length === 0 ? (
+              <div className="text-center py-16 text-gray-400 text-xs space-y-2">
+                <ArrowRightLeft className="w-8 h-8 mx-auto text-gray-300" />
+                <p className="font-semibold text-gray-600">No stock transfers recorded yet</p>
+                <p className="text-[11px]">Click "New Transfer" to move items between warehouse bins.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-gray-700">
+                  <thead className="bg-gray-50/80 text-[10.5px] uppercase font-bold text-gray-500 border-b border-gray-200/80">
+                    <tr>
+                      <th className="px-4 py-3">Date</th>
+                      <th className="px-4 py-3">Reference #</th>
+                      <th className="px-4 py-3">Item / SKU</th>
+                      <th className="px-4 py-3">From Location</th>
+                      <th className="px-4 py-3">To Location</th>
+                      <th className="px-4 py-3 text-right">Quantity</th>
+                      <th className="px-4 py-3">Remarks</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {transferEntries.map((entry, idx) => (
+                      <tr key={idx} className="hover:bg-gray-50/80 transition-colors">
+                        <td className="px-4 py-3 whitespace-nowrap text-gray-500">
+                          {entry.createdAt ? new Date(entry.createdAt).toLocaleDateString('en-IN') : 'Recent'}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap font-mono font-bold text-gray-900">
+                          {entry.referenceNumber || `TRF-${idx + 100}`}
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-gray-900">
+                          {entry.skuName || entry.skuCode || 'SKU Item'}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {entry.fromLocationName || 'Source'}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {entry.toLocationName || entry.locationName || 'Destination'}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono font-bold text-blue-700">
+                          {Number(entry.quantity || 0).toLocaleString('en-IN')} {entry.unit || 'Units'}
+                        </td>
+                        <td className="px-4 py-3 text-gray-500 text-[11px] italic">
+                          {entry.remarks || '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 3. Adjustments Tab */}
+        {activeTab === 'adjustments' && (
+          <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden">
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">Stock Adjustments Log</h3>
+                <p className="text-xs text-gray-500">Audit trail of quantity reconciliations and damage write-offs.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setAdjustmentInitialSku(null);
+                  setShowAdjustmentModal(true);
+                }}
+                className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" /> New Adjustment
+              </button>
+            </div>
+
+            {adjustmentEntries.length === 0 ? (
+              <div className="text-center py-16 text-gray-400 text-xs space-y-2">
+                <SlidersHorizontal className="w-8 h-8 mx-auto text-gray-300" />
+                <p className="font-semibold text-gray-600">No stock adjustments recorded yet</p>
+                <p className="text-[11px]">Click "New Adjustment" to record physical audit counts or wastage.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-gray-700">
+                  <thead className="bg-gray-50/80 text-[10.5px] uppercase font-bold text-gray-500 border-b border-gray-200/80">
+                    <tr>
+                      <th className="px-4 py-3">Date</th>
+                      <th className="px-4 py-3">Reference #</th>
+                      <th className="px-4 py-3">Item / SKU</th>
+                      <th className="px-4 py-3">Location</th>
+                      <th className="px-4 py-3">Direction</th>
+                      <th className="px-4 py-3 text-right">Adjustment Qty</th>
+                      <th className="px-4 py-3">Reason / Remarks</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {adjustmentEntries.map((entry, idx) => {
+                      const isInc = entry.direction === 'IN' || (entry.quantity || 0) > 0;
+                      return (
+                        <tr key={idx} className="hover:bg-gray-50/80 transition-colors">
+                          <td className="px-4 py-3 whitespace-nowrap text-gray-500">
+                            {entry.createdAt ? new Date(entry.createdAt).toLocaleDateString('en-IN') : 'Recent'}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap font-mono font-bold text-gray-900">
+                            {entry.referenceNumber || `ADJ-${idx + 100}`}
+                          </td>
+                          <td className="px-4 py-3 font-semibold text-gray-900">
+                            {entry.skuName || entry.skuCode || 'SKU Item'}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600">
+                            {entry.locationName || 'Warehouse Storage'}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              isInc ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                            }`}>
+                              {isInc ? 'Increase (+)' : 'Deduct (-)'}
                             </span>
-                            
-                            {/* Format Switcher */}
-                            <div className="inline-flex rounded-lg bg-gray-100 p-0.5 text-[10.5px] font-semibold">
+                          </td>
+                          <td className={`px-4 py-3 text-right font-mono font-bold ${
+                            isInc ? 'text-emerald-700' : 'text-rose-600'
+                          }`}>
+                            {isInc ? '+' : '-'}{Math.abs(Number(entry.quantity || 0)).toLocaleString('en-IN')} {entry.unit || 'Units'}
+                          </td>
+                          <td className="px-4 py-3 text-gray-500 text-[11px] italic">
+                            {entry.remarks || '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 4. Stock Overview & Category Tabs (Products, Materials, Semi) */}
+        {(activeTab === 'overview' || activeTab === 'products' || activeTab === 'materials' || activeTab === 'semi') && (
+          <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden">
+            {filteredSkus.length === 0 ? (
+              <div className="text-center py-16 text-gray-400 text-xs space-y-2">
+                <Package className="w-8 h-8 mx-auto text-gray-300" />
+                <p className="font-semibold text-gray-600">No matching items found</p>
+                <p className="text-[11px]">Try adjusting your search query or reset dropdown filters.</p>
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="mt-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold cursor-pointer"
+                >
+                  Reset All Filters
+                </button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-gray-700">
+                  <thead className="bg-gray-50/80 text-[10.5px] uppercase font-bold text-gray-500 border-b border-gray-200/80">
+                    <tr>
+                      <th className="px-4 py-3 w-10">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.length === filteredSkus.length && filteredSkus.length > 0}
+                          onChange={e => {
+                            if (e.target.checked) {
+                              setSelectedIds(filteredSkus.map(s => s._id));
+                            } else {
+                              setSelectedIds([]);
+                            }
+                          }}
+                          className="rounded text-blue-600 focus:ring-blue-500 border-gray-300"
+                        />
+                      </th>
+                      <th className="px-4 py-3">SKU Code</th>
+                      <th className="px-4 py-3">Item Description</th>
+                      <th className="px-4 py-3">Category</th>
+                      <th className="px-4 py-3">Attributes</th>
+                      <th className="px-4 py-3 text-right">Available Stock</th>
+                      <th className="px-4 py-3">Primary / AUOM</th>
+                      <th className="px-4 py-3 text-right">Stock Value</th>
+                      <th className="px-4 py-3 text-center">Status</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {filteredSkus.map(sku => {
+                      const stock = Number(sku.presentStock ?? sku.openingStock) || 0;
+                      const reorder = Number(sku.reorderLevel) || 10;
+                      const rate = Number((sku as any)?.avgRate || (sku as any)?.rate || (sku as any)?.costPrice || getCategoryCost(sku.category));
+                      const totalVal = stock * rate;
+                      const isSelected = selectedIds.includes(sku._id);
+
+                      // AUOM Calculation
+                      const auomDisplay = (sku.altUnit && sku.altUnitConversion && Number(sku.altUnitConversion) > 0)
+                        ? `${(stock / Number(sku.altUnitConversion)).toLocaleString('en-IN', { maximumFractionDigits: 1 })} ${sku.altUnit}`
+                        : null;
+
+                      // Status Badge
+                      const isOutOfStock = stock === 0;
+                      const isLowStock = stock > 0 && stock <= reorder;
+
+                      return (
+                        <tr 
+                          key={sku._id} 
+                          onClick={() => setSelectedDrawerSku(sku)}
+                          className={`hover:bg-blue-50/30 transition-colors cursor-pointer group ${
+                            isSelected ? 'bg-blue-50/50' : ''
+                          }`}
+                        >
+                          <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={e => {
+                                if (e.target.checked) {
+                                  setSelectedIds(prev => [...prev, sku._id]);
+                                } else {
+                                  setSelectedIds(prev => prev.filter(id => id !== sku._id));
+                                }
+                              }}
+                              className="rounded text-blue-600 focus:ring-blue-500 border-gray-300"
+                            />
+                          </td>
+                          <td className="px-4 py-3 font-mono font-bold text-gray-900 whitespace-nowrap">
+                            {sku.skuCode}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-bold text-gray-900 group-hover:text-blue-700 transition-colors">
+                              {sku.name}
+                            </div>
+                            {sku.brand && (
+                              <div className="text-[10.5px] text-gray-400 font-medium">
+                                Brand: {sku.brand}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-gray-100 text-gray-700">
+                              {sku.category || 'General'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-[11px] text-gray-500 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {sku.pages && <span className="bg-slate-100 px-1.5 py-0.2 rounded font-semibold">{sku.pages}P</span>}
+                              {sku.ruleType && <span className="bg-slate-100 px-1.5 py-0.2 rounded font-semibold">{sku.ruleType}</span>}
+                              {sku.gsm && <span className="bg-slate-100 px-1.5 py-0.2 rounded font-semibold">{sku.gsm} GSM</span>}
+                              {!sku.pages && !sku.ruleType && !sku.gsm && <span>—</span>}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono font-extrabold text-gray-900 whitespace-nowrap">
+                            {stock.toLocaleString('en-IN')}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="font-bold text-gray-800">{sku.unit || 'Pcs'}</div>
+                            {auomDisplay && (
+                              <div className="text-[10px] text-gray-400 font-mono">
+                                ≈ {auomDisplay}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono font-bold text-blue-700 whitespace-nowrap">
+                            {formatCurrency(totalVal)}
+                          </td>
+                          <td className="px-4 py-3 text-center whitespace-nowrap">
+                            {isOutOfStock ? (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                                Out of Stock
+                              </span>
+                            ) : isLowStock ? (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                Low Stock
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                In Stock
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center justify-end gap-1">
                               <button
                                 type="button"
-                                onClick={() => updateLotField(lot.id, 'paperType', 'Reel')}
-                                className={`px-2.5 py-0.5 rounded-md transition-all cursor-pointer ${
-                                  lot.paperType === 'Reel'
-                                    ? 'bg-blue-600 text-white shadow-2xs font-bold'
-                                    : 'text-gray-600 hover:text-gray-900'
-                                }`}
+                                onClick={() => setSelectedDrawerSku(sku)}
+                                className="p-1.5 text-gray-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                title="Inspect Stock Details"
                               >
-                                🗞️ Reel
+                                <Eye className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 type="button"
                                 onClick={() => {
-                                  updateLotField(lot.id, 'paperType', 'Sheet');
-                                  if (!lot.reamWeight && lot.width && lot.length && lot.gsm) {
-                                    const rw = ((Number(lot.width) * Number(lot.length) * Number(lot.gsm) * 500) / 10000000).toFixed(4);
-                                    updateLotField(lot.id, 'reamWeight', rw);
-                                    const reams = Number(lot.reamsCount) || 0;
-                                    if (reams > 0) {
-                                      updateLotField(lot.id, 'totalKg', Number((Number(rw) * reams).toFixed(2)));
-                                      updateLotField(lot.id, 'totalSheets', reams * 500);
-                                    }
-                                  }
+                                  setTransferInitialSku(sku);
+                                  setShowTransferModal(true);
                                 }}
-                                className={`px-2.5 py-0.5 rounded-md transition-all cursor-pointer ${
-                                  lot.paperType === 'Sheet' || lot.paperType === 'Board'
-                                    ? 'bg-blue-600 text-white shadow-2xs font-bold'
-                                    : 'text-gray-600 hover:text-gray-900'
-                                }`}
+                                className="p-1.5 text-gray-500 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                title="Transfer Item"
                               >
-                                📄 Sheet / Board
+                                <ArrowRightLeft className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setAdjustmentInitialSku(sku);
+                                  setShowAdjustmentModal(true);
+                                }}
+                                className="p-1.5 text-gray-500 hover:text-amber-800 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                                title="Adjust Stock"
+                              >
+                                <SlidersHorizontal className="w-3.5 h-3.5" />
                               </button>
                             </div>
-                          </div>
-
-                          {lots.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveLot(lot.id)}
-                              className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                              title="Remove Lot"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
-                          <div className="md:col-span-2">
-                            <div className="flex items-center justify-between mb-1">
-                              <label className="block text-gray-700 font-semibold text-xs">Item SKU *</label>
-                              {lot.skuId && (() => {
-                                const matchedSku = allSkus.find(s => s._id === lot.skuId);
-                                const liveStock = Number(matchedSku?.presentStock ?? matchedSku?.openingStock ?? 0);
-                                const unit = matchedSku?.unit || 'KG';
-                                return (
-                                  <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                                    Stock: {liveStock.toLocaleString('en-IN')} {unit}
-                                  </span>
-                                );
-                              })()}
-                            </div>
-                            <select
-                              required
-                              value={lot.skuId}
-                              onChange={e => {
-                                const selId = e.target.value;
-                                const selSku = allSkus.find(s => s._id === selId);
-                                updateLotField(lot.id, 'skuId', selId);
-                                if (selSku) {
-                                  updateLotField(lot.id, 'skuCode', selSku.skuCode);
-                                  updateLotField(lot.id, 'skuName', selSku.name);
-                                  updateLotField(lot.id, 'brand', selSku.brand || '');
-                                  updateLotField(lot.id, 'gsm', selSku.gsm ? String(selSku.gsm) : '');
-                                  
-                                  const detectedType = selSku.paperType === 'Sheets' ? 'Sheet' : selSku.paperType === 'Reels' ? 'Reel' : (selSku.name.toLowerCase().includes('sheet') ? 'Sheet' : 'Reel');
-                                  const detectedWidth = selSku.width ? String(selSku.width) : '';
-                                  const detectedLength = selSku.length ? String(selSku.length) : '';
-                                  
-                                  let calcReamWeight = selSku.reamWeight ? String(selSku.reamWeight) : '';
-                                  if (!calcReamWeight && detectedWidth && detectedLength && selSku.gsm) {
-                                    calcReamWeight = ((Number(detectedWidth) * Number(detectedLength) * Number(selSku.gsm) * 500) / 10000000).toFixed(4);
-                                  }
-
-                                  updateLotField(lot.id, 'paperType', detectedType);
-                                  updateLotField(lot.id, 'width', detectedWidth || '64');
-                                  updateLotField(lot.id, 'length', detectedLength || '');
-                                  updateLotField(lot.id, 'reamWeight', calcReamWeight);
-                                }
-                              }}
-                              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white"
-                            >
-                              <option value="">Select SKU material...</option>
-                              {allSkus.map((s: any) => <option key={s._id} value={s._id}>{s.name} ({s.skuCode})</option>)}
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="block text-gray-700 font-semibold mb-1 text-xs">Brand</label>
-                            <input
-                              type="text"
-                              value={lot.brand}
-                              onChange={e => updateLotField(lot.id, 'brand', e.target.value)}
-                              placeholder="e.g. Bestfriend"
-                              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-gray-700 font-semibold mb-1 text-xs">GSM</label>
-                            <input
-                              type="text"
-                              value={lot.gsm}
-                              onChange={e => updateLotField(lot.id, 'gsm', e.target.value)}
-                              placeholder="e.g. 54"
-                              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono text-center font-semibold focus:outline-none focus:border-blue-600 bg-white"
-                            />
-                          </div>
-
-                          {/* REELS ROW */}
-                          {lot.paperType === 'Reel' && (
-                            <>
-                              <div>
-                                <label className="block text-gray-700 font-semibold mb-1 text-xs">Width (CM)</label>
-                                <input
-                                  type="number"
-                                  value={lot.width || ''}
-                                  onChange={e => updateLotField(lot.id, 'width', e.target.value)}
-                                  placeholder="64"
-                                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono text-center font-semibold bg-white"
-                                />
-                              </div>
-
-                              <div>
-                                <label className="block text-blue-700 font-semibold mb-1 text-xs">Reels Count</label>
-                                <input
-                                  type="number"
-                                  value={lot.reelsCount || ''}
-                                  onChange={e => {
-                                    const cnt = Number(e.target.value) || 0;
-                                    updateLotField(lot.id, 'reelsCount', cnt);
-                                    const updatedReels = Array.from({ length: cnt }).map((_, i) => lot.reels?.[i] || { weight: 0, width: lot.width || '64', locationId: lot.locationId || '' });
-                                    updateLotField(lot.id, 'reels', updatedReels);
-                                  }}
-                                  placeholder="0"
-                                  className="w-full border border-blue-200 bg-blue-50/20 rounded-xl px-3 py-2 text-xs font-mono text-center font-bold text-blue-800 focus:ring-2 focus:ring-blue-500"
-                                />
-                              </div>
-
-                              <div>
-                                <label className="block text-gray-700 font-semibold mb-1 text-xs">Total Weight (KG)</label>
-                                <input
-                                  type="number"
-                                  value={lot.totalKg || ''}
-                                  onChange={e => updateLotField(lot.id, 'totalKg', Number(e.target.value))}
-                                  placeholder="0"
-                                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono text-right font-semibold bg-white"
-                                />
-                              </div>
-
-                              <div>
-                                <label className="block text-blue-700 font-semibold mb-1 text-xs">Rate / KG (₹)</label>
-                                <input
-                                  type="number"
-                                  step="any"
-                                  value={lot.ratePerKg || ''}
-                                  onChange={e => updateLotField(lot.id, 'ratePerKg', e.target.value)}
-                                  placeholder="0.00"
-                                  className="w-full border border-blue-200 bg-blue-50/20 rounded-xl px-3 py-2 text-xs font-mono text-right font-bold text-blue-800 focus:ring-2 focus:ring-blue-500"
-                                />
-                              </div>
-                            </>
-                          )}
-
-                          {/* SHEET / BOARD ROW */}
-                          {(lot.paperType === 'Sheet' || lot.paperType === 'Board') && (
-                            <>
-                              <div>
-                                <label className="block text-gray-700 font-semibold mb-1 text-xs">Width (CM) *</label>
-                                <input
-                                  type="number"
-                                  step="any"
-                                  value={lot.width || ''}
-                                  onChange={e => {
-                                    const w = e.target.value;
-                                    updateLotField(lot.id, 'width', w);
-                                    if (w && lot.length && lot.gsm) {
-                                      const rw = ((Number(w) * Number(lot.length) * Number(lot.gsm) * 500) / 10000000).toFixed(4);
-                                      updateLotField(lot.id, 'reamWeight', rw);
-                                      const reams = Number(lot.reamsCount) || 0;
-                                      if (reams > 0) {
-                                        updateLotField(lot.id, 'totalKg', Number((Number(rw) * reams).toFixed(2)));
-                                        updateLotField(lot.id, 'totalSheets', reams * 500);
-                                      }
-                                    }
-                                  }}
-                                  placeholder="e.g. 58.5"
-                                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono text-center font-semibold bg-white"
-                                />
-                              </div>
-
-                              <div>
-                                <label className="block text-gray-700 font-semibold mb-1 text-xs">Length (CM) *</label>
-                                <input
-                                  type="number"
-                                  step="any"
-                                  value={lot.length || ''}
-                                  onChange={e => {
-                                    const l = e.target.value;
-                                    updateLotField(lot.id, 'length', l);
-                                    if (lot.width && l && lot.gsm) {
-                                      const rw = ((Number(lot.width) * Number(l) * Number(lot.gsm) * 500) / 10000000).toFixed(4);
-                                      updateLotField(lot.id, 'reamWeight', rw);
-                                      const reams = Number(lot.reamsCount) || 0;
-                                      if (reams > 0) {
-                                        updateLotField(lot.id, 'totalKg', Number((Number(rw) * reams).toFixed(2)));
-                                        updateLotField(lot.id, 'totalSheets', reams * 500);
-                                      }
-                                    }
-                                  }}
-                                  placeholder="e.g. 91"
-                                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono text-center font-semibold bg-white"
-                                />
-                              </div>
-
-                              <div>
-                                <label className="block text-blue-700 font-semibold mb-1 text-xs">Reams Count *</label>
-                                <input
-                                  type="number"
-                                  value={lot.reamsCount || ''}
-                                  onChange={e => {
-                                    const reams = Number(e.target.value) || 0;
-                                    updateLotField(lot.id, 'reamsCount', reams);
-                                    const rw = Number(lot.reamWeight) || 0;
-                                    if (rw > 0) {
-                                      updateLotField(lot.id, 'totalKg', Number((rw * reams).toFixed(2)));
-                                    }
-                                    updateLotField(lot.id, 'totalSheets', reams * 500);
-                                  }}
-                                  placeholder="0"
-                                  className="w-full border border-blue-200 bg-blue-50/20 rounded-xl px-3 py-2 text-xs font-mono text-center font-bold text-blue-800 focus:ring-2 focus:ring-blue-500"
-                                />
-                              </div>
-
-                              <div>
-                                <label className="block text-blue-700 font-semibold mb-1 text-xs">Ream Weight (KG) *</label>
-                                <input
-                                  type="number"
-                                  step="any"
-                                  value={lot.reamWeight || ''}
-                                  onChange={e => {
-                                    const rw = e.target.value;
-                                    updateLotField(lot.id, 'reamWeight', rw);
-                                    const reams = Number(lot.reamsCount) || 0;
-                                    const rwNum = Number(rw) || 0;
-                                    updateLotField(lot.id, 'totalKg', Number((rwNum * reams).toFixed(2)));
-                                  }}
-                                  placeholder="e.g. 13.7982"
-                                  className="w-full border border-blue-200 bg-blue-50/20 rounded-xl px-3 py-2 text-xs font-mono text-right font-bold text-blue-800 focus:ring-2 focus:ring-blue-500"
-                                />
-                              </div>
-                            </>
-                          )}
-                        </div>
-
-                        <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-50/70 p-3 rounded-xl border border-slate-100 text-xs">
-                          <div className="flex items-center gap-4">
-                            <span className="font-semibold text-slate-500">
-                              Lot Subtotal: <strong className="text-slate-900 font-mono text-sm">₹{lotSubtotal.toLocaleString('en-IN')}</strong>
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <div className="flex flex-col">
-                              <label className="text-[10px] font-semibold text-slate-500">
-                                {lot.paperType === 'Reel' ? 'Storage Location:' : 'Storage Location:'}
-                              </label>
-                              <select
-                                value={lot.locationId}
-                                onChange={e => {
-                                  const selLoc = allLocations.find(l => l._id === e.target.value);
-                                  updateLotField(lot.id, 'locationId', e.target.value);
-                                  updateLotField(lot.id, 'locationName', selLoc?.name || '');
-                                }}
-                                className="px-2.5 py-1 border border-slate-200 rounded-lg bg-white text-xs font-medium text-slate-800 mt-0.5"
-                              >
-                                <option value="">Select storage location...</option>
-                                {allLocations
-                                  .filter(loc => loc.level === 'Storage Location' || !allLocations.some(c => c.parentId === loc._id))
-                                  .map((loc: any) => (
-                                    <option key={loc._id} value={loc._id}>{resolveLocationPath(loc._id)}</option>
-                                  ))}
-                              </select>
-                            </div>
-                          </div>
-                        </div>
-
-                        {lot.paperType === 'Reel' && (Number(lot.reelsCount) || 0) > 0 && (
-                          <div className="pt-3 border-t border-slate-100 space-y-2 text-left">
-                            <span className="block text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">
-                              Reel Placement Breakdown:
-                            </span>
-
-                            <div className="overflow-x-auto border border-slate-200 rounded-xl">
-                              <table className="w-full text-left text-xs border-collapse">
-                                <thead>
-                                  <tr className="bg-slate-50 text-slate-500 font-semibold text-[10.5px] border-b border-slate-200">
-                                    <th className="py-2 px-3 w-16">Reel</th>
-                                    <th className="py-2 px-3 w-32">Weight (KG) *</th>
-                                    <th className="py-2 px-3 w-32">Width (CM) *</th>
-                                    <th className="py-2 px-3">Storage Location</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                                  {Array.from({ length: Number(lot.reelsCount) || 0 }).map((_, rIdx) => {
-                                    const reelsList = lot.reels || [];
-                                    const reelObj = reelsList[rIdx] || {};
-
-                                    return (
-                                      <tr key={rIdx} className="hover:bg-blue-50/20">
-                                        <td className="py-1.5 px-3 font-mono text-slate-500 font-bold">R-{rIdx + 1}</td>
-                                        <td className="py-1.5 px-3">
-                                          <input
-                                            type="number"
-                                            value={reelObj.weight !== undefined ? reelObj.weight : ''}
-                                            onChange={e => {
-                                              const wVal = Number(e.target.value) || 0;
-                                              const updatedReels = [...(lot.reels || [])];
-                                              updatedReels[rIdx] = { ...updatedReels[rIdx], weight: wVal };
-                                              updateLotField(lot.id, 'reels', updatedReels);
-                                              const sumKg = updatedReels.reduce((s, r) => s + (Number(r.weight) || 0), 0);
-                                              updateLotField(lot.id, 'totalKg', sumKg);
-                                            }}
-                                            placeholder="0"
-                                            className="w-full px-2.5 py-1 border border-slate-200 rounded-lg text-xs font-mono font-semibold text-slate-900"
-                                          />
-                                        </td>
-                                        <td className="py-1.5 px-3">
-                                          <input
-                                            type="number"
-                                            value={reelObj.width !== undefined ? reelObj.width : (lot.width || '64')}
-                                            onChange={e => {
-                                              const updatedReels = [...(lot.reels || [])];
-                                              updatedReels[rIdx] = { ...updatedReels[rIdx], width: e.target.value };
-                                              updateLotField(lot.id, 'reels', updatedReels);
-                                            }}
-                                            placeholder="64"
-                                            className="w-full px-2.5 py-1 border border-slate-200 rounded-lg text-xs font-mono font-semibold text-slate-900"
-                                          />
-                                        </td>
-                                        <td className="py-1.5 px-3">
-                                          <select
-                                            value={reelObj.locationId || lot.locationId || ''}
-                                            onChange={e => {
-                                              const updatedReels = [...(lot.reels || [])];
-                                              updatedReels[rIdx] = { ...updatedReels[rIdx], locationId: e.target.value };
-                                              updateLotField(lot.id, 'reels', updatedReels);
-                                            }}
-                                            className="w-full px-2.5 py-1 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 bg-white"
-                                          >
-                                            <option value="">Default Lot Location</option>
-                                            {allLocations
-                                              .filter(loc => loc.level === 'Storage Location' || !allLocations.some(c => c.parentId === loc._id))
-                                              .map((loc: any) => (
-                                                <option key={loc._id} value={loc._id}>{resolveLocationPath(loc._id)}</option>
-                                              ))}
-                                          </select>
-                                        </td>
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* 3. FREIGHT & OTHER CHARGES */}
-                <div className="space-y-3 pt-2 border-t border-gray-100">
-                  <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-                    3. Freight & Other Charges
-                  </h4>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">Freight (₹)</label>
-                      <input
-                        type="number"
-                        value={batchForm.freightCharges}
-                        onChange={e => setBatchForm(f => ({ ...f, freightCharges: Number(e.target.value) }))}
-                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-right focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-2xs transition-all"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">Crane (₹)</label>
-                      <input
-                        type="number"
-                        value={batchForm.craneCharges}
-                        onChange={e => setBatchForm(f => ({ ...f, craneCharges: Number(e.target.value) }))}
-                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-right focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-2xs transition-all"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">Loading (₹)</label>
-                      <input
-                        type="number"
-                        value={batchForm.loadingCharges}
-                        onChange={e => setBatchForm(f => ({ ...f, loadingCharges: Number(e.target.value) }))}
-                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-right focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-2xs transition-all"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">Other (₹)</label>
-                      <input
-                        type="number"
-                        value={batchForm.otherCharges}
-                        onChange={e => setBatchForm(f => ({ ...f, otherCharges: Number(e.target.value) }))}
-                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-right focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white shadow-2xs transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Clean Batch Summary */}
-                  <div className="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-4 text-xs">
-                    <div className="flex items-center justify-between font-bold text-gray-900 uppercase text-[11px] tracking-wider border-b border-gray-100 pb-3">
-                      <span className="flex items-center gap-2 text-blue-600">
-                        <FileText className="w-4 h-4 text-blue-600" /> BATCH SUMMARY
-                      </span>
-                      <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 font-extrabold text-[10px] border border-blue-200">
-                        {lots.length} {lots.length === 1 ? 'LOT' : 'LOTS'}
-                      </span>
-                    </div>
-
-                    {lots.some(l => l.paperType === 'Reel') ? (
-                      <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-100 grid grid-cols-2 gap-4 text-gray-600 text-xs font-medium">
-                        <div>TOTAL REELS: <strong className="text-gray-900 font-mono font-bold">{lots.reduce((acc, l) => acc + (Number(l.reelsCount) || 0), 0)}</strong></div>
-                        <div className="text-right">TOTAL REEL WEIGHT: <strong className="text-gray-900 font-mono font-bold">{lotCalculations.totalQty.toLocaleString('en-IN')} KG</strong></div>
-                      </div>
-                    ) : (
-                      <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-100 grid grid-cols-2 gap-4 text-gray-600 text-xs font-medium">
-                        <div>TOTAL REAMS: <strong className="text-gray-900 font-mono font-bold">{lots.reduce((acc, l) => acc + (Number(l.reamsCount) || 0), 0)}</strong></div>
-                        <div className="text-right">TOTAL SHEETS: <strong className="text-gray-900 font-mono font-bold">{(lots.reduce((acc, l) => acc + (Number(l.reamsCount) || 0), 0) * 500).toLocaleString('en-IN')}</strong></div>
-                      </div>
-                    )}
-
-                    <div className="space-y-2.5 pt-1">
-                      <div className="flex items-center justify-between text-xs font-medium text-gray-600">
-                        <span>Material Subtotal:</span>
-                        <span className="font-mono font-bold text-gray-900 text-xs">₹{lotCalculations.materialTotal.toLocaleString('en-IN')}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs font-medium text-gray-600">
-                        <span>Other Charges Subtotal:</span>
-                        <span className="font-mono font-bold text-gray-900 text-xs">₹{lotCalculations.otherChargesTotal.toLocaleString('en-IN')}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between text-sm font-black text-gray-900 border-t border-gray-100 pt-3.5">
-                      <span className="text-xs uppercase tracking-wider text-gray-800 font-bold">GRAND TOTAL:</span>
-                      <span className="font-mono text-xl text-blue-600 font-black">₹{lotCalculations.grandTotal.toLocaleString('en-IN')}</span>
-                    </div>
-                  </div>
-                </div>
-
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-
-              {/* FIXED MODAL FOOTER */}
-              <div className="shrink-0 px-6 py-4 border-t border-gray-100 bg-white flex items-center justify-between gap-3 z-10">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 border border-gray-200 text-gray-700 rounded-xl text-xs font-semibold hover:bg-gray-50 flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                  <span>Cancel</span>
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs disabled:opacity-50 flex items-center gap-2 transition-colors cursor-pointer"
-                >
-                  {isSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                  <span>{editingItem ? 'Update Purchase Batch' : 'Save Purchase Batch'}</span>
-                </button>
-              </div>
-            </form>
-          )}
-        </Modal>
-      )}
-
-      {/* 6. CUSTOM CONFIRMATION DIALOG MODAL */}
-      {confirmModal.isOpen && (
-        <Modal
-          isOpen={confirmModal.isOpen}
-          onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
-          maxWidth="max-w-md"
-          hideCloseButton
-        >
-          <div className="p-2 space-y-4 text-center">
-            {/* Warning Icon Badge */}
-            <div className="mx-auto w-12 h-12 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 flex items-center justify-center shadow-2xs">
-              <AlertTriangle className="w-6 h-6" />
-            </div>
-
-            {/* Header */}
-            <div>
-              <h3 className="text-base font-black text-slate-900 tracking-tight">
-                {confirmModal.title}
-              </h3>
-              {(confirmModal.item?.batchNumber || confirmModal.item?.rawInvoice?.invoiceNumber) && (
-                <span className="inline-block mt-1 text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
-                  {confirmModal.item.batchNumber || confirmModal.item.rawInvoice?.invoiceNumber}
-                </span>
-              )}
-            </div>
-
-            {/* Content Message */}
-            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 text-xs text-slate-600 leading-relaxed font-medium">
-              {confirmModal.message}
-            </div>
-
-            {/* Action Buttons */}
-            <div className="pt-2 flex items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
-                className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-50 transition-all cursor-pointer"
-              >
-                No, Keep it
-              </button>
-              <button
-                type="button"
-                onClick={() => confirmModal.onConfirm()}
-                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-md shadow-rose-600/20 flex items-center gap-1.5 transition-all cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>{confirmModal.confirmText || 'Confirm'}</span>
-              </button>
-            </div>
+            )}
           </div>
-        </Modal>
+        )}
+      </div>
+
+      {/* ── MODALS & DRAWERS ── */}
+
+      {/* 1. Item Stock Details Drawer (5 Tabs) */}
+      <ItemStockDetailsDrawer
+        isOpen={!!selectedDrawerSku}
+        onClose={() => setSelectedDrawerSku(null)}
+        sku={selectedDrawerSku}
+        companyId={selectedCompany?._id || ''}
+        allLocations={allLocations}
+        onOpenTransfer={(s, locId) => {
+          setSelectedDrawerSku(null);
+          setTransferInitialSku(s);
+          setTransferInitialLocId(locId);
+          setShowTransferModal(true);
+        }}
+        onOpenAdjustment={(s, locId) => {
+          setSelectedDrawerSku(null);
+          setAdjustmentInitialSku(s);
+          setAdjustmentInitialLocId(locId);
+          setShowAdjustmentModal(true);
+        }}
+      />
+
+      {/* 2. Stock Transfer Modal */}
+      {showTransferModal && (
+        <StockTransferModal
+          isOpen={showTransferModal}
+          onClose={() => setShowTransferModal(false)}
+          companyId={selectedCompany?._id || ''}
+          skus={allSkus}
+          locations={allLocations}
+          initialSku={transferInitialSku}
+          initialFromLocId={transferInitialLocId}
+          onTransferSuccess={() => loadAuxiliaryData(true)}
+        />
       )}
 
-      {/* 7. ADD SKU / EDIT SKU DRAWER */}
-      {isAddSkuOpen && selectedCompany?._id && (
+      {/* 3. Stock Adjustment Modal */}
+      {showAdjustmentModal && (
+        <StockAdjustmentModal
+          isOpen={showAdjustmentModal}
+          onClose={() => setShowAdjustmentModal(false)}
+          companyId={selectedCompany?._id || ''}
+          skus={allSkus}
+          locations={allLocations}
+          initialSku={adjustmentInitialSku}
+          initialLocId={adjustmentInitialLocId}
+          onAdjustmentSuccess={() => loadAuxiliaryData(true)}
+        />
+      )}
+
+      {/* 4. Add / Edit SKU Drawer */}
+      {isAddSkuOpen && (
         <AddSkuDrawerV2
           isOpen={isAddSkuOpen}
-          companyId={selectedCompany._id}
+          companyId={selectedCompany?._id || ''}
           editSku={editingSku}
-          onClose={() => {
-            setIsAddSkuOpen(false);
-            setEditingSku(null);
-          }}
+          onClose={() => setIsAddSkuOpen(false)}
           onSaveSuccess={() => {
             setIsAddSkuOpen(false);
-            setEditingSku(null);
             loadAuxiliaryData(true);
-            loadStockData();
           }}
         />
       )}
 
-      {/* Keyframe Animation */}
-      <style>{`
-        @keyframes slideDownFade {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
+      {/* 5. Add Purchase Batch Modal */}
+      {showBatchModal && (
+        <Modal
+          isOpen={showBatchModal}
+          onClose={() => setShowBatchModal(false)}
+          title="Add Raw Material Purchase Batch"
+          size="max-w-2xl"
+        >
+          <form 
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!selectedCompany?._id) return;
+              setIsSavingBatch(true);
+              try {
+                // Submit purchase batch invoice
+                const payload = {
+                  company: selectedCompany._id,
+                  invoiceNumber: batchForm.batchNumber,
+                  supplierId: batchForm.supplierId,
+                  supplierName: batchForm.supplierName || 'Primary Paper Mill',
+                  date: batchForm.purchaseDate,
+                  type: 'MATERIALS',
+                  items: lots.map(l => ({
+                    skuId: l.skuId,
+                    skuCode: l.skuCode,
+                    skuName: l.skuName,
+                    quantity: Number(l.totalKg) || 1,
+                    unit: 'Kg',
+                    rate: Number(l.ratePerKg) || 45,
+                    locationId: l.locationId,
+                    locationName: l.locationName
+                  })),
+                  remarks: batchForm.remarks
+                };
+                await createPurchaseInvoiceV2(payload);
+                showToast(`Purchase Batch ${batchForm.batchNumber} recorded successfully!`, 'success');
+                setShowBatchModal(false);
+                loadAuxiliaryData(true);
+              } catch (err: any) {
+                console.error(err);
+                showToast(err?.response?.data?.msg || 'Failed to save purchase batch', 'error');
+              } finally {
+                setIsSavingBatch(false);
+              }
+            }}
+            className="space-y-4 text-xs text-gray-800"
+          >
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">BATCH / INVOICE #</label>
+                <input
+                  type="text"
+                  value={batchForm.batchNumber}
+                  onChange={e => setBatchForm(prev => ({ ...prev, batchNumber: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-xl font-mono font-bold bg-white"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">PURCHASE DATE</label>
+                <input
+                  type="date"
+                  value={batchForm.purchaseDate}
+                  onChange={e => setBatchForm(prev => ({ ...prev, purchaseDate: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-xl bg-white"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">SUPPLIER</label>
+                <select
+                  value={batchForm.supplierId}
+                  onChange={e => {
+                    const sup = allSuppliers.find(s => s._id === e.target.value);
+                    setBatchForm(prev => ({
+                      ...prev,
+                      supplierId: e.target.value,
+                      supplierName: sup?.name || ''
+                    }));
+                  }}
+                  className="w-full px-3 py-2 border rounded-xl bg-white"
+                >
+                  <option value="">Select Supplier</option>
+                  {allSuppliers.map(s => (
+                    <option key={s._id} value={s._id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Lots Grid */}
+            <div className="space-y-2">
+              <label className="block font-bold text-gray-700">MATERIAL LOTS INTAKE</label>
+              {lots.map((lot, idx) => (
+                <div key={lot.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                  <div className="grid grid-cols-4 gap-2">
+                    <div className="col-span-2">
+                      <label className="text-[10px] font-bold text-gray-500 block mb-0.5">PAPER REEL / MATERIAL SKU</label>
+                      <select
+                        value={lot.skuId}
+                        onChange={e => {
+                          const sku = allSkus.find(s => s._id === e.target.value);
+                          setLots(prev => prev.map(l => l.id === lot.id ? {
+                            ...l,
+                            skuId: e.target.value,
+                            skuCode: sku?.skuCode || '',
+                            skuName: sku?.name || ''
+                          } : l));
+                        }}
+                        className="w-full px-2 py-1.5 border rounded-lg bg-white"
+                        required
+                      >
+                        <option value="">Select Raw Material SKU</option>
+                        {allSkus.filter(s => getSkuCategoryGroup(s) === 'materials').map(s => (
+                          <option key={s._id} value={s._id}>{s.skuCode} — {s.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-500 block mb-0.5">WEIGHT (KG)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={lot.totalKg || ''}
+                        onChange={e => setLots(prev => prev.map(l => l.id === lot.id ? { ...l, totalKg: Number(e.target.value) } : l))}
+                        className="w-full px-2 py-1.5 border rounded-lg bg-white font-mono font-bold"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-500 block mb-0.5">RATE / KG (₹)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={lot.ratePerKg || ''}
+                        onChange={e => setLots(prev => prev.map(l => l.id === lot.id ? { ...l, ratePerKg: Number(e.target.value) } : l))}
+                        className="w-full px-2 py-1.5 border rounded-lg bg-white font-mono font-bold"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setShowBatchModal(false)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSavingBatch}
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs"
+              >
+                {isSavingBatch ? 'Saving...' : 'Save Purchase Batch'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 };
