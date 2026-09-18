@@ -9,6 +9,7 @@ import {
   Edit, 
   Trash2, 
   RefreshCw, 
+  RotateCcw,
   ChevronLeft, 
   ChevronRight,
   Layers, 
@@ -312,13 +313,15 @@ export const StockInventoryV2: React.FC = () => {
   // Load auxiliary lists from backend
   const loadAuxiliaryData = useCallback(async (force = false) => {
     if (!selectedCompany?._id || (auxLoaded && !force)) return;
+    setLoading(true);
     try {
-      const [supRes, skusRes, locsRes, balancesRes, ledgerRes] = await Promise.all([
+      const [supRes, skusRes, locsRes, balancesRes, ledgerRes, purchasesRes] = await Promise.all([
         getParties({ company: selectedCompany._id, type: 'vendor', limit: 1000, light: true }),
         getSkusV2(selectedCompany._id),
         getWarehouseHierarchyV2(selectedCompany._id),
         getBalancesV2(selectedCompany._id).catch(() => []),
-        getLedgerV2({ companyId: selectedCompany._id }).catch(() => [])
+        getLedgerV2({ companyId: selectedCompany._id }).catch(() => []),
+        getPurchaseInvoicesV2({ companyId: selectedCompany._id, limit: 1000 }).catch(() => ({ invoices: [] }))
       ]);
 
       const vendors = supRes.data?.parties || supRes.data || [];
@@ -327,7 +330,9 @@ export const StockInventoryV2: React.FC = () => {
       setBalancesList(balancesRes || []);
       setLedgerEntries(ledgerRes || []);
 
+      // 1. Calculate live ledger on-hand stock
       const balanceMap = new Map<string, number>();
+      const locationMap = new Map<string, string>();
       if (Array.isArray(balancesRes)) {
         balancesRes.forEach((b: any) => {
           const rawId = b.skuId || b.sku?._id;
@@ -335,24 +340,68 @@ export const StockInventoryV2: React.FC = () => {
           const qty = Number(b.onHand) || Number(b.quantity) || 0;
           if (sId) {
             balanceMap.set(sId, (balanceMap.get(sId) || 0) + qty);
+            if (!locationMap.has(sId)) {
+              const locObj = b.locationId || b.location;
+              const locName = typeof locObj === 'object' ? (locObj.name || '') : String(locObj || '');
+              if (locName) locationMap.set(sId, locName);
+            }
           }
         });
       }
 
+      // 2. Calculate dynamic weighted average price from purchase batches
+      const avgPriceMap = new Map<string, { totalSpend: number; totalQty: number; avgPrice: number }>();
+      const invoices = (purchasesRes as any)?.invoices || (Array.isArray(purchasesRes) ? purchasesRes : []);
+      invoices.forEach((inv: any) => {
+        if (inv.status === 'Cancelled') return;
+        (inv.items || []).forEach((item: any) => {
+          const rawId = item.skuId?._id || item.skuId;
+          const sId = rawId ? String(rawId) : '';
+          const qty = Number(item.quantity) || 0;
+          const price = Number(item.purchasePrice || item.price || item.ratePerKg) || 0;
+          if (sId && qty > 0 && price > 0) {
+            const current = avgPriceMap.get(sId) || { totalSpend: 0, totalQty: 0, avgPrice: 0 };
+            const newSpend = current.totalSpend + (qty * price);
+            const newQty = current.totalQty + qty;
+            avgPriceMap.set(sId, {
+              totalSpend: newSpend,
+              totalQty: newQty,
+              avgPrice: newQty > 0 ? (newSpend / newQty) : 0
+            });
+          }
+        });
+      });
+
       const formattedSkus: SkuV2[] = (skusRes || []).map((s: SkuV2) => {
         const sId = String(s._id);
         const ledgerStock = balanceMap.get(sId) || 0;
+        const avgStats = avgPriceMap.get(sId);
+        const calculatedAvg = avgStats && avgStats.avgPrice > 0 
+          ? avgStats.avgPrice 
+          : Number((s as any).purchasePrice || (s as any).ratePerKg || (s as any).rate || (s as any).avgRate || 0);
+
+        let locName = locationMap.get(sId) || '';
+        if (!locName) {
+          const initLoc = (s as any).initialLocation || (s as any).defaultLocation || (s as any).warehouseLocation || '';
+          locName = typeof initLoc === 'object' ? (initLoc.name || 'SKBW') : (String(initLoc).trim() || 'SKBW');
+        }
+
         return {
           ...s,
           openingStock: 0,
-          presentStock: ledgerStock
+          presentStock: ledgerStock,
+          avgRate: calculatedAvg,
+          resolvedLocation: locName
         };
       });
 
       setAllSkus(formattedSkus);
       setAuxLoaded(true);
+      setAnimationKey(Date.now());
     } catch (err) {
       console.error('Failed to load backend inventory lists:', err);
+    } finally {
+      setLoading(false);
     }
   }, [selectedCompany?._id, auxLoaded]);
 
@@ -361,6 +410,11 @@ export const StockInventoryV2: React.FC = () => {
       loadAuxiliaryData(true);
     }
   }, [selectedCompany?._id, loadAuxiliaryData]);
+
+  // Trigger smooth staggered entrance animation refresh on tab or filter changes
+  useEffect(() => {
+    setAnimationKey(Date.now());
+  }, [activeTab, debouncedSearch, categoryFilter, brandFilter, warehouseFilter, statusFilter]);
 
   // Main KPI Aggregations across all SKUs
   const kpiStats = useMemo(() => {
@@ -378,7 +432,7 @@ export const StockInventoryV2: React.FC = () => {
     allSkus.forEach(sku => {
       const group = getSkuCategoryGroup(sku);
       const stock = Number(sku.presentStock) || 0;
-      const rate = Number((sku as any)?.purchasePrice || (sku as any)?.ratePerKg || (sku as any)?.rate || (sku as any)?.avgRate || (sku as any)?.costPrice || 0);
+      const rate = Number((sku as any)?.avgRate || (sku as any)?.purchasePrice || (sku as any)?.ratePerKg || (sku as any)?.rate || 0);
       const val = stock * rate;
       totalStockVal += val;
 
@@ -498,19 +552,28 @@ export const StockInventoryV2: React.FC = () => {
 
   // Export to Excel / CSV
   const handleExportExcel = () => {
-    const exportData = filteredSkus.map(s => ({
-      'SKU Code': s.skuCode,
-      'Item Name': s.name,
-      'Category': s.category || 'General',
-      'Brand': s.brand || '-',
-      'Pages': s.pages || '-',
-      'Ruling': s.ruleType || '-',
-      'GSM': s.gsm ? `${s.gsm} GSM` : '-',
-      'Available Stock': Number(s.presentStock) || 0,
-      'Unit': s.unit || 'Pcs',
-      'AUOM': s.altUnit ? `${s.altUnit} (1:${s.altUnitConversion})` : '-',
-      'Estimated Value': formatCurrency((Number(s.presentStock) || 0) * (Number((s as any).purchasePrice || (s as any).ratePerKg || (s as any).rate || (s as any).avgRate) || 0))
-    }));
+    const exportData = filteredSkus.map(s => {
+      const itemGroup = getSkuCategoryGroup(s);
+      const itemTypeLabel = itemGroup === 'products' ? 'Finished Goods' : itemGroup === 'semi' ? 'Semi Finished' : 'Raw Material';
+      const stock = Number(s.presentStock) || 0;
+      const reorder = Number(s.reorderLevel) || 10;
+      const statusLabel = stock === 0 ? 'Out of Stock' : stock <= reorder ? 'Low Stock' : 'In Stock';
+      const avgRate = Number((s as any).avgRate || (s as any).purchasePrice || (s as any).ratePerKg || (s as any).rate || 0);
+
+      return {
+        'SKU Code': s.skuCode,
+        'Item Master': s.name,
+        'Item Type': itemTypeLabel,
+        'Category': s.category || 'General',
+        'Location': (s as any).resolvedLocation || 'SKBW',
+        'Available Stock': stock,
+        'UOM': s.unit || 'Pcs',
+        'AUOM': s.altUnit ? `${s.altUnit} (1:${s.altUnitConversion || 1})` : '—',
+        'Status': statusLabel,
+        'Stock Value': formatCurrency(stock * avgRate),
+        'Avg Unit Price': formatCurrency(avgRate)
+      };
+    });
 
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
@@ -520,250 +583,289 @@ export const StockInventoryV2: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full w-full bg-[#F4F6F8] overflow-hidden">
-      {/* ── TOP HEADER BAR ── */}
-      <header className="bg-white border-b border-gray-200/80 px-6 py-3 shrink-0 flex items-center justify-between shadow-2xs z-10">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-2xl shadow-xs">
-            <Boxes className="w-5 h-5 stroke-[2.2]" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-extrabold text-slate-900 tracking-tight">Stock & Inventory</h1>
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">
-                {kpiStats.totalItemsCount} Total Items
-              </span>
+    <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
+      {/* ── 1. Header Banner with Spacious Integrated KPI Metric Cards ── */}
+      <div className="bg-white p-4 md:p-5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-3.5 relative">
+        
+        {/* Top Row: Heading & Subtitle on Left | Action Controls on Right (Exact match to Item Master / Business Directory) */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3.5">
+            <div className="p-3 bg-blue-100/80 text-blue-700 rounded-2xl shadow-2xs shrink-0">
+              <Boxes className="w-6 h-6 stroke-[2.2]" />
             </div>
-            <p className="text-[11px] text-gray-500 font-medium">
-              Live multi-warehouse tracking, batch costing, movements audit, and stock reconciliation.
-            </p>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+                <span>Stock &amp; Inventory</span>
+                <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-bold transition-all">
+                  {kpiStats.totalItemsCount} Total Items
+                </span>
+              </h1>
+              <p className="text-xs text-gray-500 font-medium">
+                Multi-warehouse tracking &amp; live batch costing
+              </p>
+            </div>
           </div>
-        </div>
 
-        {/* Action Controls */}
-        <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={() => loadAuxiliaryData(true)}
-            className="p-2 border border-gray-200 text-gray-600 hover:bg-gray-100 rounded-xl transition-all cursor-pointer shadow-2xs"
-            title="Refresh inventory balances"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-
-          <button
-            type="button"
-            onClick={handleExportExcel}
-            className="px-3 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5 text-gray-500" /> Export Excel
-          </button>
-
-          {/* + Add New Dropdown */}
-          <div className="relative" ref={addMenuRef}>
+          {/* Right: Action Controls */}
+          <div className="flex items-center gap-2.5 shrink-0 self-start sm:self-center">
             <button
               type="button"
-              onClick={() => setShowAddMenu(prev => !prev)}
-              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+              onClick={() => {
+                setAnimationKey(Date.now());
+                loadAuxiliaryData(true);
+              }}
+              className="p-2.5 border border-gray-200 text-gray-600 hover:bg-gray-100 rounded-xl transition-all cursor-pointer shadow-2xs"
+              title="Refresh inventory balances"
             >
-              <Plus className="w-4 h-4" />
-              <span>Add New</span>
-              <ChevronDown className="w-3.5 h-3.5 ml-0.5" />
+              <RotateCcw className={`w-4 h-4 ${loading ? 'animate-spin text-blue-600' : ''}`} />
             </button>
 
-            {showAddMenu && (
-              <div className="absolute right-0 mt-1.5 w-56 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 py-1.5 divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100">
-                <div className="p-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAddMenu(false);
-                      setTransferInitialSku(null);
-                      setShowTransferModal(true);
-                    }}
-                    className="w-full px-3 py-2 text-left text-xs font-bold text-gray-800 hover:bg-blue-50 hover:text-blue-900 rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer"
-                  >
-                    <ArrowRightLeft className="w-4 h-4 text-blue-600" />
-                    <span>New Stock Transfer</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAddMenu(false);
-                      setAdjustmentInitialSku(null);
-                      setShowAdjustmentModal(true);
-                    }}
-                    className="w-full px-3 py-2 text-left text-xs font-bold text-gray-800 hover:bg-amber-50 hover:text-amber-900 rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer"
-                  >
-                    <SlidersHorizontal className="w-4 h-4 text-amber-600" />
-                    <span>Stock Adjustment</span>
-                  </button>
-                </div>
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              className="px-3.5 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5 text-gray-500" /> 
+              <span>Export Excel</span>
+            </button>
 
-                <div className="p-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAddMenu(false);
-                      handleOpenBatchModal();
-                    }}
-                    className="w-full px-3 py-2 text-left text-xs font-bold text-gray-800 hover:bg-blue-50 hover:text-blue-900 rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer"
-                  >
-                    <Layers className="w-4 h-4 text-blue-600" />
-                    <span>Add Purchase Batch</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAddMenu(false);
-                      setEditingSku(null);
-                      setIsAddSkuOpen(true);
-                    }}
-                    className="w-full px-3 py-2 text-left text-xs font-bold text-gray-800 hover:bg-purple-50 hover:text-purple-900 rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer"
-                  >
-                    <Package className="w-4 h-4 text-purple-600" />
-                    <span>Add New Item (SKU)</span>
-                  </button>
+            {/* + Add New Dropdown */}
+            <div className="relative" ref={addMenuRef}>
+              <button
+                type="button"
+                onClick={() => setShowAddMenu(prev => !prev)}
+                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add New</span>
+                <ChevronDown className="w-3.5 h-3.5 ml-0.5" />
+              </button>
+
+              {showAddMenu && (
+                <div className="absolute right-0 mt-1.5 w-56 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 py-1.5 divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100">
+                  <div className="p-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAddMenu(false);
+                        setTransferInitialSku(null);
+                        setShowTransferModal(true);
+                      }}
+                      className="w-full px-3 py-2 text-left text-xs font-bold text-gray-800 hover:bg-blue-50 hover:text-blue-900 rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer"
+                    >
+                      <ArrowRightLeft className="w-4 h-4 text-blue-600" />
+                      <span>New Stock Transfer</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAddMenu(false);
+                        setAdjustmentInitialSku(null);
+                        setShowAdjustmentModal(true);
+                      }}
+                      className="w-full px-3 py-2 text-left text-xs font-bold text-gray-800 hover:bg-amber-50 hover:text-amber-900 rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer"
+                    >
+                      <SlidersHorizontal className="w-4 h-4 text-amber-600" />
+                      <span>Stock Adjustment</span>
+                    </button>
+                  </div>
+
+                  <div className="p-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAddMenu(false);
+                        handleOpenBatchModal();
+                      }}
+                      className="w-full px-3 py-2 text-left text-xs font-bold text-gray-800 hover:bg-blue-50 hover:text-blue-900 rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer"
+                    >
+                      <Layers className="w-4 h-4 text-blue-600" />
+                      <span>Add Purchase Batch</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAddMenu(false);
+                        setEditingSku(null);
+                        setIsAddSkuOpen(true);
+                      }}
+                      className="w-full px-3 py-2 text-left text-xs font-bold text-gray-800 hover:bg-purple-50 hover:text-purple-900 rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer"
+                    >
+                      <Package className="w-4 h-4 text-purple-600" />
+                      <span>Add New Item (SKU)</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
-      </header>
 
-      {/* ── SCROLLABLE BODY ── */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-        
-        {/* ── TOP KPI DRILLDOWN CARDS ── */}
-        <div className="grid grid-cols-6 gap-3">
+        {/* Bottom Row: Full-Width 6 Spacious & Non-Congested KPI Metric Cards */}
+        <div key={`kpi-container-${animationKey}`} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-2 border-t border-gray-100/80">
           {/* Card 1: Total Items */}
           <div 
             onClick={() => setActiveTab('overview')}
-            className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+            style={{
+              animation: 'slideDownFade 0.35s ease-out forwards',
+              animationDelay: '0ms'
+            }}
+            className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between opacity-0 min-h-[74px] ${
               activeTab === 'overview'
-                ? 'bg-white border-blue-600 ring-2 ring-blue-500/20 shadow-md'
-                : 'bg-white/90 border-gray-200/90 hover:border-blue-400 hover:shadow-xs'
+                ? 'bg-white border-blue-600 ring-2 ring-blue-500/20 shadow-xs'
+                : 'bg-gray-50/70 border-gray-200 hover:bg-white hover:border-blue-400 hover:shadow-2xs'
             }`}
           >
-            <div className="flex items-center justify-between text-gray-500 text-[11px] font-bold uppercase tracking-wider">
-              <span>Total Items</span>
-              <Package className="w-4 h-4 text-blue-600" />
+            <div className="flex items-center justify-between text-gray-400 text-[10.5px] font-bold uppercase tracking-wider">
+              <span className="whitespace-nowrap">Total Items</span>
+              <Package className="w-3.5 h-3.5 text-blue-600" />
             </div>
-            <div className="mt-2">
-              <div className="text-xl font-black text-slate-900">{kpiStats.totalItemsCount.toLocaleString('en-IN')}</div>
-              <div className="text-[10.5px] font-medium text-blue-600 mt-0.5 flex items-center gap-1">
-                <span>View All Inventory</span>
-              </div>
+            <div className="flex items-center justify-between gap-1.5 mt-2">
+              <span className="text-base sm:text-lg font-bold text-gray-900 leading-none whitespace-nowrap">
+                {kpiStats.totalItemsCount.toLocaleString('en-IN')}
+              </span>
+              <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200/60 whitespace-nowrap">
+                View All
+              </span>
             </div>
           </div>
 
           {/* Card 2: Total Stock Value */}
           <div 
             onClick={() => { setActiveTab('overview'); handleResetFilters(); }}
-            className="p-3.5 rounded-2xl bg-white border border-gray-200/90 hover:border-blue-400 hover:shadow-xs shadow-2xs transition-all cursor-pointer flex flex-col justify-between"
+            style={{
+              animation: 'slideDownFade 0.35s ease-out forwards',
+              animationDelay: '40ms'
+            }}
+            className="p-3.5 rounded-2xl bg-gray-50/70 border border-gray-200 hover:bg-white hover:border-blue-400 hover:shadow-2xs transition-all cursor-pointer flex flex-col justify-between opacity-0 min-h-[74px]"
           >
-            <div className="flex items-center justify-between text-gray-500 text-[11px] font-bold uppercase tracking-wider">
-              <span>Total Stock Value</span>
-              <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
-                <DollarSign className="w-3.5 h-3.5" />
-              </div>
+            <div className="flex items-center justify-between text-gray-400 text-[10.5px] font-bold uppercase tracking-wider">
+              <span className="whitespace-nowrap">Stock Value</span>
+              <span className="w-4 h-4 rounded-md bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-bold font-mono">
+                ₹
+              </span>
             </div>
-            <div className="mt-2">
-              <div className="text-xl font-black text-slate-900">{formatCurrency(kpiStats.totalStockVal)}</div>
-              <div className="text-[10px] text-gray-400 mt-0.5">
-                Calculated from purchase batches
-              </div>
+            <div className="flex items-center justify-between gap-1.5 mt-2">
+              <span className="text-base sm:text-lg font-bold text-gray-900 leading-none whitespace-nowrap">
+                {formatCurrency(kpiStats.totalStockVal)}
+              </span>
+              <span className="text-[10px] font-medium text-gray-500 whitespace-nowrap">
+                Live Cost
+              </span>
             </div>
           </div>
 
           {/* Card 3: Finished Goods */}
           <div 
             onClick={() => setActiveTab('products')}
-            className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+            style={{
+              animation: 'slideDownFade 0.35s ease-out forwards',
+              animationDelay: '80ms'
+            }}
+            className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between opacity-0 min-h-[74px] ${
               activeTab === 'products'
-                ? 'bg-white border-blue-600 ring-2 ring-blue-500/20 shadow-md'
-                : 'bg-white/90 border-gray-200/90 hover:border-blue-400 hover:shadow-xs'
+                ? 'bg-white border-blue-600 ring-2 ring-blue-500/20 shadow-xs'
+                : 'bg-gray-50/70 border-gray-200 hover:bg-white hover:border-blue-400 hover:shadow-2xs'
             }`}
           >
-            <div className="flex items-center justify-between text-gray-500 text-[11px] font-bold uppercase tracking-wider">
-              <span>Finished Goods</span>
-              <div className="w-2 h-2 rounded-full bg-blue-600"></div>
+            <div className="flex items-center justify-between text-gray-400 text-[10.5px] font-bold uppercase tracking-wider">
+              <span className="whitespace-nowrap">Finished</span>
+              <div className="w-2 h-2 rounded-full bg-blue-600 shrink-0"></div>
             </div>
-            <div className="mt-2">
-              <div className="text-base font-black text-slate-900">{formatCurrency(kpiStats.fgValue)}</div>
-              <div className="text-[10.5px] font-mono font-bold text-blue-600 mt-0.5">
+            <div className="flex items-center justify-between gap-1.5 mt-2">
+              <span className="text-base sm:text-lg font-bold text-gray-900 leading-none whitespace-nowrap">
+                {formatCurrency(kpiStats.fgValue)}
+              </span>
+              <span className="text-[10px] font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200/60 whitespace-nowrap shrink-0">
                 {kpiStats.fgQty.toLocaleString('en-IN')} Pcs
-              </div>
+              </span>
             </div>
           </div>
 
           {/* Card 4: Raw Materials */}
           <div 
             onClick={() => setActiveTab('materials')}
-            className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+            style={{
+              animation: 'slideDownFade 0.35s ease-out forwards',
+              animationDelay: '120ms'
+            }}
+            className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between opacity-0 min-h-[74px] ${
               activeTab === 'materials'
-                ? 'bg-white border-amber-600 ring-2 ring-amber-500/20 shadow-md'
-                : 'bg-white/90 border-gray-200/90 hover:border-amber-400 hover:shadow-xs'
+                ? 'bg-white border-amber-600 ring-2 ring-amber-500/20 shadow-xs'
+                : 'bg-gray-50/70 border-gray-200 hover:bg-white hover:border-amber-400 hover:shadow-2xs'
             }`}
           >
-            <div className="flex items-center justify-between text-gray-500 text-[11px] font-bold uppercase tracking-wider">
-              <span>Raw Materials</span>
-              <div className="w-2 h-2 rounded-full bg-amber-500"></div>
+            <div className="flex items-center justify-between text-gray-400 text-[10.5px] font-bold uppercase tracking-wider">
+              <span className="whitespace-nowrap">Raw Mat</span>
+              <div className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></div>
             </div>
-            <div className="mt-2">
-              <div className="text-base font-black text-slate-900">{formatCurrency(kpiStats.rmValue)}</div>
-              <div className="text-[10.5px] font-mono font-bold text-amber-600 mt-0.5">
+            <div className="flex items-center justify-between gap-1.5 mt-2">
+              <span className="text-base sm:text-lg font-bold text-gray-900 leading-none whitespace-nowrap">
+                {formatCurrency(kpiStats.rmValue)}
+              </span>
+              <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/60 whitespace-nowrap shrink-0">
                 {kpiStats.rmKg.toLocaleString('en-IN')} KG
-              </div>
+              </span>
             </div>
           </div>
 
           {/* Card 5: Semi Finished */}
           <div 
             onClick={() => setActiveTab('semi')}
-            className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+            style={{
+              animation: 'slideDownFade 0.35s ease-out forwards',
+              animationDelay: '160ms'
+            }}
+            className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between opacity-0 min-h-[74px] ${
               activeTab === 'semi'
-                ? 'bg-white border-purple-600 ring-2 ring-purple-500/20 shadow-md'
-                : 'bg-white/90 border-gray-200/90 hover:border-purple-400 hover:shadow-xs'
+                ? 'bg-white border-purple-600 ring-2 ring-purple-500/20 shadow-xs'
+                : 'bg-gray-50/70 border-gray-200 hover:bg-white hover:border-purple-400 hover:shadow-2xs'
             }`}
           >
-            <div className="flex items-center justify-between text-gray-500 text-[11px] font-bold uppercase tracking-wider">
-              <span>Semi Finished</span>
-              <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+            <div className="flex items-center justify-between text-gray-400 text-[10.5px] font-bold uppercase tracking-wider">
+              <span className="whitespace-nowrap">Semi Fin</span>
+              <div className="w-2 h-2 rounded-full bg-purple-500 shrink-0"></div>
             </div>
-            <div className="mt-2">
-              <div className="text-base font-black text-slate-900">{formatCurrency(kpiStats.semiValue)}</div>
-              <div className="text-[10.5px] font-mono font-bold text-purple-600 mt-0.5">
+            <div className="flex items-center justify-between gap-1.5 mt-2">
+              <span className="text-base sm:text-lg font-bold text-gray-900 leading-none whitespace-nowrap">
+                {formatCurrency(kpiStats.semiValue)}
+              </span>
+              <span className="text-[10px] font-mono font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200/60 whitespace-nowrap shrink-0">
                 {kpiStats.semiPcs.toLocaleString('en-IN')} Pcs
-              </div>
+              </span>
             </div>
           </div>
 
-          {/* Card 6: Low / Out of Stock */}
+          {/* Card 6: Stock Alerts */}
           <div 
             onClick={() => setStatusFilter(prev => prev === 'ALERTS' ? 'ALL' : 'ALERTS')}
-            className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+            style={{
+              animation: 'slideDownFade 0.35s ease-out forwards',
+              animationDelay: '200ms'
+            }}
+            className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between opacity-0 min-h-[74px] ${
               statusFilter === 'ALERTS'
-                ? 'bg-rose-50 border-rose-600 ring-2 ring-rose-500/20 shadow-md'
-                : 'bg-white/90 border-gray-200/90 hover:border-rose-400 hover:shadow-xs'
+                ? 'bg-rose-50/70 border-rose-600 ring-2 ring-rose-500/20 shadow-xs'
+                : 'bg-gray-50/70 border-gray-200 hover:bg-white hover:border-rose-400 hover:shadow-2xs'
             }`}
           >
-            <div className="flex items-center justify-between text-gray-500 text-[11px] font-bold uppercase tracking-wider">
-              <span>Stock Alerts</span>
-              <AlertTriangle className="w-4 h-4 text-rose-600" />
+            <div className="flex items-center justify-between text-gray-400 text-[10.5px] font-bold uppercase tracking-wider">
+              <span className="whitespace-nowrap">Stock Alerts</span>
+              <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
             </div>
-            <div className="mt-2">
-              <div className="text-lg font-black text-rose-700">
-                {kpiStats.lowStockCount} <span className="text-xs font-normal text-gray-400">/ {kpiStats.outOfStockCount} out</span>
-              </div>
-              <div className="text-[10.5px] font-bold text-rose-600 mt-0.5">
-                {statusFilter === 'ALERTS' ? '✓ Showing Alerts' : 'Click to filter alerts'}
-              </div>
+            <div className="flex items-center justify-between gap-1.5 mt-2">
+              <span className="text-base sm:text-lg font-bold text-rose-600 leading-none whitespace-nowrap">
+                {kpiStats.lowStockCount}
+              </span>
+              <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200/60 whitespace-nowrap shrink-0">
+                {kpiStats.outOfStockCount} out
+              </span>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* ── MAIN TABS & ACTION BAR ── */}
+      {/* ── MAIN TABS & ACTION BAR ── */}
         <div className="bg-white rounded-2xl border border-gray-200/80 p-3 shadow-2xs space-y-3">
           
           {/* Main Navigation Tabs */}
@@ -950,9 +1052,16 @@ export const StockInventoryV2: React.FC = () => {
                       <th className="px-4 py-3">Remarks</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody key={`transfers-${animationKey}`} className="divide-y divide-gray-100 text-xs text-gray-700">
                     {transferEntries.map((entry, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50/80 transition-colors">
+                      <tr 
+                        key={idx} 
+                        style={{
+                          animation: 'slideDownFade 0.35s ease-out forwards',
+                          animationDelay: `${idx * 30}ms`
+                        }}
+                        className="hover:bg-gray-50/80 transition-colors opacity-0"
+                      >
                         <td className="px-4 py-3 whitespace-nowrap text-gray-500">
                           {entry.createdAt ? new Date(entry.createdAt).toLocaleDateString('en-IN') : 'Recent'}
                         </td>
@@ -1023,11 +1132,18 @@ export const StockInventoryV2: React.FC = () => {
                       <th className="px-4 py-3">Reason / Remarks</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody key={`adjustments-${animationKey}`} className="divide-y divide-gray-100 text-xs text-gray-700">
                     {adjustmentEntries.map((entry, idx) => {
                       const isInc = entry.direction === 'IN' || (entry.quantity || 0) > 0;
                       return (
-                        <tr key={idx} className="hover:bg-gray-50/80 transition-colors">
+                        <tr 
+                          key={idx} 
+                          style={{
+                            animation: 'slideDownFade 0.35s ease-out forwards',
+                            animationDelay: `${idx * 30}ms`
+                          }}
+                          className="hover:bg-gray-50/80 transition-colors opacity-0"
+                        >
                           <td className="px-4 py-3 whitespace-nowrap text-gray-500">
                             {entry.createdAt ? new Date(entry.createdAt).toLocaleDateString('en-IN') : 'Recent'}
                           </td>
@@ -1097,225 +1213,214 @@ export const StockInventoryV2: React.FC = () => {
                               setSelectedIds([]);
                             }
                           }}
-                          className="rounded text-blue-600 focus:ring-blue-500 border-gray-300"
+                          className="rounded text-blue-600 focus:ring-blue-500 border-gray-300 cursor-pointer"
                         />
                       </th>
                       <th className="px-4 py-3">SKU Code</th>
-                      <th className="px-4 py-3">Item Description</th>
-                      {activeTab === 'products' ? (
-                        <>
-                          <th className="px-4 py-3">Brand</th>
-                          <th className="px-4 py-3">Pages / Ruling</th>
-                          <th className="px-4 py-3 text-right">Available (GBL)</th>
-                          <th className="px-4 py-3 text-right">Reserved (GBL)</th>
-                          <th className="px-4 py-3 text-right">On Hand (GBL)</th>
-                          <th className="px-4 py-3 text-right">PCS Equivalent</th>
-                        </>
-                      ) : (
-                        <>
-                          <th className="px-4 py-3">Category</th>
-                          <th className="px-4 py-3">Attributes</th>
-                          <th className="px-4 py-3 text-right">Available</th>
-                          <th className="px-4 py-3 text-right">Reserved</th>
-                          <th className="px-4 py-3 text-right">In Process</th>
-                          <th className="px-4 py-3 text-right">On Hand</th>
-                          <th className="px-4 py-3">UOM</th>
-                        </>
-                      )}
-                      <th className="px-4 py-3 text-right">Stock Value</th>
+                      <th className="px-4 py-3">Item Name</th>
+                      <th className="px-4 py-3">Item Type</th>
+                      <th className="px-4 py-3">Category</th>
+                      <th className="px-4 py-3">Location</th>
+                      <th className="px-4 py-3 text-right">Available Stock</th>
+                      <th className="px-4 py-3 text-center">UOM</th>
+                      <th className="px-4 py-3 text-center">AUOM</th>
                       <th className="px-4 py-3 text-center">Status</th>
+                      <th className="px-4 py-3 text-right">Stock Value</th>
                       <th className="px-4 py-3 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {filteredSkus.map(sku => {
-                      const onHand = Number(sku.presentStock) || 0;
-                      const reorder = Number(sku.reorderLevel) || 10;
-                      const rate = Number((sku as any)?.purchasePrice || (sku as any)?.ratePerKg || (sku as any)?.rate || (sku as any)?.avgRate || (sku as any)?.costPrice || 0);
-                      const totalVal = onHand * rate;
-                      const isSelected = selectedIds.includes(sku._id);
+                  <tbody key={`overview-${animationKey}`} className="divide-y divide-gray-100 text-xs text-gray-700">
+                    {loading ? (
+                      <tr>
+                        <td colSpan={12} className="py-12 text-center text-gray-400 whitespace-nowrap">
+                          <div className="inline-flex items-center gap-2">
+                            <RotateCcw className="w-4 h-4 animate-spin text-blue-600" />
+                            <span className="font-semibold text-gray-600">Loading inventory items...</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : filteredSkus.length === 0 ? (
+                      <tr>
+                        <td colSpan={12} className="py-12 text-center text-gray-400 whitespace-nowrap">
+                          <div className="flex flex-col items-center gap-2">
+                            <Boxes className="w-8 h-8 text-gray-300" />
+                            <p className="font-semibold text-gray-600">No inventory items found</p>
+                            <p className="text-[11px]">Click below to create your first item or add a purchase batch</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredSkus.map((sku, index) => {
+                        const onHand = Number(sku.presentStock) || 0;
+                        const reorder = Number(sku.reorderLevel) || 10;
+                        const avgPrice = Number((sku as any)?.avgRate || (sku as any)?.purchasePrice || (sku as any)?.ratePerKg || (sku as any)?.rate || 0);
+                        const totalVal = onHand * avgPrice;
+                        const isSelected = selectedIds.includes(sku._id);
 
-                      // Reserved and Available calculations
-                      const reserved = 0; // Linked to Sales Orders in backend / drawer
-                      const available = Math.max(0, onHand - reserved);
-                      const inProcess = 0;
+                        // Item Type formatting
+                        const itemGroup = getSkuCategoryGroup(sku);
+                        const itemTypeLabel = itemGroup === 'products' 
+                          ? 'Finished Goods' 
+                          : itemGroup === 'semi' 
+                          ? 'Semi Finished' 
+                          : 'Raw Material';
+                        const itemTypeBadgeClass = itemGroup === 'products'
+                          ? 'bg-blue-50 text-blue-700 border-blue-200'
+                          : itemGroup === 'semi'
+                          ? 'bg-amber-50 text-amber-700 border-amber-200'
+                          : 'bg-emerald-50 text-emerald-700 border-emerald-200';
 
-                      // PCS Equivalent for Finished Goods (e.g. 1 GBL = 200 PCS)
-                      const conversionFactor = Number(sku.altUnitConversion) || 1;
-                      const pcsEquivalent = sku.altUnitConversion && Number(sku.altUnitConversion) > 0
-                        ? onHand * conversionFactor
-                        : onHand;
+                        // Status Badge
+                        const isOutOfStock = onHand === 0;
+                        const isLowStock = onHand > 0 && onHand <= reorder;
 
-                      // AUOM Calculation for general items
-                      const auomDisplay = (sku.altUnit && sku.altUnitConversion && Number(sku.altUnitConversion) > 0)
-                        ? `${(onHand * Number(sku.altUnitConversion)).toLocaleString('en-IN', { maximumFractionDigits: 1 })} ${sku.altUnit}`
-                        : null;
-
-                      // Status Badge
-                      const isOutOfStock = onHand === 0;
-                      const isLowStock = onHand > 0 && onHand <= reorder;
-
-                      return (
-                        <tr 
-                          key={sku._id} 
-                          onClick={() => setSelectedDrawerSku(sku)}
-                          className={`hover:bg-blue-50/30 transition-colors cursor-pointer group ${
-                            isSelected ? 'bg-blue-50/50' : ''
-                          }`}
-                        >
-                          <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={e => {
-                                if (e.target.checked) {
-                                  setSelectedIds(prev => [...prev, sku._id]);
-                                } else {
-                                  setSelectedIds(prev => prev.filter(id => id !== sku._id));
-                                }
-                              }}
-                              className="rounded text-blue-600 focus:ring-blue-500 border-gray-300"
-                            />
-                          </td>
-                          <td className="px-4 py-3 font-mono font-bold text-gray-900 whitespace-nowrap">
-                            {sku.skuCode}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="font-bold text-gray-900 group-hover:text-blue-700 transition-colors">
-                              {sku.name}
-                            </div>
-                            {sku.brand && activeTab !== 'products' && (
-                              <div className="text-[10.5px] text-gray-400 font-medium">
-                                Brand: {sku.brand}
+                        return (
+                          <tr 
+                            key={sku._id || index} 
+                            onClick={() => setSelectedDrawerSku(sku)}
+                            style={{
+                              animation: 'slideDownFade 0.35s ease-out forwards',
+                              animationDelay: `${index * 35}ms`
+                            }}
+                            className={`hover:bg-blue-50/20 transition-all cursor-pointer opacity-0 whitespace-nowrap ${
+                              isSelected ? 'bg-blue-50/30' : ''
+                            }`}
+                          >
+                            <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={e => {
+                                  if (e.target.checked) {
+                                    setSelectedIds(prev => [...prev, sku._id]);
+                                  } else {
+                                    setSelectedIds(prev => prev.filter(id => id !== sku._id));
+                                  }
+                                }}
+                                className="rounded text-blue-600 focus:ring-blue-500 border-gray-300 cursor-pointer"
+                              />
+                            </td>
+                            {/* 1. SKU Code */}
+                            <td className="px-4 py-3 font-mono font-bold text-gray-900 whitespace-nowrap">
+                              {sku.skuCode}
+                            </td>
+                            {/* 2. Item Name */}
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-gray-900 group-hover:text-blue-700 transition-colors">
+                                {sku.name}
                               </div>
-                            )}
-                          </td>
-
-                          {activeTab === 'products' ? (
-                            <>
-                              <td className="px-4 py-3 whitespace-nowrap font-medium text-gray-700">
-                                {sku.brand || '—'}
-                              </td>
-                              <td className="px-4 py-3 text-[11px] text-gray-500 whitespace-nowrap">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  {sku.pages && <span className="bg-slate-100 px-1.5 py-0.2 rounded font-semibold">{sku.pages}P</span>}
-                                  {sku.ruleType && <span className="bg-blue-50 text-blue-800 px-1.5 py-0.2 rounded font-semibold">{sku.ruleType}</span>}
-                                  {!sku.pages && !sku.ruleType && <span>—</span>}
-                                </div>
-                              </td>
-                              <td className="px-4 py-3 text-right font-mono font-extrabold text-emerald-700 whitespace-nowrap">
-                                {available.toLocaleString('en-IN')}
-                              </td>
-                              <td className="px-4 py-3 text-right font-mono font-bold text-amber-700 whitespace-nowrap">
-                                {reserved.toLocaleString('en-IN')}
-                              </td>
-                              <td className="px-4 py-3 text-right font-mono font-black text-gray-900 whitespace-nowrap">
-                                {onHand.toLocaleString('en-IN')}
-                              </td>
-                              <td className="px-4 py-3 text-right font-mono font-bold text-indigo-700 whitespace-nowrap">
-                                {pcsEquivalent.toLocaleString('en-IN')} PCS
-                              </td>
-                            </>
-                          ) : (
-                            <>
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-gray-100 text-gray-700">
-                                  {sku.category || 'General'}
+                            </td>
+                            {/* 3. Item Type */}
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${itemTypeBadgeClass}`}>
+                                {itemTypeLabel}
+                              </span>
+                            </td>
+                            {/* 4. Category */}
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-gray-100 text-gray-700">
+                                {sku.category || 'General'}
+                              </span>
+                            </td>
+                            {/* 5. Location */}
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <div className="flex items-center gap-1 text-[11px] font-medium text-slate-700">
+                                <MapPin className="w-3 h-3 text-indigo-500 shrink-0" />
+                                <span className="truncate max-w-[130px]" title={(sku as any).resolvedLocation || 'SKBW'}>
+                                  {(sku as any).resolvedLocation || 'SKBW'}
                                 </span>
-                              </td>
-                              <td className="px-4 py-3 text-[11px] text-gray-500 whitespace-nowrap">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  {sku.pages && <span className="bg-slate-100 px-1.5 py-0.2 rounded font-semibold">{sku.pages}P</span>}
-                                  {sku.ruleType && <span className="bg-slate-100 px-1.5 py-0.2 rounded font-semibold">{sku.ruleType}</span>}
-                                  {sku.gsm && <span className="bg-slate-100 px-1.5 py-0.2 rounded font-semibold">{sku.gsm} GSM</span>}
-                                  {!sku.pages && !sku.ruleType && !sku.gsm && <span>—</span>}
-                                </div>
-                              </td>
-                              <td className="px-4 py-3 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
-                                {available.toLocaleString('en-IN')}
-                              </td>
-                              <td className="px-4 py-3 text-right font-mono font-bold text-amber-700 whitespace-nowrap">
-                                {reserved.toLocaleString('en-IN')}
-                              </td>
-                              <td className="px-4 py-3 text-right font-mono font-bold text-indigo-600 whitespace-nowrap">
-                                {inProcess}
-                              </td>
-                              <td className="px-4 py-3 text-right font-mono font-black text-gray-900 whitespace-nowrap">
-                                {onHand.toLocaleString('en-IN')}
-                              </td>
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                <div className="font-bold text-gray-800">{sku.unit || 'Kg'}</div>
-                                {auomDisplay && (
-                                  <div className="text-[10px] text-gray-400 font-mono">
-                                    ≈ {auomDisplay}
-                                  </div>
-                                )}
-                              </td>
-                            </>
-                          )}
-
-                          <td className="px-4 py-3 text-right font-mono font-bold text-blue-700 whitespace-nowrap">
-                            {formatCurrency(totalVal)}
-                          </td>
-                          <td className="px-4 py-3 text-center whitespace-nowrap">
-                            {isOutOfStock ? (
-                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
-                                Out of Stock
+                              </div>
+                            </td>
+                            {/* 6. Available Stock */}
+                            <td className="px-4 py-3 text-right font-mono font-bold text-gray-900 text-sm whitespace-nowrap">
+                              {onHand.toLocaleString('en-IN')}
+                            </td>
+                            {/* 7. UOM */}
+                            <td className="px-4 py-3 text-center whitespace-nowrap">
+                              <span className="font-bold text-gray-800 text-xs px-2 py-0.5 bg-slate-100 rounded">
+                                {sku.unit || 'Pcs'}
                               </span>
-                            ) : isLowStock ? (
-                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                                Low Stock
-                              </span>
-                            ) : (
-                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                In Stock
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                            <div className="flex items-center justify-end gap-1">
-                              <button
-                                type="button"
-                                onClick={() => setSelectedDrawerSku(sku)}
-                                className="p-1.5 text-gray-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                                title="Inspect Stock Details"
-                              >
-                                <Eye className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setTransferInitialSku(sku);
-                                  setShowTransferModal(true);
-                                }}
-                                className="p-1.5 text-gray-500 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                                title="Transfer Item"
-                              >
-                                <ArrowRightLeft className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setAdjustmentInitialSku(sku);
-                                  setShowAdjustmentModal(true);
-                                }}
-                                className="p-1.5 text-gray-500 hover:text-amber-800 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
-                                title="Adjust Stock"
-                              >
-                                <SlidersHorizontal className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                            </td>
+                            {/* 8. AUOM */}
+                            <td className="px-4 py-3 text-center whitespace-nowrap">
+                              {sku.altUnit ? (
+                                <span className="font-mono text-[11px] text-indigo-700 font-bold bg-indigo-50/70 px-2 py-0.5 rounded border border-indigo-100">
+                                  {sku.altUnit} {sku.altUnitConversion ? `(1:${sku.altUnitConversion})` : ''}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 text-xs">—</span>
+                              )}
+                            </td>
+                            {/* 9. Status */}
+                            <td className="px-4 py-3 text-center whitespace-nowrap">
+                              {isOutOfStock ? (
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                                  Out of Stock
+                                </span>
+                              ) : isLowStock ? (
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                  Low Stock
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                  In Stock
+                                </span>
+                              )}
+                            </td>
+                            {/* 10. Stock Value (Calculated on Weighted Average Cost) */}
+                            <td className="px-4 py-3 text-right whitespace-nowrap">
+                              <div className="font-mono font-bold text-blue-700 text-xs">
+                                {formatCurrency(totalVal)}
+                              </div>
+                              <div className="text-[10px] font-mono text-gray-400" title={`Average purchase cost across batch entries: ₹${avgPrice.toFixed(2)}/${sku.unit || 'Unit'}`}>
+                                Avg ₹{avgPrice.toLocaleString('en-IN', { maximumFractionDigits: 2 })}/{sku.unit || 'Unit'}
+                              </div>
+                            </td>
+                            {/* Actions */}
+                            <td className="px-4 py-3 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedDrawerSku(sku)}
+                                  className="p-1.5 text-gray-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                  title="Inspect Stock Details"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setTransferInitialSku(sku);
+                                    setShowTransferModal(true);
+                                  }}
+                                  className="p-1.5 text-gray-500 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                  title="Transfer Item"
+                                >
+                                  <ArrowRightLeft className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setAdjustmentInitialSku(sku);
+                                    setShowAdjustmentModal(true);
+                                  }}
+                                  className="p-1.5 text-gray-500 hover:text-amber-800 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                                  title="Adjust Stock"
+                                >
+                                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               </div>
             )}
           </div>
         )}
-      </div>
 
       {/* ── MODALS & DRAWERS ── */}
 
@@ -1378,6 +1483,7 @@ export const StockInventoryV2: React.FC = () => {
           isOpen={isAddSkuOpen}
           companyId={selectedCompany?._id || ''}
           editSku={editingSku}
+          activeSection={activeTab === 'materials' ? 'materials' : activeTab === 'semi' ? 'semi' : 'products'}
           onClose={() => setIsAddSkuOpen(false)}
           onSaveSuccess={() => {
             setIsAddSkuOpen(false);
@@ -1708,6 +1814,20 @@ export const StockInventoryV2: React.FC = () => {
           </form>
         </Modal>
       )}
+
+      {/* Row & Card Entrance Keyframe Animation */}
+      <style>{`
+        @keyframes slideDownFade {
+          from {
+            opacity: 0;
+            transform: translateY(-12px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
     </div>
   );
 };

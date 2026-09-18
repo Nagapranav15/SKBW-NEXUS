@@ -289,6 +289,12 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
   const [rawMaterialsList, setRawMaterialsList] = useState<SkuV2[]>([]);
   const [allSkusList, setAllSkusList] = useState<SkuV2[]>([]);
+  const [internalCategoryCards, setInternalCategoryCards] = useState<any[]>([]);
+  const allCategories = React.useMemo(() => {
+    return (createdCategories && createdCategories.length > 0) ? createdCategories : internalCategoryCards;
+  }, [createdCategories, internalCategoryCards]);
+
+  const [selectedType, setSelectedType] = useState<'products' | 'materials' | 'semi'>('products');
   const [formCustomValues, setFormCustomValues] = useState<{ [colName: string]: any }>({});
   const [dynamicLocationText, setDynamicLocationText] = useState<string>('Loading location...');
   const [availableLocations, setAvailableLocations] = useState<{ id: string; name: string }[]>([]);
@@ -473,40 +479,71 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   }, [unitsList, form.unit, form.altUnit]);
 
 
-  const resolvedSection = React.useMemo<'products' | 'materials' | 'semi'>(() => {
+  // Initialize selectedType when drawer opens or activeSection / editSku changes
+  useEffect(() => {
+    if (!isOpen) return;
     if (editSku) {
       const catLower = (editSku.category || '').toLowerCase().trim();
       const codeUpper = (editSku.skuCode || '').toUpperCase().trim();
-      const matched = (createdCategories || []).find(c => c && c.name?.toLowerCase().trim() === catLower);
-      if (matched?.type) return matched.type;
-
+      const matched = (allCategories || []).find(c => c && c.name?.toLowerCase().trim() === catLower);
+      if (matched?.type) {
+        setSelectedType(matched.type);
+        return;
+      }
       if (catLower.includes('semi') || catLower.includes('wip') || codeUpper.startsWith('SM') || codeUpper.startsWith('SF') || codeUpper.startsWith('SEM')) {
-        return 'semi';
+        setSelectedType('semi');
+        return;
       }
       if (catLower.includes('raw') || catLower.includes('material') || catLower.includes('reel') || codeUpper.startsWith('RM')) {
-        return 'materials';
+        setSelectedType('materials');
+        return;
       }
-      if (catLower.includes('finish') || catLower.includes('product') || codeUpper.startsWith('FG')) {
-        return 'products';
-      }
+      setSelectedType('products');
+    } else {
+      if (activeSection === 'semi') setSelectedType('semi');
+      else if (activeSection === 'materials') setSelectedType('materials');
+      else setSelectedType('products');
     }
-    if (activeSection === 'semi') return 'semi';
-    if (activeSection === 'materials') return 'materials';
-    return 'products';
-  }, [editSku, activeSection, createdCategories]);
+  }, [isOpen, editSku, activeSection, allCategories]);
+
+  const resolvedSection = selectedType;
 
   const itemMainType = React.useMemo(() => {
-    if (resolvedSection === 'semi') return 'Semi';
-    if (resolvedSection === 'materials') return 'Materials';
+    if (selectedType === 'semi') return 'Semi';
+    if (selectedType === 'materials') return 'Materials';
     return 'Products';
-  }, [resolvedSection]);
+  }, [selectedType]);
+
+  const handleItemTypeChange = (newType: 'products' | 'materials' | 'semi') => {
+    setSelectedType(newType);
+
+    // Find matching categories for newly selected type
+    const matchingCats = (allCategories || []).filter(c => c && (c.type === newType || (!c.type && newType === 'products')));
+    const newCategory = matchingCats[0]?.name || (newType === 'products' ? 'Products' : newType === 'semi' ? 'Semi' : 'Materials');
+    const newUom = matchingCats[0]?.uom || (newType === 'materials' ? 'Kg' : newType === 'semi' ? 'Ream' : 'Pcs');
+
+    setForm(prev => ({
+      ...prev,
+      category: newCategory,
+      unit: newUom,
+      paperType: newType === 'materials' ? (prev.paperType || 'Reels') : '',
+      pages: newType === 'materials' ? '' : prev.pages,
+      ruleType: newType === 'materials' ? '' : prev.ruleType
+    }));
+
+    setIsNameManuallyEdited(false);
+
+    if (!editSku) {
+      regenerateSkuCode(newCategory, newType);
+    }
+  };
 
   const availableCategories = React.useMemo(() => {
-    const targetType = resolvedSection;
+    const targetType = selectedType;
     const list: string[] = [];
 
     // 1. Fetch categories created in the Categories Tab strictly matching target section type
-    (createdCategories || []).forEach(c => {
+    (allCategories || []).forEach(c => {
       if (c && c.name && c.name.trim() && (c.type === targetType || (!c.type && targetType === 'products'))) {
         const trimmed = c.name.trim();
         if (!list.includes(trimmed)) {
@@ -518,14 +555,14 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     // 2. Include form.category only if valid, non-empty, and matching the section
     const trimmedFormCat = (form.category || '').trim();
     if (trimmedFormCat && !list.includes(trimmedFormCat) && trimmedFormCat !== '—' && trimmedFormCat !== '-') {
-      const catObj = (createdCategories || []).find(c => c && c.name?.toLowerCase().trim() === trimmedFormCat.toLowerCase());
+      const catObj = (allCategories || []).find(c => c && c.name?.toLowerCase().trim() === trimmedFormCat.toLowerCase());
       if (!catObj || catObj.type === targetType) {
         list.push(trimmedFormCat);
       }
     }
 
     return list.filter(item => typeof item === 'string' && item.trim().length > 0);
-  }, [resolvedSection, createdCategories, form.category]);
+  }, [selectedType, allCategories, form.category]);
 
   // Modal popup for creating a new category matching Categories Tab structure
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
@@ -794,6 +831,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       const data = await getMetadataV2(companyId);
       if (data) {
         if (data.categories?.length) setCategoriesList(data.categories);
+        if (data.categoryCards?.length) setInternalCategoryCards(data.categoryCards);
         if (Array.isArray(data.units)) {
           setUnitsList(normalizeAndDeduplicateUnits(data.units));
         }
@@ -1101,16 +1139,16 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   }, [editSku, isOpen, defaultCategory, resolvedSection, createdCategories]);
 
   const isProductCategory = React.useMemo(() => {
-    if (activeSection === 'products' || form.category === 'Finished Goods' || form.category === 'Products') return true;
-    if (activeSection === 'materials' || activeSection === 'semi') return false;
-    const matched = (createdCategories || []).find(c => c.name === form.category);
+    if (resolvedSection === 'products' || form.category === 'Finished Goods' || form.category === 'Products') return true;
+    if (resolvedSection === 'materials' || resolvedSection === 'semi') return false;
+    const matched = (allCategories || []).find(c => c.name === form.category);
     if (matched) return matched.type === 'products';
     return !['Raw Material', 'Semi Finished'].includes(form.category);
-  }, [activeSection, form.category, createdCategories]);
+  }, [resolvedSection, form.category, allCategories]);
 
   const isRawOrSemi = React.useMemo(() => {
-    return activeSection === 'materials' || activeSection === 'semi' || ['Raw Material', 'Semi Finished'].includes(form.category);
-  }, [activeSection, form.category]);
+    return resolvedSection === 'materials' || resolvedSection === 'semi' || ['Raw Material', 'Semi Finished'].includes(form.category);
+  }, [resolvedSection, form.category]);
 
   const activeFields = React.useMemo(() => {
     // Field attributes are purely category notes and do NOT affect or restrict any fields when adding/editing an item.
@@ -1125,14 +1163,15 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   }, [resolvedSection, form.category, isProductCategory]);
 
   // Auto-generate neat sequential SKU Code (RM-001, FG-001, SM-001) - strictly monotonic, never reusing deleted item IDs
-  const regenerateSkuCode = async (targetCategory?: string) => {
+  const regenerateSkuCode = async (targetCategory?: string, overrideType?: 'products' | 'materials' | 'semi') => {
     if (editSku) return; // NEVER overwrite or change SKU Code when editing an existing SKU!
 
+    const currentSection = overrideType || resolvedSection;
     let prefix: 'RM' | 'FG' | 'SM' = 'RM';
 
-    if (resolvedSection === 'products') {
+    if (currentSection === 'products') {
       prefix = 'FG';
-    } else if (resolvedSection === 'semi') {
+    } else if (currentSection === 'semi') {
       prefix = 'SM';
     } else {
       prefix = 'RM';
@@ -1239,7 +1278,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         }
         return parts.filter(Boolean).join(' ');
       } else {
-        // Finished Goods / Products
+        // Finished Goods / Products: Name consists of Pages, Brand, and Rule Type only (GSM, Width, Height are saved in attributes but not synced into name)
         const parts: string[] = [];
         if (formData.pages) parts.push(`${formData.pages}P`);
         if (formData.brand?.trim()) parts.push(formData.brand.trim());
@@ -1249,14 +1288,6 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           const wrapped = (clean.startsWith('(') && clean.endsWith(')')) ? clean : `(${clean})`;
           parts.push(wrapped);
         }
-        if (formData.gsm) parts.push(`${formData.gsm} GSM`);
-        let sizeStr = '';
-        if (formData.width && formData.length) {
-          sizeStr = `${formData.width} x ${formData.length} CM`;
-        } else if (formData.width) {
-          sizeStr = `${formData.width} CM`;
-        }
-        if (sizeStr) parts.push(sizeStr);
         return parts.filter(Boolean).join(' ');
       }
     };
@@ -1513,25 +1544,32 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                   />
                 </div>
 
-                {/* ITEM TYPE (Locked: Products / Materials / Semi) */}
+                {/* ITEM TYPE (Selectable & Interchangeable: Products / Materials / Semi) */}
                 <div className="col-span-2 sm:col-span-1">
                   <label className="block text-[11px] font-semibold text-gray-600 mb-1 flex items-center justify-between">
-                    <span>ITEM TYPE</span>
-                    <span className="text-[10px] text-gray-400 font-semibold flex items-center gap-0.5">
-                      <Lock className="w-3 h-3 text-gray-400" />
-                      Locked
+                    <span>ITEM TYPE *</span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
+                      selectedType === 'materials'
+                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                        : selectedType === 'semi'
+                          ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                          : 'bg-blue-50 text-blue-700 border border-blue-200'
+                    }`}>
+                      {itemMainType}
                     </span>
                   </label>
                   <div className="relative">
-                    <input
-                      type="text"
-                      value={itemMainType}
-                      readOnly
-                      disabled
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-gray-100/90 text-gray-700 font-extrabold cursor-not-allowed uppercase tracking-wider"
-                    />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                      <Lock className="w-3.5 h-3.5" />
+                    <select
+                      value={selectedType}
+                      onChange={e => handleItemTypeChange(e.target.value as 'products' | 'materials' | 'semi')}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-white text-gray-900 font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer appearance-none shadow-2xs pr-8"
+                    >
+                      <option value="products">PRODUCTS (Finished Goods)</option>
+                      <option value="materials">MATERIALS (Raw Materials)</option>
+                      <option value="semi">SEMI (Semi Finished Goods)</option>
+                    </select>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                      <ChevronDown className="w-3.5 h-3.5" />
                     </div>
                   </div>
                 </div>
@@ -2223,7 +2261,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                   })()}
 
                   {/* Attributes for Semi-Finished Goods (Group & Status removed) */}
-                  {(resolvedSection === 'semi' || activeSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi') && (
+                  {(resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi') && (
                     <>
 
                       {activeFields.includes('pages') && (
@@ -2485,7 +2523,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
               )}
 
                 {/* BOM is for Finished Goods / Products AND Semi Finished materials (NO BOM for Raw Materials) */}
-                {activeSection !== 'materials' && (activeSection === 'products' || activeSection === 'semi' || form.category === 'Finished Goods' || form.category === 'Semi Finished' || !(form.category || '').toLowerCase().includes('raw')) && (
+                {resolvedSection !== 'materials' && (resolvedSection === 'products' || resolvedSection === 'semi' || form.category === 'Finished Goods' || form.category === 'Semi Finished' || !(form.category || '').toLowerCase().includes('raw')) && (
                   <div className="space-y-4 border-t border-gray-100 pt-4">
                     {/* BOM Header card banner */}
                     <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-3 flex items-center justify-between">

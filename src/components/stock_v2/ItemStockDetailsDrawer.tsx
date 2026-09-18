@@ -31,7 +31,7 @@ import {
   SkuStockDetailsResponse, 
   getSkuStockDetailsV2 
 } from '../../api/mfgApiV2';
-import Drawer from '../ui/Drawer';
+import Modal from '../ui/Modal';
 
 export type ItemDrawerTab = 'overview' | 'locations' | 'batches' | 'movements' | 'reservations';
 
@@ -110,11 +110,11 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
   if (!sku) return null;
 
   return (
-    <Drawer
+    <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={sku.name || sku.skuCode || 'Item Stock Details'}
-      size="max-w-3xl"
+      size="max-w-4xl"
+      padding="p-0"
     >
       <div className="flex flex-col h-full bg-white text-gray-800">
         {/* Header Summary Card */}
@@ -550,7 +550,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
           </button>
         </div>
       </div>
-    </Drawer>
+    </Modal>
   );
 };
 
