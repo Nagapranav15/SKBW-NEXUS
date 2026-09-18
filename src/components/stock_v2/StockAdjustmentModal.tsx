@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import Modal from '../ui/Modal';
 import { showToast } from '../ui/Toast';
-import { SkuV2, WarehouseLocationV2, createInventoryLedgerEntryV2, getBalancesV2 } from '../../api/mfgApiV2';
+import { SkuV2, WarehouseLocationV2, recordStockAdjustmentV2, getBalancesV2 } from '../../api/mfgApiV2';
 
 interface StockAdjustmentModalProps {
   isOpen: boolean;
@@ -127,17 +127,16 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
     setIsSubmitting(true);
     try {
       const finalReason = reason === 'Other' ? (customReason || 'Manual adjustment') : reason;
-      await createInventoryLedgerEntryV2({
-        transactionType: 'Stock Adjustment',
+      const adjQty = adjustmentType === 'INCREASE' ? deltaQty : -deltaQty;
+
+      await recordStockAdjustmentV2({
+        company: companyId,
         skuId: selectedSkuId,
-        quantity: deltaQty,
-        unit: selectedSku?.unit || 'Pcs',
-        direction: adjustmentType === 'INCREASE' ? 'IN' : 'OUT',
-        referenceType: 'MANUAL_ADJUSTMENT',
-        referenceId: referenceNumber,
         locationId: locationId,
-        remarks: `${finalReason}${remarks ? `: ${remarks}` : ''}`,
-        company: companyId
+        adjustmentType: reason,
+        adjustmentQty: adjQty,
+        reason: finalReason,
+        remarks: remarks || undefined
       });
 
       showToast(`Stock adjusted by ${adjustmentType === 'INCREASE' ? '+' : '-'}${deltaQty} ${selectedSku?.unit || 'Units'}!`, 'success');

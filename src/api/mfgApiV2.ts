@@ -287,3 +287,91 @@ export const renumberSkusV2 = async (companyId: string): Promise<{ msg: string; 
   const response = await api.post('/v2/skus/renumber', { companyId });
   return response.data;
 };
+
+export interface SkuStockDetailsResponse {
+  sku: SkuV2;
+  summary: {
+    onHand: number;
+    reserved: number;
+    available: number;
+    inProcess: number;
+    stockValue: number;
+    pcsEquivalent: number | null;
+    primaryUnit: string;
+    altUnit: string;
+    altUnitConversion: number;
+  };
+  locations: {
+    locationId: string;
+    locationName: string;
+    locationCode: string;
+    zoneName: string;
+    floorName: string;
+    warehouseName: string;
+    hierarchyPath: string;
+    onHand: number;
+    reserved: number;
+    available: number;
+    unitCost: number;
+    stockValue: number;
+  }[];
+  batches: {
+    batchNumber: string;
+    locationName: string;
+    receivedQty: number;
+    remainingQty: number;
+    rate: number;
+    value: number;
+    supplier: string;
+    date: string;
+  }[];
+  movements: {
+    id: string;
+    timestamp: string;
+    transactionType: string;
+    direction: 'IN' | 'OUT';
+    referenceType: string;
+    referenceId: string;
+    locationName: string;
+    qtyIn: number;
+    qtyOut: number;
+    quantity: number;
+    batchNumber: string;
+    remarks: string;
+    userName: string;
+  }[];
+  reservations: {
+    orderId: string;
+    orderNumber: string;
+    orderDate: string;
+    customerName: string;
+    orderedQty: number;
+    dispatchedQty: number;
+    reservedQty: number;
+    status: string;
+  }[];
+}
+
+export interface StockAdjustmentPayload {
+  company: string;
+  skuId: string;
+  locationId: string;
+  adjustmentType: string;
+  adjustmentQty: number;
+  reason: string;
+  remarks?: string;
+  batchNumber?: string;
+}
+
+export const getSkuStockDetailsV2 = async (skuId: string, companyId: string): Promise<SkuStockDetailsResponse> => {
+  const response = await api.get(`/v2/skus/${skuId}/stock-details`, {
+    params: { companyId }
+  });
+  return response.data;
+};
+
+export const recordStockAdjustmentV2 = async (payload: StockAdjustmentPayload): Promise<any> => {
+  const response = await api.post('/v2/ledger/adjustment', payload);
+  return response.data;
+};
+

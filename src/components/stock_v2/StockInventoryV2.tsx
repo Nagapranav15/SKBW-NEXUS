@@ -179,7 +179,7 @@ export const StockInventoryV2: React.FC = () => {
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [isSavingBatch, setIsSavingBatch] = useState(false);
   const [batchForm, setBatchForm] = useState({
-    batchNumber: 'PB-SEP-001',
+    batchNumber: 'PB-2026-001',
     purchaseDate: new Date().toISOString().split('T')[0],
     supplierId: '',
     supplierName: '',
@@ -199,12 +199,79 @@ export const StockInventoryV2: React.FC = () => {
       skuName: '',
       brand: '',
       gsm: '',
+      unit: 'Kg',
       totalKg: 0,
       ratePerKg: 0,
       locationId: '',
       locationName: ''
     }
   ]);
+
+  const handleOpenBatchModal = () => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const defaultLoc = allLocations[0]?._id || '';
+    const defaultLocName = allLocations[0]?.name || '';
+    const defaultSup = allSuppliers[0]?._id || '';
+    const defaultSupName = allSuppliers[0]?.firmName || allSuppliers[0]?.name || allSuppliers[0]?.partyName || '';
+
+    setBatchForm({
+      batchNumber: `PB-${Date.now().toString().slice(-5)}`,
+      purchaseDate: todayStr,
+      supplierId: defaultSup,
+      supplierName: defaultSupName,
+      purchaseType: 'Materials',
+      freightCharges: 0,
+      craneCharges: 0,
+      loadingCharges: 0,
+      otherCharges: 0,
+      remarks: ''
+    });
+    setLots([
+      {
+        id: `lot-${Date.now()}-1`,
+        skuId: '',
+        skuCode: '',
+        skuName: '',
+        brand: '',
+        gsm: '',
+        unit: 'Kg',
+        totalKg: 0,
+        ratePerKg: 0,
+        locationId: defaultLoc,
+        locationName: defaultLocName
+      }
+    ]);
+    setShowBatchModal(true);
+  };
+
+  const handleAddLotRow = () => {
+    const defaultLoc = allLocations[0]?._id || '';
+    const defaultLocName = allLocations[0]?.name || '';
+    setLots(prev => [
+      ...prev,
+      {
+        id: `lot-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        skuId: '',
+        skuCode: '',
+        skuName: '',
+        brand: '',
+        gsm: '',
+        unit: 'Kg',
+        totalKg: 0,
+        ratePerKg: 0,
+        locationId: defaultLoc,
+        locationName: defaultLocName
+      }
+    ]);
+  };
+
+  const handleRemoveLotRow = (id: string) => {
+    if (lots.length <= 1) {
+      showToast('A purchase batch must contain at least one item.', 'warning');
+      return;
+    }
+    setLots(prev => prev.filter(l => l.id !== id));
+  };
 
   // Confirmation Modal State
   const [confirmModal, setConfirmModal] = useState<{
@@ -274,13 +341,11 @@ export const StockInventoryV2: React.FC = () => {
 
       const formattedSkus: SkuV2[] = (skusRes || []).map((s: SkuV2) => {
         const sId = String(s._id);
-        const hasBalance = balanceMap.has(sId);
         const ledgerStock = balanceMap.get(sId) || 0;
-        const initialStock = Number(s.openingStock) || 0;
-        const liveStock = hasBalance ? (ledgerStock + initialStock) : initialStock;
         return {
           ...s,
-          presentStock: liveStock
+          openingStock: 0,
+          presentStock: ledgerStock
         };
       });
 
@@ -297,14 +362,6 @@ export const StockInventoryV2: React.FC = () => {
     }
   }, [selectedCompany?._id, loadAuxiliaryData]);
 
-  // Helper unit cost
-  const getCategoryCost = (category?: string) => {
-    if (!category) return 45;
-    if (category === 'Raw Material' || category === 'Paper Reels') return 45;
-    if (category === 'Semi Finished' || category === 'Cover Board') return 25;
-    return 60;
-  };
-
   // Main KPI Aggregations across all SKUs
   const kpiStats = useMemo(() => {
     let totalItemsCount = allSkus.length;
@@ -320,8 +377,8 @@ export const StockInventoryV2: React.FC = () => {
 
     allSkus.forEach(sku => {
       const group = getSkuCategoryGroup(sku);
-      const stock = Number(sku.presentStock ?? sku.openingStock) || 0;
-      const rate = Number((sku as any)?.avgRate || (sku as any)?.rate || (sku as any)?.costPrice || getCategoryCost(sku.category));
+      const stock = Number(sku.presentStock) || 0;
+      const rate = Number((sku as any)?.purchasePrice || (sku as any)?.ratePerKg || (sku as any)?.rate || (sku as any)?.avgRate || (sku as any)?.costPrice || 0);
       const val = stock * rate;
       totalStockVal += val;
 
@@ -449,10 +506,10 @@ export const StockInventoryV2: React.FC = () => {
       'Pages': s.pages || '-',
       'Ruling': s.ruleType || '-',
       'GSM': s.gsm ? `${s.gsm} GSM` : '-',
-      'Available Stock': Number(s.presentStock ?? s.openingStock) || 0,
+      'Available Stock': Number(s.presentStock) || 0,
       'Unit': s.unit || 'Pcs',
       'AUOM': s.altUnit ? `${s.altUnit} (1:${s.altUnitConversion})` : '-',
-      'Estimated Value': formatCurrency((Number(s.presentStock ?? s.openingStock) || 0) * (Number((s as any).avgRate) || getCategoryCost(s.category)))
+      'Estimated Value': formatCurrency((Number(s.presentStock) || 0) * (Number((s as any).purchasePrice || (s as any).ratePerKg || (s as any).rate || (s as any).avgRate) || 0))
     }));
 
     const ws = XLSX.utils.json_to_sheet(exportData);
@@ -467,7 +524,7 @@ export const StockInventoryV2: React.FC = () => {
       {/* ── TOP HEADER BAR ── */}
       <header className="bg-white border-b border-gray-200/80 px-6 py-3 shrink-0 flex items-center justify-between shadow-2xs z-10">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl shadow-xs">
+          <div className="p-2.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-2xl shadow-xs">
             <Boxes className="w-5 h-5 stroke-[2.2]" />
           </div>
           <div>
@@ -548,7 +605,7 @@ export const StockInventoryV2: React.FC = () => {
                     type="button"
                     onClick={() => {
                       setShowAddMenu(false);
-                      setShowBatchModal(true);
+                      handleOpenBatchModal();
                     }}
                     className="w-full px-3 py-2 text-left text-xs font-bold text-gray-800 hover:bg-blue-50 hover:text-blue-900 rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer"
                   >
@@ -601,15 +658,20 @@ export const StockInventoryV2: React.FC = () => {
           </div>
 
           {/* Card 2: Total Stock Value */}
-          <div className="p-3.5 rounded-2xl bg-gradient-to-br from-blue-900 via-indigo-950 to-slate-900 text-white border border-blue-800/60 shadow-xs flex flex-col justify-between">
-            <div className="flex items-center justify-between text-blue-200 text-[11px] font-bold uppercase tracking-wider">
+          <div 
+            onClick={() => { setActiveTab('overview'); handleResetFilters(); }}
+            className="p-3.5 rounded-2xl bg-white border border-gray-200/90 hover:border-blue-400 hover:shadow-xs shadow-2xs transition-all cursor-pointer flex flex-col justify-between"
+          >
+            <div className="flex items-center justify-between text-gray-500 text-[11px] font-bold uppercase tracking-wider">
               <span>Total Stock Value</span>
-              <DollarSign className="w-4 h-4 text-blue-300" />
+              <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
+                <DollarSign className="w-3.5 h-3.5" />
+              </div>
             </div>
             <div className="mt-2">
-              <div className="text-lg font-black text-white">{formatCurrency(kpiStats.totalStockVal)}</div>
-              <div className="text-[10px] text-blue-300/80 font-mono mt-0.5">
-                Weighted average cost
+              <div className="text-xl font-black text-slate-900">{formatCurrency(kpiStats.totalStockVal)}</div>
+              <div className="text-[10px] text-gray-400 mt-0.5">
+                Calculated from purchase batches
               </div>
             </div>
           </div>
@@ -1040,10 +1102,26 @@ export const StockInventoryV2: React.FC = () => {
                       </th>
                       <th className="px-4 py-3">SKU Code</th>
                       <th className="px-4 py-3">Item Description</th>
-                      <th className="px-4 py-3">Category</th>
-                      <th className="px-4 py-3">Attributes</th>
-                      <th className="px-4 py-3 text-right">Available Stock</th>
-                      <th className="px-4 py-3">Primary / AUOM</th>
+                      {activeTab === 'products' ? (
+                        <>
+                          <th className="px-4 py-3">Brand</th>
+                          <th className="px-4 py-3">Pages / Ruling</th>
+                          <th className="px-4 py-3 text-right">Available (GBL)</th>
+                          <th className="px-4 py-3 text-right">Reserved (GBL)</th>
+                          <th className="px-4 py-3 text-right">On Hand (GBL)</th>
+                          <th className="px-4 py-3 text-right">PCS Equivalent</th>
+                        </>
+                      ) : (
+                        <>
+                          <th className="px-4 py-3">Category</th>
+                          <th className="px-4 py-3">Attributes</th>
+                          <th className="px-4 py-3 text-right">Available</th>
+                          <th className="px-4 py-3 text-right">Reserved</th>
+                          <th className="px-4 py-3 text-right">In Process</th>
+                          <th className="px-4 py-3 text-right">On Hand</th>
+                          <th className="px-4 py-3">UOM</th>
+                        </>
+                      )}
                       <th className="px-4 py-3 text-right">Stock Value</th>
                       <th className="px-4 py-3 text-center">Status</th>
                       <th className="px-4 py-3 text-right">Actions</th>
@@ -1051,20 +1129,31 @@ export const StockInventoryV2: React.FC = () => {
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {filteredSkus.map(sku => {
-                      const stock = Number(sku.presentStock ?? sku.openingStock) || 0;
+                      const onHand = Number(sku.presentStock) || 0;
                       const reorder = Number(sku.reorderLevel) || 10;
-                      const rate = Number((sku as any)?.avgRate || (sku as any)?.rate || (sku as any)?.costPrice || getCategoryCost(sku.category));
-                      const totalVal = stock * rate;
+                      const rate = Number((sku as any)?.purchasePrice || (sku as any)?.ratePerKg || (sku as any)?.rate || (sku as any)?.avgRate || (sku as any)?.costPrice || 0);
+                      const totalVal = onHand * rate;
                       const isSelected = selectedIds.includes(sku._id);
 
-                      // AUOM Calculation
+                      // Reserved and Available calculations
+                      const reserved = 0; // Linked to Sales Orders in backend / drawer
+                      const available = Math.max(0, onHand - reserved);
+                      const inProcess = 0;
+
+                      // PCS Equivalent for Finished Goods (e.g. 1 GBL = 200 PCS)
+                      const conversionFactor = Number(sku.altUnitConversion) || 1;
+                      const pcsEquivalent = sku.altUnitConversion && Number(sku.altUnitConversion) > 0
+                        ? onHand * conversionFactor
+                        : onHand;
+
+                      // AUOM Calculation for general items
                       const auomDisplay = (sku.altUnit && sku.altUnitConversion && Number(sku.altUnitConversion) > 0)
-                        ? `${(stock / Number(sku.altUnitConversion)).toLocaleString('en-IN', { maximumFractionDigits: 1 })} ${sku.altUnit}`
+                        ? `${(onHand * Number(sku.altUnitConversion)).toLocaleString('en-IN', { maximumFractionDigits: 1 })} ${sku.altUnit}`
                         : null;
 
                       // Status Badge
-                      const isOutOfStock = stock === 0;
-                      const isLowStock = stock > 0 && stock <= reorder;
+                      const isOutOfStock = onHand === 0;
+                      const isLowStock = onHand > 0 && onHand <= reorder;
 
                       return (
                         <tr 
@@ -1095,36 +1184,76 @@ export const StockInventoryV2: React.FC = () => {
                             <div className="font-bold text-gray-900 group-hover:text-blue-700 transition-colors">
                               {sku.name}
                             </div>
-                            {sku.brand && (
+                            {sku.brand && activeTab !== 'products' && (
                               <div className="text-[10.5px] text-gray-400 font-medium">
                                 Brand: {sku.brand}
                               </div>
                             )}
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-gray-100 text-gray-700">
-                              {sku.category || 'General'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-[11px] text-gray-500 whitespace-nowrap">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              {sku.pages && <span className="bg-slate-100 px-1.5 py-0.2 rounded font-semibold">{sku.pages}P</span>}
-                              {sku.ruleType && <span className="bg-slate-100 px-1.5 py-0.2 rounded font-semibold">{sku.ruleType}</span>}
-                              {sku.gsm && <span className="bg-slate-100 px-1.5 py-0.2 rounded font-semibold">{sku.gsm} GSM</span>}
-                              {!sku.pages && !sku.ruleType && !sku.gsm && <span>—</span>}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-right font-mono font-extrabold text-gray-900 whitespace-nowrap">
-                            {stock.toLocaleString('en-IN')}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <div className="font-bold text-gray-800">{sku.unit || 'Pcs'}</div>
-                            {auomDisplay && (
-                              <div className="text-[10px] text-gray-400 font-mono">
-                                ≈ {auomDisplay}
-                              </div>
-                            )}
-                          </td>
+
+                          {activeTab === 'products' ? (
+                            <>
+                              <td className="px-4 py-3 whitespace-nowrap font-medium text-gray-700">
+                                {sku.brand || '—'}
+                              </td>
+                              <td className="px-4 py-3 text-[11px] text-gray-500 whitespace-nowrap">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {sku.pages && <span className="bg-slate-100 px-1.5 py-0.2 rounded font-semibold">{sku.pages}P</span>}
+                                  {sku.ruleType && <span className="bg-blue-50 text-blue-800 px-1.5 py-0.2 rounded font-semibold">{sku.ruleType}</span>}
+                                  {!sku.pages && !sku.ruleType && <span>—</span>}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-right font-mono font-extrabold text-emerald-700 whitespace-nowrap">
+                                {available.toLocaleString('en-IN')}
+                              </td>
+                              <td className="px-4 py-3 text-right font-mono font-bold text-amber-700 whitespace-nowrap">
+                                {reserved.toLocaleString('en-IN')}
+                              </td>
+                              <td className="px-4 py-3 text-right font-mono font-black text-gray-900 whitespace-nowrap">
+                                {onHand.toLocaleString('en-IN')}
+                              </td>
+                              <td className="px-4 py-3 text-right font-mono font-bold text-indigo-700 whitespace-nowrap">
+                                {pcsEquivalent.toLocaleString('en-IN')} PCS
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-gray-100 text-gray-700">
+                                  {sku.category || 'General'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-[11px] text-gray-500 whitespace-nowrap">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {sku.pages && <span className="bg-slate-100 px-1.5 py-0.2 rounded font-semibold">{sku.pages}P</span>}
+                                  {sku.ruleType && <span className="bg-slate-100 px-1.5 py-0.2 rounded font-semibold">{sku.ruleType}</span>}
+                                  {sku.gsm && <span className="bg-slate-100 px-1.5 py-0.2 rounded font-semibold">{sku.gsm} GSM</span>}
+                                  {!sku.pages && !sku.ruleType && !sku.gsm && <span>—</span>}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
+                                {available.toLocaleString('en-IN')}
+                              </td>
+                              <td className="px-4 py-3 text-right font-mono font-bold text-amber-700 whitespace-nowrap">
+                                {reserved.toLocaleString('en-IN')}
+                              </td>
+                              <td className="px-4 py-3 text-right font-mono font-bold text-indigo-600 whitespace-nowrap">
+                                {inProcess}
+                              </td>
+                              <td className="px-4 py-3 text-right font-mono font-black text-gray-900 whitespace-nowrap">
+                                {onHand.toLocaleString('en-IN')}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <div className="font-bold text-gray-800">{sku.unit || 'Kg'}</div>
+                                {auomDisplay && (
+                                  <div className="text-[10px] text-gray-400 font-mono">
+                                    ≈ {auomDisplay}
+                                  </div>
+                                )}
+                              </td>
+                            </>
+                          )}
+
                           <td className="px-4 py-3 text-right font-mono font-bold text-blue-700 whitespace-nowrap">
                             {formatCurrency(totalVal)}
                           </td>
@@ -1209,6 +1338,10 @@ export const StockInventoryV2: React.FC = () => {
           setAdjustmentInitialLocId(locId);
           setShowAdjustmentModal(true);
         }}
+        onOpenItemMaster={(s) => {
+          setEditingSku(s);
+          setIsAddSkuOpen(true);
+        }}
       />
 
       {/* 2. Stock Transfer Modal */}
@@ -1253,42 +1386,66 @@ export const StockInventoryV2: React.FC = () => {
         />
       )}
 
-      {/* 5. Add Purchase Batch Modal */}
+      {/* 5. Add Multi-Item Purchase Batch Modal */}
       {showBatchModal && (
         <Modal
           isOpen={showBatchModal}
           onClose={() => setShowBatchModal(false)}
-          title="Add Raw Material Purchase Batch"
-          size="max-w-2xl"
+          title="Record Purchase Batch (Multi-Item Intake)"
+          size="max-w-4xl"
         >
           <form 
             onSubmit={async (e) => {
               e.preventDefault();
               if (!selectedCompany?._id) return;
+
+              // Validate vendor
+              if (!batchForm.supplierId) {
+                showToast('Please select a supplier / vendor for this purchase batch.', 'error');
+                return;
+              }
+
+              // Validate lot items
+              const validLots = lots.filter(l => l.skuId && Number(l.totalKg) > 0 && Number(l.ratePerKg) > 0);
+              if (validLots.length === 0) {
+                showToast('Please add at least one item with valid SKU, quantity (>0), and rate (>0).', 'error');
+                return;
+              }
+
               setIsSavingBatch(true);
               try {
-                // Submit purchase batch invoice
+                const totalBatchVal = validLots.reduce((acc, l) => acc + (Number(l.totalKg) || 0) * (Number(l.ratePerKg) || 0), 0);
+                const defaultLoc = allLocations[0]?._id || '';
+
                 const payload = {
                   company: selectedCompany._id,
-                  invoiceNumber: batchForm.batchNumber,
+                  invoiceNumber: batchForm.batchNumber.trim(),
+                  vendorId: batchForm.supplierId,
                   supplierId: batchForm.supplierId,
-                  supplierName: batchForm.supplierName || 'Primary Paper Mill',
+                  supplierName: batchForm.supplierName || 'Primary Supplier',
                   date: batchForm.purchaseDate,
                   type: 'MATERIALS',
-                  items: lots.map(l => ({
+                  subTotal: totalBatchVal,
+                  grandTotal: totalBatchVal,
+                  items: validLots.map((l, idx) => ({
                     skuId: l.skuId,
                     skuCode: l.skuCode,
                     skuName: l.skuName,
-                    quantity: Number(l.totalKg) || 1,
-                    unit: 'Kg',
-                    rate: Number(l.ratePerKg) || 45,
-                    locationId: l.locationId,
-                    locationName: l.locationName
+                    quantity: Number(l.totalKg),
+                    unit: l.unit || 'Kg',
+                    purchasePrice: Number(l.ratePerKg),
+                    rate: Number(l.ratePerKg),
+                    ratePerKg: Number(l.ratePerKg),
+                    totalPrice: Number(l.totalKg) * Number(l.ratePerKg),
+                    lotNumber: `${batchForm.batchNumber}-L${String(idx + 1).padStart(2, '0')}`,
+                    locationId: l.locationId || defaultLoc,
+                    locationName: l.locationName || allLocations.find(loc => loc._id === (l.locationId || defaultLoc))?.name || 'Default Godown'
                   })),
                   remarks: batchForm.remarks
                 };
+
                 await createPurchaseInvoiceV2(payload);
-                showToast(`Purchase Batch ${batchForm.batchNumber} recorded successfully!`, 'success');
+                showToast(`Purchase Batch ${batchForm.batchNumber} recorded successfully with ${validLots.length} items!`, 'success');
                 setShowBatchModal(false);
                 loadAuxiliaryData(true);
               } catch (err: any) {
@@ -1300,14 +1457,16 @@ export const StockInventoryV2: React.FC = () => {
             }}
             className="space-y-4 text-xs text-gray-800"
           >
-            <div className="grid grid-cols-3 gap-3">
+            {/* Header info */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50/80 p-3.5 rounded-2xl border border-slate-200">
               <div>
                 <label className="block font-bold text-gray-700 mb-1">BATCH / INVOICE #</label>
                 <input
                   type="text"
                   value={batchForm.batchNumber}
                   onChange={e => setBatchForm(prev => ({ ...prev, batchNumber: e.target.value }))}
-                  className="w-full px-3 py-2 border rounded-xl font-mono font-bold bg-white"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl font-mono font-bold bg-white text-gray-900 focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g. PB-2026-001"
                   required
                 />
               </div>
@@ -1317,12 +1476,12 @@ export const StockInventoryV2: React.FC = () => {
                   type="date"
                   value={batchForm.purchaseDate}
                   onChange={e => setBatchForm(prev => ({ ...prev, purchaseDate: e.target.value }))}
-                  className="w-full px-3 py-2 border rounded-xl bg-white"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white text-gray-900 focus:ring-2 focus:ring-blue-500"
                   required
                 />
               </div>
               <div>
-                <label className="block font-bold text-gray-700 mb-1">SUPPLIER</label>
+                <label className="block font-bold text-gray-700 mb-1">SUPPLIER / VENDOR</label>
                 <select
                   value={batchForm.supplierId}
                   onChange={e => {
@@ -1330,88 +1489,220 @@ export const StockInventoryV2: React.FC = () => {
                     setBatchForm(prev => ({
                       ...prev,
                       supplierId: e.target.value,
-                      supplierName: sup?.name || ''
+                      supplierName: sup?.name || sup?.firmName || sup?.partyName || ''
                     }));
                   }}
-                  className="w-full px-3 py-2 border rounded-xl bg-white"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white text-gray-900 focus:ring-2 focus:ring-blue-500"
+                  required
                 >
                   <option value="">Select Supplier</option>
                   {allSuppliers.map(s => (
-                    <option key={s._id} value={s._id}>{s.name}</option>
+                    <option key={s._id} value={s._id}>{s.firmName || s.name || s.partyName}</option>
                   ))}
                 </select>
               </div>
             </div>
 
-            {/* Lots Grid */}
-            <div className="space-y-2">
-              <label className="block font-bold text-gray-700">MATERIAL LOTS INTAKE</label>
-              {lots.map((lot, idx) => (
-                <div key={lot.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                  <div className="grid grid-cols-4 gap-2">
-                    <div className="col-span-2">
-                      <label className="text-[10px] font-bold text-gray-500 block mb-0.5">PAPER REEL / MATERIAL SKU</label>
-                      <select
-                        value={lot.skuId}
-                        onChange={e => {
-                          const sku = allSkus.find(s => s._id === e.target.value);
-                          setLots(prev => prev.map(l => l.id === lot.id ? {
-                            ...l,
-                            skuId: e.target.value,
-                            skuCode: sku?.skuCode || '',
-                            skuName: sku?.name || ''
-                          } : l));
-                        }}
-                        className="w-full px-2 py-1.5 border rounded-lg bg-white"
-                        required
-                      >
-                        <option value="">Select Raw Material SKU</option>
-                        {allSkus.filter(s => getSkuCategoryGroup(s) === 'materials').map(s => (
-                          <option key={s._id} value={s._id}>{s.skuCode} — {s.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-gray-500 block mb-0.5">WEIGHT (KG)</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={lot.totalKg || ''}
-                        onChange={e => setLots(prev => prev.map(l => l.id === lot.id ? { ...l, totalKg: Number(e.target.value) } : l))}
-                        className="w-full px-2 py-1.5 border rounded-lg bg-white font-mono font-bold"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-gray-500 block mb-0.5">RATE / KG (₹)</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={lot.ratePerKg || ''}
-                        onChange={e => setLots(prev => prev.map(l => l.id === lot.id ? { ...l, ratePerKg: Number(e.target.value) } : l))}
-                        className="w-full px-2 py-1.5 border rounded-lg bg-white font-mono font-bold"
-                        required
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
+            {/* Items Header & Add Button */}
+            <div className="flex items-center justify-between pt-1">
+              <div>
+                <h4 className="font-bold text-gray-900 text-sm flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-blue-600" />
+                  <span>Batch Items & Unit Pricing</span>
+                </h4>
+                <p className="text-[11px] text-gray-500">
+                  Add multiple items to this batch. Stock and valuation will be calculated dynamically based on these rates.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddLotRow}
+                className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-xl border border-blue-200 transition-colors flex items-center gap-1.5 text-xs cursor-pointer shadow-2xs"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Item to Batch</span>
+              </button>
             </div>
 
+            {/* Multi-Item Table / Card List */}
+            <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
+              {lots.map((lot, idx) => {
+                const rowQty = Number(lot.totalKg) || 0;
+                const rowRate = Number(lot.ratePerKg) || 0;
+                const rowAmount = rowQty * rowRate;
+
+                return (
+                  <div key={lot.id} className="p-3 bg-white border border-gray-200 rounded-2xl shadow-2xs space-y-2.5 hover:border-gray-300 transition-all">
+                    <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 font-mono font-bold text-[10px] flex items-center justify-center">
+                          {idx + 1}
+                        </span>
+                        <span className="font-mono text-[11px] font-bold text-gray-500">
+                          Lot: {batchForm.batchNumber}-L{String(idx + 1).padStart(2, '0')}
+                        </span>
+                      </div>
+                      {lots.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveLotRow(lot.id)}
+                          className="text-gray-400 hover:text-red-600 transition-colors p-1 cursor-pointer"
+                          title="Remove item from batch"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
+                      {/* SKU Select */}
+                      <div className="sm:col-span-4">
+                        <label className="text-[10px] font-bold text-gray-500 block mb-0.5">ITEM / SKU</label>
+                        <select
+                          value={lot.skuId}
+                          onChange={e => {
+                            const sku = allSkus.find(s => s._id === e.target.value);
+                            setLots(prev => prev.map(l => l.id === lot.id ? {
+                              ...l,
+                              skuId: e.target.value,
+                              skuCode: sku?.skuCode || '',
+                              skuName: sku?.name || '',
+                              unit: sku?.unit || 'Kg',
+                              category: sku?.category || sku?.group || ''
+                            } : l));
+                          }}
+                          className="w-full px-2.5 py-1.5 border border-gray-300 rounded-xl bg-white text-xs font-medium text-gray-800 focus:ring-2 focus:ring-blue-500"
+                          required
+                        >
+                          <option value="">Select Item / SKU</option>
+                          {allSkus.map(s => (
+                            <option key={s._id} value={s._id}>
+                              [{s.skuCode}] {s.name} ({s.unit || 'Kg'})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Location Select */}
+                      <div className="sm:col-span-3">
+                        <label className="text-[10px] font-bold text-gray-500 block mb-0.5">STORAGE LOCATION</label>
+                        <select
+                          value={lot.locationId}
+                          onChange={e => {
+                            const loc = allLocations.find(l => l._id === e.target.value);
+                            setLots(prev => prev.map(l => l.id === lot.id ? {
+                              ...l,
+                              locationId: e.target.value,
+                              locationName: loc?.name || ''
+                            } : l));
+                          }}
+                          className="w-full px-2.5 py-1.5 border border-gray-300 rounded-xl bg-white text-xs font-medium text-gray-800 focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Select Location</option>
+                          {allLocations.map(loc => (
+                            <option key={loc._id} value={loc._id}>{loc.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Quantity */}
+                      <div className="sm:col-span-2">
+                        <label className="text-[10px] font-bold text-gray-500 block mb-0.5">
+                          QTY ({lot.unit || 'Kg'})
+                        </label>
+                        <input
+                          type="number"
+                          step="any"
+                          min="0.001"
+                          placeholder="0"
+                          value={lot.totalKg || ''}
+                          onChange={e => setLots(prev => prev.map(l => l.id === lot.id ? { ...l, totalKg: Number(e.target.value) } : l))}
+                          className="w-full px-2.5 py-1.5 border border-gray-300 rounded-xl bg-white font-mono font-bold text-xs text-gray-900 focus:ring-2 focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+
+                      {/* Rate Per Unit */}
+                      <div className="sm:col-span-2">
+                        <label className="text-[10px] font-bold text-gray-500 block mb-0.5">
+                          RATE / {lot.unit || 'UNIT'} (₹)
+                        </label>
+                        <input
+                          type="number"
+                          step="any"
+                          min="0.01"
+                          placeholder="0.00"
+                          value={lot.ratePerKg || ''}
+                          onChange={e => setLots(prev => prev.map(l => l.id === lot.id ? { ...l, ratePerKg: Number(e.target.value) } : l))}
+                          className="w-full px-2.5 py-1.5 border border-gray-300 rounded-xl bg-white font-mono font-bold text-xs text-gray-900 focus:ring-2 focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+
+                      {/* Subtotal */}
+                      <div className="sm:col-span-1 text-right">
+                        <label className="text-[9px] font-bold text-gray-400 block mb-0.5">AMOUNT</label>
+                        <span className="font-mono font-bold text-gray-900 text-xs block py-1.5">
+                          ₹{rowAmount.toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Total Batch Calculation Summary */}
+            <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-4">
+                <div>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">TOTAL ITEMS</span>
+                  <span className="font-mono font-bold text-gray-800">{lots.length} SKU(s)</span>
+                </div>
+                <div className="h-6 w-px bg-gray-200" />
+                <div>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">TOTAL QUANTITY</span>
+                  <span className="font-mono font-bold text-gray-800">
+                    {lots.reduce((acc, l) => acc + (Number(l.totalKg) || 0), 0).toLocaleString('en-IN')}
+                  </span>
+                </div>
+              </div>
+
+              <div className="text-right">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">TOTAL BATCH ESTIMATED VALUE</span>
+                <span className="font-mono font-extrabold text-blue-700 text-base">
+                  ₹{lots.reduce((acc, l) => acc + (Number(l.totalKg) || 0) * (Number(l.ratePerKg) || 0), 0).toLocaleString('en-IN')}
+                </span>
+              </div>
+            </div>
+
+            {/* Remarks */}
+            <div>
+              <label className="block font-bold text-gray-700 mb-1">REMARKS / NOTES</label>
+              <input
+                type="text"
+                placeholder="Optional supplier invoice notes, gate pass ref, etc."
+                value={batchForm.remarks}
+                onChange={e => setBatchForm(prev => ({ ...prev, remarks: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white text-xs"
+              />
+            </div>
+
+            {/* Footer Buttons */}
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
               <button
                 type="button"
                 onClick={() => setShowBatchModal(false)}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl"
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSavingBatch}
-                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs"
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs cursor-pointer disabled:opacity-50"
               >
-                {isSavingBatch ? 'Saving...' : 'Save Purchase Batch'}
+                {isSavingBatch ? 'Recording Batch...' : 'Save Purchase Batch'}
               </button>
             </div>
           </form>

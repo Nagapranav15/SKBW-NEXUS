@@ -49,7 +49,8 @@ import {
   Eye,
   ShoppingCart,
   Settings,
-  RotateCcw
+  RotateCcw,
+  Building2
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { 
@@ -1061,19 +1062,23 @@ const SkuMasterV2: React.FC = () => {
             if (locPaths.length > 0) {
               dynamicLocsStr = Array.from(new Set(locPaths)).join(' • ');
             }
+          } else {
+            resolvedLiveStock = 0;
           }
+        } else {
+          resolvedLiveStock = 0;
         }
 
         if (isMounted) {
           setModalInitialLocationText(initialLocStr);
           setModalDynamicLocationsText(dynamicLocsStr);
-          setModalDynamicLiveStock(resolvedLiveStock);
+          setModalDynamicLiveStock(resolvedLiveStock ?? 0);
         }
       } catch (err) {
         if (isMounted) {
           setModalInitialLocationText('Main Warehouse - Bay A1');
           setModalDynamicLocationsText('No live stock entries assigned');
-          setModalDynamicLiveStock(null);
+          setModalDynamicLiveStock(0);
         }
       }
     };
@@ -1188,10 +1193,8 @@ const SkuMasterV2: React.FC = () => {
 
       const formatted = (data || []).map(item => {
         const itemId = String(item._id);
-        const hasBalance = balanceMap.has(itemId);
         const ledgerStock = balanceMap.get(itemId) || 0;
-        const initialStock = Number(item.openingStock) || 0;
-        const liveStock = hasBalance ? (ledgerStock + initialStock) : initialStock;
+        const liveStock = ledgerStock;
         
         let cleanAltUnit = (item.altUnit || '').trim();
         const cleanUnit = (item.unit || '').trim();
@@ -1217,7 +1220,7 @@ const SkuMasterV2: React.FC = () => {
           altUnit: cleanAltUnit,
           altUnitConversion: cleanAltUnit ? item.altUnitConversion : undefined,
           name: formatSkuName(item.name),
-          openingStock: liveStock,
+          openingStock: 0,
           presentStock: liveStock
         };
       });
@@ -1239,7 +1242,7 @@ const SkuMasterV2: React.FC = () => {
       unit: 'Pcs',
       altUnit: 'Box',
       altUnitConversion: 10,
-      openingStock: 1100,
+      openingStock: 0,
       status: 'Active',
       ruleType: 'Unruled (UR)',
       brand: 'Happy Days',
@@ -1254,7 +1257,7 @@ const SkuMasterV2: React.FC = () => {
       unit: 'Pcs',
       altUnit: 'Dozen',
       altUnitConversion: 12,
-      openingStock: 1800,
+      openingStock: 0,
       status: 'Active',
       ruleType: 'Single Line (SR)',
       brand: 'Classmate',
@@ -1269,7 +1272,7 @@ const SkuMasterV2: React.FC = () => {
       unit: 'Pcs',
       altUnit: 'Box',
       altUnitConversion: 5,
-      openingStock: 400,
+      openingStock: 0,
       status: 'Active',
       brand: 'Navneet',
       paperType: 'Sheets',
@@ -1283,7 +1286,7 @@ const SkuMasterV2: React.FC = () => {
       unit: 'Pcs',
       altUnit: 'Pack',
       altUnitConversion: 10,
-      openingStock: 150,
+      openingStock: 0,
       status: 'Active',
       brand: 'Happy Days',
       paperType: 'Sheets',
@@ -1297,7 +1300,7 @@ const SkuMasterV2: React.FC = () => {
       unit: 'Pcs',
       altUnit: 'Box',
       altUnitConversion: 6,
-      openingStock: 1100,
+      openingStock: 0,
       status: 'Active',
       brand: 'Classmate',
       paperType: 'Sheets'
@@ -1327,7 +1330,7 @@ const SkuMasterV2: React.FC = () => {
       unit: 'Set',
       altUnit: 'Box',
       altUnitConversion: 20,
-      openingStock: 1100,
+      openingStock: 0,
       status: 'Active',
       paperType: 'Sheets',
       brand: 'Bestfriend Publishing'
@@ -1340,7 +1343,7 @@ const SkuMasterV2: React.FC = () => {
       unit: 'Pcs',
       altUnit: 'Crate',
       altUnitConversion: 50,
-      openingStock: 450,
+      openingStock: 0,
       status: 'Active',
       paperType: 'Sheets',
       brand: 'Happy Days'
@@ -1357,7 +1360,7 @@ const SkuMasterV2: React.FC = () => {
       unit: 'Kg',
       altUnit: 'Roll',
       altUnitConversion: 250,
-      openingStock: 600,
+      openingStock: 0,
       status: 'Active',
       paperType: 'Reels',
       gsm: 70,
@@ -1371,7 +1374,7 @@ const SkuMasterV2: React.FC = () => {
       unit: 'Pcs',
       altUnit: 'Pallet',
       altUnitConversion: 1000,
-      openingStock: 15000,
+      openingStock: 0,
       status: 'Active',
       paperType: 'Sheets',
       gsm: 300,
@@ -1385,7 +1388,7 @@ const SkuMasterV2: React.FC = () => {
       unit: 'Kg',
       altUnit: 'Spool',
       altUnitConversion: 15,
-      openingStock: 180,
+      openingStock: 0,
       status: 'Active',
       brand: 'UrbanThread Apparel'
     },
@@ -1397,7 +1400,7 @@ const SkuMasterV2: React.FC = () => {
       unit: 'Kg',
       altUnit: 'Bag',
       altUnitConversion: 25,
-      openingStock: 2200,
+      openingStock: 0,
       status: 'Active',
       brand: 'Campus Store Co.'
     }
@@ -1687,7 +1690,7 @@ const SkuMasterV2: React.FC = () => {
               break;
             case 'openingStock':
             case 'stock':
-              itemVal = Number(item.openingStock !== undefined ? item.openingStock : item.stock !== undefined ? item.stock : item.currentStock) || 0;
+              itemVal = Number((item as any).presentStock || 0);
               isNumeric = true;
               break;
             case 'dimensions':
@@ -1766,8 +1769,8 @@ const SkuMasterV2: React.FC = () => {
             fieldA = Number(a.gsm) || 0;
             fieldB = Number(b.gsm) || 0;
           } else if (rule.field === 'openingStock' || rule.field === 'stock') {
-            fieldA = Number(a.openingStock !== undefined ? a.openingStock : a.stock !== undefined ? a.stock : a.currentStock) || 0;
-            fieldB = Number(b.openingStock !== undefined ? b.openingStock : b.stock !== undefined ? b.stock : b.currentStock) || 0;
+            fieldA = Number((a as any).presentStock || 0);
+            fieldB = Number((b as any).presentStock || 0);
           } else if (rule.field === 'rate' || rule.field === 'price') {
             fieldA = Number(a.rate !== undefined ? a.rate : a.price !== undefined ? a.price : a.unitPrice) || 0;
             fieldB = Number(b.rate !== undefined ? b.rate : b.price !== undefined ? b.price : b.unitPrice) || 0;
@@ -1969,7 +1972,6 @@ const SkuMasterV2: React.FC = () => {
           'LENGTH (CM)': cleanVal(s.length),
           'Min Stock Level': s.minStockLevel || 0,
           'Reorder Level': cleanVal((s as any).reorderLevel),
-          'Opening Stock Qty': s.openingStock || 0,
           'Status': s.status || 'Active',
           'Preferred Vendor': cleanVal((s as any).preferredVendor)
         };
@@ -1989,7 +1991,6 @@ const SkuMasterV2: React.FC = () => {
           'LENGTH (CM)': cleanVal(s.length),
           'Min Stock Level': s.minStockLevel || 0,
           'Reorder Level': cleanVal((s as any).reorderLevel),
-          'Opening Stock Qty': s.openingStock || 0,
           'Status': s.status || 'Active',
           'Preferred Vendor': cleanVal((s as any).preferredVendor)
         };
@@ -2006,7 +2007,6 @@ const SkuMasterV2: React.FC = () => {
           'LENGTH (CM)': cleanVal(s.length),
           'STANDARD SHEETS / REAM': cleanVal(s.pages),
           'UOM': s.unit || 'Kg',
-          'Opening Stock Qty': s.openingStock || 0,
           'Min Stock Level': s.minStockLevel || 0,
           'Reorder Level': cleanVal((s as any).reorderLevel),
           'Status': s.status || 'Active',
@@ -2241,14 +2241,13 @@ const SkuMasterV2: React.FC = () => {
         'LENGTH (CM)',
         'Min Stock Level',
         'Reorder Level',
-        'Opening Stock Qty',
         'Status',
         'Preferred Vendor'
       ];
       sampleRows = [
-        ['FG-001', 'Bestfriend (UR)', '132', 'Bestfriend', 'UR', 'Longbooks', 'Pcs', 'Box', '500', '52', '14.25', '35', '50', '20', '10', 'Active', ''],
-        ['FG-002', '142P Bestfriend (UR)', '142', 'Bestfriend', 'UR', 'Executive Diaries', 'Pcs', 'Box', '200', '52', '57', '70', '50', '20', '100', 'Active', ''],
-        ['FG-003', 'Deluxe Spiral Notebook A4', '192', 'Bestfriend', 'Plain', 'Notebooks', 'Pcs', 'Box', '24', '70', '21', '29.7', '100', '50', '500', 'Active', '']
+        ['FG-001', 'Bestfriend (UR)', '132', 'Bestfriend', 'UR', 'Longbooks', 'Pcs', 'Box', '500', '52', '14.25', '35', '50', '20', 'Active', ''],
+        ['FG-002', '142P Bestfriend (UR)', '142', 'Bestfriend', 'UR', 'Executive Diaries', 'Pcs', 'Box', '200', '52', '57', '70', '50', '20', 'Active', ''],
+        ['FG-003', 'Deluxe Spiral Notebook A4', '192', 'Bestfriend', 'Plain', 'Notebooks', 'Pcs', 'Box', '24', '70', '21', '29.7', '100', '50', 'Active', '']
       ];
     } else if (activeMainTab === 'semi') {
       headers = [
@@ -2265,13 +2264,12 @@ const SkuMasterV2: React.FC = () => {
         'LENGTH (CM)',
         'Min Stock Level',
         'Reorder Level',
-        'Opening Stock Qty',
         'Status',
         'Preferred Vendor'
       ];
       sampleRows = [
-        ['SM-001', 'Akshay Inner Form 52 GSM 14.25 x 35 CM (SR)', 'Akshay Inner Form', 'Single Line', 'Inner Forms', 'Ream', 'Bundles', '50', '52', '14.25', '35', '100', '50', '800', 'Active', 'Apex Print Pack'],
-        ['SM-002', 'Cover Board 250 GSM 57 x 70 CM', 'Cover Board', 'Plain', 'Covers', 'Pcs', 'Bundles', '100', '250', '57', '70', '200', '100', '1200', 'Active', 'Sunrise Laminators']
+        ['SM-001', 'Akshay Inner Form 52 GSM 14.25 x 35 CM (SR)', 'Akshay Inner Form', 'Single Line', 'Inner Forms', 'Ream', 'Bundles', '50', '52', '14.25', '35', '100', '50', 'Active', 'Apex Print Pack'],
+        ['SM-002', 'Cover Board 250 GSM 57 x 70 CM', 'Cover Board', 'Plain', 'Covers', 'Pcs', 'Bundles', '100', '250', '57', '70', '200', '100', 'Active', 'Sunrise Laminators']
       ];
     } else {
       // Raw materials
@@ -2286,16 +2284,15 @@ const SkuMasterV2: React.FC = () => {
         'LENGTH (CM)',
         'STANDARD SHEETS / REAM',
         'UOM',
-        'Opening Stock Qty',
         'Min Stock Level',
         'Reorder Level',
         'Status',
         'Preferred Vendor'
       ];
       sampleRows = [
-        ['RM-001', 'Maplitho Reel 70 GSM 84 CM', 'Maplitho', 'Paper Reels', 'Reels', '70', '84', '', '', 'Kg', '1500', '300', '100', 'Active', 'Bhavani Paper Mill'],
-        ['RM-002', 'Duplex Board Sheet 300 GSM 57 x 70 CM (500 Sheets)', 'Duplex Board', 'Duplex Cover Board', 'Sheets', '300', '57', '70', '500', 'Kg', '2500', '500', '200', 'Active', 'Apex Board Traders'],
-        ['RM-003', 'Craft Paper Reel 80 GSM 90 CM', 'Craft Paper', 'Paper Reels', 'Reels', '80', '90', '', '', 'Kg', '1200', '200', '50', 'Active', 'Sri Balaji Paper Mart']
+        ['RM-001', 'Maplitho Reel 70 GSM 84 CM', 'Maplitho', 'Paper Reels', 'Reels', '70', '84', '', '', 'Kg', '300', '100', 'Active', 'Bhavani Paper Mill'],
+        ['RM-002', 'Duplex Board Sheet 300 GSM 57 x 70 CM (500 Sheets)', 'Duplex Board', 'Duplex Cover Board', 'Sheets', '300', '57', '70', '500', 'Kg', '500', '200', 'Active', 'Apex Board Traders'],
+        ['RM-003', 'Craft Paper Reel 80 GSM 90 CM', 'Craft Paper', 'Paper Reels', 'Reels', '80', '90', '', '', 'Kg', '200', '50', 'Active', 'Sri Balaji Paper Mart']
       ];
     }
 
@@ -2563,11 +2560,6 @@ const SkuMasterV2: React.FC = () => {
           else paperType = 'Reels';
         }
 
-        // Extract Stock
-        const rawStock = getFieldVal('openingstockqty', 'openingstock', 'stock', 'presentstock', 'qty', 'quantity', 'currentstock');
-        const stockMatch = rawStock.match(/(\d+(?:\.\d+)?)/);
-        const openingStock = stockMatch ? Number(stockMatch[1]) : (rawStock ? Number(rawStock) || 0 : 0);
-
         // Extract Min Stock
         const rawMinStock = getFieldVal('minstocklevel', 'minstock', 'minimumstock', 'lowstockalert');
         const minStockMatch = rawMinStock.match(/(\d+(?:\.\d+)?)/);
@@ -2596,8 +2588,8 @@ const SkuMasterV2: React.FC = () => {
           width,
           length,
           paperType,
-          openingStock,
-          presentStock: openingStock,
+          openingStock: 0,
+          presentStock: 0,
           minStockLevel,
           reorderLevel,
           preferredVendor,
@@ -4152,7 +4144,7 @@ const SkuMasterV2: React.FC = () => {
                                 </td>
                               );
                             case 'openingStock':
-                              const liveStockQty = Number((sku as any).presentStock ?? sku.openingStock ?? 0);
+                              const liveStockQty = Number((sku as any).presentStock || 0);
                               const minThreshold = Number((sku as any).minStockLevel || 0);
 
                               let stockBadge = (
@@ -5145,10 +5137,9 @@ const SkuMasterV2: React.FC = () => {
                   {/* CARD 4: 📦 Stock & Warehouse Location */}
                   {(() => {
                     const stockUnit = selectedSkuDetails.unit || (selectedSkuDetails.paperType === 'Sheets' ? 'Sheets' : selectedSkuDetails.paperType === 'Reels' ? 'KG' : (getItemType(selectedSkuDetails) === 'materials' ? 'KG' : 'Pcs'));
-                    const openingQty = Number(selectedSkuDetails.openingStock || 0);
                     const liveStockQty = modalDynamicLiveStock !== null 
                       ? modalDynamicLiveStock 
-                      : Number((selectedSkuDetails as any).presentStock ?? selectedSkuDetails.openingStock ?? 0);
+                      : (Number((selectedSkuDetails as any).presentStock) || 0);
 
                     const minStockRaw = (selectedSkuDetails as any).minStockLevel ?? (selectedSkuDetails as any).minStock;
                     const hasMinStock = minStockRaw !== undefined && minStockRaw !== null && minStockRaw !== '' && !isNaN(Number(minStockRaw));
@@ -5160,7 +5151,7 @@ const SkuMasterV2: React.FC = () => {
                     const reorderNum = hasReorder ? Number(reorderRaw) : 0;
                     const reorderDisplay = hasReorder ? `${reorderNum.toLocaleString('en-IN')} ${stockUnit}` : '—';
 
-                    const unitRate = Number((selectedSkuDetails as any).purchasePrice || (selectedSkuDetails as any).ratePerKg || (selectedSkuDetails as any).cost || 45);
+                    const unitRate = Number((selectedSkuDetails as any).purchasePrice || (selectedSkuDetails as any).ratePerKg || (selectedSkuDetails as any).rate || (selectedSkuDetails as any).avgRate || (selectedSkuDetails as any).cost || 0);
                     const totalEstVal = liveStockQty * unitRate;
 
                     let statusBadge = { label: 'Normal', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
@@ -5173,45 +5164,47 @@ const SkuMasterV2: React.FC = () => {
                     }
 
                     return (
-                      <div className="bg-white p-4.5 rounded-2xl border border-emerald-200/70 shadow-2xs space-y-3.5">
-                        <div className="flex items-center justify-between pb-2.5 border-b border-gray-100">
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                      <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-3.5 flex flex-col justify-between">
+                        {/* Header */}
+                        <div className="flex items-center justify-between pb-2.5 border-b border-gray-100 gap-2">
+                          <div className="flex items-center gap-2 shrink-0">
+                            <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
                               <Package className="w-4 h-4" />
                             </div>
-                            <h4 className="font-bold text-gray-900 text-xs">Stock & Warehouse Location</h4>
+                            <h4 className="font-bold text-gray-900 text-xs whitespace-nowrap">Stock & Location</h4>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5 shrink-0">
                             <button
+                              type="button"
                               onClick={() => {
                                 setTempMinStock(hasMinStock ? String(minStockNum) : '');
                                 setTempReorder(hasReorder ? String(reorderNum) : '');
                                 setTempVendor((selectedSkuDetails as any).preferredVendor || '');
                                 setIsEditingThresholds(!isEditingThresholds);
                               }}
-                              className="text-[10px] font-bold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-lg border border-amber-200/80 flex items-center gap-1 cursor-pointer"
+                              className="h-6.5 text-[10px] font-bold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-2 rounded-lg border border-amber-200/80 flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap"
                             >
-                              <Edit className="w-3 h-3" />
-                              {isEditingThresholds ? 'Cancel' : 'Edit Levels'}
+                              <Edit className="w-3 h-3 shrink-0" />
+                              <span>{isEditingThresholds ? 'Cancel' : 'Edit'}</span>
                             </button>
-                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${statusBadge.bg}`}>
+                            <span className={`h-6.5 px-2 rounded-lg text-[10px] font-black uppercase border flex items-center justify-center whitespace-nowrap ${statusBadge.bg}`}>
                               {statusBadge.label}
                             </span>
                             {statusBadge.label !== 'Normal' && (
                               <a
                                 href={`/inventory-v2/purchases?reorderSkuId=${selectedSkuDetails._id}`}
-                                className="text-[10px] font-black text-white bg-amber-600 hover:bg-amber-700 px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-2xs transition-all cursor-pointer no-underline"
+                                className="h-6.5 text-[10px] font-black text-white bg-amber-600 hover:bg-amber-700 px-2 rounded-lg flex items-center gap-1 shadow-2xs transition-all cursor-pointer no-underline whitespace-nowrap"
                                 title="Create Purchase Batch Reorder for this item"
                               >
-                                <ShoppingCart className="w-3 h-3" />
-                                <span>Reorder Material</span>
+                                <ShoppingCart className="w-3 h-3 shrink-0" />
+                                <span>Reorder</span>
                               </a>
                             )}
                           </div>
                         </div>
 
                         {isEditingThresholds && (
-                          <div className="bg-amber-50/70 p-3 rounded-xl border border-amber-200/80 space-y-2.5">
+                          <div className="bg-amber-50/70 p-3.5 rounded-xl border border-amber-200/80 space-y-2.5">
                             <div className="text-[11px] font-bold text-amber-900 flex items-center justify-between">
                               <span>Set Stock Level Thresholds ({stockUnit})</span>
                             </div>
@@ -5262,27 +5255,7 @@ const SkuMasterV2: React.FC = () => {
                           </div>
                         )}
 
-                        {/* Top Stock Metrics Grid */}
-                        <div className="grid grid-cols-3 gap-3 bg-slate-50/80 p-3 rounded-xl border border-slate-100 text-xs">
-                          <div>
-                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">OPENING BALANCE</span>
-                            <span className="font-mono font-bold text-gray-900 text-xs">{openingQty.toLocaleString('en-IN')} {stockUnit}</span>
-                          </div>
-                          <div>
-                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PRESENT LIVE STOCK</span>
-                            <span className="font-mono font-extrabold text-emerald-600 text-xs">
-                              {liveStockQty.toLocaleString('en-IN')} {stockUnit}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">EST. STOCK VALUE</span>
-                            <span className="font-mono font-bold text-slate-800 text-xs">
-                              ₹{totalEstVal.toLocaleString('en-IN')}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Dynamic Stock Thresholds & Standard Sheets */}
+                        {/* Unified Stock & Thresholds Metrics 4-Tile Grid */}
                         {(() => {
                           const isSheetItem = selectedSkuDetails.paperType === 'Sheets' || (selectedSkuDetails.name || '').toLowerCase().includes('sheet');
                           const stdSheetsVal = selectedSkuDetails.pages || 500;
@@ -5298,62 +5271,98 @@ const SkuMasterV2: React.FC = () => {
                             activeMainTab === 'materials' || activeMainTab === 'semi';
 
                           return (
-                            <div className={`grid ${isSheetItem && isRawOrSemiDetail ? 'grid-cols-4' : isSheetItem || isRawOrSemiDetail ? 'grid-cols-3' : 'grid-cols-2'} gap-3 text-xs bg-slate-50/50 p-3 rounded-xl border border-slate-100`}>
-                              <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">MIN STOCK THRESHOLD</span>
-                                <span className="font-mono font-bold text-amber-600 text-xs block">
-                                  {minStockDisplay}
-                                </span>
-                              </div>
-                              <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">REORDER LEVEL</span>
-                                <span className="font-mono font-bold text-blue-600 text-xs block">
-                                  {reorderDisplay}
-                                </span>
-                              </div>
-                              {isRawOrSemiDetail && (
-                                <div>
-                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PREFERRED VENDOR</span>
-                                  <span className="font-bold text-indigo-700 text-xs block truncate">
-                                    {(selectedSkuDetails as any).preferredVendor || '—'}
+                            <div className="space-y-2.5">
+                              <div className="grid grid-cols-2 gap-2.5 text-xs">
+                                <div className="bg-slate-50/90 p-3 rounded-xl border border-slate-200/80">
+                                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1 whitespace-nowrap">
+                                    LIVE ON-HAND
+                                  </span>
+                                  <span className="font-mono font-extrabold text-emerald-600 text-sm block truncate">
+                                    {liveStockQty.toLocaleString('en-IN')} {stockUnit}
                                   </span>
                                 </div>
-                              )}
-                              {isSheetItem && (
-                                <div>
-                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">STD. SHEETS / REAM</span>
-                                  <span className="font-mono font-bold text-indigo-600 text-xs block">
-                                    {stdSheetsVal} Sheets
+                                <div className="bg-slate-50/90 p-3 rounded-xl border border-slate-200/80">
+                                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1 whitespace-nowrap">
+                                    EST. LIVE VALUE
                                   </span>
+                                  <span className="font-mono font-extrabold text-slate-800 text-sm block truncate">
+                                    ₹{totalEstVal.toLocaleString('en-IN')}
+                                  </span>
+                                </div>
+                                <div className="bg-slate-50/90 p-3 rounded-xl border border-slate-200/80">
+                                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1 whitespace-nowrap">
+                                    MIN THRESHOLD
+                                  </span>
+                                  <span className="font-mono font-bold text-amber-600 text-sm block truncate">
+                                    {minStockDisplay}
+                                  </span>
+                                </div>
+                                <div className="bg-slate-50/90 p-3 rounded-xl border border-slate-200/80">
+                                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1 whitespace-nowrap">
+                                    REORDER LEVEL
+                                  </span>
+                                  <span className="font-mono font-bold text-blue-600 text-sm block truncate">
+                                    {reorderDisplay}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Full-Width Preferred Vendor / Aux Attributes */}
+                              {((selectedSkuDetails as any).preferredVendor || isRawOrSemiDetail || isSheetItem) && (
+                                <div className="space-y-2">
+                                  {((selectedSkuDetails as any).preferredVendor || isRawOrSemiDetail) && (
+                                    <div className="bg-slate-50/90 px-3.5 py-2.5 rounded-xl border border-slate-200/80 flex items-center justify-between gap-3">
+                                      <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+                                          <Building2 className="w-3.5 h-3.5" />
+                                        </div>
+                                        <div className="min-w-0">
+                                          <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block">
+                                            PREFERRED VENDOR
+                                          </span>
+                                          <span className="font-bold text-indigo-900 text-xs block break-words">
+                                            {(selectedSkuDetails as any).preferredVendor || '—'}
+                                          </span>
+                                        </div>
+                                      </div>
+                                      {(selectedSkuDetails as any).preferredVendor && (
+                                        <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50/80 px-2 py-0.5 rounded-md border border-indigo-200/60 shrink-0 whitespace-nowrap">
+                                          Primary Supplier
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                  {isSheetItem && (
+                                    <div className="bg-slate-50/90 px-3.5 py-2 rounded-xl border border-slate-200/80 flex items-center justify-between">
+                                      <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider">
+                                        STD. SHEETS / REAM
+                                      </span>
+                                      <span className="font-mono font-bold text-slate-700 text-xs">
+                                        {stdSheetsVal} Sheets
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
                           );
                         })()}
 
-                        {/* Separated Location Blocks: Initial Assigned & Current Dynamic */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2.5 border-t border-gray-100">
-                          {/* Initial Location */}
-                          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 space-y-1">
+                        {/* Full-Width Storage Locations Container */}
+                        <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-200/80 space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
                             <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-                              <MapPin className="w-3.5 h-3.5 text-indigo-500" />
-                              <span>INITIAL ASSIGNED LOCATION</span>
+                              <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                              <span>STORAGE & WAREHOUSE LOCATION</span>
                             </div>
-                            <div className="font-bold text-xs text-gray-800 flex items-center gap-2 pt-0.5">
-                              <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0"></span>
-                              <span className="truncate">{modalInitialLocationText || 'Not assigned'}</span>
-                            </div>
+                            <span className="text-[9.5px] font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200 whitespace-nowrap">
+                              Initial: {modalInitialLocationText || 'SKBW'}
+                            </span>
                           </div>
-
-                          {/* Dynamic Location */}
-                          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 space-y-1">
-                            <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-                              <MapPin className="w-3.5 h-3.5 text-emerald-600" />
-                              <span>CURRENT DYNAMIC LOCATION(S)</span>
-                            </div>
-                            <div className="font-bold text-xs text-gray-800 flex items-center gap-2 pt-0.5">
-                              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-                              <span className="truncate">{modalDynamicLocationsText || 'No live stock entries assigned'}</span>
+                          <div className="flex items-start gap-2 pt-0.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 mt-1"></span>
+                            <div className="text-xs font-semibold text-gray-800 break-words leading-relaxed">
+                              {modalDynamicLocationsText || 'No live batch stock assigned'}
                             </div>
                           </div>
                         </div>
@@ -6912,7 +6921,7 @@ const SkuMasterV2: React.FC = () => {
                                   name: mat.name,
                                   qty: 1,
                                   uom: mat.unit || 'Kg',
-                                  inStock: Number((mat as any).presentStock ?? (mat as any).openingStock ?? 0),
+                                  inStock: Number((mat as any).presentStock || 0),
                                   notes: ''
                                 }
                               ]);
@@ -6931,7 +6940,7 @@ const SkuMasterV2: React.FC = () => {
                             <span className="truncate text-[11px]">{mat.name}</span>
                           </div>
                           <span className="text-[10px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">
-                            {Number((mat as any).presentStock ?? (mat as any).openingStock ?? 0)}
+                            {Number((mat as any).presentStock || 0)}
                           </span>
                         </div>
                       );
@@ -6961,7 +6970,7 @@ const SkuMasterV2: React.FC = () => {
                                   name: semi.name,
                                   qty: 1,
                                   uom: semi.unit || 'Pcs',
-                                  inStock: Number((semi as any).presentStock ?? (semi as any).openingStock ?? 0),
+                                  inStock: Number((semi as any).presentStock || 0),
                                   notes: ''
                                 }
                               ]);
@@ -6980,7 +6989,7 @@ const SkuMasterV2: React.FC = () => {
                             <span className="truncate text-[11px]">{semi.name}</span>
                           </div>
                           <span className="text-[10px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">
-                            {Number((semi as any).presentStock ?? (semi as any).openingStock ?? 0)}
+                            {Number((semi as any).presentStock || 0)}
                           </span>
                         </div>
                       );

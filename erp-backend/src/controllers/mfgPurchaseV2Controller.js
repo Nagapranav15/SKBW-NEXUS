@@ -254,6 +254,13 @@ exports.createPurchaseInvoice = async (req, res, next) => {
           status: "Posted"
         }).save();
       }
+
+      // Automatically update SKU purchasePrice & ratePerKg according to purchase batch costing
+      await SkuV2.findByIdAndUpdate(valItem.skuId, {
+        purchasePrice: valItem.purchasePrice,
+        ratePerKg: valItem.ratePerKg || valItem.purchasePrice,
+        rate: valItem.purchasePrice
+      });
     }
 
     // 6. Automatically increase Vendor's outstanding liability (Material Cost Subtotal)

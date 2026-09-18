@@ -7,6 +7,8 @@ const Sequence = require("../models/sequenceModel");
 const Metadata = require("../models/metadataModel");
 const ActivityLog = require("../models/activityLogModel");
 const User = require("../models/userModel");
+const SalesOrderV2 = require("../models/salesOrderV2Model");
+const PurchaseInvoiceV2 = require("../models/purchaseInvoiceV2Model");
 const { validateUomConversion } = require("../utils/uomConversion");
 
 const toObjectId = (id) => {
@@ -1501,7 +1503,12 @@ exports.getBalances = async (req, res, next) => {
       ? { skuId: "$skuId", locationId: "$locationId", batchNumber: "$batchNumber" }
       : { skuId: "$skuId", locationId: "$locationId" };
 
-    const matchObj = { company: toObjectId(companyId), status: { $ne: "Cancelled" } };
+    const matchObj = { 
+      company: toObjectId(companyId), 
+      status: { $ne: "Cancelled" },
+      referenceType: { $ne: "OpeningStock" },
+      transactionType: { $nin: ["Opening Stock", "Opening Balance", "OPENING_BALANCE"] }
+    };
     if (skuId) matchObj.skuId = toObjectId(skuId);
     if (batchNumber) matchObj.batchNumber = batchNumber;
 
@@ -2228,6 +2235,370 @@ exports.updateMetadata = async (req, res, next) => {
       { returnDocument: 'after', upsert: true, setDefaultsOnInsert: true }
     );
     res.json(doc);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ── STOCK ADJUSTMENT V2 ───────────────────────────────────────────────────────
+
+exports.recordAdjustment = async (req, res, next) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const { 
+      skuId, 
+      locationId, 
+      adjustmentType,
+      adjustmentQty,
+      reason, 
+      remarks, 
+      company,
+      batchNumber 
+    } = req.body;
+
+    if (!company) {
+      return res.status(400).json({ msg: "company is required" });
+    }
+    if (!skuId || !locationId) {
+      return res.status(400).json({ msg: "skuId and locationId are required" });
+    }
+    const diffQty = Number(adjustmentQty);
+    if (isNaN(diffQty) || diffQty === 0) {
+      return res.status(400).json({ msg: "Adjustment quantity must be non-zero" });
+    }
+
+    const companyObjId = toObjectId(company);
+    const skuObjId = toObjectId(skuId);
+    const locObjId = toObjectId(locationId);
+
+    const skuDoc = await SkuV2.findOne({ _id: skuObjId, company: companyObjId });
+    if (!skuDoc) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ msg: "SKU not found" });
+    }
+
+    const locationDoc = await WarehouseLocationV2.findOne({ _id: locObjId, company: companyObjId });
+    if (!locationDoc) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ msg: "Location not found" });
+    }
+
+    const zone = await WarehouseLocationV2.findOne({ _id: locationDoc.parentId, company: companyObjId });
+    const floor = zone ? await WarehouseLocationV2.findOne({ _id: zone.parentId, company: companyObjId }) : null;
+    const warehouse = floor ? await WarehouseLocationV2.findOne({ _id: floor.parentId, company: companyObjId }) : null;
+
+    const matchCriteria = { skuId: skuObjId, locationId: locObjId, company: companyObjId };
+    if (batchNumber) matchCriteria.batchNumber = batchNumber;
+
+    const currentLedgerAgg = await InventoryLedger.aggregate([
+      { $match: matchCriteria },
+      {
+        $group: {
+          _id: null,
+          onHand: {
+            $sum: {
+              $cond: [{ $eq: ["$direction", "IN"] }, "$quantity", { $subtract: [0, "$quantity"] }]
+            }
+          }
+        }
+      }
+    ]);
+    const currentOnHand = currentLedgerAgg.length > 0 ? currentLedgerAgg[0].onHand : 0;
+    const isIncrease = diffQty > 0;
+    const absQty = Math.abs(diffQty);
+    const newBalance = isIncrease ? currentOnHand + absQty : Math.max(0, currentOnHand - absQty);
+
+    const referenceId = `ADJ-${Date.now()}`;
+    const transactionNumber = await Sequence.getNextSequence("IL", session);
+
+    // 1. Primary InventoryLedger
+    const primAdj = new InventoryLedger({
+      transactionNumber,
+      transactionType: "Adjustment",
+      skuId: skuObjId,
+      quantity: absQty,
+      unit: skuDoc.unit || "kg",
+      direction: isIncrease ? "IN" : "OUT",
+      referenceType: "StockAdjustment",
+      referenceId,
+      batchNumber: batchNumber || "UNKNOWN",
+      warehouseId: warehouse?._id || locObjId,
+      floorId: floor?._id || locObjId,
+      zoneId: zone?._id || locObjId,
+      locationId: locObjId,
+      remarks: remarks || `Stock Adjustment (${adjustmentType || 'General'}): ${reason || 'Physical Count Reconciliation'}`,
+      createdBy: toObjectId(req.user?.id),
+      company: companyObjId,
+      status: "Posted"
+    });
+    await primAdj.save({ session });
+
+    // 2. V2 Audit Ledger
+    const ledgerAdj = new InventoryLedgerV2({
+      transactionType: "Stock Adjustment",
+      referenceId,
+      skuId: skuObjId,
+      locationId: locObjId,
+      qtyIn: isIncrease ? absQty : 0,
+      qtyOut: isIncrease ? 0 : absQty,
+      balanceAfter: newBalance,
+      batchNumber: batchNumber || "UNKNOWN",
+      company: companyObjId,
+      remarks: `${adjustmentType || 'Adjustment'}: ${reason || ''} | ${remarks || ''}`.trim(),
+      userId: toObjectId(req.user?.id)
+    });
+    await ledgerAdj.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res.status(201).json({
+      msg: "Stock adjustment recorded successfully",
+      referenceId,
+      previousBalance: currentOnHand,
+      adjustmentQty: diffQty,
+      newBalance
+    });
+  } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+    next(err);
+  }
+};
+
+// ── SKU STOCK DETAILS COMMAND CENTER (5-TAB COMPLETE SNAPSHOT) ────────────────
+
+exports.getSkuStockDetails = async (req, res, next) => {
+  try {
+    const { skuId } = req.params;
+    const { companyId } = req.query;
+    if (!skuId || !companyId) {
+      return res.status(400).json({ msg: "skuId and companyId are required" });
+    }
+
+    const companyObjId = toObjectId(companyId);
+    const skuObjId = toObjectId(skuId);
+
+    const sku = await SkuV2.findOne({ _id: skuObjId, company: companyObjId });
+    if (!sku) {
+      return res.status(404).json({ msg: "SKU not found" });
+    }
+
+    // 1. Location Balances with full hierarchy
+    const locationBalances = await InventoryLedger.aggregate([
+      { $match: { skuId: skuObjId, company: companyObjId, status: { $ne: "Cancelled" } } },
+      {
+        $group: {
+          _id: "$locationId",
+          qtyIn: { $sum: { $cond: [{ $eq: ["$direction", "IN"] }, "$quantity", 0] } },
+          qtyOut: { $sum: { $cond: [{ $eq: ["$direction", "OUT"] }, "$quantity", 0] } }
+        }
+      },
+      {
+        $project: {
+          locationId: "$_id",
+          onHand: { $subtract: ["$qtyIn", "$qtyOut"] }
+        }
+      },
+      { $match: { onHand: { $gt: 0.0001 } } },
+      {
+        $lookup: {
+          from: "warehouselocationv2",
+          localField: "locationId",
+          foreignField: "_id",
+          as: "location"
+        }
+      },
+      { $unwind: { path: "$location", preserveNullAndEmptyArrays: true } }
+    ]);
+
+    const populatedLocations = await Promise.all(
+      locationBalances.map(async (lb) => {
+        let zone = null, floor = null, warehouse = null;
+        if (lb.location && lb.location.parentId) {
+          zone = await WarehouseLocationV2.findById(lb.location.parentId);
+          if (zone && zone.parentId) {
+            floor = await WarehouseLocationV2.findById(zone.parentId);
+            if (floor && floor.parentId) {
+              warehouse = await WarehouseLocationV2.findById(floor.parentId);
+            }
+          }
+        }
+        return {
+          locationId: lb.locationId,
+          locationName: lb.location ? lb.location.name : 'Unknown Location',
+          locationCode: lb.location ? lb.location.code : '',
+          zoneName: zone ? zone.name : '',
+          floorName: floor ? floor.name : '',
+          warehouseName: warehouse ? warehouse.name : '',
+          hierarchyPath: [warehouse?.name, floor?.name, zone?.name, lb.location?.name].filter(Boolean).join(' → '),
+          onHand: lb.onHand,
+          reserved: 0,
+          available: lb.onHand,
+          unitCost: Number(sku.costPrice || sku.rate || 0),
+          stockValue: lb.onHand * Number(sku.costPrice || sku.rate || 0)
+        };
+      })
+    );
+
+    // 2. Batch Balances & Cost Layers
+    const batchBalances = await InventoryLedger.aggregate([
+      { $match: { skuId: skuObjId, company: companyObjId, status: { $ne: "Cancelled" } } },
+      {
+        $group: {
+          _id: { batchNumber: "$batchNumber", locationId: "$locationId" },
+          qtyIn: { $sum: { $cond: [{ $eq: ["$direction", "IN"] }, "$quantity", 0] } },
+          qtyOut: { $sum: { $cond: [{ $eq: ["$direction", "OUT"] }, "$quantity", 0] } },
+          firstInDate: { $min: { $cond: [{ $eq: ["$direction", "IN"] }, "$timestamp", null] } }
+        }
+      },
+      {
+        $project: {
+          batchNumber: "$_id.batchNumber",
+          locationId: "$_id.locationId",
+          onHand: { $subtract: ["$qtyIn", "$qtyOut"] },
+          firstInDate: 1
+        }
+      },
+      { $match: { onHand: { $gt: 0.0001 } } },
+      {
+        $lookup: {
+          from: "warehouselocationv2",
+          localField: "locationId",
+          foreignField: "_id",
+          as: "location"
+        }
+      },
+      { $unwind: { path: "$location", preserveNullAndEmptyArrays: true } }
+    ]);
+
+    const batchesWithCosting = await Promise.all(
+      batchBalances.map(async (b) => {
+        let supplier = 'Direct Stock / Opening';
+        let rate = Number(sku.costPrice || sku.rate || 0);
+        let purchaseDate = b.firstInDate;
+        let receivedQty = b.onHand;
+
+        if (b.batchNumber && b.batchNumber !== 'UNKNOWN') {
+          const inv = await PurchaseInvoiceV2.findOne({
+            company: companyObjId,
+            "items.batchNumber": b.batchNumber
+          }).select("invoiceNumber invoiceDate partyName items").lean();
+
+          if (inv) {
+            supplier = inv.partyName || supplier;
+            purchaseDate = inv.invoiceDate || purchaseDate;
+            const matchedItem = inv.items?.find(it => it.batchNumber === b.batchNumber || String(it.skuId) === String(sku._id));
+            if (matchedItem) {
+              rate = matchedItem.rate || rate;
+              receivedQty = matchedItem.quantity || receivedQty;
+            }
+          }
+        }
+
+        return {
+          batchNumber: b.batchNumber || 'UNKNOWN',
+          locationName: b.location ? b.location.name : 'Unknown',
+          receivedQty,
+          remainingQty: b.onHand,
+          rate,
+          value: b.onHand * rate,
+          supplier,
+          date: purchaseDate
+        };
+      })
+    );
+
+    // 3. Movements Ledger (Recent 100 entries)
+    const movements = await InventoryLedger.find({
+      skuId: skuObjId,
+      company: companyObjId
+    })
+      .sort({ timestamp: -1 })
+      .limit(100)
+      .populate("locationId", "name code")
+      .populate("createdBy", "name email")
+      .lean();
+
+    // 4. Active Sales Order Reservations
+    const activeOrders = await SalesOrderV2.find({
+      company: companyObjId,
+      status: { $in: ["Confirmed", "Processing", "Partially Dispatched", "Pending Dispatch"] },
+      "items.skuId": skuObjId
+    }).lean();
+
+    const reservations = [];
+    let totalReserved = 0;
+
+    activeOrders.forEach(order => {
+      (order.items || []).forEach(item => {
+        if (String(item.skuId) === String(skuObjId) || item.skuCode === sku.skuCode) {
+          const orderedQty = item.quantity || 0;
+          const dispatchedQty = item.dispatchedQty || 0;
+          const remainingReserved = Math.max(0, orderedQty - dispatchedQty);
+          if (remainingReserved > 0) {
+            totalReserved += remainingReserved;
+            reservations.push({
+              orderId: order._id,
+              orderNumber: order.orderNumber,
+              orderDate: order.orderDate,
+              customerName: order.customerName || 'Customer',
+              orderedQty,
+              dispatchedQty,
+              reservedQty: remainingReserved,
+              status: order.status
+            });
+          }
+        }
+      });
+    });
+
+    // 5. Overall Totals
+    const onHandTotal = populatedLocations.reduce((sum, l) => sum + (l.onHand || 0), 0);
+    const availableTotal = Math.max(0, onHandTotal - totalReserved);
+    const unitPrice = Number(sku.costPrice || sku.rate || 0);
+    const stockValue = onHandTotal * unitPrice;
+
+    let pcsEquivalent = null;
+    if (sku.altUnitConversion && Number(sku.altUnitConversion) > 0) {
+      pcsEquivalent = onHandTotal * Number(sku.altUnitConversion);
+    }
+
+    res.json({
+      sku,
+      summary: {
+        onHand: onHandTotal,
+        reserved: totalReserved,
+        available: availableTotal,
+        inProcess: 0,
+        stockValue,
+        pcsEquivalent,
+        primaryUnit: sku.unit || 'Pcs',
+        altUnit: sku.altUnit || '',
+        altUnitConversion: sku.altUnitConversion || 1
+      },
+      locations: populatedLocations,
+      batches: batchesWithCosting,
+      movements: movements.map(m => ({
+        id: m._id,
+        timestamp: m.timestamp,
+        transactionType: m.transactionType,
+        direction: m.direction,
+        referenceType: m.referenceType,
+        referenceId: m.referenceId,
+        locationName: m.locationId?.name || 'Location',
+        qtyIn: m.direction === 'IN' ? m.quantity : 0,
+        qtyOut: m.direction === 'OUT' ? m.quantity : 0,
+        quantity: m.quantity,
+        batchNumber: m.batchNumber,
+        remarks: m.remarks,
+        userName: m.createdBy?.name || 'System'
+      })),
+      reservations
+    });
   } catch (err) {
     next(err);
   }

@@ -36,9 +36,11 @@ router.delete("/inventory-ledger/:id", (req, res) => res.status(405).json({ msg:
 // Ledger routes
 router.get("/ledger", auth, rbac(view), ctrl.getLedger);
 router.post("/ledger/transfer", auth, rbac(manage), ctrl.recordTransfer);
+router.post("/ledger/adjustment", auth, rbac(manage), ctrl.recordAdjustment);
 
-// Stock balance route
+// Stock balance route & SKU Details Command Center
 router.get("/balances", auth, rbac(view), ctrl.getBalances);
+router.get("/skus/:skuId/stock-details", auth, rbac(view), ctrl.getSkuStockDetails);
 
 // Dashboard routes
 router.get("/dashboard", auth, rbac(view), ctrl.getDashboardStats);
