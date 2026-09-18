@@ -11,6 +11,8 @@ import {
   Receipt,
   ShoppingBag,
   Settings,
+  Database,
+  Building2,
   ChevronLeft, 
   ChevronRight
 } from 'lucide-react';
