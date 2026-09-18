@@ -32,6 +32,8 @@ interface AddSkuDrawerV2Props {
   setCustomColumnValues?: React.Dispatch<React.SetStateAction<{ [key: string]: any }>>;
   createdCategories?: { id?: string; name: string; type?: 'products' | 'materials' | 'semi'; uom?: string }[];
   onCategoryCreated?: (newCategory: { id: string; name: string; type: 'products' | 'materials' | 'semi'; uom: string; fields: string[] }) => void;
+  onUnitCreated?: (newUnit: string) => void;
+  onMetadataUpdated?: () => void;
 }
 
 
@@ -174,7 +176,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   setCustomColumnValues,
   customColumnOptions = {},
   createdCategories = [],
-  onCategoryCreated
+  onCategoryCreated,
+  onUnitCreated,
+  onMetadataUpdated
 }) => {
   const [form, setForm] = useState({
     skuCode: '',
@@ -461,6 +465,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   });
 
   const handleOpenAddCategoryModal = () => {
+    if (companyId) {
+      loadMetadata();
+    }
     const currentType = resolvedSection || 'products';
     const defaultUom = currentType === 'materials' ? 'Kg' : currentType === 'semi' ? 'Ream' : 'Pcs';
     const defaultFields = currentType === 'materials'
@@ -484,6 +491,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       return;
     }
     const trimmed = categoryModalForm.name.trim();
+    const chosenUom = categoryModalForm.uom.trim() || 'Pcs';
     const fieldsArr = categoryModalForm.fieldsText
       .split(/[,·]/)
       .map(f => f.trim())
@@ -493,7 +501,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       id: `cat-${Date.now()}`,
       name: trimmed,
       type: categoryModalForm.type,
-      uom: categoryModalForm.uom.trim() || 'Pcs',
+      uom: chosenUom,
       fields: fieldsArr.length > 0 ? fieldsArr : ['Type']
     };
 
@@ -504,6 +512,12 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     const updated = categoriesList.includes(trimmed) ? categoriesList : [...categoriesList, trimmed];
     setCategoriesList(updated);
 
+    let updatedUnits = [...unitsList];
+    if (chosenUom && !updatedUnits.some(u => u.toLowerCase() === chosenUom.toLowerCase())) {
+      updatedUnits.push(chosenUom);
+      setUnitsList(normalizeAndDeduplicateUnits(updatedUnits));
+    }
+
     try {
       const updatedCategoryCards = [
         ...(createdCategories as any || []).filter((c: any) => c && c.name && c.name.toLowerCase().trim() !== trimmed.toLowerCase()),
@@ -513,19 +527,26 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         companyId,
         categories: updated,
         categoryCards: updatedCategoryCards,
-        units: unitsList,
+        units: normalizeAndDeduplicateUnits(updatedUnits),
         ruleTypes: ruleTypesList,
         groups: groupsList,
         brands: brandsList,
         categoryFields: categoryFieldsMap
       });
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('skbw_metadata_updated', { detail: { type: 'category', value: trimmed } }));
+      }
+      if (onUnitCreated && chosenUom) {
+        onUnitCreated(chosenUom);
+      }
+      if (onMetadataUpdated) {
+        onMetadataUpdated();
+      }
+
       showToast(`Category "${trimmed}" created in ${categoryModalForm.type.toUpperCase()}!`, 'success');
     } catch (err) {
       console.error('Failed to save category metadata:', err);
-    }
-
-    if (!unitsList.some(u => u.toLowerCase() === newCategoryObj.uom.toLowerCase())) {
-      setUnitsList(prev => [...prev, newCategoryObj.uom]);
     }
 
     updateFormField({
@@ -680,6 +701,16 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       loadMetadata();
     }
   }, [companyId, isOpen]);
+
+  useEffect(() => {
+    const handleMetadataChange = () => {
+      if (companyId) {
+        loadMetadata();
+      }
+    };
+    window.addEventListener('skbw_metadata_updated', handleMetadataChange);
+    return () => window.removeEventListener('skbw_metadata_updated', handleMetadataChange);
+  }, [companyId]);
 
   const loadMetadata = async () => {
     try {
@@ -856,6 +887,16 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         categoryFields: updatedFieldsMap
       });
 
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('skbw_metadata_updated', { detail: { type: field, value: cleanVal } }));
+      }
+      if (onUnitCreated && field === 'units') {
+        onUnitCreated(cleanVal);
+      }
+      if (onMetadataUpdated) {
+        onMetadataUpdated();
+      }
+
       setModalConfig({ isOpen: false, type: null, nameValue: '', selectedFields: [] });
     } catch (e) {
       console.error(e);
@@ -1001,8 +1042,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     } else if (resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi') {
       return ['gsm', 'title', 'width', 'length', 'ruleType', 'group', 'pages', 'reamWeight', 'booksGbl', 'altUnit'];
     } else {
-      // Products / Finished Goods
-      return ['gsm', 'brand', 'title', 'width', 'length', 'ruleType', 'pages', 'reamWeight', 'booksGbl', 'altUnit'];
+      // Products / Finished Goods (Pages, brands, ruling types, UOM, AUOM)
+      return ['gsm', 'brand', 'width', 'length', 'ruleType', 'pages', 'reamWeight', 'booksGbl', 'altUnit'];
     }
   }, [resolvedSection, form.category, isProductCategory]);
 
@@ -1575,7 +1616,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                   />
                 </div>
 
-                {/* For Product categories: Pages, Brand, Rule Type, Primary Unit, Alternate Units right below SKU Name */}
+                {/* For Product categories: Pages, Brand, Ruling Types, Primary Unit, Alternate Units right below SKU Name */}
                 {isProductCategory && (
                   <>
                     {/* 1. Pages */}
@@ -1650,6 +1691,30 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                             </div>
                           )}
                         </div>
+                      </div>
+                    )}
+
+                    {/* 3. Ruling Types */}
+                    {activeFields.includes('ruleType') && (
+                      <div>
+                        <label className="block text-[11px] font-semibold text-gray-600 mb-1">RULING TYPE</label>
+                        <select
+                          value={form.ruleType}
+                          onChange={e => {
+                            if (e.target.value === '__ADD_NEW__') {
+                              handleAddNewOption('ruleTypes');
+                            } else {
+                              updateFormField({ ruleType: e.target.value });
+                            }
+                          }}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
+                        >
+                          <option value="">-- Select Rule Type --</option>
+                          {ruleTypesList.map(rule => (
+                            <option key={rule} value={rule}>{rule}</option>
+                          ))}
+                          <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
+                        </select>
                       </div>
                     )}
 
@@ -1815,7 +1880,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
             </div>
 
             {/* Group 2: Specifications */}
-            {(activeFields.includes('gsm') || activeFields.includes('ruleType') || activeFields.includes('title') || activeFields.includes('width') || activeFields.includes('length')) && (
+            {((!isProductCategory && activeFields.includes('ruleType')) || (!isProductCategory && activeFields.includes('title')) || activeFields.includes('gsm') || activeFields.includes('width') || activeFields.includes('length')) && (
               <div className="space-y-4 border-t border-gray-100 pt-4">
                 <h3 className="text-xs font-bold text-gray-900 pb-1.5 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-blue-600"></span>
@@ -1835,7 +1900,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     </div>
                   )}
 
-                  {activeFields.includes('ruleType') && (
+                  {!isProductCategory && activeFields.includes('ruleType') && (
                     <div>
                       <label className="block text-[11px] font-semibold text-gray-600 mb-1">RULE TYPE</label>
                       <select
@@ -1858,7 +1923,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     </div>
                   )}
 
-                  {activeFields.includes('title') && (
+                  {!isProductCategory && activeFields.includes('title') && (
                     <div className="col-span-2">
                       <label className="block text-[11px] font-semibold text-gray-600 mb-1">TITLE (DESCRIPTION)</label>
                       <input
@@ -2924,7 +2989,31 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                 <label className="block font-semibold text-gray-700 mb-1">Default UOM</label>
                 <select
                   value={categoryModalForm.uom}
-                  onChange={(e) => setCategoryModalForm(prev => ({ ...prev, uom: e.target.value }))}
+                  onChange={(e) => {
+                    if (e.target.value === '__ADD_NEW__') {
+                      const newUnit = window.prompt('Enter new Unit of Measurement (e.g. Box, Bundle, Roll, Pcs):');
+                      if (newUnit && newUnit.trim()) {
+                        const clean = newUnit.trim();
+                        const updatedUnits = normalizeAndDeduplicateUnits([...unitsList, clean]);
+                        setUnitsList(updatedUnits);
+                        setCategoryModalForm(prev => ({ ...prev, uom: clean }));
+                        if (companyId) {
+                          updateMetadataV2({
+                            companyId,
+                            units: updatedUnits
+                          }).catch(console.error);
+                          if (typeof window !== 'undefined') {
+                            window.dispatchEvent(new CustomEvent('skbw_metadata_updated', { detail: { type: 'units', value: clean } }));
+                          }
+                        }
+                        if (onUnitCreated) {
+                          onUnitCreated(clean);
+                        }
+                      }
+                    } else {
+                      setCategoryModalForm(prev => ({ ...prev, uom: e.target.value }));
+                    }
+                  }}
                   className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500 bg-white font-semibold cursor-pointer"
                 >
                   {normalizeAndDeduplicateUnits([
@@ -2935,6 +3024,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       {u}
                     </option>
                   ))}
+                  <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom Unit...</option>
                 </select>
               </div>
             </div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useSearchParams } from 'react-router-dom';
@@ -229,16 +229,21 @@ const SkuMasterV2: React.FC = () => {
 
   const [categoriesData, setCategoriesData] = useState<CategoryCardData[]>([]);
 
-  const saveCategoriesToDb = async (updatedCards: CategoryCardData[]) => {
+  const saveCategoriesToDb = async (updatedCards: CategoryCardData[], optionalUnits?: string[]) => {
     if (!selectedCompany?._id) return;
     try {
       const catNames = Array.from(new Set(updatedCards.map(c => c.name)));
+      const allUnits = optionalUnits || unitsList;
       await updateMetadataV2({
         companyId: selectedCompany._id,
         categoryCards: updatedCards,
-        categories: catNames
+        categories: catNames,
+        units: normalizeAndDeduplicateUnits(allUnits)
       });
       localStorage.setItem(`skbw_erp_categories_cards_${selectedCompany._id}`, JSON.stringify(updatedCards));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('skbw_metadata_updated'));
+      }
     } catch (err) {
       console.error('Failed to save categories to MongoDB:', err);
     }
@@ -256,6 +261,30 @@ const SkuMasterV2: React.FC = () => {
 
   const [unitsList, setUnitsList] = useState<string[]>([]);
 
+  const loadMetadata = useCallback((companyId?: string) => {
+    const id = companyId || selectedCompany?._id;
+    if (!id) {
+      setCategoriesData([]);
+      setUnitsList([]);
+      return;
+    }
+    getMetadataV2(id).then(data => {
+      if (data?.units && Array.isArray(data.units)) {
+        setUnitsList(normalizeAndDeduplicateUnits(data.units));
+      } else {
+        setUnitsList([]);
+      }
+      if (data?.categoryCards !== undefined && Array.isArray(data.categoryCards)) {
+        setCategoriesData(data.categoryCards);
+        localStorage.setItem(`skbw_erp_categories_cards_${id}`, JSON.stringify(data.categoryCards));
+      } else {
+        setCategoriesData([]);
+      }
+    }).catch(err => {
+      console.error('Failed to load company metadata in SkuMasterV2:', err);
+    });
+  }, [selectedCompany?._id]);
+
   useEffect(() => {
     if (selectedCompany?._id) {
       const companyId = selectedCompany._id;
@@ -272,26 +301,20 @@ const SkuMasterV2: React.FC = () => {
         setCategoriesData([]);
       }
 
-      getMetadataV2(companyId).then(data => {
-        if (data?.units && Array.isArray(data.units)) {
-          setUnitsList(normalizeAndDeduplicateUnits(data.units));
-        } else {
-          setUnitsList([]);
-        }
-        if (data?.categoryCards !== undefined && Array.isArray(data.categoryCards)) {
-          setCategoriesData(data.categoryCards);
-          localStorage.setItem(`skbw_erp_categories_cards_${companyId}`, JSON.stringify(data.categoryCards));
-        } else {
-          setCategoriesData([]);
-        }
-      }).catch(err => {
-        console.error('Failed to load company metadata in SkuMasterV2:', err);
-      });
+      loadMetadata(companyId);
+
+      const handleMetadataUpdated = () => {
+        loadMetadata(companyId);
+      };
+      window.addEventListener('skbw_metadata_updated', handleMetadataUpdated);
+      return () => {
+        window.removeEventListener('skbw_metadata_updated', handleMetadataUpdated);
+      };
     } else {
       setCategoriesData([]);
       setUnitsList([]);
     }
-  }, [selectedCompany?._id]);
+  }, [selectedCompany?._id, loadMetadata]);
 
   // Expanded Category IDs
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<string[]>([]);
@@ -1506,7 +1529,12 @@ const SkuMasterV2: React.FC = () => {
   }, [bomProductSkus]);
 
   const filteredBuildProducts = useMemo(() => {
-    const baseList = bomProductSkus.length > 0 ? bomProductSkus : [...productsList, ...semiList];
+    let baseList: SkuV2[] = [];
+    if (activeMainTab === 'semi') {
+      baseList = semiList.length > 0 ? semiList : skus.filter(s => (s.category || '').toLowerCase().includes('semi') || (s.skuCode || '').startsWith('SM'));
+    } else {
+      baseList = bomProductSkus.length > 0 ? bomProductSkus : [...productsList, ...semiList];
+    }
     return baseList.filter(p => {
       const matchesSearch = (p.name || '').toLowerCase().includes(buildBomsSearch.toLowerCase()) ||
                             (p.skuCode || '').toLowerCase().includes(buildBomsSearch.toLowerCase());
@@ -1514,7 +1542,7 @@ const SkuMasterV2: React.FC = () => {
       if (onlyNoRecipeFilter && hasRecipe) return false;
       return matchesSearch;
     });
-  }, [bomProductSkus, productsList, semiList, buildBomsSearch, onlyNoRecipeFilter]);
+  }, [bomProductSkus, productsList, semiList, skus, activeMainTab, buildBomsSearch, onlyNoRecipeFilter]);
 
   const filteredRawCatalog = useMemo(() => {
     return materialsList.filter(m => (m.name || '').toLowerCase().includes(catalogSearch.toLowerCase()));
@@ -1526,8 +1554,10 @@ const SkuMasterV2: React.FC = () => {
   }, [semiList, skus, catalogSearch]);
 
   useEffect(() => {
-    if (showBuildBomsModal && !activeBomProduct && filteredBuildProducts.length > 0) {
-      handleSelectBomProduct(filteredBuildProducts[0]);
+    if (showBuildBomsModal && filteredBuildProducts.length > 0) {
+      if (!activeBomProduct || !filteredBuildProducts.some(p => p._id === activeBomProduct._id)) {
+        handleSelectBomProduct(filteredBuildProducts[0]);
+      }
     }
   }, [showBuildBomsModal, filteredBuildProducts]);
 
@@ -2881,6 +2911,7 @@ const SkuMasterV2: React.FC = () => {
 
   // Category Card Handlers
   const handleOpenAddCategoryModal = () => {
+    loadMetadata();
     setEditingCategory(null);
     setCategoryForm({
       name: '',
@@ -2892,6 +2923,7 @@ const SkuMasterV2: React.FC = () => {
   };
 
   const handleOpenEditCategoryModal = (cat: CategoryCardData) => {
+    loadMetadata();
     setEditingCategory(cat);
     setCategoryForm({
       name: cat.name,
@@ -2907,33 +2939,40 @@ const SkuMasterV2: React.FC = () => {
       showToast('Please enter category name', 'error');
       return;
     }
+    const chosenUom = categoryForm.uom.trim() || 'Pcs';
     const fieldsArr = categoryForm.fieldsText
       .split(/[,·]/)
       .map(f => f.trim())
       .filter(Boolean);
+
+    let updatedUnits = [...unitsList];
+    if (chosenUom && !updatedUnits.some(u => u.toLowerCase() === chosenUom.toLowerCase())) {
+      updatedUnits.push(chosenUom);
+      setUnitsList(normalizeAndDeduplicateUnits(updatedUnits));
+    }
 
     if (editingCategory) {
       const updatedCards = categoriesData.map(c => c.id === editingCategory.id ? {
         ...c,
         name: categoryForm.name.trim(),
         type: categoryForm.type,
-        uom: categoryForm.uom.trim() || 'Pcs',
+        uom: chosenUom,
         fields: fieldsArr.length > 0 ? fieldsArr : ['Type']
       } : c);
       setCategoriesData(updatedCards);
-      saveCategoriesToDb(updatedCards);
+      saveCategoriesToDb(updatedCards, updatedUnits);
       showToast(`Category '${categoryForm.name}' updated`, 'success');
     } else {
       const newCat: CategoryCardData = {
         id: `cat-${Date.now()}`,
         name: categoryForm.name.trim(),
         type: categoryForm.type,
-        uom: categoryForm.uom.trim() || 'Pcs',
+        uom: chosenUom,
         fields: fieldsArr.length > 0 ? fieldsArr : ['Type']
       };
       const updatedCards = [...categoriesData, newCat];
       setCategoriesData(updatedCards);
-      saveCategoriesToDb(updatedCards);
+      saveCategoriesToDb(updatedCards, updatedUnits);
       showToast(`Category '${categoryForm.name}' created`, 'success');
     }
     setShowCategoryModal(false);
@@ -3544,8 +3583,8 @@ const SkuMasterV2: React.FC = () => {
                 </div>
               </div>
 
-              {/* Optional: Build BOMs quick action for Products tab */}
-              {activeMainTab === 'products' && (
+              {/* Build BOMs quick action for Products & Semi tabs */}
+              {(activeMainTab === 'products' || activeMainTab === 'semi') && (
                 <div className="relative group">
                   <button 
                     type="button"
@@ -4725,7 +4764,28 @@ const SkuMasterV2: React.FC = () => {
                 <label className="block font-semibold text-gray-700 mb-1">Default UOM</label>
                 <select
                   value={categoryForm.uom}
-                  onChange={(e) => setCategoryForm(prev => ({ ...prev, uom: e.target.value }))}
+                  onChange={(e) => {
+                    if (e.target.value === '__ADD_NEW__') {
+                      const newUnit = window.prompt('Enter new Unit of Measurement (e.g. Box, Bundle, Roll):');
+                      if (newUnit && newUnit.trim()) {
+                        const clean = newUnit.trim();
+                        const updatedUnits = normalizeAndDeduplicateUnits([...unitsList, clean]);
+                        setUnitsList(updatedUnits);
+                        setCategoryForm(prev => ({ ...prev, uom: clean }));
+                        if (selectedCompany?._id) {
+                          updateMetadataV2({
+                            companyId: selectedCompany._id,
+                            units: updatedUnits
+                          }).catch(console.error);
+                          if (typeof window !== 'undefined') {
+                            window.dispatchEvent(new CustomEvent('skbw_metadata_updated', { detail: { type: 'units', value: clean } }));
+                          }
+                        }
+                      }
+                    } else {
+                      setCategoryForm(prev => ({ ...prev, uom: e.target.value }));
+                    }
+                  }}
                   className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500 bg-white"
                 >
                   {normalizeAndDeduplicateUnits([
@@ -4736,6 +4796,7 @@ const SkuMasterV2: React.FC = () => {
                       {u}
                     </option>
                   ))}
+                  <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom Unit...</option>
                 </select>
               </div>
             </div>
@@ -4804,6 +4865,13 @@ const SkuMasterV2: React.FC = () => {
           ];
           setCategoriesData(updatedCards);
           saveCategoriesToDb(updatedCards);
+        }}
+        onUnitCreated={(newUnit) => {
+          setUnitsList(prev => normalizeAndDeduplicateUnits([...prev, newUnit]));
+          loadMetadata();
+        }}
+        onMetadataUpdated={() => {
+          loadMetadata();
         }}
       />
 
@@ -5319,14 +5387,6 @@ const SkuMasterV2: React.FC = () => {
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <button 
-                          type="button"
-                          onClick={() => showToast('Manage BOM categories', 'info')}
-                          className="px-3 py-1.5 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 font-medium rounded-md text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
-                        >
-                          <Folder className="w-3.5 h-3.5 text-gray-500" /> Category
-                        </button>
-
                         <BomCopyPasteControls
                           getCopyPayload={() => {
                             if (!bomRecipeItems || bomRecipeItems.length === 0) return null;
