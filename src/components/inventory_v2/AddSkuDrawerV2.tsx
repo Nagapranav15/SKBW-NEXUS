@@ -1346,7 +1346,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     const updateFormField = (updates: Partial<typeof form>) => {
       setForm(prev => {
         const nextForm = { ...prev, ...updates };
-        if (!isNameManuallyEdited) {
+        if (!isNameManuallyEdited && !editSku) {
           const nextCompiled = compileSkuName(nextForm);
           if (nextCompiled) {
             nextForm.name = nextCompiled;
@@ -1356,28 +1356,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       });
     };
 
-    // Compile Sku Name dynamically from other inputs
+    // Compile Sku Name dynamically from other inputs (New Items only)
     useEffect(() => {
-      if (isNameManuallyEdited) return;
-
-      // In edit mode, check if any specification changed from initial load
-      if (editSku && lastSpecsRef.current) {
-        const currentSpecs = JSON.stringify({
-          cat: form.category || '',
-          pages: form.pages || '',
-          brand: form.brand || '',
-          ruleType: form.ruleType || '',
-          gsm: form.gsm || '',
-          width: form.width || '',
-          length: form.length || '',
-          paperType: form.paperType || '',
-          title: form.title || '',
-          group: form.group || ''
-        });
-        if (currentSpecs === lastSpecsRef.current) {
-          return;
-        }
-      }
+      if (isNameManuallyEdited || editSku) return;
 
       const compiled = compileSkuName(form);
       if (compiled && compiled !== form.name) {
@@ -1884,10 +1865,10 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       </div>
                     )}
 
-                    {/* 4. Primary UOM (Base Unit) */}
+                    {/* 4. UOM (Base Unit) */}
                     <div>
                       <label className="block text-[11px] font-semibold text-gray-600 mb-1">
-                        {isRawOrSemi ? "PRIMARY UOM *" : "PRIMARY UOM (Base) *"}
+                        UOM *
                       </label>
                       <select
                         value={displayUnits.find(u => u.toLowerCase() === (form.unit || '').trim().toLowerCase()) || form.unit || ''}
@@ -1955,7 +1936,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-[11px] font-semibold text-gray-600 mb-1">AUOM (ALTERNATE UOM)</label>
+                              <label className="block text-[11px] font-semibold text-gray-600 mb-1">AUOM</label>
                               <select
                                 value={displayUnits.find(u => u.toLowerCase() === (form.altUnit || '').trim().toLowerCase()) || form.altUnit || ''}
                                 onChange={e => {
@@ -2156,10 +2137,10 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                   Inventory & Additional Attributes
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
-                  {/* Primary UOM */}
+                  {/* UOM */}
                   <div>
                     <label className="block text-[11px] font-semibold text-gray-600 mb-1">
-                      {isRawOrSemi ? "PRIMARY UOM *" : "PRIMARY UOM (Base) *"}
+                      UOM *
                     </label>
                     <select
                       value={displayUnits.find(u => u.toLowerCase() === (form.unit || '').trim().toLowerCase()) || form.unit || ''}
@@ -2226,7 +2207,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-[11px] font-semibold text-gray-600 mb-1">AUOM (ALTERNATE UOM)</label>
+                            <label className="block text-[11px] font-semibold text-gray-600 mb-1">AUOM</label>
                             <select
                               value={displayUnits.find(u => u.toLowerCase() === (form.altUnit || '').trim().toLowerCase()) || form.altUnit || ''}
                               onChange={e => {

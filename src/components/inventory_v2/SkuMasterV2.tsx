@@ -750,15 +750,14 @@ const SkuMasterV2: React.FC = () => {
   const DEFAULT_PRODUCTS_COLUMNS = [
     { id: 'skuCode', label: 'ID / SKU CODE', visible: true },
     { id: 'name', label: 'ITEM NAME', visible: true },
-    { id: 'brand', label: 'BRAND', visible: true },
     { id: 'category', label: 'CATEGORY', visible: true },
     { id: 'status', label: 'STATUS', visible: true },
-    { id: 'unit', label: 'PRIMARY UOM', visible: true },
+    { id: 'unit', label: 'UOM', visible: true },
     { id: 'altUnitConversion', label: 'CON RATE', visible: true },
-    { id: 'altUnit', label: 'SECONDARY UOM', visible: true },
+    { id: 'altUnit', label: 'AUOM', visible: true },
     { id: 'gsm', label: 'GSM', visible: true },
     { id: 'size', label: 'SIZE', visible: true },
-    { id: 'pages', label: 'PAGES / SHEETS', visible: true },
+    { id: 'pages', label: 'PAGES', visible: true },
     { id: 'bom', label: 'BOM RECIPE', visible: true },
     { id: 'openingStock', label: 'STOCK', visible: false },
     { id: 'workOrders', label: 'WORK ORDERS', visible: false },
@@ -770,9 +769,9 @@ const SkuMasterV2: React.FC = () => {
     { id: 'name', label: 'ITEM NAME', visible: true },
     { id: 'category', label: 'CATEGORY', visible: true },
     { id: 'status', label: 'STATUS', visible: true },
-    { id: 'unit', label: 'PRIMARY UOM', visible: true },
+    { id: 'unit', label: 'UOM', visible: true },
     { id: 'altUnitConversion', label: 'CON RATE', visible: true },
-    { id: 'altUnit', label: 'SECONDARY UOM', visible: true },
+    { id: 'altUnit', label: 'AUOM', visible: true },
     { id: 'gsm', label: 'GSM', visible: true },
     { id: 'size', label: 'SIZE', visible: true },
     { id: 'pages', label: 'SHEETS PER REAM', visible: true },
@@ -787,9 +786,9 @@ const SkuMasterV2: React.FC = () => {
     { id: 'name', label: 'ITEM NAME', visible: true },
     { id: 'category', label: 'CATEGORY', visible: true },
     { id: 'status', label: 'STATUS', visible: true },
-    { id: 'unit', label: 'PRIMARY UOM', visible: true },
+    { id: 'unit', label: 'UOM', visible: true },
     { id: 'altUnitConversion', label: 'CON RATE', visible: true },
-    { id: 'altUnit', label: 'SECONDARY UOM', visible: true },
+    { id: 'altUnit', label: 'AUOM', visible: true },
     { id: 'gsm', label: 'GSM', visible: true },
     { id: 'size', label: 'SIZE', visible: true },
     { id: 'pages', label: 'PAGES / SHEETS', visible: true },
@@ -800,7 +799,7 @@ const SkuMasterV2: React.FC = () => {
     { id: 'dispatchOrders', label: 'DISPATCH ORDERS', visible: false }
   ];
 
-  const STORAGE_KEY = 'skbw_sku_master_tab_columns_v14';
+  const STORAGE_KEY = 'skbw_sku_master_tab_columns_v16';
 
   // Helper to sanitize column list against current valid defaults
   const sanitizeColumns = (savedList: any[], defaultList: typeof DEFAULT_PRODUCTS_COLUMNS) => {
@@ -5220,7 +5219,9 @@ const SkuMasterV2: React.FC = () => {
                         <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.ruleType || '—'}</span>
                       </div>
                       <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PAGES / SHEETS PER REAM</span>
+                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">
+                          {selectedSkuDetails.paperType === 'Sheets' || (getItemType(selectedSkuDetails) === 'materials') ? 'SHEETS PER REAM' : 'PAGES'}
+                        </span>
                         <span className="font-bold text-gray-900 text-xs">
                           {selectedSkuDetails.pages ? `${selectedSkuDetails.pages} ${selectedSkuDetails.paperType === 'Sheets' ? 'Sheets' : 'Pages'}` : '—'}
                         </span>
@@ -5241,11 +5242,11 @@ const SkuMasterV2: React.FC = () => {
 
                     <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs">
                       <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PRIMARY STOCKING UNIT</span>
+                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">UOM</span>
                         <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.unit || 'Pcs'}</span>
                       </div>
                       <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">SECONDARY UOM (AUOM)</span>
+                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">AUOM</span>
                         <span className="font-bold text-blue-700 text-xs">
                           {selectedSkuDetails.altUnit || '—'}
                         </span>
@@ -5898,8 +5899,8 @@ const SkuMasterV2: React.FC = () => {
             {/* TAB CONTENT: Locations (Initial & Live Multi-Location Breakdown) */}
             {detailsSubTab === 'locations' && (
               <div className="space-y-4">
-                {/* Summary Header 3-Card Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                {/* Summary Header 2-Card Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                   {/* Initial / Master Storage Location */}
                   <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-2xs space-y-2">
                     <div className="flex items-center justify-between">
@@ -5932,23 +5933,6 @@ const SkuMasterV2: React.FC = () => {
                       {(modalDynamicLiveStock !== null ? modalDynamicLiveStock : (Number((selectedSkuDetails as any).presentStock) || 0)).toLocaleString('en-IN')} {selectedSkuDetails.unit || 'Pcs'}
                     </div>
                     <p className="text-[10.5px] text-gray-400">Consolidated quantity currently held across all warehouse locations</p>
-                  </div>
-
-                  {/* Distinct Active Locations Count */}
-                  <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-2xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 text-indigo-600" />
-                        ACTIVE STORAGE LOCATIONS
-                      </span>
-                      <span className="text-[9.5px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
-                        Multi-Bay
-                      </span>
-                    </div>
-                    <div className="font-mono font-extrabold text-indigo-900 text-base">
-                      {modalLocationsBreakdown.length > 0 ? `${modalLocationsBreakdown.length} Location${modalLocationsBreakdown.length > 1 ? 's' : ''}` : '1 Location (Initial)'}
-                    </div>
-                    <p className="text-[10.5px] text-gray-400">Warehouse racks, bays, and zones storing this item</p>
                   </div>
                 </div>
 
@@ -6044,17 +6028,6 @@ const SkuMasterV2: React.FC = () => {
                       </table>
                     </div>
                   )}
-                </div>
-
-                {/* Informational Box */}
-                <div className="bg-blue-50/70 border border-blue-200/80 rounded-xl p-3 flex items-start gap-2.5 text-xs text-blue-900 shadow-2xs">
-                  <MapPin className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <div className="space-y-0.5">
-                    <div className="font-bold text-blue-950">Multi-Location Inventory Management</div>
-                    <div className="text-[11px] text-blue-800 leading-relaxed">
-                      The same SKU can be stored concurrently across multiple bays, racks, and warehouse zones. Whenever inventory is moved via <strong>Stock Transfer</strong> or received in a <strong>Purchase Batch</strong>, real-time live balances at each individual location update instantly.
-                    </div>
-                  </div>
                 </div>
               </div>
             )}
@@ -6160,7 +6133,7 @@ const SkuMasterV2: React.FC = () => {
                 }`}
               >
                 <History className="w-3.5 h-3.5" />
-                <span>Stock Transfers & Logs</span>
+                <span>Transfers & Logs</span>
                 <span className="bg-gray-100 text-gray-700 font-extrabold px-1.5 py-0.2 rounded-full text-[10px]">
                   {miniStockData?.movements?.length ?? 0}
                 </span>
