@@ -50,7 +50,12 @@ import {
   ShoppingCart,
   Settings,
   RotateCcw,
-  Building2
+  Building2,
+  ArrowDownLeft,
+  ArrowUpRight,
+  ArrowRightLeft,
+  ExternalLink,
+  Bookmark
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { 
@@ -902,6 +907,26 @@ const SkuMasterV2: React.FC = () => {
   const [modalDynamicLiveStock, setModalDynamicLiveStock] = useState<number | null>(null);
   const [modalLocationsBreakdown, setModalLocationsBreakdown] = useState<any[]>([]);
   const [isLoadingLocations, setIsLoadingLocations] = useState<boolean>(false);
+
+  // Miniature Stock Overview Modal
+  const [showMiniStockModal, setShowMiniStockModal] = useState<boolean>(false);
+  const [miniStockLoading, setMiniStockLoading] = useState<boolean>(false);
+  const [miniStockData, setMiniStockData] = useState<any>(null);
+  const [miniStockTab, setMiniStockTab] = useState<'movements' | 'locations' | 'batches'>('movements');
+
+  const handleOpenMiniStockOverview = async () => {
+    if (!selectedSkuDetails?._id || !currentCompanyId) return;
+    setShowMiniStockModal(true);
+    setMiniStockLoading(true);
+    try {
+      const res = await getSkuStockDetailsV2(selectedSkuDetails._id, currentCompanyId);
+      setMiniStockData(res);
+    } catch (err) {
+      console.error('Failed to load miniature stock overview:', err);
+    } finally {
+      setMiniStockLoading(false);
+    }
+  };
 
   const [isEditingThresholds, setIsEditingThresholds] = useState<boolean>(false);
   const [tempMinStock, setTempMinStock] = useState<string>('');
@@ -5939,13 +5964,15 @@ const SkuMasterV2: React.FC = () => {
                         <p className="text-[10.5px] text-gray-500">Same item distributed across warehouse bins, bays, and racks</p>
                       </div>
                     </div>
-                    <a
-                      href={`/stock-inventory-v2?search=${encodeURIComponent(selectedSkuDetails.skuCode)}`}
-                      className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg border border-blue-200 transition-colors no-underline"
+                    <button
+                      type="button"
+                      onClick={handleOpenMiniStockOverview}
+                      className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg border border-blue-200 transition-all cursor-pointer shadow-2xs"
+                      title="Open miniature stock overview popup"
                     >
-                      <RotateCcw className="w-3 h-3" />
+                      <RotateCcw className="w-3.5 h-3.5" />
                       <span>Stock Transfers & Logs</span>
-                    </a>
+                    </button>
                   </div>
 
                   {isLoadingLocations ? (
@@ -6058,6 +6085,306 @@ const SkuMasterV2: React.FC = () => {
               </div>
             )}
 
+          </div>
+        </Modal>
+      )}
+
+      {/* ── MINIATURE STOCK OVERVIEW & TRANSFER LOGS POPUP MODAL ── */}
+      {showMiniStockModal && selectedSkuDetails && (
+        <Modal
+          isOpen={showMiniStockModal}
+          onClose={() => setShowMiniStockModal(false)}
+          title={
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100 shrink-0">
+                <RotateCcw className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="font-bold text-sm text-gray-900 flex items-center gap-2">
+                  <span>Stock Overview & Activity Logs</span>
+                  <span className="font-mono text-[10.5px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200 shrink-0">
+                    {selectedSkuDetails.skuCode}
+                  </span>
+                </div>
+                <div className="text-[11px] font-medium text-gray-500 truncate max-w-md">
+                  {selectedSkuDetails.name}
+                </div>
+              </div>
+            </div>
+          }
+        >
+          <div className="space-y-4 text-xs max-h-[75vh] overflow-y-auto pr-1">
+            {/* 4 Clean Mini KPI Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-xl p-3 text-center space-y-0.5">
+                <div className="text-[9.5px] font-bold text-emerald-800 uppercase tracking-wider">Live On-Hand</div>
+                <div className="text-base font-extrabold text-emerald-950 font-mono">
+                  {Number(miniStockData?.summary?.onHand ?? modalDynamicLiveStock ?? (Number((selectedSkuDetails as any).presentStock) || 0)).toLocaleString('en-IN')}
+                  <span className="text-[10px] font-semibold text-emerald-700 ml-1">{selectedSkuDetails.unit || 'Pcs'}</span>
+                </div>
+              </div>
+
+              <div className="bg-blue-50/70 border border-blue-200/80 rounded-xl p-3 text-center space-y-0.5">
+                <div className="text-[9.5px] font-bold text-blue-800 uppercase tracking-wider">Available</div>
+                <div className="text-base font-extrabold text-blue-950 font-mono">
+                  {Number(miniStockData?.summary?.available ?? (modalDynamicLiveStock ?? (Number((selectedSkuDetails as any).presentStock) || 0))).toLocaleString('en-IN')}
+                  <span className="text-[10px] font-semibold text-blue-700 ml-1">{selectedSkuDetails.unit || 'Pcs'}</span>
+                </div>
+              </div>
+
+              <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-3 text-center space-y-0.5">
+                <div className="text-[9.5px] font-bold text-amber-800 uppercase tracking-wider">Reserved / Pending</div>
+                <div className="text-base font-extrabold text-amber-950 font-mono">
+                  {Number(miniStockData?.summary?.reserved ?? 0).toLocaleString('en-IN')}
+                  <span className="text-[10px] font-semibold text-amber-700 ml-1">{selectedSkuDetails.unit || 'Pcs'}</span>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 text-center space-y-0.5">
+                <div className="text-[9.5px] font-bold text-slate-600 uppercase tracking-wider">Est. Stock Value</div>
+                <div className="text-base font-extrabold text-slate-900 font-mono truncate">
+                  ₹{Number(miniStockData?.summary?.stockValue ?? ((modalDynamicLiveStock ?? (Number((selectedSkuDetails as any).presentStock) || 0)) * Number((selectedSkuDetails as any).purchasePrice || (selectedSkuDetails as any).ratePerKg || (selectedSkuDetails as any).rate || (selectedSkuDetails as any).avgRate || 0))).toLocaleString('en-IN')}
+                </div>
+              </div>
+            </div>
+
+            {/* Mini Subtab Navigation Buttons */}
+            <div className="flex border-b border-gray-200 bg-gray-50/80 p-1 rounded-xl gap-1">
+              <button
+                type="button"
+                onClick={() => setMiniStockTab('movements')}
+                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  miniStockTab === 'movements'
+                    ? 'bg-white text-blue-700 shadow-2xs border border-gray-200/80'
+                    : 'text-gray-500 hover:text-gray-800'
+                }`}
+              >
+                <History className="w-3.5 h-3.5" />
+                <span>Stock Transfers & Logs</span>
+                <span className="bg-gray-100 text-gray-700 font-extrabold px-1.5 py-0.2 rounded-full text-[10px]">
+                  {miniStockData?.movements?.length ?? 0}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMiniStockTab('locations')}
+                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  miniStockTab === 'locations'
+                    ? 'bg-white text-blue-700 shadow-2xs border border-gray-200/80'
+                    : 'text-gray-500 hover:text-gray-800'
+                }`}
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                <span>Locations</span>
+                <span className="bg-gray-100 text-gray-700 font-extrabold px-1.5 py-0.2 rounded-full text-[10px]">
+                  {miniStockData?.locations?.length ?? modalLocationsBreakdown.length ?? 0}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMiniStockTab('batches')}
+                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  miniStockTab === 'batches'
+                    ? 'bg-white text-blue-700 shadow-2xs border border-gray-200/80'
+                    : 'text-gray-500 hover:text-gray-800'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>Batches</span>
+                <span className="bg-gray-100 text-gray-700 font-extrabold px-1.5 py-0.2 rounded-full text-[10px]">
+                  {miniStockData?.batches?.length ?? 0}
+                </span>
+              </button>
+            </div>
+
+            {/* Tab Body */}
+            {miniStockLoading ? (
+              <div className="py-12 flex flex-col items-center justify-center gap-2 text-gray-400">
+                <RefreshCw className="w-5 h-5 animate-spin text-blue-600" />
+                <span className="text-xs font-semibold">Loading live stock transactions...</span>
+              </div>
+            ) : (
+              <>
+                {/* 1. Movements & Transfers Tab */}
+                {miniStockTab === 'movements' && (
+                  <div className="space-y-2.5">
+                    {(!miniStockData?.movements || miniStockData.movements.length === 0) ? (
+                      <div className="text-center py-10 bg-slate-50/70 rounded-2xl border border-dashed border-gray-200 text-gray-400 space-y-1.5">
+                        <History className="w-6 h-6 mx-auto text-gray-300" />
+                        <p className="font-bold text-gray-700 text-xs">No Stock Movement Logs Recorded</p>
+                        <p className="text-[11px] text-gray-400 max-w-xs mx-auto">
+                          Stock movements, warehouse transfers, purchase receipts, and production issues for this SKU will appear here in chronological order.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-2xs divide-y divide-gray-100 max-h-[340px] overflow-y-auto">
+                        {miniStockData.movements.map((m: any, idx: number) => {
+                          const isIncoming = m.direction === 'IN' || (m.qtyIn || 0) > 0 || (m.quantity || 0) > 0;
+                          const isTransfer = (m.transactionType || '').toLowerCase().includes('transfer');
+                          return (
+                            <div key={m.id || idx} className="p-3 bg-white hover:bg-slate-50/80 flex items-center justify-between transition-colors gap-3">
+                              <div className="flex items-start gap-2.5 min-w-0">
+                                <div className={`p-2 rounded-xl shrink-0 ${
+                                  isTransfer
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : isIncoming
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : 'bg-rose-100 text-rose-800'
+                                }`}>
+                                  {isTransfer ? (
+                                    <ArrowRightLeft className="w-3.5 h-3.5" />
+                                  ) : isIncoming ? (
+                                    <ArrowDownLeft className="w-3.5 h-3.5" />
+                                  ) : (
+                                    <ArrowUpRight className="w-3.5 h-3.5" />
+                                  )}
+                                </div>
+                                <div className="space-y-0.5 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-bold text-gray-900 text-xs">{m.transactionType || 'Stock Movement'}</span>
+                                    {m.referenceId && (
+                                      <span className="font-mono text-[9.5px] bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded border border-slate-200">
+                                        #{m.referenceId}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[10.5px] text-gray-400 flex items-center gap-1.5 flex-wrap">
+                                    <span>{m.locationName || 'Warehouse'}</span>
+                                    <span>•</span>
+                                    <span>{m.timestamp ? new Date(m.timestamp).toLocaleString('en-IN') : 'Recent'}</span>
+                                    {m.userName && <span>• by {m.userName}</span>}
+                                  </div>
+                                  {m.remarks && (
+                                    <div className="text-[10.5px] text-gray-500 italic truncate">
+                                      "{m.remarks}"
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="text-right shrink-0">
+                                <div className={`font-mono font-extrabold text-xs ${
+                                  isIncoming ? 'text-emerald-600' : 'text-rose-600'
+                                }`}>
+                                  {isIncoming ? '+' : '-'}{Math.abs(Number(m.quantity || m.qtyIn || m.qtyOut || 0)).toLocaleString('en-IN')} {selectedSkuDetails.unit || 'Pcs'}
+                                </div>
+                                {m.balanceAfter !== undefined && (
+                                  <div className="text-[10px] text-gray-400 font-mono">
+                                    Bal: {Number(m.balanceAfter).toLocaleString('en-IN')}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 2. Locations Tab */}
+                {miniStockTab === 'locations' && (
+                  <div className="space-y-2.5">
+                    {((miniStockData?.locations || modalLocationsBreakdown).length === 0) ? (
+                      <div className="text-center py-10 bg-slate-50/70 rounded-2xl border border-dashed border-gray-200 text-gray-400 space-y-1">
+                        <MapPin className="w-6 h-6 mx-auto text-gray-300" />
+                        <p className="font-bold text-gray-700 text-xs">Primary Location: {modalInitialLocationText || 'SKBW'}</p>
+                        <p className="text-[11px] text-gray-400">No multi-bay partitions recorded yet.</p>
+                      </div>
+                    ) : (
+                      <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-2xs divide-y divide-gray-100 max-h-[340px] overflow-y-auto">
+                        {(miniStockData?.locations || modalLocationsBreakdown).map((loc: any, idx: number) => (
+                          <div key={idx} className="p-3 bg-white hover:bg-slate-50/80 flex items-center justify-between transition-colors">
+                            <div className="space-y-0.5 min-w-0">
+                              <div className="font-bold text-xs text-gray-900 flex items-center gap-1.5">
+                                <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                                <span className="truncate">{loc.locationName || 'Warehouse Storage'}</span>
+                                {loc.locationCode && (
+                                  <span className="text-[10px] font-mono text-gray-500 bg-gray-100 px-1.5 py-0.2 rounded">
+                                    {loc.locationCode}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[10.5px] text-gray-400 font-medium">
+                                {loc.hierarchyPath || `${loc.warehouseName || 'Warehouse'} ➔ ${loc.floorName || 'Floor'} ➔ ${loc.zoneName || 'Zone'}`}
+                              </div>
+                            </div>
+
+                            <div className="text-right shrink-0">
+                              <div className="text-xs font-bold text-emerald-700 font-mono">
+                                {Number(loc.onHand || 0).toLocaleString('en-IN')} {selectedSkuDetails.unit || 'Pcs'}
+                              </div>
+                              <div className="text-[10px] text-gray-400 font-medium">
+                                ₹{Number(loc.stockValue || 0).toLocaleString('en-IN')}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 3. Batches Tab */}
+                {miniStockTab === 'batches' && (
+                  <div className="space-y-2.5">
+                    {(!miniStockData?.batches || miniStockData.batches.length === 0) ? (
+                      <div className="text-center py-10 bg-slate-50/70 rounded-2xl border border-dashed border-gray-200 text-gray-400 space-y-1">
+                        <Layers className="w-6 h-6 mx-auto text-gray-300" />
+                        <p className="font-bold text-gray-700 text-xs">No Batch Numbers Tagged</p>
+                        <p className="text-[11px] text-gray-400">Stock is tracked under general consolidated inventory.</p>
+                      </div>
+                    ) : (
+                      <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-2xs divide-y divide-gray-100 max-h-[340px] overflow-y-auto">
+                        {miniStockData.batches.map((b: any, idx: number) => (
+                          <div key={idx} className="p-3 bg-white hover:bg-slate-50/80 flex items-center justify-between transition-colors">
+                            <div className="space-y-0.5 min-w-0">
+                              <div className="font-bold text-xs text-gray-900 flex items-center gap-1.5 font-mono">
+                                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                                <span>Batch #{b.batchNumber || `B-${idx + 1}`}</span>
+                                {b.supplier && <span className="text-[10px] font-sans text-gray-500">({b.supplier})</span>}
+                              </div>
+                              <div className="text-[10.5px] text-gray-400">
+                                {b.locationName || 'Main Storage'} • {b.date ? new Date(b.date).toLocaleDateString('en-IN') : 'Recent'}
+                              </div>
+                            </div>
+
+                            <div className="text-right shrink-0">
+                              <div className="text-xs font-bold text-gray-900 font-mono">
+                                {Number(b.remainingQty || 0).toLocaleString('en-IN')} {selectedSkuDetails.unit || 'Pcs'}
+                              </div>
+                              <div className="text-[10.5px] text-emerald-700 font-bold font-mono">
+                                @ ₹{b.rate}/unit = ₹{Number(b.value || 0).toLocaleString('en-IN')}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Modal Bottom Footer Actions */}
+            <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
+              <a
+                href={`/stock-inventory-v2?search=${encodeURIComponent(selectedSkuDetails.skuCode)}`}
+                className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors no-underline"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Open Full Inventory Hub</span>
+              </a>
+              <button
+                type="button"
+                onClick={() => setShowMiniStockModal(false)}
+                className="px-4 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </Modal>
       )}
