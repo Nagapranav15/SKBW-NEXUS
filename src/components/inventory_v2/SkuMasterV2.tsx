@@ -256,7 +256,7 @@ const SkuMasterV2: React.FC = () => {
   const [categoryForm, setCategoryForm] = useState({
     name: '',
     type: 'products' as 'products' | 'materials' | 'semi',
-    uom: 'Pcs',
+    uom: '',
     fieldsText: ''
   });
 
@@ -2943,7 +2943,7 @@ const SkuMasterV2: React.FC = () => {
     setCategoryForm({
       name: '',
       type: activeCategorySubTab,
-      uom: unitsList[0] || 'Pcs',
+      uom: unitsList[0] || '',
       fieldsText: 'Pages, Size, Ruling'
     });
     setShowCategoryModal(true);
@@ -2966,7 +2966,7 @@ const SkuMasterV2: React.FC = () => {
       showToast('Please enter category name', 'error');
       return;
     }
-    const chosenUom = categoryForm.uom.trim() || 'Pcs';
+    const chosenUom = categoryForm.uom.trim() || unitsList[0] || '';
     const fieldsArr = categoryForm.fieldsText
       .split(/[,·]/)
       .map(f => f.trim())
@@ -4815,10 +4815,8 @@ const SkuMasterV2: React.FC = () => {
                   }}
                   className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500 bg-white"
                 >
-                  {normalizeAndDeduplicateUnits([
-                    categoryForm.uom,
-                    ...unitsList
-                  ]).map(u => (
+                  <option value="">-- Select UOM --</option>
+                  {unitsList.map(u => (
                     <option key={u} value={u}>
                       {u}
                     </option>

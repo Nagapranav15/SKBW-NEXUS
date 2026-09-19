@@ -602,7 +602,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   }>({
     name: '',
     type: 'materials',
-    uom: 'Kg',
+    uom: '',
     fieldsText: 'Paper Type, GSM, Width (cm), Length (cm), Standard Sheets'
   });
 
@@ -611,7 +611,6 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       loadMetadata();
     }
     const currentType = resolvedSection || 'products';
-    const defaultUom = currentType === 'materials' ? 'Kg' : currentType === 'semi' ? 'Ream' : 'Pcs';
     const defaultFields = currentType === 'materials'
       ? 'Paper Type, GSM, Width (cm), Length (cm), Standard Sheets'
       : currentType === 'semi'
@@ -621,7 +620,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     setCategoryModalForm({
       name: '',
       type: currentType,
-      uom: defaultUom,
+      uom: displayUnits[0] || '',
       fieldsText: defaultFields
     });
     setShowAddCategoryModal(true);
@@ -633,7 +632,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       return;
     }
     const trimmed = categoryModalForm.name.trim();
-    const chosenUom = categoryModalForm.uom.trim() || 'Pcs';
+    const chosenUom = categoryModalForm.uom.trim() || displayUnits[0] || '';
     const fieldsArr = categoryModalForm.fieldsText
       .split(/[,·]/)
       .map(f => f.trim())
@@ -3102,7 +3101,6 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                   value={categoryModalForm.type}
                   onChange={(e) => {
                     const nextType = e.target.value as 'products' | 'materials' | 'semi';
-                    const defaultUom = nextType === 'materials' ? 'Kg' : nextType === 'semi' ? 'Ream' : 'Pcs';
                     const defaultFields = nextType === 'materials'
                       ? 'Paper Type, GSM, Width (cm), Length (cm), Standard Sheets'
                       : nextType === 'semi'
@@ -3111,7 +3109,6 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     setCategoryModalForm(prev => ({
                       ...prev,
                       type: nextType,
-                      uom: defaultUom,
                       fieldsText: defaultFields
                     }));
                   }}
@@ -3154,10 +3151,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                   }}
                   className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500 bg-white font-semibold cursor-pointer"
                 >
-                  {normalizeAndDeduplicateUnits([
-                    categoryModalForm.uom,
-                    ...displayUnits
-                  ]).map(u => (
+                  <option value="">-- Select UOM --</option>
+                  {displayUnits.map(u => (
                     <option key={u} value={u}>
                       {u}
                     </option>
