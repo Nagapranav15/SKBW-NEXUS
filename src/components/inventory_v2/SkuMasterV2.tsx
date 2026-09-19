@@ -2204,7 +2204,7 @@ const SkuMasterV2: React.FC = () => {
       const isRawOrSemiTab = activeMainTab === 'materials' || activeMainTab === 'semi';
       const headers = isRawOrSemiTab
         ? ['#', 'Item Code', 'Item Name', 'Category', 'UOM', 'GSM', 'Pages', 'Status']
-        : ['#', 'Item Code', 'Item Name', 'Category', 'Primary UOM', 'Con Rate', 'Secondary UOM', 'GSM', 'Pages', 'Status'];
+        : ['#', 'Item Code', 'Item Name', 'Category', 'UOM', 'Con Rate', 'AUOM', 'GSM', 'Pages', 'Status'];
 
       const rows = targetSkus.map((item, idx) => {
         if (isRawOrSemiTab) {
@@ -7593,7 +7593,7 @@ const SkuMasterV2: React.FC = () => {
                 </div>
               </div>
 
-              {/* Primary UOM (altUnit) */}
+              {/* AUOM (altUnit) */}
               <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80 transition-colors">
                 <input
                   type="checkbox"
@@ -7604,7 +7604,7 @@ const SkuMasterV2: React.FC = () => {
                 />
                 <div className="flex-1">
                   <label htmlFor="sku_bulk_altunit_check" className="block text-xs font-bold text-gray-700 cursor-pointer">
-                    Primary UOM (Packaging / Sales Unit)
+                    AUOM (Packaging / Sales Unit)
                   </label>
                   <input
                     type="text"
@@ -7617,7 +7617,7 @@ const SkuMasterV2: React.FC = () => {
                 </div>
               </div>
 
-              {/* Secondary UOM (unit) */}
+              {/* UOM (unit) */}
               <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80 transition-colors">
                 <input
                   type="checkbox"
@@ -7628,7 +7628,7 @@ const SkuMasterV2: React.FC = () => {
                 />
                 <div className="flex-1">
                   <label htmlFor="sku_bulk_unit_check" className="block text-xs font-bold text-gray-700 cursor-pointer">
-                    Secondary UOM (Base Inventory Unit)
+                    UOM (Base Inventory Unit)
                   </label>
                   <input
                     type="text"

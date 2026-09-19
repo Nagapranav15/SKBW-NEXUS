@@ -298,7 +298,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                     </div>
                   )}
                   <div>
-                    <span className="text-[10px] font-semibold text-gray-400 uppercase block">Primary UOM</span>
+                    <span className="text-[10px] font-semibold text-gray-400 uppercase block">UOM</span>
                     <span className="font-bold text-gray-800">{sku.unit || 'Pcs'}</span>
                   </div>
                   <div>

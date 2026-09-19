@@ -1388,7 +1388,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       }
 
       if (!form.unit || !form.unit.trim()) {
-        setErrorMsg('Please select a Primary UOM (Unit)');
+        setErrorMsg('Please select a UOM (Unit)');
         return;
       }
 
@@ -1994,7 +1994,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           {isUnitSame && (
                             <div className="text-[11px] font-semibold text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
                               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                              Primary UOM and Secondary UOM cannot be identical.
+                              UOM and AUOM cannot be identical.
                             </div>
                           )}
 
@@ -2264,7 +2264,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         {isUnitSame && (
                           <div className="text-[11px] font-semibold text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
                             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                            Primary UOM and Secondary UOM cannot be identical.
+                            UOM and AUOM cannot be identical.
                           </div>
                         )}
 
