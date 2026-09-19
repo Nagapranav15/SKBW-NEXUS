@@ -65,6 +65,7 @@ import {
   renumberSkusV2,
   getWarehouseHierarchyV2,
   WarehouseLocationV2,
+  getSkuStockDetailsV2,
   getMetadataV2,
   updateMetadataV2,
   SkuV2 
@@ -549,7 +550,7 @@ const SkuMasterV2: React.FC = () => {
   const [deleteConfirmSku, setDeleteConfirmSku] = useState<SkuV2 | null>(null);
 
   // Item Details Modal State
-  const [detailsSubTab, setDetailsSubTab] = useState<'details' | 'work-orders' | 'dispatches'>('details');
+  const [detailsSubTab, setDetailsSubTab] = useState<'details' | 'locations' | 'work-orders' | 'dispatches'>('details');
   const [itemAttributes, setItemAttributes] = useState({
     fabricGsm: '70 GSM Maplitho',
     size: '18 x 24 CM',
@@ -899,6 +900,8 @@ const SkuMasterV2: React.FC = () => {
   const [modalInitialLocationText, setModalInitialLocationText] = useState<string>('Loading...');
   const [modalDynamicLocationsText, setModalDynamicLocationsText] = useState<string>('Loading...');
   const [modalDynamicLiveStock, setModalDynamicLiveStock] = useState<number | null>(null);
+  const [modalLocationsBreakdown, setModalLocationsBreakdown] = useState<any[]>([]);
+  const [isLoadingLocations, setIsLoadingLocations] = useState<boolean>(false);
 
   const [isEditingThresholds, setIsEditingThresholds] = useState<boolean>(false);
   const [tempMinStock, setTempMinStock] = useState<string>('');
@@ -1009,12 +1012,14 @@ const SkuMasterV2: React.FC = () => {
     if (!selectedSkuDetails) return;
 
     const fetchModalLocationData = async () => {
+      setIsLoadingLocations(true);
       try {
         const hierarchy = currentCompanyId ? await getWarehouseHierarchyV2(currentCompanyId).catch(() => []) : [];
         
-        let initialLocStr = 'Main Warehouse - Bay A1';
+        let initialLocStr = 'SKBW';
         let dynamicLocsStr = 'No live stock entries assigned';
         let resolvedLiveStock: number | null = null;
+        let resolvedLocationsBreakdown: any[] = [];
 
         // 1. Resolve Initial Assigned Location
         const directLoc = (selectedSkuDetails as any)?.initialLocation || 
@@ -1039,46 +1044,76 @@ const SkuMasterV2: React.FC = () => {
           }
         }
 
-        // 2. Resolve Dynamic Live Stock & Locations from Balances
+        // 2. Fetch Detailed Live Stock & Locations Breakdown
         if (selectedSkuDetails._id && currentCompanyId) {
-          const balances = await getBalancesV2(currentCompanyId, undefined, undefined, selectedSkuDetails._id).catch(() => []);
-          
-          if (balances && balances.length > 0) {
-            const sumOnHand = balances.reduce((s: number, b: any) => s + Number(b.onHand ?? b.quantity ?? 0), 0);
-            resolvedLiveStock = sumOnHand;
-
-            const locPaths: string[] = [];
-            for (const b of balances) {
-              const locObj = b.locationId || b.location;
-              if (locObj) {
-                const stockUnit = selectedSkuDetails.unit || (getItemType(selectedSkuDetails) === 'materials' ? 'KG' : 'Pcs');
-                const p = buildModalLocationPath(locObj, hierarchy);
-                if (p) {
-                  const qtyText = b.onHand !== undefined ? ` (${b.onHand} ${stockUnit})` : '';
-                  locPaths.push(`${p}${qtyText}`);
-                }
-              }
-            }
-            if (locPaths.length > 0) {
-              dynamicLocsStr = Array.from(new Set(locPaths)).join(' • ');
-            }
+          const stockDetails = await getSkuStockDetailsV2(selectedSkuDetails._id, currentCompanyId).catch(() => null);
+          if (stockDetails && Array.isArray(stockDetails.locations) && stockDetails.locations.length > 0) {
+            resolvedLocationsBreakdown = stockDetails.locations.map(loc => ({
+              ...loc,
+              hierarchyPath: loc.hierarchyPath || buildModalLocationPath(loc.locationId, hierarchy) || loc.locationName
+            }));
+            resolvedLiveStock = stockDetails.summary?.onHand ?? 0;
+            const stockUnit = selectedSkuDetails.unit || (getItemType(selectedSkuDetails) === 'materials' ? 'KG' : 'Pcs');
+            const locPaths = resolvedLocationsBreakdown.map(l => `${l.hierarchyPath || l.locationName} (${l.onHand} ${stockUnit})`);
+            dynamicLocsStr = locPaths.join(' • ');
           } else {
-            resolvedLiveStock = 0;
+            const balances = await getBalancesV2(currentCompanyId, undefined, undefined, selectedSkuDetails._id).catch(() => []);
+            if (balances && balances.length > 0) {
+              const sumOnHand = balances.reduce((s: number, b: any) => s + Number(b.onHand ?? b.quantity ?? 0), 0);
+              resolvedLiveStock = sumOnHand;
+
+              const locPaths: string[] = [];
+              resolvedLocationsBreakdown = balances.map((b: any) => {
+                const locObj = b.locationId || b.location;
+                const p = buildModalLocationPath(locObj, hierarchy);
+                const locName = typeof locObj === 'object' ? locObj.name : (p || 'Warehouse Location');
+                const locCode = typeof locObj === 'object' ? (locObj.code || '') : '';
+                const onHand = Number(b.onHand ?? b.quantity ?? 0);
+                const reserved = Number(b.reserved ?? 0);
+                const available = Math.max(0, onHand - reserved);
+                const stockUnit = selectedSkuDetails.unit || (getItemType(selectedSkuDetails) === 'materials' ? 'KG' : 'Pcs');
+                if (p) locPaths.push(`${p} (${onHand} ${stockUnit})`);
+                return {
+                  locationId: typeof locObj === 'object' ? locObj._id : String(locObj || ''),
+                  locationName: locName,
+                  locationCode: locCode,
+                  hierarchyPath: p,
+                  onHand,
+                  reserved,
+                  available,
+                  unitCost: Number(b.unitCost || 0),
+                  stockValue: Number(b.stockValue || (onHand * Number((selectedSkuDetails as any).purchasePrice || (selectedSkuDetails as any).ratePerKg || (selectedSkuDetails as any).rate || 0)))
+                };
+              });
+              if (locPaths.length > 0) {
+                dynamicLocsStr = Array.from(new Set(locPaths)).join(' • ');
+              }
+            } else {
+              resolvedLiveStock = 0;
+              resolvedLocationsBreakdown = [];
+            }
           }
         } else {
           resolvedLiveStock = 0;
+          resolvedLocationsBreakdown = [];
         }
 
         if (isMounted) {
           setModalInitialLocationText(initialLocStr);
           setModalDynamicLocationsText(dynamicLocsStr);
           setModalDynamicLiveStock(resolvedLiveStock ?? 0);
+          setModalLocationsBreakdown(resolvedLocationsBreakdown);
         }
       } catch (err) {
         if (isMounted) {
-          setModalInitialLocationText('Main Warehouse - Bay A1');
+          setModalInitialLocationText('SKBW');
           setModalDynamicLocationsText('No live stock entries assigned');
           setModalDynamicLiveStock(0);
+          setModalLocationsBreakdown([]);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingLocations(false);
         }
       }
     };
@@ -5011,12 +5046,27 @@ const SkuMasterV2: React.FC = () => {
             {/* Modal Subtabs */}
             <div className="border-b border-gray-200 flex items-center gap-6 text-xs font-semibold text-gray-500 shrink-0">
               <button
+                type="button"
                 onClick={() => setDetailsSubTab('details')}
                 className={`pb-2 transition-all cursor-pointer ${detailsSubTab === 'details' ? 'text-blue-700 border-b-2 border-blue-600 font-bold' : 'hover:text-gray-800'}`}
               >
                 Details & Categories
               </button>
               <button
+                type="button"
+                onClick={() => setDetailsSubTab('locations')}
+                className={`pb-2 transition-all cursor-pointer flex items-center gap-1.5 ${detailsSubTab === 'locations' ? 'text-blue-700 border-b-2 border-blue-600 font-bold' : 'hover:text-gray-800'}`}
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                <span>Locations</span>
+                {modalLocationsBreakdown.length > 0 && (
+                  <span className="bg-blue-100 text-blue-700 font-bold px-1.5 py-0.2 rounded-full text-[10px]">
+                    {modalLocationsBreakdown.length}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
                 onClick={() => setDetailsSubTab('work-orders')}
                 className={`pb-2 transition-all cursor-pointer flex items-center gap-1.5 ${detailsSubTab === 'work-orders' ? 'text-blue-700 border-b-2 border-blue-600 font-bold' : 'hover:text-gray-800'}`}
               >
@@ -5026,6 +5076,7 @@ const SkuMasterV2: React.FC = () => {
                 </span>
               </button>
               <button
+                type="button"
                 onClick={() => setDetailsSubTab('dispatches')}
                 className={`pb-2 transition-all cursor-pointer flex items-center gap-1.5 ${detailsSubTab === 'dispatches' ? 'text-blue-700 border-b-2 border-blue-600 font-bold' : 'hover:text-gray-800'}`}
               >
@@ -5094,7 +5145,7 @@ const SkuMasterV2: React.FC = () => {
                               <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">SKU CODE</span>
                               <span className="font-mono font-bold text-blue-600 text-xs block truncate">{selectedSkuDetails.skuCode}</span>
                             </div>
-                            <div>
+                            <div className={isRawOrSemiDetail ? '' : 'col-span-2'}>
                               <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">CATEGORY</span>
                               <span className="font-bold text-gray-900 text-xs block truncate">
                                 {selectedSkuDetails.category || (
@@ -5103,19 +5154,12 @@ const SkuMasterV2: React.FC = () => {
                                 )}
                               </span>
                             </div>
-                            <div>
-                              {!isRawOrSemiDetail ? (
-                                <>
-                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">BRAND</span>
-                                  <span className="font-bold text-gray-900 text-xs block truncate">{selectedSkuDetails.brand || '—'}</span>
-                                </>
-                              ) : (
-                                <>
-                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PREFERRED VENDOR</span>
-                                  <span className="font-bold text-blue-600 text-xs block truncate">{(selectedSkuDetails as any).preferredVendor || '—'}</span>
-                                </>
-                              )}
-                            </div>
+                            {isRawOrSemiDetail && (
+                              <div>
+                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PREFERRED VENDOR</span>
+                                <span className="font-bold text-blue-600 text-xs block truncate">{(selectedSkuDetails as any).preferredVendor || '—'}</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
@@ -5842,6 +5886,168 @@ const SkuMasterV2: React.FC = () => {
                   </div>
                 )}
 
+              </div>
+            )}
+
+            {/* TAB CONTENT: Locations (Initial & Live Multi-Location Breakdown) */}
+            {detailsSubTab === 'locations' && (
+              <div className="space-y-4">
+                {/* Summary Header 3-Card Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                  {/* Initial / Master Storage Location */}
+                  <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-2xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <Building2 className="w-3.5 h-3.5 text-blue-600" />
+                        INITIAL / MASTER LOCATION
+                      </span>
+                      <span className="text-[9.5px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                        Default
+                      </span>
+                    </div>
+                    <div className="font-bold text-gray-900 text-sm truncate" title={modalInitialLocationText || 'SKBW'}>
+                      {modalInitialLocationText || 'SKBW'}
+                    </div>
+                    <p className="text-[10.5px] text-gray-400">Default base location assigned during item creation</p>
+                  </div>
+
+                  {/* Live Total Stock Across All Locations */}
+                  <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-2xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <Package className="w-3.5 h-3.5 text-emerald-600" />
+                        LIVE TOTAL ON-HAND
+                      </span>
+                      <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        Live
+                      </span>
+                    </div>
+                    <div className="font-mono font-extrabold text-emerald-600 text-base">
+                      {(modalDynamicLiveStock !== null ? modalDynamicLiveStock : (Number((selectedSkuDetails as any).presentStock) || 0)).toLocaleString('en-IN')} {selectedSkuDetails.unit || 'Pcs'}
+                    </div>
+                    <p className="text-[10.5px] text-gray-400">Consolidated quantity currently held across all warehouse locations</p>
+                  </div>
+
+                  {/* Distinct Active Locations Count */}
+                  <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-2xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-indigo-600" />
+                        ACTIVE STORAGE LOCATIONS
+                      </span>
+                      <span className="text-[9.5px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                        Multi-Bay
+                      </span>
+                    </div>
+                    <div className="font-mono font-extrabold text-indigo-900 text-base">
+                      {modalLocationsBreakdown.length > 0 ? `${modalLocationsBreakdown.length} Location${modalLocationsBreakdown.length > 1 ? 's' : ''}` : '1 Location (Initial)'}
+                    </div>
+                    <p className="text-[10.5px] text-gray-400">Warehouse racks, bays, and zones storing this item</p>
+                  </div>
+                </div>
+
+                {/* Multi-Location Live Breakdown Table / Card List */}
+                <div className="bg-white rounded-2xl border border-gray-200/90 shadow-2xs overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-gray-50/70">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
+                        <Layers className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-gray-900 text-xs">Live Multi-Location Inventory Breakdown</h4>
+                        <p className="text-[10.5px] text-gray-500">Same item distributed across warehouse bins, bays, and racks</p>
+                      </div>
+                    </div>
+                    <a
+                      href={`/stock-inventory-v2?search=${encodeURIComponent(selectedSkuDetails.skuCode)}`}
+                      className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg border border-blue-200 transition-colors no-underline"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      <span>Stock Transfers & Logs</span>
+                    </a>
+                  </div>
+
+                  {isLoadingLocations ? (
+                    <div className="py-12 flex items-center justify-center gap-2 text-gray-400">
+                      <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
+                      <span className="text-xs font-medium">Resolving live storage locations...</span>
+                    </div>
+                  ) : modalLocationsBreakdown.length === 0 ? (
+                    <div className="p-6 text-center space-y-3">
+                      <div className="w-12 h-12 mx-auto rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400">
+                        <MapPin className="w-6 h-6 text-slate-400" />
+                      </div>
+                      <div className="space-y-1 max-w-md mx-auto">
+                        <p className="font-bold text-gray-800 text-xs">Primary Storage: {modalInitialLocationText || 'SKBW'}</p>
+                        <p className="text-[11px] text-gray-500 leading-relaxed">
+                          This SKU is assigned to <strong>{modalInitialLocationText || 'SKBW'}</strong>. When stock is transferred across multiple floors or bays, each location and on-hand balance will be listed here automatically.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-gray-100 overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="bg-slate-50/80 text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
+                            <th className="py-2.5 px-4">Location Name & Code</th>
+                            <th className="py-2.5 px-4">Full Hierarchy Path</th>
+                            <th className="py-2.5 px-4 text-right">On-Hand Stock</th>
+                            <th className="py-2.5 px-4 text-right">Available</th>
+                            <th className="py-2.5 px-4 text-right">Est. Value</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {modalLocationsBreakdown.map((loc, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></div>
+                                  <span className="font-bold text-gray-900">{loc.locationName || 'Warehouse Storage'}</span>
+                                  {loc.locationCode && (
+                                    <span className="font-mono text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
+                                      {loc.locationCode}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-3 px-4">
+                                <span className="text-[11px] text-gray-600 font-medium">
+                                  {loc.hierarchyPath || `${loc.warehouseName || 'Warehouse'} ➔ ${loc.zoneName || loc.floorName || 'General Zone'}`}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <span className="font-mono font-bold text-emerald-700 text-xs">
+                                  {Number(loc.onHand || 0).toLocaleString('en-IN')} {selectedSkuDetails.unit || 'Pcs'}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <span className="font-mono font-bold text-blue-700 text-xs">
+                                  {Number(loc.available !== undefined ? loc.available : loc.onHand || 0).toLocaleString('en-IN')} {selectedSkuDetails.unit || 'Pcs'}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <span className="font-mono font-bold text-gray-800 text-xs">
+                                  ₹{Number(loc.stockValue || (Number(loc.onHand || 0) * Number((selectedSkuDetails as any).purchasePrice || (selectedSkuDetails as any).ratePerKg || (selectedSkuDetails as any).rate || 0))).toLocaleString('en-IN')}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* Informational Box */}
+                <div className="bg-blue-50/70 border border-blue-200/80 rounded-xl p-3 flex items-start gap-2.5 text-xs text-blue-900 shadow-2xs">
+                  <MapPin className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <div className="font-bold text-blue-950">Multi-Location Inventory Management</div>
+                    <div className="text-[11px] text-blue-800 leading-relaxed">
+                      The same SKU can be stored concurrently across multiple bays, racks, and warehouse zones. Whenever inventory is moved via <strong>Stock Transfer</strong> or received in a <strong>Purchase Batch</strong>, real-time live balances at each individual location update instantly.
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 

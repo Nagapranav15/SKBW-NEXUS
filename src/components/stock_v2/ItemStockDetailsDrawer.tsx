@@ -137,11 +137,6 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                 <span className="text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-0.5 rounded-full capitalize">
                   {sku.category || 'General'}
                 </span>
-                {sku.brand && (
-                  <span className="text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200 px-2.5 py-0.5 rounded-full">
-                    {sku.brand}
-                  </span>
-                )}
                 {onOpenItemMaster && (
                   <button
                     type="button"
@@ -276,12 +271,6 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                     <span className="text-[10px] font-semibold text-gray-400 uppercase block">Category</span>
                     <span className="font-bold text-gray-800">{sku.category || 'General'}</span>
                   </div>
-                  {sku.brand && (
-                    <div>
-                      <span className="text-[10px] font-semibold text-gray-400 uppercase block">Brand</span>
-                      <span className="font-bold text-gray-800">{sku.brand}</span>
-                    </div>
-                  )}
                   {sku.pages && (
                     <div>
                       <span className="text-[10px] font-semibold text-gray-400 uppercase block">Pages / Sheets</span>
