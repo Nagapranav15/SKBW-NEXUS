@@ -67,7 +67,8 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
         getBalancesV2(companyId).catch(() => []),
         getParties({ company: companyId, type: 'customer', limit: 1000, light: true }).catch(() => ({ data: { parties: [] } }))
       ]).then(([skus, balances, partiesRes]) => {
-        setAvailableSkus(skus || []);
+        const activeOnly = (skus || []).filter((s: SkuV2) => !s.isDeleted && s.status !== 'Inactive');
+        setAvailableSkus(activeOnly);
         
         const bMap = new Map<string, number>();
         if (Array.isArray(balances)) {

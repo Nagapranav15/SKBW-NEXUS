@@ -532,7 +532,7 @@ const PurchaseInvoicePage: React.FC = () => {
       ]);
       const vendorList = vendorRes?.data?.parties || (Array.isArray(vendorRes?.data) ? vendorRes.data : []);
       setVendors(vendorList);
-      setSkus(skuRes);
+      setSkus((skuRes || []).filter(s => !s.isDeleted && s.status !== 'Inactive'));
       setLocations(locRes);
       if (balRes) setInventoryBalances(balRes);
     } catch (e) {

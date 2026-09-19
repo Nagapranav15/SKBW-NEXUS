@@ -1115,14 +1115,25 @@ const SkuMasterV2: React.FC = () => {
       });
 
       if ((selectedSkuDetails as any).bomItems && Array.isArray((selectedSkuDetails as any).bomItems) && (selectedSkuDetails as any).bomItems.length > 0) {
-        setBomRecipeItems((selectedSkuDetails as any).bomItems.map((item: any, idx: number) => ({
-          id: item.id || `b-${idx}`,
-          name: item.name,
-          qty: item.qty ?? '',
-          uom: item.uom || 'Pcs',
-          inStock: Number(item.inStock) || 0,
-          notes: item.notes || ''
-        })));
+        setBomRecipeItems((selectedSkuDetails as any).bomItems.map((item: any, idx: number) => {
+          const matchedSku = (skus || []).find(s => 
+            (item.skuId && String(s._id) === String(item.skuId)) ||
+            (item.skuCode && s.skuCode === item.skuCode) ||
+            (item.id && String(s._id) === String(item.id)) ||
+            (item.name && s.name === item.name)
+          );
+          const currentName = matchedSku?.name || item.name || item.itemName || '';
+          return {
+            id: item.id || `b-${idx}`,
+            skuId: item.skuId || matchedSku?._id,
+            skuCode: item.skuCode || matchedSku?.skuCode,
+            name: currentName,
+            qty: item.qty ?? '',
+            uom: matchedSku?.unit || item.uom || 'Pcs',
+            inStock: Number(item.inStock) || 0,
+            notes: item.notes || ''
+          };
+        }));
       } else {
         setBomRecipeItems([]);
       }
@@ -1569,14 +1580,25 @@ const SkuMasterV2: React.FC = () => {
   const handleSelectBomProduct = (prod: SkuV2) => {
     setActiveBomProduct(prod);
     if ((prod as any).bomItems && Array.isArray((prod as any).bomItems)) {
-      setActiveRecipeItems((prod as any).bomItems.map((item: any, idx: number) => ({
-        id: item.id || `b-${idx}`,
-        name: item.name,
-        qty: Number(item.qty) || 1,
-        uom: item.uom || 'Kg',
-        inStock: item.inStock ?? 500,
-        notes: item.notes || ''
-      })));
+      setActiveRecipeItems((prod as any).bomItems.map((item: any, idx: number) => {
+        const matchedSku = (skus || []).find(s => 
+          (item.skuId && String(s._id) === String(item.skuId)) ||
+          (item.skuCode && s.skuCode === item.skuCode) ||
+          (item.id && String(s._id) === String(item.id)) ||
+          (item.name && s.name === item.name)
+        );
+        const currentName = matchedSku?.name || item.name || item.itemName || '';
+        return {
+          id: item.id || `b-${idx}`,
+          skuId: item.skuId || matchedSku?._id,
+          skuCode: item.skuCode || matchedSku?.skuCode,
+          name: currentName,
+          qty: Number(item.qty) || 1,
+          uom: matchedSku?.unit || item.uom || 'Kg',
+          inStock: Number((matchedSku as any)?.openingStock ?? item.inStock ?? 0),
+          notes: item.notes || ''
+        };
+      }));
     } else {
       setActiveRecipeItems([]);
     }
@@ -5017,7 +5039,7 @@ const SkuMasterV2: React.FC = () => {
             {/* TAB CONTENT: Details & Categories arranged in Neat Cards */}
             {detailsSubTab === 'details' && (
               <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
 
                     {/* CARD 1: 🏷️ General & Classification */}
                     {(() => {
@@ -5031,6 +5053,21 @@ const SkuMasterV2: React.FC = () => {
                         (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SF') ||
                         (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SM') ||
                         activeMainTab === 'materials' || activeMainTab === 'semi';
+
+                      const itemTypeLabel = 
+                        (selectedSkuDetails.category || '').toLowerCase().includes('raw') ||
+                        (selectedSkuDetails.category || '').toLowerCase().includes('material') ||
+                        (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('RM') ||
+                        activeMainTab === 'materials'
+                          ? 'Raw Material'
+                          : (selectedSkuDetails.category || '').toLowerCase().includes('semi') ||
+                            (selectedSkuDetails.category || '').toLowerCase().includes('wip') ||
+                            (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SEM') ||
+                            (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SF') ||
+                            (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SM') ||
+                            activeMainTab === 'semi'
+                          ? 'Semi Finished'
+                          : 'Products (Finished Goods)';
 
                       return (
                         <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-2xs space-y-3">
@@ -5050,8 +5087,16 @@ const SkuMasterV2: React.FC = () => {
 
                           <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs">
                             <div>
+                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">ITEM TYPE</span>
+                              <span className="font-bold text-gray-900 text-xs block truncate">{itemTypeLabel}</span>
+                            </div>
+                            <div>
+                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">SKU CODE</span>
+                              <span className="font-mono font-bold text-blue-600 text-xs block truncate">{selectedSkuDetails.skuCode}</span>
+                            </div>
+                            <div>
                               <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">CATEGORY</span>
-                              <span className="font-bold text-gray-900 text-xs">
+                              <span className="font-bold text-gray-900 text-xs block truncate">
                                 {selectedSkuDetails.category || (
                                   (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('RM') ? 'Raw Material' :
                                   (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SEM') ? 'Semi Finished' : 'Finished Goods'
@@ -5059,21 +5104,18 @@ const SkuMasterV2: React.FC = () => {
                               </span>
                             </div>
                             <div>
-                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">SKU CODE</span>
-                              <span className="font-mono font-bold text-blue-600 text-xs">{selectedSkuDetails.skuCode}</span>
+                              {!isRawOrSemiDetail ? (
+                                <>
+                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">BRAND</span>
+                                  <span className="font-bold text-gray-900 text-xs block truncate">{selectedSkuDetails.brand || '—'}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PREFERRED VENDOR</span>
+                                  <span className="font-bold text-blue-600 text-xs block truncate">{(selectedSkuDetails as any).preferredVendor || '—'}</span>
+                                </>
+                              )}
                             </div>
-                            {!isRawOrSemiDetail && (
-                              <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">BRAND</span>
-                                <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.brand || 'Bestfriend'}</span>
-                              </div>
-                            )}
-                            {isRawOrSemiDetail && (
-                              <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PREFERRED VENDOR</span>
-                                <span className="font-bold text-blue-600 text-xs">{(selectedSkuDetails as any).preferredVendor || '—'}</span>
-                              </div>
-                            )}
                           </div>
                         </div>
                       );
@@ -5098,20 +5140,20 @@ const SkuMasterV2: React.FC = () => {
                     <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs">
                       <div>
                         <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">GSM</span>
-                        <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.gsm ? `${selectedSkuDetails.gsm} GSM` : '12 GSM'}</span>
+                        <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.gsm ? `${selectedSkuDetails.gsm} GSM` : '—'}</span>
                       </div>
                       <div>
                         <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">TRIMMED SIZE</span>
-                        <span className="font-bold text-gray-900 text-xs">{formatSize(selectedSkuDetails) !== '-' ? formatSize(selectedSkuDetails) : '32 × 122 CM'}</span>
+                        <span className="font-bold text-gray-900 text-xs">{formatSize(selectedSkuDetails) !== '-' ? formatSize(selectedSkuDetails) : '—'}</span>
                       </div>
                       <div>
                         <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">RULING SPEC</span>
-                        <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.ruleType || '-'}</span>
+                        <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.ruleType || '—'}</span>
                       </div>
                       <div>
                         <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PAGES / SHEETS PER REAM</span>
                         <span className="font-bold text-gray-900 text-xs">
-                          {selectedSkuDetails.pages ? `${selectedSkuDetails.pages} ${selectedSkuDetails.paperType === 'Sheets' ? 'Sheets' : 'Pages'}` : '122 Pages'}
+                          {selectedSkuDetails.pages ? `${selectedSkuDetails.pages} ${selectedSkuDetails.paperType === 'Sheets' ? 'Sheets' : 'Pages'}` : '—'}
                         </span>
                       </div>
                     </div>
@@ -5128,7 +5170,7 @@ const SkuMasterV2: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-3 gap-x-4 text-xs">
+                    <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs">
                       <div>
                         <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PRIMARY STOCKING UNIT</span>
                         <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.unit || 'Pcs'}</span>
@@ -5137,12 +5179,6 @@ const SkuMasterV2: React.FC = () => {
                         <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">SECONDARY UOM (AUOM)</span>
                         <span className="font-bold text-blue-700 text-xs">
                           {selectedSkuDetails.altUnit || '—'}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">STD. SHEETS / PAGES</span>
-                        <span className="font-bold text-indigo-700 text-xs">
-                          {selectedSkuDetails.pages || selectedSkuDetails.booksGbl ? `${selectedSkuDetails.pages || selectedSkuDetails.booksGbl} ${selectedSkuDetails.paperType === 'Sheets' ? 'Sheets' : 'Pages'}` : (selectedSkuDetails.paperType === 'Sheets' ? '500 Sheets' : '—')}
                         </span>
                       </div>
                     </div>
@@ -5155,10 +5191,8 @@ const SkuMasterV2: React.FC = () => {
                           const isPrimaryPcs = (selectedSkuDetails.unit || '').toLowerCase().includes('pc');
                           const outerUnit = (isAltPcs && !isPrimaryPcs) ? selectedSkuDetails.unit : selectedSkuDetails.altUnit;
                           const innerUnit = (isAltPcs && !isPrimaryPcs) ? selectedSkuDetails.altUnit : (selectedSkuDetails.unit || 'Pcs');
-                          return `Formula: 1 ${outerUnit} = ${selectedSkuDetails.altUnitConversion} ${innerUnit}`;
-                        })() : selectedSkuDetails.paperType === 'Sheets' ? (
-                          `Formula: 1 Ream = ${selectedSkuDetails.pages || 500} Sheets`
-                        ) : (
+                          return `1 ${outerUnit} = ${selectedSkuDetails.altUnitConversion} ${innerUnit}`;
+                        })() : (
                           `Direct Unit Tracking (${selectedSkuDetails.unit || 'Pcs'})`
                         )}
                       </div>
@@ -5195,7 +5229,7 @@ const SkuMasterV2: React.FC = () => {
                     }
 
                     return (
-                      <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-3.5 flex flex-col justify-between">
+                      <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-3.5">
                         {/* Header */}
                         <div className="flex items-center justify-between pb-2.5 border-b border-gray-100 gap-2">
                           <div className="flex items-center gap-2 shrink-0">
@@ -5205,19 +5239,41 @@ const SkuMasterV2: React.FC = () => {
                             <h4 className="font-bold text-gray-900 text-xs whitespace-nowrap">Stock & Location</h4>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setTempMinStock(hasMinStock ? String(minStockNum) : '');
-                                setTempReorder(hasReorder ? String(reorderNum) : '');
-                                setTempVendor((selectedSkuDetails as any).preferredVendor || '');
-                                setIsEditingThresholds(!isEditingThresholds);
-                              }}
-                              className="h-6.5 text-[10px] font-bold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-2 rounded-lg border border-amber-200/80 flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap"
-                            >
-                              <Edit className="w-3 h-3 shrink-0" />
-                              <span>{isEditingThresholds ? 'Cancel' : 'Edit'}</span>
-                            </button>
+                            {isEditingThresholds ? (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={handleSaveThresholds}
+                                  disabled={isSavingThresholds}
+                                  className="h-6.5 text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-2 rounded-lg flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                >
+                                  <Check className="w-3 h-3" />
+                                  <span>{isSavingThresholds ? 'Saving...' : 'Save'}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setIsEditingThresholds(false)}
+                                  className="h-6.5 text-[10px] font-bold text-gray-600 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 px-2 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+                                >
+                                  <X className="w-3 h-3" />
+                                  <span>Cancel</span>
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setTempMinStock(hasMinStock ? String(minStockNum) : '');
+                                  setTempReorder(hasReorder ? String(reorderNum) : '');
+                                  setTempVendor((selectedSkuDetails as any).preferredVendor || '');
+                                  setIsEditingThresholds(true);
+                                }}
+                                className="h-6.5 text-[10px] font-bold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-2 rounded-lg border border-amber-200/80 flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap"
+                              >
+                                <Edit className="w-3 h-3 shrink-0" />
+                                <span>Edit</span>
+                              </button>
+                            )}
                             <span className={`h-6.5 px-2 rounded-lg text-[10px] font-black uppercase border flex items-center justify-center whitespace-nowrap ${statusBadge.bg}`}>
                               {statusBadge.label}
                             </span>
@@ -5234,150 +5290,97 @@ const SkuMasterV2: React.FC = () => {
                           </div>
                         </div>
 
-                        {isEditingThresholds && (
-                          <div className="bg-amber-50/70 p-3.5 rounded-xl border border-amber-200/80 space-y-2.5">
-                            <div className="text-[11px] font-bold text-amber-900 flex items-center justify-between">
-                              <span>Set Stock Level Thresholds ({stockUnit})</span>
+                        {/* Unified Stock & Thresholds Metrics 4-Tile Grid - Sits exactly in place */}
+                        <div className="space-y-2.5">
+                          <div className="grid grid-cols-2 gap-2.5 text-xs">
+                            <div className="bg-slate-50/90 p-3 rounded-xl border border-slate-200/80">
+                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1 whitespace-nowrap">
+                                LIVE ON-HAND
+                              </span>
+                              <span className="font-mono font-extrabold text-emerald-600 text-sm block truncate">
+                                {liveStockQty.toLocaleString('en-IN')} {stockUnit}
+                              </span>
                             </div>
-                            <div className="grid grid-cols-3 gap-3 text-xs">
-                              <div>
-                                <label className="block text-[10px] font-bold text-gray-600 mb-1">MIN STOCK THRESHOLD</label>
+                            <div className="bg-slate-50/90 p-3 rounded-xl border border-slate-200/80">
+                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1 whitespace-nowrap">
+                                EST. LIVE VALUE
+                              </span>
+                              <span className="font-mono font-extrabold text-slate-800 text-sm block truncate">
+                                ₹{totalEstVal.toLocaleString('en-IN')}
+                              </span>
+                            </div>
+                            <div className="bg-slate-50/90 p-3 rounded-xl border border-slate-200/80">
+                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1 whitespace-nowrap">
+                                MIN THRESHOLD
+                              </span>
+                              {isEditingThresholds ? (
                                 <input
                                   type="number"
                                   value={tempMinStock}
                                   onChange={(e) => setTempMinStock(e.target.value)}
-                                  className="w-full px-2.5 py-1.5 border border-amber-300 rounded-lg text-xs font-bold text-gray-900 bg-white"
+                                  className="w-full px-2 py-1 border border-amber-400 rounded-lg text-xs font-bold text-gray-900 bg-white"
                                   placeholder="e.g. 500"
+                                  autoFocus
                                 />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-bold text-gray-600 mb-1">REORDER LEVEL</label>
+                              ) : (
+                                <span className="font-mono font-extrabold text-amber-600 text-sm block truncate">
+                                  {minStockDisplay}
+                                </span>
+                              )}
+                            </div>
+                            <div className="bg-slate-50/90 p-3 rounded-xl border border-slate-200/80">
+                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1 whitespace-nowrap">
+                                REORDER LEVEL
+                              </span>
+                              {isEditingThresholds ? (
                                 <input
                                   type="number"
                                   value={tempReorder}
                                   onChange={(e) => setTempReorder(e.target.value)}
-                                  className="w-full px-2.5 py-1.5 border border-amber-300 rounded-lg text-xs font-bold text-gray-900 bg-white"
+                                  className="w-full px-2 py-1 border border-amber-400 rounded-lg text-xs font-bold text-gray-900 bg-white"
                                   placeholder="e.g. 100"
                                 />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-bold text-gray-600 mb-1">PREFERRED VENDOR</label>
-                                <select
-                                  value={tempVendor}
-                                  onChange={(e) => setTempVendor(e.target.value)}
-                                  className="w-full px-2.5 py-1.5 border border-amber-300 rounded-lg text-xs font-bold text-gray-900 bg-white cursor-pointer"
-                                >
-                                  <option value="">-- Select Vendor --</option>
-                                  {modalVendorsList.map(v => (
-                                    <option key={v.id || v.name} value={v.name}>{v.name}</option>
-                                  ))}
-                                </select>
-                              </div>
-                            </div>
-                            <div className="flex justify-end gap-2 pt-1">
-                              <button
-                                onClick={handleSaveThresholds}
-                                disabled={isSavingThresholds}
-                                className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold shadow-2xs cursor-pointer flex items-center gap-1"
-                              >
-                                {isSavingThresholds ? 'Saving...' : 'Save Thresholds'}
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Unified Stock & Thresholds Metrics 4-Tile Grid */}
-                        {(() => {
-                          const isSheetItem = selectedSkuDetails.paperType === 'Sheets' || (selectedSkuDetails.name || '').toLowerCase().includes('sheet');
-                          const stdSheetsVal = selectedSkuDetails.pages || 500;
-                          const isRawOrSemiDetail = 
-                            (selectedSkuDetails.category || '').toLowerCase().includes('raw') ||
-                            (selectedSkuDetails.category || '').toLowerCase().includes('material') ||
-                            (selectedSkuDetails.category || '').toLowerCase().includes('semi') ||
-                            (selectedSkuDetails.category || '').toLowerCase().includes('wip') ||
-                            (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('RM') ||
-                            (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SEM') ||
-                            (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SF') ||
-                            (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SM') ||
-                            activeMainTab === 'materials' || activeMainTab === 'semi';
-
-                          return (
-                            <div className="space-y-2.5">
-                              <div className="grid grid-cols-2 gap-2.5 text-xs">
-                                <div className="bg-slate-50/90 p-3 rounded-xl border border-slate-200/80">
-                                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1 whitespace-nowrap">
-                                    LIVE ON-HAND
-                                  </span>
-                                  <span className="font-mono font-extrabold text-emerald-600 text-sm block truncate">
-                                    {liveStockQty.toLocaleString('en-IN')} {stockUnit}
-                                  </span>
-                                </div>
-                                <div className="bg-slate-50/90 p-3 rounded-xl border border-slate-200/80">
-                                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1 whitespace-nowrap">
-                                    EST. LIVE VALUE
-                                  </span>
-                                  <span className="font-mono font-extrabold text-slate-800 text-sm block truncate">
-                                    ₹{totalEstVal.toLocaleString('en-IN')}
-                                  </span>
-                                </div>
-                                <div className="bg-slate-50/90 p-3 rounded-xl border border-slate-200/80">
-                                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1 whitespace-nowrap">
-                                    MIN THRESHOLD
-                                  </span>
-                                  <span className="font-mono font-bold text-amber-600 text-sm block truncate">
-                                    {minStockDisplay}
-                                  </span>
-                                </div>
-                                <div className="bg-slate-50/90 p-3 rounded-xl border border-slate-200/80">
-                                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1 whitespace-nowrap">
-                                    REORDER LEVEL
-                                  </span>
-                                  <span className="font-mono font-bold text-blue-600 text-sm block truncate">
-                                    {reorderDisplay}
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* Full-Width Preferred Vendor / Aux Attributes */}
-                              {((selectedSkuDetails as any).preferredVendor || isRawOrSemiDetail || isSheetItem) && (
-                                <div className="space-y-2">
-                                  {((selectedSkuDetails as any).preferredVendor || isRawOrSemiDetail) && (
-                                    <div className="bg-slate-50/90 px-3.5 py-2.5 rounded-xl border border-slate-200/80 flex items-center justify-between gap-3">
-                                      <div className="flex items-center gap-2.5 min-w-0">
-                                        <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
-                                          <Building2 className="w-3.5 h-3.5" />
-                                        </div>
-                                        <div className="min-w-0">
-                                          <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block">
-                                            PREFERRED VENDOR
-                                          </span>
-                                          <span className="font-bold text-indigo-900 text-xs block break-words">
-                                            {(selectedSkuDetails as any).preferredVendor || '—'}
-                                          </span>
-                                        </div>
-                                      </div>
-                                      {(selectedSkuDetails as any).preferredVendor && (
-                                        <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50/80 px-2 py-0.5 rounded-md border border-indigo-200/60 shrink-0 whitespace-nowrap">
-                                          Primary Supplier
-                                        </span>
-                                      )}
-                                    </div>
-                                  )}
-                                  {isSheetItem && (
-                                    <div className="bg-slate-50/90 px-3.5 py-2 rounded-xl border border-slate-200/80 flex items-center justify-between">
-                                      <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider">
-                                        STD. SHEETS / REAM
-                                      </span>
-                                      <span className="font-mono font-bold text-slate-700 text-xs">
-                                        {stdSheetsVal} Sheets
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
+                              ) : (
+                                <span className="font-mono font-extrabold text-blue-600 text-sm block truncate">
+                                  {reorderDisplay}
+                                </span>
                               )}
                             </div>
-                          );
-                        })()}
+                          </div>
+
+                          {/* Preferred Vendor Row (Editable when in edit mode) */}
+                          <div className="bg-slate-50/90 px-3.5 py-2.5 rounded-xl border border-slate-200/80 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                              <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+                                <Building2 className="w-3.5 h-3.5" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">PREFERRED VENDOR</span>
+                                {isEditingThresholds ? (
+                                  <select
+                                    value={tempVendor}
+                                    onChange={(e) => setTempVendor(e.target.value)}
+                                    className="w-full px-2 py-1 mt-0.5 border border-amber-400 rounded-lg text-xs font-bold text-gray-900 bg-white cursor-pointer"
+                                  >
+                                    <option value="">-- Select Vendor --</option>
+                                    {modalVendorsList.map(v => (
+                                      <option key={v.id || v.name} value={v.name}>{v.name}</option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <span className="font-bold text-gray-900 text-xs block truncate">
+                                    {(selectedSkuDetails as any).preferredVendor || '—'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {(selectedSkuDetails as any).preferredVendor && !isEditingThresholds && (
+                              <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50/80 px-2 py-0.5 rounded-md border border-indigo-200/60 shrink-0 whitespace-nowrap">
+                                Primary Supplier
+                              </span>
+                            )}
+                          </div>
+                        </div>
 
                         {/* Full-Width Storage Locations Container */}
                         <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-200/80 space-y-1.5">

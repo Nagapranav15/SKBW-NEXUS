@@ -1120,14 +1120,25 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         group: editSku.group || ''
       });
       if ((editSku as any).bomItems && Array.isArray((editSku as any).bomItems)) {
-        setBomItems((editSku as any).bomItems.map((b: any, idx: number) => ({
-          id: b.id || b._id || `bom_${idx}_${Date.now()}`,
-          name: b.name || b.itemName || b.skuName || '',
-          qty: String(b.qty ?? b.quantity ?? ''),
-          uom: b.uom || b.unit || 'Kg',
-          inStock: Number(b.inStock ?? 0),
-          notes: b.notes || ''
-        })));
+        setBomItems((editSku as any).bomItems.map((b: any, idx: number) => {
+          const matchedSku = (allSkusList || []).find(s => 
+            (b.skuId && String(s._id) === String(b.skuId)) ||
+            (b.skuCode && s.skuCode === b.skuCode) ||
+            (b.id && String(s._id) === String(b.id)) ||
+            (b.name && s.name === b.name)
+          );
+          const currentName = matchedSku?.name || b.name || b.itemName || b.skuName || '';
+          return {
+            id: b.id || b._id || `bom_${idx}_${Date.now()}`,
+            skuId: b.skuId || matchedSku?._id,
+            skuCode: b.skuCode || matchedSku?.skuCode,
+            name: currentName,
+            qty: String(b.qty ?? b.quantity ?? ''),
+            uom: matchedSku?.unit || b.uom || b.unit || 'Kg',
+            inStock: Number((matchedSku as any)?.openingStock ?? b.inStock ?? 0),
+            notes: b.notes || ''
+          };
+        }));
       } else {
         setBomItems([]);
       }
@@ -2715,6 +2726,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                       onChange={(selectedName, matchedSku) => {
                                         updateBomItem(item.id, 'name', selectedName);
                                         if (matchedSku) {
+                                          updateBomItem(item.id, 'skuId', matchedSku._id);
+                                          updateBomItem(item.id, 'skuCode', matchedSku.skuCode);
                                           updateBomItem(item.id, 'uom', matchedSku.unit || 'Kg');
                                           updateBomItem(item.id, 'inStock', (matchedSku as any).openingStock ?? 0);
                                         }

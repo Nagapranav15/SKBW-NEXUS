@@ -402,6 +402,9 @@ exports.updateSku = async (req, res, next) => {
       }
     }
 
+    const previousName = sku.name;
+    const previousCode = sku.skuCode;
+
     if (req.body.name !== undefined && req.body.name !== null) sku.name = req.body.name;
     if (req.body.category !== undefined && req.body.category !== null) sku.category = req.body.category;
     if (req.body.unit !== undefined && req.body.unit !== null) sku.unit = req.body.unit;
@@ -453,6 +456,55 @@ exports.updateSku = async (req, res, next) => {
     }
 
     await sku.save();
+
+    // Dynamically update BOM recipes across all other SKUs referencing this item by ID, code, or name
+    if (req.body.name !== undefined || req.body.skuCode !== undefined || req.body.unit !== undefined) {
+      try {
+        const skuIdStr = String(sku._id);
+        const currentCode = sku.skuCode;
+        const currentName = sku.name;
+        const currentUnit = sku.unit || "Kg";
+
+        const affectedSkus = await SkuV2.find({
+          company: sku.company,
+          "bomItems.0": { $exists: true }
+        });
+
+        for (const aff of affectedSkus) {
+          let hasChange = false;
+          const updatedBom = (aff.bomItems || []).map(b => {
+            const bId = String(b.skuId || b.id || b._id || '');
+            const bCode = (b.skuCode || '').trim().toUpperCase();
+            const bName = (b.name || b.itemName || b.skuName || '').trim().toLowerCase();
+
+            const isMatchingSku = 
+              (bId && bId === skuIdStr) ||
+              (bCode && (bCode === currentCode.toUpperCase() || (previousCode && bCode === previousCode.toUpperCase()))) ||
+              (previousName && bName === previousName.trim().toLowerCase());
+
+            if (isMatchingSku) {
+              hasChange = true;
+              return {
+                ...b,
+                skuId: sku._id,
+                skuCode: currentCode,
+                name: currentName,
+                itemName: currentName,
+                skuName: currentName,
+                uom: currentUnit
+              };
+            }
+            return b;
+          });
+
+          if (hasChange) {
+            await SkuV2.updateOne({ _id: aff._id }, { $set: { bomItems: updatedBom } });
+          }
+        }
+      } catch (bomSyncErr) {
+        console.warn("Failed to cascade BOM item name update:", bomSyncErr);
+      }
+    }
 
     // Auto-sync units, ruleType, brand, category to company Metadata
     const cleanItemUnits = [sku.unit, sku.altUnit].filter(u => u && typeof u === 'string' && u.trim());

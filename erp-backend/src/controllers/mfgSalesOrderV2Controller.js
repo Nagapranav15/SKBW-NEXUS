@@ -208,6 +208,22 @@ exports.createSalesOrder = async (req, res, next) => {
       orderNumber = `SO-${String(nextCount).padStart(4, "0")}`;
     }
 
+    // Validate that no line item is inactive or deleted
+    const skuIds = items.map(i => i.skuId).filter(Boolean).map(toObjectId);
+    if (skuIds.length > 0) {
+      const inactiveSkus = await SkuV2.find({
+        _id: { $in: skuIds },
+        $or: [{ status: "Inactive" }, { isDeleted: true }]
+      }).select("skuCode name");
+
+      if (inactiveSkus.length > 0) {
+        const names = inactiveSkus.map(s => `${s.skuCode} - ${s.name}`).join(", ");
+        return res.status(400).json({
+          msg: `The following item(s) are Inactive / Deleted and cannot be billed: ${names}`
+        });
+      }
+    }
+
     // Process line items
     const processedItems = items.map(item => ({
       skuId: item.skuId ? toObjectId(item.skuId) : undefined,
@@ -300,6 +316,21 @@ exports.updateSalesOrder = async (req, res, next) => {
 
     if (req.body.customer) order.customer = toObjectId(req.body.customer);
     if (req.body.items && Array.isArray(req.body.items)) {
+      const skuIds = req.body.items.map(i => i.skuId).filter(Boolean).map(toObjectId);
+      if (skuIds.length > 0) {
+        const inactiveSkus = await SkuV2.find({
+          _id: { $in: skuIds },
+          $or: [{ status: "Inactive" }, { isDeleted: true }]
+        }).select("skuCode name");
+
+        if (inactiveSkus.length > 0) {
+          const names = inactiveSkus.map(s => `${s.skuCode} - ${s.name}`).join(", ");
+          return res.status(400).json({
+            msg: `The following item(s) are Inactive / Deleted and cannot be billed: ${names}`
+          });
+        }
+      }
+
       order.items = req.body.items.map(item => ({
         skuId: item.skuId ? toObjectId(item.skuId) : undefined,
         skuCode: item.skuCode || "SKU-001",

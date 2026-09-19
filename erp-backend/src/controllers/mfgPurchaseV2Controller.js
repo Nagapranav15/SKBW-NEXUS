@@ -62,8 +62,11 @@ exports.createPurchaseInvoice = async (req, res, next) => {
 
       // Check SKU
       const sku = await SkuV2.findOne({ _id: toObjectId(skuId), company: companyObjId });
-      if (!sku) {
-        return res.status(400).json({ msg: `SKU '${skuId}' not found` });
+      if (!sku || sku.isDeleted) {
+        return res.status(400).json({ msg: `SKU '${skuId}' not found or has been deleted` });
+      }
+      if (sku.status === 'Inactive') {
+        return res.status(400).json({ msg: `Item '${sku.skuCode} - ${sku.name}' is marked Inactive and cannot be billed or purchased` });
       }
 
       const primaryLocId = locationId || (splits && splits[0]?.locationId) || (reels && reels[0]?.locationId);
