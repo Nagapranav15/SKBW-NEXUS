@@ -101,6 +101,7 @@ const SettingsPage: React.FC = () => {
         brands: updatedBrands,
         categoryFields: updatedFields
       });
+      window.dispatchEvent(new CustomEvent('skbw_metadata_updated'));
       showToast('Settings saved successfully', 'success');
     } catch (e) {
       console.error(e);

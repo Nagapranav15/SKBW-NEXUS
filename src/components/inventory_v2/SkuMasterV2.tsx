@@ -2372,6 +2372,8 @@ const SkuMasterV2: React.FC = () => {
       const itemsToCreate: any[] = [];
       const dynamicCategoriesToCreate: { name: string; type: 'products' | 'materials' | 'semi'; uom: string }[] = [];
       const dynamicBrandsToCreate: string[] = [];
+      const dynamicUnitsToCreate: string[] = [];
+      const dynamicRuleTypesToCreate: string[] = [];
 
       for (let i = 1; i < rawRows.length; i++) {
         const row = rawRows[i];
@@ -2539,6 +2541,25 @@ const SkuMasterV2: React.FC = () => {
         const ruleType = getFieldVal('ruletype', 'rule', 'ruling');
         const title = getFieldVal('title', 'itemtitle', 'description', 'itemdescription');
 
+        if (unit && unit.trim()) {
+          const uTrim = unit.trim();
+          if (!dynamicUnitsToCreate.some(u => u.toLowerCase() === uTrim.toLowerCase())) {
+            dynamicUnitsToCreate.push(uTrim);
+          }
+        }
+        if (altUnit && altUnit.trim()) {
+          const auTrim = altUnit.trim();
+          if (!dynamicUnitsToCreate.some(u => u.toLowerCase() === auTrim.toLowerCase())) {
+            dynamicUnitsToCreate.push(auTrim);
+          }
+        }
+        if (ruleType && ruleType.trim()) {
+          const rtTrim = ruleType.trim();
+          if (!dynamicRuleTypesToCreate.some(r => r.toLowerCase() === rtTrim.toLowerCase())) {
+            dynamicRuleTypesToCreate.push(rtTrim);
+          }
+        }
+
         if (brand && brand.trim()) {
           const brandTrimmed = brand.trim();
           const brandLower = brandTrimmed.toLowerCase();
@@ -2616,28 +2637,40 @@ const SkuMasterV2: React.FC = () => {
         await saveCategoriesToDb(updatedCatCards);
       }
 
-      // Save dynamically discovered new brands to MongoDB metadata
-      if (dynamicBrandsToCreate.length > 0) {
+      // Save dynamically discovered new units, rule types, and brands to MongoDB metadata
+      if (dynamicBrandsToCreate.length > 0 || dynamicUnitsToCreate.length > 0 || dynamicRuleTypesToCreate.length > 0) {
         try {
           const meta = await getMetadataV2(selectedCompany._id).catch(() => null);
           const existingBrands = Array.isArray(meta?.brands) ? meta.brands : [];
           const brandSet = new Set(existingBrands.map((b: string) => b.trim().toLowerCase()));
-          const toAdd = dynamicBrandsToCreate.filter(b => !brandSet.has(b.toLowerCase()));
-          if (toAdd.length > 0) {
-            const mergedBrands = [...existingBrands, ...toAdd];
+          const brandsToAdd = dynamicBrandsToCreate.filter(b => !brandSet.has(b.toLowerCase()));
+          const mergedBrands = [...existingBrands, ...brandsToAdd];
+
+          const existingUnits = Array.isArray(meta?.units) ? meta.units : [];
+          const unitSet = new Set(existingUnits.map((u: string) => u.trim().toLowerCase()));
+          const unitsToAdd = dynamicUnitsToCreate.filter(u => !unitSet.has(u.toLowerCase()));
+          const mergedUnits = normalizeAndDeduplicateUnits([...existingUnits, ...unitsToAdd]);
+
+          const existingRuleTypes = Array.isArray(meta?.ruleTypes) ? meta.ruleTypes : [];
+          const ruleTypeSet = new Set(existingRuleTypes.map((r: string) => r.trim().toLowerCase()));
+          const ruleTypesToAdd = dynamicRuleTypesToCreate.filter(r => !ruleTypeSet.has(r.toLowerCase()));
+          const mergedRuleTypes = Array.from(new Set([...existingRuleTypes, ...ruleTypesToAdd]));
+
+          if (brandsToAdd.length > 0 || unitsToAdd.length > 0 || ruleTypesToAdd.length > 0) {
             await updateMetadataV2({
               companyId: selectedCompany._id,
               categories: meta?.categories,
-              units: meta?.units,
-              ruleTypes: meta?.ruleTypes,
+              units: mergedUnits,
+              ruleTypes: mergedRuleTypes,
               groups: meta?.groups,
               brands: mergedBrands,
               categoryFields: meta?.categoryFields,
               standardizedSheets: meta?.standardizedSheets
             });
+            window.dispatchEvent(new CustomEvent('skbw_metadata_updated'));
           }
-        } catch (brandErr) {
-          console.warn('Failed to sync imported brands to metadata:', brandErr);
+        } catch (metaErr) {
+          console.warn('Failed to sync imported metadata:', metaErr);
         }
       }
 

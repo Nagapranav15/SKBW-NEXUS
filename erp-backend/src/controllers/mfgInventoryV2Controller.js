@@ -318,6 +318,26 @@ exports.createSku = async (req, res, next) => {
       }
     }
 
+    // Auto-sync units, ruleType, brand, category to company Metadata
+    const cleanItemUnits = [newSku.unit, newSku.altUnit].filter(u => u && typeof u === 'string' && u.trim());
+    const cleanItemRuleTypes = (newSku.ruleType && typeof newSku.ruleType === 'string' && newSku.ruleType.trim()) ? [newSku.ruleType.trim()] : [];
+    const cleanItemBrands = (newSku.brand && typeof newSku.brand === 'string' && newSku.brand.trim()) ? [newSku.brand.trim()] : [];
+    const cleanItemCategories = (newSku.category && typeof newSku.category === 'string' && newSku.category.trim()) ? [newSku.category.trim()] : [];
+
+    if (cleanItemUnits.length > 0 || cleanItemRuleTypes.length > 0 || cleanItemBrands.length > 0 || cleanItemCategories.length > 0) {
+      const metaUpdate = {};
+      if (cleanItemUnits.length > 0) metaUpdate.units = { $each: cleanItemUnits };
+      if (cleanItemRuleTypes.length > 0) metaUpdate.ruleTypes = { $each: cleanItemRuleTypes };
+      if (cleanItemBrands.length > 0) metaUpdate.brands = { $each: cleanItemBrands };
+      if (cleanItemCategories.length > 0) metaUpdate.categories = { $each: cleanItemCategories };
+
+      await Metadata.findOneAndUpdate(
+        { company: toObjectId(company) },
+        { $addToSet: metaUpdate },
+        { upsert: true }
+      ).catch(() => {});
+    }
+
     ActivityLog.create({
       action: "CREATE",
       entityType: "SkuV2",
@@ -433,6 +453,26 @@ exports.updateSku = async (req, res, next) => {
     }
 
     await sku.save();
+
+    // Auto-sync units, ruleType, brand, category to company Metadata
+    const cleanItemUnits = [sku.unit, sku.altUnit].filter(u => u && typeof u === 'string' && u.trim());
+    const cleanItemRuleTypes = (sku.ruleType && typeof sku.ruleType === 'string' && sku.ruleType.trim()) ? [sku.ruleType.trim()] : [];
+    const cleanItemBrands = (sku.brand && typeof sku.brand === 'string' && sku.brand.trim()) ? [sku.brand.trim()] : [];
+    const cleanItemCategories = (sku.category && typeof sku.category === 'string' && sku.category.trim()) ? [sku.category.trim()] : [];
+
+    if (cleanItemUnits.length > 0 || cleanItemRuleTypes.length > 0 || cleanItemBrands.length > 0 || cleanItemCategories.length > 0) {
+      const metaUpdate = {};
+      if (cleanItemUnits.length > 0) metaUpdate.units = { $each: cleanItemUnits };
+      if (cleanItemRuleTypes.length > 0) metaUpdate.ruleTypes = { $each: cleanItemRuleTypes };
+      if (cleanItemBrands.length > 0) metaUpdate.brands = { $each: cleanItemBrands };
+      if (cleanItemCategories.length > 0) metaUpdate.categories = { $each: cleanItemCategories };
+
+      await Metadata.findOneAndUpdate(
+        { company: sku.company },
+        { $addToSet: metaUpdate },
+        { upsert: true }
+      ).catch(() => {});
+    }
 
     ActivityLog.create({
       action: "UPDATE",
@@ -768,6 +808,32 @@ exports.bulkImportSkus = async (req, res, next) => {
     const totalProcessed = createdCount + modifiedCount;
 
     if (totalProcessed > 0) {
+      // Auto-persist imported units, ruleTypes, brands, and categories to company Metadata
+      const cleanFilter = (arr) => Array.from(new Set(
+        (arr || [])
+          .map(x => (typeof x === 'string' ? x.trim() : ''))
+          .filter(x => x && x !== '-' && x !== '—' && x.toLowerCase() !== 'n/a' && x.toLowerCase() !== 'none' && x.toLowerCase() !== 'null' && x.toLowerCase() !== 'undefined')
+      ));
+
+      const importedUnits = cleanFilter(skus.flatMap(s => [s.unit, s.altUnit]));
+      const importedRuleTypes = cleanFilter(skus.map(s => s.ruleType));
+      const importedBrands = cleanFilter(skus.map(s => s.brand));
+      const importedCategories = cleanFilter(skus.map(s => s.category));
+
+      if (importedUnits.length > 0 || importedRuleTypes.length > 0 || importedBrands.length > 0 || importedCategories.length > 0) {
+        const updateSetObj = {};
+        if (importedUnits.length > 0) updateSetObj.units = { $each: importedUnits };
+        if (importedRuleTypes.length > 0) updateSetObj.ruleTypes = { $each: importedRuleTypes };
+        if (importedBrands.length > 0) updateSetObj.brands = { $each: importedBrands };
+        if (importedCategories.length > 0) updateSetObj.categories = { $each: importedCategories };
+
+        await Metadata.findOneAndUpdate(
+          { company: companyObjId },
+          { $addToSet: updateSetObj },
+          { upsert: true }
+        ).catch(err => console.error("Error auto-syncing metadata on bulk import:", err));
+      }
+
       ActivityLog.create({
         action: "IMPORT",
         entityType: "SkuV2",
@@ -2203,6 +2269,48 @@ exports.getMetadata = async (req, res, next) => {
       });
       await doc.save();
     }
+
+    // Auto-discover any units, ruleTypes, brands, or categories from active SKUs in this company
+    const [skuUnits, skuAltUnits, skuRuleTypes, skuBrands, skuCategories] = await Promise.all([
+      SkuV2.distinct("unit", { company: companyObjId, isDeleted: false }),
+      SkuV2.distinct("altUnit", { company: companyObjId, isDeleted: false }),
+      SkuV2.distinct("ruleType", { company: companyObjId, isDeleted: false }),
+      SkuV2.distinct("brand", { company: companyObjId, isDeleted: false }),
+      SkuV2.distinct("category", { company: companyObjId, isDeleted: false })
+    ]);
+
+    const cleanFilter = (arr) => Array.from(new Set(
+      (arr || [])
+        .map(x => (typeof x === 'string' ? x.trim() : ''))
+        .filter(x => x && x !== '-' && x !== '—' && x.toLowerCase() !== 'n/a' && x.toLowerCase() !== 'none' && x.toLowerCase() !== 'null' && x.toLowerCase() !== 'undefined')
+    ));
+
+    const combinedUnits = cleanFilter([...(doc.units || []), ...skuUnits, ...skuAltUnits]);
+    const combinedRuleTypes = cleanFilter([...(doc.ruleTypes || []), ...skuRuleTypes]);
+    const combinedBrands = cleanFilter([...(doc.brands || []), ...skuBrands]);
+    const combinedCategories = cleanFilter([...(doc.categories || []), ...skuCategories]);
+
+    // If new values were discovered from SKUs, persist them back to doc
+    let shouldUpdate = false;
+    if (combinedUnits.length !== (doc.units || []).length) {
+      doc.units = combinedUnits;
+      shouldUpdate = true;
+    }
+    if (combinedRuleTypes.length !== (doc.ruleTypes || []).length) {
+      doc.ruleTypes = combinedRuleTypes;
+      shouldUpdate = true;
+    }
+    if (combinedBrands.length !== (doc.brands || []).length) {
+      doc.brands = combinedBrands;
+      shouldUpdate = true;
+    }
+    if (shouldUpdate) {
+      await Metadata.updateOne(
+        { _id: doc._id },
+        { $set: { units: combinedUnits, ruleTypes: combinedRuleTypes, brands: combinedBrands } }
+      ).catch(() => {});
+    }
+
     res.json(doc);
   } catch (err) {
     next(err);

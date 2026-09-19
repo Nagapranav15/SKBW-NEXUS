@@ -444,6 +444,26 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
             return !isFinishedGoods;
           });
           setRawMaterialsList(rawAndSemi);
+
+          // Dynamically discover and sync units, ruleTypes, and brands present on active SKUs
+          const activeUnits = new Set<string>();
+          const activeRuleTypes = new Set<string>();
+          const activeBrands = new Set<string>();
+          skus.forEach(s => {
+            if (s.unit && s.unit.trim()) activeUnits.add(s.unit.trim());
+            if (s.altUnit && s.altUnit.trim()) activeUnits.add(s.altUnit.trim());
+            if (s.ruleType && s.ruleType.trim()) activeRuleTypes.add(s.ruleType.trim());
+            if (s.brand && s.brand.trim()) activeBrands.add(s.brand.trim());
+          });
+          if (activeUnits.size > 0) {
+            setUnitsList(prev => normalizeAndDeduplicateUnits([...prev, ...Array.from(activeUnits)]));
+          }
+          if (activeRuleTypes.size > 0) {
+            setRuleTypesList(prev => Array.from(new Set([...prev, ...Array.from(activeRuleTypes)])));
+          }
+          if (activeBrands.size > 0) {
+            setBrandsList(prev => Array.from(new Set([...prev, ...Array.from(activeBrands)])));
+          }
         }
       }).catch(console.error);
     }
@@ -463,7 +483,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
   const [categoriesList, setCategoriesList] = useState<string[]>([]);
   const [unitsList, setUnitsList] = useState<string[]>([]);
-  const [ruleTypesList, setRuleTypesList] = useState<string[]>(["Plain", "Single Line", "Double Line", "Square Ruled", "Four Line", "Unruled"]);
+  const [ruleTypesList, setRuleTypesList] = useState<string[]>([]);
   const [groupsList, setGroupsList] = useState<string[]>([]);
   const [brandsList, setBrandsList] = useState<string[]>([]);
 
@@ -477,6 +497,14 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     }
     return normalizeAndDeduplicateUnits(list);
   }, [unitsList, form.unit, form.altUnit]);
+
+  const displayRuleTypes = React.useMemo(() => {
+    const list = [...ruleTypesList];
+    if (form.ruleType && !list.some(r => r.toLowerCase() === form.ruleType.trim().toLowerCase())) {
+      list.push(form.ruleType.trim());
+    }
+    return Array.from(new Set(list.filter(Boolean)));
+  }, [ruleTypesList, form.ruleType]);
 
 
   // Initialize selectedType when drawer opens or activeSection / editSku changes
@@ -812,6 +840,11 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   // Load custom metadata lists & brands from database
   useEffect(() => {
     if (companyId && isOpen) {
+      setUnitsList([]);
+      setRuleTypesList([]);
+      setBrandsList([]);
+      setCategoriesList([]);
+      setGroupsList([]);
       loadMetadata();
     }
   }, [companyId, isOpen]);
@@ -830,15 +863,23 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     try {
       const data = await getMetadataV2(companyId);
       if (data) {
-        if (data.categories?.length) setCategoriesList(data.categories);
-        if (data.categoryCards?.length) setInternalCategoryCards(data.categoryCards);
+        if (Array.isArray(data.categories)) setCategoriesList(data.categories);
+        if (Array.isArray(data.categoryCards)) setInternalCategoryCards(data.categoryCards);
         if (Array.isArray(data.units)) {
           setUnitsList(normalizeAndDeduplicateUnits(data.units));
+        } else {
+          setUnitsList([]);
         }
-        if (data.ruleTypes?.length) setRuleTypesList(data.ruleTypes);
-        if (data.groups?.length) setGroupsList(data.groups);
+        if (Array.isArray(data.ruleTypes)) {
+          setRuleTypesList(data.ruleTypes);
+        } else {
+          setRuleTypesList([]);
+        }
+        if (Array.isArray(data.groups)) setGroupsList(data.groups);
         if (Array.isArray(data.brands)) {
           setBrandsList(data.brands);
+        } else {
+          setBrandsList([]);
         }
         if (data.standardizedSheets && Array.isArray(data.standardizedSheets) && data.standardizedSheets.length > 0) {
           setStandardizedSheets(data.standardizedSheets);
@@ -1825,7 +1866,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
                         >
                           <option value="">-- Select Rule Type --</option>
-                          {ruleTypesList.map(rule => (
+                          {displayRuleTypes.map(rule => (
                             <option key={rule} value={rule}>{rule}</option>
                           ))}
                           <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
@@ -2030,7 +2071,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
                       >
                         <option value="">-- Select Rule Type --</option>
-                        {ruleTypesList.map(rule => (
+                        {displayRuleTypes.map(rule => (
                           <option key={rule} value={rule}>{rule}</option>
                         ))}
                         <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
