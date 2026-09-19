@@ -5280,7 +5280,7 @@ const SkuMasterV2: React.FC = () => {
                             <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
                               <Package className="w-4 h-4" />
                             </div>
-                            <h4 className="font-bold text-gray-900 text-xs whitespace-nowrap">Stock & Location</h4>
+                            <h4 className="font-bold text-gray-900 text-xs whitespace-nowrap">Stock & Thresholds</h4>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
                             {isEditingThresholds ? (
@@ -5423,25 +5423,6 @@ const SkuMasterV2: React.FC = () => {
                                 Primary Supplier
                               </span>
                             )}
-                          </div>
-                        </div>
-
-                        {/* Full-Width Storage Locations Container */}
-                        <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-200/80 space-y-1.5">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-                              <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                              <span>STORAGE & WAREHOUSE LOCATION</span>
-                            </div>
-                            <span className="text-[9.5px] font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200 whitespace-nowrap">
-                              Initial: {modalInitialLocationText || 'SKBW'}
-                            </span>
-                          </div>
-                          <div className="flex items-start gap-2 pt-0.5">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 mt-1"></span>
-                            <div className="text-xs font-semibold text-gray-800 break-words leading-relaxed">
-                              {modalDynamicLocationsText || 'No live batch stock assigned'}
-                            </div>
                           </div>
                         </div>
                       </div>
