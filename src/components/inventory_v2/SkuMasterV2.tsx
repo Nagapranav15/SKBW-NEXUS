@@ -799,14 +799,17 @@ const SkuMasterV2: React.FC = () => {
     { id: 'dispatchOrders', label: 'DISPATCH ORDERS', visible: false }
   ];
 
-  const STORAGE_KEY = 'skbw_sku_master_tab_columns_v16';
+  const STORAGE_KEY = 'skbw_sku_master_tab_columns_v17';
 
   // Helper to sanitize column list against current valid defaults
   const sanitizeColumns = (savedList: any[], defaultList: typeof DEFAULT_PRODUCTS_COLUMNS) => {
     if (!Array.isArray(savedList)) return defaultList;
     const defaultIds = new Set(defaultList.map(c => c.id));
-    // Filter out obsolete or deleted column IDs (e.g. legacy 'group' or 'itemCategory')
-    const validSaved = savedList.filter(c => c && defaultIds.has(c.id));
+    // Filter out obsolete or deleted column IDs, and update label to current standard
+    const validSaved = savedList.filter(c => c && defaultIds.has(c.id)).map(c => {
+      const def = defaultList.find(d => d.id === c.id);
+      return def ? { ...c, label: def.label } : c;
+    });
     // Add any missing default columns
     const savedIds = new Set(validSaved.map(c => c.id));
     const missing = defaultList.filter(c => !savedIds.has(c.id));
