@@ -616,13 +616,24 @@ const SkuMasterV2: React.FC = () => {
     }
     setIsSavingBom(true);
     try {
+      const yieldQty = Number(recipeYieldQty) || 1;
+      const yieldUnit = recipeYieldUnit || (selectedSkuDetails as any).recipeYieldUnit || (selectedSkuDetails as any).batchYieldUnit || selectedSkuDetails.unit || 'Pcs';
       await updateSkuV2(selectedSkuDetails._id, {
         bomItems: bomRecipeItems,
-        recipeYieldQty: Number(recipeYieldQty) || 1,
-        recipeYieldUnit: recipeYieldUnit || selectedSkuDetails.unit || 'Pcs',
+        recipeYieldQty: yieldQty,
+        recipeYieldUnit: yieldUnit,
+        batchYieldQty: yieldQty,
+        batchYieldUnit: yieldUnit,
         company: selectedCompany?._id
       });
-      setSelectedSkuDetails(prev => prev ? ({ ...prev, bomItems: bomRecipeItems, recipeYieldQty: Number(recipeYieldQty) || 1, recipeYieldUnit: recipeYieldUnit || selectedSkuDetails.unit || 'Pcs' }) : null);
+      setSelectedSkuDetails(prev => prev ? ({ ...prev, bomItems: bomRecipeItems, recipeYieldQty: yieldQty, recipeYieldUnit: yieldUnit, batchYieldQty: yieldQty, batchYieldUnit: yieldUnit }) : null);
+      setSkus(prev => prev.map(s => s._id === selectedSkuDetails._id ? { ...s, bomItems: bomRecipeItems, recipeYieldQty: yieldQty, recipeYieldUnit: yieldUnit, batchYieldQty: yieldQty, batchYieldUnit: yieldUnit } : s));
+      if (activeBomProduct?._id === selectedSkuDetails._id) {
+        setActiveBomProduct(prev => prev ? ({ ...prev, bomItems: bomRecipeItems, recipeYieldQty: yieldQty, recipeYieldUnit: yieldUnit, batchYieldQty: yieldQty, batchYieldUnit: yieldUnit }) : null);
+        setActiveRecipeItems(bomRecipeItems);
+        setBuildBatchYieldQty(String(yieldQty));
+        setBuildBatchYieldUnit(yieldUnit);
+      }
       showToast('BOM Recipe saved successfully to database!', 'success');
       setIsEditingItemBom(false);
       loadSkus(false);
@@ -662,11 +673,15 @@ const SkuMasterV2: React.FC = () => {
           }))
         : [...existingItems, ...newItems];
 
-      const yieldQty = existingItems.length === 0 && copiedBom.basis ? Number(copiedBom.basis) || 1 : ((targetSku as any).recipeYieldQty || 1);
+      const yieldQty = existingItems.length === 0 && copiedBom.basis ? Number(copiedBom.basis) || 1 : ((targetSku as any).recipeYieldQty || (targetSku as any).batchYieldQty || 1);
+      const yieldUnit = copiedBom.basisUnit || (targetSku as any).recipeYieldUnit || (targetSku as any).batchYieldUnit || targetSku.unit || 'Pcs';
 
       const patchData: any = {
         bomItems: updatedBomItems,
         recipeYieldQty: yieldQty,
+        recipeYieldUnit: yieldUnit,
+        batchYieldQty: yieldQty,
+        batchYieldUnit: yieldUnit,
         company: selectedCompany?._id
       };
       if ((targetSku.altUnit || '').toLowerCase().trim() === (targetSku.unit || '').toLowerCase().trim()) {
@@ -677,9 +692,9 @@ const SkuMasterV2: React.FC = () => {
       await updateSkuV2(targetSku._id, patchData);
 
       // Instant optimistic state update across table and modal
-      setSkus(prev => prev.map(s => s._id === targetSku._id ? { ...s, bomItems: updatedBomItems, recipeYieldQty: yieldQty } : s));
+      setSkus(prev => prev.map(s => s._id === targetSku._id ? { ...s, bomItems: updatedBomItems, recipeYieldQty: yieldQty, recipeYieldUnit: yieldUnit, batchYieldQty: yieldQty, batchYieldUnit: yieldUnit } : s));
       if (activeBomProduct?._id === targetSku._id) {
-        setActiveBomProduct(prev => prev ? { ...prev, bomItems: updatedBomItems, recipeYieldQty: yieldQty } : null);
+        setActiveBomProduct(prev => prev ? { ...prev, bomItems: updatedBomItems, recipeYieldQty: yieldQty, recipeYieldUnit: yieldUnit, batchYieldQty: yieldQty, batchYieldUnit: yieldUnit } : null);
         setActiveRecipeItems(updatedBomItems.map((item, idx) => ({
           id: item.id || `b-${idx}`,
           skuId: item.skuId,
@@ -691,11 +706,13 @@ const SkuMasterV2: React.FC = () => {
           notes: item.notes || ''
         })));
         setBuildBatchYieldQty(String(yieldQty));
+        setBuildBatchYieldUnit(yieldUnit);
       }
       if (selectedSkuDetails?._id === targetSku._id) {
-        setSelectedSkuDetails(prev => prev ? { ...prev, bomItems: updatedBomItems, recipeYieldQty: yieldQty } : null);
+        setSelectedSkuDetails(prev => prev ? { ...prev, bomItems: updatedBomItems, recipeYieldQty: yieldQty, recipeYieldUnit: yieldUnit, batchYieldQty: yieldQty, batchYieldUnit: yieldUnit } : null);
         setBomRecipeItems(updatedBomItems);
         setRecipeYieldQty(String(yieldQty));
+        setRecipeYieldUnit(yieldUnit);
       }
 
       showToast(`Pasted BOM from "${copiedBom.sourceName}" to "${targetSku.name || targetSku.skuCode}"!`, 'success');
@@ -716,9 +733,11 @@ const SkuMasterV2: React.FC = () => {
       showToast(`Pasting BOM to ${targets.length} products...`, 'info');
       const targetIds = new Set(targets.map(t => t._id));
       const pastedYield = Number(copiedBom.basis) || 1;
+      const pastedUnit = copiedBom.basisUnit || '';
 
       for (const targetSku of targets) {
         if (!targetSku._id) continue;
+        const targetYieldUnit = pastedUnit || (targetSku as any).recipeYieldUnit || (targetSku as any).batchYieldUnit || targetSku.unit || 'Pcs';
         const items = copiedBom.lines.map((l, i) => ({
           id: `b-paste-${Date.now()}-${i}`,
           skuId: l.skuId,
@@ -732,6 +751,9 @@ const SkuMasterV2: React.FC = () => {
         const patchData: any = {
           bomItems: items,
           recipeYieldQty: pastedYield,
+          recipeYieldUnit: targetYieldUnit,
+          batchYieldQty: pastedYield,
+          batchYieldUnit: targetYieldUnit,
           company: selectedCompany?._id
         };
         if ((targetSku.altUnit || '').toLowerCase().trim() === (targetSku.unit || '').toLowerCase().trim()) {
@@ -753,11 +775,13 @@ const SkuMasterV2: React.FC = () => {
         notes: l.notes || ''
       }));
 
-      setSkus(prev => prev.map(s => targetIds.has(s._id) ? { ...s, bomItems: pastedLines, recipeYieldQty: pastedYield } : s));
+      setSkus(prev => prev.map(s => targetIds.has(s._id) ? { ...s, bomItems: pastedLines, recipeYieldQty: pastedYield, recipeYieldUnit: pastedUnit || s.unit || 'Pcs', batchYieldQty: pastedYield, batchYieldUnit: pastedUnit || s.unit || 'Pcs' } : s));
       if (activeBomProduct && targetIds.has(activeBomProduct._id)) {
-        setActiveBomProduct(prev => prev ? { ...prev, bomItems: pastedLines, recipeYieldQty: pastedYield } : null);
+        const activeYieldUnit = pastedUnit || activeBomProduct.unit || 'Pcs';
+        setActiveBomProduct(prev => prev ? { ...prev, bomItems: pastedLines, recipeYieldQty: pastedYield, recipeYieldUnit: activeYieldUnit, batchYieldQty: pastedYield, batchYieldUnit: activeYieldUnit } : null);
         setActiveRecipeItems(pastedLines);
         setBuildBatchYieldQty(String(pastedYield));
+        setBuildBatchYieldUnit(activeYieldUnit);
       }
 
       showToast(`Successfully pasted BOM to ${targets.length} products!`, 'success');
@@ -811,14 +835,18 @@ const SkuMasterV2: React.FC = () => {
             }))
           : [...existingItems, ...newItems];
 
-        const yieldQty = existingItems.length === 0 && copiedBom.basis ? Number(copiedBom.basis) || 1 : ((sku as any).recipeYieldQty || 1);
+        const yieldQty = existingItems.length === 0 && copiedBom.basis ? Number(copiedBom.basis) || 1 : ((sku as any).recipeYieldQty || (sku as any).batchYieldQty || 1);
+        const yieldUnit = copiedBom.basisUnit || (sku as any).recipeYieldUnit || (sku as any).batchYieldUnit || sku.unit || 'Pcs';
 
         await updateSkuV2(id, {
           bomItems: updatedBomItems,
           recipeYieldQty: yieldQty,
+          recipeYieldUnit: yieldUnit,
+          batchYieldQty: yieldQty,
+          batchYieldUnit: yieldUnit,
           company: selectedCompany?._id
         });
-        updatedSkusMap.set(id, { bomItems: updatedBomItems, yieldQty });
+        updatedSkusMap.set(id, { bomItems: updatedBomItems, yieldQty, yieldUnit });
         updatedCount++;
       }
 
@@ -826,7 +854,7 @@ const SkuMasterV2: React.FC = () => {
       setSkus(prev => prev.map(s => {
         const update = updatedSkusMap.get(s._id);
         if (update) {
-          return { ...s, bomItems: update.bomItems, recipeYieldQty: update.yieldQty };
+          return { ...s, bomItems: update.bomItems, recipeYieldQty: update.yieldQty, recipeYieldUnit: update.yieldUnit, batchYieldQty: update.yieldQty, batchYieldUnit: update.yieldUnit };
         }
         return s;
       }));
@@ -1737,8 +1765,8 @@ const SkuMasterV2: React.FC = () => {
 
   const handleSelectBomProduct = (prod: SkuV2) => {
     setActiveBomProduct(prod);
-    setBuildBatchYieldQty(String((prod as any).recipeYieldQty || '1'));
-    setBuildBatchYieldUnit((prod as any).recipeYieldUnit || prod.unit || 'Pcs');
+    setBuildBatchYieldQty(String((prod as any).recipeYieldQty ?? (prod as any).batchYieldQty ?? '1'));
+    setBuildBatchYieldUnit((prod as any).recipeYieldUnit || (prod as any).batchYieldUnit || prod.unit || 'Pcs');
     if ((prod as any).bomItems && Array.isArray((prod as any).bomItems)) {
       setActiveRecipeItems((prod as any).bomItems.map((item: any, idx: number) => {
         const matchedSku = (skus || []).find(s => 
@@ -1769,18 +1797,20 @@ const SkuMasterV2: React.FC = () => {
     setIsSavingBuildBom(true);
     try {
       const yieldQty = Number(buildBatchYieldQty) || 1;
-      const yieldUnit = buildBatchYieldUnit || (activeBomProduct as any).recipeYieldUnit || activeBomProduct.unit || 'Pcs';
+      const yieldUnit = buildBatchYieldUnit || (activeBomProduct as any).recipeYieldUnit || (activeBomProduct as any).batchYieldUnit || activeBomProduct.unit || 'Pcs';
       await updateSkuV2(activeBomProduct._id, {
         bomItems: activeRecipeItems,
         recipeYieldQty: yieldQty,
         recipeYieldUnit: yieldUnit,
+        batchYieldQty: yieldQty,
+        batchYieldUnit: yieldUnit,
         company: selectedCompany?._id
       });
       // Instant optimistic update across local state
-      setSkus(prev => prev.map(s => s._id === activeBomProduct._id ? { ...s, bomItems: activeRecipeItems, recipeYieldQty: yieldQty, recipeYieldUnit: yieldUnit } : s));
-      setActiveBomProduct(prev => prev ? { ...prev, bomItems: activeRecipeItems, recipeYieldQty: yieldQty, recipeYieldUnit: yieldUnit } : null);
+      setSkus(prev => prev.map(s => s._id === activeBomProduct._id ? { ...s, bomItems: activeRecipeItems, recipeYieldQty: yieldQty, recipeYieldUnit: yieldUnit, batchYieldQty: yieldQty, batchYieldUnit: yieldUnit } : s));
+      setActiveBomProduct(prev => prev ? { ...prev, bomItems: activeRecipeItems, recipeYieldQty: yieldQty, recipeYieldUnit: yieldUnit, batchYieldQty: yieldQty, batchYieldUnit: yieldUnit } : null);
       if (selectedSkuDetails?._id === activeBomProduct._id) {
-        setSelectedSkuDetails(prev => prev ? { ...prev, bomItems: activeRecipeItems, recipeYieldQty: yieldQty, recipeYieldUnit: yieldUnit } : null);
+        setSelectedSkuDetails(prev => prev ? { ...prev, bomItems: activeRecipeItems, recipeYieldQty: yieldQty, recipeYieldUnit: yieldUnit, batchYieldQty: yieldQty, batchYieldUnit: yieldUnit } : null);
         setBomRecipeItems(activeRecipeItems);
         setRecipeYieldQty(String(yieldQty));
         setRecipeYieldUnit(yieldUnit);
@@ -4338,8 +4368,8 @@ const SkuMasterV2: React.FC = () => {
                                             sourceSkuId: sku._id,
                                             sourceSkuCode: sku.skuCode,
                                             sourceName: sku.name || sku.skuCode,
-                                            basis: (sku as any).recipeYieldQty || 1,
-                                            basisUnit: sku.unit || 'Pcs',
+                                            basis: (sku as any).recipeYieldQty || (sku as any).batchYieldQty || 1,
+                                            basisUnit: (sku as any).recipeYieldUnit || (sku as any).batchYieldUnit || sku.unit || 'Pcs',
                                             lines: (sku as any).bomItems || []
                                           });
                                           showToast(`BOM copied from "${sku.name || sku.skuCode}" (${(sku as any).bomItems?.length} items)! Ready to paste.`, 'success');
@@ -5602,7 +5632,7 @@ const SkuMasterV2: React.FC = () => {
                               sourceSkuCode: selectedSkuDetails?.skuCode,
                               sourceName: selectedSkuDetails?.name || selectedSkuDetails?.skuCode || 'Product',
                               basis: recipeYieldQty,
-                              basisUnit: selectedSkuDetails?.unit || 'Pcs',
+                              basisUnit: recipeYieldUnit || (selectedSkuDetails as any).recipeYieldUnit || (selectedSkuDetails as any).batchYieldUnit || selectedSkuDetails?.unit || 'Pcs',
                               lines: bomRecipeItems.map(item => ({
                                 id: item.id,
                                 name: item.name,
@@ -5619,12 +5649,13 @@ const SkuMasterV2: React.FC = () => {
                               setBomRecipeItems(copied.lines.map((l, i) => ({
                                 id: `b-paste-${Date.now()}-${i}`,
                                 name: l.name,
-                                qty: l.qty,
+                                qty: Number(l.qty) || 1,
                                 uom: l.uom,
                                 inStock: l.inStock ?? 0,
                                 notes: l.notes || ''
                               })));
                               if (copied.basis) setRecipeYieldQty(String(copied.basis));
+                              if (copied.basisUnit) setRecipeYieldUnit(copied.basisUnit);
                             } else {
                               const existingNames = new Set(bomRecipeItems.map(i => (i.name || '').toLowerCase().trim()));
                               const toAdd = copied.lines
@@ -5632,13 +5663,16 @@ const SkuMasterV2: React.FC = () => {
                                 .map((l, i) => ({
                                   id: `b-merge-${Date.now()}-${i}`,
                                   name: l.name,
-                                  qty: l.qty,
+                                  qty: Number(l.qty) || 1,
                                   uom: l.uom,
                                   inStock: l.inStock ?? 0,
                                   notes: l.notes || ''
                                 }));
                               if (bomRecipeItems.length === 0 && copied.basis) {
                                 setRecipeYieldQty(String(copied.basis));
+                              }
+                              if (copied.basisUnit) {
+                                setRecipeYieldUnit(copied.basisUnit);
                               }
                               setBomRecipeItems(prev => [...prev, ...toAdd]);
                             }
@@ -7192,8 +7226,8 @@ const SkuMasterV2: React.FC = () => {
                                     sourceSkuId: prod._id,
                                     sourceSkuCode: prod.skuCode,
                                     sourceName: prod.name || prod.skuCode,
-                                    basis: (prod as any).recipeYieldQty || 1,
-                                    basisUnit: prod.unit || 'Pcs',
+                                    basis: (prod as any).recipeYieldQty || (prod as any).batchYieldQty || 1,
+                                    basisUnit: (prod as any).recipeYieldUnit || (prod as any).batchYieldUnit || prod.unit || 'Pcs',
                                     lines: (prod as any).bomItems || []
                                   });
                                   showToast(`BOM copied from "${prod.name || prod.skuCode}"! Ready to paste.`, 'success');

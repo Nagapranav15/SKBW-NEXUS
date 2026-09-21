@@ -257,6 +257,10 @@ exports.createSku = async (req, res, next) => {
       defaultLocation: typeof assignedLocation === 'object' ? (assignedLocation.name || "SKBW") : String(assignedLocation),
       status: status || "Active",
       bomItems: req.body.bomItems || [],
+      recipeYieldQty: req.body.recipeYieldQty !== undefined ? Number(req.body.recipeYieldQty) : (req.body.batchYieldQty !== undefined ? Number(req.body.batchYieldQty) : 1),
+      recipeYieldUnit: req.body.recipeYieldUnit || req.body.batchYieldUnit || req.body.unit || "",
+      batchYieldQty: req.body.batchYieldQty !== undefined ? Number(req.body.batchYieldQty) : (req.body.recipeYieldQty !== undefined ? Number(req.body.recipeYieldQty) : 1),
+      batchYieldUnit: req.body.batchYieldUnit || req.body.recipeYieldUnit || req.body.unit || "",
       processSteps: req.body.processSteps || [],
       company: toObjectId(company),
       createdBy: req.user?.id ? toObjectId(req.user.id) : undefined
@@ -449,6 +453,16 @@ exports.updateSku = async (req, res, next) => {
     }
 
     if (req.body.bomItems !== undefined) sku.bomItems = req.body.bomItems;
+    if (req.body.recipeYieldQty !== undefined || req.body.batchYieldQty !== undefined) {
+      const parsedQty = req.body.recipeYieldQty !== undefined ? Number(req.body.recipeYieldQty) : Number(req.body.batchYieldQty);
+      sku.recipeYieldQty = !isNaN(parsedQty) && parsedQty > 0 ? parsedQty : 1;
+      sku.batchYieldQty = sku.recipeYieldQty;
+    }
+    if (req.body.recipeYieldUnit !== undefined || req.body.batchYieldUnit !== undefined) {
+      const u = req.body.recipeYieldUnit !== undefined ? req.body.recipeYieldUnit : req.body.batchYieldUnit;
+      sku.recipeYieldUnit = u || "";
+      sku.batchYieldUnit = sku.recipeYieldUnit;
+    }
     if (req.body.processSteps !== undefined) sku.processSteps = req.body.processSteps;
 
     if (req.body.isDeleted !== undefined) {
@@ -670,12 +684,13 @@ exports.bulkUpdateSkus = async (req, res, next) => {
     const allowedFields = [
       "status", "category", "group", "unit", "altUnit",
       "altUnitConversion", "altUnitDirection", "minStockLevel",
-      "reorderLevel", "warehouseLocation", "leadTimeDays"
+      "reorderLevel", "warehouseLocation", "leadTimeDays",
+      "recipeYieldQty", "recipeYieldUnit", "batchYieldQty", "batchYieldUnit", "bomItems"
     ];
 
     for (const field of allowedFields) {
       if (updates[field] !== undefined && updates[field] !== "") {
-        if (field === "minStockLevel" || field === "reorderLevel" || field === "altUnitConversion" || field === "leadTimeDays") {
+        if (field === "minStockLevel" || field === "reorderLevel" || field === "altUnitConversion" || field === "leadTimeDays" || field === "recipeYieldQty" || field === "batchYieldQty") {
           const num = Number(updates[field]);
           if (!isNaN(num)) sanitizedUpdates[field] = num;
         } else {

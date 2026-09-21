@@ -24,6 +24,11 @@ export interface SkuV2 {
   altUnitConversion?: number;
   altUnitDirection?: 'PRIMARY_TO_ALT' | 'ALT_TO_PRIMARY';
   status: 'Active' | 'Inactive';
+  bomItems?: any[];
+  recipeYieldQty?: number;
+  recipeYieldUnit?: string;
+  batchYieldQty?: number;
+  batchYieldUnit?: string;
   isDeleted?: boolean;
   createdAt?: string;
 }

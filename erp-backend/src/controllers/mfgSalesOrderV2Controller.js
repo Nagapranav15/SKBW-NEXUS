@@ -141,7 +141,7 @@ exports.getSalesOrderById = async (req, res, next) => {
     const { id } = req.params;
     let order = await SalesOrderV2.findById(id)
       .populate("customer", "firmName contactName gstin phone email billingAddress shippingAddress state")
-      .populate("items.skuId", "skuCode name category unit gsm width length ruleType pages paperType reamWeight bomItems");
+      .populate("items.skuId", "skuCode name category unit gsm width length ruleType pages paperType reamWeight bomItems recipeYieldQty recipeYieldUnit batchYieldQty batchYieldUnit");
 
     if (!order) {
       // Check legacy model fallback
