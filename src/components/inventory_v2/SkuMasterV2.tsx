@@ -4038,17 +4038,12 @@ const SkuMasterV2: React.FC = () => {
                                 </td>
                               );
                             case 'name':
-                              const isSheetItemBadge = sku.paperType === 'Sheets' || (sku.name || '').toLowerCase().includes('sheet');
+                              const cleanItemName = (sku.name || '').replace(/\s*\(\d+\s*Sheets\s*\/?\s*Ream\)/gi, '').trim();
                               return (
                                 <td key="name" className="py-3 px-3 font-medium text-gray-900 whitespace-nowrap">
                                   <div className="flex items-center gap-2">
                                     {renderItemDomainIcon(sku, activeMainTab)}
-                                    <span className="font-semibold text-gray-900">{sku.name}</span>
-                                    {isSheetItemBadge && (
-                                      <span className="px-1.5 py-0.5 rounded text-[9.5px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200/80">
-                                        {sku.pages || 500} Sheets/Ream
-                                      </span>
-                                    )}
+                                    <span className="font-semibold text-gray-900">{cleanItemName}</span>
                                   </div>
                                 </td>
                               );

@@ -3,6 +3,7 @@
 export const formatSkuName = (name: string): string => {
   if (!name) return '';
   return name
+    .replace(/\s*\(\d+\s*Sheets\s*\/?\s*Ream\)/gi, '')
     .replace(/(\d+)\s*GSM/gi, '$1 GSM')
     .replace(/(\d+(?:\.\d+)?)\s*[xX*]\s*(\d+(?:\.\d+)?)\s*CM/gi, '$1 x $2 CM')
     .replace(/(\d+(?:\.\d+)?)\s*[xX*]\s*(\d+(?:\.\d+)?)(?!\s*CM)/gi, '$1 x $2')

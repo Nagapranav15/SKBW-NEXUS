@@ -1290,7 +1290,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
       if (isMat) {
         const parts: string[] = [];
-        if (formData.title?.trim()) parts.push(formData.title.trim());
+        const brandOrTitle = formData.brand?.trim() || formData.title?.trim() || '';
+        if (brandOrTitle) parts.push(brandOrTitle);
         const formatType = formData.paperType === 'Reels' ? 'Reel' : formData.paperType === 'Sheets' ? 'Sheet' : '';
         if (formatType) parts.push(formatType);
         if (formData.gsm) parts.push(`${formData.gsm} GSM`);
@@ -1301,7 +1302,6 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           sizeStr = `${formData.width} CM`;
         }
         if (sizeStr) parts.push(sizeStr);
-        if (formData.pages && formData.paperType === 'Sheets') parts.push(`(${formData.pages} Sheets/Ream)`);
         return parts.filter(Boolean).join(' ');
       } else if (isSemi) {
         const parts: string[] = [];
@@ -2072,10 +2072,16 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
                   {!isProductCategory && activeFields.includes('title') && (
                     <div className="col-span-2">
-                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">TITLE (DESCRIPTION)</label>
+                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                        {resolvedSection === 'materials' || form.category === 'Raw Material' || form.category === 'Materials' ? 'PAPER BRAND / MILL (e.g. BILT, CARTILUMIN)' : 'TITLE (DESCRIPTION)'}
+                      </label>
                       <input
                         type="text"
-                        placeholder={resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi' ? "e.g. Inner Pages Form" : "e.g. Premium White Paper Roll"}
+                        placeholder={
+                          form.paperType === 'Sheets' ? "e.g. CARTILUMIN" :
+                          form.paperType === 'Reels' ? "e.g. BILT" :
+                          resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi' ? "e.g. Inner Pages Form" : "e.g. BILT / CARTILUMIN"
+                        }
                         value={form.title}
                         onChange={e => updateFormField({ title: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
