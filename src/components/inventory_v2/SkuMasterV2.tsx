@@ -687,7 +687,9 @@ const SkuMasterV2: React.FC = () => {
           }))
         : [...existingItems, ...newItems];
 
-      const yieldQty = existingItems.length === 0 && copiedBom.basis ? Number(copiedBom.basis) || 1 : ((targetSku as any).recipeYieldQty || (targetSku as any).batchYieldQty || 1);
+      const yieldQty = copiedBom.basis !== undefined && copiedBom.basis !== null && String(copiedBom.basis).trim() !== '' 
+        ? Number(copiedBom.basis) || 1 
+        : ((targetSku as any).recipeYieldQty || (targetSku as any).batchYieldQty || 1);
       const yieldUnit = copiedBom.basisUnit || (targetSku as any).recipeYieldUnit || (targetSku as any).batchYieldUnit || targetSku.unit || 'Pcs';
 
       const patchData: any = {
@@ -849,7 +851,9 @@ const SkuMasterV2: React.FC = () => {
             }))
           : [...existingItems, ...newItems];
 
-        const yieldQty = existingItems.length === 0 && copiedBom.basis ? Number(copiedBom.basis) || 1 : ((sku as any).recipeYieldQty || (sku as any).batchYieldQty || 1);
+        const yieldQty = copiedBom.basis !== undefined && copiedBom.basis !== null && String(copiedBom.basis).trim() !== ''
+          ? Number(copiedBom.basis) || 1
+          : ((sku as any).recipeYieldQty || (sku as any).batchYieldQty || 1);
         const yieldUnit = copiedBom.basisUnit || (sku as any).recipeYieldUnit || (sku as any).batchYieldUnit || sku.unit || 'Pcs';
 
         await updateSkuV2(id, {
@@ -5727,7 +5731,7 @@ const SkuMasterV2: React.FC = () => {
                                   inStock: l.inStock ?? 0,
                                   notes: l.notes || ''
                                 }));
-                              if (bomRecipeItems.length === 0 && copied.basis) {
+                              if (copied.basis) {
                                 setRecipeYieldQty(String(copied.basis));
                               }
                               if (copied.basisUnit) {
@@ -7482,7 +7486,7 @@ const SkuMasterV2: React.FC = () => {
                                   inStock: l.inStock ?? 500,
                                   notes: l.notes || ''
                                 }));
-                              if (activeRecipeItems.length === 0 && copied.basis) {
+                              if (copied.basis) {
                                 setBuildBatchYieldQty(String(copied.basis));
                               }
                               if (copied.basisUnit) {
