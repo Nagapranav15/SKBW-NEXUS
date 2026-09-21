@@ -2240,8 +2240,7 @@ const SkuMasterV2: React.FC = () => {
           'LENGTH (CM)': cleanVal(s.length),
           'Min Stock Level': s.minStockLevel || 0,
           'Reorder Level': cleanVal((s as any).reorderLevel),
-          'Status': s.status || 'Active',
-          'Preferred Vendor': cleanVal((s as any).preferredVendor)
+          'Status': s.status || 'Active'
         };
       } else if (activeMainTab === 'semi') {
         return {
@@ -2513,13 +2512,12 @@ const SkuMasterV2: React.FC = () => {
         'LENGTH (CM)',
         'Min Stock Level',
         'Reorder Level',
-        'Status',
-        'Preferred Vendor'
+        'Status'
       ];
       sampleRows = [
-        ['FG-001', 'Bestfriend (UR)', '132', 'Bestfriend', 'UR', 'Longbooks', 'Pcs', 'Box', '500', '52', '14.25', '35', '50', '20', 'Active', ''],
-        ['FG-002', '142P Bestfriend (UR)', '142', 'Bestfriend', 'UR', 'Executive Diaries', 'Pcs', 'Box', '200', '52', '57', '70', '50', '20', 'Active', ''],
-        ['FG-003', 'Deluxe Spiral Notebook A4', '192', 'Bestfriend', 'Plain', 'Notebooks', 'Pcs', 'Box', '24', '70', '21', '29.7', '100', '50', 'Active', '']
+        ['FG-001', 'Bestfriend (UR)', '132', 'Bestfriend', 'UR', 'Longbooks', 'Pcs', 'Box', '500', '52', '14.25', '35', '50', '20', 'Active'],
+        ['FG-002', '142P Bestfriend (UR)', '142', 'Bestfriend', 'UR', 'Executive Diaries', 'Pcs', 'Box', '200', '52', '57', '70', '50', '20', 'Active'],
+        ['FG-003', 'Deluxe Spiral Notebook A4', '192', 'Bestfriend', 'Plain', 'Notebooks', 'Pcs', 'Box', '24', '70', '21', '29.7', '100', '50', 'Active']
       ];
     } else if (activeMainTab === 'semi') {
       headers = [
