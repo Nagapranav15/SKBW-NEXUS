@@ -605,6 +605,7 @@ const SkuMasterV2: React.FC = () => {
   const [recipeYieldQty, setRecipeYieldQty] = useState<string>('');
   const [recipeYieldUnit, setRecipeYieldUnit] = useState<string>('');
   const [buildBatchYieldQty, setBuildBatchYieldQty] = useState<string>('1');
+  const [buildBatchYieldUnit, setBuildBatchYieldUnit] = useState<string>('');
   const [isSavingBom, setIsSavingBom] = useState(false);
   const [isEditingItemBom, setIsEditingItemBom] = useState(false);
 
@@ -1737,6 +1738,7 @@ const SkuMasterV2: React.FC = () => {
   const handleSelectBomProduct = (prod: SkuV2) => {
     setActiveBomProduct(prod);
     setBuildBatchYieldQty(String((prod as any).recipeYieldQty || '1'));
+    setBuildBatchYieldUnit((prod as any).recipeYieldUnit || prod.unit || 'Pcs');
     if ((prod as any).bomItems && Array.isArray((prod as any).bomItems)) {
       setActiveRecipeItems((prod as any).bomItems.map((item: any, idx: number) => {
         const matchedSku = (skus || []).find(s => 
@@ -1767,18 +1769,21 @@ const SkuMasterV2: React.FC = () => {
     setIsSavingBuildBom(true);
     try {
       const yieldQty = Number(buildBatchYieldQty) || 1;
+      const yieldUnit = buildBatchYieldUnit || (activeBomProduct as any).recipeYieldUnit || activeBomProduct.unit || 'Pcs';
       await updateSkuV2(activeBomProduct._id, {
         bomItems: activeRecipeItems,
         recipeYieldQty: yieldQty,
+        recipeYieldUnit: yieldUnit,
         company: selectedCompany?._id
       });
       // Instant optimistic update across local state
-      setSkus(prev => prev.map(s => s._id === activeBomProduct._id ? { ...s, bomItems: activeRecipeItems, recipeYieldQty: yieldQty } : s));
-      setActiveBomProduct(prev => prev ? { ...prev, bomItems: activeRecipeItems, recipeYieldQty: yieldQty } : null);
+      setSkus(prev => prev.map(s => s._id === activeBomProduct._id ? { ...s, bomItems: activeRecipeItems, recipeYieldQty: yieldQty, recipeYieldUnit: yieldUnit } : s));
+      setActiveBomProduct(prev => prev ? { ...prev, bomItems: activeRecipeItems, recipeYieldQty: yieldQty, recipeYieldUnit: yieldUnit } : null);
       if (selectedSkuDetails?._id === activeBomProduct._id) {
-        setSelectedSkuDetails(prev => prev ? { ...prev, bomItems: activeRecipeItems, recipeYieldQty: yieldQty } : null);
+        setSelectedSkuDetails(prev => prev ? { ...prev, bomItems: activeRecipeItems, recipeYieldQty: yieldQty, recipeYieldUnit: yieldUnit } : null);
         setBomRecipeItems(activeRecipeItems);
         setRecipeYieldQty(String(yieldQty));
+        setRecipeYieldUnit(yieldUnit);
       }
 
       showToast(`BOM Recipe saved for ${activeBomProduct.name}!`, 'success');
@@ -7269,7 +7274,7 @@ const SkuMasterV2: React.FC = () => {
                               sourceSkuCode: activeBomProduct?.skuCode,
                               sourceName: activeBomProduct?.name || activeBomProduct?.skuCode || 'Product',
                               basis: buildBatchYieldQty,
-                              basisUnit: activeBomProduct?.unit || 'Pcs',
+                              basisUnit: buildBatchYieldUnit || (activeBomProduct as any)?.recipeYieldUnit || activeBomProduct?.unit || 'Pcs',
                               lines: activeRecipeItems.map(item => ({
                                 id: item.id,
                                 name: item.name,
@@ -7291,6 +7296,7 @@ const SkuMasterV2: React.FC = () => {
                                 notes: l.notes || ''
                               })));
                               if (copied.basis) setBuildBatchYieldQty(String(copied.basis));
+                              if (copied.basisUnit) setBuildBatchYieldUnit(copied.basisUnit);
                             } else {
                               const existingNames = new Set(activeRecipeItems.map(i => (i.name || '').toLowerCase().trim()));
                               const toAdd = copied.lines
@@ -7305,6 +7311,9 @@ const SkuMasterV2: React.FC = () => {
                                 }));
                               if (activeRecipeItems.length === 0 && copied.basis) {
                                 setBuildBatchYieldQty(String(copied.basis));
+                              }
+                              if (copied.basisUnit) {
+                                setBuildBatchYieldUnit(copied.basisUnit);
                               }
                               setActiveRecipeItems(prev => [...prev, ...toAdd]);
                             }
@@ -7324,37 +7333,57 @@ const SkuMasterV2: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Sub-header details bar */}
-                    <div className="flex items-center gap-3 text-xs font-semibold text-gray-500 bg-gray-50 p-2.5 rounded-xl border border-gray-100 flex-wrap">
-                      <span>ITEMS <strong>{activeRecipeItems.length}</strong></span>
-                      <span>·</span>
-                      <div className="flex items-center gap-1.5">
-                        <span>BATCH SIZE:</span>
-                        <input
-                          type="number"
-                          min="1"
-                          placeholder="1"
-                          value={buildBatchYieldQty}
-                          onChange={(e) => setBuildBatchYieldQty(e.target.value)}
-                          className="w-16 px-2 py-1 border border-blue-300 rounded-lg text-xs font-bold text-blue-700 text-center bg-white shadow-2xs focus:ring-2 focus:ring-blue-400 focus:outline-none"
-                          title="Batch Yield Quantity (Number of pieces)"
-                        />
-                        <input
-                          type="text"
-                          value={activeBomProduct?.unit || 'Pcs'}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setActiveBomProduct(prev => prev ? { ...prev, unit: val } : null);
-                            setSkus(prev => prev.map(s => s._id === activeBomProduct?._id ? { ...s, unit: val } : s));
-                          }}
-                          className="w-16 px-1.5 py-1 border border-gray-300 rounded-lg text-xs font-bold text-gray-800 text-center uppercase bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none"
-                          title="Yield Unit / Pieces"
-                          placeholder="Unit"
-                        />
-                      </div>
-                      <span>·</span>
-                      <span className="text-[11px] font-normal text-gray-400">Quantities configured per batch produced</span>
-                    </div>
+                    {/* Sub-header details bar with UOM & AUOM support */}
+                    {(() => {
+                      const uom = activeBomProduct?.unit || 'Pcs';
+                      const auom = activeBomProduct?.altUnit;
+                      const currentUnit = buildBatchYieldUnit || (activeBomProduct as any)?.recipeYieldUnit || uom;
+
+                      const options: { value: string; label: string }[] = [];
+                      options.push({ value: uom, label: `${uom} (UOM)` });
+                      if (auom && auom.trim() && auom.trim().toLowerCase() !== uom.trim().toLowerCase()) {
+                        options.push({ value: auom, label: `${auom} (AUOM)` });
+                      }
+                      const commonUnits = ['Pcs', 'GBL', 'Gross', 'Dozen', 'Bundle', 'Kg', 'Ream', 'Sheets', 'Box', 'Pkt'];
+                      commonUnits.forEach(cu => {
+                        if (!options.some(o => o.value.toLowerCase() === cu.toLowerCase())) {
+                          options.push({ value: cu, label: cu });
+                        }
+                      });
+
+                      return (
+                        <div className="flex items-center gap-3 text-xs font-semibold text-gray-500 bg-gray-50 p-2.5 rounded-xl border border-gray-100 flex-wrap">
+                          <span>ITEMS <strong>{activeRecipeItems.length}</strong></span>
+                          <span>·</span>
+                          <div className="flex items-center gap-1.5">
+                            <span>BATCH SIZE:</span>
+                            <input
+                              type="number"
+                              min="1"
+                              placeholder="1"
+                              value={buildBatchYieldQty}
+                              onChange={(e) => setBuildBatchYieldQty(e.target.value)}
+                              className="w-16 px-2 py-1 border border-blue-300 rounded-lg text-xs font-bold text-blue-700 text-center bg-white shadow-2xs focus:ring-2 focus:ring-blue-400 focus:outline-none"
+                              title="Batch Yield Quantity (Number of pieces)"
+                            />
+                            <select
+                              value={currentUnit}
+                              onChange={(e) => setBuildBatchYieldUnit(e.target.value)}
+                              className="px-2.5 py-1 border border-blue-300 rounded-lg text-xs font-bold text-blue-900 bg-blue-50/90 cursor-pointer shadow-2xs focus:ring-2 focus:ring-blue-400 focus:outline-none"
+                              title="Yield Unit (UOM / AUOM)"
+                            >
+                              {options.map(opt => (
+                                <option key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <span>·</span>
+                          <span className="text-[11px] font-normal text-gray-400">Quantities configured per batch produced</span>
+                        </div>
+                      );
+                    })()}
 
                     {/* Top Search Dropdown input to quickly add material */}
                     <div className="relative z-30">
