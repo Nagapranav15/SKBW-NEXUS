@@ -1292,8 +1292,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         const parts: string[] = [];
         const brandOrTitle = formData.brand?.trim() || formData.title?.trim() || '';
         if (brandOrTitle) parts.push(brandOrTitle);
-        const formatType = formData.paperType === 'Reels' ? 'Reel' : formData.paperType === 'Board' ? 'Board' : formData.paperType === 'Sheets' ? 'Sheet' : '';
-        if (formatType && !parts.some(p => p.toLowerCase().includes(formatType.toLowerCase()))) {
+        const formatType = formData.paperType === 'Reels' ? 'Reel' : formData.paperType === 'Board' ? 'Board' : (formData.paperType === 'Sheets' ? 'Sheet' : '');
+        const hasOtherAttrs = !!(brandOrTitle || formData.gsm || formData.width || formData.length);
+        if (formatType && hasOtherAttrs && !parts.some(p => p.toLowerCase().includes(formatType.toLowerCase()))) {
           parts.push(formatType);
         }
         if (formData.gsm) parts.push(`${formData.gsm} GSM`);
@@ -1309,8 +1310,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         const parts: string[] = [];
         const brandOrTitle = formData.brand?.trim() || formData.title?.trim() || '';
         if (brandOrTitle) parts.push(brandOrTitle);
-        const formatType = formData.paperType === 'Board' ? 'Board' : 'Sheet';
-        if (formatType && !parts.some(p => p.toLowerCase().includes(formatType.toLowerCase()))) {
+        const formatType = formData.paperType === 'Board' ? 'Board' : (formData.paperType === 'Reels' ? 'Reel' : (formData.paperType === 'Sheets' ? 'Sheet' : ''));
+        const hasOtherAttrs = !!(brandOrTitle || formData.gsm || formData.width || formData.length || formData.ruleType);
+        if (formatType && hasOtherAttrs && !parts.some(p => p.toLowerCase().includes(formatType.toLowerCase()))) {
           parts.push(formatType);
         }
         if (formData.gsm) parts.push(`${formData.gsm} GSM`);
@@ -1347,9 +1349,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         const nextForm = { ...prev, ...updates };
         if (!isNameManuallyEdited) {
           const nextCompiled = compileSkuName(nextForm);
-          if (nextCompiled) {
-            nextForm.name = nextCompiled;
-          }
+          nextForm.name = nextCompiled;
         }
         return nextForm;
       });
@@ -1360,7 +1360,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       if (isNameManuallyEdited) return;
 
       const compiled = compileSkuName(form);
-      if (compiled && compiled !== form.name) {
+      if (compiled !== form.name) {
         setForm(prev => ({ ...prev, name: compiled }));
       }
     }, [
