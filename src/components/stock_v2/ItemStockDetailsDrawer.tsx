@@ -271,7 +271,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                     <span className="text-[10px] font-semibold text-gray-400 uppercase block">Category</span>
                     <span className="font-bold text-gray-800">{sku.category || 'General'}</span>
                   </div>
-                  {sku.pages && (
+                  {sku.pages && sku.category !== 'Semi Finished' && sku.category !== 'Semi' && (
                     <div>
                       <span className="text-[10px] font-semibold text-gray-400 uppercase block">Pages / Sheets</span>
                       <span className="font-bold text-gray-800">{sku.pages}</span>

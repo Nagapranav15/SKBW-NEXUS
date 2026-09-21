@@ -1206,7 +1206,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     if (resolvedSection === 'materials' || form.category === 'Raw Material' || form.category === 'Materials' || (!isProductCategory && resolvedSection !== 'semi')) {
       return ['gsm', 'title', 'width', 'length', 'paperType', 'pages', 'reamWeight', 'booksGbl', 'altUnit'];
     } else if (resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi') {
-      return ['gsm', 'title', 'width', 'length', 'ruleType', 'paperType', 'group', 'pages', 'reamWeight', 'booksGbl', 'altUnit'];
+      return ['gsm', 'title', 'width', 'length', 'ruleType', 'reamWeight', 'altUnit'];
     } else {
       // Products / Finished Goods (Pages, brands, ruling types, UOM, AUOM)
       return ['gsm', 'brand', 'width', 'length', 'ruleType', 'pages', 'reamWeight', 'booksGbl', 'altUnit'];
@@ -1691,62 +1691,33 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
 
 
-                {/* Format Category Radio Selector */}
-                {activeFields.includes('paperType') && (
+                {/* Format Category Radio Selector (Only for Materials, completely removed for Semi) */}
+                {activeFields.includes('paperType') && resolvedSection !== 'semi' && form.category !== 'Semi Finished' && form.category !== 'Semi' && (
                   <div className="col-span-2 bg-gray-50/70 p-3 rounded-xl border border-gray-100 flex items-center justify-between">
                     <span className="text-[11px] font-bold text-gray-600">FORMAT CATEGORY</span>
                     <div className="flex items-center gap-4">
-                      {isRawOrSemi && (resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi') ? (
-                        <>
-                          <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
-                            <input
-                              type="radio"
-                              name="paperType"
-                              value="Sheets"
-                              checked={form.paperType === 'Sheets' || !form.paperType}
-                              onChange={() => updateFormField({ paperType: 'Sheets' })}
-                              className="text-blue-600 focus:ring-blue-500"
-                            />
-                            Sheets
-                          </label>
-                          <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
-                            <input
-                              type="radio"
-                              name="paperType"
-                              value="Board"
-                              checked={form.paperType === 'Board'}
-                              onChange={() => updateFormField({ paperType: 'Board' })}
-                              className="text-blue-600 focus:ring-blue-500"
-                            />
-                            Board
-                          </label>
-                        </>
-                      ) : (
-                        <>
-                          <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
-                            <input
-                              type="radio"
-                              name="paperType"
-                              value="Reels"
-                              checked={form.paperType === 'Reels' || (!form.paperType && resolvedSection === 'materials')}
-                              onChange={() => updateFormField({ paperType: 'Reels', length: '' })}
-                              className="text-blue-600 focus:ring-blue-500"
-                            />
-                            Reels
-                          </label>
-                          <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
-                            <input
-                              type="radio"
-                              name="paperType"
-                              value="Sheets"
-                              checked={form.paperType === 'Sheets'}
-                              onChange={() => updateFormField({ paperType: 'Sheets' })}
-                              className="text-blue-600 focus:ring-blue-500"
-                            />
-                            Sheets
-                          </label>
-                        </>
-                      )}
+                      <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
+                        <input
+                          type="radio"
+                          name="paperType"
+                          value="Reels"
+                          checked={form.paperType === 'Reels' || (!form.paperType && resolvedSection === 'materials')}
+                          onChange={() => updateFormField({ paperType: 'Reels', length: '' })}
+                          className="text-blue-600 focus:ring-blue-500"
+                        />
+                        Reels
+                      </label>
+                      <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
+                        <input
+                          type="radio"
+                          name="paperType"
+                          value="Sheets"
+                          checked={form.paperType === 'Sheets'}
+                          onChange={() => updateFormField({ paperType: 'Sheets' })}
+                          className="text-blue-600 focus:ring-blue-500"
+                        />
+                        Sheets
+                      </label>
                     </div>
                   </div>
                 )}
@@ -2119,7 +2090,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     </div>
                   )}
 
-                  {(form.paperType === 'Sheets' || resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi') && (
+                  {form.paperType === 'Sheets' && (resolvedSection === 'materials' || form.category === 'Raw Material' || form.category === 'Materials') && (
                     <div className="col-span-2 sm:col-span-1">
                       <label className="block text-[11px] font-semibold text-gray-600 mb-1">
                         STANDARD SHEETS / REAM *
@@ -2157,6 +2128,20 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         placeholder="e.g. 70"
                         value={form.length}
                         onChange={e => updateFormField({ length: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
+                      />
+                    </div>
+                  )}
+
+                  {activeFields.includes('reamWeight') && form.paperType !== 'Reels' && (
+                    <div>
+                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">REAM WEIGHT (KG)</label>
+                      <input
+                        type="number"
+                        step="any"
+                        placeholder="e.g. 10.37"
+                        value={form.reamWeight}
+                        onChange={e => updateFormField({ reamWeight: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                       />
                     </div>
@@ -2328,51 +2313,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     );
                   })()}
 
-                  {/* Attributes for Semi-Finished Goods (Group & Status removed) */}
-                  {(resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi') && (
-                    <>
 
-                      {activeFields.includes('pages') && (
-                        <div>
-                          <label className="block text-[11px] font-semibold text-gray-600 mb-1">PAGES / SHEETS</label>
-                          <input
-                            type="number"
-                            placeholder="e.g. 112 / 132"
-                            value={form.pages}
-                            onChange={e => updateFormField({ pages: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
-                          />
-                        </div>
-                      )}
-
-                      {activeFields.includes('reamWeight') && (
-                        <div>
-                          <label className="block text-[11px] font-semibold text-gray-600 mb-1">REAM WEIGHT (KG)</label>
-                          <input
-                            type="number"
-                            step="any"
-                            placeholder="e.g. 10.37"
-                            value={form.reamWeight}
-                            onChange={e => updateFormField({ reamWeight: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
-                          />
-                        </div>
-                      )}
-
-                      {activeFields.includes('booksGbl') && (
-                        <div>
-                          <label className="block text-[11px] font-semibold text-gray-600 mb-1">BOOKS / GBL</label>
-                          <input
-                            type="number"
-                            placeholder="e.g. 200 / 240"
-                            value={form.booksGbl}
-                            onChange={e => updateFormField({ booksGbl: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
-                          />
-                        </div>
-                      )}
-                    </>
-                  )}
                 </div>
               </div>
             )}

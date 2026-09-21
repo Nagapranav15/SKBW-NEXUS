@@ -5339,7 +5339,7 @@ const SkuMasterV2: React.FC = () => {
                         </div>
                         <h4 className="font-bold text-gray-900 text-xs">Specifications & Paper Format</h4>
                       </div>
-                      {selectedSkuDetails.paperType && selectedSkuDetails.paperType !== 'None' && (
+                      {selectedSkuDetails.paperType && selectedSkuDetails.paperType !== 'None' && getItemType(selectedSkuDetails) !== 'semi' && activeMainTab !== 'semi' && (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
                           {selectedSkuDetails.paperType}
                         </span>
@@ -5359,14 +5359,21 @@ const SkuMasterV2: React.FC = () => {
                         <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">RULING SPEC</span>
                         <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.ruleType || '—'}</span>
                       </div>
-                      <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">
-                          {selectedSkuDetails.paperType === 'Sheets' || getItemType(selectedSkuDetails) === 'materials' || getItemType(selectedSkuDetails) === 'semi' || activeMainTab === 'semi' ? 'SHEETS PER REAM' : 'PAGES'}
-                        </span>
-                        <span className="font-bold text-gray-900 text-xs">
-                          {selectedSkuDetails.pages ? `${selectedSkuDetails.pages} ${selectedSkuDetails.paperType === 'Sheets' || getItemType(selectedSkuDetails) === 'materials' || getItemType(selectedSkuDetails) === 'semi' ? 'Sheets' : 'Pages'}` : (getItemType(selectedSkuDetails) === 'materials' || getItemType(selectedSkuDetails) === 'semi' ? '500 Sheets' : '—')}
-                        </span>
-                      </div>
+                      {getItemType(selectedSkuDetails) !== 'semi' && activeMainTab !== 'semi' ? (
+                        <div>
+                          <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">
+                            {selectedSkuDetails.paperType === 'Sheets' || getItemType(selectedSkuDetails) === 'materials' ? 'SHEETS PER REAM' : 'PAGES'}
+                          </span>
+                          <span className="font-bold text-gray-900 text-xs">
+                            {selectedSkuDetails.pages ? `${selectedSkuDetails.pages} ${selectedSkuDetails.paperType === 'Sheets' || getItemType(selectedSkuDetails) === 'materials' ? 'Sheets' : 'Pages'}` : (getItemType(selectedSkuDetails) === 'materials' ? '500 Sheets' : '—')}
+                          </span>
+                        </div>
+                      ) : (
+                        <div>
+                          <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">REAM WEIGHT</span>
+                          <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.reamWeight ? `${selectedSkuDetails.reamWeight} KG` : '—'}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
