@@ -5,7 +5,7 @@ export interface SkuV2 {
   skuCode: string;
   name: string;
   category: string;
-  paperType?: 'Reels' | 'Sheets' | 'None';
+  paperType?: 'Reels' | 'Sheets' | 'Board' | 'None';
   unit: string;
   gsm?: number;
   width?: number;

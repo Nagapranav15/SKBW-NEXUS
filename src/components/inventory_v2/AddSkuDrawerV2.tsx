@@ -261,7 +261,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     skuCode: '',
     name: '',
     category: '',
-    paperType: '' as '' | 'Reels' | 'Sheets' | 'None',
+    paperType: '' as '' | 'Reels' | 'Sheets' | 'Board' | 'None',
     unit: '',
     altUnit: '',
     altUnitConversion: '',
@@ -1071,7 +1071,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         skuCode: editSku.skuCode || '',
         name: editSku.name || '',
         category: editSku.category || (resolvedSection === 'products' ? 'Products' : resolvedSection === 'semi' ? 'Semi' : 'Materials'),
-        paperType: (editSku.paperType || '') as '' | 'Reels' | 'Sheets' | 'None',
+        paperType: (editSku.paperType || '') as '' | 'Reels' | 'Sheets' | 'Board' | 'None',
         unit: editSku.unit || '',
         altUnit: editSku.altUnit || '',
         altUnitConversion: editSku.altUnitConversion !== undefined ? String(editSku.altUnitConversion) : '',
@@ -1292,8 +1292,10 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         const parts: string[] = [];
         const brandOrTitle = formData.brand?.trim() || formData.title?.trim() || '';
         if (brandOrTitle) parts.push(brandOrTitle);
-        const formatType = formData.paperType === 'Reels' ? 'Reel' : formData.paperType === 'Sheets' ? 'Sheet' : '';
-        if (formatType) parts.push(formatType);
+        const formatType = formData.paperType === 'Reels' ? 'Reel' : formData.paperType === 'Board' ? 'Board' : formData.paperType === 'Sheets' ? 'Sheet' : '';
+        if (formatType && !parts.some(p => p.toLowerCase().includes(formatType.toLowerCase()))) {
+          parts.push(formatType);
+        }
         if (formData.gsm) parts.push(`${formData.gsm} GSM`);
         let sizeStr = '';
         if (formData.width && formData.length) {
@@ -1307,8 +1309,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         const parts: string[] = [];
         const brandOrTitle = formData.brand?.trim() || formData.title?.trim() || '';
         if (brandOrTitle) parts.push(brandOrTitle);
-        const formatType = formData.paperType === 'Reels' ? 'Reel' : 'Sheet';
-        if (formatType && !parts.some(p => p.toLowerCase().includes('sheet') || p.toLowerCase().includes('reel'))) {
+        const formatType = formData.paperType === 'Board' ? 'Board' : 'Sheet';
+        if (formatType && !parts.some(p => p.toLowerCase().includes(formatType.toLowerCase()))) {
           parts.push(formatType);
         }
         if (formData.gsm) parts.push(`${formData.gsm} GSM`);
@@ -1343,7 +1345,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     const updateFormField = (updates: Partial<typeof form>) => {
       setForm(prev => {
         const nextForm = { ...prev, ...updates };
-        if (!isNameManuallyEdited && !editSku) {
+        if (!isNameManuallyEdited) {
           const nextCompiled = compileSkuName(nextForm);
           if (nextCompiled) {
             nextForm.name = nextCompiled;
@@ -1353,9 +1355,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       });
     };
 
-    // Compile Sku Name dynamically from other inputs (New Items only)
+    // Compile Sku Name dynamically from other inputs
     useEffect(() => {
-      if (isNameManuallyEdited || editSku) return;
+      if (isNameManuallyEdited) return;
 
       const compiled = compileSkuName(form);
       if (compiled && compiled !== form.name) {
@@ -1373,7 +1375,6 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       form.title,
       form.group,
       isNameManuallyEdited,
-      editSku,
       resolvedSection
     ]);
 
@@ -1687,33 +1688,62 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
 
 
-                {/* Reels vs Sheets Radio Selector */}
+                {/* Format Category Radio Selector */}
                 {activeFields.includes('paperType') && (
                   <div className="col-span-2 bg-gray-50/70 p-3 rounded-xl border border-gray-100 flex items-center justify-between">
                     <span className="text-[11px] font-bold text-gray-600">FORMAT CATEGORY</span>
                     <div className="flex items-center gap-4">
-                      <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
-                        <input
-                          type="radio"
-                          name="paperType"
-                          value="Reels"
-                          checked={form.paperType === 'Reels'}
-                          onChange={() => updateFormField({ paperType: 'Reels', length: '' })}
-                          className="text-blue-600 focus:ring-blue-500"
-                        />
-                        Reels
-                      </label>
-                      <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
-                        <input
-                          type="radio"
-                          name="paperType"
-                          value="Sheets"
-                          checked={form.paperType === 'Sheets'}
-                          onChange={() => updateFormField({ paperType: 'Sheets' })}
-                          className="text-blue-600 focus:ring-blue-500"
-                        />
-                        Sheets
-                      </label>
+                      {isRawOrSemi && (resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi') ? (
+                        <>
+                          <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
+                            <input
+                              type="radio"
+                              name="paperType"
+                              value="Sheets"
+                              checked={form.paperType === 'Sheets' || !form.paperType}
+                              onChange={() => updateFormField({ paperType: 'Sheets' })}
+                              className="text-blue-600 focus:ring-blue-500"
+                            />
+                            Sheets
+                          </label>
+                          <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
+                            <input
+                              type="radio"
+                              name="paperType"
+                              value="Board"
+                              checked={form.paperType === 'Board'}
+                              onChange={() => updateFormField({ paperType: 'Board' })}
+                              className="text-blue-600 focus:ring-blue-500"
+                            />
+                            Board
+                          </label>
+                        </>
+                      ) : (
+                        <>
+                          <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
+                            <input
+                              type="radio"
+                              name="paperType"
+                              value="Reels"
+                              checked={form.paperType === 'Reels' || (!form.paperType && resolvedSection === 'materials')}
+                              onChange={() => updateFormField({ paperType: 'Reels', length: '' })}
+                              className="text-blue-600 focus:ring-blue-500"
+                            />
+                            Reels
+                          </label>
+                          <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
+                            <input
+                              type="radio"
+                              name="paperType"
+                              value="Sheets"
+                              checked={form.paperType === 'Sheets'}
+                              onChange={() => updateFormField({ paperType: 'Sheets' })}
+                              className="text-blue-600 focus:ring-blue-500"
+                            />
+                            Sheets
+                          </label>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
