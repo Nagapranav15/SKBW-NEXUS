@@ -298,12 +298,16 @@ const SkuMasterV2: React.FC = () => {
   });
 
   const [unitsList, setUnitsList] = useState<string[]>([]);
+  const [settingsBrandsList, setSettingsBrandsList] = useState<string[]>([]);
+  const [settingsRuleTypesList, setSettingsRuleTypesList] = useState<string[]>([]);
 
   const loadMetadata = useCallback((companyId?: string) => {
     const id = companyId || selectedCompany?._id;
     if (!id) {
       setCategoriesData([]);
       setUnitsList([]);
+      setSettingsBrandsList([]);
+      setSettingsRuleTypesList([]);
       return;
     }
     getMetadataV2(id).then(data => {
@@ -311,6 +315,16 @@ const SkuMasterV2: React.FC = () => {
         setUnitsList(normalizeAndDeduplicateUnits(data.units));
       } else {
         setUnitsList([]);
+      }
+      if (data?.brands && Array.isArray(data.brands)) {
+        setSettingsBrandsList(data.brands.filter(b => typeof b === 'string' && b.trim().length > 0));
+      } else {
+        setSettingsBrandsList([]);
+      }
+      if (data?.ruleTypes && Array.isArray(data.ruleTypes)) {
+        setSettingsRuleTypesList(data.ruleTypes.filter(r => typeof r === 'string' && r.trim().length > 0));
+      } else {
+        setSettingsRuleTypesList([]);
       }
       if (data?.categoryCards !== undefined && Array.isArray(data.categoryCards)) {
         setCategoriesData(data.categoryCards);
@@ -1733,24 +1747,57 @@ const SkuMasterV2: React.FC = () => {
     return bomProductSkus.filter(s => (s as any).bomItems && (s as any).bomItems.length > 0).length;
   }, [bomProductSkus]);
 
-  // Available unique Titles & Rulings for Build BOMs filter dropdowns
+  // Available unique Brands from Settings (and active products) for Build BOMs filter dropdown
   const buildBomsAvailableTitles = useMemo(() => {
-    const titles = new Set<string>();
-    bomProductSkus.forEach(s => {
-      const t = (s.title || s.brand || '').trim();
-      if (t) titles.add(t);
-    });
-    return Array.from(titles).sort((a, b) => a.localeCompare(b));
-  }, [bomProductSkus]);
+    const list: string[] = [];
+    const seen = new Set<string>();
 
+    // 1. Configured Brands in Settings
+    settingsBrandsList.forEach(b => {
+      const trimmed = (b || '').trim();
+      if (trimmed && !seen.has(trimmed.toLowerCase())) {
+        seen.add(trimmed.toLowerCase());
+        list.push(trimmed);
+      }
+    });
+
+    // 2. Existing brands from product list
+    bomProductSkus.forEach(s => {
+      const b = (s.brand || '').trim();
+      if (b && !seen.has(b.toLowerCase())) {
+        seen.add(b.toLowerCase());
+        list.push(b);
+      }
+    });
+
+    return list.sort((a, b) => a.localeCompare(b));
+  }, [settingsBrandsList, bomProductSkus]);
+
+  // Available unique Ruling Types from Settings (and active products) for Build BOMs filter dropdown
   const buildBomsAvailableRulings = useMemo(() => {
-    const rulings = new Set<string>();
+    const list: string[] = [];
+    const seen = new Set<string>();
+
+    // 1. Configured Ruling Types in Settings
+    settingsRuleTypesList.forEach(r => {
+      const trimmed = (r || '').trim();
+      if (trimmed && !seen.has(trimmed.toLowerCase())) {
+        seen.add(trimmed.toLowerCase());
+        list.push(trimmed);
+      }
+    });
+
+    // 2. Existing rule types from product list
     bomProductSkus.forEach(s => {
       const r = (s.ruleType || '').trim();
-      if (r) rulings.add(r);
+      if (r && !seen.has(r.toLowerCase())) {
+        seen.add(r.toLowerCase());
+        list.push(r);
+      }
     });
-    return Array.from(rulings).sort((a, b) => a.localeCompare(b));
-  }, [bomProductSkus]);
+
+    return list.sort((a, b) => a.localeCompare(b));
+  }, [settingsRuleTypesList, bomProductSkus]);
 
   const filteredBuildProducts = useMemo(() => {
     let baseList: SkuV2[] = [];
@@ -1763,20 +1810,28 @@ const SkuMasterV2: React.FC = () => {
       const matchesSearch = (p.name || '').toLowerCase().includes(buildBomsSearch.toLowerCase()) ||
                             (p.skuCode || '').toLowerCase().includes(buildBomsSearch.toLowerCase()) ||
                             (p.title || '').toLowerCase().includes(buildBomsSearch.toLowerCase()) ||
+                            (p.brand || '').toLowerCase().includes(buildBomsSearch.toLowerCase()) ||
                             (p.ruleType || '').toLowerCase().includes(buildBomsSearch.toLowerCase());
       const hasRecipe = (p as any).bomItems && (p as any).bomItems.length > 0;
       if (onlyNoRecipeFilter && hasRecipe) return false;
 
-      // Title filter
+      // Brand / Title filter
       if (buildBomsTitleFilter) {
-        const pTitle = (p.title || p.brand || '').trim().toLowerCase();
-        if (pTitle !== buildBomsTitleFilter.toLowerCase()) return false;
+        const filterVal = buildBomsTitleFilter.toLowerCase().trim();
+        const pBrand = (p.brand || '').toLowerCase().trim();
+        const pTitle = (p.title || '').toLowerCase().trim();
+        const pName = (p.name || '').toLowerCase().trim();
+        const matchesBrand = pBrand === filterVal || pBrand.includes(filterVal) || pTitle === filterVal || pName.includes(filterVal);
+        if (!matchesBrand) return false;
       }
 
       // Ruling filter
       if (buildBomsRulingFilter) {
-        const pRuling = (p.ruleType || '').trim().toLowerCase();
-        if (pRuling !== buildBomsRulingFilter.toLowerCase()) return false;
+        const filterVal = buildBomsRulingFilter.toLowerCase().trim().replace(/[()]/g, '');
+        const pRuling = (p.ruleType || '').toLowerCase().trim().replace(/[()]/g, '');
+        const pName = (p.name || '').toLowerCase().trim();
+        const matchesRuling = pRuling === filterVal || pRuling.includes(filterVal) || pName.includes(`(${filterVal})`) || pName.includes(filterVal);
+        if (!matchesRuling) return false;
       }
 
       return matchesSearch;
@@ -1784,9 +1839,9 @@ const SkuMasterV2: React.FC = () => {
 
     // Sort by Title or Ruling
     if (buildBomsSortBy === 'title-asc') {
-      return [...filtered].sort((a, b) => (a.title || a.brand || a.name || '').localeCompare(b.title || b.brand || b.name || ''));
+      return [...filtered].sort((a, b) => (a.brand || a.title || a.name || '').localeCompare(b.brand || b.title || b.name || ''));
     } else if (buildBomsSortBy === 'title-desc') {
-      return [...filtered].sort((a, b) => (b.title || b.brand || b.name || '').localeCompare(a.title || a.brand || a.name || ''));
+      return [...filtered].sort((a, b) => (b.brand || b.title || b.name || '').localeCompare(a.brand || a.title || a.name || ''));
     } else if (buildBomsSortBy === 'ruling-asc') {
       return [...filtered].sort((a, b) => (a.ruleType || '').localeCompare(b.ruleType || ''));
     } else if (buildBomsSortBy === 'ruling-desc') {
@@ -7126,16 +7181,16 @@ const SkuMasterV2: React.FC = () => {
                     />
                   </div>
 
-                  {/* Title & Ruling Spec Filter Row */}
+                  {/* Title / Brand & Ruling Spec Filter Row */}
                   <div className="grid grid-cols-2 gap-1.5">
                     <div>
                       <select
                         value={buildBomsTitleFilter}
                         onChange={(e) => setBuildBomsTitleFilter(e.target.value)}
                         className="w-full px-2 py-1 text-[11px] font-semibold bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs truncate"
-                        title="Filter by Title"
+                        title="Filter by Brand"
                       >
-                        <option value="">All Titles ({buildBomsAvailableTitles.length})</option>
+                        <option value="">All Brands ({buildBomsAvailableTitles.length})</option>
                         {buildBomsAvailableTitles.map(t => (
                           <option key={t} value={t}>{t}</option>
                         ))}
