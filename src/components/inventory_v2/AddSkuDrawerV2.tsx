@@ -2416,11 +2416,11 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                   </div>
                 )}
 
-                {/* Initial Storage Location / Godown */}
+                {/* Storage Location / Godown */}
                 <div>
                   <label className="block text-[11px] font-bold text-gray-700 mb-1 flex items-center gap-1">
                     <MapPin className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Initial Location / Godown (Hierarchy)</span>
+                    <span>Storage Location / Godown (Hierarchy)</span>
                   </label>
                   <div className="flex gap-2">
                     <button

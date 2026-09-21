@@ -5897,41 +5897,21 @@ const SkuMasterV2: React.FC = () => {
             {/* TAB CONTENT: Locations (Initial & Live Multi-Location Breakdown) */}
             {detailsSubTab === 'locations' && (
               <div className="space-y-4">
-                {/* Summary Header 2-Card Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                  {/* Initial / Master Storage Location */}
-                  <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-2xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-                        <Building2 className="w-3.5 h-3.5 text-blue-600" />
-                        INITIAL / MASTER LOCATION
-                      </span>
-                      <span className="text-[9.5px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
-                        Default
-                      </span>
-                    </div>
-                    <div className="font-bold text-gray-900 text-sm truncate" title={modalInitialLocationText || 'SKBW'}>
-                      {modalInitialLocationText || 'SKBW'}
-                    </div>
-                    <p className="text-[10.5px] text-gray-400">Default base location assigned during item creation</p>
+                {/* Summary Header - Live Total Stock Across All Locations */}
+                <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Package className="w-3.5 h-3.5 text-emerald-600" />
+                      LIVE TOTAL ON-HAND
+                    </span>
+                    <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      Live Consolidated
+                    </span>
                   </div>
-
-                  {/* Live Total Stock Across All Locations */}
-                  <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-2xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-                        <Package className="w-3.5 h-3.5 text-emerald-600" />
-                        LIVE TOTAL ON-HAND
-                      </span>
-                      <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                        Live
-                      </span>
-                    </div>
-                    <div className="font-mono font-extrabold text-emerald-600 text-base">
-                      {(modalDynamicLiveStock !== null ? modalDynamicLiveStock : (Number((selectedSkuDetails as any).presentStock) || 0)).toLocaleString('en-IN')} {selectedSkuDetails.unit || 'Pcs'}
-                    </div>
-                    <p className="text-[10.5px] text-gray-400">Consolidated quantity currently held across all warehouse locations</p>
+                  <div className="font-mono font-extrabold text-emerald-600 text-base">
+                    {(modalDynamicLiveStock !== null ? modalDynamicLiveStock : (Number((selectedSkuDetails as any).presentStock) || 0)).toLocaleString('en-IN')} {selectedSkuDetails.unit || 'Pcs'}
                   </div>
+                  <p className="text-[10.5px] text-gray-400">Consolidated quantity currently held across all warehouse locations</p>
                 </div>
 
                 {/* Multi-Location Live Breakdown Table / Card List */}
@@ -5968,9 +5948,9 @@ const SkuMasterV2: React.FC = () => {
                         <MapPin className="w-6 h-6 text-slate-400" />
                       </div>
                       <div className="space-y-1 max-w-md mx-auto">
-                        <p className="font-bold text-gray-800 text-xs">Primary Storage: {modalInitialLocationText || 'SKBW'}</p>
+                        <p className="font-bold text-gray-800 text-xs">Warehouse Storage Breakdown</p>
                         <p className="text-[11px] text-gray-500 leading-relaxed">
-                          This SKU is assigned to <strong>{modalInitialLocationText || 'SKBW'}</strong>. When stock is transferred across multiple floors or bays, each location and on-hand balance will be listed here automatically.
+                          When stock is transferred or received across warehouse locations, each location and on-hand balance will be listed here automatically.
                         </p>
                       </div>
                     </div>
@@ -6259,7 +6239,7 @@ const SkuMasterV2: React.FC = () => {
                     {((miniStockData?.locations || modalLocationsBreakdown).length === 0) ? (
                       <div className="text-center py-10 bg-slate-50/70 rounded-2xl border border-dashed border-gray-200 text-gray-400 space-y-1">
                         <MapPin className="w-6 h-6 mx-auto text-gray-300" />
-                        <p className="font-bold text-gray-700 text-xs">Primary Location: {modalInitialLocationText || 'SKBW'}</p>
+                        <p className="font-bold text-gray-700 text-xs">Warehouse Storage</p>
                         <p className="text-[11px] text-gray-400">No multi-bay partitions recorded yet.</p>
                       </div>
                     ) : (
