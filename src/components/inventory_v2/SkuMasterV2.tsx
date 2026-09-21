@@ -5365,7 +5365,7 @@ const SkuMasterV2: React.FC = () => {
                           {selectedSkuDetails.pages ? `${selectedSkuDetails.pages} ${selectedSkuDetails.paperType === 'Sheets' || getItemType(selectedSkuDetails) === 'materials' || getItemType(selectedSkuDetails) === 'semi' ? 'Sheets' : 'Pages'}` : (getItemType(selectedSkuDetails) === 'materials' || getItemType(selectedSkuDetails) === 'semi' ? '500 Sheets' : '—')}
                         </span>
                       </div>
-                      {selectedSkuDetails.reamWeight ? (
+                      {selectedSkuDetails.reamWeight && (selectedSkuDetails.paperType === 'Sheets' || getItemType(selectedSkuDetails) === 'semi' || activeMainTab === 'semi') ? (
                         <div>
                           <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">REAM WEIGHT</span>
                           <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.reamWeight} KG</span>

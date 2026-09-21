@@ -1209,7 +1209,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       return ['gsm', 'title', 'width', 'length', 'ruleType', 'pages', 'reamWeight', 'altUnit'];
     } else {
       // Products / Finished Goods (Pages, brands, ruling types, UOM, AUOM)
-      return ['gsm', 'brand', 'width', 'length', 'ruleType', 'pages', 'reamWeight', 'booksGbl', 'altUnit'];
+      return ['gsm', 'brand', 'width', 'length', 'ruleType', 'pages', 'altUnit'];
     }
   }, [resolvedSection, form.category, isProductCategory]);
 
@@ -2133,7 +2133,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     </div>
                   )}
 
-                  {activeFields.includes('reamWeight') && form.paperType !== 'Reels' && (
+                  {activeFields.includes('reamWeight') && (form.paperType === 'Sheets' || resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi') && (
                     <div>
                       <label className="block text-[11px] font-semibold text-gray-600 mb-1">REAM WEIGHT (KG)</label>
                       <input
