@@ -43,6 +43,7 @@ import {
   ClipboardList
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Modal from '../ui/Modal';
 import { showToast } from '../ui/Toast';
@@ -211,8 +212,39 @@ const getSkuCategoryGroup = (item: SkuV2): 'products' | 'materials' | 'semi' => 
 
 export const StockInventoryV2: React.FC = () => {
   const { selectedCompany } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [activeTab, setActiveTab] = useState<StockTabType>('overview');
+  const VALID_STOCK_TABS: StockTabType[] = ['overview', 'products', 'materials', 'semi', 'batches', 'transfers', 'adjustments', 'warehouse'];
+
+  const [activeTab, setActiveTabState] = useState<StockTabType>(() => {
+    const tabFromUrl = searchParams.get('tab') as StockTabType;
+    if (tabFromUrl && VALID_STOCK_TABS.includes(tabFromUrl)) {
+      return tabFromUrl;
+    }
+    const tabFromStorage = localStorage.getItem('skbw_stock_inventory_active_tab') as StockTabType;
+    if (tabFromStorage && VALID_STOCK_TABS.includes(tabFromStorage)) {
+      return tabFromStorage;
+    }
+    return 'overview';
+  });
+
+  const setActiveTab = (tab: StockTabType) => {
+    setActiveTabState(tab);
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', tab);
+      return next;
+    }, { replace: true });
+    localStorage.setItem('skbw_stock_inventory_active_tab', tab);
+  };
+
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab') as StockTabType;
+    if (tabFromUrl && VALID_STOCK_TABS.includes(tabFromUrl) && tabFromUrl !== activeTab) {
+      setActiveTabState(tabFromUrl);
+    }
+  }, [searchParams]);
+
   const [animationKey, setAnimationKey] = useState<number>(Date.now());
 
   // Fast On-Demand Data State
@@ -2702,6 +2734,7 @@ export const StockInventoryV2: React.FC = () => {
                               type="button"
                               onClick={() => {
                                 setShowDuplicatesModal(false);
+                                setSelectedDrawerTab('overview');
                                 setSelectedDrawerSku(item);
                               }}
                               className="px-2.5 py-1 bg-blue-50 text-blue-700 font-bold rounded-lg hover:bg-blue-100 cursor-pointer text-xs"

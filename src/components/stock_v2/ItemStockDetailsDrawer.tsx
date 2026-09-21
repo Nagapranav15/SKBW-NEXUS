@@ -62,12 +62,12 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
   const [loading, setLoading] = useState(false);
   const [detailsData, setDetailsData] = useState<SkuStockDetailsResponse | null>(null);
 
-  // Set active tab to initialTab when drawer opens
+  // Set active tab to initialTab when drawer opens or sku changes
   useEffect(() => {
     if (isOpen) {
       setActiveTab(initialTab || 'overview');
     }
-  }, [isOpen, initialTab]);
+  }, [isOpen, initialTab, sku?._id]);
 
   // Fetch real-time live SKU details whenever SKU opens
   useEffect(() => {

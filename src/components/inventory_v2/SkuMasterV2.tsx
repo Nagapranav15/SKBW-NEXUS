@@ -200,8 +200,38 @@ const SkuMasterV2: React.FC = () => {
 
   const handleMainTabChange = (tab: 'products' | 'materials' | 'semi' | 'categories' | 'settings') => {
     setActiveMainTab(tab);
-    setSearchParams({ tab }, { replace: true });
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', tab);
+      if (tab !== 'categories') {
+        next.delete('subtab');
+      }
+      return next;
+    }, { replace: true });
     localStorage.setItem('skbw_item_master_active_tab', tab);
+  };
+
+  // Categories SubTab State: 'products' | 'materials' | 'semi' (persisted in URL & localStorage)
+  const [activeCategorySubTab, setActiveCategorySubTabState] = useState<'products' | 'materials' | 'semi'>(() => {
+    const subTabFromUrl = searchParams.get('subtab') as any;
+    if (subTabFromUrl && ['products', 'materials', 'semi'].includes(subTabFromUrl)) {
+      return subTabFromUrl;
+    }
+    const subTabFromStorage = localStorage.getItem('skbw_item_master_cat_subtab') as any;
+    if (subTabFromStorage && ['products', 'materials', 'semi'].includes(subTabFromStorage)) {
+      return subTabFromStorage;
+    }
+    return 'products';
+  });
+
+  const setActiveCategorySubTab = (subtab: 'products' | 'materials' | 'semi') => {
+    setActiveCategorySubTabState(subtab);
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      next.set('subtab', subtab);
+      return next;
+    }, { replace: true });
+    localStorage.setItem('skbw_item_master_cat_subtab', subtab);
   };
 
   useEffect(() => {
@@ -209,10 +239,11 @@ const SkuMasterV2: React.FC = () => {
     if (tabFromUrl && ['products', 'materials', 'semi', 'categories', 'settings'].includes(tabFromUrl) && tabFromUrl !== activeMainTab) {
       setActiveMainTab(tabFromUrl);
     }
+    const subTabFromUrl = searchParams.get('subtab') as any;
+    if (subTabFromUrl && ['products', 'materials', 'semi'].includes(subTabFromUrl) && subTabFromUrl !== activeCategorySubTab) {
+      setActiveCategorySubTabState(subTabFromUrl);
+    }
   }, [searchParams]);
-  
-  // Categories SubTab State: 'products' | 'materials' | 'semi'
-  const [activeCategorySubTab, setActiveCategorySubTab] = useState<'products' | 'materials' | 'semi'>('products');
 
   // Custom Products Sub-Filter Dropdown State (Only shown in Products tab)
   const [showProductTypeDropdown, setShowProductTypeDropdown] = useState(false);
@@ -1154,6 +1185,7 @@ const SkuMasterV2: React.FC = () => {
 
   useEffect(() => {
     if (selectedSkuDetails) {
+      setDetailsSubTab('details');
       setRecipeYieldQty((selectedSkuDetails as any).recipeYieldQty !== undefined ? String((selectedSkuDetails as any).recipeYieldQty) : ((selectedSkuDetails as any).batchYieldQty !== undefined ? String((selectedSkuDetails as any).batchYieldQty) : ''));
       setRecipeYieldUnit((selectedSkuDetails as any).recipeYieldUnit || selectedSkuDetails.unit || 'Pcs');
       
@@ -4008,6 +4040,7 @@ const SkuMasterV2: React.FC = () => {
                       <tr 
                         key={sku._id || index}
                         onClick={() => {
+                          setDetailsSubTab('details');
                           setSelectedSkuDetails(sku);
                         }}
                         style={{

@@ -46,6 +46,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useSearchParams } from 'react-router-dom';
 import Modal from '../ui/Modal';
 import { showToast } from '../ui/Toast';
 import { 
@@ -190,16 +191,18 @@ interface DirectoryItem {
 
 export const BusinessDirectoryV2: React.FC = () => {
   const { selectedCompany } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const VALID_DIRECTORY_TABS: DirectoryTabType[] = ['customers', 'vendors', 'agents', 'transporters', 'regions', 'cities'];
 
   const [activeMainTab, setActiveMainTabState] = useState<DirectoryTabType>(() => {
     try {
-      const params = new URLSearchParams(window.location.search);
-      const tabFromUrl = params.get('tab') as DirectoryTabType;
-      if (tabFromUrl && ['customers', 'vendors', 'agents', 'transporters', 'regions', 'cities'].includes(tabFromUrl)) {
+      const tabFromUrl = searchParams.get('tab') as DirectoryTabType;
+      if (tabFromUrl && VALID_DIRECTORY_TABS.includes(tabFromUrl)) {
         return tabFromUrl;
       }
       const tabFromStorage = localStorage.getItem('skbw_business_directory_tab') as DirectoryTabType;
-      if (tabFromStorage && ['customers', 'vendors', 'agents', 'transporters', 'regions', 'cities'].includes(tabFromStorage)) {
+      if (tabFromStorage && VALID_DIRECTORY_TABS.includes(tabFromStorage)) {
         return tabFromStorage;
       }
     } catch (e) {
@@ -210,15 +213,24 @@ export const BusinessDirectoryV2: React.FC = () => {
 
   const setActiveMainTab = (tab: DirectoryTabType) => {
     setActiveMainTabState(tab);
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', tab);
+      return next;
+    }, { replace: true });
     try {
       localStorage.setItem('skbw_business_directory_tab', tab);
-      const url = new URL(window.location.href);
-      url.searchParams.set('tab', tab);
-      window.history.replaceState({}, '', url.toString());
     } catch (e) {
       console.error(e);
     }
   };
+
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab') as DirectoryTabType;
+    if (tabFromUrl && VALID_DIRECTORY_TABS.includes(tabFromUrl) && tabFromUrl !== activeMainTab) {
+      setActiveMainTabState(tabFromUrl);
+    }
+  }, [searchParams]);
 
   const [animationKey, setAnimationKey] = useState<number>(Date.now());
 
