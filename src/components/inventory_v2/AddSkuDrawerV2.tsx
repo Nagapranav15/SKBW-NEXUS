@@ -554,8 +554,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       ...prev,
       category: newCategory,
       unit: newUom,
-      paperType: newType === 'materials' ? (prev.paperType || 'Reels') : '',
-      pages: newType === 'materials' ? '' : prev.pages,
+      paperType: newType === 'materials' ? (prev.paperType || 'Reels') : (newType === 'semi' ? 'Sheets' : ''),
+      pages: (newType === 'materials' && prev.paperType !== 'Sheets') ? '' : (newType === 'semi' ? (prev.pages || '500') : prev.pages),
       ruleType: newType === 'materials' ? '' : prev.ruleType
     }));
 
@@ -1206,7 +1206,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     if (resolvedSection === 'materials' || form.category === 'Raw Material' || form.category === 'Materials' || (!isProductCategory && resolvedSection !== 'semi')) {
       return ['gsm', 'title', 'width', 'length', 'paperType', 'pages', 'reamWeight', 'booksGbl', 'altUnit'];
     } else if (resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi') {
-      return ['gsm', 'title', 'width', 'length', 'ruleType', 'group', 'pages', 'reamWeight', 'booksGbl', 'altUnit'];
+      return ['gsm', 'title', 'width', 'length', 'ruleType', 'paperType', 'group', 'pages', 'reamWeight', 'booksGbl', 'altUnit'];
     } else {
       // Products / Finished Goods (Pages, brands, ruling types, UOM, AUOM)
       return ['gsm', 'brand', 'width', 'length', 'ruleType', 'pages', 'reamWeight', 'booksGbl', 'altUnit'];
@@ -1305,10 +1305,11 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         return parts.filter(Boolean).join(' ');
       } else if (isSemi) {
         const parts: string[] = [];
-        if (formData.title?.trim()) {
-          parts.push(formData.title.trim());
-        } else if (formData.brand?.trim()) {
-          parts.push(formData.brand.trim());
+        const brandOrTitle = formData.brand?.trim() || formData.title?.trim() || '';
+        if (brandOrTitle) parts.push(brandOrTitle);
+        const formatType = formData.paperType === 'Reels' ? 'Reel' : 'Sheet';
+        if (formatType && !parts.some(p => p.toLowerCase().includes('sheet') || p.toLowerCase().includes('reel'))) {
+          parts.push(formatType);
         }
         if (formData.gsm) parts.push(`${formData.gsm} GSM`);
         let sizeStr = '';
@@ -1322,10 +1323,6 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           const clean = formData.ruleType.trim();
           const wrapped = (clean.startsWith('(') && clean.endsWith(')')) ? clean : `(${clean})`;
           parts.push(wrapped);
-        }
-        if (formData.pages) parts.push(`${formData.pages}P`);
-        if (formData.group && !parts.some(p => p.toLowerCase() === formData.group.toLowerCase())) {
-          parts.push(formData.group);
         }
         return parts.filter(Boolean).join(' ');
       } else {
@@ -2089,7 +2086,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     </div>
                   )}
 
-                  {form.paperType === 'Sheets' && (
+                  {(form.paperType === 'Sheets' || resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi') && (
                     <div className="col-span-2 sm:col-span-1">
                       <label className="block text-[11px] font-semibold text-gray-600 mb-1">
                         STANDARD SHEETS / REAM *

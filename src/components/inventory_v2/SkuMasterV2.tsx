@@ -791,7 +791,7 @@ const SkuMasterV2: React.FC = () => {
     { id: 'altUnit', label: 'AUOM', visible: true },
     { id: 'gsm', label: 'GSM', visible: true },
     { id: 'size', label: 'SIZE', visible: true },
-    { id: 'pages', label: 'PAGES / SHEETS', visible: true },
+    { id: 'pages', label: 'SHEETS PER REAM', visible: true },
     { id: 'preferredVendor', label: 'PREFERRED VENDOR', visible: true },
     { id: 'bom', label: 'BOM RECIPE', visible: true },
     { id: 'openingStock', label: 'STOCK', visible: false },
@@ -799,7 +799,7 @@ const SkuMasterV2: React.FC = () => {
     { id: 'dispatchOrders', label: 'DISPATCH ORDERS', visible: false }
   ];
 
-  const STORAGE_KEY = 'skbw_sku_master_tab_columns_v17';
+  const STORAGE_KEY = 'skbw_sku_master_tab_columns_v18';
 
   // Helper to sanitize column list against current valid defaults
   const sanitizeColumns = (savedList: any[], defaultList: typeof DEFAULT_PRODUCTS_COLUMNS) => {
@@ -4179,7 +4179,7 @@ const SkuMasterV2: React.FC = () => {
                               );
                             case 'pages':
                               const pageMatch = sku.name.match(/(\d+)P/i);
-                              const isSheetItemCol = sku.paperType === 'Sheets' || (sku.name || '').toLowerCase().includes('sheet');
+                              const isSheetItemCol = sku.paperType === 'Sheets' || activeMainTab === 'materials' || activeMainTab === 'semi' || getItemType(sku) === 'materials' || getItemType(sku) === 'semi' || (sku.name || '').toLowerCase().includes('sheet');
                               const pagesStr = sku.pages
                                 ? `${sku.pages} ${isSheetItemCol ? 'Sheets/Ream' : 'P'}`
                                 : isSheetItemCol
@@ -5218,10 +5218,10 @@ const SkuMasterV2: React.FC = () => {
                       </div>
                       <div>
                         <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">
-                          {selectedSkuDetails.paperType === 'Sheets' || (getItemType(selectedSkuDetails) === 'materials') ? 'SHEETS PER REAM' : 'PAGES'}
+                          {selectedSkuDetails.paperType === 'Sheets' || getItemType(selectedSkuDetails) === 'materials' || getItemType(selectedSkuDetails) === 'semi' || activeMainTab === 'semi' ? 'SHEETS PER REAM' : 'PAGES'}
                         </span>
                         <span className="font-bold text-gray-900 text-xs">
-                          {selectedSkuDetails.pages ? `${selectedSkuDetails.pages} ${selectedSkuDetails.paperType === 'Sheets' ? 'Sheets' : 'Pages'}` : '—'}
+                          {selectedSkuDetails.pages ? `${selectedSkuDetails.pages} ${selectedSkuDetails.paperType === 'Sheets' || getItemType(selectedSkuDetails) === 'materials' || getItemType(selectedSkuDetails) === 'semi' ? 'Sheets' : 'Pages'}` : (getItemType(selectedSkuDetails) === 'materials' || getItemType(selectedSkuDetails) === 'semi' ? '500 Sheets' : '—')}
                         </span>
                       </div>
                     </div>
