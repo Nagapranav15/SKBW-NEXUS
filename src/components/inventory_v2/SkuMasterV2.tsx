@@ -675,6 +675,28 @@ const SkuMasterV2: React.FC = () => {
 
       await updateSkuV2(targetSku._id, patchData);
 
+      // Instant optimistic state update across table and modal
+      setSkus(prev => prev.map(s => s._id === targetSku._id ? { ...s, bomItems: updatedBomItems, recipeYieldQty: yieldQty } : s));
+      if (activeBomProduct?._id === targetSku._id) {
+        setActiveBomProduct(prev => prev ? { ...prev, bomItems: updatedBomItems, recipeYieldQty: yieldQty } : null);
+        setActiveRecipeItems(updatedBomItems.map((item, idx) => ({
+          id: item.id || `b-${idx}`,
+          skuId: item.skuId,
+          skuCode: item.skuCode,
+          name: item.name,
+          qty: item.qty,
+          uom: item.uom || 'Kg',
+          inStock: item.inStock ?? 0,
+          notes: item.notes || ''
+        })));
+        setBuildBatchYieldQty(String(yieldQty));
+      }
+      if (selectedSkuDetails?._id === targetSku._id) {
+        setSelectedSkuDetails(prev => prev ? { ...prev, bomItems: updatedBomItems, recipeYieldQty: yieldQty } : null);
+        setBomRecipeItems(updatedBomItems);
+        setRecipeYieldQty(String(yieldQty));
+      }
+
       showToast(`Pasted BOM from "${copiedBom.sourceName}" to "${targetSku.name || targetSku.skuCode}"!`, 'success');
       loadSkus(false);
     } catch (err: any) {
@@ -691,19 +713,24 @@ const SkuMasterV2: React.FC = () => {
     }
     try {
       showToast(`Pasting BOM to ${targets.length} products...`, 'info');
+      const targetIds = new Set(targets.map(t => t._id));
+      const pastedYield = Number(copiedBom.basis) || 1;
+
       for (const targetSku of targets) {
         if (!targetSku._id) continue;
         const items = copiedBom.lines.map((l, i) => ({
           id: `b-paste-${Date.now()}-${i}`,
+          skuId: l.skuId,
+          skuCode: l.skuCode,
           name: l.name,
           qty: l.qty,
-          uom: l.uom,
+          uom: l.uom || 'Kg',
           inStock: l.inStock ?? 0,
           notes: l.notes || ''
         }));
         const patchData: any = {
           bomItems: items,
-          recipeYieldQty: Number(copiedBom.basis) || 1,
+          recipeYieldQty: pastedYield,
           company: selectedCompany?._id
         };
         if ((targetSku.altUnit || '').toLowerCase().trim() === (targetSku.unit || '').toLowerCase().trim()) {
@@ -712,6 +739,26 @@ const SkuMasterV2: React.FC = () => {
         }
         await updateSkuV2(targetSku._id, patchData);
       }
+
+      // Instant optimistic state update for all targets
+      const pastedLines = copiedBom.lines.map((l, i) => ({
+        id: `b-paste-${Date.now()}-${i}`,
+        skuId: l.skuId,
+        skuCode: l.skuCode,
+        name: l.name,
+        qty: l.qty,
+        uom: l.uom || 'Kg',
+        inStock: l.inStock ?? 0,
+        notes: l.notes || ''
+      }));
+
+      setSkus(prev => prev.map(s => targetIds.has(s._id) ? { ...s, bomItems: pastedLines, recipeYieldQty: pastedYield } : s));
+      if (activeBomProduct && targetIds.has(activeBomProduct._id)) {
+        setActiveBomProduct(prev => prev ? { ...prev, bomItems: pastedLines, recipeYieldQty: pastedYield } : null);
+        setActiveRecipeItems(pastedLines);
+        setBuildBatchYieldQty(String(pastedYield));
+      }
+
       showToast(`Successfully pasted BOM to ${targets.length} products!`, 'success');
       loadSkus(false);
     } catch (err: any) {
@@ -730,6 +777,8 @@ const SkuMasterV2: React.FC = () => {
 
     try {
       let updatedCount = 0;
+      const updatedSkusMap = new Map<string, { bomItems: any[]; yieldQty: number }>();
+
       for (const id of selectedIds) {
         const sku = skus.find(s => s._id === id);
         if (!sku) continue;
@@ -739,9 +788,11 @@ const SkuMasterV2: React.FC = () => {
           .filter(l => !existingNames.has((l.name || '').toLowerCase().trim()))
           .map((l, i) => ({
             id: `b-bulk-paste-${Date.now()}-${i}`,
+            skuId: l.skuId,
+            skuCode: l.skuCode,
             name: l.name,
             qty: l.qty,
-            uom: l.uom,
+            uom: l.uom || 'Kg',
             inStock: l.inStock ?? 0,
             notes: l.notes || ''
           }));
@@ -749,9 +800,11 @@ const SkuMasterV2: React.FC = () => {
         const updatedBomItems = existingItems.length === 0 
           ? copiedBom.lines.map((l, i) => ({
               id: `b-bulk-paste-${Date.now()}-${i}`,
+              skuId: l.skuId,
+              skuCode: l.skuCode,
               name: l.name,
               qty: l.qty,
-              uom: l.uom,
+              uom: l.uom || 'Kg',
               inStock: l.inStock ?? 0,
               notes: l.notes || ''
             }))
@@ -764,8 +817,18 @@ const SkuMasterV2: React.FC = () => {
           recipeYieldQty: yieldQty,
           company: selectedCompany?._id
         });
+        updatedSkusMap.set(id, { bomItems: updatedBomItems, yieldQty });
         updatedCount++;
       }
+
+      // Instant optimistic state update
+      setSkus(prev => prev.map(s => {
+        const update = updatedSkusMap.get(s._id);
+        if (update) {
+          return { ...s, bomItems: update.bomItems, recipeYieldQty: update.yieldQty };
+        }
+        return s;
+      }));
 
       showToast(`Successfully pasted BOM to ${updatedCount} items!`, 'success');
       setSelectedIds([]);
@@ -1673,6 +1736,7 @@ const SkuMasterV2: React.FC = () => {
 
   const handleSelectBomProduct = (prod: SkuV2) => {
     setActiveBomProduct(prod);
+    setBuildBatchYieldQty(String((prod as any).recipeYieldQty || '1'));
     if ((prod as any).bomItems && Array.isArray((prod as any).bomItems)) {
       setActiveRecipeItems((prod as any).bomItems.map((item: any, idx: number) => {
         const matchedSku = (skus || []).find(s => 
@@ -1688,7 +1752,7 @@ const SkuMasterV2: React.FC = () => {
           skuCode: item.skuCode || matchedSku?.skuCode,
           name: currentName,
           qty: Number(item.qty) || 1,
-          uom: matchedSku?.unit || item.uom || 'Kg',
+          uom: item.uom || matchedSku?.unit || 'Kg',
           inStock: Number((matchedSku as any)?.openingStock ?? item.inStock ?? 0),
           notes: item.notes || ''
         };
@@ -1702,10 +1766,21 @@ const SkuMasterV2: React.FC = () => {
     if (!activeBomProduct?._id) return;
     setIsSavingBuildBom(true);
     try {
+      const yieldQty = Number(buildBatchYieldQty) || 1;
       await updateSkuV2(activeBomProduct._id, {
         bomItems: activeRecipeItems,
+        recipeYieldQty: yieldQty,
         company: selectedCompany?._id
       });
+      // Instant optimistic update across local state
+      setSkus(prev => prev.map(s => s._id === activeBomProduct._id ? { ...s, bomItems: activeRecipeItems, recipeYieldQty: yieldQty } : s));
+      setActiveBomProduct(prev => prev ? { ...prev, bomItems: activeRecipeItems, recipeYieldQty: yieldQty } : null);
+      if (selectedSkuDetails?._id === activeBomProduct._id) {
+        setSelectedSkuDetails(prev => prev ? { ...prev, bomItems: activeRecipeItems, recipeYieldQty: yieldQty } : null);
+        setBomRecipeItems(activeRecipeItems);
+        setRecipeYieldQty(String(yieldQty));
+      }
+
       showToast(`BOM Recipe saved for ${activeBomProduct.name}!`, 'success');
       loadSkus(false);
     } catch (err: any) {
@@ -5651,15 +5726,14 @@ const SkuMasterV2: React.FC = () => {
                           </button>
                         </div>
                       ) : (
-                        <table className="w-full text-left text-xs border-collapse min-w-[640px]">
+                        <table className="w-full text-left text-xs border-collapse min-w-[500px]">
                           <thead className="bg-gray-50/80 text-gray-500 font-bold text-[11px] border-b border-gray-200">
                             <tr>
-                              <th className="py-2.5 px-3 min-w-[220px]">Item</th>
+                              <th className="py-2.5 px-3">Item</th>
                               <th className="py-2.5 px-3 text-center w-24">Qty</th>
-                              <th className="py-2.5 px-3 w-16">UoM</th>
-                              <th className="py-2.5 px-3 w-20">In Stock</th>
-                              <th className="py-2.5 px-3 w-20 font-bold">Runs</th>
-                              <th className="py-2.5 px-3 min-w-[160px]">Notes</th>
+                              <th className="py-2.5 px-3 text-center w-20">UOM</th>
+                              <th className="py-2.5 px-3 text-center w-20">In Stock</th>
+                              <th className="py-2.5 px-3 text-center w-20 font-bold">Runs</th>
                               {isEditingItemBom && <th className="py-2.5 px-3 text-right w-10"></th>}
                             </tr>
                           </thead>
@@ -5671,7 +5745,7 @@ const SkuMasterV2: React.FC = () => {
 
                               return (
                                 <tr key={b.id} className="hover:bg-gray-50/50">
-                                  <td className="py-2 px-3">
+                                  <td className="py-2.5 px-3">
                                     {isEditingItemBom ? (
                                       <div className="relative" style={{ zIndex: 100 - idx }}>
                                         <SearchableMaterialDropdown
@@ -5693,7 +5767,7 @@ const SkuMasterV2: React.FC = () => {
                                         />
                                       </div>
                                     ) : (
-                                      <div className="font-bold text-gray-900 text-xs">
+                                      <div className="font-bold text-gray-900 text-xs leading-snug">
                                         {b.name || '—'}
                                       </div>
                                     )}
@@ -5715,26 +5789,25 @@ const SkuMasterV2: React.FC = () => {
                                       <span className="font-mono font-bold text-gray-900">{b.qty !== undefined && b.qty !== '' ? b.qty : '—'}</span>
                                     )}
                                   </td>
-                                  <td className="py-2 px-3 text-gray-600 font-semibold whitespace-nowrap w-16">{b.uom}</td>
-                                  <td className="py-2 px-3 text-gray-600 font-mono whitespace-nowrap w-20">{b.inStock ?? 0}</td>
-                                  <td className="py-2 px-3 font-bold text-gray-900 whitespace-nowrap w-20">
-                                    {runs !== null ? runs.toLocaleString() : '—'}
-                                  </td>
-                                  <td className="py-2 px-3 min-w-[160px]">
+                                  <td className="py-2 px-3 text-center w-20">
                                     {isEditingItemBom ? (
                                       <input
                                         type="text"
-                                        placeholder="Optional"
-                                        value={b.notes || ''}
+                                        value={b.uom || ''}
                                         onChange={(e) => {
                                           const val = e.target.value;
-                                          setBomRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, notes: val } : item));
+                                          setBomRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, uom: val } : item));
                                         }}
-                                        className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-600 focus:outline-none focus:border-blue-500 bg-white"
+                                        className="w-full border border-gray-200 rounded-lg px-1.5 py-1.5 text-xs font-semibold text-center uppercase focus:outline-none focus:border-blue-500 bg-white"
+                                        placeholder="UOM"
                                       />
                                     ) : (
-                                      <span className="text-gray-500 italic">{b.notes || '—'}</span>
+                                      <span className="text-gray-600 font-semibold whitespace-nowrap">{b.uom}</span>
                                     )}
+                                  </td>
+                                  <td className="py-2 px-3 text-center text-gray-600 font-mono whitespace-nowrap w-20">{b.inStock ?? 0}</td>
+                                  <td className="py-2 px-3 text-center font-bold text-gray-900 whitespace-nowrap w-20">
+                                    {runs !== null ? runs.toLocaleString() : '—'}
                                   </td>
                                   {isEditingItemBom && (
                                     <td className="py-2 px-3 text-right w-10">
@@ -7252,7 +7325,7 @@ const SkuMasterV2: React.FC = () => {
                     </div>
 
                     {/* Sub-header details bar */}
-                    <div className="flex items-center gap-3 text-xs font-semibold text-gray-500 bg-gray-50 p-2.5 rounded-xl border border-gray-100">
+                    <div className="flex items-center gap-3 text-xs font-semibold text-gray-500 bg-gray-50 p-2.5 rounded-xl border border-gray-100 flex-wrap">
                       <span>ITEMS <strong>{activeRecipeItems.length}</strong></span>
                       <span>·</span>
                       <div className="flex items-center gap-1.5">
@@ -7263,12 +7336,24 @@ const SkuMasterV2: React.FC = () => {
                           placeholder="1"
                           value={buildBatchYieldQty}
                           onChange={(e) => setBuildBatchYieldQty(e.target.value)}
-                          className="w-14 px-1.5 py-0.5 border border-blue-300 rounded text-xs font-bold text-blue-700 text-center bg-white"
+                          className="w-16 px-2 py-1 border border-blue-300 rounded-lg text-xs font-bold text-blue-700 text-center bg-white shadow-2xs focus:ring-2 focus:ring-blue-400 focus:outline-none"
+                          title="Batch Yield Quantity (Number of pieces)"
                         />
-                        <strong className="text-gray-800">{activeBomProduct?.unit || 'Pcs'}</strong>
+                        <input
+                          type="text"
+                          value={activeBomProduct?.unit || 'Pcs'}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setActiveBomProduct(prev => prev ? { ...prev, unit: val } : null);
+                            setSkus(prev => prev.map(s => s._id === activeBomProduct?._id ? { ...s, unit: val } : s));
+                          }}
+                          className="w-16 px-1.5 py-1 border border-gray-300 rounded-lg text-xs font-bold text-gray-800 text-center uppercase bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none"
+                          title="Yield Unit / Pieces"
+                          placeholder="Unit"
+                        />
                       </div>
                       <span>·</span>
-                      <span className="text-[11px] font-normal text-gray-400">Quantities are per unit produced</span>
+                      <span className="text-[11px] font-normal text-gray-400">Quantities configured per batch produced</span>
                     </div>
 
                     {/* Top Search Dropdown input to quickly add material */}
@@ -7282,6 +7367,8 @@ const SkuMasterV2: React.FC = () => {
                             ...prev,
                             {
                               id: `b-${Date.now()}`,
+                              skuId: matchedSku?._id,
+                              skuCode: matchedSku?.skuCode,
                               name: selectedName,
                               qty: '' as any,
                               uom: matchedSku?.unit || 'Kg',
@@ -7300,10 +7387,9 @@ const SkuMasterV2: React.FC = () => {
                           <span className="w-4"></span>
                           <span className="flex-1">Material</span>
                           <span className="w-20 text-center">Qty</span>
-                          <span className="w-8">UoM</span>
-                          <span className="w-12 text-center">In Stock</span>
-                          <span className="w-14 text-center">Runs</span>
-                          <span className="w-28">Notes</span>
+                          <span className="w-16 text-center">UOM</span>
+                          <span className="w-16 text-center">In Stock</span>
+                          <span className="w-16 text-center">Runs</span>
                           <span className="w-6"></span>
                         </div>
                       )}
@@ -7316,11 +7402,11 @@ const SkuMasterV2: React.FC = () => {
                         return (
                           <div
                             key={b.id}
-                            className="p-2 bg-white border border-gray-200 rounded-xl shadow-2xs flex items-center gap-2 text-xs hover:border-gray-300 transition-colors"
+                            className="p-2.5 bg-white border border-gray-200 rounded-xl shadow-2xs flex items-center gap-2.5 text-xs hover:border-gray-300 transition-colors"
                           >
                             <span className="text-gray-400 font-bold select-none cursor-grab text-[11px] w-4">⋮⋮</span>
 
-                            <div className="flex-1 font-semibold text-gray-800 text-xs truncate" title={b.name}>
+                            <div className="flex-1 font-bold text-gray-900 text-xs min-w-0 pr-2 leading-relaxed" title={b.name}>
                               {b.name}
                             </div>
 
@@ -7333,30 +7419,29 @@ const SkuMasterV2: React.FC = () => {
                                   const val = Number(e.target.value);
                                   setActiveRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, qty: val } : item));
                                 }}
-                                className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs font-semibold text-center focus:outline-none focus:border-[#064E3B]"
+                                className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs font-bold font-mono text-center focus:outline-none focus:border-[#064E3B] bg-white"
+                                placeholder="Qty"
                               />
                             </div>
 
-                            <span className="text-gray-500 font-medium text-[11px] w-8">{b.uom}</span>
-
-                            <span className="text-gray-400 font-mono text-[10px] w-12 text-center">{b.inStock}</span>
-
-                            <span className="text-gray-900 font-bold text-[11px] w-14 text-center">
-                              {runs !== null ? runs.toLocaleString() : '—'}
-                            </span>
-
-                            <div className="w-28">
+                            <div className="w-16">
                               <input
                                 type="text"
-                                placeholder="Notes"
-                                value={b.notes || ''}
+                                value={b.uom || ''}
                                 onChange={(e) => {
                                   const val = e.target.value;
-                                  setActiveRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, notes: val } : item));
+                                  setActiveRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, uom: val } : item));
                                 }}
-                                className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-600 focus:outline-none focus:border-[#064E3B]"
+                                className="w-full border border-gray-200 rounded-lg px-1.5 py-1 text-xs font-semibold text-center uppercase focus:outline-none focus:border-[#064E3B] bg-white"
+                                placeholder="UOM"
                               />
                             </div>
+
+                            <span className="text-gray-400 font-mono text-[11px] w-16 text-center">{b.inStock}</span>
+
+                            <span className="text-gray-900 font-bold text-[11px] w-16 text-center">
+                              {runs !== null ? runs.toLocaleString() : '—'}
+                            </span>
 
                             <button
                               onClick={() => setActiveRecipeItems(prev => prev.filter(item => item.id !== b.id))}

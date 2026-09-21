@@ -60,7 +60,7 @@ export const SearchableMaterialDropdown: React.FC<{
     const spaceBelow = window.innerHeight - rect.bottom;
     const placeAbove = spaceBelow < 280 && rect.top > spaceBelow;
     
-    const width = Math.min(Math.max(rect.width, 440), window.innerWidth - 24);
+    const width = Math.min(Math.max(rect.width, 580), window.innerWidth - 24);
     let left = rect.left;
     if (left + width > window.innerWidth - 12) {
       left = Math.max(12, window.innerWidth - width - 12);
@@ -2655,10 +2655,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                             <thead>
                               <tr className="border-b border-gray-100 text-[10px] font-bold text-gray-400 uppercase">
                                 <th className="py-2 px-2">ITEM</th>
-                                <th className="py-2 px-2 w-20">QTY</th>
-                                <th className="py-2 px-2 w-16">UOM</th>
-                                <th className="py-2 px-2 w-20">IN STOCK</th>
-                                <th className="py-2 px-2">NOTES</th>
+                                <th className="py-2 px-2 w-24 text-center">QTY</th>
+                                <th className="py-2 px-2 w-20 text-center">UOM</th>
+                                <th className="py-2 px-2 w-20 text-center">IN STOCK</th>
                                 <th className="py-2 px-1 w-8 text-center"></th>
                               </tr>
                             </thead>
@@ -2687,24 +2686,25 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                       value={item.qty}
                                       onChange={(e) => updateBomItem(item.id, 'qty', e.target.value)}
                                       className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-bold text-gray-800 bg-white font-mono text-center"
+                                      placeholder="Qty"
                                     />
                                   </td>
-                                  <td className="py-2 px-2 text-gray-500 font-semibold">{item.uom}</td>
-                                  <td className="py-2 px-2 text-gray-500 font-mono">{item.inStock}</td>
-                                  <td className="py-2 px-2">
+                                  <td className="py-2 px-2 text-center">
                                     <input
                                       type="text"
-                                      value={item.notes}
-                                      onChange={(e) => updateBomItem(item.id, 'notes', e.target.value)}
-                                      className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-700 bg-white"
-                                      placeholder="e.g. Paper Reel"
+                                      value={item.uom || ''}
+                                      onChange={(e) => updateBomItem(item.id, 'uom', e.target.value)}
+                                      className="w-full px-1.5 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 bg-white text-center uppercase"
+                                      placeholder="UOM"
                                     />
                                   </td>
+                                  <td className="py-2 px-2 text-center text-gray-500 font-mono">{item.inStock}</td>
                                   <td className="py-2 px-1 text-center">
                                     <button
                                       type="button"
                                       onClick={() => removeBomItem(item.id)}
                                       className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                      title="Remove item"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
                                     </button>
