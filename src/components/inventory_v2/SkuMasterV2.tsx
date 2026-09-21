@@ -1024,6 +1024,9 @@ const SkuMasterV2: React.FC = () => {
   const [activeRecipeItems, setActiveRecipeItems] = useState<BomRecipeItem[]>([]);
   const [buildBomsSearch, setBuildBomsSearch] = useState('');
   const [onlyNoRecipeFilter, setOnlyNoRecipeFilter] = useState(false);
+  const [buildBomsTitleFilter, setBuildBomsTitleFilter] = useState('');
+  const [buildBomsRulingFilter, setBuildBomsRulingFilter] = useState('');
+  const [buildBomsSortBy, setBuildBomsSortBy] = useState<'default' | 'title-asc' | 'title-desc' | 'ruling-asc' | 'ruling-desc' | 'name-asc' | 'name-desc'>('default');
   const [catalogSearch, setCatalogSearch] = useState('');
   const [isSavingBuildBom, setIsSavingBuildBom] = useState(false);
 
@@ -1730,6 +1733,25 @@ const SkuMasterV2: React.FC = () => {
     return bomProductSkus.filter(s => (s as any).bomItems && (s as any).bomItems.length > 0).length;
   }, [bomProductSkus]);
 
+  // Available unique Titles & Rulings for Build BOMs filter dropdowns
+  const buildBomsAvailableTitles = useMemo(() => {
+    const titles = new Set<string>();
+    bomProductSkus.forEach(s => {
+      const t = (s.title || s.brand || '').trim();
+      if (t) titles.add(t);
+    });
+    return Array.from(titles).sort((a, b) => a.localeCompare(b));
+  }, [bomProductSkus]);
+
+  const buildBomsAvailableRulings = useMemo(() => {
+    const rulings = new Set<string>();
+    bomProductSkus.forEach(s => {
+      const r = (s.ruleType || '').trim();
+      if (r) rulings.add(r);
+    });
+    return Array.from(rulings).sort((a, b) => a.localeCompare(b));
+  }, [bomProductSkus]);
+
   const filteredBuildProducts = useMemo(() => {
     let baseList: SkuV2[] = [];
     if (activeMainTab === 'semi') {
@@ -1737,14 +1759,46 @@ const SkuMasterV2: React.FC = () => {
     } else {
       baseList = bomProductSkus.length > 0 ? bomProductSkus : [...productsList, ...semiList];
     }
-    return baseList.filter(p => {
+    const filtered = baseList.filter(p => {
       const matchesSearch = (p.name || '').toLowerCase().includes(buildBomsSearch.toLowerCase()) ||
-                            (p.skuCode || '').toLowerCase().includes(buildBomsSearch.toLowerCase());
+                            (p.skuCode || '').toLowerCase().includes(buildBomsSearch.toLowerCase()) ||
+                            (p.title || '').toLowerCase().includes(buildBomsSearch.toLowerCase()) ||
+                            (p.ruleType || '').toLowerCase().includes(buildBomsSearch.toLowerCase());
       const hasRecipe = (p as any).bomItems && (p as any).bomItems.length > 0;
       if (onlyNoRecipeFilter && hasRecipe) return false;
+
+      // Title filter
+      if (buildBomsTitleFilter) {
+        const pTitle = (p.title || p.brand || '').trim().toLowerCase();
+        if (pTitle !== buildBomsTitleFilter.toLowerCase()) return false;
+      }
+
+      // Ruling filter
+      if (buildBomsRulingFilter) {
+        const pRuling = (p.ruleType || '').trim().toLowerCase();
+        if (pRuling !== buildBomsRulingFilter.toLowerCase()) return false;
+      }
+
       return matchesSearch;
     });
-  }, [bomProductSkus, productsList, semiList, skus, activeMainTab, buildBomsSearch, onlyNoRecipeFilter]);
+
+    // Sort by Title or Ruling
+    if (buildBomsSortBy === 'title-asc') {
+      return [...filtered].sort((a, b) => (a.title || a.brand || a.name || '').localeCompare(b.title || b.brand || b.name || ''));
+    } else if (buildBomsSortBy === 'title-desc') {
+      return [...filtered].sort((a, b) => (b.title || b.brand || b.name || '').localeCompare(a.title || a.brand || a.name || ''));
+    } else if (buildBomsSortBy === 'ruling-asc') {
+      return [...filtered].sort((a, b) => (a.ruleType || '').localeCompare(b.ruleType || ''));
+    } else if (buildBomsSortBy === 'ruling-desc') {
+      return [...filtered].sort((a, b) => (b.ruleType || '').localeCompare(a.ruleType || ''));
+    } else if (buildBomsSortBy === 'name-asc') {
+      return [...filtered].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    } else if (buildBomsSortBy === 'name-desc') {
+      return [...filtered].sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+    }
+
+    return filtered;
+  }, [bomProductSkus, productsList, semiList, skus, activeMainTab, buildBomsSearch, onlyNoRecipeFilter, buildBomsTitleFilter, buildBomsRulingFilter, buildBomsSortBy]);
 
   const filteredRawCatalog = useMemo(() => {
     return materialsList.filter(m => (m.name || '').toLowerCase().includes(catalogSearch.toLowerCase()));
@@ -2040,20 +2094,8 @@ const SkuMasterV2: React.FC = () => {
     return list;
   }, [tabFilteredSkus, filterRules, sortRules]);
 
-  // Reset pagination on tab or search change
-  useEffect(() => {
-    setPage(1);
-  }, [activeMainTab, search, categoryFilter, selectedProductSubFilter]);
-
-  // Pagination calculation
-  const total = filteredAndSortedSkus.length;
-  const totalPages = Math.max(1, Math.ceil(total / limit));
-  const startItem = total === 0 ? 0 : (page - 1) * limit + 1;
-  const endItem = Math.min(page * limit, total);
-  
-  const paginatedSkus = useMemo(() => {
-    return filteredAndSortedSkus.slice((page - 1) * limit, page * limit);
-  }, [filteredAndSortedSkus, page, limit]);
+  // Full scrolling table list (pagination removed as requested)
+  const paginatedSkus = filteredAndSortedSkus;
 
   // Selection handlers
   const handleSelectAll = (checked: boolean) => {
@@ -4168,7 +4210,7 @@ const SkuMasterV2: React.FC = () => {
                           />
                         </td>
                         <td className="py-3 px-3 text-center text-gray-400 font-mono font-semibold text-xs whitespace-nowrap">
-                          {(page - 1) * limit + index + 1}
+                          {index + 1}
                         </td>
 
                         {/* Render cells dynamically based on visibleColumns order */}
@@ -4905,74 +4947,17 @@ const SkuMasterV2: React.FC = () => {
 
       )}
 
-      {/* ── PAGINATION FOOTER ── */}
+      {/* ── TABLE SUMMARY FOOTER ── */}
       {activeMainTab !== 'categories' && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500 py-2">
-          
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500 py-3 px-4 bg-gray-50/70 border-t border-gray-200/80 rounded-b-2xl">
           <div>
-            Showing <strong className="text-gray-900">{startItem}–{endItem}</strong> of <strong className="text-gray-900">{total}</strong> items
+            Showing all <strong className="text-gray-900">{filteredAndSortedSkus.length}</strong> items
           </div>
-
-          <div className="flex items-center gap-4">
-            
-            {/* Rows Per Page */}
-            <div className="flex items-center gap-2">
-              <span>Rows</span>
-              <select
-                value={limit}
-                onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
-                className="bg-white border border-gray-200 rounded-lg px-2 py-1 text-xs font-semibold text-gray-700 focus:outline-none shadow-2xs cursor-pointer"
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
+          {selectedIds.length > 0 && (
+            <div className="text-blue-700 font-semibold bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
+              {selectedIds.length} item{selectedIds.length > 1 ? 's' : ''} selected
             </div>
-
-            {/* Page Box */}
-            <div className="flex items-center gap-1.5">
-              <span>Page</span>
-              <span className="font-bold text-gray-900 bg-white border border-gray-200 rounded-md px-2 py-1 shadow-2xs">
-                {page}
-              </span>
-              <span>of {totalPages}</span>
-            </div>
-
-            {/* Navigation Arrows */}
-            <div className="flex items-center gap-1">
-              <button
-                disabled={page <= 1}
-                onClick={() => setPage(1)}
-                className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-600 hover:text-blue-600 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
-              >
-                &laquo;
-              </button>
-              <button
-                disabled={page <= 1}
-                onClick={() => setPage(prev => Math.max(1, prev - 1))}
-                className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-600 hover:text-blue-600 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
-              >
-                &lsaquo;
-              </button>
-              <button
-                disabled={page >= totalPages}
-                onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
-                className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-600 hover:text-blue-600 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
-              >
-                &rsaquo;
-              </button>
-              <button
-                disabled={page >= totalPages}
-                onClick={() => setPage(totalPages)}
-                className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-600 hover:text-blue-600 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
-              >
-                &raquo;
-              </button>
-            </div>
-
-          </div>
-
+          )}
         </div>
       )}
 
@@ -7073,6 +7058,7 @@ const SkuMasterV2: React.FC = () => {
           onClose={() => setShowBuildBomsModal(false)}
           size="max-w-[1300px]"
           maxWidth="max-w-[1300px]"
+          hideCloseButton={true}
         >
           <div className="p-5 space-y-4 max-h-[90vh] flex flex-col">
             {/* Modal Header */}
@@ -7104,6 +7090,7 @@ const SkuMasterV2: React.FC = () => {
                 <button
                   onClick={() => setShowBuildBomsModal(false)}
                   className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all cursor-pointer"
+                  title="Close Build BOMs"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -7114,7 +7101,7 @@ const SkuMasterV2: React.FC = () => {
             <div className="grid grid-cols-12 gap-4 flex-1 overflow-hidden min-h-[540px]">
               
               {/* Column 1: Products Selector List (3 cols) */}
-              <div className="col-span-3 border border-gray-200 rounded-2xl p-3 flex flex-col gap-3 bg-gray-50/40 overflow-hidden">
+              <div className="col-span-3 border border-gray-200 rounded-2xl p-3 flex flex-col gap-2.5 bg-gray-50/40 overflow-hidden">
                 <div className="space-y-2">
                   <div className="relative">
                     <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
@@ -7123,9 +7110,75 @@ const SkuMasterV2: React.FC = () => {
                       value={buildBomsSearch}
                       onChange={(e) => setBuildBomsSearch(e.target.value)}
                       placeholder="Search products..."
-                      className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 shadow-2xs"
+                      className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 shadow-2xs font-medium"
                     />
                   </div>
+
+                  {/* Title & Ruling Spec Filter Row */}
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <div>
+                      <select
+                        value={buildBomsTitleFilter}
+                        onChange={(e) => setBuildBomsTitleFilter(e.target.value)}
+                        className="w-full px-2 py-1 text-[11px] font-semibold bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs truncate"
+                        title="Filter by Title"
+                      >
+                        <option value="">All Titles ({buildBomsAvailableTitles.length})</option>
+                        {buildBomsAvailableTitles.map(t => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <select
+                        value={buildBomsRulingFilter}
+                        onChange={(e) => setBuildBomsRulingFilter(e.target.value)}
+                        className="w-full px-2 py-1 text-[11px] font-semibold bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs truncate"
+                        title="Filter by Ruling"
+                      >
+                        <option value="">All Rulings ({buildBomsAvailableRulings.length})</option>
+                        {buildBomsAvailableRulings.map(r => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Sort Controls Row */}
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={buildBomsSortBy}
+                      onChange={(e) => setBuildBomsSortBy(e.target.value as any)}
+                      className="w-full px-2 py-1 text-[11px] font-bold bg-blue-50/80 border border-blue-200 rounded-lg text-blue-900 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs"
+                      title="Sort products list"
+                    >
+                      <option value="default">Sort: Default Code</option>
+                      <option value="title-asc">Sort: Title (A → Z)</option>
+                      <option value="title-desc">Sort: Title (Z → A)</option>
+                      <option value="ruling-asc">Sort: Ruling (A → Z)</option>
+                      <option value="ruling-desc">Sort: Ruling (Z → A)</option>
+                      <option value="name-asc">Sort: Product Name (A → Z)</option>
+                    </select>
+
+                    {(buildBomsTitleFilter || buildBomsRulingFilter || buildBomsSortBy !== 'default' || onlyNoRecipeFilter || buildBomsSearch) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBuildBomsSearch('');
+                          setBuildBomsTitleFilter('');
+                          setBuildBomsRulingFilter('');
+                          setBuildBomsSortBy('default');
+                          setOnlyNoRecipeFilter(false);
+                        }}
+                        className="px-2 py-1 text-[10px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg shrink-0 cursor-pointer transition-all"
+                        title="Reset all filters"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+
                   <label className="flex items-center gap-2 text-[11px] font-semibold text-gray-600 cursor-pointer select-none px-1">
                     <input
                       type="checkbox"
@@ -7217,7 +7270,19 @@ const SkuMasterV2: React.FC = () => {
 
                           <div className="min-w-0 flex-1">
                             <div className="font-bold text-xs text-gray-900 truncate">{prod.name}</div>
-                            <div className="text-[10px] text-gray-400 font-mono">{prod.skuCode}</div>
+                            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                              <span className="text-[10px] text-gray-400 font-mono">{prod.skuCode}</span>
+                              {(prod.title || prod.brand) && (
+                                <span className="text-[9.5px] text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded font-medium border border-emerald-200/60 truncate max-w-[100px]" title={prod.title || prod.brand}>
+                                  {prod.title || prod.brand}
+                                </span>
+                              )}
+                              {prod.ruleType && (
+                                <span className="text-[9.5px] text-blue-800 bg-blue-50 px-1.5 py-0.5 rounded font-medium border border-blue-200/60 truncate max-w-[100px]" title={prod.ruleType}>
+                                  {prod.ruleType}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
 
