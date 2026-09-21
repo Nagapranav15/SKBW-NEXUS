@@ -490,8 +490,8 @@ export const BusinessDirectoryV2: React.FC = () => {
         const res = await getParties({
           company: selectedCompany._id,
           type: partyType,
-          page: hasActiveRules ? 1 : page,
-          limit: hasActiveRules ? 10000 : limit,
+          page: 1,
+          limit: 10000,
           search: debouncedSearch
         });
 
@@ -505,7 +505,7 @@ export const BusinessDirectoryV2: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedCompany?._id, activeMainTab, page, limit, debouncedSearch, filterRules]);
+  }, [selectedCompany?._id, activeMainTab, debouncedSearch, filterRules]);
 
   // Derived Filtered & Sorted Items
   const processedItems = React.useMemo(() => {
@@ -2880,7 +2880,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         />
                       </td>
                       <td className="py-3 px-3 text-center text-gray-400 font-mono font-semibold text-xs">
-                        {(page - 1) * limit + index + 1}
+                        {index + 1}
                       </td>
 
                       {/* CUSTOMERS ROW */}
@@ -3387,33 +3387,14 @@ export const BusinessDirectoryV2: React.FC = () => {
           </table>
         </div>
 
-        {/* Footer Fast Pagination */}
+        {/* Footer Item Count Summary */}
         <div className="p-3 bg-gray-50/80 border-t border-gray-200 flex items-center justify-between text-xs text-gray-500 font-semibold">
           <span>
-            {activeMainTab === 'regions' 
-              ? `Showing ${items.length} of ${totalRecords} records`
-              : `Showing ${totalRecords > 0 ? (page - 1) * limit + 1 : 0} to ${Math.min(page * limit, totalRecords)} of ${totalRecords} ${activeMainTab === 'customers' ? 'customers' : activeMainTab === 'vendors' ? 'suppliers' : activeMainTab === 'agents' ? 'agents' : activeMainTab === 'transporters' ? 'transporters' : 'cities'}`
-            }
+            Showing all {processedItems.length} {activeMainTab === 'customers' ? 'customers' : activeMainTab === 'vendors' ? 'suppliers' : activeMainTab === 'agents' ? 'agents' : activeMainTab === 'transporters' ? 'transporters' : activeMainTab === 'regions' ? 'routes' : 'cities'}
           </span>
-          <div className="flex items-center gap-2">
-            <button
-              disabled={page <= 1}
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              className="px-2.5 py-1 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 flex items-center gap-1 cursor-pointer"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-              <span>Previous</span>
-            </button>
-            <span>Page {page} of {totalPages}</span>
-            <button
-              disabled={page >= totalPages}
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              className="px-2.5 py-1 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 flex items-center gap-1 cursor-pointer"
-            >
-              <span>Next</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <span className="text-[11px] text-gray-400 font-normal">
+            Continuous scroll enabled
+          </span>
         </div>
       </div>
 

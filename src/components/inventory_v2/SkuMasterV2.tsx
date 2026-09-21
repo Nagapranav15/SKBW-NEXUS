@@ -2247,9 +2247,9 @@ const SkuMasterV2: React.FC = () => {
         return {
           'ID / SKU Code': s.skuCode || '',
           'SKU NAME': s.name || '',
-          'PAGES': cleanVal(s.pages),
           'TITLE': cleanVal((s as any).title || s.brand),
           'RULE TYPE': cleanVal(s.ruleType),
+          'STANDARD SHEETS / REAM': cleanVal(s.pages),
           'Category': s.category || s.group || 'Semi',
           'UOM': s.unit || 'Ream',
           'AUOM (Alt Unit)': cleanVal(s.altUnit),
@@ -2257,6 +2257,7 @@ const SkuMasterV2: React.FC = () => {
           'GSM': cleanVal(s.gsm),
           'WIDTH (CM)': cleanVal(s.width),
           'LENGTH (CM)': cleanVal(s.length),
+          'REAM WEIGHT (KG)': cleanVal((s as any).reamWeight),
           'Min Stock Level': s.minStockLevel || 0,
           'Reorder Level': cleanVal((s as any).reorderLevel),
           'Status': s.status || 'Active',
@@ -2274,7 +2275,10 @@ const SkuMasterV2: React.FC = () => {
           'WIDTH (CM)': cleanVal(s.width),
           'LENGTH (CM)': cleanVal(s.length),
           'STANDARD SHEETS / REAM': cleanVal(s.pages),
+          'REAM WEIGHT (KG)': cleanVal((s as any).reamWeight),
           'UOM': s.unit || 'Kg',
+          'AUOM (Alt Unit)': cleanVal(s.altUnit),
+          'Con Rate': cleanVal(s.altUnitConversion),
           'Min Stock Level': s.minStockLevel || 0,
           'Reorder Level': cleanVal((s as any).reorderLevel),
           'Status': s.status || 'Active',
@@ -2523,6 +2527,7 @@ const SkuMasterV2: React.FC = () => {
         'SKU NAME',
         'TITLE',
         'RULE TYPE',
+        'STANDARD SHEETS / REAM',
         'Category',
         'UOM',
         'AUOM (Alt Unit)',
@@ -2530,14 +2535,15 @@ const SkuMasterV2: React.FC = () => {
         'GSM',
         'WIDTH (CM)',
         'LENGTH (CM)',
+        'REAM WEIGHT (KG)',
         'Min Stock Level',
         'Reorder Level',
         'Status',
         'Preferred Vendor'
       ];
       sampleRows = [
-        ['SM-001', 'Akshay Inner Form 52 GSM 14.25 x 35 CM (SR)', 'Akshay Inner Form', 'Single Line', 'Inner Forms', 'Ream', 'Bundles', '50', '52', '14.25', '35', '100', '50', 'Active', 'Apex Print Pack'],
-        ['SM-002', 'Cover Board 250 GSM 57 x 70 CM', 'Cover Board', 'Plain', 'Covers', 'Pcs', 'Bundles', '100', '250', '57', '70', '200', '100', 'Active', 'Sunrise Laminators']
+        ['SM-001', 'Akshay Inner Form 52 GSM 14.25 x 35 CM (SR)', 'Akshay Inner Form', 'Single Line', '500', 'Inner Forms', 'Ream', 'Bundles', '50', '52', '14.25', '35', '10.37', '100', '50', 'Active', 'Apex Print Pack'],
+        ['SM-002', 'Cover Board 250 GSM 57 x 70 CM', 'Cover Board', 'Plain', '500', 'Covers', 'Pcs', 'Bundles', '100', '250', '57', '70', '25.0', '200', '100', 'Active', 'Sunrise Laminators']
       ];
     } else {
       // Raw materials
@@ -2551,16 +2557,19 @@ const SkuMasterV2: React.FC = () => {
         'WIDTH (CM)',
         'LENGTH (CM)',
         'STANDARD SHEETS / REAM',
+        'REAM WEIGHT (KG)',
         'UOM',
+        'AUOM (Alt Unit)',
+        'Con Rate',
         'Min Stock Level',
         'Reorder Level',
         'Status',
         'Preferred Vendor'
       ];
       sampleRows = [
-        ['RM-001', 'Maplitho Reel 70 GSM 84 CM', 'Maplitho', 'Paper Reels', 'Reels', '70', '84', '', '', 'Kg', '300', '100', 'Active', 'Bhavani Paper Mill'],
-        ['RM-002', 'Duplex Board Sheet 300 GSM 57 x 70 CM (500 Sheets)', 'Duplex Board', 'Duplex Cover Board', 'Sheets', '300', '57', '70', '500', 'Kg', '500', '200', 'Active', 'Apex Board Traders'],
-        ['RM-003', 'Craft Paper Reel 80 GSM 90 CM', 'Craft Paper', 'Paper Reels', 'Reels', '80', '90', '', '', 'Kg', '200', '50', 'Active', 'Sri Balaji Paper Mart']
+        ['RM-001', 'Maplitho Reel 70 GSM 84 CM', 'Maplitho', 'Paper Reels', 'Reels', '70', '84', '', '', '', 'Kg', '', '', '300', '100', 'Active', 'Bhavani Paper Mill'],
+        ['RM-002', 'Duplex Board Sheet 300 GSM 57 x 70 CM (500 Sheets)', 'Duplex Board', 'Duplex Cover Board', 'Sheets', '300', '57', '70', '500', '11.97', 'Kg', 'Ream', '500', '500', '200', 'Active', 'Apex Board Traders'],
+        ['RM-003', 'Craft Paper Reel 80 GSM 90 CM', 'Craft Paper', 'Paper Reels', 'Reels', '80', '90', '', '', '', 'Kg', '', '', '200', '50', 'Active', 'Sri Balaji Paper Mart']
       ];
     }
 
@@ -2859,6 +2868,11 @@ const SkuMasterV2: React.FC = () => {
         const reorderLevel = rawReorder ? Number(rawReorder) || undefined : undefined;
         const preferredVendor = getFieldVal('preferredvendor', 'vendor', 'preferred_vendor', 'supplier', 'preferredsupplier') || '';
 
+        // Extract Ream Weight
+        const rawReamWeight = getFieldVal('reamweightkg', 'reamweight', 'ream_weight');
+        const reamWeightMatch = rawReamWeight.match(/(\d+(?:\.\d+)?)/);
+        const reamWeight = reamWeightMatch ? Number(reamWeightMatch[1]) : (rawReamWeight ? Number(rawReamWeight) || undefined : undefined);
+
         // Extract Status
         const rawStatus = getFieldVal('status', 'itemstatus', 'state').toLowerCase();
         const status: 'Active' | 'Inactive' = rawStatus === 'inactive' ? 'Inactive' : 'Active';
@@ -2874,6 +2888,7 @@ const SkuMasterV2: React.FC = () => {
           altUnitConversion,
           gsm,
           pages,
+          reamWeight,
           width,
           length,
           paperType,
