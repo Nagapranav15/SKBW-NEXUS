@@ -1206,7 +1206,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     if (resolvedSection === 'materials' || form.category === 'Raw Material' || form.category === 'Materials' || (!isProductCategory && resolvedSection !== 'semi')) {
       return ['gsm', 'title', 'width', 'length', 'paperType', 'pages', 'reamWeight', 'booksGbl', 'altUnit'];
     } else if (resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi') {
-      return ['gsm', 'title', 'width', 'length', 'ruleType', 'reamWeight', 'altUnit'];
+      return ['gsm', 'title', 'width', 'length', 'ruleType', 'pages', 'reamWeight', 'altUnit'];
     } else {
       // Products / Finished Goods (Pages, brands, ruling types, UOM, AUOM)
       return ['gsm', 'brand', 'width', 'length', 'ruleType', 'pages', 'reamWeight', 'booksGbl', 'altUnit'];
@@ -1417,7 +1417,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           title: form.title.trim() || '',
           group: form.group.trim() || '',
           ruleType: form.ruleType || '',
-          pages: form.pages ? Number(form.pages) : (form.paperType === 'Sheets' ? 500 : null),
+          pages: form.pages ? Number(form.pages) : ((form.paperType === 'Sheets' || resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi') ? 500 : null),
           reamWeight: form.reamWeight ? Number(form.reamWeight) : null,
           booksGbl: form.booksGbl ? Number(form.booksGbl) : null,
           minStockLevel: form.minStockLevel !== '' && !isNaN(Number(form.minStockLevel)) ? Number(form.minStockLevel) : null,
@@ -2090,7 +2090,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     </div>
                   )}
 
-                  {form.paperType === 'Sheets' && (resolvedSection === 'materials' || form.category === 'Raw Material' || form.category === 'Materials') && (
+                  {(form.paperType === 'Sheets' || resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi') && (
                     <div className="col-span-2 sm:col-span-1">
                       <label className="block text-[11px] font-semibold text-gray-600 mb-1">
                         STANDARD SHEETS / REAM *

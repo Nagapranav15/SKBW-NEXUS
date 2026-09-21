@@ -5344,21 +5344,20 @@ const SkuMasterV2: React.FC = () => {
                         <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">RULING SPEC</span>
                         <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.ruleType || '—'}</span>
                       </div>
-                      {getItemType(selectedSkuDetails) !== 'semi' && activeMainTab !== 'semi' ? (
-                        <div>
-                          <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">
-                            {selectedSkuDetails.paperType === 'Sheets' || getItemType(selectedSkuDetails) === 'materials' ? 'SHEETS PER REAM' : 'PAGES'}
-                          </span>
-                          <span className="font-bold text-gray-900 text-xs">
-                            {selectedSkuDetails.pages ? `${selectedSkuDetails.pages} ${selectedSkuDetails.paperType === 'Sheets' || getItemType(selectedSkuDetails) === 'materials' ? 'Sheets' : 'Pages'}` : (getItemType(selectedSkuDetails) === 'materials' ? '500 Sheets' : '—')}
-                          </span>
-                        </div>
-                      ) : (
+                      <div>
+                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">
+                          {selectedSkuDetails.paperType === 'Sheets' || getItemType(selectedSkuDetails) === 'materials' || getItemType(selectedSkuDetails) === 'semi' || activeMainTab === 'semi' ? 'SHEETS PER REAM' : 'PAGES'}
+                        </span>
+                        <span className="font-bold text-gray-900 text-xs">
+                          {selectedSkuDetails.pages ? `${selectedSkuDetails.pages} ${selectedSkuDetails.paperType === 'Sheets' || getItemType(selectedSkuDetails) === 'materials' || getItemType(selectedSkuDetails) === 'semi' ? 'Sheets' : 'Pages'}` : (getItemType(selectedSkuDetails) === 'materials' || getItemType(selectedSkuDetails) === 'semi' ? '500 Sheets' : '—')}
+                        </span>
+                      </div>
+                      {selectedSkuDetails.reamWeight ? (
                         <div>
                           <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">REAM WEIGHT</span>
-                          <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.reamWeight ? `${selectedSkuDetails.reamWeight} KG` : '—'}</span>
+                          <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.reamWeight} KG</span>
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   </div>
 
