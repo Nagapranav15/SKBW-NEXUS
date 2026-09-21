@@ -7337,19 +7337,14 @@ const SkuMasterV2: React.FC = () => {
                     {(() => {
                       const uom = activeBomProduct?.unit || 'Pcs';
                       const auom = activeBomProduct?.altUnit;
+                      const hasAuom = !!(auom && auom.trim() && auom.trim().toLowerCase() !== uom.trim().toLowerCase());
                       const currentUnit = buildBatchYieldUnit || (activeBomProduct as any)?.recipeYieldUnit || uom;
 
                       const options: { value: string; label: string }[] = [];
-                      options.push({ value: uom, label: `${uom} (UOM)` });
-                      if (auom && auom.trim() && auom.trim().toLowerCase() !== uom.trim().toLowerCase()) {
-                        options.push({ value: auom, label: `${auom} (AUOM)` });
+                      options.push({ value: uom, label: hasAuom ? `${uom} (UOM)` : uom });
+                      if (hasAuom) {
+                        options.push({ value: auom!.trim(), label: `${auom!.trim()} (AUOM)` });
                       }
-                      const commonUnits = ['Pcs', 'GBL', 'Gross', 'Dozen', 'Bundle', 'Kg', 'Ream', 'Sheets', 'Box', 'Pkt'];
-                      commonUnits.forEach(cu => {
-                        if (!options.some(o => o.value.toLowerCase() === cu.toLowerCase())) {
-                          options.push({ value: cu, label: cu });
-                        }
-                      });
 
                       return (
                         <div className="flex items-center gap-3 text-xs font-semibold text-gray-500 bg-gray-50 p-2.5 rounded-xl border border-gray-100 flex-wrap">
@@ -7366,18 +7361,24 @@ const SkuMasterV2: React.FC = () => {
                               className="w-16 px-2 py-1 border border-blue-300 rounded-lg text-xs font-bold text-blue-700 text-center bg-white shadow-2xs focus:ring-2 focus:ring-blue-400 focus:outline-none"
                               title="Batch Yield Quantity (Number of pieces)"
                             />
-                            <select
-                              value={currentUnit}
-                              onChange={(e) => setBuildBatchYieldUnit(e.target.value)}
-                              className="px-2.5 py-1 border border-blue-300 rounded-lg text-xs font-bold text-blue-900 bg-blue-50/90 cursor-pointer shadow-2xs focus:ring-2 focus:ring-blue-400 focus:outline-none"
-                              title="Yield Unit (UOM / AUOM)"
-                            >
-                              {options.map(opt => (
-                                <option key={opt.value} value={opt.value}>
-                                  {opt.label}
-                                </option>
-                              ))}
-                            </select>
+                            {options.length > 1 ? (
+                              <select
+                                value={currentUnit}
+                                onChange={(e) => setBuildBatchYieldUnit(e.target.value)}
+                                className="px-2.5 py-1 border border-blue-300 rounded-lg text-xs font-bold text-blue-900 bg-blue-50/90 cursor-pointer shadow-2xs focus:ring-2 focus:ring-blue-400 focus:outline-none"
+                                title="Yield Unit (UOM / AUOM)"
+                              >
+                                {options.map(opt => (
+                                  <option key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <strong className="text-gray-800 bg-white border border-gray-200 px-2.5 py-1 rounded-lg text-xs font-bold font-mono shadow-2xs">
+                                {uom}
+                              </strong>
+                            )}
                           </div>
                           <span>·</span>
                           <span className="text-[11px] font-normal text-gray-400">Quantities configured per batch produced</span>
