@@ -5,7 +5,25 @@ const inventoryLedgerSchema = new mongoose.Schema({
   transactionType: { 
     type: String, 
     required: true, 
-    enum: ["Purchase", "Processing", "Production", "Transfer", "Adjustment", "Sale", "Opening Balance", "Opening Stock", "Stock Adjustment", "Location Transfer"],
+    enum: [
+      "Purchase", 
+      "Purchase Receipt",
+      "Processing", 
+      "Production", 
+      "Production Consumption",
+      "Production Receipt",
+      "Transfer", 
+      "Location Transfer",
+      "Adjustment", 
+      "Stock Adjustment",
+      "Sale", 
+      "Sales Dispatch", 
+      "Job Work Material Out",
+      "Job Work Receipt",
+      "Reversal",
+      "Opening Balance", 
+      "Opening Stock"
+    ],
     index: true
   },
   skuId: { type: mongoose.Schema.Types.ObjectId, ref: 'SkuV2', required: true, index: true },

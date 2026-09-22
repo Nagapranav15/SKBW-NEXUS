@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, User, Package, Factory, Layers, RefreshCw, Printer, Edit, CheckCircle, AlertTriangle, ArrowRight } from 'lucide-react';
+import { X, Calendar, User, Package, Factory, Layers, RefreshCw, Printer, Edit, CheckCircle, AlertTriangle, ArrowRight, Plus } from 'lucide-react';
 import { getSalesOrderBomRequirementsV2, BomRequirementResult, SalesOrderV2 } from '../../api/salesOrderApiV2';
 import { showToast } from '../ui/Toast';
 

@@ -2309,6 +2309,14 @@ export const StockInventoryV2: React.FC = () => {
           setEditingSku(s);
           setIsAddSkuOpen(true);
         }}
+        onAddBatch={(s, locId) => {
+          setSelectedDrawerSku(null);
+          handleOpenBatchModal(s);
+        }}
+        onViewInInventory={(s) => {
+          setSelectedDrawerSku(null);
+          setSearchQuery(s.skuCode || s.name);
+        }}
       />
 
       {/* 2. Stock Transfer Modal */}

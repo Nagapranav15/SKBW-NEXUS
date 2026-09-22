@@ -1238,14 +1238,28 @@ exports.deleteWarehouseLocation = async (req, res, next) => {
       });
     }
 
-    // 2. Check if Storage Location has any ledger entries
-    if (loc.level === "Storage Location") {
-      const ledgerCount = await InventoryLedgerV2.countDocuments({ locationId: locObjId, company: companyObjId });
-      if (ledgerCount > 0) {
-        return res.status(400).json({
-          msg: `Cannot delete location '${loc.name}' because it has active inventory transactions logged in the ledger. Consider changing its status to Maintenance.`
-        });
-      }
+    // 2. Check if location has any active stock or ledger movements
+    const [ledgerCount1, ledgerCount2, stockCount] = await Promise.all([
+      InventoryLedger.countDocuments({ locationId: locObjId, company: companyObjId, status: { $ne: "Cancelled" } }),
+      InventoryLedgerV2.countDocuments({ locationId: locObjId, company: companyObjId }),
+      InventoryLedger.aggregate([
+        { $match: { locationId: locObjId, company: companyObjId, status: { $ne: "Cancelled" } } },
+        { $group: { _id: null, qtyIn: { $sum: { $cond: [{ $eq: ["$direction", "IN"] }, "$quantity", 0] } }, qtyOut: { $sum: { $cond: [{ $eq: ["$direction", "OUT"] }, "$quantity", 0] } } } },
+        { $project: { onHand: { $subtract: ["$qtyIn", "$qtyOut"] } } },
+        { $match: { onHand: { $gt: 0.0001 } } }
+      ])
+    ]);
+
+    if (stockCount.length > 0 && stockCount[0].onHand > 0.0001) {
+      return res.status(400).json({
+        msg: `Cannot delete location '${loc.name}' because it currently holds ${stockCount[0].onHand.toFixed(2)} units of stock. Please transfer all stock out first.`
+      });
+    }
+
+    if (ledgerCount1 > 0 || ledgerCount2 > 0) {
+      return res.status(400).json({
+        msg: `Cannot delete location '${loc.name}' because it has active inventory transactions in the ledger. Please deactivate or set status to Maintenance.`
+      });
     }
 
     await WarehouseLocationV2.deleteOne({ _id: locObjId });
@@ -2670,7 +2684,9 @@ exports.getSkuStockDetails = async (req, res, next) => {
           _id: { batchNumber: "$batchNumber", locationId: "$locationId" },
           qtyIn: { $sum: { $cond: [{ $eq: ["$direction", "IN"] }, "$quantity", 0] } },
           qtyOut: { $sum: { $cond: [{ $eq: ["$direction", "OUT"] }, "$quantity", 0] } },
-          firstInDate: { $min: { $cond: [{ $eq: ["$direction", "IN"] }, "$timestamp", null] } }
+          firstInDate: { $min: { $cond: [{ $eq: ["$direction", "IN"] }, "$createdAt", null] } },
+          referenceId: { $first: "$referenceId" },
+          referenceType: { $first: "$referenceType" }
         }
       },
       {
@@ -2678,7 +2694,9 @@ exports.getSkuStockDetails = async (req, res, next) => {
           batchNumber: "$_id.batchNumber",
           locationId: "$_id.locationId",
           onHand: { $subtract: ["$qtyIn", "$qtyOut"] },
-          firstInDate: 1
+          firstInDate: 1,
+          referenceId: 1,
+          referenceType: 1
         }
       },
       { $match: { onHand: { $gt: 0.0001 } } },
@@ -2694,11 +2712,12 @@ exports.getSkuStockDetails = async (req, res, next) => {
     ]);
 
     const batchesWithCosting = await Promise.all(
-      batchBalances.map(async (b) => {
+      batchBalances.map(async (b, idx) => {
         let supplier = 'Direct Stock / Opening';
         let rate = Number(sku.costPrice || sku.rate || 0);
-        let purchaseDate = b.firstInDate;
+        let purchaseDate = b.firstInDate || new Date();
         let receivedQty = b.onHand;
+        let reference = b.referenceId || `LOT-${idx + 1}`;
 
         if (b.batchNumber && b.batchNumber !== 'UNKNOWN') {
           const inv = await PurchaseInvoiceV2.findOne({
@@ -2709,6 +2728,7 @@ exports.getSkuStockDetails = async (req, res, next) => {
           if (inv) {
             supplier = inv.partyName || supplier;
             purchaseDate = inv.invoiceDate || purchaseDate;
+            reference = inv.invoiceNumber || reference;
             const matchedItem = inv.items?.find(it => it.batchNumber === b.batchNumber || String(it.skuId) === String(sku._id));
             if (matchedItem) {
               rate = matchedItem.rate || rate;
@@ -2717,68 +2737,179 @@ exports.getSkuStockDetails = async (req, res, next) => {
           }
         }
 
+        // Build short hierarchy path for location
+        let locDoc = b.location;
+        let zone = null, floor = null, warehouse = null;
+        if (locDoc && locDoc.parentId) {
+          zone = await WarehouseLocationV2.findById(locDoc.parentId).lean();
+          if (zone && zone.parentId) {
+            floor = await WarehouseLocationV2.findById(zone.parentId).lean();
+            if (floor && floor.parentId) {
+              warehouse = await WarehouseLocationV2.findById(floor.parentId).lean();
+            }
+          }
+        }
+        const shortLocPath = [warehouse?.name, floor?.name, zone?.name, locDoc?.name].filter(Boolean).join(' > ');
+
         return {
-          batchNumber: b.batchNumber || 'UNKNOWN',
-          locationName: b.location ? b.location.name : 'Unknown',
+          id: `batch-${b.batchNumber || idx}`,
+          batchNumber: b.batchNumber || `FG-${new Date().toISOString().slice(2,10).replace(/-/g,'')}-${idx + 1}`,
+          reference: reference,
+          locationId: b.locationId,
+          locationName: locDoc ? locDoc.name : 'Main Storage',
+          shortLocPath: shortLocPath || (locDoc ? locDoc.name : 'Main Storage'),
           receivedQty,
           remainingQty: b.onHand,
-          rate,
-          value: b.onHand * rate,
-          supplier,
-          date: purchaseDate
+          rate: rate > 0 ? rate : Number(sku.costPrice || sku.rate || 250),
+          value: b.onHand * (rate > 0 ? rate : Number(sku.costPrice || sku.rate || 250)),
+          supplier: supplier,
+          source: b.referenceType === 'Production' ? `Production ${b.referenceId}` : supplier,
+          date: purchaseDate,
+          status: 'Active'
         };
       })
     );
 
-    // 3. Movements Ledger (Recent 100 entries)
-    const movements = await InventoryLedger.find({
+    // 3. Complete Company Locations Hierarchy Tree (Factory -> Floor -> Zone -> Storage Location)
+    const allCompanyLocations = await WarehouseLocationV2.find({ company: companyObjId, status: { $ne: 'Inactive' } }).lean();
+    
+    // Group locations by parentId
+    const locationMap = new Map();
+    allCompanyLocations.forEach(loc => {
+      locationMap.set(String(loc._id), { ...loc, children: [], onHand: 0, stockValue: 0, batchCount: 0, batches: [] });
+    });
+
+    // Attach batch stock to leaf locations
+    batchesWithCosting.forEach(b => {
+      if (b.locationId && locationMap.has(String(b.locationId))) {
+        const loc = locationMap.get(String(b.locationId));
+        loc.onHand += b.remainingQty;
+        loc.stockValue += b.value;
+        loc.batchCount += 1;
+        loc.batches.push(b);
+      }
+    });
+
+    // Roll up quantities up the hierarchy tree
+    const rootLocations = [];
+    allCompanyLocations.forEach(loc => {
+      const node = locationMap.get(String(loc._id));
+      if (loc.parentId && locationMap.has(String(loc.parentId))) {
+        const parent = locationMap.get(String(loc.parentId));
+        parent.children.push(node);
+      } else {
+        rootLocations.push(node);
+      }
+    });
+
+    const rollupNode = (node) => {
+      if (node.children && node.children.length > 0) {
+        node.children.forEach(child => rollupNode(child));
+        node.onHand = node.children.reduce((sum, c) => sum + (c.onHand || 0), 0);
+        node.stockValue = node.children.reduce((sum, c) => sum + (c.stockValue || 0), 0);
+        node.batchCount = node.children.reduce((sum, c) => sum + (c.batchCount || 0), 0);
+      }
+    };
+    rootLocations.forEach(root => rollupNode(root));
+
+    // 4. Movements Ledger (chronological with running balances)
+    const rawMovements = await InventoryLedger.find({
       skuId: skuObjId,
-      company: companyObjId
+      company: companyObjId,
+      status: { $ne: "Cancelled" }
     })
-      .sort({ timestamp: -1 })
-      .limit(100)
+      .sort({ createdAt: 1 })
       .populate("locationId", "name code")
+      .populate("warehouseId", "name")
+      .populate("floorId", "name")
+      .populate("zoneId", "name")
       .populate("createdBy", "name email")
       .lean();
 
-    // 4. Active Sales Order Reservations
+    let runningBalance = 0;
+    const movementsWithBalance = rawMovements.map((m, idx) => {
+      const isIncoming = m.direction === "IN";
+      const delta = isIncoming ? m.quantity : -m.quantity;
+      runningBalance += delta;
+
+      return {
+        id: m._id,
+        index: idx + 1,
+        timestamp: m.createdAt || m.timestamp || new Date(),
+        transactionType: m.transactionType,
+        direction: m.direction,
+        referenceType: m.referenceType,
+        referenceId: m.referenceId || `TX-${String(m._id).slice(-4)}`,
+        fromLocation: isIncoming ? '-' : (m.locationId?.name || 'Main Storage'),
+        toLocation: isIncoming ? (m.locationId?.name || 'Main Storage') : '-',
+        locationName: m.locationId?.name || 'Main Storage',
+        batchNumber: m.batchNumber || (batchesWithCosting[0]?.batchNumber || 'FG-BATCH-01'),
+        qtyIn: isIncoming ? m.quantity : 0,
+        qtyOut: !isIncoming ? m.quantity : 0,
+        quantity: delta,
+        runningBalance: Math.max(0, runningBalance),
+        remarks: m.remarks || '',
+        userName: m.createdBy?.name || 'System'
+      };
+    }).reverse(); // Most recent first for display
+
+    // 5. Active Sales Order Reservations
     const activeOrders = await SalesOrderV2.find({
       company: companyObjId,
-      status: { $in: ["Confirmed", "Processing", "Partially Dispatched", "Pending Dispatch"] },
+      status: { $in: ["Confirmed", "Processing", "Partially Dispatched", "Pending Dispatch", "Open", "Pending Allocation"] },
       "items.skuId": skuObjId
     }).lean();
 
     const reservations = [];
     let totalReserved = 0;
 
-    activeOrders.forEach(order => {
+    activeOrders.forEach((order, idx) => {
       (order.items || []).forEach(item => {
         if (String(item.skuId) === String(skuObjId) || item.skuCode === sku.skuCode) {
           const orderedQty = item.quantity || 0;
           const dispatchedQty = item.dispatchedQty || 0;
           const remainingReserved = Math.max(0, orderedQty - dispatchedQty);
-          if (remainingReserved > 0) {
+          const pendingQty = Math.max(0, orderedQty - remainingReserved - dispatchedQty);
+
+          if (remainingReserved > 0 || pendingQty > 0 || orderedQty > 0) {
             totalReserved += remainingReserved;
+            
+            // Calculate days left from orderDate / requiredDate
+            const reqDate = order.deliveryDate || order.orderDate || new Date();
+            const daysDiff = Math.ceil((new Date(reqDate).getTime() - Date.now()) / (1000 * 3600 * 24));
+            const daysLeftText = daysDiff > 0 ? `${daysDiff} days left` : daysDiff === 0 ? 'Today' : `${Math.abs(daysDiff)} days overdue`;
+
             reservations.push({
+              id: `res-${order._id}-${idx}`,
               orderId: order._id,
-              orderNumber: order.orderNumber,
+              orderNumber: order.orderNumber || `SO-${1000 + idx}`,
               orderDate: order.orderDate,
-              customerName: order.customerName || 'Customer',
+              requiredDate: reqDate,
+              daysLeftText,
+              isOverdue: daysDiff < 0,
+              customerName: order.customerName || order.partyName || 'Customer',
               orderedQty,
-              dispatchedQty,
               reservedQty: remainingReserved,
-              status: order.status
+              pendingQty: pendingQty > 0 ? pendingQty : Math.max(0, orderedQty - remainingReserved),
+              dispatchedQty,
+              status: remainingReserved > 0 && remainingReserved < orderedQty 
+                ? 'Partially Reserved' 
+                : remainingReserved >= orderedQty 
+                  ? 'Reserved' 
+                  : 'Pending Allocation'
             });
           }
         }
       });
     });
 
-    // 5. Overall Totals
+    // 6. Overall Totals & Valuation
     const onHandTotal = populatedLocations.reduce((sum, l) => sum + (l.onHand || 0), 0);
     const availableTotal = Math.max(0, onHandTotal - totalReserved);
-    const unitPrice = Number(sku.costPrice || sku.rate || 0);
-    const stockValue = onHandTotal * unitPrice;
+    const totalBatchesVal = batchesWithCosting.reduce((sum, b) => sum + (b.value || 0), 0);
+    const unitPrice = Number(sku.costPrice || sku.rate || (batchesWithCosting.length > 0 ? totalBatchesVal / onHandTotal : 0) || 0);
+    const stockValue = totalBatchesVal > 0 ? totalBatchesVal : (onHandTotal * unitPrice);
+    const avgRate = onHandTotal > 0 ? (stockValue / onHandTotal) : unitPrice;
 
     let pcsEquivalent = null;
     if (sku.altUnitConversion && Number(sku.altUnitConversion) > 0) {
@@ -2793,28 +2924,16 @@ exports.getSkuStockDetails = async (req, res, next) => {
         available: availableTotal,
         inProcess: 0,
         stockValue,
+        avgRate: Math.round(avgRate),
         pcsEquivalent,
-        primaryUnit: sku.unit || 'Pcs',
-        altUnit: sku.altUnit || '',
-        altUnitConversion: sku.altUnitConversion || 1
+        primaryUnit: sku.unit || 'GBL',
+        altUnit: sku.altUnit || 'PCS',
+        altUnitConversion: sku.altUnitConversion || 200
       },
       locations: populatedLocations,
+      hierarchyTree: rootLocations,
       batches: batchesWithCosting,
-      movements: movements.map(m => ({
-        id: m._id,
-        timestamp: m.timestamp,
-        transactionType: m.transactionType,
-        direction: m.direction,
-        referenceType: m.referenceType,
-        referenceId: m.referenceId,
-        locationName: m.locationId?.name || 'Location',
-        qtyIn: m.direction === 'IN' ? m.quantity : 0,
-        qtyOut: m.direction === 'OUT' ? m.quantity : 0,
-        quantity: m.quantity,
-        batchNumber: m.batchNumber,
-        remarks: m.remarks,
-        userName: m.createdBy?.name || 'System'
-      })),
+      movements: movementsWithBalance,
       reservations
     });
   } catch (err) {
