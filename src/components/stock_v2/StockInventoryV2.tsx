@@ -67,6 +67,7 @@ import WarehouseStructureV2 from '../inventory_v2/WarehouseStructureV2';
 import ItemStockDetailsDrawer, { ItemDrawerTab } from './ItemStockDetailsDrawer';
 import StockTransferModal from './StockTransferModal';
 import StockAdjustmentModal from './StockAdjustmentModal';
+import { ManufacturingStepsModal } from './ManufacturingStepsModal';
 
 export type StockTabType = 'overview' | 'products' | 'materials' | 'semi' | 'batches' | 'transfers' | 'adjustments' | 'warehouse';
 
@@ -216,6 +217,8 @@ export const StockInventoryV2: React.FC = () => {
 
   const VALID_STOCK_TABS: StockTabType[] = ['overview', 'products', 'materials', 'semi', 'batches', 'transfers', 'adjustments', 'warehouse'];
 
+  const [animationKey, setAnimationKey] = useState<number>(Date.now());
+
   const [activeTab, setActiveTabState] = useState<StockTabType>(() => {
     const tabFromUrl = searchParams.get('tab') as StockTabType;
     if (tabFromUrl && VALID_STOCK_TABS.includes(tabFromUrl)) {
@@ -230,6 +233,7 @@ export const StockInventoryV2: React.FC = () => {
 
   const setActiveTab = (tab: StockTabType) => {
     setActiveTabState(tab);
+    setAnimationKey(Date.now());
     setSearchParams(prev => {
       const next = new URLSearchParams(prev);
       next.set('tab', tab);
@@ -237,15 +241,6 @@ export const StockInventoryV2: React.FC = () => {
     }, { replace: true });
     localStorage.setItem('skbw_stock_inventory_active_tab', tab);
   };
-
-  useEffect(() => {
-    const tabFromUrl = searchParams.get('tab') as StockTabType;
-    if (tabFromUrl && VALID_STOCK_TABS.includes(tabFromUrl) && tabFromUrl !== activeTab) {
-      setActiveTabState(tabFromUrl);
-    }
-  }, [searchParams]);
-
-  const [animationKey, setAnimationKey] = useState<number>(Date.now());
 
   // Fast On-Demand Data State
   const [items, setItems] = useState<any[]>([]);
@@ -256,12 +251,6 @@ export const StockInventoryV2: React.FC = () => {
   const [page, setPage] = useState(1);
   const [limit] = useState(50);
   const [totalRecords, setTotalRecords] = useState(0);
-
-  // Filter States
-  const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
-  const [brandFilter, setBrandFilter] = useState<string>('ALL');
-  const [warehouseFilter, setWarehouseFilter] = useState<string>('ALL');
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
   // Dropdowns & Auxiliary Data
   const [allSuppliers, setAllSuppliers] = useState<any[]>([]);
@@ -284,12 +273,169 @@ export const StockInventoryV2: React.FC = () => {
 
   const [isAddSkuOpen, setIsAddSkuOpen] = useState(false);
   const [editingSku, setEditingSku] = useState<SkuV2 | null>(null);
+  const [mfgStepsSku, setMfgStepsSku] = useState<SkuV2 | null>(null);
+  const [showMfgStepsModal, setShowMfgStepsModal] = useState(false);
 
   const [showAddMenu, setShowAddMenu] = useState(false);
   const addMenuRef = useRef<HTMLDivElement>(null);
 
-  // Iconic Action Toolbar States
-  const [filterRules, setFilterRules] = useState<{ id: string; field: string; operator: string; value: string }[]>([]);
+  // Filter States with persistent storage & URL synchronization
+  const [statusFilter, setStatusFilterState] = useState<string>(() => {
+    const fromUrl = searchParams.get('status');
+    if (fromUrl) return fromUrl;
+    return localStorage.getItem('skbw_stock_status_filter') || 'ALL';
+  });
+
+  const [categoryFilter, setCategoryFilterState] = useState<string>(() => {
+    const fromUrl = searchParams.get('category');
+    if (fromUrl) return fromUrl;
+    return localStorage.getItem('skbw_stock_category_filter') || 'ALL';
+  });
+
+  const [brandFilter, setBrandFilterState] = useState<string>(() => {
+    const fromUrl = searchParams.get('brand');
+    if (fromUrl) return fromUrl;
+    return localStorage.getItem('skbw_stock_brand_filter') || 'ALL';
+  });
+
+  const [warehouseFilter, setWarehouseFilterState] = useState<string>(() => {
+    const fromUrl = searchParams.get('warehouse');
+    if (fromUrl) return fromUrl;
+    return localStorage.getItem('skbw_stock_warehouse_filter') || 'ALL';
+  });
+
+  const [filterRules, setFilterRulesState] = useState<{ id: string; field: string; operator: string; value: string }[]>(() => {
+    try {
+      const saved = localStorage.getItem('skbw_stock_filter_rules');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [];
+  });
+
+  const setStatusFilter = (status: string | ((prev: string) => string)) => {
+    setStatusFilterState(prev => {
+      const nextStatus = typeof status === 'function' ? status(prev) : status;
+      if (nextStatus === 'ALL') {
+        localStorage.removeItem('skbw_stock_status_filter');
+      } else {
+        localStorage.setItem('skbw_stock_status_filter', nextStatus);
+      }
+      setSearchParams(current => {
+        const next = new URLSearchParams(current);
+        if (nextStatus && nextStatus !== 'ALL') {
+          next.set('status', nextStatus);
+        } else {
+          next.delete('status');
+        }
+        return next;
+      }, { replace: true });
+      setAnimationKey(Date.now());
+      return nextStatus;
+    });
+  };
+
+  const setCategoryFilter = (category: string | ((prev: string) => string)) => {
+    setCategoryFilterState(prev => {
+      const nextCat = typeof category === 'function' ? category(prev) : category;
+      if (nextCat === 'ALL') {
+        localStorage.removeItem('skbw_stock_category_filter');
+      } else {
+        localStorage.setItem('skbw_stock_category_filter', nextCat);
+      }
+      setSearchParams(current => {
+        const next = new URLSearchParams(current);
+        if (nextCat && nextCat !== 'ALL') {
+          next.set('category', nextCat);
+        } else {
+          next.delete('category');
+        }
+        return next;
+      }, { replace: true });
+      setAnimationKey(Date.now());
+      return nextCat;
+    });
+  };
+
+  const setBrandFilter = (brand: string | ((prev: string) => string)) => {
+    setBrandFilterState(prev => {
+      const nextBrand = typeof brand === 'function' ? brand(prev) : brand;
+      if (nextBrand === 'ALL') {
+        localStorage.removeItem('skbw_stock_brand_filter');
+      } else {
+        localStorage.setItem('skbw_stock_brand_filter', nextBrand);
+      }
+      setSearchParams(current => {
+        const next = new URLSearchParams(current);
+        if (nextBrand && nextBrand !== 'ALL') {
+          next.set('brand', nextBrand);
+        } else {
+          next.delete('brand');
+        }
+        return next;
+      }, { replace: true });
+      setAnimationKey(Date.now());
+      return nextBrand;
+    });
+  };
+
+  const setWarehouseFilter = (warehouse: string | ((prev: string) => string)) => {
+    setWarehouseFilterState(prev => {
+      const nextWh = typeof warehouse === 'function' ? warehouse(prev) : warehouse;
+      if (nextWh === 'ALL') {
+        localStorage.removeItem('skbw_stock_warehouse_filter');
+      } else {
+        localStorage.setItem('skbw_stock_warehouse_filter', nextWh);
+      }
+      setSearchParams(current => {
+        const next = new URLSearchParams(current);
+        if (nextWh && nextWh !== 'ALL') {
+          next.set('warehouse', nextWh);
+        } else {
+          next.delete('warehouse');
+        }
+        return next;
+      }, { replace: true });
+      setAnimationKey(Date.now());
+      return nextWh;
+    });
+  };
+
+  const setFilterRules = (rulesOrUpdater: any) => {
+    setFilterRulesState(prev => {
+      const nextRules = typeof rulesOrUpdater === 'function' ? rulesOrUpdater(prev) : rulesOrUpdater;
+      if (Array.isArray(nextRules) && nextRules.length > 0) {
+        localStorage.setItem('skbw_stock_filter_rules', JSON.stringify(nextRules));
+      } else {
+        localStorage.removeItem('skbw_stock_filter_rules');
+      }
+      setAnimationKey(Date.now());
+      return nextRules;
+    });
+  };
+
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab') as StockTabType;
+    if (tabFromUrl && VALID_STOCK_TABS.includes(tabFromUrl) && tabFromUrl !== activeTab) {
+      setActiveTabState(tabFromUrl);
+      setAnimationKey(Date.now());
+    }
+    const statusFromUrl = searchParams.get('status');
+    if (statusFromUrl && statusFromUrl !== statusFilter) {
+      setStatusFilterState(statusFromUrl);
+    }
+    const catFromUrl = searchParams.get('category');
+    if (catFromUrl && catFromUrl !== categoryFilter) {
+      setCategoryFilterState(catFromUrl);
+    }
+    const brandFromUrl = searchParams.get('brand');
+    if (brandFromUrl && brandFromUrl !== brandFilter) {
+      setBrandFilterState(brandFromUrl);
+    }
+    const whFromUrl = searchParams.get('warehouse');
+    if (whFromUrl && whFromUrl !== warehouseFilter) {
+      setWarehouseFilterState(whFromUrl);
+    }
+  }, [searchParams]);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const filterDropdownRef = useRef<HTMLDivElement>(null);
   const toolbarActionsRef = useRef<HTMLDivElement>(null);
@@ -475,16 +621,16 @@ export const StockInventoryV2: React.FC = () => {
   }, [search]);
 
   // Load auxiliary lists from backend
-  const loadAuxiliaryData = useCallback(async (force = false) => {
-    if (!selectedCompany?._id || (auxLoaded && !force)) return;
-    setLoading(true);
+  const loadAuxiliaryData = useCallback(async (showSpinner = false) => {
+    if (!selectedCompany?._id) return;
+    if (showSpinner) setLoading(true);
     try {
       const [supRes, skusRes, locsRes, balancesRes, ledgerRes, purchasesRes] = await Promise.all([
-        getParties({ company: selectedCompany._id, type: 'vendor', limit: 1000, light: true }),
-        getSkusV2(selectedCompany._id),
-        getWarehouseHierarchyV2(selectedCompany._id),
+        getParties({ company: selectedCompany._id, type: 'vendor', limit: 1000, light: true }).catch(() => ({ data: [] })),
+        getSkusV2(selectedCompany._id).catch(() => []),
+        getWarehouseHierarchyV2(selectedCompany._id).catch(() => []),
         getBalancesV2(selectedCompany._id).catch(() => []),
-        getLedgerV2({ companyId: selectedCompany._id }).catch(() => []),
+        getLedgerV2({ companyId: selectedCompany._id, limit: 1000 }).catch(() => []),
         getPurchaseInvoicesV2({ companyId: selectedCompany._id, limit: 1000 }).catch(() => ({ invoices: [] }))
       ]);
 
@@ -579,24 +725,18 @@ export const StockInventoryV2: React.FC = () => {
 
       setAllSkus(formattedSkus);
       setAuxLoaded(true);
-      setAnimationKey(Date.now());
     } catch (err) {
       console.error('Failed to load backend inventory lists:', err);
     } finally {
       setLoading(false);
     }
-  }, [selectedCompany?._id, auxLoaded]);
+  }, [selectedCompany?._id]);
 
   useEffect(() => {
     if (selectedCompany?._id) {
       loadAuxiliaryData(true);
     }
   }, [selectedCompany?._id, loadAuxiliaryData]);
-
-  // Trigger smooth staggered entrance animation refresh on tab or filter changes
-  useEffect(() => {
-    setAnimationKey(Date.now());
-  }, [activeTab, debouncedSearch, categoryFilter, brandFilter, warehouseFilter, statusFilter]);
 
   // Main KPI Aggregations across all SKUs
   const kpiStats = useMemo(() => {
@@ -959,7 +1099,6 @@ export const StockInventoryV2: React.FC = () => {
             <button
               type="button"
               onClick={() => {
-                setAnimationKey(Date.now());
                 loadAuxiliaryData(true);
               }}
               className="p-2.5 border border-gray-200 text-gray-600 hover:bg-gray-100 rounded-xl transition-all cursor-pointer shadow-2xs"
@@ -1050,15 +1189,11 @@ export const StockInventoryV2: React.FC = () => {
         </div>
 
         {/* Bottom Row: Full-Width 6 Spacious & Non-Congested KPI Metric Cards */}
-        <div key={`kpi-container-${animationKey}`} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-2 border-t border-gray-100/80">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-2 border-t border-gray-100/80">
           {/* Card 1: Total Items */}
           <div 
             onClick={() => setActiveTab('overview')}
-            style={{
-              animation: 'slideDownFade 0.35s ease-out forwards',
-              animationDelay: '0ms'
-            }}
-            className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between opacity-0 min-h-[74px] ${
+            className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between min-h-[74px] ${
               activeTab === 'overview'
                 ? 'bg-white border-blue-600 ring-2 ring-blue-500/20 shadow-xs'
                 : 'bg-gray-50/70 border-gray-200 hover:bg-white hover:border-blue-400 hover:shadow-2xs'
@@ -1081,11 +1216,7 @@ export const StockInventoryV2: React.FC = () => {
           {/* Card 2: Total Stock Value */}
           <div 
             onClick={() => { setActiveTab('overview'); handleResetFilters(); }}
-            style={{
-              animation: 'slideDownFade 0.35s ease-out forwards',
-              animationDelay: '40ms'
-            }}
-            className="p-3.5 rounded-2xl bg-gray-50/70 border border-gray-200 hover:bg-white hover:border-blue-400 hover:shadow-2xs transition-all cursor-pointer flex flex-col justify-between opacity-0 min-h-[74px]"
+            className="p-3.5 rounded-2xl bg-gray-50/70 border border-gray-200 hover:bg-white hover:border-blue-400 hover:shadow-2xs transition-all cursor-pointer flex flex-col justify-between min-h-[74px]"
           >
             <div className="flex items-center justify-between text-gray-400 text-[10.5px] font-bold uppercase tracking-wider">
               <span className="whitespace-nowrap">Stock Value</span>
@@ -1106,11 +1237,7 @@ export const StockInventoryV2: React.FC = () => {
           {/* Card 3: Finished Goods */}
           <div 
             onClick={() => setActiveTab('products')}
-            style={{
-              animation: 'slideDownFade 0.35s ease-out forwards',
-              animationDelay: '80ms'
-            }}
-            className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between opacity-0 min-h-[74px] ${
+            className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between min-h-[74px] ${
               activeTab === 'products'
                 ? 'bg-white border-blue-600 ring-2 ring-blue-500/20 shadow-xs'
                 : 'bg-gray-50/70 border-gray-200 hover:bg-white hover:border-blue-400 hover:shadow-2xs'
@@ -1133,11 +1260,7 @@ export const StockInventoryV2: React.FC = () => {
           {/* Card 4: Raw Materials */}
           <div 
             onClick={() => setActiveTab('materials')}
-            style={{
-              animation: 'slideDownFade 0.35s ease-out forwards',
-              animationDelay: '120ms'
-            }}
-            className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between opacity-0 min-h-[74px] ${
+            className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between min-h-[74px] ${
               activeTab === 'materials'
                 ? 'bg-white border-amber-600 ring-2 ring-amber-500/20 shadow-xs'
                 : 'bg-gray-50/70 border-gray-200 hover:bg-white hover:border-amber-400 hover:shadow-2xs'
@@ -1160,11 +1283,7 @@ export const StockInventoryV2: React.FC = () => {
           {/* Card 5: Semi Finished */}
           <div 
             onClick={() => setActiveTab('semi')}
-            style={{
-              animation: 'slideDownFade 0.35s ease-out forwards',
-              animationDelay: '160ms'
-            }}
-            className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between opacity-0 min-h-[74px] ${
+            className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between min-h-[74px] ${
               activeTab === 'semi'
                 ? 'bg-white border-purple-600 ring-2 ring-purple-500/20 shadow-xs'
                 : 'bg-gray-50/70 border-gray-200 hover:bg-white hover:border-purple-400 hover:shadow-2xs'
@@ -1187,11 +1306,7 @@ export const StockInventoryV2: React.FC = () => {
           {/* Card 6: Stock Alerts */}
           <div 
             onClick={() => setStatusFilter(prev => prev === 'ALERTS' ? 'ALL' : 'ALERTS')}
-            style={{
-              animation: 'slideDownFade 0.35s ease-out forwards',
-              animationDelay: '200ms'
-            }}
-            className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between opacity-0 min-h-[74px] ${
+            className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between min-h-[74px] ${
               statusFilter === 'ALERTS'
                 ? 'bg-rose-50/70 border-rose-600 ring-2 ring-rose-500/20 shadow-xs'
                 : 'bg-gray-50/70 border-gray-200 hover:bg-white hover:border-rose-400 hover:shadow-2xs'
@@ -1840,12 +1955,12 @@ export const StockInventoryV2: React.FC = () => {
                   <tbody key={`transfers-${animationKey}`} className="divide-y divide-gray-100 text-xs text-gray-700">
                     {transferEntries.map((entry, idx) => (
                       <tr 
-                        key={idx} 
+                        key={entry._id || idx}
                         style={{
                           animation: 'slideDownFade 0.35s ease-out forwards',
-                          animationDelay: `${idx * 30}ms`
+                          animationDelay: `${idx * 35}ms`
                         }}
-                        className="hover:bg-gray-50/80 transition-colors opacity-0"
+                        className="hover:bg-gray-50/80 transition-all opacity-0 whitespace-nowrap"
                       >
                         <td className="px-4 py-3 whitespace-nowrap text-gray-500">
                           {entry.createdAt ? new Date(entry.createdAt).toLocaleDateString('en-IN') : 'Recent'}
@@ -1922,12 +2037,12 @@ export const StockInventoryV2: React.FC = () => {
                       const isInc = entry.direction === 'IN' || (entry.quantity || 0) > 0;
                       return (
                         <tr 
-                          key={idx} 
+                          key={entry._id || idx}
                           style={{
                             animation: 'slideDownFade 0.35s ease-out forwards',
-                            animationDelay: `${idx * 30}ms`
+                            animationDelay: `${idx * 35}ms`
                           }}
-                          className="hover:bg-gray-50/80 transition-colors opacity-0"
+                          className="hover:bg-gray-50/80 transition-all opacity-0 whitespace-nowrap"
                         >
                           <td className="px-4 py-3 whitespace-nowrap text-gray-500">
                             {entry.createdAt ? new Date(entry.createdAt).toLocaleDateString('en-IN') : 'Recent'}
@@ -2250,6 +2365,17 @@ export const StockInventoryV2: React.FC = () => {
                                   <button
                                     type="button"
                                     onClick={() => {
+                                      setMfgStepsSku(sku);
+                                      setShowMfgStepsModal(true);
+                                    }}
+                                    className="p-1.5 text-gray-500 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                                    title="Configure Manufacturing Process Steps"
+                                  >
+                                    <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
                                       setTransferInitialSku(sku);
                                       setShowTransferModal(true);
                                     }}
@@ -2315,7 +2441,7 @@ export const StockInventoryV2: React.FC = () => {
         }}
         onViewInInventory={(s) => {
           setSelectedDrawerSku(null);
-          setSearchQuery(s.skuCode || s.name);
+          setSearch(s.skuCode || s.name);
         }}
       />
 
@@ -2357,6 +2483,27 @@ export const StockInventoryV2: React.FC = () => {
           onClose={() => setIsAddSkuOpen(false)}
           onSaveSuccess={() => {
             setIsAddSkuOpen(false);
+            loadAuxiliaryData(true);
+          }}
+        />
+      )}
+
+      {/* 5. Manufacturing Process Steps Modal */}
+      {showMfgStepsModal && mfgStepsSku && (
+        <ManufacturingStepsModal
+          isOpen={showMfgStepsModal}
+          onClose={() => {
+            setShowMfgStepsModal(false);
+            setMfgStepsSku(null);
+          }}
+          sku={mfgStepsSku}
+          companyId={selectedCompany?._id || ''}
+          onSaveSuccess={(updated) => {
+            const targetId = updated._id || mfgStepsSku._id;
+            setAllSkus(prev => prev.map(s => s._id === targetId ? { ...s, ...updated, processSteps: updated.processSteps } : s));
+            if (selectedSku && selectedSku._id === targetId) {
+              setSelectedSku(prev => prev ? { ...prev, ...updated, processSteps: updated.processSteps } : prev);
+            }
             loadAuxiliaryData(true);
           }}
         />

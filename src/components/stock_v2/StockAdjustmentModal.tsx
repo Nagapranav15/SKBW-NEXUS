@@ -27,6 +27,7 @@ import {
   getBalancesV2,
   getSkuStockDetailsV2 
 } from '../../api/mfgApiV2';
+import { LocationSelectPopup } from './LocationSelectPopup';
 
 interface StockAdjustmentModalProps {
   isOpen: boolean;
@@ -322,75 +323,22 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
             )}
           </div>
 
-          {/* ── CASCADING LOCATION SELECTORS (ROW OF 4) ── */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Location *</label>
-              <div className="relative">
-                <select
-                  value={warehouseId}
-                  onChange={e => {
-                    setWarehouseId(e.target.value);
-                    const floors = getFloors(e.target.value);
-                    if (floors[0]) setFloorId(floors[0]._id);
-                  }}
-                  className="w-full pl-7 pr-2.5 py-2 border border-gray-200 rounded-xl bg-white font-semibold text-gray-800 cursor-pointer focus:outline-none focus:border-blue-500"
-                >
-                  {warehouses.map(w => (
-                    <option key={w._id} value={w._id}>{w.name}</option>
-                  ))}
-                </select>
-                <MapPin className="w-3.5 h-3.5 text-blue-600 absolute left-2.5 top-2.5" />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Floor</label>
-              <select
-                value={floorId}
-                onChange={e => {
-                  setFloorId(e.target.value);
-                  const zones = getZones(e.target.value);
-                  if (zones[0]) setZoneId(zones[0]._id);
-                }}
-                className="w-full px-2.5 py-2 border border-gray-200 rounded-xl bg-white font-semibold text-gray-800 cursor-pointer focus:outline-none focus:border-blue-500"
-              >
-                {getFloors(warehouseId).map(f => (
-                  <option key={f._id} value={f._id}>{f.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Zone</label>
-              <select
-                value={zoneId}
-                onChange={e => {
-                  setZoneId(e.target.value);
-                  const locs = getStorageLocations(e.target.value);
-                  if (locs[0]) setLocationId(locs[0]._id);
-                }}
-                className="w-full px-2.5 py-2 border border-gray-200 rounded-xl bg-white font-semibold text-gray-800 cursor-pointer focus:outline-none focus:border-blue-500"
-              >
-                {getZones(floorId).map(z => (
-                  <option key={z._id} value={z._id}>{z.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Location</label>
-              <select
-                value={locationId}
-                onChange={e => setLocationId(e.target.value)}
-                className="w-full px-2.5 py-2 border border-gray-200 rounded-xl bg-white font-semibold text-gray-800 cursor-pointer focus:outline-none focus:border-blue-500"
-              >
-                {getStorageLocations(zoneId).map(l => (
-                  <option key={l._id} value={l._id}>{l.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
+          {/* ── LOCATION SELECTOR (COMPACT TRIGGER + POPUP) ── */}
+          <LocationSelectPopup
+            label="Location"
+            locations={locations}
+            warehouseId={warehouseId}
+            floorId={floorId}
+            zoneId={zoneId}
+            locationId={locationId}
+            badgeColor="blue"
+            onChange={(wId, fId, zId, lId) => {
+              setWarehouseId(wId);
+              setFloorId(fId);
+              setZoneId(zId);
+              setLocationId(lId);
+            }}
+          />
 
           {/* ── LIVE STOCK CALCULATOR (3 COLUMNS) ── */}
           <div className="bg-white border border-gray-200/80 rounded-2xl p-4 sm:p-5 shadow-2xs">

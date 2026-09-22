@@ -29,6 +29,12 @@ export interface SkuV2 {
   recipeYieldUnit?: string;
   batchYieldQty?: number;
   batchYieldUnit?: string;
+  processSteps?: any[];
+  preferredVendor?: string;
+  company?: string | any;
+  initialLocationId?: string;
+  initialLocation?: any;
+  defaultLocation?: string;
   isDeleted?: boolean;
   createdAt?: string;
 }

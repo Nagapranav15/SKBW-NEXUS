@@ -54,6 +54,7 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   ArrowRightLeft,
+  ArrowRight,
   ExternalLink,
   Bookmark
 } from 'lucide-react';
@@ -76,6 +77,7 @@ import {
   SkuV2 
 } from '../../api/mfgApiV2';
 import AddSkuDrawerV2, { SearchableMaterialDropdown } from './AddSkuDrawerV2';
+import { ManufacturingStepsModal } from '../stock_v2/ManufacturingStepsModal';
 import { normalizeAndDeduplicateUnits } from '../../utils/uomConversion';
 import { getParties } from '../../api/partyApi';
 import { showToast } from '../ui/Toast';
@@ -597,6 +599,7 @@ const SkuMasterV2: React.FC = () => {
   const [showAddDrawer, setShowAddDrawer] = useState(false);
   const [editSku, setEditSku] = useState<SkuV2 | null>(null);
   const [selectedSkuDetails, setSelectedSkuDetails] = useState<SkuV2 | null>(null);
+  const [showSkuMasterMfgModal, setShowSkuMasterMfgModal] = useState(false);
   const [deleteConfirmSku, setDeleteConfirmSku] = useState<SkuV2 | null>(null);
 
   // Item Details Modal State

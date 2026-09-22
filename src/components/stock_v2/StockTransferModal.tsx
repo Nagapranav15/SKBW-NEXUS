@@ -28,6 +28,7 @@ import {
   getBalancesV2, 
   getSkuStockDetailsV2 
 } from '../../api/mfgApiV2';
+import { LocationSelectPopup } from './LocationSelectPopup';
 
 interface BatchRow {
   batchNumber: string;
@@ -402,71 +403,21 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
                 <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">2. From Location (Source)</h3>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div>
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Warehouse *</label>
-                  <select
-                    value={sourceWarehouseId}
-                    onChange={e => {
-                      setSourceWarehouseId(e.target.value);
-                      const floors = getFloors(e.target.value);
-                      if (floors[0]) setSourceFloorId(floors[0]._id);
-                    }}
-                    className="w-full px-2.5 py-2 border border-gray-200 rounded-xl bg-white font-semibold text-gray-800 cursor-pointer focus:outline-none focus:border-blue-500"
-                  >
-                    {warehouses.map(w => (
-                      <option key={w._id} value={w._id}>{w.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Floor *</label>
-                  <select
-                    value={sourceFloorId}
-                    onChange={e => {
-                      setSourceFloorId(e.target.value);
-                      const zones = getZones(e.target.value);
-                      if (zones[0]) setSourceZoneId(zones[0]._id);
-                    }}
-                    className="w-full px-2.5 py-2 border border-gray-200 rounded-xl bg-white font-semibold text-gray-800 cursor-pointer focus:outline-none focus:border-blue-500"
-                  >
-                    {getFloors(sourceWarehouseId).map(f => (
-                      <option key={f._id} value={f._id}>{f.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Zone *</label>
-                  <select
-                    value={sourceZoneId}
-                    onChange={e => {
-                      setSourceZoneId(e.target.value);
-                      const locs = getStorageLocations(e.target.value);
-                      if (locs[0]) setSourceLocationId(locs[0]._id);
-                    }}
-                    className="w-full px-2.5 py-2 border border-gray-200 rounded-xl bg-white font-semibold text-gray-800 cursor-pointer focus:outline-none focus:border-blue-500"
-                  >
-                    {getZones(sourceFloorId).map(z => (
-                      <option key={z._id} value={z._id}>{z.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Location *</label>
-                  <select
-                    value={sourceLocationId}
-                    onChange={e => setSourceLocationId(e.target.value)}
-                    className="w-full px-2.5 py-2 border border-gray-200 rounded-xl bg-white font-semibold text-gray-800 cursor-pointer focus:outline-none focus:border-blue-500"
-                  >
-                    {getStorageLocations(sourceZoneId).map(l => (
-                      <option key={l._id} value={l._id}>{l.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              <LocationSelectPopup
+                label="Source Location"
+                locations={locations}
+                warehouseId={sourceWarehouseId}
+                floorId={sourceFloorId}
+                zoneId={sourceZoneId}
+                locationId={sourceLocationId}
+                badgeColor="rose"
+                onChange={(wId, fId, zId, lId) => {
+                  setSourceWarehouseId(wId);
+                  setSourceFloorId(fId);
+                  setSourceZoneId(zId);
+                  setSourceLocationId(lId);
+                }}
+              />
 
               {/* Source Available Stock Subcard */}
               <div className="p-3 bg-blue-50/50 border border-blue-200/60 rounded-xl flex items-center gap-3">
@@ -489,71 +440,21 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
                 <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">3. To Location (Destination)</h3>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div>
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Warehouse *</label>
-                  <select
-                    value={destWarehouseId}
-                    onChange={e => {
-                      setDestWarehouseId(e.target.value);
-                      const floors = getFloors(e.target.value);
-                      if (floors[0]) setDestFloorId(floors[0]._id);
-                    }}
-                    className="w-full px-2.5 py-2 border border-gray-200 rounded-xl bg-white font-semibold text-gray-800 cursor-pointer focus:outline-none focus:border-blue-500"
-                  >
-                    {warehouses.map(w => (
-                      <option key={w._id} value={w._id}>{w.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Floor *</label>
-                  <select
-                    value={destFloorId}
-                    onChange={e => {
-                      setDestFloorId(e.target.value);
-                      const zones = getZones(e.target.value);
-                      if (zones[0]) setDestZoneId(zones[0]._id);
-                    }}
-                    className="w-full px-2.5 py-2 border border-gray-200 rounded-xl bg-white font-semibold text-gray-800 cursor-pointer focus:outline-none focus:border-blue-500"
-                  >
-                    {getFloors(destWarehouseId).map(f => (
-                      <option key={f._id} value={f._id}>{f.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Zone *</label>
-                  <select
-                    value={destZoneId}
-                    onChange={e => {
-                      setDestZoneId(e.target.value);
-                      const locs = getStorageLocations(e.target.value);
-                      if (locs[0]) setDestLocationId(locs[0]._id);
-                    }}
-                    className="w-full px-2.5 py-2 border border-gray-200 rounded-xl bg-white font-semibold text-gray-800 cursor-pointer focus:outline-none focus:border-blue-500"
-                  >
-                    {getZones(destFloorId).map(z => (
-                      <option key={z._id} value={z._id}>{z.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Location *</label>
-                  <select
-                    value={destLocationId}
-                    onChange={e => setDestLocationId(e.target.value)}
-                    className="w-full px-2.5 py-2 border border-gray-200 rounded-xl bg-white font-semibold text-gray-800 cursor-pointer focus:outline-none focus:border-blue-500"
-                  >
-                    {getStorageLocations(destZoneId).map(l => (
-                      <option key={l._id} value={l._id}>{l.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              <LocationSelectPopup
+                label="Destination Location"
+                locations={locations}
+                warehouseId={destWarehouseId}
+                floorId={destFloorId}
+                zoneId={destZoneId}
+                locationId={destLocationId}
+                badgeColor="blue"
+                onChange={(wId, fId, zId, lId) => {
+                  setDestWarehouseId(wId);
+                  setDestFloorId(fId);
+                  setDestZoneId(zId);
+                  setDestLocationId(lId);
+                }}
+              />
 
               {/* Destination Current Stock Subcard */}
               <div className="p-3 bg-blue-50/50 border border-blue-200/60 rounded-xl flex items-center gap-3">

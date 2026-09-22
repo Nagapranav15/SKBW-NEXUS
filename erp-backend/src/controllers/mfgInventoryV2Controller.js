@@ -13,8 +13,12 @@ const { validateUomConversion } = require("../utils/uomConversion");
 
 const toObjectId = (id) => {
   if (!id) return null;
+  if (typeof id === 'object') {
+    if (id._id) id = id._id;
+    else if (id.id) id = id.id;
+  }
   try {
-    return new mongoose.Types.ObjectId(id);
+    return new mongoose.Types.ObjectId(String(id));
   } catch (e) {
     return null;
   }
@@ -361,9 +365,20 @@ exports.updateSku = async (req, res, next) => {
     const { id } = req.params;
     const compId = req.body.company || req.query.companyId;
 
-    let sku = await SkuV2.findById(toObjectId(id) || id);
+    const skuObjId = toObjectId(id);
+    let sku = null;
+    if (skuObjId) {
+      sku = await SkuV2.findById(skuObjId);
+    }
+    if (!sku) {
+      sku = await SkuV2.findOne({ _id: id });
+    }
     if (!sku && compId) {
-      sku = await SkuV2.findOne({ _id: toObjectId(id) || id, company: toObjectId(compId) || compId });
+      const compObjId = toObjectId(compId);
+      sku = await SkuV2.findOne({ 
+        _id: skuObjId || id, 
+        company: compObjId || compId 
+      });
     }
 
     if (!sku) {
@@ -452,7 +467,10 @@ exports.updateSku = async (req, res, next) => {
       sku.status = st === 'inactive' ? 'Inactive' : 'Active';
     }
 
-    if (req.body.bomItems !== undefined) sku.bomItems = req.body.bomItems;
+    if (req.body.bomItems !== undefined) {
+      sku.bomItems = Array.isArray(req.body.bomItems) ? req.body.bomItems : [];
+      sku.markModified('bomItems');
+    }
     if (req.body.recipeYieldQty !== undefined || req.body.batchYieldQty !== undefined) {
       const parsedQty = req.body.recipeYieldQty !== undefined ? Number(req.body.recipeYieldQty) : Number(req.body.batchYieldQty);
       sku.recipeYieldQty = !isNaN(parsedQty) && parsedQty > 0 ? parsedQty : 1;
@@ -463,7 +481,18 @@ exports.updateSku = async (req, res, next) => {
       sku.recipeYieldUnit = u || "";
       sku.batchYieldUnit = sku.recipeYieldUnit;
     }
-    if (req.body.processSteps !== undefined) sku.processSteps = req.body.processSteps;
+
+    // Process Steps support from processSteps, manufacturingSteps, or routing
+    if (req.body.processSteps !== undefined) {
+      sku.processSteps = Array.isArray(req.body.processSteps) ? req.body.processSteps : [];
+      sku.markModified('processSteps');
+    } else if (req.body.manufacturingSteps !== undefined) {
+      sku.processSteps = Array.isArray(req.body.manufacturingSteps) ? req.body.manufacturingSteps : [];
+      sku.markModified('processSteps');
+    } else if (req.body.routing !== undefined) {
+      sku.processSteps = Array.isArray(req.body.routing) ? req.body.routing : [];
+      sku.markModified('processSteps');
+    }
 
     if (req.body.isDeleted !== undefined) {
       sku.isDeleted = req.body.isDeleted;
@@ -2571,7 +2600,13 @@ exports.getSkuStockDetails = async (req, res, next) => {
     const companyObjId = toObjectId(companyId);
     const skuObjId = toObjectId(skuId);
 
-    const sku = await SkuV2.findOne({ _id: skuObjId, company: companyObjId });
+    let sku = null;
+    if (skuObjId && companyObjId) {
+      sku = await SkuV2.findOne({ _id: skuObjId, company: companyObjId });
+    }
+    if (!sku) {
+      sku = await SkuV2.findById(skuObjId || skuId);
+    }
     if (!sku) {
       return res.status(404).json({ msg: "SKU not found" });
     }
@@ -2832,14 +2867,49 @@ exports.getSkuStockDetails = async (req, res, next) => {
       const delta = isIncoming ? m.quantity : -m.quantity;
       runningBalance += delta;
 
+      const rawType = m.transactionType || 'Stock Transfer';
+      let normalizedType = rawType;
+      let prefix = 'TRF';
+      if (rawType.includes('Transfer')) {
+        normalizedType = 'Stock Transfer';
+        prefix = 'TRF';
+      } else if (rawType.includes('Production') || rawType.includes('Purchase') || rawType.includes('Receipt')) {
+        normalizedType = 'Production Receipt';
+        prefix = 'PR';
+      } else if (rawType.includes('Dispatch') || rawType.includes('Sales')) {
+        normalizedType = 'Sales Dispatch';
+        prefix = 'INV';
+      } else if (rawType.includes('Reservation') || rawType.includes('Release')) {
+        normalizedType = rawType.includes('Release') ? 'Stock Release' : 'Stock Reservation';
+        prefix = 'SO';
+      } else if (rawType.includes('Adjustment')) {
+        normalizedType = 'Stock Adjustment';
+        prefix = 'ADJ';
+      } else if (rawType.includes('Opening') || rawType.includes('OPENING')) {
+        normalizedType = 'Opening Stock';
+        prefix = 'OPEN';
+      }
+
+      let refId = m.referenceId || '';
+      if (!refId || !/^[A-Z]{2,4}-\d{3,5}$/.test(refId.trim())) {
+        const digits = refId.replace(/\D/g, '');
+        if (digits.length >= 4) {
+          refId = `${prefix}-${digits.slice(-4)}`;
+        } else if (digits.length > 0) {
+          refId = `${prefix}-${digits.padStart(4, '0')}`;
+        } else {
+          refId = `${prefix}-${String(1000 + ((idx * 37) % 9000))}`;
+        }
+      }
+
       return {
         id: m._id,
         index: idx + 1,
         timestamp: m.createdAt || m.timestamp || new Date(),
-        transactionType: m.transactionType,
+        transactionType: normalizedType,
         direction: m.direction,
         referenceType: m.referenceType,
-        referenceId: m.referenceId || `TX-${String(m._id).slice(-4)}`,
+        referenceId: refId,
         fromLocation: isIncoming ? '-' : (m.locationId?.name || 'Main Storage'),
         toLocation: isIncoming ? (m.locationId?.name || 'Main Storage') : '-',
         locationName: m.locationId?.name || 'Main Storage',

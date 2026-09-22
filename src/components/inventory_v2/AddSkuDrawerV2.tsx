@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Save, RefreshCw, BookOpen, Layers, Plus, Trash2, AlertCircle, MapPin, Search, ChevronDown, ChevronRight, Lock, Package, Building2, Pencil, Settings2, X } from 'lucide-react';
+import { Save, RefreshCw, BookOpen, Layers, Plus, Trash2, AlertCircle, MapPin, Search, ChevronDown, ChevronRight, Lock, Package, Building2, Pencil, Settings2, X, Zap, ArrowUp, ArrowDown } from 'lucide-react';
 import { createSkuV2, updateSkuV2, SkuV2, getMetadataV2, updateMetadataV2, getSkusV2, getNextSkuCodeV2, getBalancesV2, getWarehouseHierarchyV2, WarehouseLocationV2 } from '../../api/mfgApiV2';
 import { getParties } from '../../api/partyApi';
 import Modal from '../ui/Modal';
 import { BomCopyPasteControls } from './BomCopyPasteControls';
 import { LocationSelectModal } from './LocationSelectModal';
 import { showToast } from '../ui/Toast';
+import { CleanProcessDropdownInput } from '../stock_v2/ManufacturingStepsModal';
 import { 
   validateUomConversion, 
   getUomDirection, 
@@ -532,7 +533,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       else if (activeSection === 'materials') setSelectedType('materials');
       else setSelectedType('products');
     }
-  }, [isOpen, editSku, activeSection, allCategories]);
+  }, [isOpen, editSku?._id, activeSection]);
 
   const resolvedSection = selectedType;
 
@@ -775,11 +776,29 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     setBomItems(prev => prev.map(i => i.id === id ? { ...i, [field]: value } : i));
   };
 
-  const handleAddProcessStep = () => {
+  const handleAddProcessStep = (defaultName: any = '', defaultMachine: any = '') => {
+    const nameStr = typeof defaultName === 'string' ? defaultName : '';
+    const machineStr = typeof defaultMachine === 'string' ? defaultMachine : '';
     setProcessSteps(prev => [
       ...prev,
-      { id: 'step_' + Date.now(), stepName: '', machine: '' }
+      { 
+        id: `step_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`, 
+        stepName: nameStr, 
+        machine: machineStr 
+      }
     ]);
+  };
+
+  const handleLoadStandardProcessSteps = () => {
+    const standard = [
+      { id: `step_${Date.now()}_1`, stepName: 'Reel Slitting', machine: 'Slitter Rewinder' },
+      { id: `step_${Date.now()}_2`, stepName: 'Paper Ruling', machine: 'Ruling Machine' },
+      { id: `step_${Date.now()}_3`, stepName: 'Folding', machine: 'Folding Section' },
+      { id: `step_${Date.now()}_4`, stepName: 'Wire Stitching', machine: 'Stitching Machine' },
+      { id: `step_${Date.now()}_5`, stepName: 'Cover Lamination', machine: 'Laminator' },
+      { id: `step_${Date.now()}_6`, stepName: 'Trimming & Packaging', machine: 'Three Knife Trimmer' }
+    ];
+    setProcessSteps(standard);
   };
 
   const removeProcessStep = (id: string) => {
@@ -788,6 +807,69 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
   const updateProcessStep = (id: string, field: string, value: any) => {
     setProcessSteps(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
+  };
+
+  const moveProcessStep = (index: number, direction: 'up' | 'down') => {
+    setProcessSteps(prev => {
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= prev.length) return prev;
+      const next = [...prev];
+      const temp = next[index];
+      next[index] = next[targetIndex];
+      next[targetIndex] = temp;
+      return next;
+    });
+  };
+
+  const [customProcessStepName, setCustomProcessStepName] = useState('');
+  const [userCustomPresets, setUserCustomPresets] = useState<{ name: string }[]>(() => {
+    try {
+      const saved = localStorage.getItem(`mfg_custom_presets_${companyId || 'default'}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const handleAddCustomInputStep = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!customProcessStepName.trim()) {
+      showToast('Please enter a process step name', 'error');
+      return;
+    }
+    handleAddProcessStep(customProcessStepName.trim(), '');
+    setCustomProcessStepName('');
+    showToast('Custom process step added', 'success');
+  };
+
+  const handleSaveUserCustomPreset = () => {
+    if (!customProcessStepName.trim()) {
+      showToast('Enter a process name to save as preset', 'error');
+      return;
+    }
+    const newPreset = {
+      name: customProcessStepName.trim()
+    };
+    const updated = [...userCustomPresets.filter(p => p.name.toLowerCase() !== newPreset.name.toLowerCase()), newPreset];
+    setUserCustomPresets(updated);
+    try {
+      localStorage.setItem(`mfg_custom_presets_${companyId || 'default'}`, JSON.stringify(updated));
+      showToast(`Saved "${newPreset.name}" to your Custom Presets library`, 'success');
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteUserCustomPreset = (nameToDelete: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = userCustomPresets.filter(p => p.name !== nameToDelete);
+    setUserCustomPresets(updated);
+    try {
+      localStorage.setItem(`mfg_custom_presets_${companyId || 'default'}`, JSON.stringify(updated));
+      showToast('Removed from custom presets', 'info');
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const brandContainerRef = useRef<HTMLDivElement>(null);
@@ -1064,8 +1146,29 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     setBrandSearch(form.brand);
   }, [form.brand]);
 
-  // Update form state if editSku is provided or changes
+  const prevOpenStateRef = useRef<{ isOpen: boolean; skuId: string | undefined }>({
+    isOpen: false,
+    skuId: undefined
+  });
+
+  // Update form state when drawer opens or when target editSku changes
   useEffect(() => {
+    if (!isOpen) {
+      prevOpenStateRef.current = { isOpen: false, skuId: undefined };
+      return;
+    }
+
+    const currentSkuId = editSku?._id || (editSku ? editSku.skuCode || 'edit' : undefined);
+    const wasOpen = prevOpenStateRef.current.isOpen;
+    const prevSkuId = prevOpenStateRef.current.skuId;
+
+    // Only run full state reset/initialization if the drawer was just opened OR the target SKU actually changed!
+    if (wasOpen && prevSkuId === currentSkuId) {
+      return;
+    }
+
+    prevOpenStateRef.current = { isOpen: true, skuId: currentSkuId };
+
     if (editSku) {
       setForm({
         skuCode: editSku.skuCode || '',
@@ -1145,19 +1248,21 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       if ((editSku as any).processSteps && Array.isArray((editSku as any).processSteps)) {
         setProcessSteps((editSku as any).processSteps.map((s: any, idx: number) => ({
           id: s.id || s._id || `step_${idx}_${Date.now()}`,
-          stepName: s.stepName || s.name || s.step || '',
-          machine: s.machine || s.machineName || s.workCenter || ''
+          stepName: typeof s === 'string' ? s : (s.stepName || s.name || s.step || s.title || ''),
+          machine: typeof s === 'object' ? (s.machine || s.machineName || s.workCenter || '') : ''
         })));
       } else {
         setProcessSteps([]);
       }
     } else {
+      const defaultCat = defaultCategory || (resolvedSection === 'products' ? 'Products' : resolvedSection === 'semi' ? 'Semi' : 'Materials');
+      const defaultUom = resolvedSection === 'materials' ? 'Kg' : resolvedSection === 'semi' ? 'Ream' : 'Pcs';
       setForm({
         skuCode: '',
         name: '',
-        category: '',
-        paperType: '' as '' | 'Reels' | 'Sheets' | 'None',
-        unit: '',
+        category: defaultCat,
+        paperType: (resolvedSection === 'materials' ? 'Reels' : resolvedSection === 'semi' ? 'Sheets' : '') as '' | 'Reels' | 'Sheets' | 'Board' | 'None',
+        unit: defaultUom,
         altUnit: '',
         altUnitConversion: '',
         altUnitDirection: '' as '' | UomDirection,
@@ -1168,7 +1273,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         title: '',
         group: '',
         ruleType: '',
-        pages: '',
+        pages: resolvedSection === 'semi' ? '500' : '',
         reamWeight: '',
         booksGbl: '',
         defaultLocation: 'SKBW',
@@ -1187,7 +1292,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       setBomItems([]);
       setProcessSteps([]);
     }
-  }, [editSku, isOpen, defaultCategory, resolvedSection, createdCategories]);
+  }, [isOpen, editSku?._id, editSku?.skuCode, defaultCategory, resolvedSection]);
 
   const isProductCategory = React.useMemo(() => {
     if (resolvedSection === 'products' || form.category === 'Finished Goods' || form.category === 'Products') return true;
@@ -2662,59 +2767,181 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     </div>
 
                     {/* Book Manufacturing Process Steps Section */}
-                    <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3">
-                      <div className="flex items-center justify-between">
+                    <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3.5 shadow-2xs">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
                         <div className="flex items-center gap-2">
                           <div className="p-1.5 bg-blue-50 text-blue-700 rounded-lg">
                             <Layers className="w-4 h-4" />
                           </div>
                           <div>
                             <h4 className="font-bold text-gray-900 text-xs">Book Manufacturing Process Routing</h4>
-                            <p className="text-[10px] text-gray-400">Sequential manufacturing steps (Printing, Folding, Stitching, Binding, Trimming).</p>
+                            <p className="text-[10px] text-gray-400">Sequential manufacturing steps (Printing, Folding, Stitching, Binding, Custom Operations).</p>
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={handleAddProcessStep}
-                          className="px-3 py-1.5 border border-blue-300 text-blue-700 hover:bg-blue-50 font-bold rounded-xl text-xs flex items-center gap-1 transition-all cursor-pointer"
-                        >
-                          <Plus className="w-3 h-3" />
-                          <span>Add Step</span>
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={handleLoadStandardProcessSteps}
+                            className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 font-semibold rounded-xl text-[11px] flex items-center gap-1 transition-all border border-amber-200 cursor-pointer shadow-2xs"
+                            title="Load standard book production steps"
+                          >
+                            <Zap className="w-3 h-3 text-amber-600" />
+                            <span>Load Standard Steps</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleAddProcessStep()}
+                            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/80 font-bold rounded-xl text-xs flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Add Blank Step</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Custom Process Input Bar */}
+                      <div className="bg-gradient-to-r from-blue-50/60 via-slate-50 to-indigo-50/40 p-3 rounded-xl border border-blue-100/80 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10.5px] font-bold text-gray-700">Add Any Custom Process Operation:</span>
+                          <span className="text-[9.5px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200/50">Custom Process</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                          <div className="sm:col-span-10">
+                            <CleanProcessDropdownInput
+                              value={customProcessStepName}
+                              onChange={(val) => setCustomProcessStepName(val)}
+                              placeholder="e.g. Reel Slitting, Ruling, Cutting, Folding, Wire Stitching, Cover Lamination"
+                              className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs"
+                            />
+                          </div>
+                          <div className="sm:col-span-2 flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={handleAddCustomInputStep}
+                              className="flex-1 px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 shadow-2xs transition-all cursor-pointer"
+                            >
+                              <Plus className="w-3 h-3" />
+                              <span>Add</span>
+                            </button>
+                            {customProcessStepName.trim() && (
+                              <button
+                                type="button"
+                                onClick={handleSaveUserCustomPreset}
+                                className="px-2 py-1.5 bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold shadow-2xs transition-all cursor-pointer"
+                                title="Save as reusable preset"
+                              >
+                                <span>★</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* User Saved Presets */}
+                        {userCustomPresets.length > 0 && (
+                          <div className="pt-1.5 border-t border-blue-100/60 flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] font-bold text-indigo-600">Saved Presets:</span>
+                            {userCustomPresets.map((cp) => (
+                              <div
+                                key={cp.name}
+                                onClick={() => handleAddProcessStep(cp.name, '')}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-md text-[10.5px] font-semibold cursor-pointer transition-all"
+                              >
+                                <span>+ {cp.name}</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleDeleteUserCustomPreset(cp.name, e)}
+                                  className="p-0.5 text-indigo-400 hover:text-rose-600 rounded cursor-pointer"
+                                >
+                                  <X className="w-2.5 h-2.5" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Quick Add Preset Chips */}
+                      <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Quick Presets:</span>
+                        {[
+                          { name: 'Reel Slitting' },
+                          { name: 'Paper Ruling' },
+                          { name: 'Sheet Cutting' },
+                          { name: 'Folding' },
+                          { name: 'Wire Stitching' },
+                          { name: 'Perfect Binding' },
+                          { name: 'Cover Lamination' },
+                          { name: 'Three Knife Trimming' },
+                          { name: 'Shrink Packaging' }
+                        ].map((preset) => (
+                          <button
+                            key={preset.name}
+                            type="button"
+                            onClick={() => handleAddProcessStep(preset.name, '')}
+                            className="px-2 py-0.5 bg-gray-50 hover:bg-blue-50 text-gray-600 hover:text-blue-700 border border-gray-200 hover:border-blue-200 rounded-lg text-[10.5px] font-medium transition-all cursor-pointer flex items-center gap-1"
+                          >
+                            <Plus className="w-2.5 h-2.5 text-blue-500" />
+                            <span>{preset.name}</span>
+                          </button>
+                        ))}
                       </div>
 
                       {processSteps.length === 0 ? (
-                        <div className="bg-gray-50/60 border border-dashed border-gray-200 rounded-xl p-4 text-center text-xs text-gray-400">
-                          No process routing steps added yet — click "+ Add Step" to add manufacturing operations
+                        <div
+                          onClick={() => handleAddProcessStep()}
+                          className="bg-gray-50/60 hover:bg-blue-50/40 border border-dashed border-gray-200 hover:border-blue-300 rounded-xl p-5 text-center text-xs text-gray-500 cursor-pointer transition-all flex flex-col items-center justify-center gap-2 group"
+                        >
+                          <div className="w-8 h-8 rounded-full bg-white shadow-2xs border border-gray-200 flex items-center justify-center text-gray-400 group-hover:text-blue-600 group-hover:border-blue-300 transition-colors">
+                            <Plus className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <span className="font-semibold text-gray-700 group-hover:text-blue-700">Click to add your first process routing step</span>
+                            <p className="text-[11px] text-gray-400 mt-0.5">Or use the quick presets above to build your routing pipeline instantly</p>
+                          </div>
                         </div>
                       ) : (
                         <div className="space-y-2">
                           {processSteps.map((step, sIdx) => (
-                            <div key={step.id} className="flex items-center gap-2 bg-gray-50/70 p-2 rounded-xl border border-gray-150">
-                              <span className="w-5 h-5 rounded-full bg-blue-600 text-white font-bold text-[10px] flex items-center justify-center shrink-0">
+                            <div key={step.id} className="flex items-center gap-2 bg-gray-50/70 hover:bg-gray-50 p-2.5 rounded-xl border border-gray-200/80 transition-all">
+                              <span className="w-6 h-6 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
                                 {sIdx + 1}
                               </span>
-                              <input
-                                type="text"
-                                value={step.stepName}
-                                onChange={(e) => updateProcessStep(step.id, 'stepName', e.target.value)}
-                                className="flex-1 px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 bg-white"
-                                placeholder="Process step name (e.g. Reel Cutting)"
-                              />
-                              <input
-                                type="text"
-                                value={step.machine}
-                                onChange={(e) => updateProcessStep(step.id, 'machine', e.target.value)}
-                                className="w-44 px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-700 bg-white"
-                                placeholder="Machine / Work Center"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => removeProcessStep(step.id)}
-                                className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              <div className="flex-1">
+                                <CleanProcessDropdownInput
+                                  value={step.stepName || ''}
+                                  onChange={(val) => updateProcessStep(step.id, 'stepName', val)}
+                                  placeholder="Process step name (e.g. Reel Slitting, Folding)"
+                                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                              </div>
+                              <div className="flex items-center gap-0.5">
+                                <button
+                                  type="button"
+                                  disabled={sIdx === 0}
+                                  onClick={() => moveProcessStep(sIdx, 'up')}
+                                  className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-200 rounded-lg transition-colors cursor-pointer"
+                                  title="Move Up"
+                                >
+                                  <ArrowUp className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={sIdx === processSteps.length - 1}
+                                  onClick={() => moveProcessStep(sIdx, 'down')}
+                                  className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-200 rounded-lg transition-colors cursor-pointer"
+                                  title="Move Down"
+                                >
+                                  <ArrowDown className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removeProcessStep(step.id)}
+                                  className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer ml-1"
+                                  title="Remove Step"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
