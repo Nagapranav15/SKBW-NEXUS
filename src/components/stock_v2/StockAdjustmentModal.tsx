@@ -332,6 +332,8 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
             zoneId={zoneId}
             locationId={locationId}
             badgeColor="blue"
+            unit={unit}
+            locationStockMap={{ [locationId]: { qty: currentQty, batches: 1 } }}
             onChange={(wId, fId, zId, lId) => {
               setWarehouseId(wId);
               setFloorId(fId);

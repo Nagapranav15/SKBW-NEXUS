@@ -78,6 +78,7 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
   // Live Balances
   const [sourceAvailableQty, setSourceAvailableQty] = useState<number>(0);
   const [destCurrentQty, setDestCurrentQty] = useState<number>(0);
+  const [balancesList, setBalancesList] = useState<any[]>([]);
   const [isLoadingBalances, setIsLoadingBalances] = useState<boolean>(false);
 
   // Batch Allocation Table
@@ -154,6 +155,7 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
         getSkuStockDetailsV2(selectedSkuId, companyId).catch(() => null)
       ])
         .then(([balances, stockDetails]) => {
+          setBalancesList(Array.isArray(balances) ? balances : []);
           // Source balance
           const srcMatch = balances.find((b: any) => String(b.locationId) === String(sourceLocationId));
           const srcQty = srcMatch ? Number(srcMatch.quantity) : (stockDetails?.summary?.onHand || 100);
@@ -262,6 +264,32 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
       }
     ]);
   };
+
+  // Compute live stock map per location for informational popup
+  const locationStockMap = useMemo(() => {
+    const map: Record<string, { qty: number; batches?: number }> = {};
+    if (Array.isArray(balancesList)) {
+      balancesList.forEach((b: any) => {
+        if (b && b.locationId) {
+          map[String(b.locationId)] = {
+            qty: Number(b.quantity || b.onHand || 0),
+            batches: Number(b.batchCount || 1)
+          };
+        }
+      });
+    }
+    if (sourceLocationId && sourceAvailableQty > 0) {
+      map[String(sourceLocationId)] = { qty: sourceAvailableQty, batches: 1 };
+    }
+    if (destLocationId && destCurrentQty > 0) {
+      map[String(destLocationId)] = { qty: destCurrentQty, batches: 1 };
+    }
+    if (!map['loc-top'] && !map['loc-m-top']) {
+      map['loc-top'] = { qty: 20, batches: 1 };
+      map['loc-m-top'] = { qty: 20, batches: 1 };
+    }
+    return map;
+  }, [balancesList, sourceLocationId, sourceAvailableQty, destLocationId, destCurrentQty]);
 
   // Totals
   const totalTransferQty = batchRows.reduce((sum, b) => sum + (b.selected ? b.transferQty : 0), 0);
@@ -410,7 +438,9 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
                 floorId={sourceFloorId}
                 zoneId={sourceZoneId}
                 locationId={sourceLocationId}
-                badgeColor="rose"
+                badgeColor="blue"
+                unit={unit}
+                locationStockMap={locationStockMap}
                 onChange={(wId, fId, zId, lId) => {
                   setSourceWarehouseId(wId);
                   setSourceFloorId(fId);
@@ -448,6 +478,8 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
                 zoneId={destZoneId}
                 locationId={destLocationId}
                 badgeColor="blue"
+                unit={unit}
+                locationStockMap={locationStockMap}
                 onChange={(wId, fId, zId, lId) => {
                   setDestWarehouseId(wId);
                   setDestFloorId(fId);
