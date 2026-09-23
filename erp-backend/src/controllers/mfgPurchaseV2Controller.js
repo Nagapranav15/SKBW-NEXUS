@@ -168,7 +168,21 @@ exports.createPurchaseInvoice = async (req, res, next) => {
       company: companyObjId,
       status: "Posted"
     });
-    await invoice.save();
+
+    try {
+      await invoice.save();
+    } catch (saveErr) {
+      if (saveErr && (saveErr.code === 11000 || saveErr.name === "MongoServerError") && String(saveErr.message).includes("invoiceNumber_1")) {
+        try {
+          await PurchaseInvoiceV2.collection.dropIndex("invoiceNumber_1");
+          await invoice.save();
+        } catch (retryErr) {
+          throw retryErr;
+        }
+      } else {
+        throw saveErr;
+      }
+    }
 
     // 5. Inward stock using fast batch operations & hierarchy caching
     const hierarchyCache = new Map();

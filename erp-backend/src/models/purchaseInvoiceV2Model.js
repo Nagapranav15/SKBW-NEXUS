@@ -24,7 +24,7 @@ const purchaseInvoiceItemSchema = new mongoose.Schema({
 });
 
 const purchaseInvoiceV2Schema = new mongoose.Schema({
-  invoiceNumber: { type: String, required: true, unique: true, index: true },
+  invoiceNumber: { type: String, required: true, index: true },
   vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Party', required: true, index: true }, 
   items: [purchaseInvoiceItemSchema],
   subTotal: { type: Number, required: true },
@@ -42,4 +42,32 @@ const purchaseInvoiceV2Schema = new mongoose.Schema({
   status: { type: String, enum: ["Draft", "Posted", "Cancelled"], default: "Posted" }
 }, { timestamps: true });
 
-module.exports = mongoose.model("PurchaseInvoiceV2", purchaseInvoiceV2Schema);
+purchaseInvoiceV2Schema.index({ company: 1, invoiceNumber: 1 }, { unique: true });
+
+const PurchaseInvoiceV2 = mongoose.model("PurchaseInvoiceV2", purchaseInvoiceV2Schema);
+
+// Self-healing index migration: drop legacy global unique invoiceNumber_1 index so invoices are unique per company
+const dropLegacyIndex = async () => {
+  try {
+    const col = PurchaseInvoiceV2.collection;
+    if (col) {
+      const indexes = await col.indexes();
+      const hasOldGlobalIndex = indexes.some(idx => idx.name === "invoiceNumber_1" && idx.unique && (!idx.key || !idx.key.company));
+      if (hasOldGlobalIndex) {
+        await col.dropIndex("invoiceNumber_1");
+        console.log("Successfully dropped legacy global unique index invoiceNumber_1 on PurchaseInvoiceV2");
+      }
+    }
+  } catch (e) {
+    // Ignore if index does not exist or collection is not yet ready
+  }
+};
+
+if (mongoose.connection.readyState === 1) {
+  dropLegacyIndex();
+} else {
+  mongoose.connection.once("open", dropLegacyIndex);
+}
+
+module.exports = PurchaseInvoiceV2;
+
