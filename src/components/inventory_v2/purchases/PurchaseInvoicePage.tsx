@@ -743,8 +743,16 @@ const PurchaseInvoicePage: React.FC = () => {
         }
         item.width = w;
         item.length = l;
-        item.reamWeight = (selectedSku as any).reamWeight ? String((selectedSku as any).reamWeight) : '';
+        const rw = (selectedSku as any).reamWeight || getFallbackReamWeight(selectedSku);
+        item.reamWeight = rw ? String(Number(rw.toFixed(4))) : '';
         item.ratePerKg = '';
+
+        // Auto-assign storage location
+        const firstStorage = locations.find(loc => loc.level === 'Storage Location');
+        const defaultLocId = selectedSku.initialLocationId || (selectedSku as any).locationId || firstStorage?._id || '';
+        if (defaultLocId && !item.locationId) {
+          item.locationId = String(defaultLocId);
+        }
 
         // Auto-select preferred vendor if specified on the SKU and batch vendor is not set
         const prefVen = (selectedSku as any).preferredVendor;
@@ -770,6 +778,12 @@ const PurchaseInvoicePage: React.FC = () => {
         if (selectedSku.paperType !== 'Reels') {
           item.reelsCount = '';
           item.reels = [];
+        } else {
+          // If Reels, initialize with 1 reel if not set
+          if (!item.reelsCount || Number(item.reelsCount) === 0) {
+            item.reelsCount = '1';
+            item.reels = [{ weight: Number(item.quantity) || 0, width: Number(item.width) || 0, locationId: item.locationId || defaultLocId }];
+          }
         }
       }
     }
@@ -815,6 +829,44 @@ const PurchaseInvoicePage: React.FC = () => {
 
     updatedItems[itemIdx] = item;
     setInvoiceForm({ ...invoiceForm, items: updatedItems });
+  };
+
+  const handleAutoSplitReels = (itemIdx: number) => {
+    const updatedItems = [...invoiceForm.items];
+    const item = { ...updatedItems[itemIdx] };
+    const count = Number(item.reelsCount) || 0;
+    const totalQty = Number(item.quantity) || 0;
+    if (count <= 0) return;
+
+    const splitWeight = totalQty > 0 ? Number((totalQty / count).toFixed(2)) : 0;
+    const currentReels = item.reels || [];
+    const firstStorage = locations.find(loc => loc.level === 'Storage Location');
+    const newReels = Array.from({ length: count }).map((_, rIdx) => ({
+      weight: splitWeight,
+      width: Number(item.width) || Number(currentReels[rIdx]?.width) || 0,
+      locationId: currentReels[rIdx]?.locationId || item.locationId || firstStorage?._id || ''
+    }));
+
+    item.reels = newReels;
+    if (totalQty > 0) {
+      item.quantity = String(splitWeight * count);
+    }
+    updatedItems[itemIdx] = item;
+    setInvoiceForm({ ...invoiceForm, items: updatedItems });
+    showToast(`Distributed ${totalQty || (splitWeight * count)} KG evenly across ${count} reels`, 'info');
+  };
+
+  const handleApplyLocationToAllReels = (itemIdx: number) => {
+    const updatedItems = [...invoiceForm.items];
+    const item = { ...updatedItems[itemIdx] };
+    const firstLoc = item.reels?.[0]?.locationId || item.locationId;
+    if (!firstLoc) return;
+
+    const newReels = (item.reels || []).map(r => ({ ...r, locationId: firstLoc }));
+    item.reels = newReels;
+    updatedItems[itemIdx] = item;
+    setInvoiceForm({ ...invoiceForm, items: updatedItems });
+    showToast('Applied storage location to all reels', 'info');
   };
 
   // Submit Invoice Creation
@@ -2135,9 +2187,29 @@ const PurchaseInvoicePage: React.FC = () => {
                       {/* Inline Reels List inside card (matches handwritten sketch) */}
                       {reelsCount > 0 && (
                         <div className="pt-3 border-t border-gray-100 space-y-2">
-                          <span className="block text-[10px] font-black text-gray-400 uppercase tracking-wider">
-                            Reel Specifications & Storage Placement:
-                          </span>
+                          <div className="flex items-center justify-between flex-wrap gap-2">
+                            <span className="block text-[10px] font-black text-gray-400 uppercase tracking-wider">
+                              Reel Specifications & Storage Placement:
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleAutoSplitReels(idx)}
+                                className="text-[10.5px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 hover:underline cursor-pointer bg-blue-50/70 px-2 py-0.5 rounded border border-blue-200/60"
+                                title="Evenly distribute total lot weight across all reels"
+                              >
+                                ⚡ Auto-Split Weight
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleApplyLocationToAllReels(idx)}
+                                className="text-[10.5px] font-bold text-slate-600 hover:text-slate-800 flex items-center gap-1 hover:underline cursor-pointer bg-slate-100 px-2 py-0.5 rounded border border-slate-200"
+                                title="Copy first reel's storage location to all other reels"
+                              >
+                                📍 Location to All
+                              </button>
+                            </div>
+                          </div>
 
                           <div className="overflow-x-auto border border-gray-200 rounded-lg">
                             <table className="w-full text-left text-xs border-collapse">
