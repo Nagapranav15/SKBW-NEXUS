@@ -630,13 +630,37 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
     }
   };
 
+  const [cascadeDelete, setCascadeDelete] = useState(true);
+
   const handleDeleteLocation = async () => {
     if (!deleteConfirmNode?._id) return;
     try {
-      await deleteWarehouseLocationV2(deleteConfirmNode._id, selectedCompany?._id || '');
+      await deleteWarehouseLocationV2(deleteConfirmNode._id, selectedCompany?._id || '', cascadeDelete);
       showToast(`Deleted '${deleteConfirmNode.name}'`, 'success');
+      
+      const deletedId = deleteConfirmNode._id;
+      const deletedLevel = deleteConfirmNode.level;
       setDeleteConfirmNode(null);
-      await reloadWarehouse();
+
+      // Reload hierarchy
+      const updated = await getWarehouseHierarchyV2(selectedCompany?._id || '');
+      setLocations(updated);
+
+      // Adjust active selections if deleted item was active
+      if (deletedLevel === 'Factory' && selectedFactoryId === deletedId) {
+        const remainingFactories = updated.filter(l => l.level === 'Factory');
+        if (remainingFactories.length > 0) {
+          setSelectedFactoryId(remainingFactories[0]._id || '');
+          const fls = updated.filter(l => l.parentId === remainingFactories[0]._id && l.level === 'Floor');
+          setSelectedFloorId(fls[0]?._id || '');
+        } else {
+          setSelectedFactoryId('');
+          setSelectedFloorId('');
+        }
+      } else if (deletedLevel === 'Floor' && selectedFloorId === deletedId) {
+        const remainingFloors = updated.filter(l => l.parentId === selectedFactoryId && l.level === 'Floor');
+        setSelectedFloorId(remainingFloors[0]?._id || '');
+      }
     } catch (err: any) {
       showToast(err.message || 'Failed to delete location', 'error');
     }
@@ -865,9 +889,8 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
               const metrics = getFactoryMetrics(factory._id!);
 
               return (
-                <button
+                <div
                   key={factory._id}
-                  type="button"
                   onClick={() => {
                     setSelectedFactoryId(factory._id!);
                     const fls = locations.filter(l => l.parentId === factory._id && l.level === 'Floor');
@@ -877,31 +900,59 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                       setSelectedFloorId('');
                     }
                   }}
-                  className={`p-3 rounded-xl transition-all text-left flex items-center gap-3 cursor-pointer relative ${
+                  className={`p-3 rounded-xl transition-all text-left flex items-center justify-between gap-3 cursor-pointer relative group ${
                     isSelected
                       ? 'border border-blue-500 bg-blue-50/40 shadow-xs ring-1 ring-blue-500/20'
                       : 'border border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50/50 shadow-2xs'
                   }`}
                 >
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
-                    isSelected ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600 border border-slate-200/60'
-                  }`}>
-                    <Building2 className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between">
-                      <h3 className={`text-xs font-bold truncate ${isSelected ? 'text-blue-900' : 'text-slate-800'}`}>
-                        {factory.name}
-                      </h3>
-                      {isSelected && (
-                        <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0"></span>
-                      )}
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                      isSelected ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600 border border-slate-200/60'
+                    }`}>
+                      <Building2 className="w-4 h-4" />
                     </div>
-                    <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                      {metrics.floorsCount} Floors • {metrics.zonesCount} Zones • {metrics.locationsCount} Locations
-                    </p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <h3 className={`text-xs font-bold truncate ${isSelected ? 'text-blue-900' : 'text-slate-800'}`}>
+                          {factory.name}
+                        </h3>
+                        {isSelected && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0"></span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                        {metrics.floorsCount} Floors • {metrics.zonesCount} Zones • {metrics.locationsCount} Locations
+                      </p>
+                    </div>
                   </div>
-                </button>
+
+                  {/* Factory Actions: Edit & Delete */}
+                  <div className="flex items-center gap-1 shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenEditModal(factory);
+                      }}
+                      className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-100/50 rounded transition-colors cursor-pointer"
+                      title="Edit Factory"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteConfirmNode(factory);
+                      }}
+                      className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-100/50 rounded transition-colors cursor-pointer"
+                      title="Delete Factory"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
               );
             })
           )}
@@ -916,18 +967,50 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
               {activeFloors.map(floor => {
                 const isSelected = activeFloor?._id === floor._id;
                 return (
-                  <button
+                  <div
                     key={floor._id}
-                    type="button"
-                    onClick={() => setSelectedFloorId(floor._id!)}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
                       isSelected
                         ? 'bg-blue-50 border border-blue-400 text-blue-700 shadow-2xs'
                         : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
                     }`}
                   >
-                    {floor.name}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedFloorId(floor._id!)}
+                      className="cursor-pointer"
+                    >
+                      {floor.name}
+                    </button>
+
+                    {/* Quick Floor Edit / Delete if active */}
+                    {isSelected && (
+                      <div className="flex items-center gap-0.5 ml-1 border-l border-blue-200 pl-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenEditModal(floor);
+                          }}
+                          className="p-0.5 text-blue-500 hover:text-blue-700 hover:bg-blue-100/60 rounded cursor-pointer"
+                          title="Edit Floor"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteConfirmNode(floor);
+                          }}
+                          className="p-0.5 text-rose-400 hover:text-rose-600 hover:bg-rose-100/60 rounded cursor-pointer"
+                          title="Delete Floor"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
 
@@ -1228,15 +1311,34 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                       </span>
                       <span className="font-bold text-slate-900 text-xs">{zone.name}</span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleInspectLocation(zone)}
-                      className="text-slate-400 hover:text-blue-600 p-1 rounded transition-colors cursor-pointer flex items-center gap-0.5 text-[11px] font-medium"
-                      title="Inspect Zone"
-                    >
-                      <span>Details</span>
-                      <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
-                    </button>
+                    
+                    {/* Zone Actions: Inspect, Edit & Delete */}
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleInspectLocation(zone)}
+                        className="text-slate-400 hover:text-blue-600 p-1 rounded transition-colors cursor-pointer flex items-center gap-0.5 text-[11px] font-medium"
+                        title="Inspect Live Stock in Zone"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-slate-400 hover:text-blue-600" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditModal(zone)}
+                        className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer"
+                        title="Edit Zone"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeleteConfirmNode(zone)}
+                        className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                        title="Delete Zone"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-xs">
@@ -1271,7 +1373,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
       <Modal
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
-        title={editNode ? `Edit ${addForm.level}` : `Add New ${addForm.level}`}
+        title={editNode ? `Edit ${addForm.level}: ${editNode.name}` : `Add New ${addForm.level}`}
       >
         <form onSubmit={handleSaveLocation} className="space-y-3.5 text-xs text-left">
           {addError && (
@@ -1338,6 +1440,21 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
               </select>
             </div>
           )}
+
+          <div>
+            <label className="block text-[10.5px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
+              Status
+            </label>
+            <select
+              value={addForm.status}
+              onChange={e => setAddForm({ ...addForm, status: e.target.value as any })}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg font-medium bg-white text-slate-900 focus:outline-none focus:border-blue-500 text-xs"
+            >
+              <option value="Active">Active</option>
+              <option value="Maintenance">Maintenance</option>
+              <option value="Full">Full</option>
+            </select>
+          </div>
 
           <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
             <button
@@ -1444,12 +1561,22 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
       <Modal
         isOpen={!!deleteConfirmNode}
         onClose={() => setDeleteConfirmNode(null)}
-        title="Delete Location"
+        title={`Delete ${deleteConfirmNode?.level || 'Location'}`}
       >
-        <div className="space-y-3 text-xs text-left">
+        <div className="space-y-3.5 text-xs text-left">
           <p className="text-slate-700 font-medium">
-            Are you sure you want to delete <strong className="text-slate-900">{deleteConfirmNode?.name}</strong>?
+            Are you sure you want to delete <strong className="text-slate-900">{deleteConfirmNode?.name}</strong> ({deleteConfirmNode?.level})?
           </p>
+
+          <label className="flex items-center gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 font-medium text-xs cursor-pointer">
+            <input
+              type="checkbox"
+              checked={cascadeDelete}
+              onChange={e => setCascadeDelete(e.target.checked)}
+              className="w-4 h-4 text-rose-600 rounded border-gray-300 focus:ring-rose-500"
+            />
+            <span>Also delete all sub-locations (floors, zones, shelves) under this location</span>
+          </label>
 
           <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
             <button

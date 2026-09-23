@@ -156,9 +156,9 @@ export const updateWarehouseLocationV2 = async (id: string, locationData: any): 
   return response.data;
 };
 
-export const deleteWarehouseLocationV2 = async (id: string, companyId: string): Promise<any> => {
+export const deleteWarehouseLocationV2 = async (id: string, companyId: string, cascade: boolean = false): Promise<any> => {
   const response = await api.delete(`/v2/warehouse/locations/${id}`, {
-    params: { companyId }
+    params: { companyId, cascade: cascade ? 'true' : 'false' }
   });
   return response.data;
 };

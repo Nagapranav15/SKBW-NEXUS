@@ -1350,7 +1350,7 @@ exports.updateWarehouseLocation = async (req, res, next) => {
 exports.deleteWarehouseLocation = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { companyId } = req.query;
+    const { companyId, cascade } = req.query;
 
     if (!companyId) {
       return res.status(400).json({ msg: "companyId query parameter is required" });
@@ -1364,40 +1364,50 @@ exports.deleteWarehouseLocation = async (req, res, next) => {
       return res.status(404).json({ msg: "Warehouse location node not found" });
     }
 
-    // 1. Check if it has child sub-nodes
-    const childrenCount = await WarehouseLocationV2.countDocuments({ parentId: locObjId, company: companyObjId });
-    if (childrenCount > 0) {
+    // Collect target location and all its descendant locations
+    const allCompanyLocations = await WarehouseLocationV2.find({ company: companyObjId }).lean();
+    const targetLocationIds = [loc._id];
+    const queue = [String(loc._id)];
+    const visited = new Set(queue);
+
+    while (queue.length > 0) {
+      const currentParentId = queue.shift();
+      const children = allCompanyLocations.filter(l => l.parentId && String(l.parentId) === currentParentId);
+      for (const child of children) {
+        const childIdStr = String(child._id);
+        if (!visited.has(childIdStr)) {
+          visited.add(childIdStr);
+          targetLocationIds.push(child._id);
+          queue.push(childIdStr);
+        }
+      }
+    }
+
+    const hasChildren = targetLocationIds.length > 1;
+
+    if (hasChildren && cascade !== 'true') {
+      const childrenCount = targetLocationIds.length - 1;
       return res.status(400).json({
-        msg: `Cannot delete location '${loc.name}' because it contains ${childrenCount} child nodes. Please delete child nodes first.`
+        msg: `Cannot delete '${loc.name}' because it contains ${childrenCount} sub-location(s). Delete sub-locations first or confirm full removal.`
       });
     }
 
-    // 2. Check if location has any active stock or ledger movements
-    const [ledgerCount1, ledgerCount2, stockCount] = await Promise.all([
-      InventoryLedger.countDocuments({ locationId: locObjId, company: companyObjId, status: { $ne: "Cancelled" } }),
-      InventoryLedgerV2.countDocuments({ locationId: locObjId, company: companyObjId }),
-      InventoryLedger.aggregate([
-        { $match: { locationId: locObjId, company: companyObjId, status: { $ne: "Cancelled" } } },
-        { $group: { _id: null, qtyIn: { $sum: { $cond: [{ $eq: ["$direction", "IN"] }, "$quantity", 0] } }, qtyOut: { $sum: { $cond: [{ $eq: ["$direction", "OUT"] }, "$quantity", 0] } } } },
-        { $project: { onHand: { $subtract: ["$qtyIn", "$qtyOut"] } } },
-        { $match: { onHand: { $gt: 0.0001 } } }
-      ])
+    // Check if any of target locations has active stock
+    const stockCount = await InventoryLedger.aggregate([
+      { $match: { locationId: { $in: targetLocationIds }, company: companyObjId, status: { $ne: "Cancelled" } } },
+      { $group: { _id: null, qtyIn: { $sum: { $cond: [{ $eq: ["$direction", "IN"] }, "$quantity", 0] } }, qtyOut: { $sum: { $cond: [{ $eq: ["$direction", "OUT"] }, "$quantity", 0] } } } },
+      { $project: { onHand: { $subtract: ["$qtyIn", "$qtyOut"] } } },
+      { $match: { onHand: { $gt: 0.0001 } } }
     ]);
 
     if (stockCount.length > 0 && stockCount[0].onHand > 0.0001) {
       return res.status(400).json({
-        msg: `Cannot delete location '${loc.name}' because it currently holds ${stockCount[0].onHand.toFixed(2)} units of stock. Please transfer all stock out first.`
+        msg: `Cannot delete location '${loc.name}' because it (or its sub-locations) currently holds ${stockCount[0].onHand.toFixed(2)} units of stock. Please transfer all stock out first.`
       });
     }
 
-    if (ledgerCount1 > 0 || ledgerCount2 > 0) {
-      return res.status(400).json({
-        msg: `Cannot delete location '${loc.name}' because it has active inventory transactions in the ledger. Please deactivate or set status to Maintenance.`
-      });
-    }
-
-    await WarehouseLocationV2.deleteOne({ _id: locObjId });
-    res.json({ msg: "Warehouse location node deleted successfully" });
+    await WarehouseLocationV2.deleteMany({ _id: { $in: targetLocationIds } });
+    res.json({ msg: `Location '${loc.name}' ${hasChildren ? 'and its sub-locations were' : 'was'} deleted successfully` });
   } catch (err) {
     next(err);
   }
