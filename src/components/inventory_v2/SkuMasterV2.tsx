@@ -88,6 +88,7 @@ import Modal from '../ui/Modal';
 import { formatSkuName } from '../../utils/skuUtils';
 import { BomCopyPasteControls, MakoroPasteIcon } from './BomCopyPasteControls';
 import { copyBom, useCopiedBom } from '../../utils/bomClipboard';
+import { getActivityLogs, createActivityLog } from '../../api/activityLogApi';
 
 // Helper to render neat domain icon for items
 const renderItemDomainIcon = (skuItem: SkuV2, currentTab?: string) => {
