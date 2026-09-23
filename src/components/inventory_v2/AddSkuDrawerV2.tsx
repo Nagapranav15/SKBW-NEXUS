@@ -295,7 +295,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     return (createdCategories && createdCategories.length > 0) ? createdCategories : internalCategoryCards;
   }, [createdCategories, internalCategoryCards]);
 
-  const [selectedType, setSelectedType] = useState<'products' | 'materials' | 'semi'>('products');
+  const [userSelectedType, setUserSelectedType] = useState<'products' | 'materials' | 'semi' | null>(null);
   const [formCustomValues, setFormCustomValues] = useState<{ [colName: string]: any }>({});
   const [dynamicLocationText, setDynamicLocationText] = useState<string>('Loading location...');
   const [availableLocations, setAvailableLocations] = useState<{ id: string; name: string }[]>([]);
@@ -508,34 +508,35 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   }, [ruleTypesList, form.ruleType]);
 
 
-  // Initialize selectedType when drawer opens or activeSection / editSku changes
+  // Reset userSelectedType when drawer closes or when editSku target changes
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      setUserSelectedType(null);
+    }
+  }, [isOpen, editSku?._id]);
+
+  const resolvedSection = React.useMemo(() => {
+    if (userSelectedType) return userSelectedType;
     if (editSku) {
       const catLower = (editSku.category || '').toLowerCase().trim();
       const codeUpper = (editSku.skuCode || '').toUpperCase().trim();
       const matched = (allCategories || []).find(c => c && c.name?.toLowerCase().trim() === catLower);
-      if (matched?.type) {
-        setSelectedType(matched.type);
-        return;
-      }
+      if (matched?.type) return matched.type;
       if (catLower.includes('semi') || catLower.includes('wip') || codeUpper.startsWith('SM') || codeUpper.startsWith('SF') || codeUpper.startsWith('SEM')) {
-        setSelectedType('semi');
-        return;
+        return 'semi';
       }
       if (catLower.includes('raw') || catLower.includes('material') || catLower.includes('reel') || codeUpper.startsWith('RM')) {
-        setSelectedType('materials');
-        return;
+        return 'materials';
       }
-      setSelectedType('products');
-    } else {
-      if (activeSection === 'semi') setSelectedType('semi');
-      else if (activeSection === 'materials') setSelectedType('materials');
-      else setSelectedType('products');
+      return 'products';
     }
-  }, [isOpen, editSku?._id, activeSection]);
+    if (activeSection === 'semi' || activeSection === 'materials' || activeSection === 'products') {
+      return activeSection;
+    }
+    return 'products';
+  }, [userSelectedType, editSku, activeSection, allCategories]);
 
-  const resolvedSection = selectedType;
+  const selectedType = resolvedSection;
 
   const itemMainType = React.useMemo(() => {
     if (selectedType === 'semi') return 'Semi';
@@ -544,7 +545,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   }, [selectedType]);
 
   const handleItemTypeChange = (newType: 'products' | 'materials' | 'semi') => {
-    setSelectedType(newType);
+    setUserSelectedType(newType);
 
     // Find matching categories for newly selected type
     const matchingCats = (allCategories || []).filter(c => c && (c.type === newType || (!c.type && newType === 'products')));
@@ -1255,13 +1256,14 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         setProcessSteps([]);
       }
     } else {
-      const defaultCat = defaultCategory || (resolvedSection === 'products' ? 'Products' : resolvedSection === 'semi' ? 'Semi' : 'Materials');
-      const defaultUom = resolvedSection === 'materials' ? 'Kg' : resolvedSection === 'semi' ? 'Ream' : 'Pcs';
+      const sectionForNew = activeSection || resolvedSection || 'products';
+      const defaultCat = defaultCategory || (sectionForNew === 'products' ? 'Products' : sectionForNew === 'semi' ? 'Semi' : 'Materials');
+      const defaultUom = sectionForNew === 'materials' ? 'Kg' : sectionForNew === 'semi' ? 'Ream' : 'Pcs';
       setForm({
         skuCode: '',
         name: '',
         category: defaultCat,
-        paperType: (resolvedSection === 'materials' ? 'Reels' : resolvedSection === 'semi' ? 'Sheets' : '') as '' | 'Reels' | 'Sheets' | 'Board' | 'None',
+        paperType: (sectionForNew === 'materials' ? 'Reels' : sectionForNew === 'semi' ? 'Sheets' : '') as '' | 'Reels' | 'Sheets' | 'Board' | 'None',
         unit: defaultUom,
         altUnit: '',
         altUnitConversion: '',
@@ -1273,7 +1275,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         title: '',
         group: '',
         ruleType: '',
-        pages: resolvedSection === 'semi' ? '500' : '',
+        pages: sectionForNew === 'semi' ? '500' : '',
         reamWeight: '',
         booksGbl: '',
         defaultLocation: 'SKBW',
@@ -1292,7 +1294,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       setBomItems([]);
       setProcessSteps([]);
     }
-  }, [isOpen, editSku?._id, editSku?.skuCode, defaultCategory, resolvedSection]);
+  }, [isOpen, editSku?._id, editSku?.skuCode, defaultCategory, resolvedSection, activeSection]);
 
   const isProductCategory = React.useMemo(() => {
     if (resolvedSection === 'products' || form.category === 'Finished Goods' || form.category === 'Products') return true;
@@ -1322,7 +1324,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   const regenerateSkuCode = async (targetCategory?: string, overrideType?: 'products' | 'materials' | 'semi') => {
     if (editSku) return; // NEVER overwrite or change SKU Code when editing an existing SKU!
 
-    const currentSection = overrideType || resolvedSection;
+    const currentSection = overrideType || resolvedSection || (activeSection === 'materials' || activeSection === 'semi' || activeSection === 'products' ? activeSection : 'products');
+
     let prefix: 'RM' | 'FG' | 'SM' = 'RM';
 
     if (currentSection === 'products') {
@@ -1383,10 +1386,16 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   };
 
   useEffect(() => {
-    if (!editSku && isOpen && !form.skuCode) {
-      regenerateSkuCode();
+    if (!editSku && isOpen) {
+      const expectedSection = resolvedSection || (activeSection === 'materials' || activeSection === 'semi' || activeSection === 'products' ? activeSection : 'products');
+      const expectedPrefix = expectedSection === 'products' ? 'FG' : expectedSection === 'semi' ? 'SM' : 'RM';
+      const currentPrefix = (form.skuCode || '').split('-')[0]?.toUpperCase();
+
+      if (!form.skuCode || (currentPrefix && currentPrefix !== expectedPrefix && ['RM', 'FG', 'SM'].includes(currentPrefix))) {
+        regenerateSkuCode(undefined, expectedSection);
+      }
     }
-  }, [isOpen, form.category, !editSku, activeSection]);
+  }, [isOpen, !editSku, activeSection, resolvedSection, form.skuCode]);
 
     // Helper to compile Sku Name dynamically from specification inputs
     const compileSkuName = (formData: typeof form): string => {
