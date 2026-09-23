@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, 
@@ -6,6 +6,7 @@ import {
   ShoppingCart, 
   FileText, 
   AlertCircle,
+  AlertTriangle,
   CheckCircle,
   Clock,
   Building2,
@@ -17,11 +18,58 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getDashboardStats } from '../api/dashboardApi';
+import { getSkusV2, SkuV2 } from '../api/mfgApiV2';
+
+const getSkuCategoryGroup = (item: SkuV2): 'products' | 'materials' | 'semi' => {
+  const cat = (item.category || '').trim().toLowerCase();
+  const name = (item.name || '').trim().toLowerCase();
+  const code = (item.skuCode || '').trim().toUpperCase();
+
+  if (
+    cat.includes('semi') || 
+    cat.includes('wip') || 
+    cat === 'semi finished' || 
+    cat.includes('sub') || 
+    code.startsWith('SM') || 
+    code.startsWith('SFG') || 
+    code.startsWith('SEM') || 
+    code.startsWith('SF') ||
+    name.includes('ruled cut') ||
+    name.includes('inner signature') ||
+    name.includes('book block')
+  ) {
+    return 'semi';
+  }
+
+  if (
+    cat.includes('finish') || 
+    cat.includes('product') || 
+    code.startsWith('FG')
+  ) {
+    return 'products';
+  }
+
+  if (
+    cat.includes('raw') || 
+    cat.includes('material') || 
+    cat.includes('reel') || 
+    cat.includes('paper') ||
+    cat.includes('board') ||
+    cat.includes('ink') ||
+    cat.includes('wire') ||
+    code.startsWith('RM')
+  ) {
+    return 'materials';
+  }
+
+  return 'products';
+};
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { selectedCompany, user } = useAuth();
   const [dashData, setDashData] = useState<any>(null);
+  const [skus, setSkus] = useState<SkuV2[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -39,8 +87,14 @@ const Dashboard: React.FC = () => {
       setLoading(true);
     }
     try {
-      const res = await getDashboardStats(selectedCompany?._id);
+      const [res, skusData] = await Promise.all([
+        getDashboardStats(selectedCompany?._id),
+        selectedCompany?._id ? getSkusV2(selectedCompany._id).catch(() => []) : Promise.resolve([])
+      ]);
       setDashData(res.data);
+      if (Array.isArray(skusData)) {
+        setSkus(skusData);
+      }
     } catch (err) {
       console.error('Error fetching dashboard:', err);
     } finally {
@@ -49,6 +103,59 @@ const Dashboard: React.FC = () => {
       }
     }
   };
+
+  const kpiStats = useMemo(() => {
+    let totalItemsCount = skus.length;
+    let totalStockVal = 0;
+    let fgValue = 0;
+    let fgQty = 0;
+    let rmValue = 0;
+    let rmKg = 0;
+    let semiValue = 0;
+    let semiPcs = 0;
+    let lowStockCount = 0;
+    let outOfStockCount = 0;
+
+    skus.forEach(sku => {
+      const group = getSkuCategoryGroup(sku);
+      const stock = Number(sku.presentStock ?? sku.openingStock) || 0;
+      const rate = Number((sku as any)?.avgRate || (sku as any)?.purchasePrice || (sku as any)?.ratePerKg || (sku as any)?.rate || 0);
+      const val = stock * rate;
+      totalStockVal += val;
+
+      if (group === 'products') {
+        fgValue += val;
+        fgQty += stock;
+      } else if (group === 'materials') {
+        rmValue += val;
+        rmKg += stock;
+      } else if (group === 'semi') {
+        semiValue += val;
+        semiPcs += stock;
+      }
+
+      const reorder = Number(sku.reorderLevel) || 10;
+      if (stock === 0) {
+        outOfStockCount++;
+      } else if (stock <= reorder) {
+        lowStockCount++;
+      }
+    });
+
+    return {
+      totalItemsCount,
+      totalStockVal,
+      fgValue,
+      fgQty,
+      rmValue,
+      rmKg,
+      semiValue,
+      semiPcs,
+      lowStockCount,
+      outOfStockCount,
+      totalAlerts: lowStockCount + outOfStockCount
+    };
+  }, [skus]);
 
   if (loading) {
     return (
@@ -65,7 +172,7 @@ const Dashboard: React.FC = () => {
     { title: 'Regions', value: dashData?.stats?.routesCount || 0, icon: Compass, color: 'text-orange-600 bg-orange-50', path: '/directory?tab=regions' },
     { title: 'Markets', value: dashData?.stats?.marketsCount || 0, icon: MapPin, color: 'text-teal-600 bg-teal-50', path: '/directory?tab=cities' },
     { title: 'Transporters', value: dashData?.stats?.transportersCount || 0, icon: Truck, color: 'text-red-600 bg-red-50', path: '/directory?tab=transporters' },
-    { title: 'Items', value: dashData?.stats?.totalItems || 0, icon: Package, color: 'text-purple-600 bg-purple-50', path: '/inventory-v2/skus' }
+    { title: 'Items', value: kpiStats.totalItemsCount || dashData?.stats?.totalItems || 0, icon: Package, color: 'text-purple-600 bg-purple-50', path: '/stock-inventory' }
   ];
 
   const getStatusColor = (status: string) => {
@@ -81,22 +188,145 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-8 flex items-center justify-between">
+    <div className="p-6 text-left">
+      <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">
             Welcome back, {user?.fullName}
           </h1>
-          <p className="text-sm text-gray-500">Here's what's happening with {selectedCompany?.name || 'your business'} today.</p>
+          <p className="text-sm text-gray-500">Here&apos;s what&apos;s happening with {selectedCompany?.companyName || selectedCompany?.name || 'your business'} today.</p>
         </div>
         <button
           onClick={() => fetchDashboard()}
-          className="p-2.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200 bg-white shadow-sm flex items-center gap-1.5 font-medium text-sm"
+          className="p-2.5 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors border border-gray-200 bg-white shadow-2xs flex items-center gap-1.5 font-bold text-xs cursor-pointer"
           title="Refresh Dashboard"
         >
           <RefreshCw className="w-4 h-4" />
           <span>Refresh</span>
         </button>
+      </div>
+
+      {/* ── 6 INVENTORY & STOCK KPI SUMMARY CARDS ── */}
+      <div className="mb-8 bg-white rounded-2xl border border-gray-200/80 p-4 shadow-2xs">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          
+          {/* Card 1: Total Items */}
+          <div 
+            onClick={() => navigate('/stock-inventory')}
+            className="p-3.5 rounded-2xl border border-gray-200 bg-white hover:border-blue-400 hover:shadow-2xs transition-all cursor-pointer flex flex-col justify-between min-h-[74px]"
+          >
+            <div className="flex items-center justify-between text-gray-400 text-[10.5px] font-bold uppercase tracking-wider">
+              <span className="whitespace-nowrap">Total Items</span>
+              <Package className="w-3.5 h-3.5 text-blue-600" />
+            </div>
+            <div className="flex items-center justify-between gap-1.5 mt-2">
+              <span className="text-base sm:text-lg font-bold text-gray-900 leading-none whitespace-nowrap">
+                {kpiStats.totalItemsCount.toLocaleString('en-IN')}
+              </span>
+              <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200/60 whitespace-nowrap">
+                View All
+              </span>
+            </div>
+          </div>
+
+          {/* Card 2: Total Stock Value */}
+          <div 
+            onClick={() => navigate('/stock-inventory')}
+            className="p-3.5 rounded-2xl border border-gray-200 bg-white hover:border-blue-400 hover:shadow-2xs transition-all cursor-pointer flex flex-col justify-between min-h-[74px]"
+          >
+            <div className="flex items-center justify-between text-gray-400 text-[10.5px] font-bold uppercase tracking-wider">
+              <span className="whitespace-nowrap">Stock Value</span>
+              <span className="w-4 h-4 rounded-md bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-bold font-mono">
+                ₹
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-1.5 mt-2">
+              <span className="text-base sm:text-lg font-bold text-gray-900 leading-none whitespace-nowrap">
+                ₹{kpiStats.totalStockVal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+              </span>
+              <span className="text-[10px] font-medium text-gray-500 whitespace-nowrap">
+                Live Cost
+              </span>
+            </div>
+          </div>
+
+          {/* Card 3: Finished Goods */}
+          <div 
+            onClick={() => navigate('/stock-inventory?tab=products')}
+            className="p-3.5 rounded-2xl border border-gray-200 bg-white hover:border-blue-400 hover:shadow-2xs transition-all cursor-pointer flex flex-col justify-between min-h-[74px]"
+          >
+            <div className="flex items-center justify-between text-gray-400 text-[10.5px] font-bold uppercase tracking-wider">
+              <span className="whitespace-nowrap">Finished</span>
+              <div className="w-2 h-2 rounded-full bg-blue-600 shrink-0"></div>
+            </div>
+            <div className="flex items-center justify-between gap-1.5 mt-2">
+              <span className="text-base sm:text-lg font-bold text-gray-900 leading-none whitespace-nowrap">
+                ₹{kpiStats.fgValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+              </span>
+              <span className="text-[10px] font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200/60 whitespace-nowrap shrink-0">
+                {kpiStats.fgQty.toLocaleString('en-IN')} Pcs
+              </span>
+            </div>
+          </div>
+
+          {/* Card 4: Raw Materials */}
+          <div 
+            onClick={() => navigate('/stock-inventory?tab=materials')}
+            className="p-3.5 rounded-2xl border border-gray-200 bg-white hover:border-amber-400 hover:shadow-2xs transition-all cursor-pointer flex flex-col justify-between min-h-[74px]"
+          >
+            <div className="flex items-center justify-between text-gray-400 text-[10.5px] font-bold uppercase tracking-wider">
+              <span className="whitespace-nowrap">Raw Mat</span>
+              <div className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></div>
+            </div>
+            <div className="flex items-center justify-between gap-1.5 mt-2">
+              <span className="text-base sm:text-lg font-bold text-gray-900 leading-none whitespace-nowrap">
+                ₹{kpiStats.rmValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+              </span>
+              <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/60 whitespace-nowrap shrink-0">
+                {kpiStats.rmKg.toLocaleString('en-IN')} KG
+              </span>
+            </div>
+          </div>
+
+          {/* Card 5: Semi Finished */}
+          <div 
+            onClick={() => navigate('/stock-inventory?tab=semi')}
+            className="p-3.5 rounded-2xl border border-gray-200 bg-white hover:border-purple-400 hover:shadow-2xs transition-all cursor-pointer flex flex-col justify-between min-h-[74px]"
+          >
+            <div className="flex items-center justify-between text-gray-400 text-[10.5px] font-bold uppercase tracking-wider">
+              <span className="whitespace-nowrap">Semi Fin</span>
+              <div className="w-2 h-2 rounded-full bg-purple-500 shrink-0"></div>
+            </div>
+            <div className="flex items-center justify-between gap-1.5 mt-2">
+              <span className="text-base sm:text-lg font-bold text-gray-900 leading-none whitespace-nowrap">
+                ₹{kpiStats.semiValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+              </span>
+              <span className="text-[10px] font-mono font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200/60 whitespace-nowrap shrink-0">
+                {kpiStats.semiPcs.toLocaleString('en-IN')} Pcs
+              </span>
+            </div>
+          </div>
+
+          {/* Card 6: Stock Alerts */}
+          <div 
+            onClick={() => navigate('/stock-inventory?status=LOW_STOCK')}
+            className="p-3.5 rounded-2xl border border-rose-200 bg-white hover:border-rose-400 hover:shadow-2xs transition-all cursor-pointer flex flex-col justify-between min-h-[74px]"
+          >
+            <div className="flex items-center justify-between text-gray-400 text-[10.5px] font-bold uppercase tracking-wider">
+              <span className="whitespace-nowrap">Stock Alerts</span>
+              <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
+            </div>
+            <div className="flex items-center justify-between gap-1.5 mt-2">
+              <span className="text-base sm:text-lg font-bold text-rose-600 leading-none whitespace-nowrap">
+                {kpiStats.lowStockCount}
+              </span>
+              <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200/60 whitespace-nowrap shrink-0">
+                {kpiStats.outOfStockCount} out
+              </span>
+            </div>
+          </div>
+
+        </div>
       </div>
 
       {/* At a Glance Grid */}
