@@ -442,7 +442,7 @@ exports.getPurchaseInvoices = async (req, res, next) => {
     const [invoices, total] = await Promise.all([
       PurchaseInvoiceV2.find(query)
         .populate("vendorId", "firmName ownerName phone contactName email outstanding")
-        .populate("items.skuId", "skuCode name category unit paperType pages reamWeight gsm ruleType")
+        .populate("items.skuId", "skuCode name category unit paperType pages reamWeight gsm width length brand ruleType purchasePrice ratePerKg")
         .populate("items.locationId", "name level")
         .populate("createdBy", "fullName")
         .sort({ createdAt: -1 })

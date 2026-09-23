@@ -3087,50 +3087,88 @@ const PurchaseInvoicePage: React.FC = () => {
                           <th className="px-3 py-2.5 text-center">Width</th>
                           <th className="px-3 py-2.5 text-center">Reels</th>
                           <th className="px-3 py-2.5 text-right">Total KG</th>
+                          <th className="px-3 py-2.5 text-right">Rate/KG (₹)</th>
                           <th className="px-3 py-2.5 text-right">Mat Amount (₹)</th>
                           <th className="px-3 py-2.5 text-right">Landed Rate/KG (₹)</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100 text-gray-700 font-medium">
                         {selectedInvoice.items?.map((item, idx) => {
-                          const skuName = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any).name : 'Raw Material';
+                          const skuIdVal = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any)._id : item.skuId;
                           const resolvedSku = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null;
-                          const brand = item.brand || resolvedSku?.brand || '—';
-                          const gsm = item.gsm || resolvedSku?.gsm || '—';
-                          const width = item.width || resolvedSku?.width || '—';
-                          
+                          const fullSku = skus.find(s => s._id === (resolvedSku?._id || skuIdVal)) || resolvedSku;
+                          const skuName = resolvedSku?.name || fullSku?.name || 'Raw Material';
+
+                          // Brand resolution
+                          const brand = item.brand || resolvedSku?.brand || fullSku?.brand || '';
+
+                          // GSM resolution with robust regex fallback from name
+                          let gsmVal: string | number = item.gsm || resolvedSku?.gsm || fullSku?.gsm || (item.reels && item.reels[0]?.gsm) || '';
+                          if (!gsmVal && skuName) {
+                            const gsmMatch = skuName.match(/(\d+)\s*GSM/i);
+                            if (gsmMatch) gsmVal = gsmMatch[1];
+                          }
+
+                          // Width resolution with robust regex fallback from name
+                          let widthVal: string | number = item.width || resolvedSku?.width || fullSku?.width || (item.reels && item.reels[0]?.width) || '';
+                          if (!widthVal && skuName) {
+                            const widthMatch = skuName.match(/(\d+(?:\.\d+)?)\s*(?:CM|cm|"|in|x|\*)/i);
+                            if (widthMatch) widthVal = widthMatch[1];
+                          }
+
+                          // Quantity KG resolution
                           let displayQtyKg = item.quantity || 0;
-                          if (resolvedSku?.paperType === 'Sheets') {
-                            const stdSheets = resolvedSku.pages || 500;
-                            const reamWeight = item.reamWeight || resolvedSku?.reamWeight || getFallbackReamWeight(resolvedSku) || 0;
+                          const isSheets = (resolvedSku?.paperType === 'Sheets') || (fullSku?.paperType === 'Sheets');
+                          if (isSheets) {
+                            const stdSheets = resolvedSku?.pages || fullSku?.pages || 500;
+                            const reamWeight = item.reamWeight || resolvedSku?.reamWeight || fullSku?.reamWeight || getFallbackReamWeight(fullSku || resolvedSku) || 0;
                             if (reamWeight > 0) {
                               const reams = (item.quantity || 0) / stdSheets;
                               displayQtyKg = reams * reamWeight;
                             }
+                          } else if (item.reels && item.reels.length > 0) {
+                            const reelsTotalWt = item.reels.reduce((sum, r) => sum + (Number(r.weight) || 0), 0);
+                            if (reelsTotalWt > 0) displayQtyKg = reelsTotalWt;
                           }
-                          
-                          // Calculate Landed Rate / KG (Total Lot Cost with freight / Total KGs)
+
+                          // Base Rate / KG
+                          const baseRatePerKg = item.ratePerKg || (displayQtyKg > 0 ? (item.totalPrice || 0) / displayQtyKg : (item.purchasePrice || 0));
+
+                          // Landed Rate / KG (Total Lot Cost with freight / Total KGs)
                           const totalMatSubtotal = selectedInvoice.subTotal || selectedInvoice.items.reduce((s, it) => s + (it.totalPrice || 0), 0) || 1;
                           const totalFreightCharges = (selectedInvoice.freight || 0) + (selectedInvoice.craneCharges || 0) + (selectedInvoice.otherCharges || 0);
                           const lotMatCost = item.totalPrice || 0;
-                          const lotFreightShare = totalMatSubtotal > 0 ? (lotMatCost / totalMatSubtotal) * totalFreightCharges : 0;
+                          const lotFreightShare = (totalFreightCharges > 0 && totalMatSubtotal > 0) ? (lotMatCost / totalMatSubtotal) * totalFreightCharges : 0;
                           const lotLandedTotal = lotMatCost + lotFreightShare;
-                          const landedRatePerKg = displayQtyKg > 0 ? lotLandedTotal / displayQtyKg : 0;
+                          const landedRatePerKg = displayQtyKg > 0 ? (lotLandedTotal / displayQtyKg) : baseRatePerKg;
+
+                          const reelsCount = item.reels?.length || (!isSheets ? 1 : 0);
 
                           return (
                             <tr key={idx} className="hover:bg-gray-50/50">
                               <td className="px-3 py-2.5 text-gray-450 font-bold">{idx + 1}</td>
                               <td className="px-3 py-2.5 font-bold text-gray-900">
                                 <div>{skuName}</div>
-                                <div className="text-[10px] text-gray-400 font-normal">{brand}</div>
+                                {brand && brand !== '—' && (
+                                  <div className="text-[10px] text-gray-400 font-normal">{brand}</div>
+                                )}
                               </td>
-                              <td className="px-3 py-2.5 text-center font-bold text-gray-700">{gsm}</td>
-                              <td className="px-3 py-2.5 text-center font-bold text-gray-700">{width} cm</td>
-                              <td className="px-3 py-2.5 text-center font-bold text-gray-800">{item.reels?.length || 0}</td>
+                              <td className="px-3 py-2.5 text-center font-bold text-gray-700">{gsmVal || '—'}</td>
+                              <td className="px-3 py-2.5 text-center font-bold text-gray-700">
+                                {widthVal ? `${widthVal} cm` : '—'}
+                              </td>
+                              <td className="px-3 py-2.5 text-center font-bold text-gray-800">
+                                {reelsCount > 0 ? reelsCount : '—'}
+                              </td>
                               <td className="px-3 py-2.5 text-right font-black text-gray-955">
                                 {displayQtyKg.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                               </td>
-                              <td className="px-3 py-2.5 text-right font-black text-gray-955">₹{(item.totalPrice || 0).toLocaleString('en-IN')}</td>
+                              <td className="px-3 py-2.5 text-right font-bold text-gray-800 font-mono">
+                                ₹{baseRatePerKg.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </td>
+                              <td className="px-3 py-2.5 text-right font-black text-gray-955">
+                                ₹{(item.totalPrice || 0).toLocaleString('en-IN')}
+                              </td>
                               <td className="px-3 py-2.5 text-right font-black text-blue-700 font-mono">
                                 ₹{landedRatePerKg.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
@@ -3171,11 +3209,12 @@ const PurchaseInvoicePage: React.FC = () => {
                               const locationName = balance && balance.location
                                 ? balance.location.name 
                                 : 'Not Allocated';
+                              const rWidth = reel.width || item.width || (typeof item.skuId === 'object' ? (item.skuId as any)?.width : '') || (skuName.match(/(\d+(?:\.\d+)?)\s*(?:CM|cm)/i)?.[1]) || '';
                               return (
                                 <div key={rIdx} className="bg-white p-2 border border-gray-100 rounded-lg flex items-center justify-between text-[11px]">
                                   <div className="min-w-0">
                                     <p className="font-bold text-gray-800 truncate">Reel #{reel.reelNumber}</p>
-                                    <p className="text-[10px] text-gray-400 font-mono">{reel.weight} KG • {reel.width} cm</p>
+                                    <p className="text-[10px] text-gray-400 font-mono">{reel.weight || 0} KG{rWidth ? ` • ${rWidth} cm` : ''}</p>
                                   </div>
                                   <div className="text-right">
                                     <span className={`inline-flex px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
