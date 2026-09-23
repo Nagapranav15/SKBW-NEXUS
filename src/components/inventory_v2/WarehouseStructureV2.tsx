@@ -1,12 +1,11 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { 
   Building2, Layers, Search, 
-  Edit, Trash2, ChevronDown, 
-  Plus, Package, 
-  Filter, Eye,
+  Edit2, Trash2, ChevronDown, 
+  Plus, Package, Eye,
   Boxes, ArrowRight, Printer, Download,
-  SlidersHorizontal, Check, X, ArrowLeftRight, History, Sparkles,
-  FileSpreadsheet
+  SlidersHorizontal, History, Sparkles,
+  FileSpreadsheet, ArrowUpRight, CheckCircle2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../../context/AuthContext';
@@ -17,7 +16,6 @@ import {
   deleteWarehouseLocationV2, 
   getLocationDetailsV2,
   getSkusV2,
-  recordTransferV2,
   WarehouseLocationV2, 
   SkuV2
 } from '../../api/mfgApiV2';
@@ -29,19 +27,19 @@ interface WarehouseStructureV2Props {
   isEmbedded?: boolean;
 }
 
-const ZONE_COLOR_PALETTES: Record<string, { bg: string; text: string; border: string }> = {
-  A: { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' },
-  B: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
-  C: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
-  D: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
-  E: { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' },
-  F: { bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200' }
+const ZONE_COLOR_PALETTES: Record<string, { bg: string; text: string; border: string; dot: string }> = {
+  A: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200/80', dot: 'bg-blue-500' },
+  B: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200/80', dot: 'bg-emerald-500' },
+  C: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200/80', dot: 'bg-amber-500' },
+  D: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200/80', dot: 'bg-purple-500' },
+  E: { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200/80', dot: 'bg-rose-500' },
+  F: { bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200/80', dot: 'bg-cyan-500' }
 };
 
 const getZoneColor = (zoneName: string) => {
   const clean = zoneName.replace(/zone/i, '').trim().toUpperCase();
   const firstChar = clean[0] || 'A';
-  return ZONE_COLOR_PALETTES[firstChar] || { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' };
+  return ZONE_COLOR_PALETTES[firstChar] || { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200/80', dot: 'bg-blue-500' };
 };
 
 const getZoneLetter = (zoneName: string) => {
@@ -69,16 +67,13 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
   } | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
 
-  // Search & Filter
+  // Search
   const [zoneSearch, setZoneSearch] = useState('');
-  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
-  const [stockTypeFilter, setStockTypeFilter] = useState<'ALL' | 'RAW' | 'SEMI' | 'FG'>('ALL');
 
-  // Modals
+  // Modals & Dropdowns
   const [showAddModal, setShowAddModal] = useState(false);
   const [editNode, setEditNode] = useState<WarehouseLocationV2 | null>(null);
   const [deleteConfirmNode, setDeleteConfirmNode] = useState<WarehouseLocationV2 | null>(null);
-  const [showTransferModal, setShowTransferModal] = useState(false);
   const [showToolsDropdown, setShowToolsDropdown] = useState(false);
   const [showExportDropdown, setShowExportDropdown] = useState(false);
   const [showZoneExportDropdown, setShowZoneExportDropdown] = useState(false);
@@ -107,16 +102,6 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
   const [addLoading, setAddLoading] = useState(false);
   const [addError, setAddError] = useState('');
 
-  // Transfer Stock Form State
-  const [transferForm, setTransferForm] = useState({
-    skuId: '',
-    fromLocationId: '',
-    toLocationId: '',
-    quantity: '',
-    remarks: ''
-  });
-  const [transferLoading, setTransferLoading] = useState(false);
-
   // Initial Load
   useEffect(() => {
     if (selectedCompany?._id) {
@@ -135,9 +120,9 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
       setSkus(skusData);
 
       // Initialize selected factory and floor
-      const factories = hierarchyData.filter(l => l.level === 'Factory');
-      if (factories.length > 0) {
-        const defaultFactory = factories[0];
+      const factoriesList = hierarchyData.filter(l => l.level === 'Factory');
+      if (factoriesList.length > 0) {
+        const defaultFactory = factoriesList[0];
         setSelectedFactoryId(defaultFactory._id || '');
         const floors = hierarchyData.filter(l => l.parentId === defaultFactory._id && l.level === 'Floor');
         if (floors.length > 0) {
@@ -377,7 +362,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
     return locations.filter(l => l.level === 'Storage Location' && zoneIds.has(l.parentId));
   }, [locations, activeZones]);
 
-  // Compute Factory Metrics (Floors, Zones, Locations counts)
+  // Compute Factory Metrics
   const getFactoryMetrics = (factoryId: string) => {
     const factoryFloors = locations.filter(l => l.parentId === factoryId && l.level === 'Floor');
     const floorIds = new Set(factoryFloors.map(f => f._id));
@@ -394,11 +379,9 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
 
   // Helper to compute stock & SKU breakdown for a location or zone
   const getLocationStockMetrics = (location: WarehouseLocationV2) => {
-    // 1. Direct SKU matches
     const locationName = (location.name || '').toLowerCase();
     const locId = location._id;
 
-    // Filter SKUs that match this location by ID, warehouseLocation name, or distributed pattern
     const assignedSkus = skus.filter(s => {
       const wLoc = (s.warehouseLocation || '').toLowerCase();
       const sLocId = (s as any).locationId;
@@ -429,7 +412,6 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
       }
     });
 
-    // If active database has SKUs but locations haven't been tagged individually yet, provide realistic proportion
     const totalSkus = assignedSkus.length > 0 ? assignedSkus.length : (rawMatSkus + semiSkus + fgSkus);
 
     return {
@@ -461,10 +443,8 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
     let rowIdx = 1;
 
     activeZones.forEach(zone => {
-      // Find storage locations under this zone
       const locs = locations.filter(l => l.parentId === zone._id && l.level === 'Storage Location');
 
-      // Filter by search query if any
       const matchesSearch = !zoneSearch.trim() || 
         zone.name.toLowerCase().includes(zoneSearch.toLowerCase().trim()) ||
         locs.some(l => l.name.toLowerCase().includes(zoneSearch.toLowerCase().trim()));
@@ -472,7 +452,6 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
       if (!matchesSearch) return;
 
       if (locs.length === 0) {
-        // Zone without explicit storage locations
         const metrics = getLocationStockMetrics(zone);
         rows.push({
           index: rowIdx++,
@@ -527,7 +506,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
     };
   }, [tableRows]);
 
-  // Compute Zone-Wise Summaries for the bottom cards
+  // Compute Zone-Wise Summaries
   const zoneSummaries = useMemo(() => {
     return activeZones.map(zone => {
       const locs = locations.filter(l => l.parentId === zone._id && l.level === 'Storage Location');
@@ -733,31 +712,34 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
   };
 
   return (
-    <div className="space-y-4 text-left font-sans animate-in fade-in duration-150">
+    <div className="space-y-4 text-left font-sans animate-in fade-in duration-150 max-w-[1600px] mx-auto">
       
-      {/* ── 1. SECTION HEADER ── */}
-      <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-2xs">
+      {/* ── 1. HEADER & CONTROLS ── */}
+      <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           
-          {/* Left Title & Icon */}
+          {/* Title & Subtitle */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-              <Layers className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-lg bg-blue-50/80 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+              <Layers className="w-4 h-4" />
             </div>
             <div>
-              <span className="text-[10px] font-black text-blue-600 tracking-wider uppercase block">
-                Master Management
-              </span>
-              <h2 className="text-lg font-extrabold text-gray-900 tracking-tight leading-tight">
-                Warehouse Hierarchy & Storage Setup
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-semibold text-blue-600 tracking-wider uppercase">
+                  Master Management
+                </span>
+                <span className="text-slate-300">•</span>
+                <span className="text-[11px] text-slate-400 font-medium">
+                  {factories.length} {factories.length === 1 ? 'Factory' : 'Factories'}
+                </span>
+              </div>
+              <h2 className="text-base font-bold text-slate-900 tracking-tight">
+                Warehouse Structure & Storage Locations
               </h2>
-              <p className="text-xs text-gray-500 font-medium">
-                Manage factories, floors, zones and storage locations
-              </p>
             </div>
           </div>
 
-          {/* Right Action Buttons */}
+          {/* Action Buttons */}
           <div className="flex items-center gap-2 flex-wrap">
             
             {/* Tools Dropdown */}
@@ -768,21 +750,21 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                   setShowToolsDropdown(!showToolsDropdown);
                   setShowExportDropdown(false);
                 }}
-                className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 rounded-xl text-xs font-bold text-gray-700 flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                className="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
               >
-                <SlidersHorizontal className="w-3.5 h-3.5 text-gray-500" />
+                <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
                 <span>Tools</span>
-                <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                <ChevronDown className="w-3 h-3 text-slate-400" />
               </button>
               {showToolsDropdown && (
-                <div className="absolute right-0 top-full mt-1.5 w-48 bg-white rounded-xl border border-gray-200 shadow-xl py-1 z-50 text-xs font-semibold animate-in fade-in duration-150">
+                <div className="absolute right-0 top-full mt-1.5 w-48 bg-white rounded-xl border border-slate-200 shadow-lg py-1 z-50 text-xs font-medium animate-in fade-in duration-100">
                   <button
                     onClick={() => {
                       fetchActivityLogs();
                       setShowActivityLogModal(true);
                       setShowToolsDropdown(false);
                     }}
-                    className="w-full px-3 py-2 text-left text-gray-700 hover:bg-blue-50 flex items-center gap-2"
+                    className="w-full px-3 py-2 text-left text-slate-700 hover:bg-blue-50/70 hover:text-blue-700 flex items-center gap-2 transition-colors"
                   >
                     <History className="w-3.5 h-3.5 text-blue-600" />
                     <span>Activity History</span>
@@ -792,7 +774,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                       findDuplicates();
                       setShowToolsDropdown(false);
                     }}
-                    className="w-full px-3 py-2 text-left text-gray-700 hover:bg-blue-50 flex items-center gap-2"
+                    className="w-full px-3 py-2 text-left text-slate-700 hover:bg-blue-50/70 hover:text-blue-700 flex items-center gap-2 transition-colors"
                   >
                     <Sparkles className="w-3.5 h-3.5 text-amber-600" />
                     <span>Scan Duplicates</span>
@@ -803,10 +785,10 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                         handleSeedDefaultHierarchy();
                         setShowToolsDropdown(false);
                       }}
-                      className="w-full px-3 py-2 text-left text-blue-700 hover:bg-blue-50 flex items-center gap-2 font-bold"
+                      className="w-full px-3 py-2 text-left text-blue-700 hover:bg-blue-50 flex items-center gap-2 font-semibold border-t border-slate-100"
                     >
                       <Plus className="w-3.5 h-3.5 text-blue-600" />
-                      <span>Setup SKBW / LOM / Maruti</span>
+                      <span>Setup Default Plants</span>
                     </button>
                   )}
                 </div>
@@ -817,9 +799,9 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
             <button
               type="button"
               onClick={() => window.print()}
-              className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 rounded-xl text-xs font-bold text-gray-700 flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+              className="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
             >
-              <Printer className="w-3.5 h-3.5 text-gray-500" />
+              <Printer className="w-3.5 h-3.5 text-slate-500" />
               <span>Print</span>
             </button>
 
@@ -831,17 +813,17 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                   setShowExportDropdown(!showExportDropdown);
                   setShowToolsDropdown(false);
                 }}
-                className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 rounded-xl text-xs font-bold text-gray-700 flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                className="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
               >
-                <Download className="w-3.5 h-3.5 text-gray-500" />
+                <Download className="w-3.5 h-3.5 text-slate-500" />
                 <span>Export</span>
-                <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                <ChevronDown className="w-3 h-3 text-slate-400" />
               </button>
               {showExportDropdown && (
-                <div className="absolute right-0 top-full mt-1.5 w-44 bg-white rounded-xl border border-gray-200 shadow-xl py-1 z-50 text-xs font-semibold animate-in fade-in duration-150">
+                <div className="absolute right-0 top-full mt-1.5 w-44 bg-white rounded-xl border border-slate-200 shadow-lg py-1 z-50 text-xs font-medium animate-in fade-in duration-100">
                   <button
                     onClick={handleExportExcel}
-                    className="w-full px-3 py-2 text-left text-gray-700 hover:bg-blue-50 flex items-center gap-2"
+                    className="w-full px-3 py-2 text-left text-slate-700 hover:bg-blue-50/70 hover:text-blue-700 flex items-center gap-2 transition-colors"
                   >
                     <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
                     <span>Export Excel (.xlsx)</span>
@@ -854,27 +836,27 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
             <button
               type="button"
               onClick={() => handleOpenAddModal('Factory')}
-              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3.5 h-3.5" />
               <span>Add Factory</span>
             </button>
           </div>
         </div>
 
-        {/* ── 2. FACTORY CARDS SELECTOR ── */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 mt-4">
+        {/* ── 2. FACTORY CARDS ── */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
           {factories.length === 0 ? (
-            <div className="col-span-3 p-6 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200 space-y-2">
-              <Building2 className="w-8 h-8 text-gray-300 mx-auto" />
-              <p className="font-bold text-gray-700 text-sm">No Factories Configured Yet</p>
-              <p className="text-xs text-gray-400">Click &apos;+ Add Factory&apos; or use Tools to initialize SKBW, LOM, and Maruti structures.</p>
+            <div className="col-span-3 p-6 text-center bg-slate-50/70 rounded-xl border border-dashed border-slate-200 space-y-2">
+              <Building2 className="w-7 h-7 text-slate-300 mx-auto" />
+              <p className="font-semibold text-slate-700 text-xs">No Factories Configured Yet</p>
+              <p className="text-[11px] text-slate-400">Click &apos;+ Add Factory&apos; or use Tools to initialize default factory setup.</p>
               <button
                 type="button"
                 onClick={handleSeedDefaultHierarchy}
-                className="mt-2 px-3.5 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs hover:bg-blue-700 cursor-pointer"
+                className="mt-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 shadow-xs hover:bg-blue-700 cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5" /> Initialize Default Factories
+                <Plus className="w-3.5 h-3.5" /> Initialize SKBW / LOM / Maruti
               </button>
             </div>
           ) : (
@@ -895,22 +877,27 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                       setSelectedFloorId('');
                     }
                   }}
-                  className={`p-3.5 rounded-2xl transition-all text-left flex items-center gap-3.5 cursor-pointer relative ${
+                  className={`p-3 rounded-xl transition-all text-left flex items-center gap-3 cursor-pointer relative ${
                     isSelected
-                      ? 'border-2 border-blue-600 bg-blue-50/20 shadow-xs ring-2 ring-blue-600/10'
-                      : 'border border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50/60 shadow-2xs'
+                      ? 'border border-blue-500 bg-blue-50/40 shadow-xs ring-1 ring-blue-500/20'
+                      : 'border border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50/50 shadow-2xs'
                   }`}
                 >
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                    isSelected ? 'bg-blue-600 text-white shadow-2xs' : 'bg-blue-50 text-blue-600 border border-blue-100'
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                    isSelected ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600 border border-slate-200/60'
                   }`}>
-                    <Building2 className="w-5 h-5" />
+                    <Building2 className="w-4 h-4" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-sm font-bold text-gray-900 truncate">
-                      {factory.name}
-                    </h3>
-                    <p className="text-[11px] text-gray-500 font-medium">
+                    <div className="flex items-center justify-between">
+                      <h3 className={`text-xs font-bold truncate ${isSelected ? 'text-blue-900' : 'text-slate-800'}`}>
+                        {factory.name}
+                      </h3>
+                      {isSelected && (
+                        <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0"></span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500 font-medium mt-0.5">
                       {metrics.floorsCount} Floors • {metrics.zonesCount} Zones • {metrics.locationsCount} Locations
                     </p>
                   </div>
@@ -920,12 +907,12 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
           )}
         </div>
 
-        {/* ── 3. FLOOR SELECTOR TABS & FLOOR SUMMARY ── */}
+        {/* ── 3. FLOOR TABS & SUMMARY ── */}
         {activeFactory && (
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mt-4 pt-4 border-t border-gray-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-3.5 pt-3 border-t border-slate-100">
             
             {/* Floor Pill Tabs */}
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 flex-wrap">
               {activeFloors.map(floor => {
                 const isSelected = activeFloor?._id === floor._id;
                 return (
@@ -933,10 +920,10 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                     key={floor._id}
                     type="button"
                     onClick={() => setSelectedFloorId(floor._id!)}
-                    className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                       isSelected
-                        ? 'bg-blue-50 border border-blue-500 text-blue-600 shadow-2xs'
-                        : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300'
+                        ? 'bg-blue-50 border border-blue-400 text-blue-700 shadow-2xs'
+                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
                     }`}
                   >
                     {floor.name}
@@ -947,11 +934,11 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
               <button
                 type="button"
                 onClick={() => handleOpenAddModal('Floor', activeFactory._id)}
-                className="px-3 py-1.5 rounded-xl text-xs font-bold text-gray-500 hover:text-blue-600 border border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50/40 transition-all cursor-pointer flex items-center gap-1"
+                className="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-500 hover:text-blue-600 border border-dashed border-slate-300 hover:border-blue-400 hover:bg-blue-50/30 transition-all cursor-pointer flex items-center gap-1"
                 title="Add Floor to this Factory"
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Floor</span>
+                <Plus className="w-3 h-3" />
+                <span>Floor</span>
               </button>
             </div>
 
@@ -960,9 +947,9 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
               <button
                 type="button"
                 onClick={() => setShowFloorSummaryModal(true)}
-                className="px-3.5 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl text-xs font-bold text-gray-700 flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs self-start sm:self-auto"
+                className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer self-start sm:self-auto"
               >
-                <Boxes className="w-3.5 h-3.5 text-gray-500" />
+                <Boxes className="w-3.5 h-3.5 text-slate-500" />
                 <span>Floor Summary</span>
               </button>
             )}
@@ -970,36 +957,32 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
         )}
       </div>
 
-      {/* ── 4. SELECTED FLOOR TABLE ── */}
+      {/* ── 4. FLOOR LOCATIONS TABLE ── */}
       {activeFloor && (
-        <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
           
           {/* Table Header Toolbar */}
-          <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-                <Layers className="w-4 h-4" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-gray-900 leading-tight">
-                  {activeFloor.name}
-                </h3>
-                <p className="text-[11px] text-gray-400 font-medium">
-                  {activeZones.length} Zones • {activeStorageLocations.length} Storage Locations
-                </p>
-              </div>
+          <div className="px-4 py-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-slate-50/40">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-900">
+                {activeFloor.name}
+              </span>
+              <span className="text-slate-300">•</span>
+              <span className="text-[11px] text-slate-500 font-medium">
+                {activeZones.length} Zones, {activeStorageLocations.length} Locations
+              </span>
             </div>
 
             <div className="flex items-center gap-2">
               {/* Search input */}
               <div className="relative">
-                <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Search zones..."
+                  placeholder="Search zones or bins..."
                   value={zoneSearch}
                   onChange={e => setZoneSearch(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium text-gray-800 placeholder-gray-400 focus:bg-white focus:outline-none focus:border-blue-500 w-44 sm:w-56"
+                  className="pl-8 pr-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 w-44 sm:w-52"
                 />
               </div>
 
@@ -1007,7 +990,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
               <button
                 type="button"
                 onClick={() => handleOpenAddModal('Zone', activeFloor._id)}
-                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer shrink-0"
+                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1 shadow-xs transition-colors cursor-pointer shrink-0"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Zone</span>
@@ -1018,23 +1001,23 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
           {/* Table Element */}
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
-              <thead className="bg-gray-50/80 border-b border-gray-100 text-[10.5px] font-bold text-gray-400 uppercase tracking-wider">
+              <thead className="bg-slate-50/80 border-b border-slate-100 text-[10.5px] font-semibold text-slate-500 uppercase tracking-wider">
                 <tr>
-                  <th className="px-4 py-3 w-12 text-center">#</th>
-                  <th className="px-4 py-3 w-28 text-center">Zone</th>
-                  <th className="px-4 py-3">Storage Location</th>
-                  <th className="px-4 py-3">Raw Materials (KG)</th>
-                  <th className="px-4 py-3">Semi Finished (PCS)</th>
-                  <th className="px-4 py-3">Finished Goods (GBL)</th>
-                  <th className="px-4 py-3 text-center">Total SKUs</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="px-3.5 py-2.5 w-10 text-center">#</th>
+                  <th className="px-3.5 py-2.5 w-24 text-center">Zone</th>
+                  <th className="px-3.5 py-2.5">Storage Location</th>
+                  <th className="px-3.5 py-2.5">Raw Materials (KG)</th>
+                  <th className="px-3.5 py-2.5">Semi Finished (PCS)</th>
+                  <th className="px-3.5 py-2.5">Finished Goods (GBL)</th>
+                  <th className="px-3.5 py-2.5 text-center">Total SKUs</th>
+                  <th className="px-3.5 py-2.5 text-right w-24">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-slate-100 font-medium">
                 {tableRows.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-gray-400 font-medium">
-                      No zones or storage locations created for {activeFloor.name} yet.
+                    <td colSpan={8} className="py-10 text-center text-slate-400">
+                      No zones or storage locations configured for {activeFloor.name} yet.
                     </td>
                   </tr>
                 ) : (
@@ -1043,29 +1026,29 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                     const zoneLetter = getZoneLetter(row.zone.name);
 
                     return (
-                      <tr key={`${row.zone._id}_${row.location._id}_${row.index}`} className="hover:bg-blue-50/20 transition-colors">
+                      <tr key={`${row.zone._id}_${row.location._id}_${row.index}`} className="hover:bg-slate-50/60 transition-colors">
                         
                         {/* # */}
-                        <td className="px-4 py-3 text-center font-bold text-gray-400">
+                        <td className="px-3.5 py-2.5 text-center font-semibold text-slate-400">
                           {row.index}
                         </td>
 
                         {/* Zone Badge */}
-                        <td className="px-4 py-3 text-center">
-                          <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg text-xs font-black border ${zoneStyle.bg} ${zoneStyle.text} ${zoneStyle.border}`}>
+                        <td className="px-3.5 py-2.5 text-center">
+                          <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-[11px] font-bold border ${zoneStyle.bg} ${zoneStyle.text} ${zoneStyle.border}`}>
                             {zoneLetter}
                           </span>
                         </td>
 
                         {/* Storage Location */}
-                        <td className="px-4 py-3 font-bold text-gray-900">
+                        <td className="px-3.5 py-2.5 font-semibold text-slate-900">
                           <div className="flex items-center gap-1.5">
                             <span>{row.location.name}</span>
                             {row.location.level === 'Zone' && (
                               <button
                                 type="button"
                                 onClick={() => handleOpenAddModal('Storage Location', row.zone._id)}
-                                className="text-[10px] text-blue-600 font-bold hover:underline ml-1"
+                                className="text-[10px] text-blue-600 font-semibold hover:underline ml-1"
                               >
                                 + Add Bin
                               </button>
@@ -1074,78 +1057,63 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                         </td>
 
                         {/* Raw Materials (KG) */}
-                        <td className="px-4 py-3">
-                          <div className="space-y-0.5">
-                            <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
-                              <Package className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                              <span>{row.rawMatQty.toLocaleString('en-IN')} KG</span>
-                            </div>
-                            <div className="text-[10.5px] text-gray-400 font-medium pl-5">
-                              {row.rawMatSkus} SKUs
-                            </div>
+                        <td className="px-3.5 py-2.5">
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="font-semibold text-slate-800">{row.rawMatQty.toLocaleString('en-IN')} KG</span>
+                            <span className="text-[10.5px] text-slate-400 font-normal">({row.rawMatSkus} SKUs)</span>
                           </div>
                         </td>
 
                         {/* Semi Finished (PCS) */}
-                        <td className="px-4 py-3">
-                          <div className="space-y-0.5">
-                            <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
-                              <Layers className="w-3.5 h-3.5 text-purple-500 shrink-0" />
-                              <span>{row.semiQty.toLocaleString('en-IN')} PCS</span>
-                            </div>
-                            <div className="text-[10.5px] text-gray-400 font-medium pl-5">
-                              {row.semiSkus} SKUs
-                            </div>
+                        <td className="px-3.5 py-2.5">
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="font-semibold text-slate-800">{row.semiQty.toLocaleString('en-IN')} PCS</span>
+                            <span className="text-[10.5px] text-slate-400 font-normal">({row.semiSkus} SKUs)</span>
                           </div>
                         </td>
 
                         {/* Finished Goods (GBL) */}
-                        <td className="px-4 py-3">
-                          <div className="space-y-0.5">
-                            <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
-                              <Boxes className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                              <span>{row.fgQty.toLocaleString('en-IN')} GBL</span>
-                            </div>
-                            <div className="text-[10.5px] text-gray-400 font-medium pl-5">
-                              {row.fgSkus} SKUs
-                            </div>
+                        <td className="px-3.5 py-2.5">
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="font-semibold text-slate-800">{row.fgQty.toLocaleString('en-IN')} GBL</span>
+                            <span className="text-[10.5px] text-slate-400 font-normal">({row.fgSkus} SKUs)</span>
                           </div>
                         </td>
 
                         {/* Total SKUs */}
-                        <td className="px-4 py-3 text-center font-black text-gray-900 text-xs">
+                        <td className="px-3.5 py-2.5 text-center font-bold text-slate-800">
                           {row.totalSkus}
                         </td>
 
                         {/* Actions */}
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-3.5 py-2.5 text-right">
                           <div className="flex items-center justify-end gap-1">
                             
-                            {/* Inspect Eye */}
+                            {/* Inspect */}
                             <button
                               type="button"
                               onClick={() => handleInspectLocation(row.location)}
-                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                              title="Inspect Location Stock"
+                              className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer"
+                              title="Inspect Live Stock"
                             >
                               <Eye className="w-3.5 h-3.5" />
                             </button>
 
-                            {/* Edit Pencil */}
+                            {/* Edit */}
                             <button
                               type="button"
                               onClick={() => handleOpenEditModal(row.location)}
-                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                              className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer"
                               title="Edit Location"
                             >
-                              <Edit className="w-3.5 h-3.5" />
+                              <Edit2 className="w-3.5 h-3.5" />
                             </button>
 
-                            {/* Delete Trash */}
+                            {/* Delete */}
                             <button
                               type="button"
                               onClick={() => setDeleteConfirmNode(row.location)}
-                              className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
                               title="Delete Location"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -1160,48 +1128,33 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
 
               {/* Table Footer Totals */}
               {tableRows.length > 0 && (
-                <tfoot className="bg-blue-50/40 border-t border-blue-100 font-bold">
+                <tfoot className="bg-slate-50/70 border-t border-slate-200 text-xs font-semibold">
                   <tr>
-                    <td colSpan={3} className="px-4 py-3.5 text-gray-900 text-xs font-black">
+                    <td colSpan={3} className="px-3.5 py-2.5 text-slate-900 font-bold">
                       Total ({activeFloor.name})
                     </td>
-                    <td className="px-4 py-3.5">
-                      <div className="space-y-0.5">
-                        <div className="font-black text-gray-900 text-xs flex items-center gap-1.5">
-                          <Package className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                          <span>{floorTotals.totalRawMatQty.toLocaleString('en-IN')} KG</span>
-                        </div>
-                        <div className="text-[10px] text-gray-500 pl-5">
-                          {floorTotals.totalRawMatSkus} SKUs
-                        </div>
+                    <td className="px-3.5 py-2.5">
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="font-bold text-slate-900">{floorTotals.totalRawMatQty.toLocaleString('en-IN')} KG</span>
+                        <span className="text-[10px] text-slate-500 font-normal">({floorTotals.totalRawMatSkus} SKUs)</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3.5">
-                      <div className="space-y-0.5">
-                        <div className="font-black text-gray-900 text-xs flex items-center gap-1.5">
-                          <Layers className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-                          <span>{floorTotals.totalSemiQty.toLocaleString('en-IN')} PCS</span>
-                        </div>
-                        <div className="text-[10px] text-gray-500 pl-5">
-                          {floorTotals.totalSemiSkus} SKUs
-                        </div>
+                    <td className="px-3.5 py-2.5">
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="font-bold text-slate-900">{floorTotals.totalSemiQty.toLocaleString('en-IN')} PCS</span>
+                        <span className="text-[10px] text-slate-500 font-normal">({floorTotals.totalSemiSkus} SKUs)</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3.5">
-                      <div className="space-y-0.5">
-                        <div className="font-black text-gray-900 text-xs flex items-center gap-1.5">
-                          <Boxes className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                          <span>{floorTotals.totalFgQty.toLocaleString('en-IN')} GBL</span>
-                        </div>
-                        <div className="text-[10px] text-gray-500 pl-5">
-                          {floorTotals.totalFgSkus} SKUs
-                        </div>
+                    <td className="px-3.5 py-2.5">
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="font-bold text-slate-900">{floorTotals.totalFgQty.toLocaleString('en-IN')} GBL</span>
+                        <span className="text-[10px] text-slate-500 font-normal">({floorTotals.totalFgSkus} SKUs)</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3.5 text-center font-black text-gray-900 text-xs">
+                    <td className="px-3.5 py-2.5 text-center font-bold text-slate-900">
                       {floorTotals.totalSkusCount}
                     </td>
-                    <td className="px-4 py-3.5"></td>
+                    <td className="px-3.5 py-2.5"></td>
                   </tr>
                 </tfoot>
               )}
@@ -1212,36 +1165,42 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
 
       {/* ── 5. ZONE WISE SUMMARY SECTION ── */}
       {activeFloor && zoneSummaries.length > 0 && (
-        <div className="space-y-3 pt-2">
+        <div className="space-y-2.5 pt-1">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-gray-900">
-              Zone Wise Summary ({activeFloor.name})
-            </h3>
             <div className="flex items-center gap-2">
+              <h3 className="text-xs font-bold text-slate-900">
+                Zone Wise Summary
+              </h3>
+              <span className="text-[11px] text-slate-400 font-medium">
+                ({activeFloor.name})
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl text-xs font-bold text-gray-700 flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                className="px-2.5 py-1 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg text-xs font-medium text-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
               >
-                <Printer className="w-3.5 h-3.5 text-gray-500" />
-                <span>Print Zone Summary</span>
+                <Printer className="w-3 h-3 text-slate-400" />
+                <span>Print</span>
               </button>
 
               <div className="relative">
                 <button
                   type="button"
                   onClick={() => setShowZoneExportDropdown(!showZoneExportDropdown)}
-                  className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl text-xs font-bold text-gray-700 flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                  className="px-2.5 py-1 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg text-xs font-medium text-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                 >
-                  <Download className="w-3.5 h-3.5 text-gray-500" />
-                  <span>Export Zone Summary</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                  <Download className="w-3 h-3 text-slate-400" />
+                  <span>Export</span>
+                  <ChevronDown className="w-3 h-3 text-slate-400" />
                 </button>
                 {showZoneExportDropdown && (
-                  <div className="absolute right-0 top-full mt-1.5 w-44 bg-white rounded-xl border border-gray-200 shadow-xl py-1 z-50 text-xs font-semibold animate-in fade-in duration-150">
+                  <div className="absolute right-0 top-full mt-1.5 w-44 bg-white rounded-xl border border-slate-200 shadow-lg py-1 z-50 text-xs font-medium animate-in fade-in duration-100">
                     <button
                       onClick={handleExportExcel}
-                      className="w-full px-3 py-2 text-left text-gray-700 hover:bg-blue-50 flex items-center gap-2"
+                      className="w-full px-3 py-2 text-left text-slate-700 hover:bg-blue-50/70 hover:text-blue-700 flex items-center gap-2 transition-colors"
                     >
                       <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
                       <span>Export Excel (.xlsx)</span>
@@ -1252,7 +1211,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {zoneSummaries.map(({ zone, rawMatQty, rawMatSkus, semiQty, semiSkus, fgQty, fgSkus }) => {
               const zoneStyle = getZoneColor(zone.name);
               const zoneLetter = getZoneLetter(zone.name);
@@ -1260,48 +1219,43 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
               return (
                 <div
                   key={zone._id}
-                  className="p-4 bg-white border border-gray-200/80 rounded-2xl shadow-2xs hover:border-blue-200 transition-colors space-y-3"
+                  className="p-3.5 bg-white border border-slate-200/80 rounded-xl shadow-2xs hover:border-slate-300 transition-colors space-y-2.5"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-[11px] font-black border ${zoneStyle.bg} ${zoneStyle.text} ${zoneStyle.border}`}>
+                      <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-[11px] font-bold border ${zoneStyle.bg} ${zoneStyle.text} ${zoneStyle.border}`}>
                         {zoneLetter}
                       </span>
-                      <span className="font-bold text-gray-900 text-xs">{zone.name}</span>
+                      <span className="font-bold text-slate-900 text-xs">{zone.name}</span>
                     </div>
                     <button
                       type="button"
                       onClick={() => handleInspectLocation(zone)}
-                      className="text-gray-400 hover:text-blue-600 p-1 rounded-lg transition-colors cursor-pointer"
+                      className="text-slate-400 hover:text-blue-600 p-1 rounded transition-colors cursor-pointer flex items-center gap-0.5 text-[11px] font-medium"
                       title="Inspect Zone"
                     >
-                      <ArrowRight className="w-4 h-4 text-blue-600" />
+                      <span>Details</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 pt-1 border-t border-gray-100 text-xs">
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-1 text-[11px] font-bold text-gray-900">
-                        <Package className="w-3 h-3 text-blue-500 shrink-0" />
-                        <span>{rawMatQty.toLocaleString('en-IN')} KG</span>
-                      </div>
-                      <p className="text-[10px] text-gray-400 font-medium pl-4">{rawMatSkus} SKUs</p>
+                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-xs">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-medium">Raw Mat</span>
+                      <span className="font-bold text-slate-800 text-[11px]">{rawMatQty.toLocaleString('en-IN')} KG</span>
+                      <p className="text-[10px] text-slate-400 font-normal">{rawMatSkus} SKUs</p>
                     </div>
 
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-1 text-[11px] font-bold text-gray-900">
-                        <Layers className="w-3 h-3 text-purple-500 shrink-0" />
-                        <span>{semiQty.toLocaleString('en-IN')} PCS</span>
-                      </div>
-                      <p className="text-[10px] text-gray-400 font-medium pl-4">{semiSkus} SKUs</p>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-medium">Semi Fin</span>
+                      <span className="font-bold text-slate-800 text-[11px]">{semiQty.toLocaleString('en-IN')} PCS</span>
+                      <p className="text-[10px] text-slate-400 font-normal">{semiSkus} SKUs</p>
                     </div>
 
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-1 text-[11px] font-bold text-gray-900">
-                        <Boxes className="w-3 h-3 text-emerald-500 shrink-0" />
-                        <span>{fgQty.toLocaleString('en-IN')} GBL</span>
-                      </div>
-                      <p className="text-[10px] text-gray-400 font-medium pl-4">{fgSkus} SKUs</p>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-medium">Finished</span>
+                      <span className="font-bold text-slate-800 text-[11px]">{fgQty.toLocaleString('en-IN')} GBL</span>
+                      <p className="text-[10px] text-slate-400 font-normal">{fgSkus} SKUs</p>
                     </div>
                   </div>
                 </div>
@@ -1321,20 +1275,20 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
       >
         <form onSubmit={handleSaveLocation} className="space-y-3.5 text-xs text-left">
           {addError && (
-            <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl font-medium">
+            <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg font-medium text-xs">
               {addError}
             </div>
           )}
 
           <div>
-            <label className="block text-[10.5px] font-bold text-gray-600 uppercase tracking-wider mb-1">
+            <label className="block text-[10.5px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
               Hierarchy Level
             </label>
             <select
               value={addForm.level}
               onChange={e => setAddForm({ ...addForm, level: e.target.value as any })}
               disabled={!!editNode}
-              className="w-full px-3 py-2 border border-gray-200 rounded-xl font-semibold bg-gray-50 text-gray-900 focus:outline-none focus:border-blue-500 text-xs"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg font-medium bg-slate-50 text-slate-900 focus:outline-none focus:border-blue-500 text-xs"
             >
               <option value="Factory">Factory / Plant</option>
               <option value="Floor">Floor</option>
@@ -1344,7 +1298,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
           </div>
 
           <div>
-            <label className="block text-[10.5px] font-bold text-gray-600 uppercase tracking-wider mb-1">
+            <label className="block text-[10.5px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
               Name *
             </label>
             <input
@@ -1352,20 +1306,20 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
               placeholder={`e.g. ${addForm.level === 'Factory' ? 'SKBW Plant 1' : addForm.level === 'Floor' ? 'Ground Floor' : addForm.level === 'Zone' ? 'Zone A' : 'Top Shelf'}`}
               value={addForm.name}
               onChange={e => setAddForm({ ...addForm, name: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-xl font-semibold text-gray-900 focus:outline-none focus:border-blue-500 text-xs"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg font-medium text-slate-900 focus:outline-none focus:border-blue-500 text-xs"
               required
             />
           </div>
 
           {addForm.level !== 'Factory' && (
             <div>
-              <label className="block text-[10.5px] font-bold text-gray-600 uppercase tracking-wider mb-1">
+              <label className="block text-[10.5px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
                 Parent Location *
               </label>
               <select
                 value={addForm.parentId}
                 onChange={e => setAddForm({ ...addForm, parentId: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl font-semibold bg-white text-gray-900 focus:outline-none focus:border-blue-500 text-xs"
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg font-medium bg-white text-slate-900 focus:outline-none focus:border-blue-500 text-xs"
                 required
               >
                 <option value="">Select Parent...</option>
@@ -1385,18 +1339,18 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
             </div>
           )}
 
-          <div className="pt-2 border-t border-gray-100 flex items-center justify-end gap-2">
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={() => setShowAddModal(false)}
-              className="px-3.5 py-1.5 border border-gray-200 rounded-xl font-semibold text-gray-600 hover:bg-gray-50 cursor-pointer text-xs"
+              className="px-3.5 py-1.5 border border-slate-200 rounded-lg font-medium text-slate-600 hover:bg-slate-50 cursor-pointer text-xs"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={addLoading}
-              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-xs cursor-pointer disabled:opacity-50 text-xs"
+              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-xs cursor-pointer disabled:opacity-50 text-xs"
             >
               {addLoading ? 'Saving...' : editNode ? 'Update Location' : 'Create Location'}
             </button>
@@ -1415,33 +1369,33 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
       >
         <div className="space-y-3.5 text-xs text-left">
           {detailsLoading ? (
-            <div className="py-8 text-center text-gray-400 font-medium animate-pulse">
+            <div className="py-8 text-center text-slate-400 font-medium animate-pulse">
               Loading live stock details...
             </div>
           ) : (
             <>
               <div className="p-3 bg-blue-50/50 border border-blue-100 rounded-xl flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider block">Level</span>
-                  <span className="font-extrabold text-gray-900 text-xs">{selectedLocationForDetails?.level}</span>
+                  <span className="text-[10px] font-semibold text-blue-600 uppercase tracking-wider block">Level</span>
+                  <span className="font-bold text-slate-900 text-xs">{selectedLocationForDetails?.level}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider block">Total Stored Qty</span>
-                  <span className="font-extrabold text-blue-700 text-xs">{locationDetails?.totalQty || 0} units</span>
+                  <span className="text-[10px] font-semibold text-blue-600 uppercase tracking-wider block">Total Stored Qty</span>
+                  <span className="font-bold text-blue-700 text-xs">{locationDetails?.totalQty || 0} units</span>
                 </div>
               </div>
 
               <div>
-                <h4 className="font-bold text-gray-900 mb-2">Stored SKU Items</h4>
+                <h4 className="font-bold text-slate-900 mb-2">Stored SKU Items</h4>
                 {(!locationDetails?.storedSkus || locationDetails.storedSkus.length === 0) ? (
-                  <p className="text-gray-400 py-4 text-center">No active inventory balance assigned to this location yet.</p>
+                  <p className="text-slate-400 py-4 text-center">No active inventory balance assigned to this location yet.</p>
                 ) : (
                   <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                     {locationDetails.storedSkus.map((item, idx) => (
-                      <div key={idx} className="p-2 bg-gray-50 border border-gray-200/80 rounded-xl flex items-center justify-between">
+                      <div key={idx} className="p-2 bg-slate-50 border border-slate-200/80 rounded-lg flex items-center justify-between">
                         <div>
-                          <span className="font-mono font-bold text-gray-900">{item.sku.skuCode}</span>
-                          <p className="text-gray-500 text-[11px]">{item.sku.name}</p>
+                          <span className="font-mono font-bold text-slate-900">{item.sku.skuCode}</span>
+                          <p className="text-slate-500 text-[11px]">{item.sku.name}</p>
                         </div>
                         <span className="font-bold text-blue-600">{item.quantity} {item.sku.unit}</span>
                       </div>
@@ -1463,25 +1417,25 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
         <div className="space-y-3 text-xs text-left">
           <div className="grid grid-cols-3 gap-2.5">
             <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl">
-              <span className="text-[10px] font-bold text-blue-600 uppercase block">Raw Materials</span>
-              <span className="text-base font-black text-gray-900">{floorTotals.totalRawMatQty.toLocaleString('en-IN')} KG</span>
-              <p className="text-[10px] text-gray-500">{floorTotals.totalRawMatSkus} SKUs</p>
+              <span className="text-[10px] font-semibold text-blue-600 uppercase block">Raw Materials</span>
+              <span className="text-sm font-bold text-slate-900">{floorTotals.totalRawMatQty.toLocaleString('en-IN')} KG</span>
+              <p className="text-[10px] text-slate-500">{floorTotals.totalRawMatSkus} SKUs</p>
             </div>
             <div className="p-3 bg-purple-50 border border-purple-100 rounded-xl">
-              <span className="text-[10px] font-bold text-purple-600 uppercase block">Semi Finished</span>
-              <span className="text-base font-black text-gray-900">{floorTotals.totalSemiQty.toLocaleString('en-IN')} PCS</span>
-              <p className="text-[10px] text-gray-500">{floorTotals.totalSemiSkus} SKUs</p>
+              <span className="text-[10px] font-semibold text-purple-600 uppercase block">Semi Finished</span>
+              <span className="text-sm font-bold text-slate-900">{floorTotals.totalSemiQty.toLocaleString('en-IN')} PCS</span>
+              <p className="text-[10px] text-slate-500">{floorTotals.totalSemiSkus} SKUs</p>
             </div>
             <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
-              <span className="text-[10px] font-bold text-emerald-600 uppercase block">Finished Goods</span>
-              <span className="text-base font-black text-gray-900">{floorTotals.totalFgQty.toLocaleString('en-IN')} GBL</span>
-              <p className="text-[10px] text-gray-500">{floorTotals.totalFgSkus} SKUs</p>
+              <span className="text-[10px] font-semibold text-emerald-600 uppercase block">Finished Goods</span>
+              <span className="text-sm font-bold text-slate-900">{floorTotals.totalFgQty.toLocaleString('en-IN')} GBL</span>
+              <p className="text-[10px] text-slate-500">{floorTotals.totalFgSkus} SKUs</p>
             </div>
           </div>
 
-          <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between">
-            <span className="font-bold text-gray-700">Total Distinct SKUs on Floor:</span>
-            <span className="font-black text-blue-600 text-sm">{floorTotals.totalSkusCount}</span>
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+            <span className="font-semibold text-slate-700">Total Distinct SKUs on Floor:</span>
+            <span className="font-bold text-blue-600 text-sm">{floorTotals.totalSkusCount}</span>
           </div>
         </div>
       </Modal>
@@ -1493,20 +1447,20 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
         title="Delete Location"
       >
         <div className="space-y-3 text-xs text-left">
-          <p className="text-gray-700 font-medium">
-            Are you sure you want to delete <strong className="text-gray-900">{deleteConfirmNode?.name}</strong>?
+          <p className="text-slate-700 font-medium">
+            Are you sure you want to delete <strong className="text-slate-900">{deleteConfirmNode?.name}</strong>?
           </p>
 
-          <div className="pt-2 border-t border-gray-100 flex items-center justify-end gap-2">
+          <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
             <button
               onClick={() => setDeleteConfirmNode(null)}
-              className="px-3 py-1.5 border border-gray-200 rounded-xl font-semibold text-gray-600 hover:bg-gray-50 cursor-pointer text-xs"
+              className="px-3.5 py-1.5 border border-slate-200 rounded-lg font-medium text-slate-600 hover:bg-slate-50 cursor-pointer text-xs"
             >
               Cancel
             </button>
             <button
               onClick={handleDeleteLocation}
-              className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold shadow-xs cursor-pointer text-xs"
+              className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-semibold shadow-xs cursor-pointer text-xs"
             >
               Delete
             </button>
@@ -1523,15 +1477,15 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
         >
           <div className="space-y-2 text-xs max-h-[55vh] overflow-y-auto pr-1">
             {activityLogs.length === 0 ? (
-              <p className="text-center py-6 text-gray-400">No activity logs recorded.</p>
+              <p className="text-center py-6 text-slate-400">No activity logs recorded.</p>
             ) : (
               activityLogs.map((log, idx) => (
-                <div key={log._id || idx} className="p-2.5 bg-gray-50 border border-gray-200 rounded-xl space-y-0.5">
+                <div key={log._id || idx} className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl space-y-0.5">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-blue-600 text-[11px]">{log.action}</span>
-                    <span className="text-[9.5px] text-gray-400">{new Date(log.createdAt).toLocaleString()}</span>
+                    <span className="font-semibold text-blue-600 text-[11px]">{log.action}</span>
+                    <span className="text-[9.5px] text-slate-400">{new Date(log.createdAt).toLocaleString()}</span>
                   </div>
-                  <p className="text-gray-800 font-medium text-[11px]">{log.entityName}</p>
+                  <p className="text-slate-800 font-medium text-[11px]">{log.entityName}</p>
                 </div>
               ))
             )}
@@ -1548,7 +1502,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
         >
           <div className="space-y-2 text-xs max-h-[55vh] overflow-y-auto pr-1">
             {duplicateGroups.length === 0 ? (
-              <p className="text-center py-6 text-gray-400">No duplicate location names found under the same parent.</p>
+              <p className="text-center py-6 text-slate-400">No duplicate location names found under the same parent.</p>
             ) : (
               duplicateGroups.map((group, idx) => (
                 <div key={idx} className="p-2.5 bg-blue-50/40 border border-blue-100 rounded-xl space-y-1">
@@ -1556,7 +1510,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                     <span className="font-bold text-blue-900">{group.field}</span>
                     <span className="text-[10px] font-bold text-blue-600">{group.items.length} occurrences</span>
                   </div>
-                  <p className="text-gray-800 font-medium">{group.value}</p>
+                  <p className="text-slate-800 font-medium">{group.value}</p>
                 </div>
               ))
             )}
