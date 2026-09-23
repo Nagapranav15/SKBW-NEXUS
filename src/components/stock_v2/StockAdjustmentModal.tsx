@@ -86,23 +86,54 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
       setReferenceNumber(`ADJ-${Math.floor(1000 + Math.random() * 9000)}`);
       setRemarks('Extra stock found during physical verification.');
 
-      // Default locations
-      const defaultWh = warehouses[0] || locations[0];
+      // Smart hierarchy resolution for initialLocId
+      let resolvedWhId = '';
+      let resolvedFloorId = '';
+      let resolvedZoneId = '';
+      let resolvedLocId = initialLocId || '';
+
+      if (initialLocId && locations.length > 0) {
+        const targetLoc = locations.find(l => String(l._id) === String(initialLocId));
+        if (targetLoc) {
+          resolvedLocId = targetLoc._id;
+          const zone = locations.find(l => String(l._id) === String(targetLoc.parentId));
+          if (zone) {
+            resolvedZoneId = zone._id;
+            const floor = locations.find(l => String(l._id) === String(zone.parentId));
+            if (floor) {
+              resolvedFloorId = floor._id;
+              const wh = locations.find(l => String(l._id) === String(floor.parentId));
+              if (wh) {
+                resolvedWhId = wh._id;
+              }
+            }
+          }
+        }
+      }
+
+      // Fallback to default warehouse hierarchy
+      const defaultWh = warehouses.find(w => w._id === resolvedWhId) || warehouses[0] || locations[0];
       if (defaultWh) {
-        setWarehouseId(defaultWh._id);
-        const floors = getFloors(defaultWh._id);
-        const defaultFloor = floors[0] || defaultWh;
-        setFloorId(defaultFloor._id);
+        const whId = resolvedWhId || defaultWh._id;
+        setWarehouseId(whId);
 
-        const zones = getZones(defaultFloor._id);
-        const defaultZone = zones[0] || defaultFloor;
-        setZoneId(defaultZone._id);
+        const floors = getFloors(whId);
+        const defaultFloor = floors.find(f => f._id === resolvedFloorId) || floors[0] || defaultWh;
+        const fId = resolvedFloorId || defaultFloor._id;
+        setFloorId(fId);
 
-        const storageLocs = getStorageLocations(defaultZone._id);
-        if (storageLocs.length > 0) {
-          setLocationId(initialLocId || storageLocs[0]._id);
+        const zones = getZones(fId);
+        const defaultZone = zones.find(z => z._id === resolvedZoneId) || zones[0] || defaultFloor;
+        const zId = resolvedZoneId || defaultZone._id;
+        setZoneId(zId);
+
+        const storageLocs = getStorageLocations(zId);
+        if (resolvedLocId) {
+          setLocationId(resolvedLocId);
+        } else if (storageLocs.length > 0) {
+          setLocationId(storageLocs[0]._id);
         } else {
-          setLocationId(initialLocId || defaultZone._id);
+          setLocationId(zId);
         }
       }
     }
@@ -266,30 +297,19 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-center">
             <div>
               <label className="text-[10.5px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Item (SKU) *</label>
-              <div className="relative">
-                <select
-                  value={selectedSkuId}
-                  onChange={e => setSelectedSkuId(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 bg-white cursor-pointer focus:outline-none focus:border-blue-500 pr-8"
-                  required
-                >
-                  <option value="">-- Choose an item --</option>
-                  {skus.map(s => (
-                    <option key={s._id} value={s._id}>
-                      {s.skuCode} – {s.name}
-                    </option>
-                  ))}
-                </select>
-                {selectedSkuId && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedSkuId('')}
-                    className="absolute right-2.5 top-3 text-gray-400 hover:text-gray-700 cursor-pointer"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
+              <select
+                value={selectedSkuId}
+                onChange={e => setSelectedSkuId(e.target.value)}
+                className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 bg-white cursor-pointer focus:outline-none focus:border-blue-500"
+                required
+              >
+                <option value="">-- Choose an item --</option>
+                {skus.map(s => (
+                  <option key={s._id} value={s._id}>
+                    {s.skuCode} – {s.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Rich Item Preview Card */}

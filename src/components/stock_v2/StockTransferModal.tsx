@@ -108,29 +108,73 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
       setRemarks('Moving stock between locations for better space utilization.');
       setAutoFifo(false);
 
-      // Auto pick default warehouse structure
-      const defaultWh = warehouses[0] || locations[0];
+      // Smart hierarchy resolution for initialFromLocId
+      let resolvedSrcWhId = '';
+      let resolvedSrcFloorId = '';
+      let resolvedSrcZoneId = '';
+      let resolvedSrcLocId = initialFromLocId || '';
+
+      if (initialFromLocId && locations.length > 0) {
+        const targetLoc = locations.find(l => String(l._id) === String(initialFromLocId));
+        if (targetLoc) {
+          resolvedSrcLocId = targetLoc._id;
+          const zone = locations.find(l => String(l._id) === String(targetLoc.parentId));
+          if (zone) {
+            resolvedSrcZoneId = zone._id;
+            const floor = locations.find(l => String(l._id) === String(zone.parentId));
+            if (floor) {
+              resolvedSrcFloorId = floor._id;
+              const wh = locations.find(l => String(l._id) === String(floor.parentId));
+              if (wh) {
+                resolvedSrcWhId = wh._id;
+              }
+            }
+          }
+        }
+      }
+
+      // Auto pick warehouse structure
+      const defaultWh = warehouses.find(w => w._id === resolvedSrcWhId) || warehouses[0] || locations[0];
       if (defaultWh) {
-        setSourceWarehouseId(defaultWh._id);
-        setDestWarehouseId(defaultWh._id);
+        const srcWhId = resolvedSrcWhId || defaultWh._id;
+        setSourceWarehouseId(srcWhId);
+        setDestWarehouseId(srcWhId);
 
-        const floors = getFloors(defaultWh._id);
-        const defaultFloor = floors[0] || defaultWh;
-        setSourceFloorId(defaultFloor._id);
-        setDestFloorId(defaultFloor._id);
+        const floors = getFloors(srcWhId);
+        const defaultFloor = floors.find(f => f._id === resolvedSrcFloorId) || floors[0] || defaultWh;
+        const srcFloorId = resolvedSrcFloorId || defaultFloor._id;
+        setSourceFloorId(srcFloorId);
+        setDestFloorId(srcFloorId);
 
-        const zones = getZones(defaultFloor._id);
-        const defaultZone = zones[0] || defaultFloor;
-        setSourceZoneId(defaultZone._id);
-        setDestZoneId(defaultZone._id);
+        const zones = getZones(srcFloorId);
+        const defaultZone = zones.find(z => z._id === resolvedSrcZoneId) || zones[0] || defaultFloor;
+        const srcZoneId = resolvedSrcZoneId || defaultZone._id;
+        setSourceZoneId(srcZoneId);
+        setDestZoneId(srcZoneId);
 
-        const storageLocs = getStorageLocations(defaultZone._id);
-        if (storageLocs.length > 0) {
-          setSourceLocationId(initialFromLocId || storageLocs[0]._id);
+        const storageLocs = getStorageLocations(srcZoneId);
+        if (resolvedSrcLocId) {
+          setSourceLocationId(resolvedSrcLocId);
+          // Find alternative destination location
+          const altLoc = storageLocs.find(l => String(l._id) !== String(resolvedSrcLocId));
+          if (altLoc) {
+            setDestLocationId(altLoc._id);
+          } else {
+            // Find any other storage location in the warehouse
+            const allLeafs = locations.filter(l => l.level === 'Storage Location' || !locations.some(c => c.parentId === l._id));
+            const otherLeaf = allLeafs.find(l => String(l._id) !== String(resolvedSrcLocId));
+            if (otherLeaf) {
+              setDestLocationId(otherLeaf._id);
+            } else {
+              setDestLocationId(resolvedSrcLocId);
+            }
+          }
+        } else if (storageLocs.length > 0) {
+          setSourceLocationId(storageLocs[0]._id);
           setDestLocationId(storageLocs.length > 1 ? storageLocs[1]._id : storageLocs[0]._id);
         } else {
-          setSourceLocationId(initialFromLocId || defaultZone._id);
-          setDestLocationId(defaultZone._id);
+          setSourceLocationId(srcZoneId);
+          setDestLocationId(srcZoneId);
         }
       }
     }
@@ -311,11 +355,15 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
 
     setIsSubmitting(true);
     try {
+      const selectedBatches = batchRows.filter(b => b.selected && b.transferQty > 0);
+      const primaryBatchNumber = selectedBatches.length === 1 ? selectedBatches[0].batchNumber : undefined;
+
       await recordTransferV2({
         skuId: selectedSkuId,
         fromLocationId: sourceLocationId,
         toLocationId: destLocationId,
         quantity: totalTransferQty,
+        batchNumber: primaryBatchNumber,
         remarks: remarks || `Stock transfer ref #${referenceNumber}`,
         company: companyId
       });

@@ -546,6 +546,60 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
     return allLocations.length > 0 ? allLocations : [];
   }, [allLocations]);
 
+  // Clean flat leaf storage locations table view
+  const flatLeafLocations = useMemo(() => {
+    if (locationsList && locationsList.length > 0) {
+      return locationsList.map((l, idx) => ({
+        id: l.locationId || `loc-${idx}`,
+        factory: l.warehouseName || 'SKBW',
+        floor: l.floorName || 'Ground',
+        zone: l.zoneName || 'A',
+        location: l.locationName || 'Storage Location',
+        path: l.hierarchyPath || `${l.warehouseName || 'SKBW'} ➔ ${l.floorName || 'Ground'} ➔ ${l.zoneName || 'A'} ➔ ${l.locationName}`,
+        onHand: l.onHand || 0,
+        reserved: l.reserved || 0,
+        available: l.available || Math.max(0, (l.onHand || 0) - (l.reserved || 0)),
+        unitCost: l.unitCost || (l.onHand > 0 ? Math.round((l.stockValue || 0) / l.onHand) : (avgRate || 250)),
+        stockValue: l.stockValue || (l.onHand * (avgRate || 250)),
+        locationId: l.locationId
+      }));
+    }
+
+    const sOnHand = totalStock || 110;
+    const topQty = Math.round(sOnHand * 0.75);
+    const bottomQty = Math.max(0, sOnHand - topQty);
+    return [
+      {
+        id: 'loc-top',
+        factory: 'SKBW',
+        floor: 'Ground',
+        zone: 'A',
+        location: 'Top Shelf',
+        path: 'SKBW ➔ Ground ➔ Zone A ➔ Top Shelf',
+        onHand: topQty,
+        reserved: Math.min(reservedStock, topQty),
+        available: Math.max(0, topQty - Math.min(reservedStock, topQty)),
+        unitCost: avgRate || 250,
+        stockValue: topQty * (avgRate || 250),
+        locationId: 'loc-top'
+      },
+      {
+        id: 'loc-bottom',
+        factory: 'SKBW',
+        floor: 'Ground',
+        zone: 'M',
+        location: 'Bottom Shelf',
+        path: 'SKBW ➔ Ground ➔ Zone M ➔ Bottom Shelf',
+        onHand: bottomQty,
+        reserved: Math.max(0, reservedStock - Math.min(reservedStock, topQty)),
+        available: Math.max(0, bottomQty - Math.max(0, reservedStock - Math.min(reservedStock, topQty))),
+        unitCost: avgRate || 250,
+        stockValue: bottomQty * (avgRate || 250),
+        locationId: 'loc-bottom'
+      }
+    ];
+  }, [locationsList, totalStock, reservedStock, avgRate]);
+
   // Batches Tab calculations
   const totalBatchesCount = batchesList.length;
   const totalBatchQty = batchesList.reduce((sum, b) => sum + (b.remainingQty || 0), 0);
@@ -568,6 +622,38 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
     setSelectedBatchIds(prev => 
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     );
+  };
+
+  // Export Batches to Excel
+  const handleExportBatches = () => {
+    const listToExport = selectedBatchIds.length > 0 
+      ? batchesList.filter(b => selectedBatchIds.includes(b.id || b.batchNumber))
+      : batchesList;
+
+    if (listToExport.length === 0) {
+      showToast('No batches to export', 'error');
+      return;
+    }
+
+    const exportRows = listToExport.map((b, idx) => ({
+      '#': idx + 1,
+      'Batch No': b.batchNumber,
+      'Reference': b.reference || '',
+      'Date': b.date ? new Date(b.date).toLocaleDateString('en-IN') : '',
+      'Supplier / Source': b.source || b.supplier || '',
+      'Location': b.shortLocPath || b.locationName || '',
+      [`Qty (${unit})`]: b.remainingQty,
+      [`Qty (${altUnit})`]: b.remainingQty * conversionFactor,
+      [`Rate (₹/${unit})`]: b.rate,
+      'Value (₹)': b.value,
+      'Status': b.status || 'Active'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Batches');
+    XLSX.writeFile(wb, `${sku?.skuCode || 'Item'}_Batches_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    showToast(`Exported ${listToExport.length} batch(es) successfully`, 'success');
   };
 
   // Movements Filtered List & Pagination
@@ -766,18 +852,18 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
 
           {/* ── 4 TOP METRIC CARDS ── */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 mt-4">
-            {/* Card 1: Available */}
-            <div className="p-3 sm:p-3.5 rounded-2xl bg-white border border-emerald-200/80 shadow-2xs flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 shrink-0">
-                <Layers className="w-5 h-5" />
+            {/* Card 1: On Hand */}
+            <div className="p-3 sm:p-3.5 rounded-2xl bg-white border border-blue-200/80 shadow-2xs flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600 shrink-0">
+                <Box className="w-5 h-5" />
               </div>
               <div className="min-w-0">
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">AVAILABLE</div>
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">ON HAND</div>
                 <div className="text-base sm:text-lg font-black text-gray-900 leading-tight">
-                  {availableStock.toLocaleString('en-IN')} <span className="text-xs font-bold text-emerald-600 font-sans">{unit}</span>
+                  {totalStock.toLocaleString('en-IN')} <span className="text-xs font-bold text-blue-600 font-sans">{unit}</span>
                 </div>
                 <div className="text-[11px] font-medium text-gray-400 font-mono truncate">
-                  ≈ {availablePcs.toLocaleString('en-IN')} {altUnit}
+                  ≈ {(totalStock * conversionFactor).toLocaleString('en-IN')} {altUnit}
                 </div>
               </div>
             </div>
@@ -798,34 +884,34 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
               </div>
             </div>
 
-            {/* Card 3: In Process */}
-            <div className="p-3 sm:p-3.5 rounded-2xl bg-white border border-blue-200/80 shadow-2xs flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600 shrink-0">
-                <Settings className="w-5 h-5" />
+            {/* Card 3: Available */}
+            <div className="p-3 sm:p-3.5 rounded-2xl bg-white border border-emerald-200/80 shadow-2xs flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 shrink-0">
+                <Layers className="w-5 h-5" />
               </div>
               <div className="min-w-0">
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">IN PROCESS</div>
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">AVAILABLE</div>
                 <div className="text-base sm:text-lg font-black text-gray-900 leading-tight">
-                  {inProcessStock.toLocaleString('en-IN')} <span className="text-xs font-bold text-blue-600 font-sans">{unit}</span>
+                  {availableStock.toLocaleString('en-IN')} <span className="text-xs font-bold text-emerald-600 font-sans">{unit}</span>
                 </div>
                 <div className="text-[11px] font-medium text-gray-400 font-mono truncate">
-                  ≈ {inProcessPcs.toLocaleString('en-IN')} {altUnit}
+                  ≈ {availablePcs.toLocaleString('en-IN')} {altUnit}
                 </div>
               </div>
             </div>
 
-            {/* Card 4: Stock Value */}
-            <div className="p-3 sm:p-3.5 rounded-2xl bg-white border border-indigo-200/80 shadow-2xs flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600 shrink-0">
-                <span className="font-mono font-black text-base text-indigo-700">₹</span>
+            {/* Card 4: In Production */}
+            <div className="p-3 sm:p-3.5 rounded-2xl bg-white border border-purple-200/80 shadow-2xs flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-purple-50 text-purple-600 shrink-0">
+                <Settings className="w-5 h-5" />
               </div>
               <div className="min-w-0">
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">STOCK VALUE</div>
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">IN PRODUCTION</div>
                 <div className="text-base sm:text-lg font-black text-gray-900 leading-tight">
-                  {formatCurrency(stockValue)}
+                  {inProcessStock.toLocaleString('en-IN')} <span className="text-xs font-bold text-purple-600 font-sans">{unit}</span>
                 </div>
                 <div className="text-[11px] font-medium text-gray-400 font-mono truncate">
-                  Avg ₹{avgRate} / {unit}
+                  ≈ {inProcessPcs.toLocaleString('en-IN')} {altUnit}
                 </div>
               </div>
             </div>
@@ -1152,7 +1238,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
           )}
 
           {/* ════════════════════════════════════════════════════════════════════
-              TAB 2: LOCATIONS — MINIMAL CLEAN LAYOUT
+              TAB 2: LOCATIONS — MINIMAL CLEAN TABULAR LAYOUT
              ════════════════════════════════════════════════════════════════════ */}
           {!loading && activeTab === 'locations' && (
             <div className="space-y-3 animate-fadeIn">
@@ -1164,7 +1250,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                   </div>
                   <div>
                     <span className="text-xs font-bold text-gray-900">Stock Locations</span>
-                    <span className="ml-2 text-[10px] text-gray-400 font-medium">across warehouses &amp; bins</span>
+                    <span className="ml-2 text-[10px] text-gray-400 font-medium">Physical stock stored at leaf locations</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -1178,68 +1264,92 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                     }`}
                   >
                     {hideZeroStockLocations ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                    <span>{hideZeroStockLocations ? 'Active Only' : 'All Bins'}</span>
+                    <span>{hideZeroStockLocations ? 'Active Only' : 'All Locations'}</span>
                   </button>
-                  <button type="button" onClick={handleExpandAllLocations} className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-all cursor-pointer" title="Expand All"><Maximize2 className="w-3 h-3" /></button>
-                  <button type="button" onClick={handleCollapseAllLocations} className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-all cursor-pointer" title="Collapse All"><Minimize2 className="w-3 h-3" /></button>
                 </div>
               </div>
 
-              {/* Clean Tree */}
+              {/* Clean Flat Table View */}
               <div className="bg-white border border-gray-200/80 rounded-2xl overflow-hidden shadow-2xs">
-                {/* Table Header */}
-                <div className="grid grid-cols-12 bg-gray-50 px-3.5 py-2 text-[9.5px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">
-                  <div className="col-span-5">Location</div>
-                  <div className="col-span-2 text-center">Batches</div>
-                  <div className="col-span-2 text-right">Qty ({unit})</div>
-                  <div className="col-span-3 text-right">Value &amp; Action</div>
-                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="bg-gray-50/90 border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                        <th className="p-3">Factory</th>
+                        <th className="p-3">Floor</th>
+                        <th className="p-3">Zone</th>
+                        <th className="p-3">Storage Location</th>
+                        <th className="p-3 text-right">On Hand ({unit})</th>
+                        <th className="p-3 text-right">Reserved ({unit})</th>
+                        <th className="p-3 text-right">Available ({unit})</th>
+                        <th className="p-3 text-right">Stock Value (₹)</th>
+                        <th className="p-3 text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 font-medium text-gray-800">
+                      {flatLeafLocations
+                        .filter(loc => !hideZeroStockLocations || loc.onHand > 0)
+                        .map((loc, idx) => (
+                          <tr key={loc.id || idx} className="hover:bg-blue-50/30 transition-colors">
+                            <td className="p-3 font-bold text-gray-900">{loc.factory}</td>
+                            <td className="p-3 text-gray-700">{loc.floor}</td>
+                            <td className="p-3 text-gray-700">{loc.zone}</td>
+                            <td className="p-3 font-bold text-blue-700 font-mono">{loc.location}</td>
+                            <td className="p-3 text-right font-mono font-bold text-gray-900">{loc.onHand.toLocaleString('en-IN')}</td>
+                            <td className="p-3 text-right font-mono font-bold text-amber-600">{loc.reserved.toLocaleString('en-IN')}</td>
+                            <td className="p-3 text-right font-mono font-bold text-emerald-600">{loc.available.toLocaleString('en-IN')}</td>
+                            <td className="p-3 text-right font-mono font-bold text-gray-900">{formatCurrency(loc.stockValue)}</td>
+                            <td className="p-3 text-center">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => onOpenTransfer?.(sku, loc.locationId)}
+                                  className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-all"
+                                  title="Transfer stock from this location"
+                                >
+                                  <ArrowRightLeft className="w-3 h-3" />
+                                  <span>Transfer</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => onOpenAdjustment?.(sku, loc.locationId)}
+                                  className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-all"
+                                  title="Adjust stock at this location"
+                                >
+                                  <SlidersHorizontal className="w-3 h-3" />
+                                  <span>Adjust</span>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
 
-                <div className="divide-y divide-gray-50 text-xs">
-                  {(hierarchyTree.length > 0 ? hierarchyTree : [
-                    {
-                      _id: 'root-skbw',
-                      name: 'SKBW',
-                      level: 'Factory',
-                      batchCount: batchesList.length || 2,
-                      onHand: totalStock,
-                      stockValue: stockValue,
-                      children: [
-                        {
-                          _id: 'floor-ground',
-                          name: 'Ground',
-                          level: 'Floor',
-                          batchCount: batchesList.length || 2,
-                          onHand: totalStock,
-                          stockValue: stockValue,
-                          children: [
-                            {
-                              _id: 'zone-a',
-                              name: 'A',
-                              level: 'Zone',
-                              batchCount: batchesList.length || 2,
-                              onHand: totalStock,
-                              stockValue: stockValue,
-                              children: [
-                                { _id: 'loc-top', name: 'Top', code: 'SKBW > Ground > A > Top', level: 'Storage Location', batchCount: 2, onHand: 100, stockValue: 25000, batches: batchesList.slice(0, 2) },
-                                { _id: 'loc-bottom', name: 'Bottom', code: 'SKBW > Ground > A > Bottom', level: 'Storage Location', batchCount: 1, onHand: 10, stockValue: 3000, batches: batchesList.slice(2, 3) }
-                              ]
-                            },
-                            { _id: 'zone-b', name: 'B', level: 'Zone', batchCount: 0, onHand: 0, stockValue: 0, children: [] },
-                            { _id: 'zone-m', name: 'M', level: 'Zone', batchCount: 0, onHand: 0, stockValue: 0, children: [] }
-                          ]
-                        },
-                        { _id: 'floor-first', name: 'First Floor', level: 'Floor', batchCount: 0, onHand: 0, stockValue: 0, children: [] }
-                      ]
-                    }
-                  ]).map(rootNode => renderHierarchyNode(rootNode, 0))}
+                      {flatLeafLocations.filter(loc => !hideZeroStockLocations || loc.onHand > 0).length === 0 && (
+                        <tr>
+                          <td colSpan={9} className="p-8 text-center text-gray-400">
+                            No active storage locations found for this item.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                    <tfoot className="bg-gray-50 border-t border-gray-200 text-xs font-bold text-gray-900">
+                      <tr>
+                        <td colSpan={4} className="p-3 uppercase tracking-wider text-gray-500 text-[10px]">TOTAL STOCK AT LOCATIONS</td>
+                        <td className="p-3 text-right font-mono font-black text-gray-900">{totalStock.toLocaleString('en-IN')} {unit}</td>
+                        <td className="p-3 text-right font-mono font-black text-amber-600">{reservedStock.toLocaleString('en-IN')} {unit}</td>
+                        <td className="p-3 text-right font-mono font-black text-emerald-600">{availableStock.toLocaleString('en-IN')} {unit}</td>
+                        <td className="p-3 text-right font-mono font-black text-gray-900">{formatCurrency(stockValue)}</td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  </table>
                 </div>
               </div>
 
-              {/* Tiny hint */}
+              {/* Footnote */}
               <p className="text-[10.5px] text-gray-400 flex items-center gap-1.5 px-1">
                 <AlertCircle className="w-3 h-3 text-gray-400 shrink-0" />
-                Real-time stock. Use Transfer to move between locations.
+                <span>Physical stock is stored strictly at leaf storage locations. Parent totals are calculated aggregations.</span>
               </p>
             </div>
           )}
@@ -1264,19 +1374,68 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
+                    onClick={handleExportBatches}
+                    className="px-3 py-1.5 bg-gray-50 hover:bg-blue-50 hover:text-blue-700 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                    title="Export batches to Excel"
+                  >
+                    <Download className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Export</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => onAddBatch?.(sku)}
                     className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Add Batch</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowBatchMenu(prev => !prev)}
-                    className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all cursor-pointer"
-                  >
-                    <MoreVertical className="w-4 h-4" />
-                  </button>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowBatchMenu(prev => !prev)}
+                      className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all cursor-pointer"
+                      title="More batch options"
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
+                    {showBatchMenu && (
+                      <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 py-1 divide-y divide-gray-100 text-xs font-semibold animate-in fade-in zoom-in-95 duration-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowBatchMenu(false);
+                            handleSelectAllBatches(true);
+                          }}
+                          className="w-full px-3 py-2 text-left hover:bg-blue-50 text-gray-700 flex items-center gap-2 cursor-pointer"
+                        >
+                          <Check className="w-3.5 h-3.5 text-blue-600" />
+                          <span>Select All Batches</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowBatchMenu(false);
+                            handleSelectAllBatches(false);
+                          }}
+                          className="w-full px-3 py-2 text-left hover:bg-gray-50 text-gray-700 flex items-center gap-2 cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5 text-gray-400" />
+                          <span>Clear Selection</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowBatchMenu(false);
+                            handleExportBatches();
+                          }}
+                          className="w-full px-3 py-2 text-left hover:bg-blue-50 text-gray-700 flex items-center gap-2 cursor-pointer"
+                        >
+                          <Download className="w-3.5 h-3.5 text-blue-600" />
+                          <span>Export to Excel</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1403,13 +1562,20 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
               <div className="bg-white border border-gray-200/80 rounded-2xl p-3.5 shadow-2xs flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2 text-xs font-semibold text-gray-700">
                   <FileText className="w-4 h-4 text-blue-600" />
-                  <span>Batch Actions: Select one or more batches to perform stock operations.</span>
+                  <span>
+                    {selectedBatchIds.length > 0 
+                      ? `${selectedBatchIds.length} batch(es) selected` 
+                      : 'Batch Actions: Select one or more batches to perform stock operations.'}
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => onOpenTransfer?.(sku)}
+                    onClick={() => {
+                      const selectedBatch = batchesList.find(b => selectedBatchIds.includes(b.id || b.batchNumber));
+                      onOpenTransfer?.(sku, selectedBatch?.locationId);
+                    }}
                     className="px-3 py-1.5 bg-gray-50 hover:bg-blue-50 hover:text-blue-700 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 flex items-center gap-1.5 transition-all cursor-pointer"
                   >
                     <ArrowRightLeft className="w-3.5 h-3.5 text-blue-600" />
@@ -1417,11 +1583,22 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => onOpenAdjustment?.(sku)}
+                    onClick={() => {
+                      const selectedBatch = batchesList.find(b => selectedBatchIds.includes(b.id || b.batchNumber));
+                      onOpenAdjustment?.(sku, selectedBatch?.locationId);
+                    }}
                     className="px-3 py-1.5 bg-gray-50 hover:bg-amber-50 hover:text-amber-700 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 flex items-center gap-1.5 transition-all cursor-pointer"
                   >
                     <SlidersHorizontal className="w-3.5 h-3.5 text-amber-600" />
                     <span>Adjust</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportBatches}
+                    className="px-3 py-1.5 bg-gray-50 hover:bg-blue-50 hover:text-blue-700 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Export</span>
                   </button>
                   <button
                     type="button"
@@ -2105,208 +2282,6 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
       )}
     </Modal>
   );
-
-  // Helper to check recursively if a node or any descendant has stock > 0
-  function hasStockInBranch(node: any): boolean {
-    if (Number(node.onHand || 0) > 0) return true;
-    if (node.children && Array.isArray(node.children)) {
-      return node.children.some((child: any) => hasStockInBranch(child));
-    }
-    return false;
-  }
-
-  // Helper function to render recursive hierarchy nodes for Tab 2 (Locations)
-  function renderHierarchyNode(node: any, depth = 0) {
-    if (hideZeroStockLocations && !hasStockInBranch(node)) {
-      return null;
-    }
-
-    const isExpanded = !!expandedNodes[String(node._id)];
-    const hasChildren = node.children && node.children.length > 0;
-    const isLeafStorage = node.level === 'Storage Location' || (!hasChildren && (node.batches || Number(node.onHand || 0) > 0));
-    const isZeroStock = Number(node.onHand || 0) === 0;
-
-    const indentClasses = depth === 0 ? 'pl-3.5' : depth === 1 ? 'pl-7' : depth === 2 ? 'pl-11' : 'pl-15';
-
-    const getNodeLevelBadge = () => {
-      if (node.level === 'Factory') return <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200 uppercase tracking-wider shrink-0">Warehouse</span>;
-      if (node.level === 'Floor') return <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-100 text-slate-700 border border-slate-200 uppercase tracking-wider shrink-0">Floor</span>;
-      if (node.level === 'Zone') return <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 uppercase tracking-wider shrink-0">Zone</span>;
-      
-      const hasStock = Number(node.onHand || 0) > 0;
-      return (
-        <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider shrink-0 border ${
-          hasStock ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-100 text-gray-500 border-gray-200'
-        }`}>
-          {hasStock ? 'Active Bin' : 'Empty Bin'}
-        </span>
-      );
-    };
-
-    const getNodeIcon = () => {
-      if (node.level === 'Factory') return (
-        <div className="p-1 bg-blue-600 text-white rounded-lg shadow-2xs shrink-0">
-          <Building2 className="w-3.5 h-3.5" />
-        </div>
-      );
-      if (node.level === 'Floor') return (
-        <div className="p-1 bg-slate-100 text-slate-700 rounded-lg shrink-0">
-          <Layers className="w-3.5 h-3.5" />
-        </div>
-      );
-      if (node.level === 'Zone') return (
-        <div className="p-1 bg-amber-100 text-amber-700 rounded-lg shrink-0">
-          <Box className="w-3.5 h-3.5" />
-        </div>
-      );
-      
-      const hasStock = Number(node.onHand || 0) > 0;
-      return (
-        <div className={`p-1 rounded-lg shrink-0 ${hasStock ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400'}`}>
-          <MapPin className="w-3.5 h-3.5" />
-        </div>
-      );
-    };
-
-    return (
-      <div key={node._id} className="divide-y divide-gray-50/60">
-        <div className={`grid grid-cols-12 px-3 py-2 items-center transition-all border-b border-gray-100/80 ${
-          depth === 0 ? 'bg-gray-50/60 font-bold' :
-          depth === 1 ? 'bg-white font-semibold hover:bg-slate-50/50' :
-          'bg-white hover:bg-blue-50/20'
-        } ${isZeroStock ? 'opacity-60 hover:opacity-90' : ''}`}>
-          
-          {/* Location Name, Level Badge & Expand Toggle */}
-          <div className={`col-span-5 flex items-center gap-1.5 min-w-0 ${indentClasses}`}>
-            {hasChildren ? (
-              <button
-                type="button"
-                onClick={() => toggleNodeExpand(String(node._id))}
-                className="p-0.5 text-gray-400 hover:text-blue-600 rounded transition-all cursor-pointer shrink-0"
-              >
-                <ChevronRight className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-90 text-blue-600' : ''}`} />
-              </button>
-            ) : (
-              <span className="w-4 shrink-0 inline-block" />
-            )}
-            
-            {getNodeIcon()}
-            
-            <div className="flex items-center gap-1.5 min-w-0 flex-1">
-              <span className={`truncate ${depth === 0 ? 'font-bold text-gray-900 text-[12px]' : depth === 1 ? 'font-semibold text-gray-800 text-[11px]' : 'font-medium text-gray-700 text-[11px]'}`}>
-                {node.name}
-              </span>
-              {getNodeLevelBadge()}
-            </div>
-          </div>
-
-          {/* Batch Count */}
-          <div className="col-span-2 text-center">
-            {node.batchCount > 0 ? (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-200/70">
-                {node.batchCount}
-              </span>
-            ) : (
-              <span className="text-gray-300 font-mono text-xs">—</span>
-            )}
-          </div>
-
-          {/* Quantity Primary */}
-          <div className="col-span-2 text-right">
-            {!isZeroStock ? (
-              <span className="font-mono font-bold text-[11px] text-gray-900">
-                {Number(node.onHand || 0).toLocaleString('en-IN')}
-                <span className="text-[9px] text-gray-400 font-normal ml-0.5">{unit}</span>
-              </span>
-            ) : (
-              <span className="text-gray-300 font-mono text-xs">0</span>
-            )}
-          </div>
-
-          {/* Stock Value & Actions */}
-          <div className="col-span-3 text-right flex items-center justify-end gap-1.5 pr-1">
-            {!isZeroStock ? (
-              <span className="font-mono font-bold text-[11px] text-emerald-700">
-                {formatCurrency(node.stockValue || 0)}
-              </span>
-            ) : (
-              <span className="text-gray-300 font-mono text-xs">₹0</span>
-            )}
-
-            <button
-              type="button"
-              onClick={() => onOpenTransfer?.(sku, node._id)}
-              className="p-1 bg-white hover:bg-blue-600 text-blue-600 hover:text-white rounded-lg border border-blue-200/80 transition-all cursor-pointer shadow-2xs shrink-0"
-              title={`Transfer stock from ${node.name}`}
-            >
-              <ArrowRightLeft className="w-3 h-3" />
-            </button>
-          </div>
-        </div>
-
-        {/* Embedded Batches List for Storage Locations */}
-        {isExpanded && isLeafStorage && node.batches && node.batches.length > 0 && (
-          <div className="bg-slate-50/80 p-3 ml-8 sm:ml-14 my-2 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2">
-            <div className="flex items-center justify-between px-1">
-              <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1">
-                <Box className="w-3 h-3 text-indigo-600" />
-                <span>Batches Stored in {node.name}</span>
-              </span>
-              <span className="text-[10px] text-gray-500 font-semibold">{node.batches.length} Active Batches</span>
-            </div>
-            <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-              <table className="w-full text-left text-[11px]">
-                <thead>
-                  <tr className="bg-gray-50 text-gray-500 font-bold uppercase tracking-wider text-[9px] border-b border-gray-200">
-                    <th className="p-2 font-bold">BATCH NO.</th>
-                    <th className="p-2 font-bold">REFERENCE</th>
-                    <th className="p-2 font-bold">DATE</th>
-                    <th className="p-2 text-right font-bold">QUANTITY ({unit})</th>
-                    <th className="p-2 text-right font-bold">QUANTITY ({altUnit})</th>
-                    <th className="p-2 text-right font-bold">RATE (₹/{unit})</th>
-                    <th className="p-2 text-right font-bold">VALUE (₹)</th>
-                    <th className="p-2 text-center font-bold">STATUS</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 font-medium text-gray-800">
-                  {node.batches.map((b: any, bIdx: number) => (
-                    <tr key={bIdx} className="hover:bg-blue-50/30 transition-colors">
-                      <td className="p-2 font-mono font-bold text-gray-900">{b.batchNumber}</td>
-                      <td className="p-2 font-mono text-blue-700 font-bold">{b.reference || 'PR-0098'}</td>
-                      <td className="p-2 text-gray-500">{b.date ? new Date(b.date).toLocaleDateString('en-IN') : '20 Sep 2026'}</td>
-                      <td className="p-2 text-right font-mono font-bold text-gray-900">{Number(b.remainingQty || 0).toLocaleString('en-IN')}</td>
-                      <td className="p-2 text-right font-mono text-gray-500">{(Number(b.remainingQty || 0) * conversionFactor).toLocaleString('en-IN')}</td>
-                      <td className="p-2 text-right font-mono text-gray-900">₹{b.rate}</td>
-                      <td className="p-2 text-right font-mono font-bold text-emerald-700">{formatCurrency(b.value)}</td>
-                      <td className="p-2 text-center">
-                        <span className="px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          {b.status || 'Active'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="flex items-center justify-between pt-1">
-              <button
-                type="button"
-                onClick={() => onAddBatch?.(sku, node._id)}
-                className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Batch Intake to {node.name}</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Recursive Children Rendering */}
-        {isExpanded && hasChildren && node.children.map((child: any) => renderHierarchyNode(child, depth + 1))}
-      </div>
-    );
-  }
 };
 
 export default ItemStockDetailsDrawer;

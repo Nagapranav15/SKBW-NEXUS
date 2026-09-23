@@ -79,11 +79,6 @@ export const Modal: React.FC<ModalProps> = ({
             </div>
           )}
           <div className={`overflow-y-auto flex-1 flex flex-col ${padding}`}>
-            {!title && !hideCloseButton && (
-              <button type="button" onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1.5 hover:bg-slate-100 rounded-xl z-10 cursor-pointer transition-colors">
-                <X className="w-5 h-5" />
-              </button>
-            )}
             {children}
           </div>
         </div>
