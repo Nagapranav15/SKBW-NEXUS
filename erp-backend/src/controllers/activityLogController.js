@@ -1,10 +1,25 @@
+const mongoose = require("mongoose");
 const ActivityLog = require("../models/activityLogModel");
 
 exports.getActivityLogs = async (req, res) => {
   try {
     const filter = {};
-    if (req.query.company) filter.company = req.query.company;
-    if (req.query.entityType) filter.entityType = req.query.entityType;
+    if (req.query.company) {
+      if (mongoose.Types.ObjectId.isValid(req.query.company)) {
+        filter.company = new mongoose.Types.ObjectId(req.query.company);
+      } else {
+        filter.company = req.query.company;
+      }
+    }
+    
+    if (req.query.entityType) {
+      const et = String(req.query.entityType).trim();
+      if (et === 'SkuV2' || et === 'SKU' || et === 'Item' || et === 'ITEM' || et === 'ItemMaster') {
+        filter.entityType = { $in: ['SkuV2', 'SKU', 'Item', 'ITEM', 'ItemMaster'] };
+      } else {
+        filter.entityType = et;
+      }
+    }
 
     if (req.query.search) {
       const searchRegex = new RegExp(req.query.search, 'i');
@@ -32,9 +47,13 @@ exports.getActivityLogs = async (req, res) => {
 
 exports.createActivityLog = async (req, res) => {
   try {
+    const payload = { ...req.body };
+    if (payload.company && mongoose.Types.ObjectId.isValid(payload.company)) {
+      payload.company = new mongoose.Types.ObjectId(payload.company);
+    }
     const log = await ActivityLog.create({
-      ...req.body,
-      performedBy: req.user ? req.user.fullName : "System"
+      ...payload,
+      performedBy: req.user ? (req.user.fullName || req.user.email) : (payload.performedBy || "System")
     });
     res.status(201).json(log);
   } catch (err) {

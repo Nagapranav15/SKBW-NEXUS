@@ -14,6 +14,8 @@ router.get("/skus/next-code", auth, rbac(view), ctrl.getNextSkuCode);
 router.post("/skus", auth, rbac(manage), ctrl.createSku);
 router.post("/skus/bulk-delete", auth, rbac(manage), ctrl.bulkDeleteSkus);
 router.post("/skus/bulk-update", auth, rbac(manage), ctrl.bulkUpdateSkus);
+router.post("/skus/recycle-bin/clear", auth, rbac(manage), ctrl.clearRecycleBin);
+router.post("/skus/:id/restore", auth, rbac(manage), ctrl.restoreSku);
 router.put("/skus/:id", auth, rbac(manage), ctrl.updateSku);
 router.delete("/skus/:id", auth, rbac(manage), ctrl.deleteSku);
 router.post("/skus/bulk-import", auth, rbac(manage), ctrl.bulkImportSkus);

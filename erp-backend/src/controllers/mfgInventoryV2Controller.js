@@ -603,7 +603,19 @@ exports.deleteSku = async (req, res, next) => {
 
     const companyObjId = sku.company || req.query.companyId;
 
-    // Permanently record sequence number in Sequence collection so this SKU ID is never reused
+    // Stock check: If SKU currently holds positive stock, block deletion and alert user
+    const ledgerAgg = await InventoryLedgerV2.aggregate([
+      { $match: { skuId: sku._id } },
+      { $group: { _id: "$skuId", totalIn: { $sum: "$qtyIn" }, totalOut: { $sum: "$qtyOut" } } }
+    ]);
+    const onHandStock = ledgerAgg.length > 0 ? ((ledgerAgg[0].totalIn || 0) - (ledgerAgg[0].totalOut || 0)) : (sku.openingStock || 0);
+    if (onHandStock > 0) {
+      return res.status(400).json({
+        msg: `Cannot delete SKU '${sku.skuCode}' (${sku.name}) because it holds active stock (${onHandStock} ${sku.unit || 'units'}). Please adjust or transfer stock to 0 before deleting.`
+      });
+    }
+
+    // Permanently record sequence number in Sequence collection so this SKU ID is never reused by new items
     const numMatch = (sku.skuCode || '').match(/^([A-Z]+)-(\d{1,4})$/i);
     if (numMatch) {
       const p = numMatch[1].toUpperCase();
@@ -619,7 +631,7 @@ exports.deleteSku = async (req, res, next) => {
 
     if (permanent === "true") {
       const count = await InventoryLedgerV2.countDocuments({ skuId: sku._id });
-      if (count > 0) {
+      if (count > 0 && onHandStock !== 0) {
         return res.status(400).json({ 
           msg: `Cannot permanently delete SKU '${sku.skuCode}' because it has active inventory ledger history.` 
         });
@@ -670,6 +682,26 @@ exports.bulkDeleteSkus = async (req, res, next) => {
     const companyObjId = toObjectId(companyId);
     const skuObjIds = ids.map(id => toObjectId(id));
 
+    // Check stock for all requested SKUs
+    const activeSkus = await SkuV2.find({ _id: { $in: skuObjIds }, company: companyObjId, isDeleted: { $ne: true } });
+    const stockCheckAgg = await InventoryLedgerV2.aggregate([
+      { $match: { skuId: { $in: activeSkus.map(s => s._id) } } },
+      { $group: { _id: "$skuId", totalIn: { $sum: "$qtyIn" }, totalOut: { $sum: "$qtyOut" } } }
+    ]);
+    const stockMap = new Map();
+    stockCheckAgg.forEach(row => {
+      const net = (row.totalIn || 0) - (row.totalOut || 0);
+      if (net > 0) stockMap.set(String(row._id), net);
+    });
+
+    const blockedSkus = activeSkus.filter(s => stockMap.has(String(s._id)));
+    if (blockedSkus.length > 0) {
+      const blockedList = blockedSkus.map(s => `'${s.skuCode}' (${stockMap.get(String(s._id))} ${s.unit})`).join(', ');
+      return res.status(400).json({
+        msg: `Cannot delete items with active stock: ${blockedList}. Please transfer or adjust stock to 0 first.`
+      });
+    }
+
     const result = await SkuV2.updateMany(
       { _id: { $in: skuObjIds }, company: companyObjId, isDeleted: { $ne: true } },
       { $set: { isDeleted: true, status: "Inactive" } }
@@ -688,6 +720,79 @@ exports.bulkDeleteSkus = async (req, res, next) => {
       msg: `Successfully moved ${result.modifiedCount || ids.length} items to recycle bin`,
       count: result.modifiedCount || ids.length
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.restoreSku = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const skuObjId = toObjectId(id) || id;
+    const sku = await SkuV2.findById(skuObjId) || await SkuV2.findOne({ _id: id });
+    if (!sku) {
+      return res.status(404).json({ msg: "SKU not found" });
+    }
+
+    // Check if another active SKU exists with the exact same skuCode
+    const duplicate = await SkuV2.findOne({
+      skuCode: sku.skuCode,
+      company: sku.company,
+      isDeleted: false,
+      _id: { $ne: sku._id }
+    });
+
+    if (duplicate) {
+      return res.status(400).json({
+        msg: `Cannot restore SKU: An active item with SKU Code '${sku.skuCode}' already exists.`
+      });
+    }
+
+    sku.isDeleted = false;
+    sku.status = "Active";
+    await sku.save();
+
+    ActivityLog.create({
+      action: "RESTORE",
+      entityType: "SkuV2",
+      entityName: sku.skuCode,
+      details: `Restored SKU '${sku.name}' (${sku.skuCode}) back to active inventory with original SKU ID.`,
+      performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
+      company: sku.company
+    }).catch(e => console.error("ActivityLog error:", e));
+
+    res.json({ msg: `Restored item '${sku.skuCode}' to active inventory`, sku });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.clearRecycleBin = async (req, res, next) => {
+  try {
+    const { companyId } = req.body;
+    if (!companyId) {
+      return res.status(400).json({ msg: "companyId is required" });
+    }
+    const companyObjId = toObjectId(companyId);
+
+    const deletedSkus = await SkuV2.find({ company: companyObjId, isDeleted: true });
+    if (deletedSkus.length === 0) {
+      return res.json({ msg: "Recycle bin is already empty", count: 0 });
+    }
+
+    const deletedIds = deletedSkus.map(s => s._id);
+    await SkuV2.deleteMany({ _id: { $in: deletedIds } });
+
+    ActivityLog.create({
+      action: "PERMANENT_DELETE",
+      entityType: "SkuV2",
+      entityName: "Recycle Bin",
+      details: `Permanently cleared ${deletedSkus.length} deleted items from Recycle Bin.`,
+      performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
+      company: companyObjId
+    }).catch(e => console.error("ActivityLog error:", e));
+
+    res.json({ msg: `Successfully cleared ${deletedSkus.length} items from Recycle Bin`, count: deletedSkus.length });
   } catch (err) {
     next(err);
   }

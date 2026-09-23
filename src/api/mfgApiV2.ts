@@ -105,6 +105,16 @@ export const deleteSkuV2 = async (id: string, companyId: string, permanent?: boo
   return response.data;
 };
 
+export const restoreSkuV2 = async (id: string, companyId?: string): Promise<any> => {
+  const response = await api.post(`/v2/skus/${id}/restore`, { companyId });
+  return response.data;
+};
+
+export const clearRecycleBinV2 = async (companyId: string): Promise<any> => {
+  const response = await api.post('/v2/skus/recycle-bin/clear', { companyId });
+  return response.data;
+};
+
 export const bulkDeleteSkusV2 = async (ids: string[], companyId: string): Promise<any> => {
   const response = await api.post('/v2/skus/bulk-delete', { ids, companyId });
   return response.data;

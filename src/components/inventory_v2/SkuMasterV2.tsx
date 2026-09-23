@@ -65,6 +65,8 @@ import {
   createSkuV2,
   deleteSkuV2, 
   updateSkuV2,
+  restoreSkuV2,
+  clearRecycleBinV2,
   bulkImportSkusV2,
   bulkDeleteSkusV2,
   bulkUpdateSkusV2,
@@ -2179,30 +2181,21 @@ const SkuMasterV2: React.FC = () => {
 
 
   // Activity Log fetcher
+  const [activityLogSearch, setActivityLogSearch] = useState('');
+
   const fetchActivityLogs = async () => {
     try {
       setActivityLogLoading(true);
       const res = await getActivityLogs({
         company: selectedCompany?._id,
         entityType: 'SkuV2',
-        limit: 50
+        limit: 100
       });
-      const backendLogs = res.data?.logs || [];
-      if (backendLogs.length === 0) {
-        const mockLogs = skus.slice(0, 10).map((s, idx) => ({
-          _id: `mock-log-${idx}`,
-          action: 'CREATE',
-          entityType: 'SkuV2',
-          entityName: s.skuCode,
-          details: `Item '${s.name}' was verified in system inventory.`,
-          performedBy: selectedCompany?.companyName || 'Admin',
-          createdAt: s.createdAt || new Date().toISOString()
-        }));
-        setActivityLogs(mockLogs);
-      } else {
-        setActivityLogs(backendLogs);
-      }
+      const backendLogs = res.data?.logs || res.data || [];
+      const validLogs = Array.isArray(backendLogs) ? backendLogs : (backendLogs.logs || []);
+      setActivityLogs(validLogs);
     } catch (err) {
+      console.error('Failed to fetch activity logs:', err);
       showToast('Failed to fetch activity logs', 'error');
     } finally {
       setActivityLogLoading(false);
@@ -2225,12 +2218,34 @@ const SkuMasterV2: React.FC = () => {
   const handleRestoreSku = async (sku: SkuV2) => {
     if (!sku._id || !selectedCompany?._id) return;
     try {
-      await updateSkuV2(sku._id, { isDeleted: false, status: 'Active', company: selectedCompany._id });
+      await restoreSkuV2(sku._id, selectedCompany._id);
       showToast(`Restored item '${sku.skuCode}' to active inventory`, 'success');
       fetchRecycleBinSkus();
       loadSkus(false);
+      fetchActivityLogs();
     } catch (err: any) {
-      showToast(err.message || 'Failed to restore item', 'error');
+      showToast(err.response?.data?.msg || err.message || 'Failed to restore item', 'error');
+    }
+  };
+
+  const [clearingRecycleBin, setClearingRecycleBin] = useState(false);
+
+  const handleClearRecycleBin = async () => {
+    if (!selectedCompany?._id || recycledSkus.length === 0 || clearingRecycleBin) return;
+    if (!window.confirm(`Are you sure you want to permanently clear all ${recycledSkus.length} items from the Recycle Bin? This action CANNOT be undone.`)) {
+      return;
+    }
+    setClearingRecycleBin(true);
+    try {
+      const res = await clearRecycleBinV2(selectedCompany._id);
+      showToast(res?.msg || 'Cleared Recycle Bin successfully', 'success');
+      fetchRecycleBinSkus();
+      loadSkus(false);
+      fetchActivityLogs();
+    } catch (err: any) {
+      showToast(err.response?.data?.msg || err.message || 'Failed to clear recycle bin', 'error');
+    } finally {
+      setClearingRecycleBin(false);
     }
   };
 
@@ -2242,6 +2257,7 @@ const SkuMasterV2: React.FC = () => {
       showToast(`Permanently deleted item '${sku.skuCode}'`, 'success');
       fetchRecycleBinSkus();
       loadSkus(false);
+      fetchActivityLogs();
     } catch (err: any) {
       showToast(err.response?.data?.msg || err.message || 'Failed to permanently delete item', 'error');
     }
@@ -2540,6 +2556,16 @@ const SkuMasterV2: React.FC = () => {
 
   const handleBulkDeleteSkus = async () => {
     if (selectedIds.length === 0 || !selectedCompany?._id) return;
+
+    // Check if any selected items hold active stock
+    const selectedSkusWithStock = skus.filter(s => selectedIds.includes(s._id) && Number(s.presentStock || 0) > 0);
+    if (selectedSkusWithStock.length > 0) {
+      const list = selectedSkusWithStock.map(s => `'${s.skuCode}' (${s.presentStock} ${s.unit || ''})`).join(', ');
+      showToast(`Cannot delete items with active stock: ${list}`, 'error');
+      alert(`Cannot delete items with active stock:\n\n${selectedSkusWithStock.map(s => `• ${s.skuCode} (${s.name}): ${s.presentStock} ${s.unit}`).join('\n')}\n\nPlease transfer or adjust stock to 0 before deleting.`);
+      return;
+    }
+
     setIsBulkOperating(true);
     try {
       await bulkDeleteSkusV2(selectedIds, selectedCompany._id);
@@ -2547,6 +2573,7 @@ const SkuMasterV2: React.FC = () => {
       setShowBulkDeleteModal(false);
       setSelectedIds([]);
       loadSkus(false);
+      fetchActivityLogs();
     } catch (err: any) {
       showToast(err?.response?.data?.msg || err?.message || 'Failed to delete items', 'error');
     } finally {
@@ -3196,6 +3223,13 @@ const SkuMasterV2: React.FC = () => {
   // Delete Single SKU
   const handleDeleteSku = async () => {
     if (!deleteConfirmSku?._id) return;
+    if (Number(deleteConfirmSku.presentStock || 0) > 0) {
+      alert(`Cannot delete SKU '${deleteConfirmSku.skuCode}' (${deleteConfirmSku.name}) because it holds active stock (${deleteConfirmSku.presentStock} ${deleteConfirmSku.unit || ''}).\n\nPlease transfer or adjust the stock to 0 before deleting this item.`);
+      showToast(`Cannot delete '${deleteConfirmSku.skuCode}': active stock present (${deleteConfirmSku.presentStock} ${deleteConfirmSku.unit || ''})`, 'error');
+      setDeleteConfirmSku(null);
+      return;
+    }
+
     try {
       if (deleteConfirmSku._id.startsWith('demo-')) {
         showToast(`Item '${deleteConfirmSku.skuCode}' deleted`, 'success');
@@ -4711,7 +4745,14 @@ const SkuMasterV2: React.FC = () => {
 
                             {/* Trash Delete Icon */}
                             <button
-                              onClick={() => setDeleteConfirmSku(sku)}
+                              onClick={() => {
+                                if (Number(sku.presentStock || 0) > 0) {
+                                  alert(`Cannot delete SKU '${sku.skuCode}' (${sku.name}) because it holds active stock (${sku.presentStock} ${sku.unit || ''}).\n\nPlease transfer or adjust the stock to 0 before deleting this item.`);
+                                  showToast(`Cannot delete SKU '${sku.skuCode}': active stock present (${sku.presentStock} ${sku.unit || ''})`, 'error');
+                                  return;
+                                }
+                                setDeleteConfirmSku(sku);
+                              }}
                               className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
                               title="Delete item"
                             >
@@ -5190,19 +5231,32 @@ const SkuMasterV2: React.FC = () => {
           title="Confirm Delete"
         >
           <div className="space-y-4 text-xs">
-            <p>
-              Are you sure you want to delete item <strong className="text-gray-900">{deleteConfirmSku.skuCode}</strong> ({deleteConfirmSku.name})?
-            </p>
+            {Number(deleteConfirmSku.presentStock || 0) > 0 ? (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl space-y-1.5">
+                <div className="flex items-center gap-2 text-rose-800 font-bold">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>Deletion Blocked: Active Stock Present</span>
+                </div>
+                <p className="text-rose-700">
+                  Item <strong className="text-rose-900">{deleteConfirmSku.skuCode}</strong> currently holds <strong>{deleteConfirmSku.presentStock} {deleteConfirmSku.unit || 'units'}</strong> in stock. Please adjust or transfer stock to 0 before deleting.
+                </p>
+              </div>
+            ) : (
+              <p>
+                Are you sure you want to delete item <strong className="text-gray-900">{deleteConfirmSku.skuCode}</strong> ({deleteConfirmSku.name})?
+              </p>
+            )}
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={() => setDeleteConfirmSku(null)}
-                className="px-4 py-2 border border-gray-300 rounded-xl text-gray-600 font-semibold"
+                className="px-4 py-2 border border-gray-300 rounded-xl text-gray-600 font-semibold cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteSku}
-                className="px-4 py-2 bg-rose-600 text-white rounded-xl font-semibold hover:bg-rose-700 shadow-xs"
+                disabled={Number(deleteConfirmSku.presentStock || 0) > 0}
+                className="px-4 py-2 bg-rose-600 text-white rounded-xl font-semibold hover:bg-rose-700 shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Delete Item
               </button>
@@ -6555,26 +6609,104 @@ const SkuMasterV2: React.FC = () => {
       {showActivityLog && (
         <Modal
           isOpen={showActivityLog}
-          onClose={() => setShowActivityLog(false)}
+          onClose={() => {
+            setShowActivityLog(false);
+            setActivityLogSearch('');
+          }}
           title="Items Activity History Log"
+          maxWidth="max-w-2xl"
         >
-          <div className="space-y-3 text-xs max-h-[60vh] overflow-y-auto pr-1">
-            {activityLogLoading ? (
-              <p className="text-center py-6 text-gray-400">Loading activity history...</p>
-            ) : activityLogs.length === 0 ? (
-              <p className="text-center py-6 text-gray-400">No activity logs found.</p>
-            ) : (
-              activityLogs.map((log, idx) => (
-                <div key={log._id || idx} className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-blue-700">{log.action}</span>
-                    <span className="text-[10px] text-gray-400">{new Date(log.createdAt).toLocaleString()}</span>
-                  </div>
-                  <p className="text-gray-800 font-medium">{log.entityName}</p>
-                  <p className="text-gray-500 text-[11px]">{log.details}</p>
+          <div className="space-y-3.5 text-xs text-left">
+            {/* Header controls */}
+            <div className="flex items-center justify-between gap-3">
+              <div className="relative flex-1">
+                <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search activity logs by action, SKU, details, user..."
+                  value={activityLogSearch}
+                  onChange={(e) => setActivityLogSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:border-blue-500 font-medium"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={fetchActivityLogs}
+                disabled={activityLogLoading}
+                className="px-3 py-1.5 bg-white hover:bg-blue-50 text-blue-700 border border-gray-200 rounded-xl font-bold flex items-center gap-1.5 shrink-0 transition-all cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${activityLogLoading ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
+              </button>
+            </div>
+
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+              {activityLogLoading ? (
+                <div className="py-12 text-center text-gray-400 font-medium animate-pulse">
+                  Loading activity history...
                 </div>
-              ))
-            )}
+              ) : (() => {
+                const query = activityLogSearch.toLowerCase().trim();
+                const filtered = activityLogs.filter((log: any) => {
+                  if (!query) return true;
+                  return (
+                    (log.action || '').toLowerCase().includes(query) ||
+                    (log.entityName || '').toLowerCase().includes(query) ||
+                    (log.details || '').toLowerCase().includes(query) ||
+                    (log.performedBy || '').toLowerCase().includes(query)
+                  );
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="py-12 text-center space-y-2 bg-gray-50/60 rounded-2xl border border-dashed border-gray-200">
+                      <History className="w-8 h-8 text-gray-300 mx-auto" />
+                      <p className="font-bold text-gray-600">No Activity Logs Found</p>
+                      <p className="text-[11px] text-gray-400">
+                        {query ? 'No logs match your search term.' : 'No SKU history events recorded yet.'}
+                      </p>
+                    </div>
+                  );
+                }
+
+                return filtered.map((log: any, idx: number) => {
+                  const act = (log.action || '').toUpperCase();
+                  const isCreate = act.includes('CREATE') || act.includes('IMPORT');
+                  const isDelete = act.includes('DELETE');
+                  const isRestore = act.includes('RESTORE');
+                  
+                  const badgeColor = isRestore
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : isDelete
+                    ? 'bg-rose-50 text-rose-700 border-rose-200'
+                    : isCreate
+                    ? 'bg-blue-50 text-blue-700 border-blue-200'
+                    : 'bg-amber-50 text-amber-700 border-amber-200';
+
+                  return (
+                    <div key={log._id || idx} className="p-3 bg-white border border-gray-200 rounded-xl space-y-1.5 shadow-2xs hover:border-blue-200 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider border ${badgeColor}`}>
+                            {log.action}
+                          </span>
+                          <span className="font-bold text-gray-900 font-mono text-xs">{log.entityName}</span>
+                        </div>
+                        <span className="text-[10px] text-gray-400 font-medium">
+                          {log.createdAt ? new Date(log.createdAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : '—'}
+                        </span>
+                      </div>
+                      <p className="text-gray-600 text-xs leading-relaxed">{log.details}</p>
+                      {log.performedBy && (
+                        <div className="text-[10px] text-gray-400 font-medium pt-0.5">
+                          By: <span className="text-gray-700 font-semibold">{log.performedBy}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
+            </div>
           </div>
         </Modal>
       )}
@@ -8061,15 +8193,29 @@ const SkuMasterV2: React.FC = () => {
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={fetchRecycleBinSkus}
-                disabled={loadingRecycleBin}
-                className="px-3 py-1.5 bg-white hover:bg-rose-100/60 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${loadingRecycleBin ? 'animate-spin' : ''}`} />
-                <span>Refresh</span>
-              </button>
+              <div className="flex items-center gap-2">
+                {recycledSkus.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleClearRecycleBin}
+                    disabled={clearingRecycleBin || loadingRecycleBin}
+                    className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                    title="Permanently empty all deleted items from recycle bin"
+                  >
+                    <Trash2 className={`w-3.5 h-3.5 ${clearingRecycleBin ? 'animate-spin' : ''}`} />
+                    <span>{clearingRecycleBin ? 'Clearing...' : 'Empty Recycle Bin'}</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={fetchRecycleBinSkus}
+                  disabled={loadingRecycleBin}
+                  className="px-3 py-1.5 bg-white hover:bg-rose-100/60 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingRecycleBin ? 'animate-spin' : ''}`} />
+                  <span>Refresh</span>
+                </button>
+              </div>
             </div>
 
             {loadingRecycleBin ? (
