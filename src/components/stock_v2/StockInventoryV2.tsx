@@ -292,24 +292,16 @@ export const StockInventoryV2: React.FC = () => {
     return localStorage.getItem('skbw_stock_category_filter') || 'ALL';
   });
 
-  const [brandFilter, setBrandFilterState] = useState<string>(() => {
-    const fromUrl = searchParams.get('brand');
+  const [ruleTypeFilter, setRuleTypeFilterState] = useState<string>(() => {
+    const fromUrl = searchParams.get('ruleType') || searchParams.get('rulingType');
     if (fromUrl) return fromUrl;
-    return localStorage.getItem('skbw_stock_brand_filter') || 'ALL';
+    return localStorage.getItem('skbw_stock_ruletype_filter') || 'ALL';
   });
 
   const [warehouseFilter, setWarehouseFilterState] = useState<string>(() => {
     const fromUrl = searchParams.get('warehouse');
     if (fromUrl) return fromUrl;
     return localStorage.getItem('skbw_stock_warehouse_filter') || 'ALL';
-  });
-
-  const [filterRules, setFilterRulesState] = useState<{ id: string; field: string; operator: string; value: string }[]>(() => {
-    try {
-      const saved = localStorage.getItem('skbw_stock_filter_rules');
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return [];
   });
 
   const setStatusFilter = (status: string | ((prev: string) => string)) => {
@@ -356,25 +348,26 @@ export const StockInventoryV2: React.FC = () => {
     });
   };
 
-  const setBrandFilter = (brand: string | ((prev: string) => string)) => {
-    setBrandFilterState(prev => {
-      const nextBrand = typeof brand === 'function' ? brand(prev) : brand;
-      if (nextBrand === 'ALL') {
-        localStorage.removeItem('skbw_stock_brand_filter');
+  const setRuleTypeFilter = (ruleType: string | ((prev: string) => string)) => {
+    setRuleTypeFilterState(prev => {
+      const nextRule = typeof ruleType === 'function' ? ruleType(prev) : ruleType;
+      if (nextRule === 'ALL') {
+        localStorage.removeItem('skbw_stock_ruletype_filter');
       } else {
-        localStorage.setItem('skbw_stock_brand_filter', nextBrand);
+        localStorage.setItem('skbw_stock_ruletype_filter', nextRule);
       }
       setSearchParams(current => {
         const next = new URLSearchParams(current);
-        if (nextBrand && nextBrand !== 'ALL') {
-          next.set('brand', nextBrand);
+        if (nextRule && nextRule !== 'ALL') {
+          next.set('ruleType', nextRule);
         } else {
-          next.delete('brand');
+          next.delete('ruleType');
+          next.delete('rulingType');
         }
         return next;
       }, { replace: true });
       setAnimationKey(Date.now());
-      return nextBrand;
+      return nextRule;
     });
   };
 
@@ -400,19 +393,6 @@ export const StockInventoryV2: React.FC = () => {
     });
   };
 
-  const setFilterRules = (rulesOrUpdater: any) => {
-    setFilterRulesState(prev => {
-      const nextRules = typeof rulesOrUpdater === 'function' ? rulesOrUpdater(prev) : rulesOrUpdater;
-      if (Array.isArray(nextRules) && nextRules.length > 0) {
-        localStorage.setItem('skbw_stock_filter_rules', JSON.stringify(nextRules));
-      } else {
-        localStorage.removeItem('skbw_stock_filter_rules');
-      }
-      setAnimationKey(Date.now());
-      return nextRules;
-    });
-  };
-
   useEffect(() => {
     const tabFromUrl = searchParams.get('tab') as StockTabType;
     if (tabFromUrl && VALID_STOCK_TABS.includes(tabFromUrl) && tabFromUrl !== activeTab) {
@@ -427,9 +407,9 @@ export const StockInventoryV2: React.FC = () => {
     if (catFromUrl && catFromUrl !== categoryFilter) {
       setCategoryFilterState(catFromUrl);
     }
-    const brandFromUrl = searchParams.get('brand');
-    if (brandFromUrl && brandFromUrl !== brandFilter) {
-      setBrandFilterState(brandFromUrl);
+    const ruleTypeFromUrl = searchParams.get('ruleType') || searchParams.get('rulingType');
+    if (ruleTypeFromUrl && ruleTypeFromUrl !== ruleTypeFilter) {
+      setRuleTypeFilterState(ruleTypeFromUrl);
     }
     const whFromUrl = searchParams.get('warehouse');
     if (whFromUrl && whFromUrl !== warehouseFilter) {
@@ -801,10 +781,10 @@ export const StockInventoryV2: React.FC = () => {
     return Array.from(set).sort();
   }, [allSkus]);
 
-  const availableBrands = useMemo(() => {
+  const availableRuleTypes = useMemo(() => {
     const set = new Set<string>();
     allSkus.forEach(s => {
-      if (s.brand) set.add(s.brand);
+      if (s.ruleType && s.ruleType.trim()) set.add(s.ruleType.trim());
     });
     return Array.from(set).sort();
   }, [allSkus]);
@@ -822,8 +802,8 @@ export const StockInventoryV2: React.FC = () => {
       // Category Dropdown Filter
       if (categoryFilter !== 'ALL' && sku.category !== categoryFilter) return false;
 
-      // Brand Dropdown Filter
-      if (brandFilter !== 'ALL' && sku.brand !== brandFilter) return false;
+      // Ruling Type Dropdown Filter
+      if (ruleTypeFilter !== 'ALL' && (sku.ruleType || '').trim() !== ruleTypeFilter) return false;
 
       // Stock Status Filter
       const stock = Number(sku.presentStock ?? sku.openingStock) || 0;
@@ -831,26 +811,6 @@ export const StockInventoryV2: React.FC = () => {
       if (statusFilter === 'IN_STOCK' && stock <= 0) return false;
       if (statusFilter === 'LOW_STOCK' && (stock <= 0 || stock > reorder)) return false;
       if (statusFilter === 'OUT_OF_STOCK' && stock > 0) return false;
-      if (statusFilter === 'ALERTS' && stock > reorder) return false;
-
-      // Dynamic Filter Rules (from Filter Popover)
-      for (const rule of filterRules) {
-        if (!rule.value) continue;
-        const ruleVal = rule.value.toLowerCase().trim();
-        let itemVal = '';
-        if (rule.field === 'category') itemVal = (sku.category || '').toLowerCase().trim();
-        else if (rule.field === 'brand') itemVal = (sku.brand || '').toLowerCase().trim();
-        else if (rule.field === 'name') itemVal = (sku.name || '').toLowerCase().trim();
-        else if (rule.field === 'skuCode') itemVal = (sku.skuCode || '').toLowerCase().trim();
-        else if (rule.field === 'location') itemVal = ((sku as any).resolvedLocation || '').toLowerCase().trim();
-        else if (rule.field === 'status') {
-          itemVal = stock === 0 ? 'out of stock' : stock <= reorder ? 'low stock' : 'in stock';
-        }
-
-        if (rule.operator === 'is' && itemVal !== ruleVal) return false;
-        if (rule.operator === 'is_not' && itemVal === ruleVal) return false;
-        if (rule.operator === 'contains' && !itemVal.includes(ruleVal)) return false;
-      }
 
       // Search Query
       if (debouncedSearch.trim()) {
@@ -858,8 +818,9 @@ export const StockInventoryV2: React.FC = () => {
         const matchesCode = (sku.skuCode || '').toLowerCase().includes(query);
         const matchesName = (sku.name || '').toLowerCase().includes(query);
         const matchesCat = (sku.category || '').toLowerCase().includes(query);
+        const matchesRule = (sku.ruleType || '').toLowerCase().includes(query);
         const matchesBrand = (sku.brand || '').toLowerCase().includes(query);
-        if (!matchesCode && !matchesName && !matchesCat && !matchesBrand) return false;
+        if (!matchesCode && !matchesName && !matchesCat && !matchesRule && !matchesBrand) return false;
       }
 
       return true;
@@ -890,7 +851,7 @@ export const StockInventoryV2: React.FC = () => {
     }
 
     return list;
-  }, [allSkus, activeTab, categoryFilter, brandFilter, statusFilter, filterRules, sortRules, debouncedSearch]);
+  }, [allSkus, activeTab, categoryFilter, ruleTypeFilter, statusFilter, sortRules, debouncedSearch]);
 
   // Filtered Stock Transfers
   const transferEntries = useMemo(() => {
@@ -911,10 +872,9 @@ export const StockInventoryV2: React.FC = () => {
   const handleResetFilters = () => {
     setSearch('');
     setCategoryFilter('ALL');
-    setBrandFilter('ALL');
+    setRuleTypeFilter('ALL');
     setWarehouseFilter('ALL');
     setStatusFilter('ALL');
-    setFilterRules([]);
     setSelectedIds([]);
   };
 
@@ -1415,7 +1375,7 @@ export const StockInventoryV2: React.FC = () => {
                       setShowExportMenu(false);
                     }}
                     className={`p-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
-                      filterRules.length > 0 || categoryFilter !== 'ALL' || brandFilter !== 'ALL' || statusFilter !== 'ALL'
+                      categoryFilter !== 'ALL' || ruleTypeFilter !== 'ALL' || statusFilter !== 'ALL'
                         ? 'bg-blue-600 text-white border-blue-600 shadow-blue-100'
                         : 'bg-white hover:bg-blue-50/60 text-blue-600 border-gray-200 hover:border-blue-200'
                     }`}
@@ -1436,14 +1396,14 @@ export const StockInventoryV2: React.FC = () => {
                       <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-3">
                         <div className="flex items-center gap-2">
                           <h4 className="text-sm font-bold text-gray-900">Inventory Filters</h4>
-                          {(filterRules.length > 0 || categoryFilter !== 'ALL' || brandFilter !== 'ALL' || statusFilter !== 'ALL') && (
+                          {(categoryFilter !== 'ALL' || ruleTypeFilter !== 'ALL' || statusFilter !== 'ALL') && (
                             <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
                               Active
                             </span>
                           )}
                         </div>
                         <div className="flex items-center gap-2">
-                          {(filterRules.length > 0 || categoryFilter !== 'ALL' || brandFilter !== 'ALL' || statusFilter !== 'ALL') && (
+                          {(categoryFilter !== 'ALL' || ruleTypeFilter !== 'ALL' || statusFilter !== 'ALL') && (
                             <button
                               type="button"
                               onClick={handleResetFilters}
@@ -1470,8 +1430,7 @@ export const StockInventoryV2: React.FC = () => {
                             { id: 'ALL', label: 'All Items' },
                             { id: 'IN_STOCK', label: 'In Stock' },
                             { id: 'LOW_STOCK', label: 'Low Stock' },
-                            { id: 'OUT_OF_STOCK', label: 'Out of Stock' },
-                            { id: 'ALERTS', label: 'All Alerts' }
+                            { id: 'OUT_OF_STOCK', label: 'Out of Stock' }
                           ].map(pill => (
                             <button
                               key={pill.id}
@@ -1489,8 +1448,8 @@ export const StockInventoryV2: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Category & Brand selects */}
-                      <div className="grid grid-cols-2 gap-2 mb-3">
+                      {/* Category & Ruling Type selects */}
+                      <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="text-[10px] font-bold text-gray-400 tracking-wider uppercase block mb-1">Category</label>
                           <select
@@ -1505,91 +1464,19 @@ export const StockInventoryV2: React.FC = () => {
                           </select>
                         </div>
                         <div>
-                          <label className="text-[10px] font-bold text-gray-400 tracking-wider uppercase block mb-1">Brand</label>
+                          <label className="text-[10px] font-bold text-gray-400 tracking-wider uppercase block mb-1">Ruling Type</label>
                           <select
-                            value={brandFilter}
-                            onChange={e => setBrandFilter(e.target.value)}
+                            value={ruleTypeFilter}
+                            onChange={e => setRuleTypeFilter(e.target.value)}
                             className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:outline-none focus:border-blue-500 cursor-pointer"
                           >
-                            <option value="ALL">All Brands</option>
-                            {availableBrands.map(b => (
-                              <option key={b} value={b}>{b}</option>
+                            <option value="ALL">All Ruling Types</option>
+                            {availableRuleTypes.map(rt => (
+                              <option key={rt} value={rt}>{rt}</option>
                             ))}
                           </select>
                         </div>
                       </div>
-
-                      {/* Custom Filter Rules */}
-                      <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                        {filterRules.map(rule => (
-                          <div key={rule.id} className="bg-gray-50 border border-gray-200 rounded-xl p-2.5 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-bold text-gray-400 tracking-wider uppercase">WHERE</span>
-                              <button
-                                type="button"
-                                onClick={() => setFilterRules(prev => prev.filter(r => r.id !== rule.id))}
-                                className="text-gray-400 hover:text-gray-600 cursor-pointer"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                            <div className="grid grid-cols-2 gap-1.5">
-                              <select
-                                value={rule.field}
-                                onChange={e => {
-                                  const val = e.target.value;
-                                  setFilterRules(prev => prev.map(r => r.id === rule.id ? { ...r, field: val } : r));
-                                }}
-                                className="px-2 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold bg-white text-gray-800 cursor-pointer"
-                              >
-                                <option value="name">Item Name</option>
-                                <option value="skuCode">SKU Code</option>
-                                <option value="category">Category</option>
-                                <option value="brand">Brand</option>
-                                <option value="unit">UOM</option>
-                                <option value="presentStock">Available Stock</option>
-                              </select>
-                              <select
-                                value={rule.operator}
-                                onChange={e => {
-                                  const val = e.target.value;
-                                  setFilterRules(prev => prev.map(r => r.id === rule.id ? { ...r, operator: val } : r));
-                                }}
-                                className="px-2 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold bg-white text-gray-800 cursor-pointer"
-                              >
-                                <option value="contains">Contains</option>
-                                <option value="equals">Equals</option>
-                                <option value="greater_than">Greater than</option>
-                                <option value="less_than">Less than</option>
-                              </select>
-                            </div>
-                            <input
-                              type="text"
-                              placeholder="Value..."
-                              value={rule.value}
-                              onChange={e => {
-                                const val = e.target.value;
-                                setFilterRules(prev => prev.map(r => r.id === rule.id ? { ...r, value: val } : r));
-                              }}
-                              className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold bg-white text-gray-800 placeholder-gray-400"
-                            />
-                          </div>
-                        ))}
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFilterRules(prev => [
-                            ...prev,
-                            { id: 'filter_' + Date.now(), field: 'name', operator: 'contains', value: '' }
-                          ]);
-                        }}
-                        className="w-full mt-3 py-2 border border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50/40 rounded-xl text-xs font-semibold text-gray-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Add custom rule</span>
-                      </button>
                     </div>
                   )}
                 </div>
