@@ -1116,89 +1116,113 @@ const PurchaseInvoicePage: React.FC = () => {
     setAddError('');
 
     if (!invoiceForm.vendorId) {
-      setAddError('Please select a Supplier');
+      setAddError('Please select a Supplier / Vendor');
       return;
     }
 
-    const firstStorage = locations.find(loc => loc.level === 'Storage Location');
-    if (!firstStorage) {
-      setAddError('No storage location defined in the database. Please complete warehouse setup first.');
-      return;
-    }
+    const firstStorage = locations.find(loc => loc.level === 'Storage Location')
+      || locations.find(loc => loc.level === 'Zone')
+      || locations[0];
+    const defaultStorageId = firstStorage?._id || '';
 
-    const finalInvoiceNumber = invoiceForm.invoiceNumber || `PB${new Date().toISOString().slice(2, 10).replace(/-/g, '')}`;
+    const finalInvoiceNumber = (invoiceForm.invoiceNumber || '').trim() || `PB${new Date().toISOString().slice(2, 10).replace(/-/g, '')}`;
 
     // Format validated items
     const validatedItems = [];
     for (let i = 0; i < invoiceForm.items.length; i++) {
       const item = invoiceForm.items[i];
-      if (!item.skuId || !item.quantity || !item.purchasePrice) {
-        setAddError(`Please fill all required fields in row ${i + 1}`);
-        return;
-      }
-      
-      const qty = Number(item.quantity);
-      const price = Number(item.purchasePrice);
-      const reelsCount = Number(item.reelsCount) || 0;
-      
-      if (qty <= 0 || price <= 0) {
-        setAddError(`Quantity and price must be positive numbers in row ${i + 1}`);
+      if (!item.skuId) {
+        setAddError(`Please select an Item SKU in Lot #${i + 1}`);
         return;
       }
 
       const selectedSku = skus.find(s => s._id === item.skuId);
-      const isReels = selectedSku?.paperType === 'Reels' || reelsCount > 0;
+      const isReels = selectedSku?.paperType === 'Reels' || Number(item.reelsCount) > 0;
+      const isSheets = selectedSku?.paperType === 'Sheets';
+      const stdSheets = Number(item.sheetsPerReam) || selectedSku?.pages || 500;
 
-      if (isReels) {
-        const totalReelsWeight = (item.reels || []).reduce((sum: number, r: any) => sum + (Number(r.weight) || 0), 0);
-        const primaryLocId = item.reels?.[0]?.locationId || item.locationId || firstStorage._id || '';
-
-        validatedItems.push({
-          skuId: item.skuId,
-          quantity: totalReelsWeight,
-          unit: 'kg',
-          purchasePrice: price,
-          totalPrice: totalReelsWeight * price,
-          lotNumber: item.lotNumber || finalInvoiceNumber,
-          locationId: primaryLocId,
-          reels: item.reels || []
-        });
-      } else if ((item as any).splits && (item as any).splits.length > 0) {
-        // Splitted non-reels lot (Multi-location) - keep as 1 single material lot entry
-        const selectedSku = skus.find(s => s._id === item.skuId);
-        const totalSplitQty = (item as any).splits.reduce((sum: number, s: any) => sum + (Number(s.quantity) || 0), 0);
-        const primaryLocId = (item as any).splits[0]?.locationId || item.locationId || firstStorage._id || '';
-
-        validatedItems.push({
-          skuId: item.skuId,
-          quantity: totalSplitQty,
-          unit: selectedSku?.unit || 'kg',
-          purchasePrice: price,
-          totalPrice: totalSplitQty * price,
-          lotNumber: item.lotNumber || finalInvoiceNumber,
-          locationId: primaryLocId,
-          splits: (item as any).splits,
-          reels: [],
-          reamWeight: (item as any).reamWeight ? Number((item as any).reamWeight) : undefined,
-          ratePerKg: (item as any).ratePerKg ? Number((item as any).ratePerKg) : undefined
-        });
-      } else {
-        // Non-reels lot (standard single location)
-        const selectedSku = skus.find(s => s._id === item.skuId);
-        const destLocId = item.locationId || firstStorage._id || '';
-        validatedItems.push({
-          skuId: item.skuId,
-          quantity: qty,
-          unit: selectedSku?.unit || 'kg',
-          purchasePrice: price,
-          totalPrice: qty * price,
-          lotNumber: item.lotNumber || finalInvoiceNumber,
-          locationId: destLocId,
-          reels: [],
-          reamWeight: (item as any).reamWeight ? Number((item as any).reamWeight) : undefined,
-          ratePerKg: (item as any).ratePerKg ? Number((item as any).ratePerKg) : undefined
-        });
+      // Quantity resolution
+      let qty = Number(item.quantity) || 0;
+      if (isReels && (item.reels || []).length > 0) {
+        const reelsWt = (item.reels || []).reduce((sum: number, r: any) => sum + (Number(r.weight) || 0), 0);
+        if (reelsWt > 0) {
+          qty = reelsWt;
+        }
       }
+      if (isSheets && qty <= 0 && (item as any).splits && (item as any).splits.length > 0) {
+        const splitSum = (item as any).splits.reduce((sum: number, s: any) => sum + (Number(s.quantity) || 0), 0);
+        if (splitSum > 0) qty = splitSum;
+      }
+
+      // Price resolution
+      let price = Number(item.purchasePrice) || 0;
+      if (price <= 0 && isSheets) {
+        const rw = Number(item.reamWeight) || (selectedSku as any)?.reamWeight || getFallbackReamWeight(selectedSku) || 0;
+        const rkg = Number(item.ratePerKg) || 0;
+        if (rw > 0 && rkg > 0) {
+          price = (rw * rkg) / stdSheets;
+        }
+      }
+      if (price <= 0 && selectedSku?.purchasePrice) {
+        price = Number(selectedSku.purchasePrice);
+      } else if (price <= 0 && selectedSku?.standardCost) {
+        price = Number(selectedSku.standardCost);
+      }
+
+      if (qty <= 0) {
+        setAddError(`Please enter a valid quantity for Lot #${i + 1} (${selectedSku?.name || 'Item'})`);
+        return;
+      }
+      if (price <= 0) {
+        setAddError(`Please enter a valid rate/price for Lot #${i + 1} (${selectedSku?.name || 'Item'})`);
+        return;
+      }
+
+      // Storage location
+      const itemLocId = item.locationId || defaultStorageId;
+
+      // Clean splits
+      let cleanedSplits: any[] = [];
+      if ((item as any).splits && (item as any).splits.length > 0) {
+        cleanedSplits = (item as any).splits
+          .filter((s: any) => Number(s.quantity) > 0)
+          .map((s: any) => ({
+            locationId: s.locationId || itemLocId || defaultStorageId,
+            quantity: Number(s.quantity)
+          }));
+      }
+      if (cleanedSplits.length === 0) {
+        cleanedSplits = [{
+          locationId: itemLocId || defaultStorageId,
+          quantity: qty
+        }];
+      }
+
+      // Clean reels
+      let cleanedReels: any[] = [];
+      if (isReels && (item.reels || []).length > 0) {
+        cleanedReels = (item.reels || []).map((r: any, rIdx: number) => ({
+          reelNumber: r.reelNumber || `${finalInvoiceNumber}-R${String(rIdx + 1).padStart(2, '0')}`,
+          gsm: Number(r.gsm) || Number(selectedSku?.gsm) || 0,
+          width: Number(r.width) || Number(selectedSku?.width) || 0,
+          weight: Number(r.weight) || 0,
+          locationId: r.locationId || itemLocId || defaultStorageId
+        }));
+      }
+
+      validatedItems.push({
+        skuId: item.skuId,
+        quantity: qty,
+        unit: selectedSku?.unit || (isReels ? 'kg' : isSheets ? 'Sheets' : 'Pcs'),
+        purchasePrice: price,
+        totalPrice: qty * price,
+        lotNumber: item.lotNumber || finalInvoiceNumber,
+        locationId: cleanedSplits[0]?.locationId || itemLocId || defaultStorageId,
+        splits: cleanedSplits,
+        reels: cleanedReels,
+        reamWeight: item.reamWeight ? Number(item.reamWeight) : undefined,
+        ratePerKg: item.ratePerKg ? Number(item.ratePerKg) : undefined
+      });
     }
 
     const matTotal = validatedItems.reduce((sum, item) => sum + item.totalPrice, 0);
@@ -1252,7 +1276,7 @@ const PurchaseInvoicePage: React.FC = () => {
       loadInvoices();
     } catch (err: any) {
       console.error(err);
-      setAddError(err.response?.data?.msg || 'Failed to submit purchase invoice');
+      setAddError(err.response?.data?.msg || err.message || 'Failed to submit purchase invoice');
     } finally {
       setAddLoading(false);
     }

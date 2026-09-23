@@ -37,10 +37,32 @@ exports.createPurchaseInvoice = async (req, res, next) => {
 
     const companyObjId = toObjectId(company);
 
-    // 1. Validate Vendor
-    const vendor = await Party.findOne({ _id: toObjectId(vendorId), type: "vendor", company: companyObjId });
+    // 1. Validate Vendor (with flexible company matching)
+    let vendor = await Party.findOne({ 
+      _id: toObjectId(vendorId), 
+      $or: [{ company: companyObjId }, { company: null }, { company: { $exists: false } }] 
+    });
     if (!vendor) {
-      return res.status(400).json({ msg: "Vendor not found or mismatch for this company" });
+      vendor = await Party.findById(toObjectId(vendorId));
+    }
+    if (!vendor) {
+      return res.status(400).json({ msg: "Vendor not found in database" });
+    }
+
+    // Resolve default fallback location for this company
+    let defaultLocation = await WarehouseLocationV2.findOne({ company: companyObjId, level: "Storage Location" })
+      || await WarehouseLocationV2.findOne({ company: companyObjId, level: "Zone" })
+      || await WarehouseLocationV2.findOne({ company: companyObjId })
+      || await WarehouseLocationV2.findOne();
+
+    if (!defaultLocation) {
+      defaultLocation = await WarehouseLocationV2.create({
+        name: "Main Storage",
+        code: "MAIN-01",
+        level: "Storage Location",
+        company: companyObjId,
+        createdBy: toObjectId(req.user?.id)
+      });
     }
 
     // 2. Validate Items, SKUs, and Location Hierarchies
@@ -51,7 +73,7 @@ exports.createPurchaseInvoice = async (req, res, next) => {
       const { skuId, quantity, purchasePrice, lotNumber, locationId, reels, splits } = item;
       
       if (!skuId || !quantity || !purchasePrice || !lotNumber) {
-        return res.status(400).json({ msg: "Missing fields in purchase items" });
+        return res.status(400).json({ msg: "Missing fields in purchase items (SKU, Quantity, Price, or Lot Number)" });
       }
 
       const qty = Number(quantity);
@@ -61,7 +83,10 @@ exports.createPurchaseInvoice = async (req, res, next) => {
       }
 
       // Check SKU
-      const sku = await SkuV2.findOne({ _id: toObjectId(skuId), company: companyObjId });
+      let sku = await SkuV2.findOne({ _id: toObjectId(skuId), company: companyObjId });
+      if (!sku) {
+        sku = await SkuV2.findById(toObjectId(skuId));
+      }
       if (!sku || sku.isDeleted) {
         return res.status(400).json({ msg: `SKU '${skuId}' not found or has been deleted` });
       }
@@ -70,24 +95,33 @@ exports.createPurchaseInvoice = async (req, res, next) => {
       }
 
       const primaryLocId = locationId || (splits && splits[0]?.locationId) || (reels && reels[0]?.locationId);
-      if (!primaryLocId) {
-        return res.status(400).json({ msg: `Storage location is required for SKU '${sku.skuCode}'` });
+      let location = primaryLocId ? await WarehouseLocationV2.findOne({ _id: toObjectId(primaryLocId), company: companyObjId }) : null;
+      if (!location && primaryLocId) {
+        location = await WarehouseLocationV2.findById(toObjectId(primaryLocId));
       }
-
-      const location = await WarehouseLocationV2.findOne({ _id: toObjectId(primaryLocId), company: companyObjId });
       if (!location) {
-        return res.status(400).json({ msg: `Storage Location '${primaryLocId}' not found` });
+        location = defaultLocation;
       }
 
       const itemTotal = qty * price;
       subTotal += itemTotal;
-      const cleanReels = (Array.isArray(reels) ? reels : []).map((r, rIdx) => ({
-        reelNumber: r.reelNumber || r.reelNo || `${lotNumber}-R${String(rIdx + 1).padStart(2, '0')}`,
-        gsm: Number(r.gsm) || Number(sku.gsm) || 0,
-        width: Number(r.width) || Number(sku.width) || 0,
-        weight: Number(r.weight) || 0,
-        locationId: r.locationId || location._id
-      }));
+
+      const cleanSplits = (Array.isArray(splits) ? splits : [])
+        .filter(s => s && Number(s.quantity) > 0)
+        .map(s => ({
+          locationId: toObjectId(s.locationId) || location._id,
+          quantity: Number(s.quantity)
+        }));
+
+      const cleanReels = (Array.isArray(reels) ? reels : [])
+        .filter(r => r && (Number(r.weight) > 0 || r.reelNumber || r.reelNo))
+        .map((r, rIdx) => ({
+          reelNumber: r.reelNumber || r.reelNo || `${lotNumber}-R${String(rIdx + 1).padStart(2, '0')}`,
+          gsm: Number(r.gsm) || Number(sku.gsm) || 0,
+          width: Number(r.width) || Number(sku.width) || 0,
+          weight: Number(r.weight) || 0,
+          locationId: toObjectId(r.locationId) || location._id
+        }));
 
       validatedItems.push({
         skuId: sku._id,
@@ -97,7 +131,7 @@ exports.createPurchaseInvoice = async (req, res, next) => {
         totalPrice: itemTotal,
         lotNumber,
         locationId: location._id,
-        splits: Array.isArray(splits) ? splits : [],
+        splits: cleanSplits,
         reels: cleanReels,
         reamWeight: item.reamWeight ? Number(item.reamWeight) : undefined,
         ratePerKg: item.ratePerKg ? Number(item.ratePerKg) : undefined
@@ -106,14 +140,14 @@ exports.createPurchaseInvoice = async (req, res, next) => {
 
     const grandTotal = subTotal + Number(taxAmount) + Number(freight) + Number(craneCharges) + Number(otherCharges);
 
-    // 3. Generate sequential invoice number if not manually specified
+    // 3. Generate sequential invoice number if not manually specified or resolve duplicate
     let finalInvoiceNo = invoiceNumber;
     if (!finalInvoiceNo) {
       finalInvoiceNo = await Sequence.getNextSequence("PB");
     } else {
       const exists = await PurchaseInvoiceV2.findOne({ invoiceNumber: finalInvoiceNo, company: companyObjId });
       if (exists) {
-        return res.status(400).json({ msg: `Purchase Invoice '${finalInvoiceNo}' already exists` });
+        finalInvoiceNo = await Sequence.getNextSequence("PB");
       }
     }
 
@@ -130,7 +164,7 @@ exports.createPurchaseInvoice = async (req, res, next) => {
       grandTotal,
       dueDate: dueDate ? new Date(dueDate) : undefined,
       remarks: remarks || "",
-      createdBy: toObjectId(req.user.id),
+      createdBy: toObjectId(req.user?.id) || companyObjId,
       company: companyObjId,
       status: "Posted"
     });
@@ -522,9 +556,28 @@ exports.editPurchaseInvoice = async (req, res, next) => {
 
     const companyObjId = invoice.company;
 
-    const vendor = await Party.findById(invoice.vendorId);
+    let vendor = await Party.findById(invoice.vendorId);
+    if (!vendor) {
+      vendor = await Party.findOne({ _id: toObjectId(invoice.vendorId) });
+    }
     if (!vendor) {
       return res.status(400).json({ msg: "Vendor associated with invoice not found" });
+    }
+
+    // Resolve default fallback location for this company
+    let defaultLocation = await WarehouseLocationV2.findOne({ company: companyObjId, level: "Storage Location" })
+      || await WarehouseLocationV2.findOne({ company: companyObjId, level: "Zone" })
+      || await WarehouseLocationV2.findOne({ company: companyObjId })
+      || await WarehouseLocationV2.findOne();
+
+    if (!defaultLocation) {
+      defaultLocation = await WarehouseLocationV2.create({
+        name: "Main Storage",
+        code: "MAIN-01",
+        level: "Storage Location",
+        company: companyObjId,
+        createdBy: toObjectId(req.user?.id)
+      });
     }
 
     // Validate SKU/Locations
@@ -535,7 +588,7 @@ exports.editPurchaseInvoice = async (req, res, next) => {
       const { skuId, quantity, purchasePrice, lotNumber, locationId, reels, splits } = item;
       
       if (!skuId || !quantity || !purchasePrice || !lotNumber) {
-        return res.status(400).json({ msg: "Missing fields in purchase items" });
+        return res.status(400).json({ msg: "Missing fields in purchase items (SKU, Quantity, Price, or Lot Number)" });
       }
 
       const qty = Number(quantity);
@@ -544,41 +597,52 @@ exports.editPurchaseInvoice = async (req, res, next) => {
         return res.status(400).json({ msg: "Quantity and price must be greater than zero" });
       }
 
-      const sku = await SkuV2.findById(skuId);
+      let sku = await SkuV2.findById(skuId);
+      if (!sku) {
+        sku = await SkuV2.findOne({ _id: toObjectId(skuId) });
+      }
       if (!sku) {
         return res.status(400).json({ msg: `SKU '${skuId}' not found` });
       }
 
       const primaryLocId = locationId || (splits && splits[0]?.locationId) || (reels && reels[0]?.locationId);
-      if (!primaryLocId) {
-        return res.status(400).json({ msg: `Storage location is required for SKU '${sku.skuCode}'` });
+      let location = primaryLocId ? await WarehouseLocationV2.findById(primaryLocId) : null;
+      if (!location && primaryLocId) {
+        location = await WarehouseLocationV2.findOne({ _id: toObjectId(primaryLocId) });
       }
-
-      const location = await WarehouseLocationV2.findById(primaryLocId);
       if (!location) {
-        return res.status(400).json({ msg: `Location '${primaryLocId}' not found` });
+        location = defaultLocation;
       }
 
       const itemTotal = qty * price;
       subTotal += itemTotal;
 
-      const cleanReels = (Array.isArray(reels) ? reels : []).map((r, rIdx) => ({
-        reelNumber: r.reelNumber || r.reelNo || `${lotNumber}-R${String(rIdx + 1).padStart(2, '0')}`,
-        gsm: Number(r.gsm) || Number(sku.gsm) || 0,
-        width: Number(r.width) || Number(sku.width) || 0,
-        weight: Number(r.weight) || 0,
-        locationId: r.locationId || location._id
-      }));
+      const cleanSplits = (Array.isArray(splits) ? splits : [])
+        .filter(s => s && Number(s.quantity) > 0)
+        .map(s => ({
+          locationId: toObjectId(s.locationId) || location._id,
+          quantity: Number(s.quantity)
+        }));
+
+      const cleanReels = (Array.isArray(reels) ? reels : [])
+        .filter(r => r && (Number(r.weight) > 0 || r.reelNumber || r.reelNo))
+        .map((r, rIdx) => ({
+          reelNumber: r.reelNumber || r.reelNo || `${lotNumber}-R${String(rIdx + 1).padStart(2, '0')}`,
+          gsm: Number(r.gsm) || Number(sku.gsm) || 0,
+          width: Number(r.width) || Number(sku.width) || 0,
+          weight: Number(r.weight) || 0,
+          locationId: toObjectId(r.locationId) || location._id
+        }));
 
       validatedItems.push({
         skuId: sku._id,
         quantity: qty,
-        unit: sku.unit,
+        unit: sku.unit || "kg",
         purchasePrice: price,
         totalPrice: itemTotal,
         lotNumber,
         locationId: location._id,
-        splits: Array.isArray(splits) ? splits : [],
+        splits: cleanSplits,
         reels: cleanReels,
         reamWeight: item.reamWeight ? Number(item.reamWeight) : undefined,
         ratePerKg: item.ratePerKg ? Number(item.ratePerKg) : undefined
