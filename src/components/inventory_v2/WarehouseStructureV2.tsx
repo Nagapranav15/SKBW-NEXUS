@@ -16,6 +16,7 @@ import {
   deleteWarehouseLocationV2, 
   getLocationDetailsV2,
   getSkusV2,
+  getBalancesV2,
   WarehouseLocationV2, 
   SkuV2
 } from '../../api/mfgApiV2';
@@ -54,6 +55,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
   const { selectedCompany } = useAuth();
   const [locations, setLocations] = useState<WarehouseLocationV2[]>([]);
   const [skus, setSkus] = useState<SkuV2[]>([]);
+  const [balances, setBalances] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Active Selections
@@ -115,12 +117,14 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
   const loadInitialData = async () => {
     setLoading(true);
     try {
-      const [hierarchyData, skusData] = await Promise.all([
+      const [hierarchyData, skusData, balancesData] = await Promise.all([
         getWarehouseHierarchyV2(selectedCompany?._id || ''),
-        getSkusV2(selectedCompany?._id || '')
+        getSkusV2(selectedCompany?._id || ''),
+        getBalancesV2(selectedCompany?._id || '').catch(() => [])
       ]);
       setLocations(hierarchyData);
       setSkus(skusData);
+      setBalances(balancesData || []);
 
       // Initialize selected factory and floor
       const factoriesList = hierarchyData.filter(l => l.level === 'Factory');
@@ -142,8 +146,14 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
 
   const reloadWarehouse = async () => {
     try {
-      const data = await getWarehouseHierarchyV2(selectedCompany?._id || '');
+      const [data, skusData, balancesData] = await Promise.all([
+        getWarehouseHierarchyV2(selectedCompany?._id || ''),
+        getSkusV2(selectedCompany?._id || '').catch(() => []),
+        getBalancesV2(selectedCompany?._id || '').catch(() => [])
+      ]);
       setLocations(data);
+      if (skusData?.length) setSkus(skusData);
+      if (balancesData) setBalances(balancesData);
     } catch (e) {
       console.error(e);
     }
@@ -380,50 +390,129 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
     };
   };
 
-  // Helper to compute stock & SKU breakdown for a location or zone
-  const getLocationStockMetrics = (location: WarehouseLocationV2) => {
-    const locationName = (location.name || '').toLowerCase();
-    const locId = location._id;
+  // Helper to compute live stock & SKU breakdown for a location or zone
+  const getLocationStockMetrics = (targetLoc: WarehouseLocationV2) => {
+    if (!targetLoc?._id) {
+      return { rawMatQty: 0, rawMatSkus: 0, semiQty: 0, semiSkus: 0, fgQty: 0, fgSkus: 0, totalSkus: 0 };
+    }
 
-    const assignedSkus = skus.filter(s => {
-      const wLoc = (s.warehouseLocation || '').toLowerCase();
-      const sLocId = (s as any).locationId;
-      return sLocId === locId || wLoc.includes(locationName);
-    });
+    // Collect all descendant IDs for target location (e.g. if target is Zone, collect Zone ID + all its Bins)
+    const targetLocIds = new Set<string>([String(targetLoc._id)]);
+    const targetLocNames = new Set<string>([targetLoc.name.toLowerCase().trim()]);
 
-    let rawMatQty = 0;
-    let rawMatSkus = 0;
-    let semiQty = 0;
-    let semiSkus = 0;
-    let fgQty = 0;
-    let fgSkus = 0;
-
-    assignedSkus.forEach(sku => {
-      const type = (sku.itemType || '').toLowerCase();
-      const group = (sku.group || sku.category || '').toLowerCase();
-      const stock = Number(sku.presentStock ?? sku.openingStock) || 0;
-
-      if (type.includes('material') || group.includes('material') || group.includes('paper') || group.includes('raw')) {
-        rawMatQty += stock;
-        rawMatSkus += 1;
-      } else if (type.includes('semi') || group.includes('semi') || group.includes('work')) {
-        semiQty += stock;
-        semiSkus += 1;
-      } else {
-        fgQty += stock;
-        fgSkus += 1;
+    const childLocations = locations.filter(l => l.parentId === targetLoc._id);
+    childLocations.forEach(c => {
+      if (c._id) {
+        targetLocIds.add(String(c._id));
+        targetLocNames.add(c.name.toLowerCase().trim());
       }
     });
 
-    const totalSkus = assignedSkus.length > 0 ? assignedSkus.length : (rawMatSkus + semiSkus + fgSkus);
+    // Also collect parent info for contextual matching
+    const parent = targetLoc.parentId ? locations.find(l => l._id === targetLoc.parentId) : null;
+    const parentName = parent ? parent.name.toLowerCase().trim() : '';
+
+    let rawMatQty = 0;
+    let semiQty = 0;
+    let fgQty = 0;
+
+    const rawMatSkuIds = new Set<string>();
+    const semiSkuIds = new Set<string>();
+    const fgSkuIds = new Set<string>();
+    const processedBalancesSkuIds = new Set<string>();
+
+    // 1. Calculate from live Balances (Ledger aggregates)
+    if (Array.isArray(balances) && balances.length > 0) {
+      balances.forEach((b: any) => {
+        const bLocId = b.locationId ? String(b.locationId._id || b.locationId) : '';
+        const bLocName = (b.location?.name || b.locationName || '').toLowerCase().trim();
+        
+        const isLocMatch = (bLocId && targetLocIds.has(bLocId)) || 
+          (bLocName && (targetLocNames.has(bLocName) || (parentName && bLocName.includes(parentName) && bLocName.includes(targetLoc.name.toLowerCase()))));
+
+        if (isLocMatch) {
+          const rawSkuId = b.skuId || b.sku?._id;
+          const skuIdStr = rawSkuId ? String(rawSkuId._id || rawSkuId) : '';
+          const skuObj: SkuV2 | undefined = b.sku || skus.find(s => String(s._id) === skuIdStr);
+          const qty = Number(b.onHand ?? b.quantity ?? b.qty) || 0;
+
+          if (qty > 0 && skuObj) {
+            processedBalancesSkuIds.add(skuIdStr || skuObj.skuCode);
+
+            const cat = (skuObj.category || '').toLowerCase();
+            const group = (skuObj.group || '').toLowerCase();
+            const itemType = (skuObj.itemType || '').toLowerCase();
+            const paperType = (skuObj.paperType || '').toLowerCase();
+
+            const isRaw = cat.includes('raw') || cat.includes('material') || cat.includes('paper') || 
+                          group.includes('material') || group.includes('paper') || group.includes('raw') ||
+                          itemType.includes('material') || itemType.includes('raw') || (paperType !== 'none' && paperType !== '');
+            
+            const isSemi = !isRaw && (cat.includes('semi') || group.includes('semi') || itemType.includes('semi') || group.includes('work in progress') || group.includes('wip'));
+
+            if (isRaw) {
+              rawMatQty += qty;
+              rawMatSkuIds.add(skuIdStr || skuObj.skuCode);
+            } else if (isSemi) {
+              semiQty += qty;
+              semiSkuIds.add(skuIdStr || skuObj.skuCode);
+            } else {
+              fgQty += qty;
+              fgSkuIds.add(skuIdStr || skuObj.skuCode);
+            }
+          }
+        }
+      });
+    }
+
+    // 2. Secondary fallback: Check SKUs with initialLocation / defaultLocation / warehouseLocation
+    skus.forEach(s => {
+      const sId = String(s._id || s.skuCode);
+      if (processedBalancesSkuIds.has(sId)) return; // Already counted from live ledger
+
+      const initialLocId = String(s.initialLocationId || (s as any).locationId || s.initialLocation?._id || '');
+      const defaultLocName = (s.defaultLocation || s.warehouseLocation || (s as any).location || '').toLowerCase().trim();
+
+      const isMatch = (initialLocId && targetLocIds.has(initialLocId)) ||
+        (defaultLocName && (targetLocNames.has(defaultLocName) || (parentName && defaultLocName.includes(parentName) && defaultLocName.includes(targetLoc.name.toLowerCase()))));
+
+      if (isMatch) {
+        const stock = Number(s.presentStock ?? s.openingStock) || 0;
+        if (stock > 0) {
+          const cat = (s.category || '').toLowerCase();
+          const group = (s.group || '').toLowerCase();
+          const itemType = (s.itemType || '').toLowerCase();
+          const paperType = (s.paperType || '').toLowerCase();
+
+          const isRaw = cat.includes('raw') || cat.includes('material') || cat.includes('paper') || 
+                        group.includes('material') || group.includes('paper') || group.includes('raw') ||
+                        itemType.includes('material') || itemType.includes('raw') || (paperType !== 'none' && paperType !== '');
+          
+          const isSemi = !isRaw && (cat.includes('semi') || group.includes('semi') || itemType.includes('semi') || group.includes('work in progress') || group.includes('wip'));
+
+          if (isRaw) {
+            rawMatQty += stock;
+            rawMatSkuIds.add(sId);
+          } else if (isSemi) {
+            semiQty += stock;
+            semiSkuIds.add(sId);
+          } else {
+            fgQty += stock;
+            fgSkuIds.add(sId);
+          }
+        }
+      }
+    });
+
+    const totalSkus = new Set([...rawMatSkuIds, ...semiSkuIds, ...fgSkuIds]).size;
 
     return {
       rawMatQty,
-      rawMatSkus,
+      rawMatSkus: rawMatSkuIds.size,
       semiQty,
-      semiSkus,
+      semiSkus: semiSkuIds.size,
       fgQty,
-      fgSkus,
+      fgSkus: fgSkuIds.size,
       totalSkus
     };
   };
@@ -476,7 +565,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
     });
 
     return rows;
-  }, [activeZones, locations, skus, zoneSearch]);
+  }, [activeZones, locations, skus, balances, zoneSearch]);
 
   // Compute Floor Totals
   const floorTotals = useMemo(() => {
@@ -551,7 +640,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
         storageLocationsCount: locs.length
       };
     });
-  }, [activeZones, locations, skus]);
+  }, [activeZones, locations, skus, balances]);
 
   // Modal Handlers
   const handleOpenAddModal = (level: 'Factory' | 'Floor' | 'Zone' | 'Storage Location', parentId = '') => {

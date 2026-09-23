@@ -1889,8 +1889,11 @@ exports.getBalances = async (req, res, next) => {
       pipeline.push({ $match: { "sku.category": category } });
     }
 
-    const balances = await InventoryLedger.aggregate(pipeline);
-    res.json(balances);
+    let balances = await InventoryLedger.aggregate(pipeline);
+    if (!balances || balances.length === 0) {
+      balances = await InventoryLedgerV2.aggregate(pipeline);
+    }
+    res.json(balances || []);
   } catch (err) {
     next(err);
   }
