@@ -64,10 +64,12 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
   const [availableSkus, setAvailableSkus] = useState<SkuV2[]>([]);
   const [stockMap, setStockMap] = useState<Map<string, number>>(new Map());
-  const [itemSearchQuery, setItemSearchQuery] = useState('');
+  
+  // Row item search & dropdown state
   const [activeItemDropdownIdx, setActiveItemDropdownIdx] = useState<number | null>(null);
+  const [rowSearchTerms, setRowSearchTerms] = useState<{ [key: number]: string }>({});
 
-  // Line items state
+  // Clean empty initial line items (No hardcoded values)
   const [items, setItems] = useState<OrderItemRow[]>([
     {
       skuId: '',
@@ -76,42 +78,36 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       category: 'Finished Goods',
       uom: 'Pcs',
       stockGbl: null,
-      gbl: 1,
-      pcsPerGbl: 240,
-      totalPcs: 240,
-      rate: 23,
+      gbl: '',
+      pcsPerGbl: '',
+      totalPcs: 0,
+      rate: '',
       discPercent: 0,
-      amount: 5520
+      amount: 0
     }
   ]);
 
-  // Other charges state
-  const [otherCharges, setOtherCharges] = useState<OtherChargeItem[]>([
-    { name: 'Transport / Cargo', quantity: 4, rate: 80, amount: 320 },
-    { name: 'Packing & Forwarding', quantity: 4, rate: 45, amount: 180 }
-  ]);
+  // Clean initial other charges
+  const [otherCharges, setOtherCharges] = useState<OtherChargeItem[]>([]);
 
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   const customerRef = useRef<HTMLDivElement>(null);
-  const itemDropdownRefs = useRef<{ [key: number]: HTMLDivElement | null }>({});
+  const dropdownContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (customerRef.current && !customerRef.current.contains(e.target as Node)) {
         setShowCustomerDropdown(false);
       }
-      if (activeItemDropdownIdx !== null) {
-        const ref = itemDropdownRefs.current[activeItemDropdownIdx];
-        if (ref && !ref.contains(e.target as Node)) {
-          setActiveItemDropdownIdx(null);
-        }
+      if (dropdownContainerRef.current && !dropdownContainerRef.current.contains(e.target as Node)) {
+        setActiveItemDropdownIdx(null);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [activeItemDropdownIdx]);
+  }, []);
 
   useEffect(() => {
     if (isOpen && companyId) {
@@ -177,10 +173,10 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
             category: i.category || 'Finished Goods',
             uom: i.uom || 'Pcs',
             stockGbl: skuIdStr ? stockGbl : null,
-            gbl: gbl || 1,
-            pcsPerGbl: pcsPerGbl || 240,
-            totalPcs: totalQty || (gbl * pcsPerGbl),
-            rate: rate || 0,
+            gbl: gbl || '',
+            pcsPerGbl: pcsPerGbl || '',
+            totalPcs: totalQty || (Number(gbl) * Number(pcsPerGbl)),
+            rate: rate || '',
             discPercent: disc || 0,
             amount: amt
           };
@@ -210,29 +206,27 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
           category: 'Finished Goods',
           uom: 'Pcs',
           stockGbl: null,
-          gbl: 2,
-          pcsPerGbl: 240,
-          totalPcs: 480,
-          rate: 23,
+          gbl: '',
+          pcsPerGbl: '',
+          totalPcs: 0,
+          rate: '',
           discPercent: 0,
-          amount: 11040
+          amount: 0
         }
       ]);
-      setOtherCharges([
-        { name: 'Transport / Cargo', quantity: 4, rate: 80, amount: 320 },
-        { name: 'Packing & Forwarding', quantity: 4, rate: 45, amount: 180 }
-      ]);
+      setOtherCharges([]);
+      setRowSearchTerms({});
     }
   }, [editOrder, isOpen]);
 
-  // Update item row calculations
+  // Update item row calculations dynamically
   const updateItemRow = (index: number, updates: Partial<OrderItemRow>) => {
     setItems(prev => {
       const copy = [...prev];
       const row = { ...copy[index], ...updates };
 
       const gblNum = Number(row.gbl) || 0;
-      const pcsPerGblNum = Number(row.pcsPerGbl) || 1;
+      const pcsPerGblNum = Number(row.pcsPerGbl) || 0;
       const rateNum = Number(row.rate) || 0;
       const discNum = Number(row.discPercent) || 0;
 
@@ -250,10 +244,10 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   };
 
   const handleSelectSku = (index: number, sku: SkuV2) => {
-    const pcsPerGbl = (sku as any).altUnitConversion || (sku as any).pages || 240;
+    const pcsPerGbl = (sku as any).altUnitConversion || (sku as any).pages || (sku as any).sheetsPerReam || 240;
     const rawStock = stockMap.get(String(sku._id)) || 0;
     const stockGbl = pcsPerGbl > 0 ? Math.floor(rawStock / pcsPerGbl) : rawStock;
-    const defaultRate = (sku as any).sellingPrice || (sku as any).price || (sku as any).standardCost || 23;
+    const defaultRate = (sku as any).sellingPrice || (sku as any).price || (sku as any).standardCost || (sku as any).purchasePrice || '';
 
     updateItemRow(index, {
       skuId: sku._id,
@@ -266,6 +260,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       rate: defaultRate
     });
 
+    setRowSearchTerms(prev => ({ ...prev, [index]: sku.name }));
     setActiveItemDropdownIdx(null);
   };
 
@@ -279,12 +274,12 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
         category: 'Finished Goods',
         uom: 'Pcs',
         stockGbl: null,
-        gbl: 1,
-        pcsPerGbl: 240,
-        totalPcs: 240,
-        rate: 23,
+        gbl: '',
+        pcsPerGbl: '',
+        totalPcs: 0,
+        rate: '',
         discPercent: 0,
-        amount: 5520
+        amount: 0
       }
     ]);
   };
@@ -298,7 +293,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   const handleAddChargeRow = () => {
     setOtherCharges(prev => [
       ...prev,
-      { name: 'Miscellaneous Charge', quantity: 1, rate: 100, amount: 100 }
+      { name: 'Transport / Cargo', quantity: 1, rate: 0, amount: 0 }
     ]);
   };
 
@@ -344,7 +339,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
     const validItems = items.filter(i => i.itemName.trim() && Number(i.totalPcs) > 0);
     if (validItems.length === 0) {
-      setErrorMsg('Please add at least one line item with valid product and quantity');
+      setErrorMsg('Please select an Item / Product and enter valid GBL & PCS quantity');
       return;
     }
 
@@ -416,15 +411,15 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
     ).slice(0, 30);
   }, [customersList, customerSearch]);
 
-  const filteredSkus = useMemo(() => {
-    if (!itemSearchQuery.trim()) return availableSkus.slice(0, 40);
-    const q = itemSearchQuery.toLowerCase();
+  const getFilteredSkusForRow = (rowIdx: number) => {
+    const term = (rowSearchTerms[rowIdx] !== undefined ? rowSearchTerms[rowIdx] : items[rowIdx]?.itemName || '').toLowerCase().trim();
+    if (!term) return availableSkus.slice(0, 50);
     return availableSkus.filter(s =>
-      (s.name || '').toLowerCase().includes(q) ||
-      (s.brand || '').toLowerCase().includes(q) ||
-      (s.skuCode || '').toLowerCase().includes(q)
-    ).slice(0, 40);
-  }, [availableSkus, itemSearchQuery]);
+      (s.name || '').toLowerCase().includes(term) ||
+      (s.brand || '').toLowerCase().includes(term) ||
+      (s.skuCode || '').toLowerCase().includes(term)
+    ).slice(0, 50);
+  };
 
   return (
     <Modal
@@ -466,7 +461,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
         </div>
 
         {/* ── SCROLLABLE BODY ── */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 bg-white">
+        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 bg-white" ref={dropdownContainerRef}>
           
           {errorMsg && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
@@ -525,7 +520,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
                   {/* Customer Dropdown Popover */}
                   {showCustomerDropdown && (
-                    <div className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-2xl z-[99] max-h-56 overflow-y-auto divide-y divide-gray-50 p-1">
+                    <div className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-2xl z-[999] max-h-56 overflow-y-auto divide-y divide-gray-50 p-1">
                       {filteredCustomers.map(c => (
                         <div
                           key={c._id}
@@ -696,17 +691,6 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
               </div>
 
               <div className="flex items-center gap-2">
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
-                  <input
-                    type="text"
-                    value={itemSearchQuery}
-                    onChange={(e) => setItemSearchQuery(e.target.value)}
-                    placeholder="Search product / SKU..."
-                    className="pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-xl w-48 font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
-                  />
-                </div>
-
                 <button
                   type="button"
                   onClick={handleAddItemRow}
@@ -725,26 +709,29 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
               </div>
             </div>
 
-            {/* Items Table */}
-            <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-3xs">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left divide-y divide-gray-200">
-                  <thead className="bg-gray-50/90 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                    <tr>
-                      <th className="py-2.5 px-3 w-10 text-center">#</th>
-                      <th className="py-2.5 px-3 min-w-[220px]">ITEM / PRODUCT</th>
-                      <th className="py-2.5 px-3 text-center w-24">STOCK (GBL)</th>
-                      <th className="py-2.5 px-3 text-center w-24">GBL <span className="text-red-500">*</span></th>
-                      <th className="py-2.5 px-3 text-center w-24">PCS / GBL</th>
-                      <th className="py-2.5 px-3 text-center w-24">TOTAL PCS</th>
-                      <th className="py-2.5 px-3 text-center w-28">RATE (₹) <span className="text-red-500">*</span></th>
-                      <th className="py-2.5 px-3 text-center w-20">DISC %</th>
-                      <th className="py-2.5 px-3 text-right w-32">AMOUNT (₹)</th>
-                      <th className="py-2.5 px-3 text-center w-20">ACTIONS</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 bg-white">
-                    {items.map((row, idx) => (
+            {/* Items Table with non-clipping container */}
+            <div className="border border-gray-200 rounded-2xl shadow-3xs overflow-visible">
+              <table className="w-full text-left divide-y divide-gray-200">
+                <thead className="bg-gray-50/90 text-[10px] font-bold text-gray-500 uppercase tracking-wider rounded-t-2xl">
+                  <tr>
+                    <th className="py-2.5 px-3 w-10 text-center">#</th>
+                    <th className="py-2.5 px-3 min-w-[240px]">ITEM / PRODUCT</th>
+                    <th className="py-2.5 px-3 text-center w-24">STOCK (GBL)</th>
+                    <th className="py-2.5 px-3 text-center w-24">GBL <span className="text-red-500">*</span></th>
+                    <th className="py-2.5 px-3 text-center w-24">PCS / GBL</th>
+                    <th className="py-2.5 px-3 text-center w-24">TOTAL PCS</th>
+                    <th className="py-2.5 px-3 text-center w-28">RATE (₹) <span className="text-red-500">*</span></th>
+                    <th className="py-2.5 px-3 text-center w-20">DISC %</th>
+                    <th className="py-2.5 px-3 text-right w-32">AMOUNT (₹)</th>
+                    <th className="py-2.5 px-3 text-center w-20">ACTIONS</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 bg-white">
+                  {items.map((row, idx) => {
+                    const filteredRowSkus = getFilteredSkusForRow(idx);
+                    const isDropdownOpen = activeItemDropdownIdx === idx;
+
+                    return (
                       <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
                         
                         {/* 1. Index */}
@@ -752,47 +739,62 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                           {idx + 1}
                         </td>
 
-                        {/* 2. ITEM / PRODUCT (NO SKU ID AS REQUIRED BY USER) */}
+                        {/* 2. ITEM / PRODUCT (Clean Name without SKU Code, dynamic searchable combobox) */}
                         <td className="py-2 px-3 relative">
-                          <div 
-                            className="relative"
-                            ref={el => itemDropdownRefs.current[idx] = el}
-                          >
-                            <div
-                              onClick={() => setActiveItemDropdownIdx(activeItemDropdownIdx === idx ? null : idx)}
-                              className="w-full px-3 py-1.5 bg-white border border-gray-200 hover:border-blue-400 rounded-xl flex items-center justify-between gap-2 font-bold text-gray-900 cursor-pointer shadow-3xs"
-                            >
-                              <div className="flex items-center gap-2 truncate">
-                                <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                                <span className={row.itemName ? 'text-gray-900 font-extrabold truncate' : 'text-gray-400 font-normal'}>
-                                  {row.itemName || 'Search product / SKU...'}
-                                </span>
-                              </div>
-                              <ChevronDown className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                          <div className="relative">
+                            <div className="relative flex items-center">
+                              <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5 pointer-events-none" />
+                              <input
+                                type="text"
+                                value={rowSearchTerms[idx] !== undefined ? rowSearchTerms[idx] : row.itemName}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setRowSearchTerms(prev => ({ ...prev, [idx]: val }));
+                                  setActiveItemDropdownIdx(idx);
+                                }}
+                                onFocus={() => {
+                                  setActiveItemDropdownIdx(idx);
+                                  if (rowSearchTerms[idx] === undefined) {
+                                    setRowSearchTerms(prev => ({ ...prev, [idx]: row.itemName }));
+                                  }
+                                }}
+                                placeholder="Search product / SKU..."
+                                className="w-full pl-8 pr-8 py-1.5 bg-white border border-gray-200 hover:border-blue-400 focus:border-blue-500 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all shadow-3xs"
+                              />
+                              <ChevronDown 
+                                className="w-3.5 h-3.5 text-gray-400 absolute right-3 top-2.5 cursor-pointer hover:text-gray-600"
+                                onClick={() => setActiveItemDropdownIdx(isDropdownOpen ? null : idx)}
+                              />
                             </div>
 
-                            {/* Dropdown Menu */}
-                            {activeItemDropdownIdx === idx && (
-                              <div className="absolute left-0 top-full mt-1 w-80 bg-white border border-gray-200 rounded-xl shadow-2xl z-[99] max-h-60 overflow-y-auto divide-y divide-gray-50 p-1">
-                                {filteredSkus.map(sku => (
+                            {/* Dropdown Menu Popover */}
+                            {isDropdownOpen && (
+                              <div className="absolute left-0 top-full mt-1.5 w-84 bg-white border border-gray-200 rounded-xl shadow-2xl z-[9999] max-h-60 overflow-y-auto divide-y divide-gray-50 p-1.5 animate-in fade-in zoom-in-95 duration-100">
+                                {filteredRowSkus.map(sku => (
                                   <div
                                     key={sku._id}
                                     onClick={() => handleSelectSku(idx, sku)}
-                                    className="p-2 hover:bg-blue-50/80 cursor-pointer rounded-lg transition-colors flex items-center justify-between"
+                                    className="p-2.5 hover:bg-blue-50/80 cursor-pointer rounded-lg transition-colors flex items-center justify-between group"
                                   >
                                     <div className="truncate pr-2">
-                                      <div className="font-bold text-gray-900 text-xs truncate">{sku.name}</div>
-                                      <div className="text-[10px] text-gray-400">
-                                        {sku.category || 'Finished Goods'} • {sku.unit || 'Pcs'}
+                                      <div className="font-bold text-gray-900 text-xs truncate group-hover:text-blue-700">
+                                        {sku.name}
+                                      </div>
+                                      <div className="text-[10px] text-gray-400 mt-0.5">
+                                        {sku.category || 'Finished Goods'} • Unit: {sku.unit || 'Pcs'}
                                       </div>
                                     </div>
-                                    <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-extrabold shrink-0">
-                                      ₹{(sku as any).sellingPrice || (sku as any).price || 23}
-                                    </span>
+                                    <div className="text-right shrink-0">
+                                      <span className="text-[11px] bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-md font-black">
+                                        ₹{(sku as any).sellingPrice || (sku as any).price || (sku as any).standardCost || (sku as any).purchasePrice || 23}
+                                      </span>
+                                    </div>
                                   </div>
                                 ))}
-                                {filteredSkus.length === 0 && (
-                                  <div className="p-3 text-center text-gray-400 italic">No products found</div>
+                                {filteredRowSkus.length === 0 && (
+                                  <div className="p-3 text-center text-gray-400 italic text-[11px]">
+                                    {availableSkus.length === 0 ? 'No active products found in Item Master' : 'No matching products'}
+                                  </div>
                                 )}
                               </div>
                             )}
@@ -802,11 +804,11 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                         {/* 3. STOCK (GBL) */}
                         <td className="py-2 px-3 text-center font-bold text-gray-700">
                           {row.stockGbl !== null ? (
-                            <span className="inline-block px-2 py-0.5 bg-slate-100 rounded-lg text-gray-800 font-extrabold">
+                            <span className="inline-block px-2.5 py-0.5 bg-slate-100 rounded-lg text-gray-800 font-extrabold text-[11px]">
                               {row.stockGbl}
                             </span>
                           ) : (
-                            <span className="text-gray-400">—</span>
+                            <span className="text-gray-400 font-normal">—</span>
                           )}
                         </td>
 
@@ -817,6 +819,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                             min="1"
                             value={row.gbl}
                             onChange={(e) => updateItemRow(idx, { gbl: e.target.value })}
+                            placeholder="Qty"
                             className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl text-center font-extrabold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
                             required
                           />
@@ -829,13 +832,14 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                             min="1"
                             value={row.pcsPerGbl}
                             onChange={(e) => updateItemRow(idx, { pcsPerGbl: e.target.value })}
+                            placeholder="240"
                             className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl text-center font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
                           />
                         </td>
 
                         {/* 6. TOTAL PCS */}
-                        <td className="py-2 px-3 text-center font-extrabold text-gray-900">
-                          {row.totalPcs.toLocaleString('en-IN')}
+                        <td className="py-2 px-3 text-center font-extrabold text-gray-900 text-xs">
+                          {row.totalPcs > 0 ? row.totalPcs.toLocaleString('en-IN') : '0'}
                         </td>
 
                         {/* 7. RATE (₹) * */}
@@ -846,6 +850,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                             min="0"
                             value={row.rate}
                             onChange={(e) => updateItemRow(idx, { rate: e.target.value })}
+                            placeholder="0.00"
                             className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl text-center font-extrabold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
                             required
                           />
@@ -864,8 +869,11 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                         </td>
 
                         {/* 9. AMOUNT (₹) */}
-                        <td className="py-2 px-3 text-right font-black text-gray-900">
-                          {row.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        <td className="py-2 px-3 text-right font-black text-gray-900 text-xs">
+                          {row.amount > 0 
+                            ? row.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                            : '0.00'
+                          }
                         </td>
 
                         {/* 10. ACTIONS */}
@@ -873,9 +881,9 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                           <div className="flex items-center justify-center gap-1">
                             <button
                               type="button"
-                              onClick={() => setActiveItemDropdownIdx(activeItemDropdownIdx === idx ? null : idx)}
+                              onClick={() => setActiveItemDropdownIdx(isDropdownOpen ? null : idx)}
                               className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                              title="Edit item product"
+                              title="Select product from Item Master"
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
@@ -892,10 +900,10 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                         </td>
 
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
 
@@ -922,75 +930,74 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                   </button>
                 </div>
 
-                <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-3xs">
-                  <table className="w-full text-left divide-y divide-gray-200">
-                    <thead className="bg-gray-50/90 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                      <tr>
-                        <th className="py-2 px-3 w-8 text-center">#</th>
-                        <th className="py-2 px-3">CHARGE NAME</th>
-                        <th className="py-2 px-3 text-center w-20">QTY</th>
-                        <th className="py-2 px-3 text-center w-24">RATE (₹)</th>
-                        <th className="py-2 px-3 text-right w-28">AMOUNT (₹)</th>
-                        <th className="py-2 px-3 text-center w-16">ACTIONS</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 bg-white">
-                      {otherCharges.map((charge, cIdx) => (
-                        <tr key={cIdx} className="hover:bg-slate-50/60 transition-colors">
-                          <td className="py-2 px-3 text-center font-bold text-gray-500">
-                            {cIdx + 1}
-                          </td>
-                          <td className="py-1.5 px-3">
-                            <input
-                              type="text"
-                              value={charge.name}
-                              onChange={(e) => handleUpdateChargeRow(cIdx, { name: e.target.value })}
-                              placeholder="Charge description"
-                              className="w-full px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-900 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                            />
-                          </td>
-                          <td className="py-1.5 px-3">
-                            <input
-                              type="number"
-                              min="1"
-                              value={charge.quantity}
-                              onChange={(e) => handleUpdateChargeRow(cIdx, { quantity: Number(e.target.value) || 0 })}
-                              className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-center text-xs font-extrabold text-gray-900 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                            />
-                          </td>
-                          <td className="py-1.5 px-3">
-                            <input
-                              type="number"
-                              min="0"
-                              value={charge.rate}
-                              onChange={(e) => handleUpdateChargeRow(cIdx, { rate: Number(e.target.value) || 0 })}
-                              className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-center text-xs font-extrabold text-gray-900 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                            />
-                          </td>
-                          <td className="py-1.5 px-3 text-right font-black text-gray-900">
-                            {charge.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </td>
-                          <td className="py-1.5 px-3 text-center">
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveChargeRow(cIdx)}
-                              className="p-1 text-red-500 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                      {otherCharges.length === 0 && (
+                {otherCharges.length > 0 ? (
+                  <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-3xs">
+                    <table className="w-full text-left divide-y divide-gray-200">
+                      <thead className="bg-gray-50/90 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
                         <tr>
-                          <td colSpan={6} className="py-3 text-center text-gray-400 italic text-[11px]">
-                            No additional freight or packaging charges added.
-                          </td>
+                          <th className="py-2 px-3 w-8 text-center">#</th>
+                          <th className="py-2 px-3">CHARGE NAME</th>
+                          <th className="py-2 px-3 text-center w-20">QTY</th>
+                          <th className="py-2 px-3 text-center w-24">RATE (₹)</th>
+                          <th className="py-2 px-3 text-right w-28">AMOUNT (₹)</th>
+                          <th className="py-2 px-3 text-center w-16">ACTIONS</th>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 bg-white">
+                        {otherCharges.map((charge, cIdx) => (
+                          <tr key={cIdx} className="hover:bg-slate-50/60 transition-colors">
+                            <td className="py-2 px-3 text-center font-bold text-gray-500">
+                              {cIdx + 1}
+                            </td>
+                            <td className="py-1.5 px-3">
+                              <input
+                                type="text"
+                                value={charge.name}
+                                onChange={(e) => handleUpdateChargeRow(cIdx, { name: e.target.value })}
+                                placeholder="Transport / Cargo"
+                                className="w-full px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-900 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                              />
+                            </td>
+                            <td className="py-1.5 px-3">
+                              <input
+                                type="number"
+                                min="1"
+                                value={charge.quantity}
+                                onChange={(e) => handleUpdateChargeRow(cIdx, { quantity: Number(e.target.value) || 0 })}
+                                className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-center text-xs font-extrabold text-gray-900 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                              />
+                            </td>
+                            <td className="py-1.5 px-3">
+                              <input
+                                type="number"
+                                min="0"
+                                value={charge.rate}
+                                onChange={(e) => handleUpdateChargeRow(cIdx, { rate: Number(e.target.value) || 0 })}
+                                className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-center text-xs font-extrabold text-gray-900 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                              />
+                            </td>
+                            <td className="py-1.5 px-3 text-right font-black text-gray-900">
+                              {charge.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                            <td className="py-1.5 px-3 text-center">
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveChargeRow(cIdx)}
+                                className="p-1 text-red-500 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-slate-50/50 border border-dashed border-slate-200 rounded-xl text-center text-gray-400 text-[11px] italic">
+                    No additional charges added. Click "+ Add Charge" to add freight, cargo or packaging expenses.
+                  </div>
+                )}
               </div>
 
               {/* Notes / Instructions Card */}
