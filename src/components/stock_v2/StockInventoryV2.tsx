@@ -2252,17 +2252,6 @@ export const StockInventoryV2: React.FC = () => {
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      setMfgStepsSku(sku);
-                                      setShowMfgStepsModal(true);
-                                    }}
-                                    className="p-1.5 text-gray-500 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
-                                    title="Configure Manufacturing Process Steps"
-                                  >
-                                    <Layers className="w-3.5 h-3.5 text-indigo-600" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
                                       setTransferInitialSku(sku);
                                       setShowTransferModal(true);
                                     }}
