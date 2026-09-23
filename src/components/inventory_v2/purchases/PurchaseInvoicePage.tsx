@@ -1539,7 +1539,7 @@ const PurchaseInvoicePage: React.FC = () => {
   return (
     <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
       {/* Main Content Layout */}
-      <div className={`transition-all duration-300 ${activeSubPage === 'details' && selectedInvoice ? 'lg:mr-[640px]' : ''}`}>
+      <div className="transition-all duration-300">
         {/* ── SUB-PAGE 3: MAIN LIST VIEW ──────────────────────────────────────── */}
         <div className="space-y-4">
           
@@ -2925,62 +2925,69 @@ const PurchaseInvoicePage: React.FC = () => {
         </form>
       </Modal>
 
-      {/* ── SUB-PAGE 2: BATCH DETAILS SIDE DRAWER ────────────────────────────── */}
+      {/* ── SUB-PAGE 2: BATCH DETAILS DIALOG BOX POPUP ────────────────────────── */}
       {activeSubPage === 'details' && selectedInvoice && (
-        <div className="fixed top-0 right-0 h-full w-full sm:w-[640px] bg-white shadow-2xl border-l border-gray-200 z-[60] flex flex-col animate-in slide-in-from-right duration-250 font-sans text-xs !mt-0">
-          {/* Header */}
-          <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
-            <div>
-              <h2 className="text-base font-bold text-gray-900 flex items-center gap-1.5">
-                <FileText className="w-4 h-4 text-blue-600 animate-pulse-slow" />
-                Purchase Batch Details
-              </h2>
-              <p className="text-[10px] text-gray-500 mt-0.5 font-medium">
-                Registered on {selectedInvoice.createdAt ? new Date(selectedInvoice.createdAt).toLocaleString('en-IN') : '—'} by Admin
-              </p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 font-sans text-xs">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
+              <div>
+                <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-blue-600 animate-pulse-slow" />
+                  Purchase Batch Details
+                </h2>
+                <p className="text-[10px] text-gray-500 mt-0.5 font-medium">
+                  Registered on {selectedInvoice.createdAt ? new Date(selectedInvoice.createdAt).toLocaleString('en-IN') : '—'} by Admin
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleEditInvoice(selectedInvoice)}
+                  className="px-3 py-1.5 border border-gray-200 text-gray-700 hover:bg-gray-100 bg-white rounded-lg text-xs font-bold shadow-3xs flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Edit className="w-3.5 h-3.5 text-amber-500" /> Edit Batch
+                </button>
+                <button
+                  onClick={() => setActiveSubPage('list')}
+                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-200 rounded-lg transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => handleEditInvoice(selectedInvoice)}
-                className="px-2.5 py-1.5 border border-gray-200 text-gray-700 hover:bg-gray-50 bg-white rounded-lg text-[10px] font-bold shadow-3xs flex items-center gap-1 transition-all"
-              >
-                <Edit className="w-3 h-3 text-amber-500" /> Edit
-              </button>
-              <button
-                onClick={() => setActiveSubPage('list')}
-                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
 
           {/* Details Content Scroll Area */}
           {(() => {
-            
-
             let totalReelsCount = 0;
             let totalReamsCount = 0;
             let totalKgWeight = 0;
 
             selectedInvoice.items?.forEach(item => {
               const resolvedSku = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null;
-              if (resolvedSku?.paperType === 'Sheets') {
-                const stdSheets = resolvedSku?.pages || 500;
-                const reamWeight = item.reamWeight || resolvedSku?.reamWeight || getFallbackReamWeight(resolvedSku) || 0;
+              const fullSku = skus.find(s => s._id === (resolvedSku?._id || item.skuId)) || resolvedSku;
+              if (resolvedSku?.paperType === 'Sheets' || fullSku?.paperType === 'Sheets') {
+                const stdSheets = resolvedSku?.pages || fullSku?.pages || 500;
+                const reamWeight = item.reamWeight || resolvedSku?.reamWeight || fullSku?.reamWeight || getFallbackReamWeight(fullSku || resolvedSku) || 0;
                 const itemReams = (item.quantity || 0) / stdSheets;
                 totalReamsCount += itemReams;
                 totalKgWeight += itemReams * reamWeight;
+              } else if (item.reels && item.reels.length > 0) {
+                totalReelsCount += item.reels.length;
+                const reelsWt = item.reels.reduce((s, r) => s + (Number(r.weight) || 0), 0);
+                totalKgWeight += reelsWt > 0 ? reelsWt : (item.quantity || 0);
               } else {
-                totalReelsCount += item.reels?.length || 0;
                 totalKgWeight += item.quantity || 0;
               }
             });
 
+            // Weight-based freight & extra inward expenses per KG
+            const totalFreightCharges = (Number(selectedInvoice.freight) || 0) + (Number(selectedInvoice.craneCharges) || 0) + (Number(selectedInvoice.otherCharges) || 0);
+            const extraInwardPerKg = (totalFreightCharges > 0 && totalKgWeight > 0) ? (totalFreightCharges / totalKgWeight) : 0;
+
             return (
-              <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-white">
-                {/* Header batch summary cards (matching Customer module details card UI exactly) */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 shrink-0">
+              <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 bg-white">
+                {/* Header batch summary cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 shrink-0">
                   {/* Card 1: Batch Number */}
                   <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
                     <span className="block text-[10px] text-blue-600 font-bold uppercase tracking-wider leading-tight">Batch Number</span>
@@ -2991,7 +2998,7 @@ const PurchaseInvoicePage: React.FC = () => {
 
                   {/* Card 2: Supplier / Vendor */}
                   <div className="bg-indigo-50/40 border border-indigo-100 rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-                    <span className="block text-[10px] text-indigo-650 font-bold uppercase tracking-wider leading-tight">Supplier / Vendor</span>
+                    <span className="block text-[10px] text-indigo-650 font-bold uppercase tracking-wider leading-tight">Supplier</span>
                     <span className="block text-xs text-indigo-900 font-extrabold mt-1 truncate px-1" title={typeof selectedInvoice.vendorId === 'object' && selectedInvoice.vendorId !== null ? (selectedInvoice.vendorId.firmName || selectedInvoice.vendorId.ownerName) : 'Supplier'}>
                       {typeof selectedInvoice.vendorId === 'object' && selectedInvoice.vendorId !== null ? (selectedInvoice.vendorId.firmName || selectedInvoice.vendorId.ownerName) : 'Supplier'}
                     </span>
@@ -2999,7 +3006,7 @@ const PurchaseInvoicePage: React.FC = () => {
 
                   {/* Card 3: Purchase Date */}
                   <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-                    <span className="block text-[10px] text-blue-650 font-bold uppercase tracking-wider leading-tight">Purchase Date</span>
+                    <span className="block text-[10px] text-blue-650 font-bold uppercase tracking-wider leading-tight">Date</span>
                     <span className="block text-xs text-blue-900 font-extrabold mt-1 truncate px-1">
                       {selectedInvoice.createdAt ? new Date(selectedInvoice.createdAt).toLocaleDateString('en-IN') : '—'}
                     </span>
@@ -3007,41 +3014,40 @@ const PurchaseInvoicePage: React.FC = () => {
 
                   {/* Card 4: Total Lots */}
                   <div className="bg-emerald-50/40 border border-emerald-100 rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-                    <span className="block text-[10px] text-emerald-700 font-bold uppercase tracking-wider leading-tight">Total Lots</span>
-                    <span className="block text-xl text-emerald-900 font-extrabold mt-0.5">
+                    <span className="block text-[10px] text-emerald-700 font-bold uppercase tracking-wider leading-tight">Lots</span>
+                    <span className="block text-base text-emerald-900 font-extrabold mt-0.5">
                       {selectedInvoice.items?.length || 0}
                     </span>
                   </div>
 
                   {/* Card 5: Total Reels */}
                   <div className="bg-amber-50/40 border border-amber-100 rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-                    <span className="block text-[10px] text-amber-700 font-bold uppercase tracking-wider leading-tight">Total Reels</span>
-                    <span className="block text-xl text-amber-900 font-extrabold mt-0.5">
+                    <span className="block text-[10px] text-amber-700 font-bold uppercase tracking-wider leading-tight">Reels</span>
+                    <span className="block text-base text-amber-900 font-extrabold mt-0.5">
                       {totalReelsCount || '0'}
                     </span>
                   </div>
 
                   {/* Card 6: Total Reams */}
                   <div className="bg-teal-50/40 border border-teal-100 rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-                    <span className="block text-[10px] text-teal-700 font-bold uppercase tracking-wider leading-tight">Total Reams</span>
-                    <span className="block text-xl text-teal-900 font-extrabold mt-0.5">
-                      {totalReamsCount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                    <span className="block text-[10px] text-teal-700 font-bold uppercase tracking-wider leading-tight">Reams</span>
+                    <span className="block text-base text-teal-900 font-extrabold mt-0.5">
+                      {totalReamsCount > 0 ? totalReamsCount.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '0'}
                     </span>
                   </div>
 
                   {/* Card 7: Total Weight (KG) */}
                   <div className="bg-red-50/40 border border-red-100 rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-                    <span className="block text-[10px] text-red-650 font-bold uppercase tracking-wider leading-tight">Total Weight (KG)</span>
-                    <span className="block text-xl text-red-900 font-extrabold mt-0.5">
+                    <span className="block text-[10px] text-red-650 font-bold uppercase tracking-wider leading-tight">Total KG</span>
+                    <span className="block text-base text-red-900 font-extrabold mt-0.5">
                       {totalKgWeight.toLocaleString('en-IN')}
                     </span>
                   </div>
+                </div>
 
-                  </div>
-
-            {/* Details Tabs and panels */}
-            <div className="space-y-4">
-              <div className="flex gap-2 border-b border-gray-200 pb-px">
+                {/* Details Tabs and panels */}
+                <div className="space-y-4">
+                  <div className="flex gap-2 border-b border-gray-200 pb-px">
                 <button
                   onClick={() => setDetailsTab('lots')}
                   className={`px-4 py-2 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
@@ -3134,13 +3140,8 @@ const PurchaseInvoicePage: React.FC = () => {
                           // Base Rate / KG
                           const baseRatePerKg = item.ratePerKg || (displayQtyKg > 0 ? (item.totalPrice || 0) / displayQtyKg : (item.purchasePrice || 0));
 
-                          // Landed Rate / KG (Total Lot Cost with freight / Total KGs)
-                          const totalMatSubtotal = selectedInvoice.subTotal || selectedInvoice.items.reduce((s, it) => s + (it.totalPrice || 0), 0) || 1;
-                          const totalFreightCharges = (selectedInvoice.freight || 0) + (selectedInvoice.craneCharges || 0) + (selectedInvoice.otherCharges || 0);
-                          const lotMatCost = item.totalPrice || 0;
-                          const lotFreightShare = (totalFreightCharges > 0 && totalMatSubtotal > 0) ? (lotMatCost / totalMatSubtotal) * totalFreightCharges : 0;
-                          const lotLandedTotal = lotMatCost + lotFreightShare;
-                          const landedRatePerKg = displayQtyKg > 0 ? (lotLandedTotal / displayQtyKg) : baseRatePerKg;
+                          // Landed Rate / KG = Base Purchase Rate + Inward Freight/Crane Expenses per KG
+                          const landedRatePerKg = baseRatePerKg + extraInwardPerKg;
 
                           const reelsCount = item.reels?.length || (!isSheets ? 1 : 0);
 
@@ -3300,6 +3301,12 @@ const PurchaseInvoicePage: React.FC = () => {
                     <span>Other / Loading Charges:</span>
                     <span className="text-gray-800 font-semibold">₹{(selectedInvoice.otherCharges || 0).toLocaleString('en-IN')}</span>
                   </div>
+                  {extraInwardPerKg > 0 && (
+                    <div className="flex justify-between pl-2 text-blue-700 font-bold border-t border-dashed pt-1 mt-1">
+                      <span>Inward Additional Expenses / KG:</span>
+                      <span className="font-mono">+₹{extraInwardPerKg.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/KG</span>
+                    </div>
+                  )}
                 </div>
                 <div className="flex justify-between border-t pt-2 text-gray-955 font-black">
                   <span>Total Landed Invoice Cost:</span>
@@ -3311,26 +3318,27 @@ const PurchaseInvoicePage: React.FC = () => {
           );
         })()}
 
-          {/* Footer actions wrapper */}
-          <div className="p-5 border-t border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
-            {selectedInvoice.status !== 'Cancelled' ? (
+            {/* Footer actions wrapper */}
+            <div className="px-6 py-3.5 border-t border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
+              {selectedInvoice.status !== 'Cancelled' ? (
+                <button
+                  onClick={() => handleCancelInvoice(selectedInvoice)}
+                  className="px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 bg-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-3xs"
+                >
+                  <Ban className="w-3.5 h-3.5" /> Cancel Batch
+                </button>
+              ) : (
+                <span className="px-3 py-1.5 bg-red-100/70 text-red-800 border border-red-200 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                  <Ban className="w-3.5 h-3.5" /> Batch Cancelled
+                </span>
+              )}
               <button
-                onClick={() => handleCancelInvoice(selectedInvoice)}
-                className="px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 bg-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-3xs"
+                onClick={() => setActiveSubPage('list')}
+                className="px-5 py-2 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 text-gray-700 font-bold text-xs shadow-3xs cursor-pointer"
               >
-                <Ban className="w-3.5 h-3.5" /> Cancel Batch
+                Close Window
               </button>
-            ) : (
-              <span className="px-3 py-1.5 bg-red-100/70 text-red-800 border border-red-200 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
-                <Ban className="w-3.5 h-3.5" /> Batch Cancelled
-              </span>
-            )}
-            <button
-              onClick={() => setActiveSubPage('list')}
-              className="px-5 py-2 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 text-gray-700 font-bold text-xs shadow-3xs"
-            >
-              Close Window
-            </button>
+            </div>
           </div>
         </div>
       )}
