@@ -1,7 +1,8 @@
+
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { 
-  Building2, Layers, Search, 
-  Edit2, Trash2, ChevronDown, 
+import {
+  Building2, Layers, Search,
+  Edit2, Trash2, ChevronDown,
   Plus, Package, Eye,
   Boxes, ArrowRight, Printer, Download,
   SlidersHorizontal, History, Sparkles,
@@ -9,15 +10,15 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../../context/AuthContext';
-import { 
-  getWarehouseHierarchyV2, 
-  createWarehouseLocationV2, 
-  updateWarehouseLocationV2, 
-  deleteWarehouseLocationV2, 
+import {
+  getWarehouseHierarchyV2,
+  createWarehouseLocationV2,
+  updateWarehouseLocationV2,
+  deleteWarehouseLocationV2,
   getLocationDetailsV2,
   getSkusV2,
   getBalancesV2,
-  WarehouseLocationV2, 
+  WarehouseLocationV2,
   SkuV2
 } from '../../api/mfgApiV2';
 import { getActivityLogs } from '../../api/activityLogApi';
@@ -426,8 +427,8 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
       balances.forEach((b: any) => {
         const bLocId = b.locationId ? String(b.locationId._id || b.locationId) : '';
         const bLocName = (b.location?.name || b.locationName || '').toLowerCase().trim();
-        
-        const isLocMatch = (bLocId && targetLocIds.has(bLocId)) || 
+
+        const isLocMatch = (bLocId && targetLocIds.has(bLocId)) ||
           (bLocName && (targetLocNames.has(bLocName) || (parentName && bLocName.includes(parentName) && bLocName.includes(targetLoc.name.toLowerCase()))));
 
         if (isLocMatch) {
@@ -444,10 +445,10 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
             const itemType = (skuObj.itemType || '').toLowerCase();
             const paperType = (skuObj.paperType || '').toLowerCase();
 
-            const isRaw = cat.includes('raw') || cat.includes('material') || cat.includes('paper') || 
-                          group.includes('material') || group.includes('paper') || group.includes('raw') ||
-                          itemType.includes('material') || itemType.includes('raw') || (paperType !== 'none' && paperType !== '');
-            
+            const isRaw = cat.includes('raw') || cat.includes('material') || cat.includes('paper') ||
+              group.includes('material') || group.includes('paper') || group.includes('raw') ||
+              itemType.includes('material') || itemType.includes('raw') || (paperType !== 'none' && paperType !== '');
+
             const isSemi = !isRaw && (cat.includes('semi') || group.includes('semi') || itemType.includes('semi') || group.includes('work in progress') || group.includes('wip'));
 
             if (isRaw) {
@@ -484,10 +485,10 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
           const itemType = (s.itemType || '').toLowerCase();
           const paperType = (s.paperType || '').toLowerCase();
 
-          const isRaw = cat.includes('raw') || cat.includes('material') || cat.includes('paper') || 
-                        group.includes('material') || group.includes('paper') || group.includes('raw') ||
-                        itemType.includes('material') || itemType.includes('raw') || (paperType !== 'none' && paperType !== '');
-          
+          const isRaw = cat.includes('raw') || cat.includes('material') || cat.includes('paper') ||
+            group.includes('material') || group.includes('paper') || group.includes('raw') ||
+            itemType.includes('material') || itemType.includes('raw') || (paperType !== 'none' && paperType !== '');
+
           const isSemi = !isRaw && (cat.includes('semi') || group.includes('semi') || itemType.includes('semi') || group.includes('work in progress') || group.includes('wip'));
 
           if (isRaw) {
@@ -537,7 +538,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
     activeZones.forEach(zone => {
       const locs = locations.filter(l => l.parentId === zone._id && l.level === 'Storage Location');
 
-      const matchesSearch = !zoneSearch.trim() || 
+      const matchesSearch = !zoneSearch.trim() ||
         zone.name.toLowerCase().includes(zoneSearch.toLowerCase().trim()) ||
         locs.some(l => l.name.toLowerCase().includes(zoneSearch.toLowerCase().trim()));
 
@@ -729,7 +730,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
     try {
       await deleteWarehouseLocationV2(deleteConfirmNode._id, selectedCompany?._id || '', cascadeDelete);
       showToast(`Deleted '${deleteConfirmNode.name}'`, 'success');
-      
+
       const deletedId = deleteConfirmNode._id;
       const deletedLevel = deleteConfirmNode.level;
       setDeleteConfirmNode(null);
@@ -829,11 +830,11 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
 
   return (
     <div className="space-y-4 text-left font-sans animate-in fade-in duration-150 max-w-[1600px] mx-auto">
-      
+
       {/* ── 1. HEADER & CONTROLS ── */}
       <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          
+
           {/* Title & Subtitle */}
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-blue-50/80 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
@@ -857,7 +858,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2 flex-wrap">
-            
+
             {/* Tools Dropdown */}
             <div className="relative">
               <button
@@ -992,16 +993,14 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                       setSelectedFloorId('');
                     }
                   }}
-                  className={`shrink-0 w-56 sm:w-60 p-2.5 rounded-xl transition-all text-left flex items-center justify-between gap-2.5 cursor-pointer relative group ${
-                    isSelected
+                  className={`shrink-0 w-56 sm:w-60 p-2.5 rounded-xl transition-all text-left flex items-center justify-between gap-2.5 cursor-pointer relative group ${isSelected
                       ? 'border border-blue-500 bg-blue-50/40 shadow-xs ring-1 ring-blue-500/20'
                       : 'border border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50/50 shadow-2xs'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                      isSelected ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600 border border-slate-200/60'
-                    }`}>
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isSelected ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600 border border-slate-200/60'
+                      }`}>
                       <Building2 className="w-4 h-4" />
                     </div>
                     <div className="min-w-0 flex-1">
@@ -1053,7 +1052,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
         {/* ── 3. FLOOR TABS & SUMMARY ── */}
         {activeFactory && (
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-3.5 pt-3 border-t border-slate-100">
-            
+
             {/* Floor Pill Tabs */}
             <div className="flex items-center gap-1.5 flex-wrap">
               {activeFloors.map(floor => {
@@ -1061,11 +1060,10 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                 return (
                   <div
                     key={floor._id}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
-                      isSelected
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${isSelected
                         ? 'bg-blue-50 border border-blue-400 text-blue-700 shadow-2xs'
                         : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
-                    }`}
+                      }`}
                   >
                     <button
                       type="button"
@@ -1135,7 +1133,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
       {/* ── 4. FLOOR LOCATIONS TABLE ── */}
       {activeFloor && (
         <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
-          
+
           {/* Table Header Toolbar */}
           <div className="px-4 py-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-slate-50/40">
             <div className="flex items-center gap-2">
@@ -1202,7 +1200,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
 
                     return (
                       <tr key={`${row.zone._id}_${row.location._id}_${row.index}`} className="hover:bg-slate-50/60 transition-colors">
-                        
+
                         {/* # */}
                         <td className="px-3.5 py-2.5 text-center font-semibold text-slate-400">
                           {row.index}
@@ -1263,7 +1261,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                         {/* Actions */}
                         <td className="px-3.5 py-2.5 text-right">
                           <div className="flex items-center justify-end gap-1">
-                            
+
                             {/* Inspect */}
                             <button
                               type="button"
@@ -1350,7 +1348,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                 ({activeFloor.name})
               </span>
             </div>
-            
+
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
@@ -1403,7 +1401,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                       </span>
                       <span className="font-bold text-slate-900 text-xs truncate">{zone.name}</span>
                     </div>
-                    
+
                     {/* Zone Actions: Inspect, Edit & Delete */}
                     <div className="flex items-center gap-1">
                       <button

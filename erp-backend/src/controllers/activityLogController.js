@@ -29,6 +29,20 @@ exports.getActivityLogs = async (req, res) => {
             { entityType: { $regex: /sku|item|inventory/i } }
           ]
         });
+      } else if (/^(Purchase|Batch|Invoice)/i.test(et)) {
+        conditions.push({
+          $or: [
+            { entityType: { $in: ['PurchaseInvoiceV2', 'PurchaseBatch', 'PurchaseInvoice', 'Purchase', 'purchase', 'PurchaseOrder', 'PO'] } },
+            { entityType: { $regex: /purchase|invoice|batch/i } }
+          ]
+        });
+      } else if (/^(Warehouse|Location|Floor|Zone)/i.test(et)) {
+        conditions.push({
+          $or: [
+            { entityType: { $in: ['WarehouseLocationV2', 'Warehouse', 'warehouse', 'Location', 'Zone', 'Floor', 'Factory'] } },
+            { entityType: { $regex: /warehouse|location|zone|floor|factory/i } }
+          ]
+        });
       } else {
         conditions.push({ entityType: et });
       }
