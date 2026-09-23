@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -24,7 +25,7 @@ export const Modal: React.FC<ModalProps> = ({
   maxWidth,
   className = '',
   hideCloseButton = false,
-  zIndex = 'z-[90]',
+  zIndex = 'z-[9999]',
   padding = 'p-6',
 }) => {
   const modalSize = maxWidth || size || 'max-w-lg';
@@ -55,17 +56,17 @@ export const Modal: React.FC<ModalProps> = ({
 
   if (!isOpen) return null;
 
-  return (
+  const modalContent = (
     <div className={`fixed inset-0 ${zIndex} transition-all duration-200 animate-fadeIn`}>
       {/* Dedicated Full-Screen Backdrop Overlay covering 100% of viewport edge-to-edge */}
       <div 
-        className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity cursor-pointer"
+        className="fixed inset-0 bg-slate-950/60 backdrop-blur-md transition-opacity cursor-pointer"
         onClick={onClose}
       />
 
       {/* Modal Dialog Content Container */}
       <div className="fixed inset-0 overflow-y-auto flex items-center justify-center p-3 sm:p-6 pointer-events-none">
-        <div className={`relative bg-white rounded-2xl shadow-2xl shadow-slate-900/15 border border-slate-200/90 flex flex-col w-full ${modalSize} max-h-[90vh] overflow-hidden animate-modalPop pointer-events-auto ${className}`}>
+        <div className={`relative bg-white rounded-2xl shadow-2xl shadow-slate-950/20 border border-slate-200 flex flex-col w-full ${modalSize} max-h-[90vh] overflow-hidden animate-modalPop pointer-events-auto ${className}`}>
           {title && (
             <div className="px-6 py-4 border-b border-slate-100 bg-white flex justify-between items-center shrink-0">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -85,6 +86,9 @@ export const Modal: React.FC<ModalProps> = ({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : modalContent;
 };
 
 export default Modal;
+

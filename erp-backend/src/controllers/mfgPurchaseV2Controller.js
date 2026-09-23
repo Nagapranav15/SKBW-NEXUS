@@ -170,37 +170,50 @@ exports.createPurchaseInvoice = async (req, res, next) => {
     });
     await invoice.save();
 
-    // 5. Inward stock using V2 Ledger Engine for each item
+    // 5. Inward stock using fast batch operations & hierarchy caching
+    const hierarchyCache = new Map();
+    const getHierarchy = async (locId) => {
+      const key = String(locId);
+      if (hierarchyCache.has(key)) return hierarchyCache.get(key);
+
+      let loc = await WarehouseLocationV2.findOne({ _id: toObjectId(locId), company: companyObjId });
+      if (!loc) loc = await WarehouseLocationV2.findById(toObjectId(locId));
+      if (!loc) {
+        const fallback = { warehouseId: locId, floorId: locId, zoneId: locId, locationId: locId };
+        hierarchyCache.set(key, fallback);
+        return fallback;
+      }
+
+      const chain = [loc];
+      let curr = loc;
+      while (curr && curr.parentId) {
+        let parent = await WarehouseLocationV2.findOne({ _id: curr.parentId, company: companyObjId });
+        if (!parent) parent = await WarehouseLocationV2.findById(curr.parentId);
+        if (!parent) break;
+        chain.unshift(parent);
+        curr = parent;
+      }
+
+      const factoryNode = chain.find(n => n.level === "Factory");
+      const floorNode = chain.find(n => n.level === "Floor");
+      const zoneNode = chain.find(n => n.level === "Zone");
+      const storageNode = chain.find(n => n.level === "Storage Location");
+
+      const warehouseId = factoryNode ? factoryNode._id : (chain[0]?._id || loc._id);
+      const floorId = floorNode ? floorNode._id : (chain[1]?._id || warehouseId);
+      const zoneId = zoneNode ? zoneNode._id : (chain[2]?._id || floorId);
+      const locationId = storageNode ? storageNode._id : loc._id;
+
+      const resH = { warehouseId, floorId, zoneId, locationId };
+      hierarchyCache.set(key, resH);
+      return resH;
+    };
+
+    const ledgerDocs = [];
+    const skuUpdates = [];
+
     for (const valItem of validatedItems) {
-      // Helper function to resolve hierarchy for any locationId
-      const getHierarchy = async (locId) => {
-        const loc = await WarehouseLocationV2.findOne({ _id: toObjectId(locId), company: companyObjId });
-        if (!loc) return { warehouseId: locId, floorId: locId, zoneId: locId, locationId: locId };
-
-        const chain = [loc];
-        let curr = loc;
-        while (curr && curr.parentId) {
-          const parent = await WarehouseLocationV2.findOne({ _id: curr.parentId, company: companyObjId });
-          if (!parent) break;
-          chain.unshift(parent);
-          curr = parent;
-        }
-
-        const factoryNode = chain.find(n => n.level === "Factory");
-        const floorNode = chain.find(n => n.level === "Floor");
-        const zoneNode = chain.find(n => n.level === "Zone");
-        const storageNode = chain.find(n => n.level === "Storage Location");
-
-        const warehouseId = factoryNode ? factoryNode._id : (chain[0]?._id || loc._id);
-        const floorId = floorNode ? floorNode._id : (chain[1]?._id || warehouseId);
-        const zoneId = zoneNode ? zoneNode._id : (chain[2]?._id || floorId);
-        const locationId = storageNode ? storageNode._id : loc._id;
-
-        return { warehouseId, floorId, zoneId, locationId };
-      };
-
       if (valItem.reels && valItem.reels.length > 0) {
-        // Group reels by locationId if present
         const reelsByLoc = {};
         valItem.reels.forEach(r => {
           const lId = String(r.locationId || valItem.locationId);
@@ -211,13 +224,11 @@ exports.createPurchaseInvoice = async (req, res, next) => {
         for (const locIdStr of Object.keys(reelsByLoc)) {
           const reelsGroup = reelsByLoc[locIdStr];
           let groupWeight = reelsGroup.reduce((s, r) => s + (Number(r.weight) || 0), 0);
-          if (groupWeight <= 0) {
-            groupWeight = valItem.quantity;
-          }
+          if (groupWeight <= 0) groupWeight = valItem.quantity;
           const h = await getHierarchy(locIdStr);
           const transactionNumber = await Sequence.getNextSequence("IL");
 
-          await new InventoryLedger({
+          ledgerDocs.push({
             transactionNumber,
             transactionType: "Purchase",
             skuId: valItem.skuId,
@@ -233,10 +244,10 @@ exports.createPurchaseInvoice = async (req, res, next) => {
             locationId: h.locationId,
             remarks: `Lot: ${valItem.lotNumber}. Inwarded via invoice ${finalInvoiceNo}`,
             reels: reelsGroup,
-            createdBy: toObjectId(req.user.id),
+            createdBy: toObjectId(req.user?.id) || companyObjId,
             company: companyObjId,
             status: "Posted"
-          }).save();
+          });
         }
       } else if (valItem.splits && valItem.splits.length > 0) {
         for (const split of valItem.splits) {
@@ -245,7 +256,7 @@ exports.createPurchaseInvoice = async (req, res, next) => {
           const h = await getHierarchy(split.locationId);
           const transactionNumber = await Sequence.getNextSequence("IL");
 
-          await new InventoryLedger({
+          ledgerDocs.push({
             transactionNumber,
             transactionType: "Purchase",
             skuId: valItem.skuId,
@@ -261,16 +272,16 @@ exports.createPurchaseInvoice = async (req, res, next) => {
             locationId: h.locationId,
             remarks: `Lot: ${valItem.lotNumber}. Inwarded via invoice ${finalInvoiceNo}`,
             reels: [],
-            createdBy: toObjectId(req.user.id),
+            createdBy: toObjectId(req.user?.id) || companyObjId,
             company: companyObjId,
             status: "Posted"
-          }).save();
+          });
         }
       } else {
         const h = await getHierarchy(valItem.locationId);
         const transactionNumber = await Sequence.getNextSequence("IL");
 
-        await new InventoryLedger({
+        ledgerDocs.push({
           transactionNumber,
           transactionType: "Purchase",
           skuId: valItem.skuId,
@@ -286,18 +297,26 @@ exports.createPurchaseInvoice = async (req, res, next) => {
           locationId: h.locationId,
           remarks: `Lot: ${valItem.lotNumber}. Inwarded via invoice ${finalInvoiceNo}`,
           reels: [],
-          createdBy: toObjectId(req.user.id),
+          createdBy: toObjectId(req.user?.id) || companyObjId,
           company: companyObjId,
           status: "Posted"
-        }).save();
+        });
       }
 
-      // Automatically update SKU purchasePrice & ratePerKg according to purchase batch costing
-      await SkuV2.findByIdAndUpdate(valItem.skuId, {
-        purchasePrice: valItem.purchasePrice,
-        ratePerKg: valItem.ratePerKg || valItem.purchasePrice,
-        rate: valItem.purchasePrice
-      });
+      skuUpdates.push(
+        SkuV2.findByIdAndUpdate(valItem.skuId, {
+          purchasePrice: valItem.purchasePrice,
+          ratePerKg: valItem.ratePerKg || valItem.purchasePrice,
+          rate: valItem.purchasePrice
+        })
+      );
+    }
+
+    if (ledgerDocs.length > 0) {
+      await InventoryLedger.insertMany(ledgerDocs, { ordered: false });
+    }
+    if (skuUpdates.length > 0) {
+      await Promise.all(skuUpdates);
     }
 
     // 6. Automatically increase Vendor's outstanding liability (Material Cost Subtotal)
@@ -423,7 +442,6 @@ exports.getPurchaseInvoices = async (req, res, next) => {
     }
 
     const companyObjId = toObjectId(companyId);
-    await migratePurchaseBatchNumbers(companyObjId);
 
     const query = { company: companyObjId };
     if (vendorId) query.vendorId = toObjectId(vendorId);
@@ -680,10 +698,18 @@ exports.editPurchaseInvoice = async (req, res, next) => {
     await InventoryLedger.deleteMany({ referenceType: "PurchaseInvoice", referenceId: invoice.invoiceNumber });
     await InventoryLedger.deleteMany({ batchNumber: invoice.invoiceNumber });
 
-    // Helper function to resolve hierarchy for any locationId
+    // Helper function to resolve hierarchy for any locationId with caching
+    const hierarchyCache = new Map();
     const getHierarchy = async (locId) => {
+      const key = String(locId);
+      if (hierarchyCache.has(key)) return hierarchyCache.get(key);
+
       const loc = await WarehouseLocationV2.findById(locId);
-      if (!loc) return { warehouseId: locId, floorId: locId, zoneId: locId, locationId: locId };
+      if (!loc) {
+        const fallback = { warehouseId: locId, floorId: locId, zoneId: locId, locationId: locId };
+        hierarchyCache.set(key, fallback);
+        return fallback;
+      }
       let zoneId = loc._id, floorId = loc._id, warehouseId = loc._id;
       const p1 = loc.parentId ? await WarehouseLocationV2.findById(loc.parentId) : null;
       if (p1) {
@@ -697,8 +723,13 @@ exports.editPurchaseInvoice = async (req, res, next) => {
           floorId = p1._id; warehouseId = p1._id;
         }
       }
-      return { warehouseId, floorId, zoneId, locationId: loc._id };
+      const resH = { warehouseId, floorId, zoneId, locationId: loc._id };
+      hierarchyCache.set(key, resH);
+      return resH;
     };
+
+    const ledgerDocs = [];
+    const skuUpdates = [];
 
     for (const valItem of validatedItems) {
       if (valItem.reels && valItem.reels.length > 0) {
@@ -711,11 +742,12 @@ exports.editPurchaseInvoice = async (req, res, next) => {
 
         for (const locIdStr of Object.keys(reelsByLoc)) {
           const reelsGroup = reelsByLoc[locIdStr];
-          const groupWeight = reelsGroup.reduce((s, r) => s + (Number(r.weight) || 0), 0);
+          let groupWeight = reelsGroup.reduce((s, r) => s + (Number(r.weight) || 0), 0);
+          if (groupWeight <= 0) groupWeight = valItem.quantity;
           const h = await getHierarchy(locIdStr);
           const transactionNumber = await Sequence.getNextSequence("IL");
 
-          await new InventoryLedger({
+          ledgerDocs.push({
             transactionNumber,
             transactionType: "Purchase",
             skuId: valItem.skuId,
@@ -731,10 +763,10 @@ exports.editPurchaseInvoice = async (req, res, next) => {
             locationId: h.locationId,
             remarks: `Lot: ${valItem.lotNumber}. Inwarded via invoice ${invoice.invoiceNumber}`,
             reels: reelsGroup,
-            createdBy: toObjectId(req.user.id),
+            createdBy: toObjectId(req.user?.id) || companyObjId,
             company: companyObjId,
             status: "Posted"
-          }).save();
+          });
         }
       } else if (valItem.splits && valItem.splits.length > 0) {
         for (const split of valItem.splits) {
@@ -743,7 +775,7 @@ exports.editPurchaseInvoice = async (req, res, next) => {
           const h = await getHierarchy(split.locationId);
           const transactionNumber = await Sequence.getNextSequence("IL");
 
-          await new InventoryLedger({
+          ledgerDocs.push({
             transactionNumber,
             transactionType: "Purchase",
             skuId: valItem.skuId,
@@ -759,16 +791,16 @@ exports.editPurchaseInvoice = async (req, res, next) => {
             locationId: h.locationId,
             remarks: `Lot: ${valItem.lotNumber}. Inwarded via invoice ${invoice.invoiceNumber}`,
             reels: [],
-            createdBy: toObjectId(req.user.id),
+            createdBy: toObjectId(req.user?.id) || companyObjId,
             company: companyObjId,
             status: "Posted"
-          }).save();
+          });
         }
       } else {
         const h = await getHierarchy(valItem.locationId);
         const transactionNumber = await Sequence.getNextSequence("IL");
 
-        await new InventoryLedger({
+        ledgerDocs.push({
           transactionNumber,
           transactionType: "Purchase",
           skuId: valItem.skuId,
@@ -784,11 +816,26 @@ exports.editPurchaseInvoice = async (req, res, next) => {
           locationId: h.locationId,
           remarks: `Lot: ${valItem.lotNumber}. Inwarded via invoice ${invoice.invoiceNumber}`,
           reels: [],
-          createdBy: toObjectId(req.user.id),
+          createdBy: toObjectId(req.user?.id) || companyObjId,
           company: companyObjId,
           status: "Posted"
-        }).save();
+        });
       }
+
+      skuUpdates.push(
+        SkuV2.findByIdAndUpdate(valItem.skuId, {
+          purchasePrice: valItem.purchasePrice,
+          ratePerKg: valItem.ratePerKg || valItem.purchasePrice,
+          rate: valItem.purchasePrice
+        })
+      );
+    }
+
+    if (ledgerDocs.length > 0) {
+      await InventoryLedger.insertMany(ledgerDocs, { ordered: false });
+    }
+    if (skuUpdates.length > 0) {
+      await Promise.all(skuUpdates);
     }
 
     // Update Invoice details

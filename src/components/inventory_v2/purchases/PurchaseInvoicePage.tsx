@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, X, FileText, Trash2, Download, HelpCircle, Check, Eye, Edit, ArrowRight, Layers, Clock, AlertTriangle, CheckCircle, Settings, User, MapPin as MapPinIcon, Ban, Save, Package, Receipt, AlertCircle, Building2, RotateCcw, Filter } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -1273,7 +1274,7 @@ const PurchaseInvoicePage: React.FC = () => {
       setActiveSubPage('list');
       setIsEditing(false);
       setEditingInvoiceId(null);
-      loadInvoices();
+      loadInvoices(false);
     } catch (err: any) {
       console.error(err);
       setAddError(err.response?.data?.msg || err.message || 'Failed to submit purchase invoice');
@@ -2926,9 +2927,17 @@ const PurchaseInvoicePage: React.FC = () => {
       </Modal>
 
       {/* ── SUB-PAGE 2: BATCH DETAILS DIALOG BOX POPUP ────────────────────────── */}
-      {activeSubPage === 'details' && selectedInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 font-sans text-xs">
+      {activeSubPage === 'details' && selectedInvoice && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] transition-all duration-200 animate-fadeIn">
+          {/* Backdrop Blur Overlay covering 100% of the viewport edge-to-edge */}
+          <div 
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-md transition-opacity cursor-pointer"
+            onClick={() => setActiveSubPage('list')}
+          />
+
+          {/* Modal Container */}
+          <div className="fixed inset-0 overflow-y-auto flex items-center justify-center p-3 sm:p-5 pointer-events-none">
+            <div className="relative bg-white rounded-2xl shadow-2xl shadow-slate-950/20 border border-slate-200 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-modalPop font-sans text-xs pointer-events-auto">
             {/* Header */}
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
               <div>
@@ -3341,7 +3350,9 @@ const PurchaseInvoicePage: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
+      </div>,
+      document.body
+    )}
 
       {/* ── MULTI-LOCATION STORAGE ALLOCATION SPLIT MODAL ───────────────────────────── */}
       {splittingItemIdx !== null && (() => {
