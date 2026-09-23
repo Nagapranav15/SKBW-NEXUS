@@ -14,11 +14,11 @@ import {
 import { WarehouseLocationV2 } from '../../api/mfgApiV2';
 
 interface LocationSelectPopupProps {
-  label: string;
+  label?: string;
   locations: WarehouseLocationV2[];
-  warehouseId: string;
-  floorId: string;
-  zoneId: string;
+  warehouseId?: string;
+  floorId?: string;
+  zoneId?: string;
   locationId: string;
   onChange: (warehouseId: string, floorId: string, zoneId: string, locationId: string) => void;
   badgeColor?: 'blue' | 'rose' | 'indigo' | 'emerald';
@@ -26,6 +26,9 @@ interface LocationSelectPopupProps {
   required?: boolean;
   unit?: string;
   locationStockMap?: Record<string, { qty: number; batches?: number }>;
+  variant?: 'card' | 'compact';
+  hideLabel?: boolean;
+  className?: string;
 }
 
 const FALLBACK_LOCATIONS: WarehouseLocationV2[] = [
@@ -47,15 +50,18 @@ const FALLBACK_LOCATIONS: WarehouseLocationV2[] = [
 export const LocationSelectPopup: React.FC<LocationSelectPopupProps> = ({
   label,
   locations = [],
-  warehouseId,
-  floorId,
-  zoneId,
+  warehouseId = '',
+  floorId = '',
+  zoneId = '',
   locationId,
   onChange,
   disabled = false,
   required = true,
   unit = 'GBL',
-  locationStockMap = {}
+  locationStockMap = {},
+  variant = 'card',
+  hideLabel = false,
+  className = ''
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -165,15 +171,46 @@ export const LocationSelectPopup: React.FC<LocationSelectPopupProps> = ({
   // Sync draft state on open or prop change (all nodes closed/collapsed by default)
   useEffect(() => {
     if (isOpen) {
-      setSelectedWhId(warehouseId);
-      setSelectedFId(floorId);
-      setSelectedZId(zoneId);
-      setSelectedLId(locationId);
+      let wh = warehouseId || '';
+      let fl = floorId || '';
+      let zn = zoneId || '';
+      let lc = locationId || '';
+
+      if (lc && (!wh || !fl || !zn)) {
+        const target = locMap.get(lc);
+        if (target) {
+          if (target.level === 'Storage Location') {
+            const z = target.parentId ? locMap.get(String(target.parentId)) : undefined;
+            const f = z?.parentId ? locMap.get(String(z.parentId)) : undefined;
+            const w = f?.parentId ? locMap.get(String(f.parentId)) : undefined;
+            if (z?._id) zn = String(z._id);
+            if (f?._id) fl = String(f._id);
+            if (w?._id) wh = String(w._id);
+          } else if (target.level === 'Zone') {
+            zn = String(target._id);
+            const f = target.parentId ? locMap.get(String(target.parentId)) : undefined;
+            const w = f?.parentId ? locMap.get(String(f.parentId)) : undefined;
+            if (f?._id) fl = String(f._id);
+            if (w?._id) wh = String(w._id);
+          } else if (target.level === 'Floor') {
+            fl = String(target._id);
+            const w = target.parentId ? locMap.get(String(target.parentId)) : undefined;
+            if (w?._id) wh = String(w._id);
+          } else if (target.level === 'Factory') {
+            wh = String(target._id);
+          }
+        }
+      }
+
+      setSelectedWhId(wh);
+      setSelectedFId(fl);
+      setSelectedZId(zn);
+      setSelectedLId(lc);
       setSearchQuery('');
       // Everything closed by default
       setExpandedNodes({});
     }
-  }, [isOpen, warehouseId, floorId, zoneId, locationId]);
+  }, [isOpen, warehouseId, floorId, zoneId, locationId, locMap]);
 
   const toggleExpand = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -311,67 +348,114 @@ export const LocationSelectPopup: React.FC<LocationSelectPopupProps> = ({
   };
 
   return (
-    <div className="space-y-1.5 font-sans">
-      {/* Label */}
-      <div className="flex items-center justify-between">
-        <label className="text-[10.5px] font-bold text-gray-500 uppercase tracking-wider block">
-          {label} {required && <span className="text-rose-500">*</span>}
-        </label>
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => setIsOpen(true)}
-          className="text-[10.5px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer transition-colors"
-        >
-          <span>Change Location</span>
-          <ChevronRight className="w-3 h-3 text-blue-500" />
-        </button>
-      </div>
-
-      {/* Trigger Box on Form */}
-      <div
-        onClick={() => !disabled && setIsOpen(true)}
-        className={`w-full p-2.5 bg-white border border-slate-200/90 hover:border-blue-400 rounded-2xl transition-all cursor-pointer shadow-3xs group flex items-center justify-between gap-3 ${
-          disabled ? 'opacity-60 cursor-not-allowed' : ''
-        }`}
-        title="Click to select location"
-      >
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-xl shrink-0 bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shadow-3xs">
-            <Layers className="w-4 h-4 stroke-[2]" />
-          </div>
-
-          <div className="min-w-0">
-            <div className="flex items-center flex-wrap gap-1 text-xs font-semibold text-slate-800">
-              <span className="text-slate-900 font-bold">{currentWhName}</span>
-              <ChevronRight className="w-3 h-3 text-slate-300 shrink-0" />
-              <span className="text-slate-600">{currentFloorName}</span>
-              <ChevronRight className="w-3 h-3 text-slate-300 shrink-0" />
-              <span className="text-slate-600">{currentZoneName}</span>
-              <ChevronRight className="w-3 h-3 text-slate-300 shrink-0" />
-              <span className="font-bold px-1.5 py-0.5 rounded-md text-[11px] bg-blue-50 text-blue-700 border border-blue-100">
-                {currentLocName}
+    <div className={`space-y-1.5 font-sans ${className}`}>
+      {variant === 'compact' ? (
+        <div>
+          {!hideLabel && label && (
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+              {label} {required && <span className="text-rose-500">*</span>}
+            </label>
+          )}
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!disabled) setIsOpen(true);
+            }}
+            className={`w-full px-2.5 py-1.5 bg-white border border-gray-200 hover:border-blue-400 rounded-xl transition-all cursor-pointer shadow-3xs group flex items-center justify-between gap-1.5 text-xs text-left ${
+              disabled ? 'opacity-60 cursor-not-allowed' : ''
+            }`}
+            title="Click to select warehouse hierarchy storage location"
+          >
+            <div className="flex items-center gap-1.5 min-w-0 flex-1 truncate">
+              <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+              <span className="truncate font-semibold text-gray-800 text-[11px]">
+                {locationId && currentTarget ? (
+                  <span className="inline-flex items-center gap-1">
+                    {currentParts.length > 1 ? (
+                      <>
+                        <span className="text-gray-500 font-medium">{currentParts.slice(0, -1).join(' > ')} &gt; </span>
+                        <span className="font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">{currentParts[currentParts.length - 1]}</span>
+                      </>
+                    ) : (
+                      <span className="font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">{currentParts[0]}</span>
+                    )}
+                  </span>
+                ) : (
+                  <span className="text-gray-400 font-normal">-- Choose Storage Area --</span>
+                )}
               </span>
             </div>
-            <div className="text-[10px] text-slate-400 mt-0.5">
-              Storage Bin: <span className="font-semibold text-slate-700">{currentLocName}</span> ({currentWhName} • {currentFloorName} • {currentZoneName})
-            </div>
-          </div>
+            <ChevronDown className="w-3.5 h-3.5 text-gray-400 group-hover:text-blue-600 shrink-0 transition-colors" />
+          </button>
         </div>
+      ) : (
+        <>
+          {/* Label */}
+          {!hideLabel && (
+            <div className="flex items-center justify-between">
+              <label className="text-[10.5px] font-bold text-gray-500 uppercase tracking-wider block">
+                {label} {required && <span className="text-rose-500">*</span>}
+              </label>
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => setIsOpen(true)}
+                className="text-[10.5px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                <span>Change Location</span>
+                <ChevronRight className="w-3 h-3 text-blue-500" />
+              </button>
+            </div>
+          )}
 
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsOpen(true);
-          }}
-          className="px-2.5 py-1 bg-slate-50 group-hover:bg-blue-50 group-hover:text-blue-700 text-slate-600 rounded-xl text-[11px] font-semibold shrink-0 transition-colors cursor-pointer flex items-center gap-1"
-        >
-          <span>Select</span>
-          <ChevronDown className="w-3 h-3 text-slate-400" />
-        </button>
-      </div>
+          {/* Trigger Box on Form */}
+          <div
+            onClick={() => !disabled && setIsOpen(true)}
+            className={`w-full p-2.5 bg-white border border-slate-200/90 hover:border-blue-400 rounded-2xl transition-all cursor-pointer shadow-3xs group flex items-center justify-between gap-3 ${
+              disabled ? 'opacity-60 cursor-not-allowed' : ''
+            }`}
+            title="Click to select location"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl shrink-0 bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shadow-3xs">
+                <Layers className="w-4 h-4 stroke-[2]" />
+              </div>
+
+              <div className="min-w-0">
+                <div className="flex items-center flex-wrap gap-1 text-xs font-semibold text-slate-800">
+                  <span className="text-slate-900 font-bold">{currentWhName}</span>
+                  <ChevronRight className="w-3 h-3 text-slate-300 shrink-0" />
+                  <span className="text-slate-600">{currentFloorName}</span>
+                  <ChevronRight className="w-3 h-3 text-slate-300 shrink-0" />
+                  <span className="text-slate-600">{currentZoneName}</span>
+                  <ChevronRight className="w-3 h-3 text-slate-300 shrink-0" />
+                  <span className="font-bold px-1.5 py-0.5 rounded-md text-[11px] bg-blue-50 text-blue-700 border border-blue-100">
+                    {currentLocName}
+                  </span>
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">
+                  Storage Bin: <span className="font-semibold text-slate-700">{currentLocName}</span> ({currentWhName} • {currentFloorName} • {currentZoneName})
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOpen(true);
+              }}
+              className="px-2.5 py-1 bg-slate-50 group-hover:bg-blue-50 group-hover:text-blue-700 text-slate-600 rounded-xl text-[11px] font-semibold shrink-0 transition-colors cursor-pointer flex items-center gap-1"
+            >
+              <span>Select</span>
+              <ChevronDown className="w-3 h-3 text-slate-400" />
+            </button>
+          </div>
+        </>
+      )}
 
       {/* ── CUTE, MINIMAL & INFORMATIONAL POPUP (NO DARK BG SHIFT) ── */}
       {isOpen && (
