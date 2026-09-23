@@ -872,22 +872,22 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
         </div>
 
         {/* ── 2. FACTORY CARDS ── */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
-          {factories.length === 0 ? (
-            <div className="col-span-3 p-6 text-center bg-slate-50/70 rounded-xl border border-dashed border-slate-200 space-y-2">
-              <Building2 className="w-7 h-7 text-slate-300 mx-auto" />
-              <p className="font-semibold text-slate-700 text-xs">No Factories Configured Yet</p>
-              <p className="text-[11px] text-slate-400">Click &apos;+ Add Factory&apos; or use Tools to initialize default factory setup.</p>
-              <button
-                type="button"
-                onClick={handleSeedDefaultHierarchy}
-                className="mt-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 shadow-xs hover:bg-blue-700 cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" /> Initialize SKBW / LOM / Maruti
-              </button>
-            </div>
-          ) : (
-            factories.map(factory => {
+        {factories.length === 0 ? (
+          <div className="p-6 text-center bg-slate-50/70 rounded-xl border border-dashed border-slate-200 space-y-2 mt-3">
+            <Building2 className="w-7 h-7 text-slate-300 mx-auto" />
+            <p className="font-semibold text-slate-700 text-xs">No Factories Configured Yet</p>
+            <p className="text-[11px] text-slate-400">Click &apos;+ Add Factory&apos; or use Tools to initialize default factory setup.</p>
+            <button
+              type="button"
+              onClick={handleSeedDefaultHierarchy}
+              className="mt-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 shadow-xs hover:bg-blue-700 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" /> Initialize SKBW / LOM / Maruti
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2.5 mt-3 overflow-x-auto pb-1.5 pt-0.5 scrollbar-thin">
+            {factories.map(factory => {
               const isSelected = activeFactory?._id === factory._id;
               const metrics = getFactoryMetrics(factory._id!);
 
@@ -903,14 +903,14 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                       setSelectedFloorId('');
                     }
                   }}
-                  className={`p-3 rounded-xl transition-all text-left flex items-center justify-between gap-3 cursor-pointer relative group ${
+                  className={`shrink-0 w-56 sm:w-60 p-2.5 rounded-xl transition-all text-left flex items-center justify-between gap-2.5 cursor-pointer relative group ${
                     isSelected
                       ? 'border border-blue-500 bg-blue-50/40 shadow-xs ring-1 ring-blue-500/20'
                       : 'border border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50/50 shadow-2xs'
                   }`}
                 >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
                       isSelected ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600 border border-slate-200/60'
                     }`}>
                       <Building2 className="w-4 h-4" />
@@ -924,14 +924,14 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                           <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0"></span>
                         )}
                       </div>
-                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                        {metrics.floorsCount} Floors • {metrics.zonesCount} Zones • {metrics.locationsCount} Locations
+                      <p className="text-[10.5px] text-slate-500 font-medium truncate mt-0.5">
+                        {metrics.floorsCount} Floors • {metrics.zonesCount} Zones • {metrics.locationsCount} Locs
                       </p>
                     </div>
                   </div>
 
                   {/* Factory Actions: Edit & Delete */}
-                  <div className="flex items-center gap-1 shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-0.5 shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
                     <button
                       type="button"
                       onClick={(e) => {
@@ -957,9 +957,9 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                   </div>
                 </div>
               );
-            })
-          )}
-        </div>
+            })}
+          </div>
+        )}
 
         {/* ── 3. FLOOR TABS & SUMMARY ── */}
         {activeFactory && (
