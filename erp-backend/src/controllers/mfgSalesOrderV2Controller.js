@@ -234,6 +234,8 @@ exports.createSalesOrder = async (req, res, next) => {
       altUnit: item.altUnit || "",
       altUnitConversion: Number(item.altUnitConversion) || 1,
       quantity: Number(item.quantity) || 1,
+      gbl: Number(item.gbl) || 0,
+      pcsPerGbl: Number(item.pcsPerGbl) || 1,
       unitPrice: Number(item.unitPrice) || 0,
       discountPercent: Number(item.discountPercent) || 0,
       taxableAmount: Number(item.taxableAmount) || (Number(item.quantity) * Number(item.unitPrice)),
@@ -257,6 +259,8 @@ exports.createSalesOrder = async (req, res, next) => {
       customerPoNumber: customerPoNumber || "",
       customerPoDate: customerPoDate || "",
       facility: facility || "Main Factory",
+      transporter: req.body.transporter || "",
+      otherCharges: Array.isArray(req.body.otherCharges) ? req.body.otherCharges : [],
       internalNotes: internalNotes || "",
       billingAddress: billingAddress || {},
       shippingAddress: shippingAddress || {},
@@ -305,7 +309,7 @@ exports.updateSalesOrder = async (req, res, next) => {
 
     const fields = [
       "customerName", "orderDate", "promisedDate", "customerPoNumber", "customerPoDate",
-      "facility", "internalNotes", "billingAddress", "shippingAddress", "isInterstate",
+      "facility", "transporter", "otherCharges", "internalNotes", "billingAddress", "shippingAddress", "isInterstate",
       "subtotal", "totalCgst", "totalSgst", "totalIgst", "freightCharges", "roundOff", "grandTotal",
       "status", "materialsStatus", "fulfillmentStatus"
     ];
@@ -340,6 +344,8 @@ exports.updateSalesOrder = async (req, res, next) => {
         altUnit: item.altUnit || "",
         altUnitConversion: Number(item.altUnitConversion) || 1,
         quantity: Number(item.quantity) || 1,
+        gbl: Number(item.gbl) || 0,
+        pcsPerGbl: Number(item.pcsPerGbl) || 1,
         unitPrice: Number(item.unitPrice) || 0,
         discountPercent: Number(item.discountPercent) || 0,
         taxableAmount: Number(item.taxableAmount) || 0,

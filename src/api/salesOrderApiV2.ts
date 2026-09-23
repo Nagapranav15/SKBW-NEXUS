@@ -11,6 +11,8 @@ export interface SalesOrderItemV2 {
   altUnit?: string;
   altUnitConversion?: number;
   quantity: number;
+  gbl?: number;
+  pcsPerGbl?: number;
   unitPrice: number;
   discountPercent?: number;
   taxableAmount?: number;
@@ -21,6 +23,13 @@ export interface SalesOrderItemV2 {
   igstAmount?: number;
   totalAmount: number;
   dispatchedQty?: number;
+}
+
+export interface OtherChargeItem {
+  name: string;
+  quantity: number;
+  rate: number;
+  amount: number;
 }
 
 export interface SalesOrderV2 {
@@ -35,6 +44,8 @@ export interface SalesOrderV2 {
   customerPoNumber?: string;
   customerPoDate?: string;
   facility?: string;
+  transporter?: string;
+  otherCharges?: OtherChargeItem[];
   internalNotes?: string;
   billingAddress?: any;
   shippingAddress?: any;

@@ -34,6 +34,14 @@ const salesOrderItemV2Schema = new mongoose.Schema({
     required: true,
     min: 0.001
   },
+  gbl: {
+    type: Number,
+    default: 0
+  },
+  pcsPerGbl: {
+    type: Number,
+    default: 1
+  },
   unitPrice: {
     type: Number,
     required: true,
@@ -154,6 +162,14 @@ const salesOrderV2Schema = new mongoose.Schema({
   totalIgst: {
     type: Number,
     default: 0
+  },
+  transporter: {
+    type: String,
+    default: ""
+  },
+  otherCharges: {
+    type: Array,
+    default: []
   },
   freightCharges: {
     type: Number,
