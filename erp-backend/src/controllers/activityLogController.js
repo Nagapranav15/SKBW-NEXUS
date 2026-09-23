@@ -3,45 +3,64 @@ const ActivityLog = require("../models/activityLogModel");
 
 exports.getActivityLogs = async (req, res) => {
   try {
-    const filter = {};
-    if (req.query.company) {
-      if (mongoose.Types.ObjectId.isValid(req.query.company)) {
-        filter.company = new mongoose.Types.ObjectId(req.query.company);
+    const conditions = [];
+
+    const companyParam = req.query.company || req.query.companyId;
+    if (companyParam) {
+      const compIdStr = String(companyParam).trim();
+      if (mongoose.Types.ObjectId.isValid(compIdStr)) {
+        conditions.push({
+          $or: [
+            { company: new mongoose.Types.ObjectId(compIdStr) },
+            { company: compIdStr }
+          ]
+        });
       } else {
-        filter.company = req.query.company;
+        conditions.push({ company: compIdStr });
       }
     }
     
     if (req.query.entityType) {
       const et = String(req.query.entityType).trim();
-      if (et === 'SkuV2' || et === 'SKU' || et === 'Item' || et === 'ITEM' || et === 'ItemMaster') {
-        filter.entityType = { $in: ['SkuV2', 'SKU', 'Item', 'ITEM', 'ItemMaster'] };
+      if (/^(Sku|Item|Inventory)/i.test(et)) {
+        conditions.push({
+          $or: [
+            { entityType: { $in: ['SkuV2', 'SKU', 'sku', 'Sku', 'Item', 'ITEM', 'item', 'ItemMaster', 'itemMaster', 'Inventory', 'inventory', 'InventoryLedger', 'InventoryLedgerV2', 'Material', 'Product', 'Semi'] } },
+            { entityType: { $regex: /sku|item|inventory/i } }
+          ]
+        });
       } else {
-        filter.entityType = et;
+        conditions.push({ entityType: et });
       }
     }
 
     if (req.query.search) {
       const searchRegex = new RegExp(req.query.search, 'i');
-      filter.$or = [
-        { entityName: searchRegex },
-        { details: searchRegex },
-        { performedBy: searchRegex }
-      ];
+      conditions.push({
+        $or: [
+          { entityName: searchRegex },
+          { details: searchRegex },
+          { performedBy: searchRegex },
+          { action: searchRegex }
+        ]
+      });
     }
 
+    const filter = conditions.length > 0 ? { $and: conditions } : {};
+
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 50;
+    const limit = parseInt(req.query.limit) || 100;
     const skip = (page - 1) * limit;
 
     const [logs, total] = await Promise.all([
-      ActivityLog.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      ActivityLog.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
       ActivityLog.countDocuments(filter)
     ]);
 
-    res.json({ logs, total, page, limit });
+    res.json({ logs: logs || [], total: total || 0, page, limit });
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    console.error("getActivityLogs error:", err);
+    res.status(500).json({ msg: err.message, logs: [], total: 0 });
   }
 };
 
