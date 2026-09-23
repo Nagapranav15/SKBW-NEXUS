@@ -550,7 +550,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     // Find matching categories for newly selected type
     const matchingCats = (allCategories || []).filter(c => c && (c.type === newType || (!c.type && newType === 'products')));
     const newCategory = matchingCats[0]?.name || (newType === 'products' ? 'Products' : newType === 'semi' ? 'Semi' : 'Materials');
-    const newUom = matchingCats[0]?.uom || (newType === 'materials' ? 'Kg' : newType === 'semi' ? 'Ream' : 'Pcs');
+    const newUom = matchingCats[0]?.uom || '';
 
     setForm(prev => ({
       ...prev,
@@ -1070,7 +1070,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       let updatedCategoryCards = [...(createdCategories as any || [])];
 
       if (field === 'categories') {
-        const defaultUom = resolvedSection === 'materials' ? 'Kg' : resolvedSection === 'semi' ? 'Ream' : 'Pcs';
+        const defaultUom = '';
         const newCategoryObj = {
           id: `cat-${Date.now()}`,
           name: cleanVal,
@@ -1258,7 +1258,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     } else {
       const sectionForNew = activeSection || resolvedSection || 'products';
       const defaultCat = defaultCategory || (sectionForNew === 'products' ? 'Products' : sectionForNew === 'semi' ? 'Semi' : 'Materials');
-      const defaultUom = sectionForNew === 'materials' ? 'Kg' : sectionForNew === 'semi' ? 'Ream' : 'Pcs';
+      const matchingCats = (allCategories || []).filter(c => c && (c.type === sectionForNew || (!c.type && sectionForNew === 'products')));
+      const defaultUom = matchingCats[0]?.uom || '';
       setForm({
         skuCode: '',
         name: '',
