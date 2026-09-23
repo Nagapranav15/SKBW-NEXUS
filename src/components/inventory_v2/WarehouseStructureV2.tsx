@@ -43,8 +43,11 @@ const getZoneColor = (zoneName: string) => {
 };
 
 const getZoneLetter = (zoneName: string) => {
+  if (!zoneName) return 'Z';
+  const match = zoneName.match(/zone\s*([a-zA-Z0-9])/i);
+  if (match) return match[1].toUpperCase();
   const clean = zoneName.replace(/zone/i, '').trim().toUpperCase();
-  return clean || 'A';
+  return clean.charAt(0) || zoneName.charAt(0).toUpperCase() || 'Z';
 };
 
 const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded = false }) => {
@@ -1118,7 +1121,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
 
                         {/* Zone Badge */}
                         <td className="px-3.5 py-2.5 text-center">
-                          <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-[11px] font-bold border ${zoneStyle.bg} ${zoneStyle.text} ${zoneStyle.border}`}>
+                          <span className={`inline-flex items-center justify-center w-6 h-6 shrink-0 overflow-hidden rounded-md text-[11px] font-bold border ${zoneStyle.bg} ${zoneStyle.text} ${zoneStyle.border}`}>
                             {zoneLetter}
                           </span>
                         </td>
@@ -1305,11 +1308,11 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                   className="p-3.5 bg-white border border-slate-200/80 rounded-xl shadow-2xs hover:border-slate-300 transition-colors space-y-2.5"
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-[11px] font-bold border ${zoneStyle.bg} ${zoneStyle.text} ${zoneStyle.border}`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`inline-flex items-center justify-center w-6 h-6 shrink-0 overflow-hidden rounded-md text-[11px] font-bold border ${zoneStyle.bg} ${zoneStyle.text} ${zoneStyle.border}`}>
                         {zoneLetter}
                       </span>
-                      <span className="font-bold text-slate-900 text-xs">{zone.name}</span>
+                      <span className="font-bold text-slate-900 text-xs truncate">{zone.name}</span>
                     </div>
                     
                     {/* Zone Actions: Inspect, Edit & Delete */}
