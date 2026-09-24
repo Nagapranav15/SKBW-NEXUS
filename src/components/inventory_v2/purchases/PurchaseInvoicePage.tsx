@@ -15,6 +15,8 @@ import {
 } from './purchaseService';
 import { showToast } from '../../ui/Toast';
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import Modal from '../../ui/Modal';
 import { LocationSelectPopup } from '../../stock_v2/LocationSelectPopup';
 import { convertAltToPrimary, convertPrimaryToAlt, formatUomFormula } from '../../../utils/uomConversion';
@@ -864,6 +866,88 @@ const PurchaseInvoicePage: React.FC = () => {
     XLSX.writeFile(workbook, `Purchase_Batches_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
+  const handleExportPDF = () => {
+    if (invoices.length === 0) {
+      showToast('No purchase batches available to export', 'info');
+      return;
+    }
+
+    const companyName = selectedCompany?.name || 'SKBW ERP';
+    const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+    try {
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+      doc.setFontSize(14);
+      doc.setTextColor(29, 78, 216);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${companyName} — PURCHASE BATCHES REPORT`, 14, 14);
+
+      doc.setFontSize(9);
+      doc.setTextColor(100, 116, 139);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Generated on ${dateStr} • Total Purchase Batches: ${invoices.length}`, 14, 20);
+
+      const headers = ['#', 'Batch No.', 'Date', 'Supplier', 'Material', 'Total Qty (KG)', 'Landed Rate/KG (₹)', 'Landed Total (₹)', 'Status'];
+
+      const rows = invoices.map((inv, idx) => {
+        const supplierName = typeof inv.vendorId === 'object' && inv.vendorId !== null ? (inv.vendorId.firmName || inv.vendorId.ownerName) : 'Supplier';
+        const firstItem = inv.items?.[0];
+        const materialName = firstItem && typeof firstItem.skuId === 'object' && firstItem.skuId !== null ? (firstItem.skuId as any).name : 'Raw Material';
+        let totalKgWeight = 0;
+        inv.items?.forEach(item => {
+          const resolvedSku = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null;
+          const fullSku = skus.find(s => s._id === (resolvedSku?._id || item.skuId)) || resolvedSku;
+          if (resolvedSku?.paperType === 'Sheets' || fullSku?.paperType === 'Sheets') {
+            const stdSheets = resolvedSku?.pages || fullSku?.pages || 500;
+            const reamWeight = item.reamWeight || resolvedSku?.reamWeight || fullSku?.reamWeight || getFallbackReamWeight(fullSku || resolvedSku) || 0;
+            const itemReams = (item.quantity || 0) / stdSheets;
+            totalKgWeight += itemReams * reamWeight;
+          } else if (item.reels && item.reels.length > 0) {
+            const reelsWt = item.reels.reduce((s, r) => s + (Number(r.weight) || 0), 0);
+            totalKgWeight += reelsWt > 0 ? reelsWt : (item.quantity || 0);
+          } else {
+            totalKgWeight += item.quantity || 0;
+          }
+        });
+
+        const grandTotal = inv.grandTotal || ((inv.subTotal || 0) + (inv.freight || 0) + (inv.craneCharges || 0) + (inv.otherCharges || 0) + (inv.taxAmount || 0));
+        const landedRatePerKg = totalKgWeight > 0 ? (grandTotal / totalKgWeight) : 0;
+        const formattedDate = inv.createdAt ? new Date(inv.createdAt).toLocaleDateString('en-IN') : '—';
+        const statusStr = inv.status === 'Posted' ? 'Received' : inv.status;
+
+        return [
+          idx + 1,
+          inv.invoiceNumber || '—',
+          formattedDate,
+          supplierName,
+          materialName,
+          totalKgWeight.toLocaleString('en-IN', { maximumFractionDigits: 2 }),
+          `₹${landedRatePerKg.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+          `₹${grandTotal.toLocaleString('en-IN')}`,
+          statusStr
+        ];
+      });
+
+      autoTable(doc, {
+        startY: 24,
+        head: [headers],
+        body: rows,
+        theme: 'striped',
+        headStyles: { fillColor: [37, 99, 235], textColor: 255, fontSize: 9, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 8, textColor: 50 },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        margin: { top: 24, left: 14, right: 14, bottom: 14 }
+      });
+
+      doc.save(`Purchase_Batches_${new Date().toISOString().slice(0, 10)}.pdf`);
+      showToast('Exported Purchase Batches to PDF successfully', 'success');
+    } catch (err: any) {
+      console.error('PDF Export Error:', err);
+      showToast('Failed to export PDF: ' + (err.message || 'Unknown error'), 'error');
+    }
+  };
+
   // Add Item Lot Row
   const handleAddItemRow = () => {
     setInvoiceForm({
@@ -1683,88 +1767,37 @@ const PurchaseInvoicePage: React.FC = () => {
                 )}
               </div>
 
-              {/* 2. Tools Popover Button */}
-              <div className="relative" ref={toolsDropdownRef}>
-                <button
-                  type="button"
-                  onClick={() => setShowToolsDropdown(!showToolsDropdown)}
-                  className={`p-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
-                    showToolsDropdown
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white hover:bg-blue-50/60 text-blue-600 border-gray-200 hover:border-blue-200'
-                  }`}
-                  title="Tools & Logs"
-                >
-                  <Settings className="w-4 h-4" />
-                </button>
-
-                {showToolsDropdown && (
-                  <div className="absolute right-0 top-full mt-2 w-52 bg-white/95 backdrop-blur-md rounded-2xl border border-gray-200 shadow-2xl p-2 z-50 divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-150 text-left">
-                    <div className="py-1">
-                      <button
-                        onClick={() => { fetchActivityLogs(); setShowActivityLog(true); setShowToolsDropdown(false); }}
-                        className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-bold text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-colors cursor-pointer"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-3.5 h-3.5 text-gray-400" />
-                          <span>Activity Log</span>
-                        </div>
-                        <kbd className="px-1.5 bg-gray-50 border border-gray-200 rounded text-[9px] text-gray-400 font-mono">Alt+L</kbd>
-                      </button>
-                      <button
-                        onClick={() => { findPurchaseDuplicates(); setShowDuplicates(true); setShowToolsDropdown(false); }}
-                        className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-bold text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-colors cursor-pointer"
-                      >
-                        <div className="flex items-center gap-2">
-                          <AlertTriangle className="w-3.5 h-3.5 text-gray-400" />
-                          <span>Find Duplicates</span>
-                        </div>
-                        <kbd className="px-1.5 bg-gray-50 border border-gray-200 rounded text-[9px] text-gray-400 font-mono">Alt+F</kbd>
-                      </button>
-                      <button
-                        onClick={() => { fetchRecycleBin(); setShowRecycleBin(true); setShowToolsDropdown(false); }}
-                        className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-bold text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-colors cursor-pointer"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Trash2 className="w-3.5 h-3.5 text-gray-400" />
-                          <span>Recycle Bin</span>
-                        </div>
-                        <kbd className="px-1.5 bg-gray-50 border border-gray-200 rounded text-[9px] text-gray-400 font-mono">Alt+R</kbd>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+              {/* 2. Activity Logs Button */}
+              <button
+                onClick={() => { fetchActivityLogs(); setShowActivityLog(true); }}
+                className="px-3 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs bg-white hover:bg-blue-50/60 text-blue-600 border-gray-200 hover:border-blue-200"
+                title="View Activity Logs"
+              >
+                <Clock className="w-3.5 h-3.5 text-blue-600" />
+                <span>Activity Logs</span>
+              </button>
 
               {/* 3. Export Excel Button */}
               <button
                 onClick={handleExportExcel}
-                className="p-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center cursor-pointer shadow-2xs bg-white hover:bg-blue-50/60 text-blue-600 border-gray-200 hover:border-blue-200"
+                className="px-3 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs bg-white hover:bg-emerald-50/60 text-emerald-700 border-gray-200 hover:border-emerald-200"
                 title="Export / Download Excel"
               >
-                <Download className="w-4 h-4" />
+                <Download className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Export Excel</span>
               </button>
 
-              {/* 4. Reload Button */}
+              {/* 4. Export PDF Button */}
               <button
-                onClick={() => { fetchInvoices(); showToast('Purchase batches refreshed', 'info'); }}
-                className="p-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center cursor-pointer shadow-2xs bg-white hover:bg-blue-50/60 text-blue-600 border-gray-200 hover:border-blue-200"
-                title="Refresh List"
+                onClick={handleExportPDF}
+                className="px-3 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs bg-white hover:bg-red-50/60 text-red-700 border-gray-200 hover:border-red-200"
+                title="Export / Download PDF"
               >
-                <RefreshCw className="w-4 h-4" />
+                <FileText className="w-3.5 h-3.5 text-red-600" />
+                <span>Export PDF</span>
               </button>
 
-              {/* 5. Reorder Low Stock Action Button */}
-              <button
-                onClick={() => handleReorderLowStockItems()}
-                className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-amber-500/20 active:scale-[0.98] cursor-pointer"
-                title="Create purchase batch for materials at or below reorder level"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Reorder Low Stock</span>
-              </button>
-
-              {/* 6. + New Purchase Batch Button */}
+              {/* 5. + New Purchase Batch Button */}
               <button
                 onClick={handleNewPurchaseClick}
                 className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/20 active:scale-[0.98] cursor-pointer"
