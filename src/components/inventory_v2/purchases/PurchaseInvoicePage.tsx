@@ -4028,7 +4028,7 @@ const PurchaseInvoicePage: React.FC = () => {
             </div>
           </div>,
           document.body
-        );
+        ) : null;
       })()}
       {/* ── TOOLS SUB-MODALS & SLIDE-OVERS ────────────────────────────────────── */}
       {/* Activity Log Drawer */}
