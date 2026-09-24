@@ -56,7 +56,8 @@ import {
   ArrowRightLeft,
   ArrowRight,
   ExternalLink,
-  Bookmark
+  Bookmark,
+  ShieldAlert
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { 
@@ -4508,8 +4509,16 @@ const SkuMasterV2: React.FC = () => {
                                 </td>
                               );
                             case 'pages':
+                              const isReelItem = sku.paperType === 'Reels' || (sku.name || '').toLowerCase().includes('reel');
+                              if (isReelItem) {
+                                return (
+                                  <td key="pages" className="py-3 px-3 text-center text-gray-400 font-medium whitespace-nowrap">
+                                    —
+                                  </td>
+                                );
+                              }
                               const pageMatch = sku.name.match(/(\d+)P/i);
-                              const isSheetItemCol = sku.paperType === 'Sheets' || activeMainTab === 'materials' || activeMainTab === 'semi' || getItemType(sku) === 'materials' || getItemType(sku) === 'semi' || (sku.name || '').toLowerCase().includes('sheet');
+                              const isSheetItemCol = sku.paperType === 'Sheets' || activeMainTab === 'semi' || getItemType(sku) === 'semi' || (sku.name || '').toLowerCase().includes('sheet');
                               const pagesStr = sku.pages
                                 ? `${sku.pages} ${isSheetItemCol ? 'Sheets/Ream' : 'P'}`
                                 : isSheetItemCol
@@ -5310,23 +5319,21 @@ const SkuMasterV2: React.FC = () => {
           className="h-[84vh] min-h-[580px]"
           title={
             <div className="flex items-center justify-between w-full pr-6 text-left">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5 flex-wrap">
                 {renderItemDomainIcon(selectedSkuDetails, activeMainTab)}
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-gray-900 text-base">{selectedSkuDetails.name}</span>
-                    <span className="font-mono text-xs text-gray-400">{selectedSkuDetails.skuCode}</span>
-                    <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold px-2 py-0.5 rounded-md flex items-center gap-1">
-                      <Tag className="w-3 h-3" />
-                      {selectedSkuDetails.category || (
-                        (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('RM') ? 'Raw Material' :
-                        (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SEM') ? 'Semi Finished' : 'Finished Goods'
-                      )}
-                    </span>
-                  </div>
+                <span className="font-black text-gray-900 text-base tracking-tight">{selectedSkuDetails.name}</span>
+                <div className="flex items-center gap-1.5 bg-blue-50/80 border border-blue-200 text-blue-800 px-2.5 py-0.5 rounded-xl text-xs font-mono font-bold">
+                  <Package className="w-3.5 h-3.5 text-blue-600" />
+                  <span>{selectedSkuDetails.skuCode}</span>
                 </div>
+                <span className="text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200/80 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                  {selectedSkuDetails.category || (
+                    (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('RM') ? 'Raw Material' :
+                    (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SEM') ? 'Semi Finished' : 'Finished Goods'
+                  )}
+                </span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => {
@@ -5335,7 +5342,7 @@ const SkuMasterV2: React.FC = () => {
                     setEditSku(itemToEdit);
                     setShowAddDrawer(true);
                   }}
-                  className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
                 >
                   <Edit className="w-3.5 h-3.5" />
                   <span>Edit Item</span>
@@ -5347,7 +5354,7 @@ const SkuMasterV2: React.FC = () => {
                     setSelectedSkuDetails(null);
                     setDeleteConfirmSku(itemToDelete);
                   }}
-                  className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold border border-rose-200 rounded-xl text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                  className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold border border-rose-200 rounded-xl text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5 text-rose-600" />
                   <span>Delete</span>
@@ -5356,21 +5363,22 @@ const SkuMasterV2: React.FC = () => {
             </div>
           }
         >
-          <div className="space-y-5 text-xs text-left h-full flex flex-col overflow-y-auto pr-1">
+          <div className="space-y-4 text-xs text-left h-full flex flex-col overflow-y-auto pr-1">
             
             {/* Modal Subtabs */}
             <div className="border-b border-gray-200 flex items-center gap-6 text-xs font-semibold text-gray-500 shrink-0">
               <button
                 type="button"
                 onClick={() => setDetailsSubTab('details')}
-                className={`pb-2 transition-all cursor-pointer ${detailsSubTab === 'details' ? 'text-blue-700 border-b-2 border-blue-600 font-bold' : 'hover:text-gray-800'}`}
+                className={`pb-2.5 transition-all cursor-pointer flex items-center gap-1.5 ${detailsSubTab === 'details' ? 'text-blue-700 border-b-2 border-blue-600 font-bold' : 'hover:text-gray-800'}`}
               >
-                Details & Categories
+                <Package className="w-3.5 h-3.5" />
+                <span>Details & Categories</span>
               </button>
               <button
                 type="button"
                 onClick={() => setDetailsSubTab('locations')}
-                className={`pb-2 transition-all cursor-pointer flex items-center gap-1.5 ${detailsSubTab === 'locations' ? 'text-blue-700 border-b-2 border-blue-600 font-bold' : 'hover:text-gray-800'}`}
+                className={`pb-2.5 transition-all cursor-pointer flex items-center gap-1.5 ${detailsSubTab === 'locations' ? 'text-blue-700 border-b-2 border-blue-600 font-bold' : 'hover:text-gray-800'}`}
               >
                 <MapPin className="w-3.5 h-3.5" />
                 <span>Locations</span>
@@ -5383,8 +5391,9 @@ const SkuMasterV2: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setDetailsSubTab('work-orders')}
-                className={`pb-2 transition-all cursor-pointer flex items-center gap-1.5 ${detailsSubTab === 'work-orders' ? 'text-blue-700 border-b-2 border-blue-600 font-bold' : 'hover:text-gray-800'}`}
+                className={`pb-2.5 transition-all cursor-pointer flex items-center gap-1.5 ${detailsSubTab === 'work-orders' ? 'text-blue-700 border-b-2 border-blue-600 font-bold' : 'hover:text-gray-800'}`}
               >
+                <ClipboardList className="w-3.5 h-3.5" />
                 <span>Work Orders</span>
                 <span className="bg-gray-100 text-gray-600 px-1.5 py-0.2 rounded-full text-[10px] font-bold">
                   {getWorkOrderCount(selectedSkuDetails)}
@@ -5393,8 +5402,9 @@ const SkuMasterV2: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setDetailsSubTab('dispatches')}
-                className={`pb-2 transition-all cursor-pointer flex items-center gap-1.5 ${detailsSubTab === 'dispatches' ? 'text-blue-700 border-b-2 border-blue-600 font-bold' : 'hover:text-gray-800'}`}
+                className={`pb-2.5 transition-all cursor-pointer flex items-center gap-1.5 ${detailsSubTab === 'dispatches' ? 'text-blue-700 border-b-2 border-blue-600 font-bold' : 'hover:text-gray-800'}`}
               >
+                <Package className="w-3.5 h-3.5" />
                 <span>Dispatches</span>
                 <span className="bg-gray-100 text-gray-600 px-1.5 py-0.2 rounded-full text-[10px] font-bold">
                   {getDispatchOrderCount(selectedSkuDetails)}
@@ -5402,171 +5412,118 @@ const SkuMasterV2: React.FC = () => {
               </button>
             </div>
 
-            {/* TAB CONTENT: Details & Categories arranged in Neat Cards */}
+            {/* TAB CONTENT: Details & Categories arranged in symmetrical 2x2 cards */}
             {detailsSubTab === 'details' && (
-              <div className="space-y-4">
+              <div className="space-y-4 animate-fadeIn">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                  
+                  {/* CARD 1 (Top-Left): Item Specifications */}
+                  {(() => {
+                    const isRawOrSemiDetail = 
+                      (selectedSkuDetails.category || '').toLowerCase().includes('raw') ||
+                      (selectedSkuDetails.category || '').toLowerCase().includes('material') ||
+                      (selectedSkuDetails.category || '').toLowerCase().includes('semi') ||
+                      (selectedSkuDetails.category || '').toLowerCase().includes('wip') ||
+                      (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('RM') ||
+                      (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SEM') ||
+                      (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SF') ||
+                      (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SM') ||
+                      activeMainTab === 'materials' || activeMainTab === 'semi';
 
-                    {/* CARD 1: 🏷️ General & Classification */}
-                    {(() => {
-                      const isRawOrSemiDetail = 
-                        (selectedSkuDetails.category || '').toLowerCase().includes('raw') ||
-                        (selectedSkuDetails.category || '').toLowerCase().includes('material') ||
-                        (selectedSkuDetails.category || '').toLowerCase().includes('semi') ||
-                        (selectedSkuDetails.category || '').toLowerCase().includes('wip') ||
-                        (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('RM') ||
-                        (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SEM') ||
-                        (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SF') ||
-                        (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SM') ||
-                        activeMainTab === 'materials' || activeMainTab === 'semi';
+                    const itemTypeLabel = 
+                      (selectedSkuDetails.category || '').toLowerCase().includes('raw') ||
+                      (selectedSkuDetails.category || '').toLowerCase().includes('material') ||
+                      (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('RM') ||
+                      activeMainTab === 'materials'
+                        ? 'Raw Material'
+                        : (selectedSkuDetails.category || '').toLowerCase().includes('semi') ||
+                          (selectedSkuDetails.category || '').toLowerCase().includes('wip') ||
+                          (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SEM') ||
+                          (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SF') ||
+                          (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SM') ||
+                          activeMainTab === 'semi'
+                        ? 'Semi Finished'
+                        : 'Products (Finished Goods)';
 
-                      const itemTypeLabel = 
-                        (selectedSkuDetails.category || '').toLowerCase().includes('raw') ||
-                        (selectedSkuDetails.category || '').toLowerCase().includes('material') ||
-                        (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('RM') ||
-                        activeMainTab === 'materials'
-                          ? 'Raw Material'
-                          : (selectedSkuDetails.category || '').toLowerCase().includes('semi') ||
-                            (selectedSkuDetails.category || '').toLowerCase().includes('wip') ||
-                            (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SEM') ||
-                            (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SF') ||
-                            (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SM') ||
-                            activeMainTab === 'semi'
-                          ? 'Semi Finished'
-                          : 'Products (Finished Goods)';
+                    const isReel = selectedSkuDetails.paperType === 'Reels' || (selectedSkuDetails.name || '').toLowerCase().includes('reel');
+                    const isSheet = selectedSkuDetails.paperType === 'Sheets' || (selectedSkuDetails.name || '').toLowerCase().includes('sheet') || (selectedSkuDetails.category || '').toLowerCase().includes('semi') || (selectedSkuDetails.skuCode || '').startsWith('SM') || activeMainTab === 'semi' || activeMainTab === 'materials';
 
-                      return (
-                        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-2xs space-y-3">
-                          <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-                            <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
-                                <Tag className="w-4 h-4" />
-                              </div>
-                              <h4 className="font-bold text-gray-900 text-xs">General & Classification</h4>
+                    return (
+                      <div className="bg-white border border-gray-200/80 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4">
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
+                          <div className="flex items-center gap-2">
+                            <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
+                              <Tag className="w-4 h-4" />
                             </div>
-                            <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
-                              (selectedSkuDetails.status || 'Active') === 'Active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'
-                            }`}>
-                              {selectedSkuDetails.status || 'Active'}
+                            <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Item Specifications</h3>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const itemToEdit = selectedSkuDetails;
+                              setSelectedSkuDetails(null);
+                              setEditSku(itemToEdit);
+                              setShowAddDrawer(true);
+                            }}
+                            className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 bg-blue-50/60 hover:bg-blue-100/60 px-2.5 py-1 rounded-lg border border-blue-200/60 transition-all cursor-pointer"
+                          >
+                            <Edit className="w-3 h-3" />
+                            <span>Edit</span>
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-y-3.5 gap-x-4 text-xs">
+                          <div>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">SKU CODE</span>
+                            <span className="font-mono font-bold text-gray-900 text-xs block truncate">{selectedSkuDetails.skuCode}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">ITEM TYPE</span>
+                            <span className="font-bold text-gray-900 text-xs block truncate">{itemTypeLabel}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">CATEGORY</span>
+                            <span className="font-bold text-gray-900 text-xs block truncate">{selectedSkuDetails.category || '—'}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">BRAND</span>
+                            <span className="font-bold text-gray-900 text-xs block truncate">{selectedSkuDetails.brand || (selectedSkuDetails as any).title || '—'}</span>
+                          </div>
+
+                          <div>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                              {isReel || isSheet ? 'SHEETS PER REAM' : 'PAGES'}
+                            </span>
+                            <span className="font-bold text-gray-900 text-xs block">
+                              {isReel ? '—' : isSheet ? (selectedSkuDetails.pages ? `${selectedSkuDetails.pages} Sheets/Ream` : '500 Sheets/Ream') : (selectedSkuDetails.pages ? `${selectedSkuDetails.pages} Pages` : '—')}
                             </span>
                           </div>
-
-                          <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs">
-                            <div>
-                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">ITEM TYPE</span>
-                              <span className="font-bold text-gray-900 text-xs block truncate">{itemTypeLabel}</span>
-                            </div>
-                            <div>
-                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">SKU CODE</span>
-                              <span className="font-mono font-bold text-blue-600 text-xs block truncate">{selectedSkuDetails.skuCode}</span>
-                            </div>
-                            <div className={isRawOrSemiDetail ? '' : 'col-span-2'}>
-                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">CATEGORY</span>
-                              <span className="font-bold text-gray-900 text-xs block truncate">
-                                {selectedSkuDetails.category || (
-                                  (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('RM') ? 'Raw Material' :
-                                  (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SEM') ? 'Semi Finished' : 'Finished Goods'
-                                )}
-                              </span>
-                            </div>
-                            {isRawOrSemiDetail && (
-                              <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">PREFERRED VENDOR</span>
-                                <span className="font-bold text-blue-600 text-xs block truncate">{(selectedSkuDetails as any).preferredVendor || '—'}</span>
-                              </div>
-                            )}
+                          <div>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">RULING SPEC</span>
+                            <span className="font-bold text-gray-900 text-xs block truncate">{selectedSkuDetails.ruleType || '—'}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">GSM</span>
+                            <span className="font-bold text-gray-900 text-xs block">{selectedSkuDetails.gsm ? `${selectedSkuDetails.gsm} GSM` : '—'}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">TRIMMED SIZE</span>
+                            <span className="font-bold text-gray-900 text-xs block truncate">
+                              {selectedSkuDetails.width && selectedSkuDetails.length
+                                ? `${selectedSkuDetails.width} × ${selectedSkuDetails.length} CM`
+                                : selectedSkuDetails.width
+                                  ? `${selectedSkuDetails.width} CM`
+                                  : formatSize(selectedSkuDetails) !== '-'
+                                    ? formatSize(selectedSkuDetails)
+                                    : '—'}
+                            </span>
                           </div>
                         </div>
-                      );
-                    })()}
+                      </div>
+                    );
+                  })()}
 
-                  {/* CARD 2: 📐 Specifications & Paper Format */}
-                  <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-2xs space-y-3">
-                    <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
-                          <Ruler className="w-4 h-4" />
-                        </div>
-                        <h4 className="font-bold text-gray-900 text-xs">Specifications & Paper Format</h4>
-                      </div>
-                      {selectedSkuDetails.paperType && selectedSkuDetails.paperType !== 'None' && getItemType(selectedSkuDetails) !== 'semi' && activeMainTab !== 'semi' && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                          {selectedSkuDetails.paperType}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs">
-                      <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">GSM</span>
-                        <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.gsm ? `${selectedSkuDetails.gsm} GSM` : '—'}</span>
-                      </div>
-                      <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">TRIMMED SIZE</span>
-                        <span className="font-bold text-gray-900 text-xs">{formatSize(selectedSkuDetails) !== '-' ? formatSize(selectedSkuDetails) : '—'}</span>
-                      </div>
-                      <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">RULING SPEC</span>
-                        <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.ruleType || '—'}</span>
-                      </div>
-                      <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">
-                          {selectedSkuDetails.paperType === 'Sheets' || getItemType(selectedSkuDetails) === 'materials' || getItemType(selectedSkuDetails) === 'semi' || activeMainTab === 'semi' ? 'SHEETS PER REAM' : 'PAGES'}
-                        </span>
-                        <span className="font-bold text-gray-900 text-xs">
-                          {selectedSkuDetails.pages ? `${selectedSkuDetails.pages} ${selectedSkuDetails.paperType === 'Sheets' || getItemType(selectedSkuDetails) === 'materials' || getItemType(selectedSkuDetails) === 'semi' ? 'Sheets' : 'Pages'}` : (getItemType(selectedSkuDetails) === 'materials' || getItemType(selectedSkuDetails) === 'semi' ? '500 Sheets' : '—')}
-                        </span>
-                      </div>
-                      {selectedSkuDetails.reamWeight && (selectedSkuDetails.paperType === 'Sheets' || getItemType(selectedSkuDetails) === 'semi' || activeMainTab === 'semi') ? (
-                        <div>
-                          <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">REAM WEIGHT</span>
-                          <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.reamWeight} KG</span>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  {/* CARD 3: 🔄 Units & Conversion Logic */}
-                  <div className="bg-white p-4 rounded-2xl border border-amber-200/70 shadow-2xs space-y-3">
-                    <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
-                          <RefreshCw className="w-4 h-4" />
-                        </div>
-                        <h4 className="font-bold text-gray-900 text-xs">Units & Conversion Logic</h4>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs">
-                      <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">UOM</span>
-                        <span className="font-bold text-gray-900 text-xs">{selectedSkuDetails.unit || 'Pcs'}</span>
-                      </div>
-                      <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">AUOM</span>
-                        <span className="font-bold text-blue-700 text-xs">
-                          {selectedSkuDetails.altUnit || '—'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="bg-[#faf5ff] p-3 rounded-xl border border-[#f3e8ff] text-center space-y-0.5">
-                      <div className="text-[10px] font-black text-blue-600 uppercase tracking-wider">CONVERSION FORMULA</div>
-                      <div className="font-extrabold text-xs text-blue-950">
-                        {selectedSkuDetails.altUnit && selectedSkuDetails.altUnitConversion ? (() => {
-                          const isAltPcs = (selectedSkuDetails.altUnit || '').toLowerCase().includes('pc');
-                          const isPrimaryPcs = (selectedSkuDetails.unit || '').toLowerCase().includes('pc');
-                          const outerUnit = (isAltPcs && !isPrimaryPcs) ? selectedSkuDetails.unit : selectedSkuDetails.altUnit;
-                          const innerUnit = (isAltPcs && !isPrimaryPcs) ? selectedSkuDetails.altUnit : (selectedSkuDetails.unit || 'Pcs');
-                          return `1 ${outerUnit} = ${selectedSkuDetails.altUnitConversion} ${innerUnit}`;
-                        })() : (
-                          `Direct Unit Tracking (${selectedSkuDetails.unit || 'Pcs'})`
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* CARD 4: 📦 Stock & Warehouse Location */}
+                  {/* CARD 2 (Top-Right): Stock Control & Thresholds */}
                   {(() => {
                     const stockUnit = selectedSkuDetails.unit || (selectedSkuDetails.paperType === 'Sheets' ? 'Sheets' : selectedSkuDetails.paperType === 'Reels' ? 'KG' : (getItemType(selectedSkuDetails) === 'materials' ? 'KG' : 'Pcs'));
                     const liveStockQty = modalDynamicLiveStock !== null 
@@ -5583,9 +5540,6 @@ const SkuMasterV2: React.FC = () => {
                     const reorderNum = hasReorder ? Number(reorderRaw) : 0;
                     const reorderDisplay = hasReorder ? `${reorderNum.toLocaleString('en-IN')} ${stockUnit}` : '—';
 
-                    const unitRate = Number((selectedSkuDetails as any).purchasePrice || (selectedSkuDetails as any).ratePerKg || (selectedSkuDetails as any).rate || (selectedSkuDetails as any).avgRate || (selectedSkuDetails as any).cost || 0);
-                    const totalEstVal = liveStockQty * unitRate;
-
                     let statusBadge = { label: 'Normal', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
                     if (liveStockQty === 0) {
                       statusBadge = { label: 'Out of Stock', bg: 'bg-rose-50 text-rose-700 border-rose-200' };
@@ -5596,14 +5550,13 @@ const SkuMasterV2: React.FC = () => {
                     }
 
                     return (
-                      <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-3.5">
-                        {/* Header */}
-                        <div className="flex items-center justify-between pb-2.5 border-b border-gray-100 gap-2">
+                      <div className="bg-white border border-gray-200/80 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4">
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-2.5 gap-2">
                           <div className="flex items-center gap-2 shrink-0">
-                            <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
-                              <Package className="w-4 h-4" />
+                            <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">
+                              <ShieldAlert className="w-4 h-4" />
                             </div>
-                            <h4 className="font-bold text-gray-900 text-xs whitespace-nowrap">Stock & Thresholds</h4>
+                            <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider whitespace-nowrap">Stock & Thresholds</h3>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
                             {isEditingThresholds ? (
@@ -5641,109 +5594,55 @@ const SkuMasterV2: React.FC = () => {
                                 <span>Edit</span>
                               </button>
                             )}
-                            <span className={`h-6.5 px-2 rounded-lg text-[10px] font-black uppercase border flex items-center justify-center whitespace-nowrap ${statusBadge.bg}`}>
+                            <span className={`h-6.5 px-2.5 rounded-lg text-[10px] font-bold uppercase border flex items-center justify-center whitespace-nowrap ${statusBadge.bg}`}>
                               {statusBadge.label}
                             </span>
-                            {statusBadge.label !== 'Normal' && (
-                              <a
-                                href={`/inventory-v2/purchases?reorderSkuId=${selectedSkuDetails._id}`}
-                                className="h-6.5 text-[10px] font-black text-white bg-amber-600 hover:bg-amber-700 px-2 rounded-lg flex items-center gap-1 shadow-2xs transition-all cursor-pointer no-underline whitespace-nowrap"
-                                title="Create Purchase Batch Reorder for this item"
-                              >
-                                <ShoppingCart className="w-3 h-3 shrink-0" />
-                                <span>Reorder</span>
-                              </a>
-                            )}
                           </div>
                         </div>
 
-                        {/* Unified Stock & Thresholds Metrics 4-Tile Grid - Sits exactly in place */}
-                        <div className="space-y-2.5">
-                          <div className="grid grid-cols-2 gap-2.5 text-xs">
-                            <div className="bg-slate-50/90 p-3 rounded-xl border border-slate-200/80">
-                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1 whitespace-nowrap">
-                                LIVE ON-HAND
-                              </span>
-                              <span className="font-mono font-extrabold text-emerald-600 text-sm block truncate">
-                                {liveStockQty.toLocaleString('en-IN')} {stockUnit}
-                              </span>
-                            </div>
-                            <div className="bg-slate-50/90 p-3 rounded-xl border border-slate-200/80">
-                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1 whitespace-nowrap">
-                                EST. LIVE VALUE
-                              </span>
-                              <span className="font-mono font-extrabold text-slate-800 text-sm block truncate">
-                                ₹{totalEstVal.toLocaleString('en-IN')}
-                              </span>
-                            </div>
-                            <div className="bg-slate-50/90 p-3 rounded-xl border border-slate-200/80">
-                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1 whitespace-nowrap">
-                                MIN THRESHOLD
-                              </span>
-                              {isEditingThresholds ? (
-                                <input
-                                  type="number"
-                                  value={tempMinStock}
-                                  onChange={(e) => setTempMinStock(e.target.value)}
-                                  className="w-full px-2 py-1 border border-amber-400 rounded-lg text-xs font-bold text-gray-900 bg-white"
-                                  placeholder="e.g. 500"
-                                  autoFocus
-                                />
-                              ) : (
-                                <span className="font-mono font-extrabold text-amber-600 text-sm block truncate">
-                                  {minStockDisplay}
-                                </span>
-                              )}
-                            </div>
-                            <div className="bg-slate-50/90 p-3 rounded-xl border border-slate-200/80">
-                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1 whitespace-nowrap">
-                                REORDER LEVEL
-                              </span>
-                              {isEditingThresholds ? (
-                                <input
-                                  type="number"
-                                  value={tempReorder}
-                                  onChange={(e) => setTempReorder(e.target.value)}
-                                  className="w-full px-2 py-1 border border-amber-400 rounded-lg text-xs font-bold text-gray-900 bg-white"
-                                  placeholder="e.g. 100"
-                                />
-                              ) : (
-                                <span className="font-mono font-extrabold text-blue-600 text-sm block truncate">
-                                  {reorderDisplay}
-                                </span>
-                              )}
-                            </div>
+                        <div className="grid grid-cols-2 gap-y-3.5 gap-x-4 text-xs">
+                          <div>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">LIVE ON-HAND</span>
+                            <span className="font-mono font-extrabold text-emerald-600 text-sm block truncate">
+                              {liveStockQty.toLocaleString('en-IN')} {stockUnit}
+                            </span>
                           </div>
-
-                          {/* Preferred Vendor Row (Editable when in edit mode) */}
-                          <div className="bg-slate-50/90 px-3.5 py-2.5 rounded-xl border border-slate-200/80 flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                              <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
-                                <Building2 className="w-3.5 h-3.5" />
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">PREFERRED VENDOR</span>
-                                {isEditingThresholds ? (
-                                  <select
-                                    value={tempVendor}
-                                    onChange={(e) => setTempVendor(e.target.value)}
-                                    className="w-full px-2 py-1 mt-0.5 border border-amber-400 rounded-lg text-xs font-bold text-gray-900 bg-white cursor-pointer"
-                                  >
-                                    <option value="">-- Select Vendor --</option>
-                                    {modalVendorsList.map(v => (
-                                      <option key={v.id || v.name} value={v.name}>{v.name}</option>
-                                    ))}
-                                  </select>
-                                ) : (
-                                  <span className="font-bold text-gray-900 text-xs block truncate">
-                                    {(selectedSkuDetails as any).preferredVendor || '—'}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            {(selectedSkuDetails as any).preferredVendor && !isEditingThresholds && (
-                              <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50/80 px-2 py-0.5 rounded-md border border-indigo-200/60 shrink-0 whitespace-nowrap">
-                                Primary Supplier
+                          <div>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">STOCK STATUS</span>
+                            <span className="font-bold text-gray-800 text-xs block truncate">
+                              {liveStockQty === 0 ? 'Depleted' : hasMinStock && liveStockQty <= minStockNum ? 'Below Minimum' : 'Healthy Inventory'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">MIN STOCK LEVEL</span>
+                            {isEditingThresholds ? (
+                              <input
+                                type="number"
+                                value={tempMinStock}
+                                onChange={(e) => setTempMinStock(e.target.value)}
+                                className="w-full px-2 py-1 border border-amber-400 rounded-lg text-xs font-bold text-gray-900 bg-white"
+                                placeholder="e.g. 500"
+                                autoFocus
+                              />
+                            ) : (
+                              <span className="font-mono font-black text-gray-900 text-sm block truncate">
+                                {minStockDisplay}
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">REORDER LEVEL</span>
+                            {isEditingThresholds ? (
+                              <input
+                                type="number"
+                                value={tempReorder}
+                                onChange={(e) => setTempReorder(e.target.value)}
+                                className="w-full px-2 py-1 border border-amber-400 rounded-lg text-xs font-bold text-gray-900 bg-white"
+                                placeholder="e.g. 100"
+                              />
+                            ) : (
+                              <span className="font-mono font-black text-gray-900 text-sm block truncate">
+                                {reorderDisplay}
                               </span>
                             )}
                           </div>
@@ -5752,10 +5651,119 @@ const SkuMasterV2: React.FC = () => {
                     );
                   })()}
 
+                  {/* CARD 3 (Bottom-Left): Units & Conversion Logic */}
+                  {(() => {
+                    return (
+                      <div className="bg-white border border-gray-200/80 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-3.5">
+                        <div className="flex items-center gap-2 border-b border-gray-100 pb-2.5">
+                          <div className="p-1.5 rounded-lg bg-amber-50 text-amber-600">
+                            <RefreshCw className="w-4 h-4" />
+                          </div>
+                          <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Units & Conversion Logic</h3>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 text-xs">
+                          <div>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">STOCKING UNIT (UOM)</span>
+                            <span className="font-black text-gray-900 font-mono text-sm">{selectedSkuDetails.unit || 'Pcs'}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">ALTERNATE UNIT (AUOM)</span>
+                            <span className="font-black text-gray-900 font-mono text-sm">
+                              {selectedSkuDetails.altUnit || '—'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="bg-purple-50/80 border border-purple-200/80 rounded-xl px-3.5 py-2.5 flex items-center justify-between gap-3">
+                          <span className="text-[10px] font-bold text-purple-900 uppercase tracking-wider whitespace-nowrap">
+                            CONVERSION FORMULA
+                          </span>
+                          <span className="font-mono font-bold text-purple-700 text-xs bg-white px-2.5 py-1 rounded-lg border border-purple-200/60 shadow-2xs whitespace-nowrap">
+                            {selectedSkuDetails.altUnit && selectedSkuDetails.altUnitConversion ? (() => {
+                              const isAltPcs = (selectedSkuDetails.altUnit || '').toLowerCase().includes('pc');
+                              const isPrimaryPcs = (selectedSkuDetails.unit || '').toLowerCase().includes('pc');
+                              const outerUnit = (isAltPcs && !isPrimaryPcs) ? selectedSkuDetails.unit : selectedSkuDetails.altUnit;
+                              const innerUnit = (isAltPcs && !isPrimaryPcs) ? selectedSkuDetails.altUnit : (selectedSkuDetails.unit || 'Pcs');
+                              return `1 ${outerUnit} = ${selectedSkuDetails.altUnitConversion} ${innerUnit}`;
+                            })() : (
+                              `Direct Unit Tracking (${selectedSkuDetails.unit || 'Pcs'})`
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* CARD 4 (Bottom-Right): Procurement & Valuation */}
+                  {(() => {
+                    const unitRate = Number((selectedSkuDetails as any).purchasePrice || (selectedSkuDetails as any).ratePerKg || (selectedSkuDetails as any).rate || (selectedSkuDetails as any).avgRate || (selectedSkuDetails as any).cost || 0);
+                    const liveStockQty = modalDynamicLiveStock !== null 
+                      ? modalDynamicLiveStock 
+                      : (Number((selectedSkuDetails as any).presentStock) || 0);
+                    const totalEstVal = liveStockQty * unitRate;
+
+                    return (
+                      <div className="bg-white border border-gray-200/80 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-3.5">
+                        <div className="flex items-center gap-2 border-b border-gray-100 pb-2.5">
+                          <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
+                            <Building2 className="w-4 h-4" />
+                          </div>
+                          <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Procurement & Valuation</h3>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 text-xs">
+                          <div>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">PREFERRED VENDOR</span>
+                            {isEditingThresholds ? (
+                              <select
+                                value={tempVendor}
+                                onChange={(e) => setTempVendor(e.target.value)}
+                                className="w-full px-2 py-1 border border-amber-400 rounded-lg text-xs font-bold text-gray-900 bg-white cursor-pointer"
+                              >
+                                <option value="">-- Select Vendor --</option>
+                                {modalVendorsList.map(v => (
+                                  <option key={v.id || v.name} value={v.name}>{v.name}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className="font-bold text-gray-900 text-xs block truncate">
+                                {(selectedSkuDetails as any).preferredVendor || '—'}
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">EST. LIVE VALUE</span>
+                            <span className="font-mono font-extrabold text-slate-800 text-sm block">
+                              ₹{totalEstVal.toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="bg-slate-50/80 border border-slate-200/70 rounded-xl px-3.5 py-2.5 flex items-center justify-between text-xs">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">UNIT RATE / COST</span>
+                          <span className="font-mono font-bold text-gray-700">
+                            {unitRate > 0 ? `₹${unitRate.toLocaleString('en-IN')} / ${selectedSkuDetails.unit || 'Pcs'}` : '—'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                 </div>
 
-                {/* 3. Bill of Materials (BOM) - Shown for Finished Goods & Semi-Finished Materials! */}
-                {(getItemType(selectedSkuDetails) === 'products' || getItemType(selectedSkuDetails) === 'semi' || activeMainTab === 'products' || activeMainTab === 'semi' || !(selectedSkuDetails?.category || '').toLowerCase().includes('raw')) && (
+                {/* 3. Bill of Materials (BOM) - Only shown for Finished Goods & Semi-Finished Materials, hidden for Raw Materials */}
+                {(() => {
+                  const isRawMaterial = 
+                    activeMainTab === 'materials' || 
+                    getItemType(selectedSkuDetails) === 'materials' || 
+                    (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('RM') || 
+                    (selectedSkuDetails.category || '').toLowerCase().includes('raw') || 
+                    (selectedSkuDetails.category || '').toLowerCase().includes('material');
+                  
+                  if (isRawMaterial) return null;
+
+                  return (
                   <div className="space-y-3 border-t border-gray-100 pt-4">
                     {/* Yellow Notice Banner */}
                     <div className="bg-amber-50/90 border border-amber-200/90 rounded-xl p-3 flex items-center justify-between text-xs font-semibold text-amber-900 shadow-2xs">
@@ -6085,33 +6093,47 @@ const SkuMasterV2: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                )}
+                );
+              })()}
 
-                {/* 4. Process Steps */}
-                <div className="space-y-3 border-t border-gray-100 pt-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="p-2 bg-blue-100 text-blue-700 rounded-xl">
-                        <SlidersHorizontal className="w-4 h-4" />
+                {/* 4. Process Steps (Only for Finished Goods & Semi-Finished Items) */}
+                {(() => {
+                  const isRawMaterial = 
+                    activeMainTab === 'materials' || 
+                    getItemType(selectedSkuDetails) === 'materials' || 
+                    (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('RM') || 
+                    (selectedSkuDetails.category || '').toLowerCase().includes('raw') || 
+                    (selectedSkuDetails.category || '').toLowerCase().includes('material');
+
+                  if (isRawMaterial) return null;
+
+                  return (
+                    <div className="space-y-3 border-t border-gray-100 pt-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="p-2 bg-blue-100 text-blue-700 rounded-xl">
+                            <SlidersHorizontal className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-gray-900 text-xs">Book Manufacturing Process Steps</h4>
+                            <p className="text-[11px] text-gray-400">Reel Slitting &rarr; Paper Ruling &rarr; Folding &rarr; Wire Stitching &rarr; Cover Lamination &rarr; Trimming</p>
+                          </div>
+                        </div>
+
+                        <button 
+                          onClick={() => showToast('Process step added', 'success')}
+                          className="px-3 py-1.5 border border-blue-300 text-blue-600 bg-white hover:bg-blue-50 rounded-lg font-semibold text-xs shadow-2xs flex items-center gap-1 cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Add Step
+                        </button>
                       </div>
-                      <div>
-                        <h4 className="font-bold text-gray-900 text-xs">Book Manufacturing Process Steps</h4>
-                        <p className="text-[11px] text-gray-400">Reel Slitting &rarr; Paper Ruling &rarr; Folding &rarr; Wire Stitching &rarr; Cover Lamination &rarr; Trimming</p>
+
+                      <div className="border-2 border-dashed border-gray-200 rounded-2xl p-6 text-center text-gray-400 text-xs font-medium bg-gray-50/50">
+                        No custom steps yet — click "Add Step" to define book production routing
                       </div>
                     </div>
-
-                    <button 
-                      onClick={() => showToast('Process step added', 'success')}
-                      className="px-3 py-1.5 border border-blue-300 text-blue-600 bg-white hover:bg-blue-50 rounded-lg font-semibold text-xs shadow-2xs flex items-center gap-1 cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> Add Step
-                    </button>
-                  </div>
-
-                  <div className="border-2 border-dashed border-gray-200 rounded-2xl p-6 text-center text-gray-400 text-xs font-medium bg-gray-50/50">
-                    No custom steps yet — click "Add Step" to define book production routing
-                  </div>
-                </div>
+                  );
+                })()}
 
                 {/* 5. Custom Fields (Rendered dynamically ONLY if custom columns exist!) */}
                 {customColumns.length > 0 && (

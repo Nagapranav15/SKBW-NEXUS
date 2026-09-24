@@ -1425,11 +1425,6 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         const parts: string[] = [];
         const brandOrTitle = formData.brand?.trim() || formData.title?.trim() || '';
         if (brandOrTitle) parts.push(brandOrTitle);
-        const formatType = formData.paperType === 'Board' ? 'Board' : (formData.paperType === 'Reels' ? 'Reel' : (formData.paperType === 'Sheets' ? 'Sheet' : ''));
-        const hasOtherAttrs = !!(brandOrTitle || formData.gsm || formData.width || formData.length || formData.ruleType);
-        if (formatType && hasOtherAttrs && !parts.some(p => p.toLowerCase().includes(formatType.toLowerCase()))) {
-          parts.push(formatType);
-        }
         if (formData.gsm) parts.push(`${formData.gsm} GSM`);
         let sizeStr = '';
         if (formData.width && formData.length) {
@@ -2584,7 +2579,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
               )}
 
                 {/* BOM is for Finished Goods / Products AND Semi Finished materials (NO BOM for Raw Materials) */}
-                {resolvedSection !== 'materials' && (resolvedSection === 'products' || resolvedSection === 'semi' || form.category === 'Finished Goods' || form.category === 'Semi Finished' || !(form.category || '').toLowerCase().includes('raw')) && (
+                {(selectedType === 'products' || selectedType === 'semi') && (
                   <div className="space-y-4 border-t border-gray-100 pt-4">
                     {/* BOM Header card banner */}
                     <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-3 flex items-center justify-between">

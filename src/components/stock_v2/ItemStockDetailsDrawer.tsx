@@ -1001,33 +1001,56 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                     </div>
                     <div>
                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">ITEM TYPE</span>
-                      <span className="font-bold text-gray-900">{sku.category === 'Raw Material' ? 'Raw Material' : sku.category === 'Semi Finished' ? 'Semi Finished' : 'Finished Goods'}</span>
+                      <span className="font-bold text-gray-900">
+                        {(() => {
+                          const cat = (sku.category || '').toLowerCase();
+                          const code = (sku.skuCode || '').toUpperCase();
+                          if (cat.includes('raw') || cat.includes('material') || code.startsWith('RM')) return 'Raw Material';
+                          if (cat.includes('semi') || code.startsWith('SM') || code.startsWith('SEM') || code.startsWith('SF')) return 'Semi Finished';
+                          return 'Finished Goods';
+                        })()}
+                      </span>
                     </div>
                     <div>
                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">CATEGORY</span>
-                      <span className="font-bold text-gray-900">{sku.category || 'AKSHAY'}</span>
+                      <span className="font-bold text-gray-900">{sku.category || '—'}</span>
                     </div>
                     <div>
                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">BRAND</span>
-                      <span className="font-bold text-gray-900">{sku.brand || sku.category || 'AKSHAY'}</span>
+                      <span className="font-bold text-gray-900">{sku.brand || sku.title || '—'}</span>
                     </div>
 
                     <div>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">PAGES</span>
-                      <span className="font-bold text-gray-900">{sku.pages || '172'}</span>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                        {(() => {
+                          const isReel = sku.paperType === 'Reels' || (sku.name || '').toLowerCase().includes('reel');
+                          const isSheet = sku.paperType === 'Sheets' || (sku.name || '').toLowerCase().includes('sheet') || (sku.category || '').toLowerCase().includes('semi') || (sku.skuCode || '').startsWith('SM');
+                          if (isReel || isSheet) return 'SHEETS PER REAM';
+                          return 'PAGES';
+                        })()}
+                      </span>
+                      <span className="font-bold text-gray-900">
+                        {(() => {
+                          const isReel = sku.paperType === 'Reels' || (sku.name || '').toLowerCase().includes('reel');
+                          if (isReel) return '—';
+                          const isSheet = sku.paperType === 'Sheets' || (sku.name || '').toLowerCase().includes('sheet') || (sku.category || '').toLowerCase().includes('semi') || (sku.skuCode || '').startsWith('SM');
+                          if (isSheet) return sku.pages ? `${sku.pages} Sheets/Ream` : '500 Sheets/Ream';
+                          return sku.pages ? `${sku.pages}` : '—';
+                        })()}
+                      </span>
                     </div>
                     <div>
                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">RULING TYPE</span>
-                      <span className="font-bold text-gray-900">{sku.ruleType ? `(${sku.ruleType})` : '(DR)'}</span>
+                      <span className="font-bold text-gray-900">{sku.ruleType ? `(${sku.ruleType})` : '—'}</span>
                     </div>
                     <div>
                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">GSM</span>
-                      <span className="font-bold text-gray-900">{sku.gsm ? `${sku.gsm} GSM` : '52 GSM'}</span>
+                      <span className="font-bold text-gray-900">{sku.gsm ? `${sku.gsm} GSM` : '—'}</span>
                     </div>
                     <div>
                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">TRIMMED SIZE</span>
                       <span className="font-bold text-gray-900">
-                        {sku.width && sku.length ? `${sku.width} × ${sku.length} CM` : '69 × 79 CM'}
+                        {sku.width && sku.length ? `${sku.width} × ${sku.length} CM` : sku.width ? `${sku.width} CM` : '—'}
                       </span>
                     </div>
                   </div>
@@ -1046,13 +1069,13 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                     <div>
                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">MIN STOCK LEVEL</span>
                       <span className="font-black text-gray-900 text-sm font-mono">
-                        {sku.minStockLevel || (sku as any).minStock || '200'} {unit}
+                        {sku.minStockLevel || (sku as any).minStock ? `${sku.minStockLevel || (sku as any).minStock} ${unit}` : '—'}
                       </span>
                     </div>
                     <div>
                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">REORDER LEVEL</span>
                       <span className="font-black text-gray-900 text-sm font-mono">
-                        {sku.reorderLevel || '100'} {unit}
+                        {sku.reorderLevel || (sku as any).reorderQty ? `${sku.reorderLevel || (sku as any).reorderQty} ${unit}` : '—'}
                       </span>
                     </div>
                     <div>
@@ -1076,21 +1099,26 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                     <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Units & Conversion Logic</h3>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-3 items-center text-xs">
+                  <div className="grid grid-cols-2 gap-4 text-xs">
                     <div>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">STOCKING UNIT</span>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">STOCKING UNIT (UOM)</span>
                       <span className="font-black text-gray-900 font-mono text-sm">{unit}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">ALTERNATE UOM</span>
-                      <span className="font-black text-gray-900 font-mono text-sm">{altUnit}</span>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">ALTERNATE UNIT (AUOM)</span>
+                      <span className="font-black text-gray-900 font-mono text-sm">{altUnit || '—'}</span>
                     </div>
-                    <div className="bg-purple-50/70 border border-purple-200/80 rounded-xl p-2.5 text-center">
-                      <span className="text-[9px] font-bold text-purple-900 uppercase tracking-wider block mb-0.5">CONVERSION FORMULA</span>
-                      <span className="font-mono font-bold text-purple-700 text-xs">
-                        1 {unit} = {conversionFactor} {altUnit}
-                      </span>
-                    </div>
+                  </div>
+
+                  <div className="bg-purple-50/80 border border-purple-200/80 rounded-xl px-3.5 py-2.5 flex items-center justify-between gap-3">
+                    <span className="text-[10px] font-bold text-purple-900 uppercase tracking-wider whitespace-nowrap">
+                      CONVERSION FORMULA
+                    </span>
+                    <span className="font-mono font-bold text-purple-700 text-xs bg-white px-2.5 py-1 rounded-lg border border-purple-200/60 shadow-2xs whitespace-nowrap">
+                      {sku.altUnit && sku.altUnitConversion
+                        ? `1 ${unit} = ${sku.altUnitConversion} ${sku.altUnit}`
+                        : `Direct Tracking (${unit})`}
+                    </span>
                   </div>
                 </div>
 
