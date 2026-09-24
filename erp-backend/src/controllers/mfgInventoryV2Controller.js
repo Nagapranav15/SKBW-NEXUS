@@ -203,7 +203,7 @@ exports.getNextSkuCode = async (req, res, next) => {
 
 exports.createSku = async (req, res, next) => {
   try {
-    const { skuCode, name, category, unit, altUnit, altUnitConversion, altUnitDirection, paperType, gsm, width, length, brand, title, group, ruleType, pages, booksGbl, openingStock, minStockLevel, reorderLevel, preferredVendor, initialLocationId, defaultLocation, status, company } = req.body;
+    const { skuCode, name, category, unit, altUnit, altUnitConversion, altUnitDirection, paperType, gsm, width, length, brand, title, group, ruleType, pages, sheetsPerReam, standardSheets, reamWeight, booksGbl, openingStock, minStockLevel, reorderLevel, preferredVendor, initialLocationId, defaultLocation, status, company } = req.body;
     if (!company) {
       return res.status(400).json({ msg: "company is required" });
     }
@@ -233,6 +233,13 @@ exports.createSku = async (req, res, next) => {
     const assignedLocation = initialLocationId || req.body.initialLocation || defaultLocation || "SKBW";
     const assignedLocationId = initialLocationId || (defaultStructure?.storageLoc?._id || defaultStructure?.factory?._id);
 
+    const rawPages = pages !== undefined && pages !== null && pages !== '' 
+      ? pages 
+      : (sheetsPerReam !== undefined && sheetsPerReam !== null && sheetsPerReam !== '' 
+        ? sheetsPerReam 
+        : standardSheets);
+    const pagesVal = rawPages !== undefined && rawPages !== null && rawPages !== '' && !isNaN(Number(rawPages)) ? Number(rawPages) : undefined;
+
     const newSku = new SkuV2({
       skuCode,
       name,
@@ -249,7 +256,8 @@ exports.createSku = async (req, res, next) => {
       title: title || "",
       group: group || "",
       ruleType,
-      pages: pages ? Number(pages) : undefined,
+      pages: pagesVal,
+      reamWeight: reamWeight !== undefined && reamWeight !== null && reamWeight !== '' ? Number(reamWeight) : undefined,
       booksGbl: booksGbl ? Number(booksGbl) : undefined,
       openingStock: openingStock ? Number(openingStock) : 0,
       presentStock: openingStock ? Number(openingStock) : 0,
@@ -446,7 +454,11 @@ exports.updateSku = async (req, res, next) => {
     if (req.body.title !== undefined) sku.title = req.body.title || "";
     if (req.body.group !== undefined) sku.group = req.body.group || "";
     if (req.body.ruleType !== undefined) sku.ruleType = req.body.ruleType || "";
-    if (req.body.pages !== undefined) sku.pages = req.body.pages !== null && req.body.pages !== '' ? Number(req.body.pages) : undefined;
+    const rawPagesUpdate = req.body.pages !== undefined ? req.body.pages : (req.body.sheetsPerReam !== undefined ? req.body.sheetsPerReam : req.body.standardSheets);
+    if (rawPagesUpdate !== undefined) {
+      sku.pages = rawPagesUpdate !== null && rawPagesUpdate !== '' && !isNaN(Number(rawPagesUpdate)) ? Number(rawPagesUpdate) : undefined;
+    }
+    if (req.body.reamWeight !== undefined) sku.reamWeight = req.body.reamWeight !== null && req.body.reamWeight !== '' ? Number(req.body.reamWeight) : undefined;
     if (req.body.booksGbl !== undefined) sku.booksGbl = req.body.booksGbl !== null && req.body.booksGbl !== '' ? Number(req.body.booksGbl) : undefined;
     if (req.body.openingStock !== undefined) sku.openingStock = req.body.openingStock !== undefined && req.body.openingStock !== null && req.body.openingStock !== '' ? Number(req.body.openingStock) : sku.openingStock;
     if (req.body.minStockLevel !== undefined) sku.minStockLevel = req.body.minStockLevel !== '' && req.body.minStockLevel !== null ? Number(req.body.minStockLevel) : undefined;
@@ -920,7 +932,11 @@ exports.bulkImportSkus = async (req, res, next) => {
         brand: item.brand || "",
         group: item.group || item.category || "",
         ruleType: item.ruleType,
-        pages: item.pages ? Number(item.pages) : undefined,
+        pages: (item.pages !== undefined && item.pages !== null && item.pages !== '')
+          ? Number(item.pages)
+          : ((item.sheetsPerReam !== undefined && item.sheetsPerReam !== null && item.sheetsPerReam !== '')
+            ? Number(item.sheetsPerReam)
+            : (item.standardSheets !== undefined && item.standardSheets !== null && item.standardSheets !== '' ? Number(item.standardSheets) : undefined)),
         reamWeight: item.reamWeight ? Number(item.reamWeight) : undefined,
         booksGbl: item.booksGbl ? Number(item.booksGbl) : undefined,
         openingStock: item.openingStock !== undefined ? Number(item.openingStock) : 0,

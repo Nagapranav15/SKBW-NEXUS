@@ -4519,8 +4519,9 @@ const SkuMasterV2: React.FC = () => {
                               }
                               const pageMatch = sku.name.match(/(\d+)P/i);
                               const isSheetItemCol = sku.paperType === 'Sheets' || activeMainTab === 'semi' || getItemType(sku) === 'semi' || (sku.name || '').toLowerCase().includes('sheet');
-                              const pagesStr = sku.pages
-                                ? `${sku.pages} ${isSheetItemCol ? 'Sheets/Ream' : 'P'}`
+                              const pagesVal = (sku as any).pages ?? (sku as any).sheetsPerReam ?? (sku as any).standardSheets;
+                              const pagesStr = (pagesVal !== undefined && pagesVal !== null && pagesVal !== '')
+                                ? `${pagesVal} ${isSheetItemCol ? 'Sheets/Ream' : 'P'}`
                                 : isSheetItemCol
                                   ? '500 Sheets/Ream'
                                   : pageMatch
@@ -5495,7 +5496,11 @@ const SkuMasterV2: React.FC = () => {
                               {isReel || isSheet ? 'SHEETS PER REAM' : 'PAGES'}
                             </span>
                             <span className="font-bold text-gray-900 text-xs block">
-                              {isReel ? '—' : isSheet ? (selectedSkuDetails.pages ? `${selectedSkuDetails.pages} Sheets/Ream` : '500 Sheets/Ream') : (selectedSkuDetails.pages ? `${selectedSkuDetails.pages} Pages` : '—')}
+                              {(() => {
+                                const detailPages = (selectedSkuDetails as any).pages ?? (selectedSkuDetails as any).sheetsPerReam ?? (selectedSkuDetails as any).standardSheets;
+                                const hasVal = detailPages !== undefined && detailPages !== null && detailPages !== '';
+                                return isReel ? '—' : isSheet ? (hasVal ? `${detailPages} Sheets/Ream` : '500 Sheets/Ream') : (hasVal ? `${detailPages} Pages` : '—');
+                              })()}
                             </span>
                           </div>
                           <div>
@@ -5516,6 +5521,12 @@ const SkuMasterV2: React.FC = () => {
                                   : formatSize(selectedSkuDetails) !== '-'
                                     ? formatSize(selectedSkuDetails)
                                     : '—'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">REAM WEIGHT</span>
+                            <span className="font-bold text-gray-900 text-xs block truncate">
+                              {selectedSkuDetails.reamWeight ? `${selectedSkuDetails.reamWeight} KG` : '—'}
                             </span>
                           </div>
                         </div>
@@ -6979,7 +6990,7 @@ const SkuMasterV2: React.FC = () => {
                       </div>
                       <div>
                         <span className="text-gray-400 text-[10px] uppercase font-bold">Pages:</span>
-                        <p className="font-medium text-gray-800">{item.pages || '—'}</p>
+                        <p className="font-medium text-gray-800">{(item as any).pages ?? (item as any).sheetsPerReam ?? (item as any).standardSheets ?? '—'}</p>
                       </div>
                       <div>
                         <span className="text-gray-400 text-[10px] uppercase font-bold">Opening Stock:</span>

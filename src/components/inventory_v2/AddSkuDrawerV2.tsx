@@ -1187,7 +1187,10 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         title: editSku.title || '',
         group: editSku.group || '',
         ruleType: editSku.ruleType || '',
-        pages: (editSku as any).pages !== undefined ? String((editSku as any).pages) : '',
+        pages: (() => {
+          const p = (editSku as any)?.pages ?? (editSku as any)?.sheetsPerReam ?? (editSku as any)?.standardSheets;
+          return p !== undefined && p !== null ? String(p) : '';
+        })(),
         reamWeight: (editSku as any).reamWeight !== undefined ? String((editSku as any).reamWeight) : '',
         booksGbl: (editSku as any).booksGbl !== undefined ? String((editSku as any).booksGbl) : '',
         defaultLocation: (editSku as any).defaultLocation || 'SKBW',
@@ -1532,8 +1535,16 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           title: form.title.trim() || '',
           group: form.group.trim() || '',
           ruleType: form.ruleType || '',
-          pages: form.pages ? Number(form.pages) : ((form.paperType === 'Sheets' || resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi') ? 500 : null),
-          reamWeight: form.reamWeight ? Number(form.reamWeight) : null,
+          pages: (form.pages !== undefined && form.pages !== null && form.pages !== '')
+            ? Number(form.pages)
+            : ((form.paperType === 'Sheets' || resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi') ? 500 : null),
+          sheetsPerReam: (form.pages !== undefined && form.pages !== null && form.pages !== '')
+            ? Number(form.pages)
+            : ((form.paperType === 'Sheets' || resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi') ? 500 : null),
+          standardSheets: (form.pages !== undefined && form.pages !== null && form.pages !== '')
+            ? Number(form.pages)
+            : ((form.paperType === 'Sheets' || resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi') ? 500 : null),
+          reamWeight: form.reamWeight !== undefined && form.reamWeight !== null && form.reamWeight !== '' && !isNaN(Number(form.reamWeight)) ? Number(form.reamWeight) : null,
           booksGbl: form.booksGbl ? Number(form.booksGbl) : null,
           minStockLevel: form.minStockLevel !== '' && !isNaN(Number(form.minStockLevel)) ? Number(form.minStockLevel) : null,
           reorderLevel: form.reorderLevel !== '' && !isNaN(Number(form.reorderLevel)) ? Number(form.reorderLevel) : null,
