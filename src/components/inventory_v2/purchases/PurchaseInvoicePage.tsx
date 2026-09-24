@@ -3413,7 +3413,17 @@ const PurchaseInvoicePage: React.FC = () => {
                         </thead>
                         <tbody className="divide-y divide-gray-100 bg-white">
                           {(() => {
-                            const batchBalances = inventoryBalances.filter(b => b.batchNumber === selectedInvoice.invoiceNumber);
+                            const batchBalances = inventoryBalances
+                              .filter(b => b.batchNumber === selectedInvoice.invoiceNumber)
+                              .sort((a, b) => {
+                                const rawLocIdA = typeof a.location === 'object' && a.location !== null ? (a.location as any)._id : (a.location || a.locationId);
+                                const rawLocIdB = typeof b.location === 'object' && b.location !== null ? (b.location as any)._id : (b.location || b.locationId);
+                                const masterLocA = locations.find(l => String(l._id) === String(rawLocIdA)) || (typeof a.location === 'object' ? (a.location as any) : null);
+                                const masterLocB = locations.find(l => String(l._id) === String(rawLocIdB)) || (typeof b.location === 'object' ? (b.location as any) : null);
+                                const nameA = masterLocA?.name || (typeof a.location === 'object' ? (a.location as any).name : '') || String(rawLocIdA || '');
+                                const nameB = masterLocB?.name || (typeof b.location === 'object' ? (b.location as any).name : '') || String(rawLocIdB || '');
+                                return nameA.localeCompare(nameB);
+                              });
 
                             if (batchBalances.length > 0) {
                               return batchBalances.map((b, idx) => {
@@ -3467,7 +3477,17 @@ const PurchaseInvoicePage: React.FC = () => {
                             }
 
                             // Fallback if inventoryBalances has not fetched yet
-                            return (selectedInvoice.items || []).map((item, idx) => {
+                            const sortedItems = [...(selectedInvoice.items || [])].sort((a, b) => {
+                              const rawLocIdA = typeof a.locationId === 'object' && a.locationId !== null ? (a.locationId as any)._id : a.locationId;
+                              const rawLocIdB = typeof b.locationId === 'object' && b.locationId !== null ? (b.locationId as any)._id : b.locationId;
+                              const masterLocA = locations.find(l => String(l._id) === String(rawLocIdA)) || (typeof a.locationId === 'object' ? (a.locationId as any) : null);
+                              const masterLocB = locations.find(l => String(l._id) === String(rawLocIdB)) || (typeof b.locationId === 'object' ? (b.locationId as any) : null);
+                              const nameA = masterLocA?.name || String(rawLocIdA || '');
+                              const nameB = masterLocB?.name || String(rawLocIdB || '');
+                              return nameA.localeCompare(nameB);
+                            });
+
+                            return sortedItems.map((item, idx) => {
                               const skuObj = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : skus.find(s => s._id === item.skuId);
                               const rawLocId = typeof item.locationId === 'object' && item.locationId !== null ? (item.locationId as any)._id : item.locationId;
                               const masterLoc = locations.find(l => String(l._id) === String(rawLocId)) || (typeof item.locationId === 'object' ? (item.locationId as any) : null);
