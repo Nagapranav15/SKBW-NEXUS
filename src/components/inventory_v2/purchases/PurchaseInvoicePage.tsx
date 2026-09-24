@@ -3322,72 +3322,161 @@ const PurchaseInvoicePage: React.FC = () => {
                 </div>
               )}
 
-              {/* ALLOCATION TAB */}
+              {/* ALLOCATION TAB (MATCHING ITEM MASTER DESIGN EXACTLY) */}
               {detailsTab === 'allocation' && (
-                <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4 shadow-3xs">
-                  <div className="flex justify-between items-center border-b pb-2">
-                    <span className="font-bold text-gray-800 uppercase tracking-wider text-[10px]">Reels Location Mapping</span>
-                    <span className="text-[10px] text-gray-400 font-bold">Total {selectedInvoice.items?.reduce((sum, item) => sum + (item.reels?.length || 0), 0) || 0} Reels</span>
+                <div className="space-y-4 font-sans text-left">
+                  {/* Top Summary Card (Live Consolidated Total) */}
+                  <div className="bg-white rounded-2xl border border-gray-200/90 p-4 shadow-2xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10.5px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        LIVE TOTAL ON-HAND
+                      </span>
+                      <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        Live Consolidated
+                      </span>
+                    </div>
+                    <div className="font-mono font-extrabold text-emerald-600 text-lg">
+                      {totalKgWeight > 0 ? `${totalKgWeight.toLocaleString('en-IN', { maximumFractionDigits: 2 })} KG` : `${totalSheetsCount.toLocaleString('en-IN')} Sheets`}
+                    </div>
+                    <p className="text-[10.5px] text-gray-400">Consolidated quantity currently held across all warehouse locations for Batch {selectedInvoice.invoiceNumber}</p>
                   </div>
-                  
-                  <div className="space-y-4">
-                    {selectedInvoice.items?.map((item, idx) => {
-                      const skuName = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any).name : 'Raw Material';
-                      const lotNo = item.lotNumber || `${selectedInvoice.invoiceNumber}-L0${idx + 1}`;
-                      return (
-                        <div key={idx} className="border border-gray-150 rounded-xl p-3 bg-gray-50/20 space-y-2">
-                          <div className="flex justify-between items-center text-[10px] font-bold">
-                            <span className="text-gray-800 font-black">{skuName}</span>
-                            <span className="text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-mono">Lot: {lotNo}</span>
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-2">
-                            {item.reels?.map((reel, rIdx) => {
-                              const balance = inventoryBalances.find(
-                                b => b.batchNumber === selectedInvoice.invoiceNumber && 
-                                     b.reels?.some((r: any) => r.reelNumber === reel.reelNumber)
-                              );
-                              const locationName = balance && balance.location
-                                ? balance.location.name 
-                                : 'Not Allocated';
-                              const rWidth = reel.width || item.width || (typeof item.skuId === 'object' ? (item.skuId as any)?.width : '') || (skuName.match(/(\d+(?:\.\d+)?)\s*(?:CM|cm)/i)?.[1]) || '';
-                              return (
-                                <div key={rIdx} className="bg-white p-2 border border-gray-100 rounded-lg flex items-center justify-between text-[11px]">
-                                  <div className="min-w-0">
-                                    <p className="font-bold text-gray-800 truncate">Reel #{reel.reelNumber}</p>
-                                    <p className="text-[10px] text-gray-400 font-mono">{reel.weight || 0} KG{rWidth ? ` • ${rWidth} cm` : ''}</p>
-                                  </div>
-                                  <div className="text-right">
-                                    <span className={`inline-flex px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
-                                      locationName === 'Not Allocated' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'
-                                    }`}>
-                                      {locationName}
-                                    </span>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
 
-                          <div className="pt-1 flex justify-end">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setAllocateForm(prev => ({
-                                  ...prev,
-                                  itemIndex: idx,
-                                  lotNumber: lotNo
-                                }));
-                                setShowAllocateModal(true);
-                              }}
-                              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-bold shadow-3xs flex items-center gap-1 transition-all"
-                            >
-                              <ArrowRight className="w-3 h-3" /> Allocate Reels Location
-                            </button>
-                          </div>
+                  {/* Multi-Location Live Breakdown Table Card */}
+                  <div className="bg-white rounded-2xl border border-gray-200/90 shadow-2xs overflow-hidden">
+                    <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-gray-50/70">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
+                          <Layers className="w-3.5 h-3.5" />
                         </div>
-                      );
-                    })}
+                        <div>
+                          <h4 className="font-bold text-gray-900 text-xs">Live Multi-Location Inventory Breakdown</h4>
+                          <p className="text-[10.5px] text-gray-500">Same item distributed across warehouse bins, bays, and racks</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowAllocateModal(true)}
+                        className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-xl border border-blue-200 transition-all cursor-pointer shadow-3xs"
+                        title="Allocate location & reels"
+                      >
+                        <MapPinIcon className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Allocate Location & Reels</span>
+                      </button>
+                    </div>
+
+                    <div className="divide-y divide-gray-100 overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="bg-slate-50/80 text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
+                            <th className="py-2.5 px-4">Location Name & Code</th>
+                            <th className="py-2.5 px-4">Full Hierarchy Path</th>
+                            <th className="py-2.5 px-4 text-right">On-Hand Stock</th>
+                            <th className="py-2.5 px-4 text-right">Available</th>
+                            <th className="py-2.5 px-4 text-right">Est. Value</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 bg-white">
+                          {(() => {
+                            const batchBalances = inventoryBalances.filter(b => b.batchNumber === selectedInvoice.invoiceNumber);
+                            
+                            if (batchBalances.length === 0) {
+                              return (selectedInvoice.items || []).map((item, idx) => {
+                                const skuObj = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : skus.find(s => s._id === item.skuId);
+                                const locIdVal = typeof item.locationId === 'object' && item.locationId !== null ? (item.locationId as any)._id : item.locationId;
+                                const locObj = locations.find(l => l._id === locIdVal) || (typeof item.locationId === 'object' ? (item.locationId as any) : null);
+                                const paths = resolveLocationPath(locIdVal || '');
+                                const fullPath = [paths.factory, paths.floor, paths.zone].filter(p => p && p !== '—').join(' ➔ ') || 'Default Warehouse Area';
+                                const locName = locObj?.name || 'Main Storage';
+                                const locCode = locObj?.code || 'MAIN-01';
+                                const qtyVal = Number(item.quantity) || 0;
+                                const itemVal = qtyVal * (Number(item.purchasePrice) || 0);
+
+                                return (
+                                  <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                                    <td className="py-3 px-4">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></div>
+                                        <span className="font-bold text-gray-900">{locName}</span>
+                                        <span className="font-mono text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
+                                          {locCode}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td className="py-3 px-4">
+                                      <span className="text-[11px] text-gray-600 font-medium">
+                                        {fullPath} ➔ {locName}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 px-4 text-right">
+                                      <span className="font-mono font-bold text-emerald-700 text-xs">
+                                        {qtyVal.toLocaleString('en-IN')} {skuObj?.unit || 'KG'}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 px-4 text-right">
+                                      <span className="font-mono font-bold text-blue-700 text-xs">
+                                        {qtyVal.toLocaleString('en-IN')} {skuObj?.unit || 'KG'}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 px-4 text-right font-mono font-bold text-gray-900 text-xs">
+                                      ₹{itemVal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                    </td>
+                                  </tr>
+                                );
+                              });
+                            }
+
+                            return batchBalances.map((b, idx) => {
+                              const locObj = b.location;
+                              const locIdVal = locObj?._id || b.locationId;
+                              const paths = resolveLocationPath(locIdVal || '');
+                              const fullPath = [paths.factory, paths.floor, paths.zone].filter(p => p && p !== '—').join(' ➔ ') || 'Default Warehouse Area';
+                              const locName = locObj?.name || 'Storage Location';
+                              const locCode = locObj?.code || 'LOC-01';
+                              const qtyVal = Number(b.onHand) || 0;
+                              const availVal = Number(b.available !== undefined ? b.available : b.onHand || 0);
+                              const skuObj = b.sku || (typeof selectedInvoice.items?.[0]?.skuId === 'object' ? selectedInvoice.items[0].skuId : null);
+                              const priceVal = Number(skuObj?.purchasePrice) || Number(selectedInvoice.items?.[0]?.purchasePrice) || 0;
+                              const estValue = qtyVal * priceVal;
+
+                              return (
+                                <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                                  <td className="py-3 px-4">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></div>
+                                      <span className="font-bold text-gray-900">{locName}</span>
+                                      {locCode && (
+                                        <span className="font-mono text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
+                                          {locCode}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-4">
+                                    <span className="text-[11px] text-gray-600 font-medium">
+                                      {fullPath} ➔ {locName}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-4 text-right">
+                                    <span className="font-mono font-bold text-emerald-700 text-xs">
+                                      {qtyVal.toLocaleString('en-IN')} {skuObj?.unit || 'KG'}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-4 text-right">
+                                    <span className="font-mono font-bold text-blue-700 text-xs">
+                                      {availVal.toLocaleString('en-IN')} {skuObj?.unit || 'KG'}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-4 text-right font-mono font-bold text-gray-900 text-xs">
+                                    ₹{estValue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                  </td>
+                                </tr>
+                              );
+                            });
+                          })()}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
               )}
