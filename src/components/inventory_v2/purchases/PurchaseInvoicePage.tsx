@@ -1297,29 +1297,12 @@ const PurchaseInvoicePage: React.FC = () => {
           company: selectedCompany?._id
         }).catch(() => {});
       }
-      loadInvoices();
-      setActiveSubPage('list');
-    } catch (err: any) {
-      setAddError(err.response?.data?.msg || err.message || 'Failed to save purchase batch');
-    } finally {
-      setAddLoading(false);
-    }
-  };
-          action: 'CREATE',
-          entityType: 'PurchaseInvoiceV2',
-          entityName: invoiceData.invoiceNumber,
-          details: `Purchase Batch '${invoiceData.invoiceNumber}' was recorded successfully`,
-          company: selectedCompany?._id
-        }).catch(() => {});
-      }
-
       setActiveSubPage('list');
       setIsEditing(false);
       setEditingInvoiceId(null);
-      loadInvoices(false);
+      loadInvoices();
     } catch (err: any) {
-      console.error(err);
-      setAddError(err.response?.data?.msg || err.message || 'Failed to submit purchase invoice');
+      setAddError(err.response?.data?.msg || err.message || 'Failed to save purchase batch');
     } finally {
       setAddLoading(false);
     }
