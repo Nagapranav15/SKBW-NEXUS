@@ -3731,9 +3731,9 @@ const PurchaseInvoicePage: React.FC = () => {
           setAllocateForm(prev => ({ ...prev, quantity: sumWeight > 0 ? String(sumWeight) : '' }));
         };
 
-        return (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-black/15" onClick={() => !allocateSubmitting && setShowAllocateModal(false)} />
+        return typeof document !== 'undefined' ? createPortal(
+          <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={() => !allocateSubmitting && setShowAllocateModal(false)} />
 
             <div className="bg-white rounded-2xl border border-gray-200 shadow-xl max-w-lg w-full relative z-10 animate-in zoom-in-95 duration-150 overflow-hidden flex flex-col max-h-[85vh]">
               <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
@@ -4026,14 +4026,15 @@ const PurchaseInvoicePage: React.FC = () => {
                 </div>
               </form>
             </div>
-          </div>
+          </div>,
+          document.body
         );
       })()}
       {/* ── TOOLS SUB-MODALS & SLIDE-OVERS ────────────────────────────────────── */}
       {/* Activity Log Drawer */}
       {showActivityLog && (
-        <div className="fixed inset-0 z-[60] overflow-hidden !mt-0">
-          <div className="absolute inset-0 overflow-hidden bg-black/10 transition-opacity" onClick={() => setShowActivityLog(false)}></div>
+        <div className="fixed inset-0 z-[100000] overflow-hidden !mt-0">
+          <div className="absolute inset-0 overflow-hidden bg-slate-950/40 backdrop-blur-xs transition-opacity" onClick={() => setShowActivityLog(false)}></div>
           <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
             <div className="pointer-events-auto w-screen max-w-md">
               <div className="flex h-full flex-col bg-white shadow-2xl animate-in slide-in-from-right duration-250">
@@ -4077,7 +4078,7 @@ const PurchaseInvoicePage: React.FC = () => {
 
       {/* Find Duplicates Modal */}
       {showDuplicates && (
-        <div className="fixed inset-0 z-[60] overflow-y-auto flex items-center justify-center p-4 bg-black/15 !mt-0 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[100000] overflow-y-auto flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-xs !mt-0 animate-in fade-in duration-200">
           <div className="relative bg-white rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-2xl flex justify-between items-center">
               <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
@@ -4128,7 +4129,7 @@ const PurchaseInvoicePage: React.FC = () => {
 
       {/* Recycle Bin Drawer */}
       {showRecycleBin && (
-        <div className="fixed inset-0 z-[60] overflow-hidden !mt-0">
+        <div className="fixed inset-0 z-[100000] overflow-hidden !mt-0">
           <div className="absolute inset-0 overflow-hidden bg-black/10 transition-opacity" onClick={() => setShowRecycleBin(false)}></div>
           <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
             <div className="pointer-events-auto w-screen max-w-md">
