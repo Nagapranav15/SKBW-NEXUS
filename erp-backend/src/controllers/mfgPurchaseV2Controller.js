@@ -159,8 +159,6 @@ exports.createPurchaseInvoice = async (req, res, next) => {
       }
     }
 
-    const isDraftBatch = req.body.status === "Draft";
-
     // 4. Save Purchase Invoice
     const invoice = new PurchaseInvoiceV2({
       invoiceNumber: finalInvoiceNo,
@@ -713,7 +711,6 @@ exports.editPurchaseInvoice = async (req, res, next) => {
     }
 
     const wasDraft = invoice.status === "Draft";
-    const isDraftBatch = req.body.status === "Draft";
 
     const newGrandTotal = subTotal + Number(taxAmount) + Number(freight) + Number(craneCharges) + Number(otherCharges);
     
