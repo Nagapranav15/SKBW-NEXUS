@@ -547,10 +547,11 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   const handleItemTypeChange = (newType: 'products' | 'materials' | 'semi') => {
     setUserSelectedType(newType);
 
-    // Find matching categories for newly selected type
+    // If current category belongs to newly selected type, preserve it; otherwise reset to empty
     const matchingCats = (allCategories || []).filter(c => c && (c.type === newType || (!c.type && newType === 'products')));
-    const newCategory = matchingCats[0]?.name || (newType === 'products' ? 'Products' : newType === 'semi' ? 'Semi' : 'Materials');
-    const newUom = matchingCats[0]?.uom || '';
+    const isCurrentCatValid = form.category && matchingCats.some(c => c.name?.toLowerCase().trim() === form.category.toLowerCase().trim());
+    const newCategory = isCurrentCatValid ? form.category : '';
+    const newUom = isCurrentCatValid ? (matchingCats.find(c => c.name?.toLowerCase().trim() === form.category.toLowerCase().trim())?.uom || form.unit) : '';
 
     setForm(prev => ({
       ...prev,
@@ -582,17 +583,16 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       }
     });
 
-    // 2. Include form.category only if valid, non-empty, and matching the section
-    const trimmedFormCat = (form.category || '').trim();
-    if (trimmedFormCat && !list.includes(trimmedFormCat) && trimmedFormCat !== '—' && trimmedFormCat !== '-') {
-      const catObj = (allCategories || []).find(c => c && c.name?.toLowerCase().trim() === trimmedFormCat.toLowerCase());
-      if (!catObj || catObj.type === targetType) {
-        list.push(trimmedFormCat);
+    // 2. If editing an existing SKU and its category is not in list, preserve it
+    if (editSku && editSku.category && editSku.category.trim()) {
+      const trimmedEditCat = editSku.category.trim();
+      if (!list.includes(trimmedEditCat) && trimmedEditCat !== '—' && trimmedEditCat !== '-') {
+        list.push(trimmedEditCat);
       }
     }
 
     return list.filter(item => typeof item === 'string' && item.trim().length > 0);
-  }, [selectedType, allCategories, form.category]);
+  }, [selectedType, allCategories, editSku]);
 
   // Modal popup for creating a new category matching Categories Tab structure
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
@@ -1174,7 +1174,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       setForm({
         skuCode: editSku.skuCode || '',
         name: editSku.name || '',
-        category: editSku.category || (resolvedSection === 'products' ? 'Products' : resolvedSection === 'semi' ? 'Semi' : 'Materials'),
+        category: editSku.category || '',
         paperType: (editSku.paperType || '') as '' | 'Reels' | 'Sheets' | 'Board' | 'None',
         unit: editSku.unit || '',
         altUnit: editSku.altUnit || '',
@@ -1257,13 +1257,13 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       }
     } else {
       const sectionForNew = activeSection || resolvedSection || 'products';
-      const defaultCat = defaultCategory || (sectionForNew === 'products' ? 'Products' : sectionForNew === 'semi' ? 'Semi' : 'Materials');
       const matchingCats = (allCategories || []).filter(c => c && (c.type === sectionForNew || (!c.type && sectionForNew === 'products')));
-      const defaultUom = matchingCats[0]?.uom || '';
+      const validDefaultCat = defaultCategory && matchingCats.some(c => c.name?.toLowerCase().trim() === defaultCategory.toLowerCase().trim()) ? defaultCategory : '';
+      const defaultUom = validDefaultCat ? (matchingCats.find(c => c.name?.toLowerCase().trim() === validDefaultCat.toLowerCase().trim())?.uom || '') : '';
       setForm({
         skuCode: '',
         name: '',
-        category: defaultCat,
+        category: validDefaultCat,
         paperType: (sectionForNew === 'materials' ? 'Reels' : sectionForNew === 'semi' ? 'Sheets' : '') as '' | 'Reels' | 'Sheets' | 'Board' | 'None',
         unit: defaultUom,
         altUnit: '',
@@ -1497,6 +1497,11 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       e.preventDefault();
       if (!form.skuCode.trim() || !form.name.trim()) {
         setErrorMsg('SKU Code and SKU Name are required');
+        return;
+      }
+
+      if (!form.category || !form.category.trim()) {
+        setErrorMsg('Please select a Category');
         return;
       }
 
@@ -1761,7 +1766,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-bold text-gray-800 cursor-pointer appearance-none shadow-2xs pr-8"
                       required
                     >
-                      <option value="" disabled>Select Category</option>
+                      <option value="">Select Category</option>
                       {availableCategories.map(cat => (
                         <option key={cat} value={cat}>{cat}</option>
                       ))}
