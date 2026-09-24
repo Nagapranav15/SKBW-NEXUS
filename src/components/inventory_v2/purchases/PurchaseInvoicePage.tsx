@@ -2366,158 +2366,168 @@ const PurchaseInvoicePage: React.FC = () => {
                         </>
                       )}
 
-                      {paperType === 'Sheets' && (
-                        <>
-                          <div>
-                            <label className="block text-[11px] font-semibold text-blue-600 mb-1">QTY IN REAMS *</label>
-                            <input
-                              type="number"
-                              step="any"
-                              placeholder="0"
-                              value={((Number(item.quantity) || 0) / (Number(item.sheetsPerReam) || selectedSku?.pages || 500)) || ''}
-                              onChange={e => {
-                                const reams = Number(e.target.value) || 0;
-                                const stdSheets = Number(item.sheetsPerReam) || selectedSku?.pages || 500;
-                                const totalSheets = reams * stdSheets;
-                                
-                                const updatedItems = [...invoiceForm.items];
-                                updatedItems[idx].quantity = String(totalSheets);
-                                
-                                const firstStorage = locations.find(loc => loc.level === 'Storage Location');
-                                const defaultLocId = updatedItems[idx].locationId || firstStorage?._id || '';
-                                updatedItems[idx].splits = [{ locationId: defaultLocId, quantity: String(totalSheets) }];
-                                
-                                // Recalculate price per sheet
-                                const rw = Number(updatedItems[idx].reamWeight) || 0;
-                                const rkg = Number(updatedItems[idx].ratePerKg) || 0;
-                                if (rw > 0 && rkg > 0) {
-                                  updatedItems[idx].purchasePrice = String((rw * rkg) / stdSheets);
-                                }
-                                setInvoiceForm({ ...invoiceForm, items: updatedItems });
-                              }}
-                              className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-xs text-right font-bold text-blue-900 focus:ring-2 focus:ring-blue-500"
-                              required
-                            />
+                      {paperType === 'Sheets' && (() => {
+                        const stdSheets = Number(item.sheetsPerReam) || (selectedSku as any)?.pages || (selectedSku as any)?.sheetsPerReam || (selectedSku as any)?.standardSheets || 500;
+                        const reamWeightNum = item.reamWeight !== undefined && item.reamWeight !== null && item.reamWeight !== ''
+                          ? Number(item.reamWeight) || 0
+                          : ((selectedSku as any)?.reamWeight || getFallbackReamWeight(selectedSku) || 0);
+                        const ratePerKgNum = Number(item.ratePerKg) || 0;
+                        
+                        const totalSheets = Number(item.quantity) || 0;
+                        const reamsVal = stdSheets > 0 ? (totalSheets / stdSheets) : 0;
+                        const totalWeightKg = reamsVal * reamWeightNum;
+                        const totalCost = totalWeightKg * ratePerKgNum;
+                        const ratePerSheet = totalSheets > 0 ? (totalCost / totalSheets) : (reamWeightNum > 0 && ratePerKgNum > 0 ? (reamWeightNum * ratePerKgNum) / stdSheets : (Number(item.purchasePrice) || 0));
+
+                        return (
+                          <div className="col-span-1 sm:col-span-2 lg:col-span-4 space-y-3 mt-1">
+                            {/* 1st line: QTY in reams, sheets/ ream, ream weight, rate */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                              <div>
+                                <label className="block text-[11px] font-semibold text-blue-600 mb-1">QTY IN REAMS *</label>
+                                <input
+                                  type="number"
+                                  step="any"
+                                  placeholder="0"
+                                  value={reamsVal > 0 ? reamsVal : ''}
+                                  onChange={e => {
+                                    const reams = Number(e.target.value) || 0;
+                                    const calcTotalSheets = reams * stdSheets;
+                                    
+                                    const updatedItems = [...invoiceForm.items];
+                                    updatedItems[idx].quantity = String(calcTotalSheets);
+                                    
+                                    const firstStorage = locations.find(loc => loc.level === 'Storage Location');
+                                    const defaultLocId = updatedItems[idx].locationId || firstStorage?._id || '';
+                                    updatedItems[idx].splits = [{ locationId: defaultLocId, quantity: String(calcTotalSheets) }];
+                                    
+                                    if (reamWeightNum > 0 && ratePerKgNum > 0) {
+                                      updatedItems[idx].purchasePrice = String((reamWeightNum * ratePerKgNum) / stdSheets);
+                                    }
+                                    setInvoiceForm({ ...invoiceForm, items: updatedItems });
+                                  }}
+                                  className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-xs text-right font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                                  required
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-semibold text-blue-600 mb-1">SHEETS / REAM *</label>
+                                <input
+                                  type="number"
+                                  step="any"
+                                  value={item.sheetsPerReam !== undefined && item.sheetsPerReam !== null && item.sheetsPerReam !== '' ? item.sheetsPerReam : stdSheets}
+                                  onChange={e => {
+                                    const val = Number(e.target.value) || 500;
+                                    const updatedItems = [...invoiceForm.items];
+                                    updatedItems[idx].sheetsPerReam = val;
+
+                                    const currentReams = reamsVal > 0 ? reamsVal : 1;
+                                    const calcTotalSheets = currentReams * val;
+                                    updatedItems[idx].quantity = String(calcTotalSheets);
+
+                                    if (reamWeightNum > 0 && ratePerKgNum > 0) {
+                                      updatedItems[idx].purchasePrice = String((reamWeightNum * ratePerKgNum) / val);
+                                    }
+                                    setInvoiceForm({ ...invoiceForm, items: updatedItems });
+                                  }}
+                                  className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-xs text-center font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                                  required
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-semibold text-blue-600 mb-1">REAM WEIGHT (KG) *</label>
+                                <input
+                                  type="number"
+                                  step="any"
+                                  placeholder="e.g. 10.37"
+                                  value={item.reamWeight !== undefined && item.reamWeight !== null && item.reamWeight !== '' ? item.reamWeight : (reamWeightNum > 0 ? String(Number(reamWeightNum.toFixed(4))) : '')}
+                                  onChange={e => {
+                                    const rw = e.target.value;
+                                    const updatedItems = [...invoiceForm.items];
+                                    updatedItems[idx].reamWeight = rw;
+                                    
+                                    const rwNum = Number(rw) || 0;
+                                    if (rwNum > 0 && ratePerKgNum > 0) {
+                                      updatedItems[idx].purchasePrice = String((rwNum * ratePerKgNum) / stdSheets);
+                                    }
+                                    setInvoiceForm({ ...invoiceForm, items: updatedItems });
+                                  }}
+                                  className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-xs text-right font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                                  required
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-semibold text-blue-600 mb-1">RATE / KG (₹) *</label>
+                                <input
+                                  type="number"
+                                  step="any"
+                                  placeholder="e.g. 80"
+                                  value={item.ratePerKg || ''}
+                                  onChange={e => {
+                                    const rkg = e.target.value;
+                                    const updatedItems = [...invoiceForm.items];
+                                    updatedItems[idx].ratePerKg = rkg;
+                                    
+                                    const rkgNum = Number(rkg) || 0;
+                                    if (reamWeightNum > 0 && rkgNum > 0) {
+                                      updatedItems[idx].purchasePrice = String((reamWeightNum * rkgNum) / stdSheets);
+                                    }
+                                    setInvoiceForm({ ...invoiceForm, items: updatedItems });
+                                  }}
+                                  className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-xs text-right font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                                  required
+                                />
+                              </div>
+                            </div>
+
+                            {/* 2nd line: total sheets, Total weight, Total cost, Rate/ sheet */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                              <div>
+                                <label className="block text-[11px] font-semibold text-gray-500 mb-1">TOTAL SHEETS</label>
+                                <input
+                                  type="text"
+                                  value={totalSheets.toLocaleString('en-IN') + ' Sheets'}
+                                  disabled
+                                  className="w-full px-3 py-2 border border-gray-200 bg-gray-100/60 rounded-xl text-xs text-right font-black text-gray-700 cursor-not-allowed"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-semibold text-gray-500 mb-1">TOTAL WEIGHT (KG)</label>
+                                <input
+                                  type="text"
+                                  value={totalWeightKg.toLocaleString('en-IN', { maximumFractionDigits: 2 }) + ' kg'}
+                                  disabled
+                                  className="w-full px-3 py-2 border border-gray-200 bg-gray-100/60 rounded-xl text-xs text-right font-bold text-gray-600 cursor-not-allowed"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-semibold text-gray-500 mb-1">TOTAL COST (₹)</label>
+                                <input
+                                  type="text"
+                                  value={'₹' + totalCost.toLocaleString('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 2 })}
+                                  disabled
+                                  className="w-full px-3 py-2 border border-gray-200 bg-gray-100/60 rounded-xl text-xs text-right font-black text-gray-800 cursor-not-allowed"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-semibold text-gray-500 mb-1">RATE / SHEET (₹)</label>
+                                <input
+                                  type="text"
+                                  value={'₹' + ratePerSheet.toFixed(4)}
+                                  disabled
+                                  className="w-full px-3 py-2 border border-gray-200 bg-gray-100/60 rounded-xl text-xs text-right font-bold text-gray-600 cursor-not-allowed"
+                                />
+                              </div>
+                            </div>
                           </div>
-
-                          <div>
-                            <label className="block text-[11px] font-semibold text-blue-600 mb-1">REAM WEIGHT (KG) *</label>
-                            <input
-                              type="number"
-                              step="any"
-                              placeholder="e.g. 10.37"
-                              value={item.reamWeight || (selectedSku as any)?.reamWeight || (getFallbackReamWeight(selectedSku) ? String(Number(getFallbackReamWeight(selectedSku)!.toFixed(4))) : '')}
-                              onChange={e => {
-                                const rw = e.target.value;
-                                const updatedItems = [...invoiceForm.items];
-                                updatedItems[idx].reamWeight = rw;
-                                
-                                // Recalculate price per sheet
-                                const rwNum = Number(rw) || 0;
-                                const rkgNum = Number(updatedItems[idx].ratePerKg) || 0;
-                                const stdSheets = Number(updatedItems[idx].sheetsPerReam) || selectedSku?.pages || 500;
-                                if (rwNum > 0 && rkgNum > 0) {
-                                  updatedItems[idx].purchasePrice = String((rwNum * rkgNum) / stdSheets);
-                                }
-                                setInvoiceForm({ ...invoiceForm, items: updatedItems });
-                              }}
-                              className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-xs text-right font-bold text-blue-900 focus:ring-2 focus:ring-blue-500"
-                              required
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-[11px] font-semibold text-gray-500 mb-1">TOTAL WEIGHT (KG)</label>
-                            <input
-                              type="text"
-                              value={(((Number(item.quantity) || 0) / (Number(item.sheetsPerReam) || selectedSku?.pages || 500)) * (Number(item.reamWeight) || (selectedSku as any)?.reamWeight || getFallbackReamWeight(selectedSku) || 0)).toLocaleString('en-IN', { maximumFractionDigits: 2 }) + ' kg'}
-                              disabled
-                              className="w-full px-3 py-2 border border-gray-200 bg-gray-100/60 rounded-xl text-xs text-right font-bold text-gray-600 cursor-not-allowed"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-[11px] font-semibold text-blue-600 mb-1">RATE / KG (₹) *</label>
-                            <input
-                              type="number"
-                              step="any"
-                              placeholder="e.g. 80"
-                              value={item.ratePerKg || ''}
-                              onChange={e => {
-                                const rkg = e.target.value;
-                                const updatedItems = [...invoiceForm.items];
-                                updatedItems[idx].ratePerKg = rkg;
-                                
-                                // Recalculate price per sheet
-                                const rwNum = Number(updatedItems[idx].reamWeight) || (selectedSku as any)?.reamWeight || getFallbackReamWeight(selectedSku) || 0;
-                                const rkgNum = Number(rkg) || 0;
-                                const stdSheets = Number(updatedItems[idx].sheetsPerReam) || selectedSku?.pages || 500;
-                                if (rwNum > 0 && rkgNum > 0) {
-                                  updatedItems[idx].purchasePrice = String((rwNum * rkgNum) / stdSheets);
-                                }
-                                setInvoiceForm({ ...invoiceForm, items: updatedItems });
-                              }}
-                              className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-xs text-right font-bold text-blue-900 focus:ring-2 focus:ring-blue-500"
-                              required
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-[11px] font-semibold text-gray-500 mb-1">TOTAL SHEETS</label>
-                            <input
-                              type="text"
-                              value={(Number(item.quantity) || 0).toLocaleString() + ' Sheets'}
-                              disabled
-                              className="w-full px-3 py-2 border border-gray-200 bg-gray-100/60 rounded-xl text-xs text-right font-black text-gray-700 cursor-not-allowed"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-[11px] font-semibold text-gray-500 mb-1">TOTAL COST (₹)</label>
-                            <input
-                              type="text"
-                              value={'₹' + ((((Number(item.quantity) || 0) / (Number(item.sheetsPerReam) || selectedSku?.pages || 500)) * (Number(item.reamWeight) || (selectedSku as any)?.reamWeight || getFallbackReamWeight(selectedSku) || 0)) * (Number(item.ratePerKg) || 0)).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                              disabled
-                              className="w-full px-3 py-2 border border-gray-200 bg-gray-100/60 rounded-xl text-xs text-right font-black text-gray-800 cursor-not-allowed"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-[11px] font-semibold text-gray-500 mb-1">RATE / SHEET (₹)</label>
-                            <input
-                              type="text"
-                              value={'₹' + (Number(item.purchasePrice) || 0).toFixed(4)}
-                              disabled
-                              className="w-full px-3 py-2 border border-gray-200 bg-gray-100/60 rounded-xl text-xs text-right font-bold text-gray-600 cursor-not-allowed"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-[11px] font-semibold text-blue-600 mb-1">SHEETS / REAM *</label>
-                            <input
-                              type="number"
-                              value={item.sheetsPerReam !== undefined ? item.sheetsPerReam : ((selectedSku as any)?.pages || (selectedSku as any)?.sheetsPerReam || 500)}
-                              onChange={e => {
-                                const val = Number(e.target.value) || 500;
-                                const updatedItems = [...invoiceForm.items];
-                                updatedItems[idx].sheetsPerReam = val;
-
-                                const currentReams = ((Number(updatedItems[idx].quantity) || 0) / ((selectedSku as any)?.pages || 500));
-                                const totalSheets = (currentReams > 0 ? currentReams : 1) * val;
-                                updatedItems[idx].quantity = String(totalSheets);
-
-                                const rwNum = Number(updatedItems[idx].reamWeight) || (selectedSku as any)?.reamWeight || getFallbackReamWeight(selectedSku) || 0;
-                                const rkgNum = Number(updatedItems[idx].ratePerKg) || 0;
-                                if (rwNum > 0 && rkgNum > 0) {
-                                  updatedItems[idx].purchasePrice = String((rwNum * rkgNum) / val);
-                                }
-                                setInvoiceForm({ ...invoiceForm, items: updatedItems });
-                              }}
-                              className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-xs text-center font-bold text-blue-900 focus:ring-2 focus:ring-blue-500"
-                            />
-                          </div>
-                        </>
-                      )}
+                        );
+                      })()}
 
                       {paperType === 'None' && (
                         <>
@@ -2764,14 +2774,6 @@ const PurchaseInvoicePage: React.FC = () => {
                             Reel Specifications & Storage Allocation:
                           </span>
                           <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleAutoSplitReels(idx)}
-                              className="text-xs font-bold text-blue-700 hover:text-blue-800 flex items-center gap-1 cursor-pointer bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg border border-blue-200 transition-colors"
-                              title="Evenly distribute total lot weight across all reels"
-                            >
-                              ⚡ Auto-Split Weight
-                            </button>
                             <button
                               type="button"
                               onClick={() => handleApplyLocationToAllReels(idx)}
