@@ -72,7 +72,7 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
   loading, 
   skus: _skus,
   onViewDetails,
-  onEditInvoice: _onEditInvoice,
+  onEditInvoice,
   onCancelInvoice
 }) => {
   if (loading) {
@@ -201,6 +201,19 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
                       >
                         <Eye className="w-4 h-4" />
                       </button>
+                      {!isCancelled && onEditInvoice && (
+                        <button
+                          onClick={() => onEditInvoice(inv)}
+                          className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                            isDraft 
+                              ? 'text-amber-600 hover:text-amber-700 hover:bg-amber-50' 
+                              : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50'
+                          }`}
+                          title={isDraft ? "Edit / Receive Draft Order" : "Edit Purchase Batch"}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      )}
                       {!isCancelled && (
                         <button
                           onClick={() => onCancelInvoice(inv)}
@@ -924,23 +937,15 @@ const PurchaseInvoicePage: React.FC = () => {
           }
         }
 
-        // Auto-suggest reorder quantity if present and item.quantity is empty
-        const recReorder = (selectedSku as any).reorderLevel || (selectedSku as any).reorderQty || (selectedSku as any).minStockLevel;
-        if (recReorder && !item.quantity) {
-          item.quantity = String(recReorder);
-          item.splits = [{ locationId: item.locationId || defaultLocId, quantity: String(recReorder) }];
-        }
+        // Keep quantity empty for user input (do not auto-populate reorder quantity)
         
-        // Reset Reels if not Reels format
+        // Keep reels user-definable (do not auto-populate default reel count or quantity)
         if (selectedSku.paperType !== 'Reels') {
           item.reelsCount = '';
           item.reels = [];
         } else {
-          // If Reels, initialize with 1 reel if not set
-          if (!item.reelsCount || Number(item.reelsCount) === 0) {
-            item.reelsCount = '1';
-            item.reels = [{ weight: Number(item.quantity) || 0, width: Number(item.width) || 0, locationId: item.locationId || defaultLocId }];
-          }
+          item.reelsCount = item.reelsCount || '';
+          item.reels = item.reels || [];
         }
       }
     }
@@ -1132,7 +1137,7 @@ const PurchaseInvoicePage: React.FC = () => {
   };
 
   // Submit Invoice Creation
-  const handleInvoiceSubmit = async (e: React.FormEvent) => {
+  const handleInvoiceSubmit = async (e: React.FormEvent, targetStatus: 'Draft' | 'Posted' = 'Posted') => {
     e.preventDefault();
     setAddError('');
 
@@ -1190,13 +1195,15 @@ const PurchaseInvoicePage: React.FC = () => {
         price = Number(selectedSku.standardCost);
       }
 
-      if (qty <= 0) {
-        setAddError(`Please enter a valid quantity for Lot #${i + 1} (${selectedSku?.name || 'Item'})`);
-        return;
-      }
-      if (price <= 0) {
-        setAddError(`Please enter a valid rate/price for Lot #${i + 1} (${selectedSku?.name || 'Item'})`);
-        return;
+      if (targetStatus !== 'Draft') {
+        if (qty <= 0) {
+          setAddError(`Please enter a valid quantity for Lot #${i + 1} (${selectedSku?.name || 'Item'})`);
+          return;
+        }
+        if (price <= 0) {
+          setAddError(`Please enter a valid rate/price for Lot #${i + 1} (${selectedSku?.name || 'Item'})`);
+          return;
+        }
       }
 
       // Storage location
@@ -1215,7 +1222,7 @@ const PurchaseInvoicePage: React.FC = () => {
       if (cleanedSplits.length === 0) {
         cleanedSplits = [{
           locationId: itemLocId || defaultStorageId,
-          quantity: qty
+          quantity: qty || 0
         }];
       }
 
@@ -1262,27 +1269,42 @@ const PurchaseInvoicePage: React.FC = () => {
         taxAmount: tax,
         freight,
         craneCharges: crane,
-        otherCharges: loading + other, // Combined loading and other charges
+        otherCharges: loading + other,
         subTotal: matTotal,
         grandTotal: matTotal + tax + freight + crane + loading + other,
         company: selectedCompany?._id,
-        status: 'Posted'
+        status: targetStatus
       };
 
       if (isEditing && editingInvoiceId) {
         await updatePurchaseInvoiceV2(editingInvoiceId, invoiceData);
-        showToast('Purchase invoice updated successfully!', 'success');
+        showToast(targetStatus === 'Draft' ? 'Draft purchase batch updated successfully!' : 'Purchase batch updated & received successfully!', 'success');
         createActivityLog({
           action: 'UPDATE',
           entityType: 'PurchaseInvoiceV2',
           entityName: invoiceData.invoiceNumber,
-          details: `Purchase Batch '${invoiceData.invoiceNumber}' was updated successfully`,
+          details: `Purchase Batch '${invoiceData.invoiceNumber}' was updated (${targetStatus}) successfully`,
           company: selectedCompany?._id
         }).catch(() => {});
       } else {
         await createPurchaseInvoiceV2(invoiceData);
-        showToast('Purchase invoice inwarded successfully!', 'success');
+        showToast(targetStatus === 'Draft' ? 'Draft purchase order saved successfully!' : 'Purchase batch inwarded & received successfully!', 'success');
         createActivityLog({
+          action: 'CREATE',
+          entityType: 'PurchaseInvoiceV2',
+          entityName: invoiceData.invoiceNumber,
+          details: `Purchase Batch '${invoiceData.invoiceNumber}' was saved (${targetStatus}) successfully`,
+          company: selectedCompany?._id
+        }).catch(() => {});
+      }
+      loadInvoices();
+      setActiveSubPage('list');
+    } catch (err: any) {
+      setAddError(err.response?.data?.msg || err.message || 'Failed to save purchase batch');
+    } finally {
+      setAddLoading(false);
+    }
+  };
           action: 'CREATE',
           entityType: 'PurchaseInvoiceV2',
           entityName: invoiceData.invoiceNumber,
@@ -2988,8 +3010,18 @@ const PurchaseInvoicePage: React.FC = () => {
                 Cancel
               </button>
               <button
-                type="submit"
+                type="button"
                 disabled={addLoading}
+                onClick={(e) => handleInvoiceSubmit(e, 'Draft')}
+                className="px-3.5 py-1.5 border border-amber-300 bg-amber-50 hover:bg-amber-100 disabled:opacity-50 text-amber-800 rounded-lg text-xs font-bold shadow-2xs active:scale-[0.98] flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <FileText className="w-3.5 h-3.5 text-amber-700" />
+                <span>Save Draft Order</span>
+              </button>
+              <button
+                type="button"
+                disabled={addLoading}
+                onClick={(e) => handleInvoiceSubmit(e, 'Posted')}
                 className="px-5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold shadow-md shadow-blue-500/20 active:scale-[0.98] flex items-center gap-1.5 transition-all cursor-pointer"
               >
                 {addLoading ? (
@@ -3000,7 +3032,7 @@ const PurchaseInvoicePage: React.FC = () => {
                 ) : (
                   <>
                     <Save className="w-3.5 h-3.5" />
-                    <span>{isEditing ? 'Update Purchase Batch' : 'Save Purchase Batch'}</span>
+                    <span>{isEditing ? 'Save & Receive Batch' : 'Save & Receive Batch'}</span>
                   </>
                 )}
               </button>

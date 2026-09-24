@@ -65,6 +65,8 @@ exports.createPurchaseInvoice = async (req, res, next) => {
       });
     }
 
+    const isDraftBatch = req.body.status === "Draft";
+
     // 2. Validate Items, SKUs, and Location Hierarchies
     const validatedItems = [];
     let subTotal = 0;
@@ -72,14 +74,20 @@ exports.createPurchaseInvoice = async (req, res, next) => {
     for (const item of items) {
       const { skuId, quantity, purchasePrice, lotNumber, locationId, reels, splits } = item;
       
-      if (!skuId || !quantity || !purchasePrice || !lotNumber) {
-        return res.status(400).json({ msg: "Missing fields in purchase items (SKU, Quantity, Price, or Lot Number)" });
+      if (!isDraftBatch) {
+        if (!skuId || quantity === undefined || quantity === null || purchasePrice === undefined || purchasePrice === null || !lotNumber) {
+          return res.status(400).json({ msg: "Missing fields in purchase items (SKU, Quantity, Price, or Lot Number)" });
+        }
+      } else {
+        if (!skuId) {
+          return res.status(400).json({ msg: "SKU is required for each lot" });
+        }
       }
 
-      const qty = Number(quantity);
-      const price = Number(purchasePrice);
-      if (qty <= 0 || price <= 0) {
-        return res.status(400).json({ msg: "Quantity and price must be greater than zero" });
+      const qty = Number(quantity) || 0;
+      const price = Number(purchasePrice) || 0;
+      if (!isDraftBatch && (qty <= 0 || price <= 0)) {
+        return res.status(400).json({ msg: "Quantity and price must be greater than zero for received batches" });
       }
 
       // Check SKU
@@ -151,6 +159,8 @@ exports.createPurchaseInvoice = async (req, res, next) => {
       }
     }
 
+    const isDraftBatch = req.body.status === "Draft";
+
     // 4. Save Purchase Invoice
     const invoice = new PurchaseInvoiceV2({
       invoiceNumber: finalInvoiceNo,
@@ -166,7 +176,7 @@ exports.createPurchaseInvoice = async (req, res, next) => {
       remarks: remarks || "",
       createdBy: toObjectId(req.user?.id) || companyObjId,
       company: companyObjId,
-      status: "Posted"
+      status: isDraftBatch ? "Draft" : "Posted"
     });
 
     try {
@@ -182,6 +192,19 @@ exports.createPurchaseInvoice = async (req, res, next) => {
       } else {
         throw saveErr;
       }
+    }
+
+    if (isDraftBatch) {
+      ActivityLog.create({
+        action: "CREATE_DRAFT",
+        entityType: "purchase_invoice",
+        entityName: finalInvoiceNo,
+        details: `Draft Purchase Batch '${finalInvoiceNo}' saved for vendor '${vendor.firmName || vendor.ownerName}' (Amount: ₹${subTotal}).`,
+        performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
+        company: companyObjId
+      }).catch(e => console.error("ActivityLog error:", e));
+
+      return res.status(201).json(invoice);
     }
 
     // 5. Inward stock using fast batch operations & hierarchy caching
@@ -612,6 +635,8 @@ exports.editPurchaseInvoice = async (req, res, next) => {
       });
     }
 
+    const isDraftBatch = req.body.status === "Draft";
+
     // Validate SKU/Locations
     const validatedItems = [];
     let subTotal = 0;
@@ -619,14 +644,20 @@ exports.editPurchaseInvoice = async (req, res, next) => {
     for (const item of items) {
       const { skuId, quantity, purchasePrice, lotNumber, locationId, reels, splits } = item;
       
-      if (!skuId || !quantity || !purchasePrice || !lotNumber) {
-        return res.status(400).json({ msg: "Missing fields in purchase items (SKU, Quantity, Price, or Lot Number)" });
+      if (!isDraftBatch) {
+        if (!skuId || quantity === undefined || quantity === null || purchasePrice === undefined || purchasePrice === null || !lotNumber) {
+          return res.status(400).json({ msg: "Missing fields in purchase items (SKU, Quantity, Price, or Lot Number)" });
+        }
+      } else {
+        if (!skuId) {
+          return res.status(400).json({ msg: "SKU is required for each lot" });
+        }
       }
 
-      const qty = Number(quantity);
-      const price = Number(purchasePrice);
-      if (qty <= 0 || price <= 0) {
-        return res.status(400).json({ msg: "Quantity and price must be greater than zero" });
+      const qty = Number(quantity) || 0;
+      const price = Number(purchasePrice) || 0;
+      if (!isDraftBatch && (qty <= 0 || price <= 0)) {
+        return res.status(400).json({ msg: "Quantity and price must be greater than zero for received batches" });
       }
 
       let sku = await SkuV2.findById(skuId);
@@ -681,6 +712,9 @@ exports.editPurchaseInvoice = async (req, res, next) => {
       });
     }
 
+    const wasDraft = invoice.status === "Draft";
+    const isDraftBatch = req.body.status === "Draft";
+
     const newGrandTotal = subTotal + Number(taxAmount) + Number(freight) + Number(craneCharges) + Number(otherCharges);
     
     // Check if new grand total is less than already paid amount
@@ -688,14 +722,36 @@ exports.editPurchaseInvoice = async (req, res, next) => {
       return res.status(400).json({ msg: `Cannot edit invoice to amount ₹${newGrandTotal} which is less than the already paid amount of ₹${invoice.paidAmount}` });
     }
 
+    // Update invoice properties
+    invoice.items = validatedItems;
+    invoice.subTotal = subTotal;
+    invoice.taxAmount = Number(taxAmount);
+    invoice.freight = Number(freight);
+    invoice.craneCharges = Number(craneCharges);
+    invoice.otherCharges = Number(otherCharges);
+    invoice.grandTotal = newGrandTotal;
+    if (dueDate) invoice.dueDate = new Date(dueDate);
+    if (remarks !== undefined) invoice.remarks = remarks;
+    invoice.status = isDraftBatch ? "Draft" : "Posted";
+
+    await invoice.save();
+
+    if (isDraftBatch) {
+      await InventoryLedger.deleteMany({ referenceType: "PurchaseInvoice", referenceId: invoice.invoiceNumber });
+      await InventoryLedger.deleteMany({ batchNumber: invoice.invoiceNumber });
+      return res.json(invoice);
+    }
+
     const newSupplierPayable = subTotal;
-    const oldSupplierPayable = invoice.subTotal || 0;
+    const oldSupplierPayable = wasDraft ? 0 : (invoice.subTotal || 0);
     const diff = newSupplierPayable - oldSupplierPayable;
 
-    // Update Vendor Outstanding (Material cost difference)
-    vendor.outstanding = Math.max((vendor.outstanding || 0) + diff, 0);
-    vendor.outstandingBalance = Math.max((vendor.outstandingBalance || 0) + diff, 0);
-    await vendor.save();
+    // Update Vendor Outstanding
+    if (diff !== 0) {
+      vendor.outstanding = Math.max((vendor.outstanding || 0) + diff, 0);
+      vendor.outstandingBalance = Math.max((vendor.outstandingBalance || 0) + diff, 0);
+      await vendor.save();
+    }
 
     // Update financial Transaction
     await Transaction.findOneAndUpdate(
