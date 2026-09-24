@@ -2357,15 +2357,22 @@ const PurchaseInvoicePage: React.FC = () => {
 
                       {paperType === 'Sheets' && (() => {
                         const stdSheets = Number(item.sheetsPerReam) || (selectedSku as any)?.pages || (selectedSku as any)?.sheetsPerReam || (selectedSku as any)?.standardSheets || 500;
-                        const reamWeightNum = item.reamWeight !== undefined && item.reamWeight !== null && item.reamWeight !== ''
-                          ? Number(item.reamWeight) || 0
-                          : ((selectedSku as any)?.reamWeight || getFallbackReamWeight(selectedSku) || 0);
+                        
+                        const defaultRw = (selectedSku as any)?.reamWeight !== undefined && (selectedSku as any)?.reamWeight !== null
+                          ? String((selectedSku as any).reamWeight)
+                          : (getFallbackReamWeight(selectedSku) ? String(Number(getFallbackReamWeight(selectedSku)!.toFixed(4))) : '0');
+                        
+                        const reamWeightStr = item.reamWeight !== undefined && item.reamWeight !== null
+                          ? item.reamWeight
+                          : defaultRw;
+                          
+                        const reamWeightNum = Number(reamWeightStr) || 0;
                         const ratePerKgNum = Number(item.ratePerKg) || 0;
                         
                         const hasQty = item.quantity !== undefined && item.quantity !== null && item.quantity !== '';
                         const totalSheets = hasQty ? Number(item.quantity) || 0 : 0;
-                        const reamsVal = hasQty && stdSheets > 0 ? (totalSheets / stdSheets) : '';
-                        const totalWeightKg = (typeof reamsVal === 'number' ? reamsVal : 0) * reamWeightNum;
+                        const reamsVal = stdSheets > 0 ? (totalSheets / stdSheets) : 0;
+                        const totalWeightKg = reamsVal * reamWeightNum;
                         const totalCost = totalWeightKg * ratePerKgNum;
                         const ratePerSheet = totalSheets > 0 ? (totalCost / totalSheets) : (reamWeightNum > 0 && ratePerKgNum > 0 ? (reamWeightNum * ratePerKgNum) / stdSheets : (Number(item.purchasePrice) || 0));
 
@@ -2378,13 +2385,13 @@ const PurchaseInvoicePage: React.FC = () => {
                                 <input
                                   type="number"
                                   step="any"
-                                  placeholder="e.g. 50"
+                                  placeholder="0"
                                   value={reamsVal}
                                   onChange={e => {
                                     const rawVal = e.target.value;
                                     const updatedItems = [...invoiceForm.items];
                                     if (rawVal === '' || rawVal === null || rawVal === undefined) {
-                                      updatedItems[idx].quantity = '';
+                                      updatedItems[idx].quantity = '0';
                                       updatedItems[idx].purchasePrice = '';
                                       updatedItems[idx].splits = [];
                                     } else {
@@ -2419,7 +2426,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                     updatedItems[idx].sheetsPerReam = val;
 
                                     if (hasQty) {
-                                      const currentReams = typeof reamsVal === 'number' ? reamsVal : 0;
+                                      const currentReams = reamsVal;
                                       const calcTotalSheets = currentReams * val;
                                       updatedItems[idx].quantity = String(calcTotalSheets);
                                     }
@@ -2439,8 +2446,8 @@ const PurchaseInvoicePage: React.FC = () => {
                                 <input
                                   type="number"
                                   step="any"
-                                  placeholder="e.g. 10.37"
-                                  value={item.reamWeight !== undefined && item.reamWeight !== null && item.reamWeight !== '' ? item.reamWeight : (reamWeightNum > 0 ? String(Number(reamWeightNum.toFixed(4))) : '')}
+                                  placeholder="0"
+                                  value={reamWeightStr}
                                   onChange={e => {
                                     const rw = e.target.value;
                                     const updatedItems = [...invoiceForm.items];
