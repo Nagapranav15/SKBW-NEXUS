@@ -1559,10 +1559,12 @@ const PurchaseInvoicePage: React.FC = () => {
 
   // Dashboard Stats (mocked or loaded)
   const dashboardTotalBatches = total;
-  const dashboardTotalValue = invoices.reduce((sum, inv) => {
-    const finalVal = inv.grandTotal || ((inv.subTotal || 0) + (inv.freight || 0) + (inv.craneCharges || 0) + (inv.otherCharges || 0) + (inv.taxAmount || 0));
-    return sum + finalVal;
-  }, 0);
+  const dashboardTotalValue = invoices
+    .filter(inv => inv.status !== 'Cancelled')
+    .reduce((sum, inv) => {
+      const finalVal = inv.grandTotal || ((inv.subTotal || 0) + (inv.freight || 0) + (inv.craneCharges || 0) + (inv.otherCharges || 0) + (inv.taxAmount || 0));
+      return sum + finalVal;
+    }, 0);
   const dashboardPendingReceipts = invoices.filter(inv => inv.status === 'Draft').length;
 
   return (
@@ -1782,7 +1784,7 @@ const PurchaseInvoicePage: React.FC = () => {
             let hasAnyReels = false;
             let hasAnySheets = false;
 
-            invoices.forEach(inv => {
+            invoices.filter(inv => inv.status !== 'Cancelled').forEach(inv => {
               inv.items?.forEach(item => {
                 const resolvedSku = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null;
                 const fullSku = skus.find(s => s._id === (resolvedSku?._id || item.skuId)) || resolvedSku;
@@ -3379,18 +3381,21 @@ const PurchaseInvoicePage: React.FC = () => {
                         <tbody className="divide-y divide-gray-100 bg-white">
                           {(() => {
                             const batchBalances = inventoryBalances.filter(b => b.batchNumber === selectedInvoice.invoiceNumber);
-                            
-                            if (batchBalances.length === 0) {
-                              return (selectedInvoice.items || []).map((item, idx) => {
-                                const skuObj = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : skus.find(s => s._id === item.skuId);
-                                const locIdVal = typeof item.locationId === 'object' && item.locationId !== null ? (item.locationId as any)._id : item.locationId;
-                                const locObj = locations.find(l => l._id === locIdVal) || (typeof item.locationId === 'object' ? (item.locationId as any) : null);
+
+                            if (batchBalances.length > 0) {
+                              return batchBalances.map((b, idx) => {
+                                const rawLocId = typeof b.location === 'object' && b.location !== null ? (b.location as any)._id : (b.location || b.locationId);
+                                const masterLoc = locations.find(l => String(l._id) === String(rawLocId)) || (typeof b.location === 'object' ? (b.location as any) : null);
+                                const locIdVal = masterLoc?._id || rawLocId;
                                 const paths = resolveLocationPath(locIdVal || '');
                                 const fullPath = [paths.factory, paths.floor, paths.zone].filter(p => p && p !== '—').join(' ➔ ') || 'Default Warehouse Area';
-                                const locName = locObj?.name || 'Main Storage';
-                                const locCode = locObj?.code || 'MAIN-01';
-                                const qtyVal = Number(item.quantity) || 0;
-                                const itemVal = qtyVal * (Number(item.purchasePrice) || 0);
+                                const locName = masterLoc?.name || (typeof b.location === 'object' ? (b.location as any).name : 'Storage Location');
+                                const locCode = masterLoc?.code || (typeof b.location === 'object' ? (b.location as any).code : '') || '';
+                                const qtyVal = Number(b.onHand) || 0;
+                                const availVal = Number(b.available !== undefined ? b.available : b.onHand || 0);
+                                const skuObj = b.sku || (typeof selectedInvoice.items?.[0]?.skuId === 'object' ? selectedInvoice.items[0].skuId : null);
+                                const priceVal = Number(skuObj?.purchasePrice) || Number(selectedInvoice.items?.[0]?.purchasePrice) || 0;
+                                const estValue = qtyVal * priceVal;
 
                                 return (
                                   <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
@@ -3398,9 +3403,11 @@ const PurchaseInvoicePage: React.FC = () => {
                                       <div className="flex items-center gap-2">
                                         <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></div>
                                         <span className="font-bold text-gray-900">{locName}</span>
-                                        <span className="font-mono text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
-                                          {locCode}
-                                        </span>
+                                        {locCode && (
+                                          <span className="font-mono text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
+                                            {locCode}
+                                          </span>
+                                        )}
                                       </div>
                                     </td>
                                     <td className="py-3 px-4">
@@ -3415,29 +3422,28 @@ const PurchaseInvoicePage: React.FC = () => {
                                     </td>
                                     <td className="py-3 px-4 text-right">
                                       <span className="font-mono font-bold text-blue-700 text-xs">
-                                        {qtyVal.toLocaleString('en-IN')} {skuObj?.unit || 'KG'}
+                                        {availVal.toLocaleString('en-IN')} {skuObj?.unit || 'KG'}
                                       </span>
                                     </td>
                                     <td className="py-3 px-4 text-right font-mono font-bold text-gray-900 text-xs">
-                                      ₹{itemVal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                      ₹{estValue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                                     </td>
                                   </tr>
                                 );
                               });
                             }
 
-                            return batchBalances.map((b, idx) => {
-                              const locObj = b.location;
-                              const locIdVal = locObj?._id || b.locationId;
-                              const paths = resolveLocationPath(locIdVal || '');
+                            // Fallback if inventoryBalances has not fetched yet
+                            return (selectedInvoice.items || []).map((item, idx) => {
+                              const skuObj = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : skus.find(s => s._id === item.skuId);
+                              const rawLocId = typeof item.locationId === 'object' && item.locationId !== null ? (item.locationId as any)._id : item.locationId;
+                              const masterLoc = locations.find(l => String(l._id) === String(rawLocId)) || (typeof item.locationId === 'object' ? (item.locationId as any) : null);
+                              const paths = resolveLocationPath(rawLocId || '');
                               const fullPath = [paths.factory, paths.floor, paths.zone].filter(p => p && p !== '—').join(' ➔ ') || 'Default Warehouse Area';
-                              const locName = locObj?.name || 'Storage Location';
-                              const locCode = locObj?.code || 'LOC-01';
-                              const qtyVal = Number(b.onHand) || 0;
-                              const availVal = Number(b.available !== undefined ? b.available : b.onHand || 0);
-                              const skuObj = b.sku || (typeof selectedInvoice.items?.[0]?.skuId === 'object' ? selectedInvoice.items[0].skuId : null);
-                              const priceVal = Number(skuObj?.purchasePrice) || Number(selectedInvoice.items?.[0]?.purchasePrice) || 0;
-                              const estValue = qtyVal * priceVal;
+                              const locName = masterLoc?.name || 'Main Storage';
+                              const locCode = masterLoc?.code || '';
+                              const qtyVal = Number(item.quantity) || 0;
+                              const itemVal = qtyVal * (Number(item.purchasePrice) || 0);
 
                               return (
                                 <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
@@ -3464,11 +3470,11 @@ const PurchaseInvoicePage: React.FC = () => {
                                   </td>
                                   <td className="py-3 px-4 text-right">
                                     <span className="font-mono font-bold text-blue-700 text-xs">
-                                      {availVal.toLocaleString('en-IN')} {skuObj?.unit || 'KG'}
+                                      {qtyVal.toLocaleString('en-IN')} {skuObj?.unit || 'KG'}
                                     </span>
                                   </td>
                                   <td className="py-3 px-4 text-right font-mono font-bold text-gray-900 text-xs">
-                                    ₹{estValue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                    ₹{itemVal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                                   </td>
                                 </tr>
                               );

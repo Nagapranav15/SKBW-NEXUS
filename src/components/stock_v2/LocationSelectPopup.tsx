@@ -461,7 +461,7 @@ export const LocationSelectPopup: React.FC<LocationSelectPopupProps> = ({
       {/* ── CUTE, MINIMAL & INFORMATIONAL POPUP (NO DARK BG SHIFT) ── */}
       {isOpen && typeof document !== 'undefined' && createPortal(
         <div 
-          className="fixed inset-0 z-[100000] flex items-center justify-center p-3 sm:p-4 bg-slate-950/40 backdrop-blur-xs animate-fadeIn font-sans"
+          className="fixed inset-0 z-[200000] flex items-center justify-center p-3 sm:p-4 bg-slate-950/40 backdrop-blur-xs animate-fadeIn font-sans"
           onClick={() => setIsOpen(false)}
         >
           <div 
