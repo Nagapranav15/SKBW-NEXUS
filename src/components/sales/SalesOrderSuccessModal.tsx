@@ -20,6 +20,7 @@ interface SalesOrderSuccessModalProps {
   order: SalesOrderV2;
   onClose?: () => void;
   onViewOrder: (order: SalesOrderV2) => void;
+  onConfirmOrder?: (order: SalesOrderV2) => void;
   onPrintOrder: (order: SalesOrderV2) => void;
   onCreateNew: () => void;
   onGoToOrders: () => void;
@@ -362,6 +363,17 @@ export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
 
       {/* ── BOTTOM ACTION BUTTONS (Matching Screenshot 1:1) ── */}
       <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+        {/* Button 0: Confirm Order (if currently Draft) */}
+        {order.status === 'Draft' && onConfirmOrder && (
+          <button
+            onClick={() => onConfirmOrder(order)}
+            className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+          >
+            <Check className="w-4 h-4 stroke-[3]" />
+            <span>Confirm Order</span>
+          </button>
+        )}
+
         {/* Button 1: View Sales Order (Solid Blue) */}
         <button
           onClick={() => onViewOrder(order)}

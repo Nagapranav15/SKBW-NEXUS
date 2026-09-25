@@ -6,7 +6,8 @@ import {
   ChevronRight, Plus, Trash2, CheckCircle, Clock,
   AlertCircle, CreditCard, IndianRupee
 } from 'lucide-react';
-import { SalesOrderV2 } from '../../api/salesOrderApiV2';
+import { SalesOrderV2, updateSalesOrderV2Status } from '../../api/salesOrderApiV2';
+import { saveCustomSalesOrder } from '../../utils/salesOrderStorage';
 import { useAuth } from '../../context/AuthContext';
 import { getParties } from '../../api/partyApi';
 import { getBalancesV2, getSkusV2 } from '../../api/mfgApiV2';
@@ -24,6 +25,7 @@ interface SalesOrderDetailPanelV2Props {
   order: SalesOrderV2 | null;
   onClose: () => void;
   onEdit: (order: SalesOrderV2) => void;
+  onOrderUpdated?: (updatedOrder: SalesOrderV2) => void;
 }
 
 export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = ({
@@ -31,11 +33,13 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
   order,
   onClose,
   onEdit,
+  onOrderUpdated,
 }) => {
   const { selectedCompany, user } = useAuth();
   const [addressTab, setAddressTab] = useState<'billing' | 'delivery'>('billing');
   const [customerDetails, setCustomerDetails] = useState<any | null>(null);
   const [stockMap, setStockMap] = useState<Map<string, number>>(new Map());
+  const [isConfirming, setIsConfirming] = useState(false);
 
   // Lock body scroll while modal is open
   useEffect(() => {
@@ -207,6 +211,41 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
     return 'bg-gray-100 text-gray-500 border-gray-200';
   };
 
+  // Confirm Order Handler (converts Draft -> Confirmed)
+  const handleConfirmOrder = async () => {
+    if (!order) return;
+    setIsConfirming(true);
+    try {
+      const confirmedOrder: SalesOrderV2 = {
+        ...order,
+        status: 'Confirmed',
+        fulfillmentStatus: order.fulfillmentStatus === 'Draft' ? 'Pending' : (order.fulfillmentStatus || 'Pending'),
+        updatedAt: new Date().toISOString()
+      };
+
+      const isLocalId = !order._id || order._id.startsWith('so-mock-') || order._id.startsWith('so-user-');
+      if (order._id && !isLocalId) {
+        try {
+          await updateSalesOrderV2Status(order._id, { status: 'Confirmed' });
+        } catch (apiErr) {
+          console.warn('Backend updateSalesOrderV2Status failed, proceeding locally:', apiErr);
+        }
+      }
+
+      saveCustomSalesOrder(confirmedOrder);
+      showToast(`Sales Order ${order.orderNumber} confirmed successfully!`, 'success');
+
+      if (onOrderUpdated) {
+        onOrderUpdated(confirmedOrder);
+      }
+    } catch (err: any) {
+      console.error('Error confirming order:', err);
+      showToast(err.message || 'Failed to confirm order', 'error');
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
   // WhatsApp Handler
   const handleWhatsApp = () => {
     const phone = (order.customerPhone || custObj?.phone || '').replace(/\D/g, '');
@@ -256,19 +295,31 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
-            <button onClick={() => onEdit(order)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 transition-all cursor-pointer">
+            {order.status === 'Draft' && (
+              <button
+                type="button"
+                onClick={handleConfirmOrder}
+                disabled={isConfirming}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                title="Convert drafted order into confirmed order"
+              >
+                <CheckCircle className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>{isConfirming ? 'Confirming...' : 'Confirm Order'}</span>
+              </button>
+            )}
+            <button onClick={() => onEdit(order)} className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 transition-all cursor-pointer">
               <Edit className="w-3.5 h-3.5 text-blue-500" /> Edit
             </button>
-            <button onClick={() => showToast('Order duplicated into Draft mode', 'info')} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 transition-all cursor-pointer">
+            <button onClick={() => showToast('Order duplicated into Draft mode', 'info')} className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 transition-all cursor-pointer">
               <Copy className="w-3.5 h-3.5 text-gray-500" /> Duplicate
             </button>
-            <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 transition-all cursor-pointer">
+            <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 transition-all cursor-pointer">
               <Printer className="w-3.5 h-3.5 text-gray-500" /> Print
             </button>
-            <button onClick={() => showToast('Generating Sales Order PDF...', 'info')} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 transition-all cursor-pointer">
+            <button onClick={() => showToast('Generating Sales Order PDF...', 'info')} className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 transition-all cursor-pointer">
               <FileText className="w-3.5 h-3.5 text-gray-500" /> PDF
             </button>
-            <button onClick={handleWhatsApp} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-emerald-50 border border-gray-200 rounded-lg text-xs font-bold text-emerald-600 transition-all cursor-pointer">
+            <button onClick={handleWhatsApp} className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-emerald-50 border border-gray-200 rounded-lg text-xs font-bold text-emerald-600 transition-all cursor-pointer">
               <WhatsAppIcon className="w-3.5 h-3.5" /> WhatsApp
             </button>
             <button onClick={onClose} className="p-1.5 bg-white hover:bg-gray-100 border border-gray-200 rounded-lg text-gray-400 hover:text-gray-700 transition-all cursor-pointer ml-1">
@@ -279,6 +330,38 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
 
         {/* ── SCROLLABLE BODY ── */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 text-xs">
+
+          {/* ── DRAFT ORDER CONFIRMATION BANNER ── */}
+          {order.status === 'Draft' && (
+            <div className="bg-gradient-to-r from-amber-50 via-orange-50/50 to-emerald-50/50 border border-amber-200/90 rounded-2xl p-4 flex items-center justify-between gap-4 shadow-3xs">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-100/90 border border-amber-200 flex items-center justify-center shrink-0 text-amber-700 shadow-3xs">
+                  <Clock className="w-5 h-5 stroke-[2.2]" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs font-black text-amber-950 uppercase tracking-wide">Drafted Sales Order</h4>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200/60 text-amber-900 border border-amber-300/50">
+                      Draft
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-amber-800/90 mt-0.5">
+                    This order is currently saved as a draft. Click <strong>Confirm Order</strong> to convert it into an active confirmed sales order.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleConfirmOrder}
+                disabled={isConfirming}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0 flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <CheckCircle className="w-4 h-4 stroke-[2.5]" />
+                <span>{isConfirming ? 'Confirming...' : 'Confirm Order'}</span>
+              </button>
+            </div>
+          )}
 
           {/* ── ROW 1: Three info cards ── */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">

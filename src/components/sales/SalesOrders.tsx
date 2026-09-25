@@ -578,6 +578,44 @@ const SalesOrders: React.FC = () => {
     }
   };
 
+  // Confirm Draft Order
+  const handleConfirmDraftOrder = async (order: SalesOrderV2) => {
+    try {
+      const confirmedOrder: SalesOrderV2 = {
+        ...order,
+        status: 'Confirmed',
+        fulfillmentStatus: order.fulfillmentStatus === 'Draft' ? 'Pending' : (order.fulfillmentStatus || 'Pending'),
+        updatedAt: new Date().toISOString()
+      };
+
+      const isLocalId = !order._id || order._id.startsWith('so-mock-') || order._id.startsWith('so-user-');
+      if (order._id && !isLocalId) {
+        try {
+          await updateSalesOrderV2Status(order._id, { status: 'Confirmed' });
+        } catch (apiErr) {
+          console.warn('API updateSalesOrderV2Status failed, confirming locally:', apiErr);
+        }
+      }
+
+      saveCustomSalesOrder(confirmedOrder);
+      setOrders(prev => {
+        const idx = prev.findIndex(o => o._id === confirmedOrder._id || o.orderNumber === confirmedOrder.orderNumber);
+        if (idx >= 0) {
+          const copy = [...prev];
+          copy[idx] = confirmedOrder;
+          return copy;
+        }
+        return [confirmedOrder, ...prev];
+      });
+
+      showToast(`Sales Order ${order.orderNumber} confirmed successfully!`, 'success');
+      setSuccessOrder(confirmedOrder);
+    } catch (err: any) {
+      console.error(err);
+      showToast('Failed to confirm order', 'error');
+    }
+  };
+
   // WhatsApp Sender
   const handleTriggerWhatsApp = (order: SalesOrderV2) => {
     const phone = (order.customerPhone || '9988776655').replace(/\D/g, '');
@@ -605,6 +643,7 @@ const SalesOrders: React.FC = () => {
                 setSuccessOrder(null);
                 setSelectedOrderDetail(ord);
               }}
+              onConfirmOrder={handleConfirmDraftOrder}
               onPrintOrder={(ord) => {
                 setPrintEstimationOrder(ord);
               }}
@@ -1338,6 +1377,17 @@ const SalesOrders: React.FC = () => {
                                   <span>View</span>
                                 </button>
 
+                                {order.status === 'Draft' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => { handleConfirmDraftOrder(order); setActiveMenuOrderId(null); }}
+                                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50 transition-colors"
+                                  >
+                                    <Check className="w-4 h-4 text-emerald-600 stroke-[3]" />
+                                    <span>Confirm Order</span>
+                                  </button>
+                                )}
+
                                 <button
                                   type="button"
                                   onClick={() => { setEditingOrder(order); setShowDrawer(true); setActiveMenuOrderId(null); }}
@@ -1463,6 +1513,20 @@ const SalesOrders: React.FC = () => {
           setSelectedOrderDetail(null);
           setEditingOrder(ord);
           setShowDrawer(true);
+        }}
+        onOrderUpdated={(updated) => {
+          saveCustomSalesOrder(updated);
+          setOrders(prev => {
+            const idx = prev.findIndex(o => o._id === updated._id || o.orderNumber === updated.orderNumber);
+            if (idx >= 0) {
+              const copy = [...prev];
+              copy[idx] = updated;
+              return copy;
+            }
+            return [updated, ...prev];
+          });
+          setSelectedOrderDetail(null);
+          setSuccessOrder(updated);
         }}
       />
 

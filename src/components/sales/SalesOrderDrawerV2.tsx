@@ -1019,7 +1019,15 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   const handleSaveOrder = async (overrideStatus?: string) => {
     setErrorMsg('');
 
-    const finalStatus = overrideStatus || orderStatus || 'Confirmed';
+    // If an order was in Draft and user clicks the main confirm/save button without override, convert to Confirmed
+    let finalStatus = overrideStatus || orderStatus;
+    if (!overrideStatus) {
+      if (editOrder?.status === 'Draft' && orderStatus === 'Draft') {
+        finalStatus = 'Confirmed';
+      } else {
+        finalStatus = orderStatus || 'Confirmed';
+      }
+    }
     const isDraft = finalStatus === 'Draft';
 
     if (!isDraft && !selectedCustomer && !customerSearch.trim()) {
@@ -1304,7 +1312,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       hideCloseButton={true}
     >
       <form 
-        onSubmit={(e) => { e.preventDefault(); handleSaveOrder(); }} 
+        onSubmit={(e) => { e.preventDefault(); handleSaveOrder(editOrder?.status === 'Draft' ? 'Confirmed' : undefined); }} 
         onKeyDown={handleFormKeyDown}
         className="flex flex-col max-h-[92vh] overflow-hidden font-sans text-xs bg-slate-50/70"
       >
@@ -1346,10 +1354,10 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
             <button
               type="submit"
               disabled={isSaving}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white font-bold rounded-xl text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className={`px-4 py-2 ${editOrder?.status === 'Draft' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'} active:scale-98 text-white font-bold rounded-xl text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50`}
             >
-              <Save className="w-4 h-4 stroke-[2.5]" />
-              <span>{isSaving ? 'Saving...' : 'Save Sales Order'}</span>
+              {editOrder?.status === 'Draft' ? <Check className="w-4 h-4 stroke-[2.5]" /> : <Save className="w-4 h-4 stroke-[2.5]" />}
+              <span>{isSaving ? 'Saving...' : (editOrder?.status === 'Draft' ? 'Confirm Order' : 'Save Sales Order')}</span>
             </button>
           </div>
         </div>
