@@ -353,12 +353,12 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   const [highlightedProductIdxMap, setHighlightedProductIdxMap] = useState<Record<number, number>>({});
   const dropdownContainerRef = useRef<HTMLDivElement>(null);
 
-  // Auto-focus 1st field (Customer Search Input) upon opening form
+  // Auto-focus 1st field (Customer Search Input) & Open Customer Dropdown by default upon opening form
   useEffect(() => {
     if (isOpen) {
       setHighlightedCustomerIdx(0);
       setActiveItemDropdownIdx(null);
-      setShowCustomerDropdown(false);
+      setShowCustomerDropdown(true);
       const timer = setTimeout(() => {
         customerInputRef.current?.focus();
         customerInputRef.current?.select();
@@ -1323,6 +1323,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                         setHighlightedCustomerIdx(0);
                       }}
                       onClick={() => setShowCustomerDropdown(true)}
+                      onFocus={() => setShowCustomerDropdown(true)}
                       placeholder="Search customer firm name..."
                       className="w-full pl-8 pr-10 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
                     />
