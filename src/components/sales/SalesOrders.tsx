@@ -209,7 +209,7 @@ const SalesOrders: React.FC = () => {
       if (e.key === 'Escape') {
         if (showDrawer) setShowDrawer(false);
         if (selectedOrderDetail) setSelectedOrderDetail(null);
-        if (selectedPrintOrder) setSelectedPrintOrder(null);
+        if (printEstimationOrder) setPrintEstimationOrder(null);
         if (showSuccessModal) setShowSuccessModal(false);
         if (whatsappOrder) setWhatsappOrder(null);
       }
@@ -217,7 +217,7 @@ const SalesOrders: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showDrawer, selectedOrderDetail, selectedPrintOrder, showSuccessModal, whatsappOrder]);
+  }, [showDrawer, selectedOrderDetail, printEstimationOrder, showSuccessModal, whatsappOrder]);
 
   // Unique list of regions for dropdown
   const availableRegions = useMemo(() => {
