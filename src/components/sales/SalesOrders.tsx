@@ -210,14 +210,16 @@ const SalesOrders: React.FC = () => {
         if (showDrawer) setShowDrawer(false);
         if (selectedOrderDetail) setSelectedOrderDetail(null);
         if (printEstimationOrder) setPrintEstimationOrder(null);
-        if (showSuccessModal) setShowSuccessModal(false);
+        if (estimationOrder) setEstimationOrder(null);
+        if (successOrder) setSuccessOrder(null);
+        if (cancellingOrder) setCancellingOrder(null);
         if (whatsappOrder) setWhatsappOrder(null);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showDrawer, selectedOrderDetail, printEstimationOrder, showSuccessModal, whatsappOrder]);
+  }, [showDrawer, selectedOrderDetail, printEstimationOrder, estimationOrder, successOrder, cancellingOrder, whatsappOrder]);
 
   // Unique list of regions for dropdown
   const availableRegions = useMemo(() => {
