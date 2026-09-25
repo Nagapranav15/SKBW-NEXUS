@@ -99,8 +99,18 @@ export function getUnitRank(unitName?: string): number {
  */
 export function roundUomQty(val: number, maxDecimals: number = 6): number {
   if (isNaN(val) || !isFinite(val)) return 0;
+  // Snap near integers (e.g. 0.9999 -> 1, 1.0001 -> 1, 299.9999 -> 300) caused by floating point precision
+  const nearestInt = Math.round(val);
+  if (Math.abs(val - nearestInt) < 0.0002) {
+    return nearestInt;
+  }
   const factor = Math.pow(10, maxDecimals);
-  return Math.round((val + Number.EPSILON) * factor) / factor;
+  const rounded = Math.round((val + Number.EPSILON) * factor) / factor;
+  const roundedNearestInt = Math.round(rounded);
+  if (Math.abs(rounded - roundedNearestInt) < 0.0002) {
+    return roundedNearestInt;
+  }
+  return rounded;
 }
 
 /**
@@ -221,7 +231,7 @@ export function convertAltToPrimary(altQty: number, sku?: SkuUomLike | null): nu
     // 1 Alt = Factor * Primary -> Alt * Factor = Primary
     result = altQty * factor;
   }
-  return roundUomQty(result);
+  return roundUomQty(result, 8);
 }
 
 /**

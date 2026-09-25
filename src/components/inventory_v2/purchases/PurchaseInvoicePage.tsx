@@ -29,6 +29,7 @@ interface PurchaseInvoiceFormItem {
   length: string;
   reelsCount: string;
   quantity: string;
+  altQuantity?: string;
   purchasePrice: string;
   reamWeight: string;
   ratePerKg: string;
@@ -72,7 +73,7 @@ const getFallbackReamWeight = (sku: any): number => {
 const InvoiceTable: React.FC<InvoiceTableProps> = ({ 
   invoices, 
   loading, 
-  skus: _skus,
+  skus,
   onViewDetails,
   onEditInvoice,
   onCancelInvoice
@@ -122,10 +123,11 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
 
               inv.items?.forEach((item) => {
                 const resolvedSku = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null;
-                const paperType = resolvedSku?.paperType;
+                const fullSku = skus.find(s => s._id === (resolvedSku?._id || item.skuId)) || resolvedSku;
+                const paperType = resolvedSku?.paperType || fullSku?.paperType;
                 if (paperType === 'Sheets') {
-                  const stdSheets = resolvedSku?.pages || 500;
-                  const reamWeight = item.reamWeight || resolvedSku?.reamWeight || getFallbackReamWeight(resolvedSku) || 0;
+                  const stdSheets = resolvedSku?.pages || fullSku?.pages || 500;
+                  const reamWeight = item.reamWeight || resolvedSku?.reamWeight || fullSku?.reamWeight || getFallbackReamWeight(fullSku || resolvedSku) || 0;
                   const itemReams = (item.quantity || 0) / stdSheets;
                   totalReamsCount += itemReams;
                   totalKgWeight += itemReams * reamWeight;
@@ -133,8 +135,10 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
                   totalReelsCount += item.reels.length;
                   const reelsWt = item.reels.reduce((s, r) => s + (Number(r.weight) || 0), 0);
                   totalKgWeight += reelsWt > 0 ? reelsWt : (item.quantity || 0);
+                } else if (paperType === 'Reels') {
+                  totalReelsCount += Number(item.reelsCount) || 1;
+                  totalKgWeight += item.quantity || 0;
                 } else {
-                  totalReelsCount += 1;
                   totalKgWeight += item.quantity || 0;
                 }
               });
@@ -872,76 +876,186 @@ const PurchaseInvoicePage: React.FC = () => {
       return;
     }
 
-    const companyName = selectedCompany?.name || 'SKBW ERP';
+    const companyName = selectedCompany?.name && selectedCompany.name !== 'hi' ? selectedCompany.name : 'SKBW ERP';
     const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
     try {
       const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
 
-      doc.setFontSize(14);
-      doc.setTextColor(29, 78, 216);
+      // Header Banner Box
+      doc.setFillColor(30, 58, 138); // Deep Navy Blue
+      doc.rect(0, 0, pageWidth, 20, 'F');
+
+      // Header Text inside banner
+      doc.setFontSize(13);
+      doc.setTextColor(255, 255, 255);
       doc.setFont('helvetica', 'bold');
-      doc.text(`${companyName} — PURCHASE BATCHES REPORT`, 14, 14);
+      doc.text(`${companyName.toUpperCase()} — PURCHASE BATCHES REPORT`, 14, 13);
 
-      doc.setFontSize(9);
+      // Metadata Bar below banner
+      doc.setFontSize(8.5);
       doc.setTextColor(100, 116, 139);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Generated on ${dateStr} • Total Purchase Batches: ${invoices.length}`, 14, 20);
+      doc.setFont('helvetica', 'bold');
+      const totalRecs = invoices.length;
+      const receivedCount = invoices.filter(i => i.status === 'Posted').length;
+      const grandTotalVal = invoices.filter(i => i.status !== 'Cancelled').reduce((sum, i) => sum + (i.grandTotal || i.subTotal || 0), 0);
 
-      const headers = ['#', 'Batch No.', 'Date', 'Supplier', 'Material', 'Total Qty (KG)', 'Landed Rate/KG (₹)', 'Landed Total (₹)', 'Status'];
+      doc.text(
+        `Generated: ${dateStr}   |   Total Batches: ${totalRecs}   |   Received: ${receivedCount}   |   Total Value: Rs. ${grandTotalVal.toLocaleString('en-IN')}`,
+        14,
+        27
+      );
+
+      // Table headers matching UI columns accurately
+      const headers = [
+        '#',
+        'Batch No.',
+        'Date',
+        'Supplier',
+        'Material Lots',
+        'Total Reels',
+        'Total Reams',
+        'Total Qty',
+        'Landed Rate/KG (Rs.)',
+        'Total Value (Rs.)',
+        'Status'
+      ];
+
+      let totalReelsSum = 0;
+      let totalReamsSum = 0;
+      let totalKgSum = 0;
+      let grandTotalSum = 0;
 
       const rows = invoices.map((inv, idx) => {
-        const supplierName = typeof inv.vendorId === 'object' && inv.vendorId !== null ? (inv.vendorId.firmName || inv.vendorId.ownerName) : 'Supplier';
+        const supplierName = typeof inv.vendorId === 'object' && inv.vendorId !== null
+          ? (inv.vendorId.firmName || inv.vendorId.ownerName || 'Unknown') 
+          : 'Supplier';
+
         const firstItem = inv.items?.[0];
-        const materialName = firstItem && typeof firstItem.skuId === 'object' && firstItem.skuId !== null ? (firstItem.skuId as any).name : 'Raw Material';
-        let totalKgWeight = 0;
+        const firstSku = firstItem && typeof firstItem.skuId === 'object' && firstItem.skuId !== null ? (firstItem.skuId as any) : null;
+        const materialName = firstSku?.name || 'Raw Material';
+        const lotsCount = inv.items?.length || 0;
+        const lotsLabel = lotsCount === 1 ? materialName : `${lotsCount} Lots (${materialName})`;
+
+        let reelsCount = 0;
+        let reamsCount = 0;
+        let totalKg = 0;
+
         inv.items?.forEach(item => {
           const resolvedSku = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null;
           const fullSku = skus.find(s => s._id === (resolvedSku?._id || item.skuId)) || resolvedSku;
-          if (resolvedSku?.paperType === 'Sheets' || fullSku?.paperType === 'Sheets') {
+          const paperType = resolvedSku?.paperType || fullSku?.paperType;
+
+          if (paperType === 'Sheets') {
             const stdSheets = resolvedSku?.pages || fullSku?.pages || 500;
             const reamWeight = item.reamWeight || resolvedSku?.reamWeight || fullSku?.reamWeight || getFallbackReamWeight(fullSku || resolvedSku) || 0;
             const itemReams = (item.quantity || 0) / stdSheets;
-            totalKgWeight += itemReams * reamWeight;
+            reamsCount += itemReams;
+            totalKg += itemReams * reamWeight;
           } else if (item.reels && item.reels.length > 0) {
+            reelsCount += item.reels.length;
             const reelsWt = item.reels.reduce((s, r) => s + (Number(r.weight) || 0), 0);
-            totalKgWeight += reelsWt > 0 ? reelsWt : (item.quantity || 0);
+            totalKg += reelsWt > 0 ? reelsWt : (item.quantity || 0);
+          } else if (paperType === 'Reels') {
+            reelsCount += Number(item.reelsCount) || 1;
+            totalKg += item.quantity || 0;
           } else {
-            totalKgWeight += item.quantity || 0;
+            totalKg += item.quantity || 0;
           }
         });
 
+        if (inv.status !== 'Cancelled') {
+          totalReelsSum += reelsCount;
+          totalReamsSum += reamsCount;
+          totalKgSum += totalKg;
+        }
+
         const grandTotal = inv.grandTotal || ((inv.subTotal || 0) + (inv.freight || 0) + (inv.craneCharges || 0) + (inv.otherCharges || 0) + (inv.taxAmount || 0));
-        const landedRatePerKg = totalKgWeight > 0 ? (grandTotal / totalKgWeight) : 0;
+        if (inv.status !== 'Cancelled') {
+          grandTotalSum += grandTotal;
+        }
+
+        const landedRate = totalKg > 0 ? grandTotal / totalKg : 0;
         const formattedDate = inv.createdAt ? new Date(inv.createdAt).toLocaleDateString('en-IN') : '—';
-        const statusStr = inv.status === 'Posted' ? 'Received' : inv.status;
+        const statusLabel = inv.status === 'Posted' ? 'Received' : inv.status;
 
         return [
           idx + 1,
           inv.invoiceNumber || '—',
           formattedDate,
           supplierName,
-          materialName,
-          totalKgWeight.toLocaleString('en-IN', { maximumFractionDigits: 2 }),
-          `₹${landedRatePerKg.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-          `₹${grandTotal.toLocaleString('en-IN')}`,
-          statusStr
+          lotsLabel,
+          reelsCount > 0 ? reelsCount : '—',
+          reamsCount > 0 ? reamsCount.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '—',
+          totalKg > 0 ? `${totalKg.toLocaleString('en-IN', { maximumFractionDigits: 2 })} KG` : '—',
+          landedRate > 0 ? landedRate.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—',
+          grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+          statusLabel
         ];
       });
 
+      // Add Summary Row at the bottom
+      const summaryRow = [
+        '',
+        'TOTALS',
+        '',
+        '',
+        `${invoices.length} Batches`,
+        totalReelsSum > 0 ? String(totalReelsSum) : '—',
+        totalReamsSum > 0 ? totalReamsSum.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '—',
+        totalKgSum > 0 ? `${totalKgSum.toLocaleString('en-IN', { maximumFractionDigits: 2 })} KG` : '—',
+        '—',
+        grandTotalSum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        ''
+      ];
+
       autoTable(doc, {
-        startY: 24,
+        startY: 32,
         head: [headers],
-        body: rows,
-        theme: 'striped',
-        headStyles: { fillColor: [37, 99, 235], textColor: 255, fontSize: 9, fontStyle: 'bold' },
-        bodyStyles: { fontSize: 8, textColor: 50 },
+        body: [...rows, summaryRow],
+        theme: 'grid',
+        headStyles: {
+          fillColor: [37, 99, 235],
+          textColor: 255,
+          fontSize: 8,
+          fontStyle: 'bold',
+          halign: 'center',
+          valign: 'middle',
+          cellPadding: 2.5
+        },
+        bodyStyles: {
+          fontSize: 7.5,
+          textColor: 40,
+          valign: 'middle',
+          cellPadding: 2
+        },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 10 },
+          1: { halign: 'left', fontStyle: 'bold', cellWidth: 26 },
+          2: { halign: 'center', cellWidth: 22 },
+          3: { halign: 'left', cellWidth: 40 },
+          4: { halign: 'left', cellWidth: 48 },
+          5: { halign: 'center', cellWidth: 18 },
+          6: { halign: 'center', cellWidth: 20 },
+          7: { halign: 'right', fontStyle: 'bold', cellWidth: 26 },
+          8: { halign: 'right', cellWidth: 26 },
+          9: { halign: 'right', fontStyle: 'bold', cellWidth: 28 },
+          10: { halign: 'center', fontStyle: 'bold', cellWidth: 18 }
+        },
+        didParseCell: (data) => {
+          if (data.section === 'body' && data.row.index === rows.length) {
+            data.cell.styles.fontStyle = 'bold';
+            data.cell.styles.fillColor = [241, 245, 249];
+            data.cell.styles.textColor = [15, 23, 42];
+          }
+        },
         alternateRowStyles: { fillColor: [248, 250, 252] },
-        margin: { top: 24, left: 14, right: 14, bottom: 14 }
+        margin: { top: 32, left: 10, right: 10, bottom: 14 }
       });
 
       doc.save(`Purchase_Batches_${new Date().toISOString().slice(0, 10)}.pdf`);
-      showToast('Exported Purchase Batches to PDF successfully', 'success');
+      showToast('Exported Purchase Batches PDF successfully', 'success');
     } catch (err: any) {
       console.error('PDF Export Error:', err);
       showToast('Failed to export PDF: ' + (err.message || 'Unknown error'), 'error');
@@ -954,7 +1068,7 @@ const PurchaseInvoicePage: React.FC = () => {
       ...invoiceForm,
       items: [
         ...invoiceForm.items,
-        { skuId: '', brand: '', gsm: '', width: '', length: '', reelsCount: '', quantity: '', purchasePrice: '', reamWeight: '', ratePerKg: '', lotNumber: '', locationId: '', splits: [], reels: [] }
+        { skuId: '', brand: '', gsm: '', width: '', length: '', reelsCount: '', quantity: '', altQuantity: '', purchasePrice: '', reamWeight: '', ratePerKg: '', lotNumber: '', locationId: '', splits: [], reels: [] }
       ]
     });
   };
@@ -996,6 +1110,8 @@ const PurchaseInvoicePage: React.FC = () => {
         // Keep rate and quantity user-definable (do not auto-populate default rates)
         item.ratePerKg = '';
         item.purchasePrice = '';
+        item.quantity = '';
+        item.altQuantity = '';
 
         // Auto-assign storage location
         const firstStorage = locations.find(loc => loc.level === 'Storage Location');
@@ -1168,6 +1284,9 @@ const PurchaseInvoicePage: React.FC = () => {
     // Synchronize total lot quantity if user updates splits
     const totalAllocated = currentSplits.reduce((sum: number, s: any) => sum + (Number(s.quantity) || 0), 0);
     item.quantity = String(totalAllocated);
+    if (selectedSku?.altUnit && selectedSku?.altUnitConversion) {
+      item.altQuantity = totalAllocated === 0 ? '0' : String(convertPrimaryToAlt(totalAllocated, selectedSku));
+    }
 
     updatedItems[itemIdx] = item;
     setInvoiceForm({ ...invoiceForm, items: updatedItems });
@@ -1442,6 +1561,9 @@ const PurchaseInvoicePage: React.FC = () => {
           })(),
           reelsCount: String(item.reels?.length || 0),
           quantity: String(item.quantity),
+          altQuantity: selectedSku?.altUnit && selectedSku?.altUnitConversion
+            ? String(convertPrimaryToAlt(Number(item.quantity) || 0, selectedSku))
+            : '',
           purchasePrice: String(item.purchasePrice),
           reamWeight: item.reamWeight ? String(item.reamWeight) : ((selectedSku as any)?.reamWeight ? String((selectedSku as any).reamWeight) : ''),
           ratePerKg: item.ratePerKg ? String(item.ratePerKg) : (() => {
@@ -1831,9 +1953,9 @@ const PurchaseInvoicePage: React.FC = () => {
                 } else if (item.reels && item.reels.length > 0) {
                   hasAnyReels = true;
                   dashboardTotalReels += item.reels.length;
-                } else {
+                } else if (paperType === 'Reels') {
                   hasAnyReels = true;
-                  dashboardTotalReels += 1;
+                  dashboardTotalReels += Number(item.reelsCount) || 1;
                 }
               });
             });
@@ -2580,45 +2702,91 @@ const PurchaseInvoicePage: React.FC = () => {
                             <>
                               <div className="col-span-1 sm:col-span-2">
                                 <label className="block text-[11px] font-semibold text-blue-600 mb-1">
-                                  QTY IN {selectedSku.altUnit}
+                                  QTY IN {unitLabel} *
                                   <span className="text-[10px] font-normal text-gray-400 ml-1 font-mono">({formatUomFormula(selectedSku)})</span>
                                 </label>
                                 <input
                                   type="number"
+                                  step="any"
                                   placeholder="0"
+                                  value={item.quantity !== undefined && item.quantity !== null ? item.quantity : ''}
                                   onChange={e => {
-                                    const val = Number(e.target.value) || 0;
-                                    const primaryQty = convertAltToPrimary(val, selectedSku);
-                                    handleItemRowChange(idx, 'quantity', String(primaryQty));
+                                    const val = e.target.value;
+                                    const updatedItems = [...invoiceForm.items];
+                                    updatedItems[idx].quantity = val;
+                                    if (val === '' || val === null || val === undefined) {
+                                      updatedItems[idx].altQuantity = '';
+                                    } else {
+                                      const num = Number(val);
+                                      if (isNaN(num)) {
+                                        updatedItems[idx].altQuantity = '';
+                                      } else if (num === 0) {
+                                        updatedItems[idx].altQuantity = '0';
+                                      } else {
+                                        updatedItems[idx].altQuantity = String(convertPrimaryToAlt(num, selectedSku));
+                                      }
+                                    }
+                                    const firstStorage = locations.find(loc => loc.level === 'Storage Location');
+                                    const defaultLocId = updatedItems[idx].locationId || firstStorage?._id || '';
+                                    if (!updatedItems[idx].splits || updatedItems[idx].splits.length <= 1) {
+                                      updatedItems[idx].splits = [{ locationId: defaultLocId, quantity: val !== '' ? val : '0' }];
+                                    }
+                                    setInvoiceForm({ ...invoiceForm, items: updatedItems });
                                   }}
-                                  disabled={item.splits && item.splits.length > 0}
+                                  disabled={Boolean(item.splits && item.splits.length > 1)}
                                   className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-xs text-right font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+                                  required
                                 />
                               </div>
                               <div>
                                 <label className="block text-[11px] font-semibold text-gray-600 mb-1 flex items-center justify-between">
-                                  <span>TOTAL {unitLabel}</span>
-                                  {Number(item.quantity) > 0 && (
-                                    <span className="text-[9px] font-bold text-blue-700 font-mono">
-                                      {convertPrimaryToAlt(Number(item.quantity), selectedSku)} {selectedSku.altUnit}
-                                    </span>
-                                  )}
+                                  <span>TOTAL {selectedSku.altUnit}</span>
                                 </label>
                                 <input
                                   type="number"
-                                  value={item.quantity}
-                                  onChange={e => handleItemRowChange(idx, 'quantity', e.target.value)}
-                                  disabled={item.splits && item.splits.length > 0}
-                                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs text-right font-black focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-60"
+                                  step="any"
                                   placeholder="0"
-                                  required
+                                  value={
+                                    item.altQuantity !== undefined && item.altQuantity !== ''
+                                      ? item.altQuantity
+                                      : (item.quantity !== '' && item.quantity !== undefined
+                                          ? (Number(item.quantity) === 0 ? '0' : String(convertPrimaryToAlt(Number(item.quantity) || 0, selectedSku)))
+                                          : '')
+                                  }
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    const updatedItems = [...invoiceForm.items];
+                                    updatedItems[idx].altQuantity = val;
+                                    if (val === '' || val === null || val === undefined) {
+                                      updatedItems[idx].quantity = '';
+                                    } else {
+                                      const altNum = Number(val);
+                                      if (isNaN(altNum)) {
+                                        updatedItems[idx].quantity = '';
+                                      } else if (altNum === 0) {
+                                        updatedItems[idx].quantity = '0';
+                                      } else {
+                                        const primaryQty = convertAltToPrimary(altNum, selectedSku);
+                                        updatedItems[idx].quantity = String(primaryQty);
+                                      }
+                                    }
+                                    const firstStorage = locations.find(loc => loc.level === 'Storage Location');
+                                    const defaultLocId = updatedItems[idx].locationId || firstStorage?._id || '';
+                                    if (!updatedItems[idx].splits || updatedItems[idx].splits.length <= 1) {
+                                      updatedItems[idx].splits = [{ locationId: defaultLocId, quantity: updatedItems[idx].quantity !== '' ? updatedItems[idx].quantity : '0' }];
+                                    }
+                                    setInvoiceForm({ ...invoiceForm, items: updatedItems });
+                                  }}
+                                  disabled={Boolean(item.splits && item.splits.length > 1)}
+                                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs text-right font-black focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-60"
                                 />
                               </div>
                               <div>
                                 <label className="block text-[11px] font-semibold text-gray-600 mb-1">RATE / {unitLabel} (₹)</label>
                                 <input
                                   type="number"
-                                  value={item.purchasePrice}
+                                  step="any"
+                                  value={item.purchasePrice !== undefined && item.purchasePrice !== null ? item.purchasePrice : ''}
                                   onChange={e => handleItemRowChange(idx, 'purchasePrice', e.target.value)}
                                   className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs text-right font-bold focus:ring-2 focus:ring-blue-500 bg-white"
                                   placeholder="0.00"
@@ -2632,9 +2800,20 @@ const PurchaseInvoicePage: React.FC = () => {
                                 <label className="block text-[11px] font-semibold text-gray-600 mb-1">TOTAL {unitLabel}</label>
                                 <input
                                   type="number"
-                                  value={item.quantity}
-                                  onChange={e => handleItemRowChange(idx, 'quantity', e.target.value)}
-                                  disabled={item.splits && item.splits.length > 0}
+                                  step="any"
+                                  value={item.quantity !== undefined && item.quantity !== null ? item.quantity : ''}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    const updatedItems = [...invoiceForm.items];
+                                    updatedItems[idx].quantity = val;
+                                    const firstStorage = locations.find(loc => loc.level === 'Storage Location');
+                                    const defaultLocId = updatedItems[idx].locationId || firstStorage?._id || '';
+                                    if (!updatedItems[idx].splits || updatedItems[idx].splits.length <= 1) {
+                                      updatedItems[idx].splits = [{ locationId: defaultLocId, quantity: val !== '' ? val : '0' }];
+                                    }
+                                    setInvoiceForm({ ...invoiceForm, items: updatedItems });
+                                  }}
+                                  disabled={Boolean(item.splits && item.splits.length > 1)}
                                   className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs text-right font-black focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-60"
                                   placeholder="0"
                                   required
@@ -2645,7 +2824,8 @@ const PurchaseInvoicePage: React.FC = () => {
                                 <label className="block text-[11px] font-semibold text-gray-600 mb-1">RATE / {unitLabel} (₹)</label>
                                 <input
                                   type="number"
-                                  value={item.purchasePrice}
+                                  step="any"
+                                  value={item.purchasePrice !== undefined && item.purchasePrice !== null ? item.purchasePrice : ''}
                                   onChange={e => handleItemRowChange(idx, 'purchasePrice', e.target.value)}
                                   className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs text-right font-bold focus:ring-2 focus:ring-blue-500 bg-white"
                                   placeholder="0.00"
@@ -2755,7 +2935,8 @@ const PurchaseInvoicePage: React.FC = () => {
                                       <td className="py-2 px-3">
                                         <input
                                           type="number"
-                                          value={split.quantity || ''}
+                                          step="any"
+                                          value={split.quantity !== undefined && split.quantity !== null ? split.quantity : ''}
                                           onChange={e => handleSplitRowChange(idx, sIdx, 'quantity', e.target.value)}
                                           placeholder="0"
                                           className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-black text-right text-blue-700 focus:ring-2 focus:ring-blue-500 bg-white"
@@ -3123,9 +3304,11 @@ const PurchaseInvoicePage: React.FC = () => {
                 totalReelsCount += item.reels.length;
                 const reelsWt = item.reels.reduce((s, r) => s + (Number(r.weight) || 0), 0);
                 totalKgWeight += reelsWt > 0 ? reelsWt : (item.quantity || 0);
-              } else {
+              } else if (resolvedSku?.paperType === 'Reels' || fullSku?.paperType === 'Reels') {
                 hasReels = true;
-                totalReelsCount += 1;
+                totalReelsCount += Number(item.reelsCount) || 1;
+                totalKgWeight += item.quantity || 0;
+              } else {
                 totalKgWeight += item.quantity || 0;
               }
             });
