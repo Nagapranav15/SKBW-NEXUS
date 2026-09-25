@@ -6,6 +6,7 @@ import { PendingOrdersProductionView } from './PendingOrdersProductionView';
 import SalesOrderDetailPanelV2 from './SalesOrderDetailPanelV2';
 import SalesOrderDrawerV2 from './SalesOrderDrawerV2';
 import PrintOrderEstimationModal from './PrintOrderEstimationModal';
+import SalesOrderSuccessModal from './SalesOrderSuccessModal';
 
 const PendingOrders: React.FC = () => {
   const { selectedCompany } = useAuth();
@@ -15,6 +16,7 @@ const PendingOrders: React.FC = () => {
   const [editingOrder, setEditingOrder] = useState<SalesOrderV2 | null>(null);
   const [showDrawer, setShowDrawer] = useState(false);
   const [printEstimationOrder, setPrintEstimationOrder] = useState<SalesOrderV2 | null>(null);
+  const [successOrder, setSuccessOrder] = useState<SalesOrderV2 | null>(null);
 
   const fetchOrders = async () => {
     try {
@@ -93,8 +95,29 @@ const PendingOrders: React.FC = () => {
             }
             return [saved, ...prev];
           });
+          setSuccessOrder(saved);
         }}
       />
+
+      {successOrder && (
+        <SalesOrderSuccessModal
+          order={successOrder}
+          onClose={() => setSuccessOrder(null)}
+          onViewOrder={(ord) => {
+            setSuccessOrder(null);
+            setSelectedOrderDetail(ord);
+          }}
+          onPrintOrder={(ord) => {
+            setPrintEstimationOrder(ord);
+          }}
+          onCreateNew={() => {
+            setSuccessOrder(null);
+            setEditingOrder(null);
+            setShowDrawer(true);
+          }}
+          onGoToOrders={() => setSuccessOrder(null)}
+        />
+      )}
 
       {printEstimationOrder && (
         <PrintOrderEstimationModal

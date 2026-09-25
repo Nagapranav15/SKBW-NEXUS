@@ -182,23 +182,43 @@ export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
         onClick={e => e.stopPropagation()}
       >
         {/* ── TOP BANNER: SUCCESS & ACTIONS ── */}
-        <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 border-b border-emerald-100/80 px-6 py-4 flex items-center justify-between shrink-0">
+        <div className={`border-b px-6 py-4 flex items-center justify-between shrink-0 ${
+          order.status === 'Draft'
+            ? 'bg-gradient-to-r from-amber-50 via-yellow-50 to-orange-50 border-amber-200/80'
+            : 'bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 border-emerald-100/80'
+        }`}>
           <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-md shadow-emerald-200 shrink-0">
+            <div className={`w-11 h-11 rounded-2xl text-white flex items-center justify-center shadow-md shrink-0 ${
+              order.status === 'Draft'
+                ? 'bg-amber-500 shadow-amber-200'
+                : 'bg-emerald-500 shadow-emerald-200'
+            }`}>
               <CheckCircle className="w-6 h-6" strokeWidth={2.5} />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl font-black text-gray-900 tracking-tight">Sales Order Created Successfully!</h1>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-black font-mono bg-emerald-100 text-emerald-800 border border-emerald-300">
+                <h1 className="text-xl font-black text-gray-900 tracking-tight">
+                  {order.status === 'Draft' ? 'Draft Sales Order Saved Successfully!' : 'Sales Order Created Successfully!'}
+                </h1>
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-black font-mono border ${
+                  order.status === 'Draft'
+                    ? 'bg-amber-100 text-amber-800 border-amber-300'
+                    : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                }`}>
                   {order.orderNumber}
                 </span>
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800">
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                  order.status === 'Draft'
+                    ? 'bg-amber-200 text-amber-900'
+                    : 'bg-blue-100 text-blue-800'
+                }`}>
                   {order.status || 'Confirmed'}
                 </span>
               </div>
               <p className="text-xs text-gray-600 mt-0.5">
-                Saved on {fmtDate(order.orderDate)} • Ready for Production & Dispatch Planning
+                {order.status === 'Draft'
+                  ? `Saved on ${fmtDate(order.orderDate)} • Draft order saved and can be reviewed, edited, or confirmed anytime`
+                  : `Saved on ${fmtDate(order.orderDate)} • Ready for Production & Dispatch Planning`}
               </p>
             </div>
           </div>
