@@ -23,6 +23,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { generateFullDashboardOrders, INITIAL_FEATURED_ORDERS } from './salesOrderSampleData';
 import { PendingOrdersProductionView } from './PendingOrdersProductionView';
+import { getCustomSalesOrders, saveCustomSalesOrder } from '../../utils/salesOrderStorage';
 
 // Custom SVG WhatsApp icon matching site vibe
 const WhatsAppIcon: React.FC<{ className?: string }> = ({ 
@@ -164,15 +165,46 @@ const SalesOrders: React.FC = () => {
           };
         });
         setOrders(enriched);
+        const customOrders = getCustomSalesOrders();
+        if (customOrders.length > 0) {
+          const merged = [...customOrders];
+          enriched.forEach(bo => {
+            if (!merged.some(co => (co._id && bo._id && co._id === bo._id) || (co.orderNumber && bo.orderNumber && co.orderNumber === bo.orderNumber))) {
+              merged.push(bo);
+            }
+          });
+          setOrders(merged);
+        } else {
+          setOrders(enriched);
+        }
       } else {
         // Use realistic sample dataset of 124 records matching the screenshot dashboard perfectly
         const mockDashboardOrders = generateFullDashboardOrders();
-        setOrders(mockDashboardOrders);
+        const customOrders = getCustomSalesOrders();
+        if (customOrders.length > 0) {
+          const merged = [...customOrders];
+          mockDashboardOrders.forEach(bo => {
+            if (!merged.some(co => (co._id && bo._id && co._id === bo._id) || (co.orderNumber && bo.orderNumber && co.orderNumber === bo.orderNumber))) {
+              merged.push(bo);
+            }
+          });
+          setOrders(merged);
+        } else {
+          setOrders(mockDashboardOrders);
+        }
       }
     } catch (err) {
       console.error(err);
       showToast('Loaded demo sales orders', 'info');
-      setOrders(generateFullDashboardOrders());
+      const customOrders = getCustomSalesOrders();
+      const mockDashboardOrders = generateFullDashboardOrders();
+      const merged = [...customOrders];
+      mockDashboardOrders.forEach(bo => {
+        if (!merged.some(co => (co._id && bo._id && co._id === bo._id) || (co.orderNumber && bo.orderNumber && co.orderNumber === bo.orderNumber))) {
+          merged.push(bo);
+        }
+      });
+      setOrders(merged);
     } finally {
       setLoading(false);
     }
@@ -528,10 +560,16 @@ const SalesOrders: React.FC = () => {
   const handleConfirmCancelOrder = async () => {
     if (!cancellingOrder) return;
     try {
-      if (cancellingOrder._id && !cancellingOrder._id.startsWith('so-mock-')) {
-        await updateSalesOrderV2Status(cancellingOrder._id, { status: 'Cancelled' });
+      if (cancellingOrder._id && !cancellingOrder._id.startsWith('so-mock-') && !cancellingOrder._id.startsWith('so-user-')) {
+        try {
+          await updateSalesOrderV2Status(cancellingOrder._id, { status: 'Cancelled' });
+        } catch (apiErr) {
+          console.warn('API error cancelling order:', apiErr);
+        }
       }
-      setOrders(prev => prev.map(o => o._id === cancellingOrder._id ? { ...o, status: 'Cancelled' } : o));
+      const updatedCancelled = { ...cancellingOrder, status: 'Cancelled' as const };
+      saveCustomSalesOrder(updatedCancelled);
+      setOrders(prev => prev.map(o => o._id === cancellingOrder._id ? updatedCancelled : o));
       showToast(`Sales Order ${cancellingOrder.orderNumber} cancelled successfully`, 'success');
       setCancellingOrder(null);
     } catch (err) {
@@ -543,8 +581,9 @@ const SalesOrders: React.FC = () => {
   // WhatsApp Sender
   const handleTriggerWhatsApp = (order: SalesOrderV2) => {
     const phone = (order.customerPhone || '9988776655').replace(/\D/g, '');
+    const statusDesc = order.status === 'Draft' ? 'saved as Draft' : 'confirmed';
     const msg = encodeURIComponent(
-      `Namaste *${order.customerName}*,\n\nYour Sales Order *${order.orderNumber}* for *₹${(order.grandTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}* is confirmed and scheduled for dispatch by *${order.promisedDate || 'soon'}*.\n\nThank you for choosing *${selectedCompany?.name || 'SKBW Core'}*!`
+      `Namaste *${order.customerName}*,\n\nYour Sales Order *${order.orderNumber}* for *₹${(order.grandTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}* is ${statusDesc} and scheduled for dispatch by *${order.promisedDate || 'soon'}*.\n\nThank you!`
     );
     const waUrl = `https://wa.me/91${phone}?text=${msg}`;
     window.open(waUrl, '_blank');
@@ -1398,6 +1437,7 @@ const SalesOrders: React.FC = () => {
         onClose={() => setShowDrawer(false)}
         onSaveSuccess={(saved) => {
           setShowDrawer(false);
+          saveCustomSalesOrder(saved);
           // Prepend newly created/updated order
           setOrders(prev => {
             const idx = prev.findIndex(o => o._id === saved._id || o.orderNumber === saved.orderNumber);
@@ -1505,7 +1545,7 @@ const SalesOrders: React.FC = () => {
 
             <div className="p-3 bg-emerald-50/70 border border-emerald-100 rounded-2xl text-xs text-emerald-950 font-medium leading-relaxed">
               <p className="text-[10.5px] font-bold text-emerald-700 uppercase tracking-wider mb-1">Message Preview:</p>
-              "Namaste <strong>{whatsappOrder.customerName}</strong>, your Sales Order <strong>{whatsappOrder.orderNumber}</strong> for <strong>₹{whatsappOrder.grandTotal?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> is confirmed and scheduled for dispatch by <strong>{whatsappOrder.promisedDate || 'soon'}</strong>. Thank you for choosing {selectedCompany?.name || 'SKBW Core'}!"
+              "Namaste <strong>{whatsappOrder.customerName}</strong>, your Sales Order <strong>{whatsappOrder.orderNumber}</strong> for <strong>₹{whatsappOrder.grandTotal?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> is {whatsappOrder.status === 'Draft' ? 'saved as Draft' : 'confirmed'} and scheduled for dispatch by <strong>{whatsappOrder.promisedDate || 'soon'}</strong>. Thank you!"
             </div>
 
             <div className="flex items-center justify-end gap-2.5 pt-2">

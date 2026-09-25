@@ -126,26 +126,15 @@ export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
       showToast('No phone number found for this customer', 'error');
       return;
     }
+    const statusText = order.status === 'Draft' ? 'saved as Draft' : 'created and confirmed';
     const msg = encodeURIComponent(
-      `Namaste *${order.customerName}*,\n\nYour Sales Order *${order.orderNumber}* for *${fmtMoney(grandTotal)}* has been created and confirmed.\n\n• *Items:* ${itemsCount} SKU(s)\n• *Expected Delivery:* ${fmtDate(order.promisedDate)}\n• *Transporter:* ${order.transporter || 'Chennupati Cargo Services'}\n\nThank you for choosing *${selectedCompany?.name || 'SKBW Core'}*!`
+      `Namaste *${order.customerName}*,\n\nYour Sales Order *${order.orderNumber}* for *${fmtMoney(grandTotal)}* has been ${statusText}.\n\n• *Items:* ${itemsCount} SKU(s)\n• *Expected Delivery:* ${fmtDate(order.promisedDate)}\n• *Transporter:* ${order.transporter || 'Chennupati Cargo Services'}\n\nThank you!`
     );
     window.open(`https://wa.me/91${phone}?text=${msg}`, '_blank');
   };
 
   return (
     <div className="w-full max-w-6xl mx-auto space-y-6 pb-12 animate-in fade-in duration-300">
-      {/* ── BREADCRUMBS (Matching Screenshot 1:1) ── */}
-      <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
-        <button onClick={onGoToOrders} className="hover:text-blue-600 transition-colors cursor-pointer">
-          Sales
-        </button>
-        <span>/</span>
-        <button onClick={onGoToOrders} className="hover:text-blue-600 transition-colors cursor-pointer">
-          Orders
-        </button>
-        <span>/</span>
-        <span className="text-gray-900 font-bold">Create Sales Order</span>
-      </div>
 
       {/* ── HERO CELEBRATION (Matching Screenshot 1:1) ── */}
       <div className="relative py-4 text-center">

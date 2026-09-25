@@ -17,6 +17,7 @@ import {
   OtherChargeItem 
 } from '../../api/salesOrderApiV2';
 import { MOCK_SALES_ORDERS_V2 } from './salesOrderSampleData';
+import { saveCustomSalesOrder } from '../../utils/salesOrderStorage';
 
 import { showToast } from '../ui/Toast';
 
@@ -1018,33 +1019,55 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   const handleSaveOrder = async (overrideStatus?: string) => {
     setErrorMsg('');
 
-    if (!selectedCustomer && !customerSearch.trim()) {
+    const finalStatus = overrideStatus || orderStatus || 'Confirmed';
+    const isDraft = finalStatus === 'Draft';
+
+    if (!isDraft && !selectedCustomer && !customerSearch.trim()) {
       showToast('Please select or specify a Customer', 'error');
       return;
     }
 
-    const validItems = items.filter(i => i.itemName.trim() && Number(i.totalPcs) > 0);
-    if (validItems.length === 0) {
+    const validItems = items.filter(i => i.itemName.trim() && (isDraft || Number(i.totalPcs) > 0));
+    if (!isDraft && validItems.length === 0) {
       showToast('Please enter at least one valid product with total pcs > 0', 'error');
       return;
     }
 
     const validCharges = otherCharges.filter(c => c.name && c.name.trim() !== '');
-    if (validCharges.length === 0) {
+    if (!isDraft && validCharges.length === 0) {
       showToast('Order Charges are mandatory. Please select at least one preset charge.', 'error');
       return;
     }
 
     setIsSaving(true);
     try {
-      const finalStatus = overrideStatus || orderStatus || 'Confirmed';
-      const processedItems: SalesOrderItemV2[] = validItems.map(i => ({
+      const itemsToMap = validItems.length > 0 
+        ? validItems 
+        : items.filter(i => i.itemName.trim()).length > 0 
+          ? items.filter(i => i.itemName.trim()) 
+          : [{
+              skuId: '',
+              skuCode: 'SKU-001',
+              itemName: 'Draft Item',
+              category: 'Finished Goods',
+              uom: 'Pcs',
+              stockGbl: 0,
+              gbl: 0,
+              pcsPerGbl: 1,
+              totalPcs: 1,
+              rate: 0,
+              discPercent: 0,
+              discAmount: 0,
+              amount: 0
+            }];
+
+      const processedItems: SalesOrderItemV2[] = itemsToMap.map(i => ({
         skuId: i.skuId || undefined,
         skuCode: i.skuCode || 'SKU-001',
-        itemName: i.itemName.trim(),
+        itemName: i.itemName.trim() || 'Item',
         category: i.category || 'Finished Goods',
         uom: i.uom || 'Pcs',
-        quantity: Number(i.totalPcs),
+        quantity: Number(i.totalPcs) || 1,
         gbl: Number(i.gbl) || 0,
         pcsPerGbl: Number(i.pcsPerGbl) || 1,
         unitPrice: Number(i.rate) || 0,
@@ -1058,7 +1081,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
         orderNumber: orderNumber || `SO-${Date.now().toString().slice(-4)}`,
         company: companyId,
         customer: selectedCustomer?._id || undefined,
-        customerName: customerSearch.trim() || selectedCustomer?.firmName || 'Customer',
+        customerName: customerSearch.trim() || selectedCustomer?.firmName || (isDraft ? 'Draft Customer' : 'Customer'),
         customerPhone: billingAddress.phone || selectedCustomer?.phone || selectedCustomer?.mobile || '',
         city: billingAddress.city || selectedCustomer?.city || '',
         region: billingAddress.state || selectedCustomer?.state || '',
@@ -1078,28 +1101,52 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
         grandTotal: totals.grandTotal,
         status: finalStatus as any,
         materialsStatus: 'Ready',
-        fulfillmentStatus: finalStatus === 'Draft' ? 'Pending' : 'Pending'
+        fulfillmentStatus: 'Pending'
       };
 
       let saved: SalesOrderV2;
-      if (editOrder?._id && !editOrder._id.startsWith('so-mock-')) {
-        saved = await updateSalesOrderV2(editOrder._id, payload);
+      const isLocalId = !editOrder?._id || editOrder._id.startsWith('so-mock-') || editOrder._id.startsWith('so-user-');
+
+      if (editOrder?._id && !isLocalId) {
+        try {
+          saved = await updateSalesOrderV2(editOrder._id, payload);
+        } catch (apiErr) {
+          console.warn('API update failed, updating locally:', apiErr);
+          saved = {
+            ...editOrder,
+            ...payload,
+            _id: editOrder._id,
+            updatedAt: new Date().toISOString()
+          } as SalesOrderV2;
+        }
+      } else if (editOrder?._id && isLocalId) {
+        saved = {
+          ...editOrder,
+          ...payload,
+          _id: editOrder._id,
+          updatedAt: new Date().toISOString()
+        } as SalesOrderV2;
       } else {
         try {
           saved = await createSalesOrderV2(payload);
         } catch (apiErr) {
-          console.warn('API error, saving locally:', apiErr);
+          console.warn('API create failed, saving locally:', apiErr);
           saved = {
             ...payload,
-            _id: `so-user-${Date.now()}`
+            _id: `so-user-${Date.now()}`,
+            createdAt: new Date().toISOString()
           } as SalesOrderV2;
         }
       }
 
+      // Persist to custom localStorage so drafts & updates survive refresh
+      saveCustomSalesOrder(saved);
+      showToast(isDraft ? 'Draft Sales Order saved successfully' : 'Sales Order saved successfully', 'success');
+
       onSaveSuccess(saved);
       onClose();
     } catch (err: any) {
-      console.error(err);
+      console.error('Error saving order:', err);
       showToast(err.response?.data?.msg || err.message || 'Failed to save Sales Order', 'error');
     } finally {
       setIsSaving(false);

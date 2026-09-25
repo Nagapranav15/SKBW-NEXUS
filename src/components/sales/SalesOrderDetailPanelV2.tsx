@@ -211,7 +211,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
   const handleWhatsApp = () => {
     const phone = (order.customerPhone || custObj?.phone || '').replace(/\D/g, '');
     if (!phone) { showToast('No phone number found for this customer', 'error'); return; }
-    const msg = encodeURIComponent(`Namaste *${order.customerName}*, your Sales Order *${order.orderNumber}* for *${fmtMoney(grandTotal)}* is ${order.status}. Thank you for choosing *${selectedCompany?.name || 'SKBW'}*!`);
+    const msg = encodeURIComponent(`Namaste *${order.customerName}*, your Sales Order *${order.orderNumber}* for *${fmtMoney(grandTotal)}* is ${order.status}. Thank you!`);
     window.open(`https://wa.me/91${phone}?text=${msg}`, '_blank');
   };
 
