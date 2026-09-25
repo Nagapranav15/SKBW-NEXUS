@@ -804,139 +804,143 @@ const SalesOrders: React.FC = () => {
             </div>
           </div>
 
-          {/* 3. Statistics Cards (5 Cards Grid) */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
-            {/* Card 1: TOTAL ORDERS */}
-            <button
-              onClick={() => { setStatusFilter('all'); }}
-              className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
-                statusFilter === 'all' 
-                  ? 'bg-blue-50/40 border-blue-400 ring-2 ring-blue-100' 
-                  : 'bg-white border-gray-200/80 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Total Orders</span>
-                <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-              </div>
-              <p className="text-2xl font-black text-gray-900 mt-1 font-mono">{metrics.totalOrders}</p>
-            </button>
+          {/* 3. Statistics Cards (5 Cards Grid) - Hidden on Pending tab */}
+          {statusFilter !== 'Pending' && (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
+              {/* Card 1: TOTAL ORDERS */}
+              <button
+                onClick={() => { setStatusFilter('all'); }}
+                className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
+                  statusFilter === 'all' 
+                    ? 'bg-blue-50/40 border-blue-400 ring-2 ring-blue-100' 
+                    : 'bg-white border-gray-200/80 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Total Orders</span>
+                  <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                </div>
+                <p className="text-2xl font-black text-gray-900 mt-1 font-mono">{metrics.totalOrders}</p>
+              </button>
 
-            {/* Card 2: CONFIRMED ORDERS */}
-            <button
-              onClick={() => { setStatusFilter('Confirmed'); }}
-              className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
-                statusFilter === 'Confirmed' 
-                  ? 'bg-emerald-50/40 border-emerald-400 ring-2 ring-emerald-100' 
-                  : 'bg-white border-gray-200/80 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Confirmed</span>
-                <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
-              </div>
-              <p className="text-2xl font-black text-emerald-600 mt-1 font-mono">{orders.filter(o => o.status === 'Confirmed').length}</p>
-            </button>
+              {/* Card 2: CONFIRMED ORDERS */}
+              <button
+                onClick={() => { setStatusFilter('Confirmed'); }}
+                className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
+                  statusFilter === 'Confirmed' 
+                    ? 'bg-emerald-50/40 border-emerald-400 ring-2 ring-emerald-100' 
+                    : 'bg-white border-gray-200/80 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Confirmed</span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                </div>
+                <p className="text-2xl font-black text-emerald-600 mt-1 font-mono">{orders.filter(o => o.status === 'Confirmed').length}</p>
+              </button>
 
-            {/* Card 3: PENDING ORDERS */}
-            <button
-              onClick={() => { setStatusFilter('Pending'); }}
-              className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
-                statusFilter === 'Pending' 
-                  ? 'bg-amber-50/40 border-amber-400 ring-2 ring-amber-100' 
-                  : 'bg-white border-gray-200/80 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Pending</span>
-                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-              </div>
-              <p className="text-2xl font-black text-amber-600 mt-1 font-mono">{metrics.pendingCount}</p>
-            </button>
+              {/* Card 3: PENDING ORDERS */}
+              <button
+                onClick={() => { setStatusFilter('Pending'); }}
+                className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
+                  statusFilter === 'Pending' 
+                    ? 'bg-amber-50/40 border-amber-400 ring-2 ring-amber-100' 
+                    : 'bg-white border-gray-200/80 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Pending</span>
+                  <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                </div>
+                <p className="text-2xl font-black text-amber-600 mt-1 font-mono">{metrics.pendingCount}</p>
+              </button>
 
-            {/* Card 4: DRAFT ORDERS */}
-            <button
-              onClick={() => { setStatusFilter('Draft'); }}
-              className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
-                statusFilter === 'Draft' 
-                  ? 'bg-slate-100/60 border-slate-400 ring-2 ring-slate-100' 
-                  : 'bg-white border-gray-200/80 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Draft</span>
-                <span className="w-2 h-2 rounded-full bg-slate-500"></span>
-              </div>
-              <p className="text-2xl font-black text-slate-700 mt-1 font-mono">{metrics.draftCount}</p>
-            </button>
+              {/* Card 4: DRAFT ORDERS */}
+              <button
+                onClick={() => { setStatusFilter('Draft'); }}
+                className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
+                  statusFilter === 'Draft' 
+                    ? 'bg-slate-100/60 border-slate-400 ring-2 ring-slate-100' 
+                    : 'bg-white border-gray-200/80 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Draft</span>
+                  <span className="w-2 h-2 rounded-full bg-slate-500"></span>
+                </div>
+                <p className="text-2xl font-black text-slate-700 mt-1 font-mono">{metrics.draftCount}</p>
+              </button>
 
-            {/* Card 5: TOTAL VALUE */}
-            <div className="w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 bg-white border-gray-200/80">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Total Value</span>
-                <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+              {/* Card 5: TOTAL VALUE */}
+              <div className="w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 bg-white border-gray-200/80">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Total Value</span>
+                  <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+                </div>
+                <p className="text-2xl font-black text-purple-700 mt-1 font-mono">₹{Math.round(metrics.totalAmount).toLocaleString('en-IN')}</p>
               </div>
-              <p className="text-2xl font-black text-purple-700 mt-1 font-mono">₹{Math.round(metrics.totalAmount).toLocaleString('en-IN')}</p>
             </div>
-          </div>
+          )}
 
-          {/* 4. Table Card Container with Filter Toolbar */}
-          <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden space-y-0">
-            {/* Filter Sub-bar */}
-            <div className="bg-gray-50/50 border-b border-gray-200 px-4 py-2.5 flex items-center justify-between flex-wrap gap-2 text-xs font-semibold text-gray-600">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Region:</span>
-                <select
-                  value={regionFilter}
-                  onChange={e => setRegionFilter(e.target.value)}
-                  className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 shadow-2xs focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                >
-                  <option value="all">All Regions ({availableRegions.length})</option>
-                  {availableRegions.map(r => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                </select>
-
-                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider ml-2">Agent:</span>
-                <select
-                  value={agentFilter}
-                  onChange={e => setAgentFilter(e.target.value)}
-                  className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 shadow-2xs focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                >
-                  <option value="all">All Agents ({availableAgents.length})</option>
-                  {availableAgents.map(a => (
-                    <option key={a} value={a}>{a}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Date Range:</span>
-                <div className="flex items-center gap-1.5 border border-gray-200 rounded-xl px-2.5 py-1 bg-white text-xs font-semibold shadow-2xs">
+          {/* 4. Table Card Container with Filter Toolbar - Hidden on Pending tab */}
+          {statusFilter !== 'Pending' && (
+            <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden space-y-0">
+              {/* Filter Sub-bar */}
+              <div className="bg-gray-50/50 border-b border-gray-200 px-4 py-2.5 flex items-center justify-between flex-wrap gap-2 text-xs font-semibold text-gray-600">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Region:</span>
                   <select
-                    value={dateRangeFilter}
-                    onChange={(e) => setDateRangeFilter(e.target.value)}
-                    className="bg-transparent border-none text-xs font-semibold text-gray-700 cursor-pointer focus:outline-none font-mono"
+                    value={regionFilter}
+                    onChange={e => setRegionFilter(e.target.value)}
+                    className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 shadow-2xs focus:ring-2 focus:ring-blue-500 cursor-pointer"
                   >
-                    <option value="sep_2026">01/09/2026 – 30/09/2026</option>
-                    <option value="this_month">This Month</option>
-                    <option value="last_30d">Last 30 Days</option>
-                    <option value="last_90d">Last 90 Days</option>
-                    <option value="all">All Dates</option>
+                    <option value="all">All Regions ({availableRegions.length})</option>
+                    {availableRegions.map(r => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+
+                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider ml-2">Agent:</span>
+                  <select
+                    value={agentFilter}
+                    onChange={e => setAgentFilter(e.target.value)}
+                    className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 shadow-2xs focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                  >
+                    <option value="all">All Agents ({availableAgents.length})</option>
+                    {availableAgents.map(a => (
+                      <option key={a} value={a}>{a}</option>
+                    ))}
                   </select>
                 </div>
 
-                {(search || statusFilter !== 'all' || regionFilter !== 'all' || agentFilter !== 'all' || dateRangeFilter !== 'sep_2026') && (
-                  <button
-                    onClick={handleResetFilters}
-                    className="text-blue-600 hover:text-blue-800 text-xs font-bold px-2 py-1 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                  >
-                    Clear Filters
-                  </button>
-                )}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Date Range:</span>
+                  <div className="flex items-center gap-1.5 border border-gray-200 rounded-xl px-2.5 py-1 bg-white text-xs font-semibold shadow-2xs">
+                    <select
+                      value={dateRangeFilter}
+                      onChange={(e) => setDateRangeFilter(e.target.value)}
+                      className="bg-transparent border-none text-xs font-semibold text-gray-700 cursor-pointer focus:outline-none font-mono"
+                    >
+                      <option value="sep_2026">01/09/2026 – 30/09/2026</option>
+                      <option value="this_month">This Month</option>
+                      <option value="last_30d">Last 30 Days</option>
+                      <option value="last_90d">Last 90 Days</option>
+                      <option value="all">All Dates</option>
+                    </select>
+                  </div>
+
+                  {(search || statusFilter !== 'all' || regionFilter !== 'all' || agentFilter !== 'all' || dateRangeFilter !== 'sep_2026') && (
+                    <button
+                      onClick={handleResetFilters}
+                      className="text-blue-600 hover:text-blue-800 text-xs font-bold px-2 py-1 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                    >
+                      Clear Filters
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
       {/* ── ADVANCED FILTERS DRAWER (COLLAPSIBLE) ── */}
       {showAdvancedFilters && (

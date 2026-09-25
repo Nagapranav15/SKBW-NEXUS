@@ -3,7 +3,8 @@ import {
   Factory, Package, AlertTriangle, CheckCircle2, Clock,
   ChevronDown, ChevronRight, Search, Download, Printer,
   Eye, Play, RefreshCw, Layers, Calendar, Filter, ArrowUpDown,
-  Building, Phone, ArrowRight, ShieldCheck, Box
+  Building, Phone, ArrowRight, ShieldCheck, Box, Sparkles,
+  TrendingUp, Check, MessageSquare, Tag, Zap, X
 } from 'lucide-react';
 import { SalesOrderV2 } from '../../api/salesOrderApiV2';
 import { getBalancesV2, getSkusV2 } from '../../api/mfgApiV2';
@@ -354,115 +355,168 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
     window.print();
   };
 
+  // WhatsApp quick notification
+  const openWhatsAppChat = (customerName: string, phone?: string, orderNumber?: string, balanceGbl?: number, dueDate?: string) => {
+    if (!phone) {
+      showToast('No phone number available for this customer', 'warning');
+      return;
+    }
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    const phoneWithCountry = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+    const msg = `Dear ${customerName}, update regarding Sales Order #${orderNumber || ''}: Balance pending is ${balanceGbl || 0} GBL scheduled for delivery by ${dueDate || 'earliest'}.`;
+    window.open(`https://wa.me/${phoneWithCountry}?text=${encodeURIComponent(msg)}`, '_blank');
+  };
+
   return (
     <div className="space-y-4 animate-in fade-in-50 duration-200">
-      {/* ── TOP KPI BAR (TALLY PRODUCTION MATRIX SUMMARY) ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      {/* ── TOP KPI BAR (HIGH-TECH PRODUCTION & SHORTFALL MATRIX) ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
         {/* KPI 1: Total Pending Orders */}
-        <div className="bg-white rounded-2xl border border-gray-200/80 p-3.5 shadow-2xs">
-          <div className="flex items-center justify-between">
+        <div className="bg-gradient-to-br from-amber-500/[0.08] via-amber-500/[0.02] to-white border border-amber-200/90 rounded-2xl p-4 shadow-3xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group">
+          <Clock className="absolute -right-3 -bottom-3 w-20 h-20 text-amber-500/10 pointer-events-none group-hover:scale-110 group-hover:rotate-6 transition-transform duration-500" />
+          <div className="flex items-center justify-between relative z-10">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Pending Orders</span>
-            <div className="w-6 h-6 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-              <Clock className="w-3.5 h-3.5" />
+            <div className="w-7 h-7 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shadow-xs">
+              <Clock className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-gray-900 font-mono">{kpis.totalOrders}</span>
-            <span className="text-xs text-gray-500 font-medium">Orders</span>
+          <div className="mt-2 flex items-baseline gap-2 relative z-10">
+            <span className="text-3xl font-black text-gray-950 font-mono tracking-tight">{kpis.totalOrders}</span>
+            <span className="text-[11px] font-bold text-amber-700 bg-amber-100/90 px-2 py-0.5 rounded-full border border-amber-200/60">Active Queue</span>
           </div>
+          <p className="text-[11px] text-gray-500 font-medium mt-1 relative z-10 flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+            <span>{pendingOrders.length} sales orders in queue</span>
+          </p>
         </div>
 
         {/* KPI 2: Total Pending Demand */}
-        <div className="bg-white rounded-2xl border border-gray-200/80 p-3.5 shadow-2xs">
-          <div className="flex items-center justify-between">
+        <div className="bg-gradient-to-br from-blue-500/[0.08] via-indigo-500/[0.02] to-white border border-blue-200/90 rounded-2xl p-4 shadow-3xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group">
+          <Package className="absolute -right-3 -bottom-3 w-20 h-20 text-blue-500/10 pointer-events-none group-hover:scale-110 group-hover:-rotate-6 transition-transform duration-500" />
+          <div className="flex items-center justify-between relative z-10">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Pending Demand</span>
-            <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-              <Package className="w-3.5 h-3.5" />
+            <div className="w-7 h-7 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shadow-xs">
+              <Package className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-black text-blue-700 font-mono">{kpis.totalPendingGbl.toLocaleString()}</span>
-            <span className="text-xs font-bold text-blue-600">GBL</span>
-            <span className="text-[11px] text-gray-400 font-mono">({kpis.totalPendingPcs.toLocaleString()} Pcs)</span>
+          <div className="mt-2 flex items-baseline gap-2 relative z-10">
+            <span className="text-3xl font-black text-blue-700 font-mono tracking-tight">{kpis.totalPendingGbl.toLocaleString()}</span>
+            <span className="text-xs font-black text-blue-600 bg-blue-100/80 px-2 py-0.5 rounded-md border border-blue-200/60">GBL</span>
           </div>
+          <p className="text-[11px] text-gray-500 font-medium mt-1 relative z-10 font-mono">
+            {kpis.totalPendingPcs.toLocaleString()} Pieces demanded
+          </p>
         </div>
 
         {/* KPI 3: Finished Stock in Hand */}
-        <div className="bg-white rounded-2xl border border-gray-200/80 p-3.5 shadow-2xs">
-          <div className="flex items-center justify-between">
+        <div className="bg-gradient-to-br from-emerald-500/[0.08] via-teal-500/[0.02] to-white border border-emerald-200/90 rounded-2xl p-4 shadow-3xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group">
+          <Box className="absolute -right-3 -bottom-3 w-20 h-20 text-emerald-500/10 pointer-events-none group-hover:scale-110 transition-transform duration-500" />
+          <div className="flex items-center justify-between relative z-10">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Stock In Hand</span>
-            <div className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <Box className="w-3.5 h-3.5" />
+            <div className="w-7 h-7 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shadow-xs">
+              <Box className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-black text-emerald-600 font-mono">{kpis.totalStockGbl.toLocaleString()}</span>
-            <span className="text-xs font-bold text-emerald-600">GBL</span>
-            <span className="text-[11px] text-gray-400 font-medium">Available</span>
+          <div className="mt-2 flex items-baseline gap-2 relative z-10">
+            <span className="text-3xl font-black text-emerald-600 font-mono tracking-tight">{kpis.totalStockGbl.toLocaleString()}</span>
+            <span className="text-xs font-black text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md border border-emerald-200/60">GBL</span>
           </div>
+          <p className="text-[11px] text-emerald-700 font-medium mt-1 relative z-10 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>Live inventory in warehouse</span>
+          </p>
         </div>
 
-        {/* KPI 4: Net Production Shortfall */}
-        <div className="bg-white rounded-2xl border border-rose-200/90 bg-rose-50/20 p-3.5 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-rose-700 uppercase tracking-wider">To Produce (Shortfall)</span>
-            <div className="w-6 h-6 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center">
-              <Factory className="w-3.5 h-3.5" />
+        {/* KPI 4: Net Production Shortfall (Hero Action Card) */}
+        <div className="bg-gradient-to-br from-rose-500/[0.12] via-rose-500/[0.03] to-white border-2 border-rose-300 rounded-2xl p-4 shadow-xs shadow-rose-500/10 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group">
+          <Factory className="absolute -right-3 -bottom-3 w-20 h-20 text-rose-500/10 pointer-events-none group-hover:scale-110 transition-transform duration-500" />
+          <div className="flex items-center justify-between relative z-10">
+            <span className="text-[11px] font-bold text-rose-800 uppercase tracking-wider">To Produce (Shortfall)</span>
+            <div className="w-7 h-7 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shadow-xs">
+              <Factory className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-black text-rose-600 font-mono">{kpis.totalShortfallGbl.toLocaleString()}</span>
-            <span className="text-xs font-bold text-rose-600">GBL</span>
-            <span className="text-[11px] text-rose-500 font-mono">({kpis.totalShortfallPcs.toLocaleString()} Pcs)</span>
+          <div className="mt-2 flex items-baseline gap-2 relative z-10">
+            <span className="text-3xl font-black text-rose-600 font-mono tracking-tight">{kpis.totalShortfallGbl.toLocaleString()}</span>
+            <span className="text-xs font-black text-rose-700 bg-rose-100 px-2 py-0.5 rounded-md border border-rose-200/80">GBL</span>
+          </div>
+          <div className="mt-2 space-y-1 relative z-10">
+            <div className="flex justify-between text-[10px] font-bold text-rose-700 font-mono">
+              <span>{kpis.totalShortfallPcs.toLocaleString()} Pcs needed</span>
+              <span>{kpis.totalPendingGbl > 0 ? Math.round((kpis.totalShortfallGbl / kpis.totalPendingGbl) * 100) : 0}% deficit</span>
+            </div>
+            <div className="w-full bg-rose-200/60 rounded-full h-1.5 overflow-hidden">
+              <div 
+                className="bg-gradient-to-r from-rose-500 to-red-600 h-1.5 rounded-full transition-all duration-700" 
+                style={{ width: `${Math.min(100, kpis.totalPendingGbl > 0 ? (kpis.totalShortfallGbl / kpis.totalPendingGbl) * 100 : 0)}%` }} 
+              />
+            </div>
           </div>
         </div>
 
         {/* KPI 5: Ready for Immediate Dispatch */}
-        <div className="bg-white rounded-2xl border border-gray-200/80 p-3.5 shadow-2xs col-span-2 sm:col-span-1">
-          <div className="flex items-center justify-between">
+        <div className="bg-gradient-to-br from-teal-500/[0.08] via-emerald-500/[0.02] to-white border border-teal-200/90 rounded-2xl p-4 shadow-3xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group col-span-2 sm:col-span-1">
+          <ShieldCheck className="absolute -right-3 -bottom-3 w-20 h-20 text-teal-500/10 pointer-events-none group-hover:scale-110 transition-transform duration-500" />
+          <div className="flex items-center justify-between relative z-10">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Ready To Dispatch</span>
-            <div className="w-6 h-6 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center">
-              <ShieldCheck className="w-3.5 h-3.5" />
+            <div className="w-7 h-7 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center shadow-xs">
+              <ShieldCheck className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-teal-700 font-mono">{kpis.readyOrdersCount}</span>
-            <span className="text-xs text-teal-600 font-medium">Orders 100% in stock</span>
+          <div className="mt-2 flex items-baseline gap-2 relative z-10">
+            <span className="text-3xl font-black text-teal-700 font-mono tracking-tight">{kpis.readyOrdersCount}</span>
+            <span className="text-[11px] font-bold text-teal-700 bg-teal-100/90 px-2 py-0.5 rounded-full border border-teal-200/60">100% Stocked</span>
+          </div>
+          <div className="mt-2 space-y-1 relative z-10">
+            <div className="flex justify-between text-[10px] font-bold text-teal-700 font-mono">
+              <span>Readiness</span>
+              <span>{pendingOrders.length > 0 ? Math.round((kpis.readyOrdersCount / pendingOrders.length) * 100) : 0}%</span>
+            </div>
+            <div className="w-full bg-teal-100 rounded-full h-1.5 overflow-hidden">
+              <div 
+                className="bg-gradient-to-r from-teal-500 to-emerald-500 h-1.5 rounded-full transition-all duration-700" 
+                style={{ width: `${Math.min(100, pendingOrders.length > 0 ? (kpis.readyOrdersCount / pendingOrders.length) * 100 : 0)}%` }} 
+              />
+            </div>
           </div>
         </div>
       </div>
 
       {/* ── TOOLBAR: TALLY VIEW SWITCHER & FILTER CONTROLS ── */}
-      <div className="bg-white rounded-2xl border border-gray-200/80 p-3 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-white rounded-2xl border border-gray-200/90 p-3.5 shadow-2xs flex flex-wrap items-center justify-between gap-3">
         {/* Left: View Mode Toggle */}
         <div className="flex items-center gap-2">
-          <div className="bg-gray-100/90 p-1 rounded-xl flex items-center gap-1 border border-gray-200/60">
+          <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 border border-slate-200/80 shadow-3xs">
             <button
               onClick={() => setViewMode('item_wise')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
                 viewMode === 'item_wise'
-                  ? 'bg-white text-gray-900 shadow-2xs border border-gray-200/80'
+                  ? 'bg-white text-blue-700 shadow-xs border border-gray-200/80'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              <Factory className="w-3.5 h-3.5 text-blue-600" />
+              <Factory className={`w-3.5 h-3.5 ${viewMode === 'item_wise' ? 'text-blue-600' : 'text-gray-500'}`} />
               <span>Production View</span>
-              <span className="px-1.5 py-0.2 bg-blue-50 text-blue-700 rounded-md text-[10px] font-mono">
+              <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono font-bold ${
+                viewMode === 'item_wise' ? 'bg-blue-50 text-blue-700' : 'bg-gray-200/70 text-gray-700'
+              }`}>
                 {filteredRequirements.length}
               </span>
             </button>
 
             <button
               onClick={() => setViewMode('order_wise')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
                 viewMode === 'order_wise'
-                  ? 'bg-white text-gray-900 shadow-2xs border border-gray-200/80'
+                  ? 'bg-white text-amber-800 shadow-xs border border-gray-200/80'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              <Building className="w-3.5 h-3.5 text-amber-600" />
+              <Building className={`w-3.5 h-3.5 ${viewMode === 'order_wise' ? 'text-amber-600' : 'text-gray-500'}`} />
               <span>Customer View</span>
-              <span className="px-1.5 py-0.2 bg-amber-50 text-amber-700 rounded-md text-[10px] font-mono">
+              <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono font-bold ${
+                viewMode === 'order_wise' ? 'bg-amber-50 text-amber-800' : 'bg-gray-200/70 text-gray-700'
+              }`}>
                 {pendingOrders.length}
               </span>
             </button>
@@ -472,22 +526,22 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
           {viewMode === 'item_wise' && (
             <button
               onClick={toggleAllDetails}
-              className="px-3 py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 transition-all flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-1.5 bg-slate-50 hover:bg-slate-100 active:scale-95 border border-slate-200/80 rounded-xl text-xs font-bold text-gray-700 transition-all flex items-center gap-1.5 cursor-pointer shadow-3xs"
               title="Expand/Collapse all customer orders under each SKU (Alt+F1)"
             >
-              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${expandedSkus.size === filteredRequirements.length ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${expandedSkus.size === filteredRequirements.length ? 'rotate-180 text-blue-600' : 'text-gray-500'}`} />
               <span>{expandedSkus.size === filteredRequirements.length ? 'Collapse All' : 'Detailed View (Alt+F1)'}</span>
             </button>
           )}
         </div>
 
         {/* Center: Quick Shortfall Filters */}
-        <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200/80 p-1 rounded-xl">
+        <div className="flex items-center gap-1.5 bg-slate-100/90 border border-slate-200/80 p-1 rounded-xl shadow-3xs">
           <button
             onClick={() => setFilterMode('all')}
-            className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+            className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
               filterMode === 'all'
-                ? 'bg-white text-gray-900 shadow-2xs border border-gray-200'
+                ? 'bg-white text-gray-900 shadow-xs border border-gray-200/80'
                 : 'text-gray-500 hover:text-gray-800'
             }`}
           >
@@ -495,24 +549,24 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
           </button>
           <button
             onClick={() => setFilterMode('shortfall')}
-            className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
+            className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
               filterMode === 'shortfall'
-                ? 'bg-rose-600 text-white shadow-2xs'
+                ? 'bg-rose-600 text-white shadow-xs'
                 : 'text-rose-700 hover:bg-rose-50'
             }`}
           >
-            <AlertTriangle className="w-3 h-3" />
+            <span className={`w-2 h-2 rounded-full ${filterMode === 'shortfall' ? 'bg-white' : 'bg-rose-500'} animate-pulse`}></span>
             <span>Shortfall Only ({itemWiseRequirements.filter(r => r.shortfallGbl > 0).length})</span>
           </button>
           <button
             onClick={() => setFilterMode('in_stock')}
-            className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
+            className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
               filterMode === 'in_stock'
-                ? 'bg-emerald-600 text-white shadow-2xs'
+                ? 'bg-emerald-600 text-white shadow-xs'
                 : 'text-emerald-700 hover:bg-emerald-50'
             }`}
           >
-            <CheckCircle2 className="w-3 h-3" />
+            <CheckCircle2 className="w-3.5 h-3.5" />
             <span>In Stock ({itemWiseRequirements.filter(r => r.shortfallGbl === 0).length})</span>
           </button>
         </div>
@@ -523,16 +577,24 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
             <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5" />
             <input
               type="text"
-              placeholder="Search SKU or customer..."
+              placeholder="Search SKU, customer, city..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 w-44 sm:w-56"
+              className="pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 w-48 sm:w-60 shadow-3xs transition-all"
             />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2 top-2.5 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
           <button
             onClick={handleExportExcel}
-            className="p-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl text-gray-600 shadow-2xs cursor-pointer transition-colors"
+            className="p-2 bg-white hover:bg-emerald-50 hover:text-emerald-700 border border-gray-200 hover:border-emerald-300 rounded-xl text-gray-600 shadow-3xs cursor-pointer transition-all active:scale-95"
             title="Export Production Schedule to Excel (Alt+E)"
           >
             <Download className="w-4 h-4" />
@@ -540,7 +602,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
 
           <button
             onClick={handlePrint}
-            className="p-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl text-gray-600 shadow-2xs cursor-pointer transition-colors"
+            className="p-2 bg-white hover:bg-blue-50 hover:text-blue-700 border border-gray-200 hover:border-blue-300 rounded-xl text-gray-600 shadow-3xs cursor-pointer transition-all active:scale-95"
             title="Print Production Plan (Alt+P)"
           >
             <Printer className="w-4 h-4" />
@@ -549,7 +611,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
           {onRefresh && (
             <button
               onClick={onRefresh}
-              className="p-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl text-gray-600 shadow-2xs cursor-pointer transition-colors"
+              className="p-2 bg-white hover:bg-gray-100 border border-gray-200 rounded-xl text-gray-600 shadow-3xs cursor-pointer transition-all active:scale-95"
               title="Refresh Orders & Stock"
             >
               <RefreshCw className="w-4 h-4" />
@@ -590,8 +652,8 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                   return (
                     <React.Fragment key={req.skuCode}>
                       <tr 
-                        className={`hover:bg-blue-50/40 transition-colors ${
-                          hasShortfall ? 'bg-rose-50/15' : ''
+                        className={`hover:bg-blue-50/40 transition-colors border-l-4 ${
+                          hasShortfall ? 'border-l-rose-500 bg-rose-50/15' : 'border-l-emerald-500 bg-emerald-50/10'
                         }`}
                       >
                         {/* Expand Button & Index */}
@@ -662,19 +724,20 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                         {/* Production Shortfall (Tally MRP Calculation) */}
                         <td className="py-3 px-4 text-center bg-rose-50/30 border-x border-rose-100">
                           {hasShortfall ? (
-                            <div>
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black font-mono bg-rose-100 text-rose-700 border border-rose-200">
-                                <AlertTriangle className="w-3 h-3 text-rose-600" />
-                                {req.shortfallGbl} GBL Short
+                            <div className="inline-flex flex-col items-center">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-black font-mono bg-gradient-to-r from-rose-100 to-red-100 text-rose-800 border border-rose-300 shadow-3xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-ping"></span>
+                                <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                                {req.shortfallGbl} GBL Deficit
                               </span>
-                              <div className="text-[10px] text-rose-600 font-mono mt-0.5 font-bold">
-                                {req.shortfallPcs.toLocaleString()} Pcs to produce
+                              <div className="text-[10.5px] text-rose-600 font-mono mt-0.5 font-bold">
+                                {req.shortfallPcs.toLocaleString()} Pcs to manufacture
                               </div>
                             </div>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                              Stock Available
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-800 border border-emerald-300 shadow-3xs">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              Stock Covered (100%)
                             </span>
                           )}
                         </td>
@@ -708,17 +771,17 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                             {hasShortfall && req.productionStatus !== 'In Production' ? (
                               <button
                                 onClick={() => handleStartProduction(req.skuCode, req.skuName, req.shortfallGbl)}
-                                className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-2xs flex items-center gap-1 cursor-pointer"
+                                className="px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs hover:shadow active:scale-95 flex items-center gap-1.5 cursor-pointer"
                                 title="Start production batch for this shortfall"
                               >
-                                <Play className="w-3 h-3 fill-current" />
+                                <Play className="w-3 h-3 fill-current text-indigo-100" />
                                 <span>Produce</span>
                               </button>
                             ) : null}
 
                             <button
                               onClick={() => toggleSingleSku(req.skuCode)}
-                              className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
+                              className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
                               title="View orders waiting for this SKU"
                             >
                               <Eye className="w-3 h-3 text-gray-500" />
@@ -771,8 +834,19 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                                       <td className="py-2 px-3 font-mono text-gray-600">{o.orderDate}</td>
                                       <td className="py-2 px-3 font-bold text-gray-900">{o.customerName}</td>
                                       <td className="py-2 px-3 text-gray-500">
-                                        <span>{o.city || '—'}</span>
-                                        {o.customerPhone && <span className="text-[10px] text-gray-400 font-mono ml-1.5">({o.customerPhone})</span>}
+                                        <div className="flex items-center gap-1.5">
+                                          <span>{o.city || '—'}</span>
+                                          {o.customerPhone && (
+                                            <button
+                                              onClick={() => openWhatsAppChat(o.customerName, o.customerPhone, o.orderNumber, o.pendingGbl, o.promisedDate)}
+                                              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-mono cursor-pointer transition-colors"
+                                              title="Send WhatsApp update to customer"
+                                            >
+                                              <MessageSquare className="w-2.5 h-2.5 text-emerald-600" />
+                                              <span>{o.customerPhone}</span>
+                                            </button>
+                                          )}
+                                        </div>
                                       </td>
                                       <td className="py-2 px-3 text-center font-mono text-gray-700">
                                         <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-semibold">
@@ -791,7 +865,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                                       <td className="py-2 px-3 text-right">
                                         <button
                                           onClick={() => onViewOrder(o.rawOrder)}
-                                          className="px-2 py-1 bg-white hover:bg-blue-50 text-blue-600 border border-blue-200 rounded text-[11px] font-bold cursor-pointer"
+                                          className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-[11px] font-bold cursor-pointer transition-colors"
                                         >
                                           View SO
                                         </button>
@@ -859,7 +933,16 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                   const readinessPct = items.length > 0 ? Math.round((itemsReady / items.length) * 100) : 100;
 
                   return (
-                    <tr key={order._id || order.orderNumber} className="hover:bg-blue-50/30 transition-colors">
+                    <tr 
+                      key={order._id || order.orderNumber} 
+                      className={`hover:bg-blue-50/30 transition-colors border-l-4 ${
+                        readinessPct === 100 
+                          ? 'border-l-emerald-500 bg-emerald-50/10' 
+                          : readinessPct > 50 
+                          ? 'border-l-amber-500 bg-amber-50/10' 
+                          : 'border-l-rose-500 bg-rose-50/15'
+                      }`}
+                    >
                       {/* SO Number */}
                       <td className="py-3 px-4">
                         <button
@@ -877,7 +960,16 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                       <td className="py-3 px-4">
                         <div className="font-bold text-gray-900">{order.customerName}</div>
                         {order.customerPhone && (
-                          <div className="text-[10px] text-gray-400 font-mono">{order.customerPhone}</div>
+                          <div className="mt-1">
+                            <button
+                              onClick={() => openWhatsAppChat(order.customerName, order.customerPhone, order.orderNumber, totalPendingGbl, order.promisedDate)}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10.5px] font-mono cursor-pointer transition-colors border border-emerald-200/60"
+                              title="Send WhatsApp update to customer"
+                            >
+                              <MessageSquare className="w-3 h-3 text-emerald-600" />
+                              <span>{order.customerPhone}</span>
+                            </button>
+                          </div>
                         )}
                       </td>
 
@@ -886,7 +978,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
 
                       {/* Due On */}
                       <td className="py-3 px-3 text-center font-mono">
-                        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-bold">
+                        <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-bold">
                           {order.promisedDate || '—'}
                         </span>
                       </td>
@@ -904,27 +996,33 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
 
                       {/* Stock Coverage */}
                       <td className="py-3 px-3 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full ${
-                                readinessPct === 100
-                                  ? 'bg-emerald-500'
-                                  : readinessPct > 50
-                                  ? 'bg-amber-500'
-                                  : 'bg-rose-500'
-                              }`}
-                              style={{ width: `${readinessPct}%` }}
-                            />
+                        <div className="flex flex-col items-center gap-1">
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full transition-all duration-500 ${
+                                  readinessPct === 100
+                                    ? 'bg-emerald-500'
+                                    : readinessPct > 50
+                                    ? 'bg-amber-500'
+                                    : 'bg-rose-500'
+                                }`}
+                                style={{ width: `${readinessPct}%` }}
+                              />
+                            </div>
+                            <span className={`text-[11px] font-mono font-bold ${
+                              readinessPct === 100 ? 'text-emerald-700' : readinessPct > 50 ? 'text-amber-700' : 'text-rose-700'
+                            }`}>
+                              {readinessPct}%
+                            </span>
                           </div>
-                          <span className={`text-[10.5px] font-mono font-bold ${
-                            readinessPct === 100 ? 'text-emerald-700' : 'text-gray-600'
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            readinessPct === 100 
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                              : 'bg-gray-100 text-gray-600 border border-gray-200'
                           }`}>
-                            {readinessPct}%
+                            {readinessPct === 100 ? 'Ready to Dispatch' : `${itemsReady}/${items.length} items ready`}
                           </span>
-                        </div>
-                        <div className="text-[9.5px] text-gray-400 mt-0.5">
-                          {readinessPct === 100 ? 'Ready to Dispatch' : `${itemsReady}/${items.length} in stock`}
                         </div>
                       </td>
 
@@ -938,7 +1036,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                         <div className="flex items-center justify-center gap-1.5">
                           <button
                             onClick={() => onViewOrder(order)}
-                            className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-3xs"
                           >
                             View Order
                           </button>
