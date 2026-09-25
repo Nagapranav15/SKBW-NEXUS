@@ -52,6 +52,8 @@ export interface SalesOrderV2 {
   isInterstate?: boolean;
   items: SalesOrderItemV2[];
   subtotal: number;
+  discountPercent?: number;
+  discountAmount?: number;
   totalCgst?: number;
   totalSgst?: number;
   totalIgst?: number;

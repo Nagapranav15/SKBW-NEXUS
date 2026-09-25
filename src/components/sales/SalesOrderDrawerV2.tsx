@@ -489,6 +489,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       }
 
       setOtherCharges(editOrder.otherCharges || []);
+      setOverallDiscount((editOrder as any).discountPercent !== undefined ? (editOrder as any).discountPercent : ((editOrder as any).overallDiscount || ''));
     } else {
       // ── COMPLETELY BLANK VALUES FOR NEW ORDERS (NO DEFAULT VALUES) ──
       setSelectedCustomer(null);
@@ -721,13 +722,16 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
     const itemsTotal = items.reduce((s, i) => s + (Number(i.amount) || 0), 0);
     const otherChargesTotal = otherCharges.reduce((s, c) => s + (Number(c.amount) || 0), 0);
     const subtotal = itemsTotal + otherChargesTotal;
-    const overallDiscNum = Number(overallDiscount) || 0;
-    const grandTotal = Math.max(0, subtotal - overallDiscNum);
+    const discountPercent = Number(overallDiscount) || 0;
+    const discountAmount = Math.round(((subtotal * discountPercent) / 100) * 100) / 100;
+    const grandTotal = Math.max(0, Math.round((subtotal - discountAmount) * 100) / 100);
 
     return {
       itemsTotal,
       otherChargesTotal,
       subtotal,
+      discountPercent,
+      discountAmount,
       grandTotal
     };
   }, [items, otherCharges, overallDiscount]);
@@ -797,6 +801,8 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
         shippingAddress: sameAddress ? billingAddress : shippingAddress,
         items: processedItems,
         subtotal: totals.subtotal,
+        discountPercent: totals.discountPercent,
+        discountAmount: totals.discountAmount,
         grandTotal: totals.grandTotal,
         status: finalStatus as any,
         materialsStatus: 'Ready',
@@ -1871,16 +1877,21 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                   <div className="flex items-center justify-between text-gray-600">
                     <span className="font-medium">Discount (Overall)</span>
                     <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={overallDiscount}
-                        onChange={(e) => setOverallDiscount(e.target.value)}
-                        className="w-16 px-2 py-0.5 text-right bg-white border border-gray-200 rounded-lg text-xs font-mono font-bold text-gray-900 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                      />
-                      <span className="font-mono text-xs font-semibold text-gray-600">
-                        {Number(overallDiscount || 0).toFixed(2)}
+                      <div className="relative flex items-center">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max="100"
+                          placeholder="0.00"
+                          value={overallDiscount}
+                          onChange={(e) => setOverallDiscount(e.target.value)}
+                          className="w-20 pr-5 pl-2 py-0.5 text-right bg-white border border-gray-200 rounded-lg text-xs font-mono font-bold text-gray-900 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                        />
+                        <span className="absolute right-1.5 text-[10px] text-gray-400 font-bold select-none pointer-events-none">%</span>
+                      </div>
+                      <span className="font-mono text-xs font-semibold text-gray-600 min-w-[50px] text-right">
+                        {totals.discountAmount.toFixed(2)}
                       </span>
                     </div>
                   </div>
