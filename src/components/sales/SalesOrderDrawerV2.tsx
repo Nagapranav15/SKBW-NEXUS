@@ -17,6 +17,8 @@ import {
 } from '../../api/salesOrderApiV2';
 import { MOCK_SALES_ORDERS_V2 } from './salesOrderSampleData';
 
+import { showToast } from '../ui/Toast';
+
 interface SalesOrderDrawerV2Props {
   isOpen: boolean;
   companyId: string;
@@ -55,26 +57,26 @@ interface AddressDetails {
 
 // Master pool of customers ensuring ALL customers appear across the system
 const BASE_CUSTOMERS = [
-  { _id: 'cust-1', firmName: 'Sri Durga Venkateswara Books', ownerName: 'Venkatesh', phone: '9966259732', address: '3-1-825/25, Vinayaka Chowk', city: 'Tirupati', state: 'Andhra Pradesh', pincode: '517501', creditLimit: 40000, outstandingBalance: 12450, lastOrderDate: '2026-09-15', group: 'A Grade' },
-  { _id: 'cust-2', firmName: 'Malleswari Stationery', ownerName: 'Malleswar Rao', phone: '9246912503', address: 'Shop 14, Main Road', city: 'Nizamabad', state: 'Telangana', pincode: '503001', creditLimit: 50000, outstandingBalance: 8200, lastOrderDate: '2026-09-12', group: 'A Grade' },
-  { _id: 'cust-3', firmName: 'Laxmi Book Center', ownerName: 'Laxmi Narayana', phone: '9988776655', address: 'Beside Bus Complex', city: 'Vijayawada', state: 'Andhra Pradesh', pincode: '520001', creditLimit: 75000, outstandingBalance: 18430, lastOrderDate: '2026-09-20', group: 'A Grade' },
-  { _id: 'cust-4', firmName: 'Sree Venkatesh Books', ownerName: 'Venkateshwarlu', phone: '9876543210', address: 'Court Road, Trunk Road', city: 'Kadapa', state: 'Andhra Pradesh', pincode: '516001', creditLimit: 30000, outstandingBalance: 9780, lastOrderDate: '2026-09-10', group: 'Regular' },
-  { _id: 'cust-5', firmName: 'Raju Stationers', ownerName: 'Raju', phone: '9123456780', address: 'Gandhi Road', city: 'Ongole', state: 'Andhra Pradesh', pincode: '523001', creditLimit: 25000, outstandingBalance: 4860, lastOrderDate: '2026-09-08', group: 'Regular' },
-  { _id: 'cust-6', firmName: 'Modern Books', ownerName: 'Ramesh Gupta', phone: '9988112233', address: 'Abids, Main Circle', city: 'Hyderabad', state: 'Telangana', pincode: '500001', creditLimit: 100000, outstandingBalance: 21400, lastOrderDate: '2026-09-14', group: 'A Grade' },
-  { _id: 'cust-7', firmName: 'Srinivasa Book House', ownerName: 'Srinivasulu', phone: '9012345678', address: 'Pogathota, Main Bazaar', city: 'Nellore', state: 'Andhra Pradesh', pincode: '524001', creditLimit: 35000, outstandingBalance: 7320, lastOrderDate: '2026-09-11', group: 'Regular' },
-  { _id: 'cust-8', firmName: 'Vidyarthi Stationery', ownerName: 'Murthy', phone: '9494949494', address: 'High Road', city: 'Chittoor', state: 'Andhra Pradesh', pincode: '517001', creditLimit: 40000, outstandingBalance: 5960, lastOrderDate: '2026-09-09', group: 'Regular' },
-  { _id: 'cust-9', firmName: 'Krishna Book Depot', ownerName: 'Krishna Murthy', phone: '9988223344', address: 'Park Road, Old City', city: 'Kurnool', state: 'Andhra Pradesh', pincode: '518001', creditLimit: 45000, outstandingBalance: 11250, lastOrderDate: '2026-09-07', group: 'Regular' },
-  { _id: 'cust-10', firmName: 'Sai Balaji Stationers', ownerName: 'Balaji', phone: '9865321478', address: 'Hanamkonda Main Road', city: 'Warangal', state: 'Telangana', pincode: '506001', creditLimit: 50000, outstandingBalance: 8400, lastOrderDate: '2026-09-05', group: 'Regular' },
-  { _id: 'cust-11', firmName: 'ABC Educational Supplies', ownerName: 'Rajesh Kumar', phone: '9876543210', address: 'MG Road, Commercial Street', city: 'Bangalore', state: 'Karnataka', pincode: '560001', creditLimit: 50000, outstandingBalance: 25000, lastOrderDate: '2026-08-28', group: 'A Grade' },
-  { _id: 'cust-12', firmName: 'XYZ School Supplies', ownerName: 'Priya Sharma', phone: '9876543212', address: 'Brigade Road, 2nd Floor', city: 'Bangalore', state: 'Karnataka', pincode: '560025', creditLimit: 40000, outstandingBalance: 15000, lastOrderDate: '2026-08-25', group: 'Regular' },
-  { _id: 'cust-13', firmName: 'Modern College Store', ownerName: 'Amit Patel', phone: '9876543214', address: 'Residency Road, Shantinagar', city: 'Bangalore', state: 'Karnataka', pincode: '560027', creditLimit: 60000, outstandingBalance: 30000, lastOrderDate: '2026-08-30', group: 'A Grade' },
-  { _id: 'cust-14', firmName: 'Kalyani Book Center', ownerName: 'Subba Rao', phone: '9848123456', address: 'Brodipet 4th Line', city: 'Guntur', state: 'Andhra Pradesh', pincode: '522002', creditLimit: 50000, outstandingBalance: 14200, lastOrderDate: '2026-09-01', group: 'A Grade' },
-  { _id: 'cust-15', firmName: 'Sri Rama Stationery Mart', ownerName: 'Rama Rao', phone: '9440192834', address: 'Daba Gardens, Main Road', city: 'Visakhapatnam', state: 'Andhra Pradesh', pincode: '530020', creditLimit: 80000, outstandingBalance: 22000, lastOrderDate: '2026-09-03', group: 'A Grade' },
-  { _id: 'cust-16', firmName: 'Balaji Paper & Books', ownerName: 'Srinivasa Reddy', phone: '9866012398', address: 'Main Road, Kotagummam', city: 'Rajahmundry', state: 'Andhra Pradesh', pincode: '533101', creditLimit: 45000, outstandingBalance: 9500, lastOrderDate: '2026-08-20', group: 'Regular' },
-  { _id: 'cust-17', firmName: 'Navata Stationers', ownerName: 'Narayana', phone: '9849201928', address: 'Cinema Road', city: 'Kakinada', state: 'Andhra Pradesh', pincode: '533001', creditLimit: 40000, outstandingBalance: 11000, lastOrderDate: '2026-08-22', group: 'Regular' },
-  { _id: 'cust-18', firmName: 'Venkateswara Educational Stores', ownerName: 'Prasad', phone: '9441829304', address: 'RR Pet', city: 'Eluru', state: 'Andhra Pradesh', pincode: '534002', creditLimit: 35000, outstandingBalance: 6800, lastOrderDate: '2026-08-24', group: 'Regular' },
-  { _id: 'cust-19', firmName: 'Saraswathi Book Depot', ownerName: 'Gopal', phone: '9848901234', address: 'Tower Circle', city: 'Karimnagar', state: 'Telangana', pincode: '505001', creditLimit: 50000, outstandingBalance: 16400, lastOrderDate: '2026-08-18', group: 'Regular' },
-  { _id: 'cust-20', firmName: 'Pragati Paper Mart', ownerName: 'Mohan Lal', phone: '9908123456', address: 'Sultan Bazaar', city: 'Hyderabad', state: 'Telangana', pincode: '500095', creditLimit: 120000, outstandingBalance: 31000, lastOrderDate: '2026-09-04', group: 'A Grade' }
+  { _id: 'cust-1', firmName: 'Sri Durga Venkateswara Books', ownerName: 'Venkatesh', phone: '9966259732', address: '3-1-825/25, Vinayaka Chowk', city: 'Tirupati', state: 'Andhra Pradesh', pincode: '517501', creditLimit: 40000, outstandingBalance: 12450, preferredTransport: 'Chennupati Cargo Services', lastOrderDate: '2026-09-15', group: 'A Grade' },
+  { _id: 'cust-2', firmName: 'Malleswari Stationery', ownerName: 'Malleswar Rao', phone: '9246912503', address: 'Shop 14, Main Road', city: 'Nizamabad', state: 'Telangana', pincode: '503001', creditLimit: 50000, outstandingBalance: 8200, preferredTransport: 'Navata Road Transport', lastOrderDate: '2026-09-12', group: 'A Grade' },
+  { _id: 'cust-3', firmName: 'Laxmi Book Center', ownerName: 'Laxmi Narayana', phone: '9988776655', address: 'Beside Bus Complex', city: 'Vijayawada', state: 'Andhra Pradesh', pincode: '520001', creditLimit: 75000, outstandingBalance: 18430, preferredTransport: 'VRL Logistics', lastOrderDate: '2026-09-20', group: 'A Grade' },
+  { _id: 'cust-4', firmName: 'Sree Venkatesh Books', ownerName: 'Venkateshwarlu', phone: '9876543210', address: 'Court Road, Trunk Road', city: 'Kadapa', state: 'Andhra Pradesh', pincode: '516001', creditLimit: 30000, outstandingBalance: 9780, preferredTransport: 'Kranti Transport', lastOrderDate: '2026-09-10', group: 'Regular' },
+  { _id: 'cust-5', firmName: 'Raju Stationers', ownerName: 'Raju', phone: '9123456780', address: 'Gandhi Road', city: 'Ongole', state: 'Andhra Pradesh', pincode: '523001', creditLimit: 25000, outstandingBalance: 4860, preferredTransport: 'Navata Road Transport', lastOrderDate: '2026-09-08', group: 'Regular' },
+  { _id: 'cust-6', firmName: 'Modern Books', ownerName: 'Ramesh Gupta', phone: '9988112233', address: 'Abids, Main Circle', city: 'Hyderabad', state: 'Telangana', pincode: '500001', creditLimit: 100000, outstandingBalance: 21400, preferredTransport: 'Chennupati Cargo Services', lastOrderDate: '2026-09-14', group: 'A Grade' },
+  { _id: 'cust-7', firmName: 'Srinivasa Book House', ownerName: 'Srinivasulu', phone: '9012345678', address: 'Pogathota, Main Bazaar', city: 'Nellore', state: 'Andhra Pradesh', pincode: '524001', creditLimit: 35000, outstandingBalance: 7320, preferredTransport: 'Navata Road Transport', lastOrderDate: '2026-09-11', group: 'Regular' },
+  { _id: 'cust-8', firmName: 'Vidyarthi Stationery', ownerName: 'Murthy', phone: '9494949494', address: 'High Road', city: 'Chittoor', state: 'Andhra Pradesh', pincode: '517001', creditLimit: 40000, outstandingBalance: 5960, preferredTransport: 'VRL Logistics', lastOrderDate: '2026-09-09', group: 'Regular' },
+  { _id: 'cust-9', firmName: 'Krishna Book Depot', ownerName: 'Krishna Murthy', phone: '9988223344', address: 'Park Road, Old City', city: 'Kurnool', state: 'Andhra Pradesh', pincode: '518001', creditLimit: 45000, outstandingBalance: 11250, preferredTransport: 'Kranti Transport', lastOrderDate: '2026-09-07', group: 'Regular' },
+  { _id: 'cust-10', firmName: 'Sai Balaji Stationers', ownerName: 'Balaji', phone: '9865321478', address: 'Hanamkonda Main Road', city: 'Warangal', state: 'Telangana', pincode: '506001', creditLimit: 50000, outstandingBalance: 8400, preferredTransport: 'Navata Road Transport', lastOrderDate: '2026-09-05', group: 'Regular' },
+  { _id: 'cust-11', firmName: 'ABC Educational Supplies', ownerName: 'Rajesh Kumar', phone: '9876543210', address: 'MG Road, Commercial Street', city: 'Bangalore', state: 'Karnataka', pincode: '560001', creditLimit: 50000, outstandingBalance: 25000, preferredTransport: 'VRL Logistics', lastOrderDate: '2026-08-28', group: 'A Grade' },
+  { _id: 'cust-12', firmName: 'XYZ School Supplies', ownerName: 'Priya Sharma', phone: '9876543212', address: 'Brigade Road, 2nd Floor', city: 'Bangalore', state: 'Karnataka', pincode: '560025', creditLimit: 40000, outstandingBalance: 15000, preferredTransport: 'Chennupati Cargo Services', lastOrderDate: '2026-08-25', group: 'Regular' },
+  { _id: 'cust-13', firmName: 'Modern College Store', ownerName: 'Amit Patel', phone: '9876543214', address: 'Residency Road, Shantinagar', city: 'Bangalore', state: 'Karnataka', pincode: '560027', creditLimit: 60000, outstandingBalance: 30000, preferredTransport: 'VRL Logistics', lastOrderDate: '2026-08-30', group: 'A Grade' },
+  { _id: 'cust-14', firmName: 'Kalyani Book Center', ownerName: 'Subba Rao', phone: '9848123456', address: 'Brodipet 4th Line', city: 'Guntur', state: 'Andhra Pradesh', pincode: '522002', creditLimit: 50000, outstandingBalance: 14200, preferredTransport: 'Navata Road Transport', lastOrderDate: '2026-09-01', group: 'A Grade' },
+  { _id: 'cust-15', firmName: 'Sri Rama Stationery Mart', ownerName: 'Rama Rao', phone: '9440192834', address: 'Daba Gardens, Main Road', city: 'Visakhapatnam', state: 'Andhra Pradesh', pincode: '530020', creditLimit: 80000, outstandingBalance: 22000, preferredTransport: 'Chennupati Cargo Services', lastOrderDate: '2026-09-03', group: 'A Grade' },
+  { _id: 'cust-16', firmName: 'Balaji Paper & Books', ownerName: 'Srinivasa Reddy', phone: '9866012398', address: 'Main Road, Kotagummam', city: 'Rajahmundry', state: 'Andhra Pradesh', pincode: '533101', creditLimit: 45000, outstandingBalance: 9500, preferredTransport: 'Navata Road Transport', lastOrderDate: '2026-08-20', group: 'Regular' },
+  { _id: 'cust-17', firmName: 'Navata Stationers', ownerName: 'Narayana', phone: '9849201928', address: 'Cinema Road', city: 'Kakinada', state: 'Andhra Pradesh', pincode: '533001', creditLimit: 40000, outstandingBalance: 11000, preferredTransport: 'Navata Road Transport', lastOrderDate: '2026-08-22', group: 'Regular' },
+  { _id: 'cust-18', firmName: 'Venkateswara Educational Stores', ownerName: 'Prasad', phone: '9441829304', address: 'RR Pet', city: 'Eluru', state: 'Andhra Pradesh', pincode: '534002', creditLimit: 35000, outstandingBalance: 6800, preferredTransport: 'Kranti Transport', lastOrderDate: '2026-08-24', group: 'Regular' },
+  { _id: 'cust-19', firmName: 'Saraswathi Book Depot', ownerName: 'Gopal', phone: '9848901234', address: 'Tower Circle', city: 'Karimnagar', state: 'Telangana', pincode: '505001', creditLimit: 50000, outstandingBalance: 16400, preferredTransport: 'Navata Road Transport', lastOrderDate: '2026-08-18', group: 'Regular' },
+  { _id: 'cust-20', firmName: 'Pragati Paper Mart', ownerName: 'Mohan Lal', phone: '9908123456', address: 'Sultan Bazaar', city: 'Hyderabad', state: 'Telangana', pincode: '500095', creditLimit: 120000, outstandingBalance: 31000, preferredTransport: 'Chennupati Cargo Services', lastOrderDate: '2026-09-04', group: 'A Grade' }
 ];
 
 // Combine base customers and all sample customers from sales orders
@@ -166,6 +168,13 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   const [orderDate, setOrderDate] = useState<string>('');
   const [promisedDate, setPromisedDate] = useState<string>('');
   const [transporter, setTransporter] = useState<string>('');
+  const [transporterList, setTransporterList] = useState<string[]>([
+    'Chennupati Cargo Services',
+    'VRL Logistics',
+    'Navata Road Transport',
+    'Kranti Transport',
+    'Direct / Self Pickup'
+  ]);
   const [orderType, setOrderType] = useState<'' | 'Credit' | 'Cash'>('');
   const [orderStatus, setOrderStatus] = useState<string>('');
 
@@ -236,8 +245,11 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
         getParties({ limit: 10000, type: 'customer' })
           .catch(() => getParties({ company: companyId, limit: 10000, type: 'customer' }))
           .catch(() => getParties({ limit: 10000 }))
+          .catch(() => ({ data: { parties: [] } })),
+        getParties({ limit: 1000, type: 'transporter' })
+          .catch(() => getParties({ company: companyId, limit: 1000, type: 'transporter' }))
           .catch(() => ({ data: { parties: [] } }))
-      ]).then(([skus1, skus2, balances1, balances2, partiesRes]) => {
+      ]).then(([skus1, skus2, balances1, balances2, partiesRes, transportersRes]) => {
         // Collect raw SKUs from both endpoints
         const rawSkus: SkuV2[] = [
           ...(Array.isArray(skus1) ? skus1 : []),
@@ -299,6 +311,13 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
           }
         });
         setCustomersList(combined);
+
+        // Merge transporters from backend
+        const backendTransporters: any[] = transportersRes?.data?.parties || transportersRes?.parties || transportersRes?.data || [];
+        const tNames = backendTransporters.map((t: any) => t.firmName || t.name).filter(Boolean);
+        if (tNames.length > 0) {
+          setTransporterList(prev => Array.from(new Set([...prev, ...tNames])));
+        }
       });
 
       if (!editOrder) {
@@ -471,6 +490,13 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
     if (sameAddress) {
       setShippingAddress(newAddr);
     }
+
+    // Dynamic Transporter: Auto-populate if assigned earlier to that customer
+    const assignedTransport = c.preferredTransport || c.transporter || c.transport || c.defaultTransport || c.transporterName || '';
+    if (assignedTransport) {
+      setTransporter(assignedTransport);
+      setTransporterList(prev => prev.includes(assignedTransport) ? prev : [assignedTransport, ...prev]);
+    }
   };
 
   // Keep shipping synced when sameAddress is true
@@ -637,13 +663,13 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
     setErrorMsg('');
 
     if (!selectedCustomer && !customerSearch.trim()) {
-      setErrorMsg('Please select or specify a Customer');
+      showToast('Please select or specify a Customer', 'error');
       return;
     }
 
     const validItems = items.filter(i => i.itemName.trim() && Number(i.totalPcs) > 0);
     if (validItems.length === 0) {
-      setErrorMsg('Please enter at least one valid product with total pcs > 0');
+      showToast('Please enter at least one valid product with total pcs > 0', 'error');
       return;
     }
 
@@ -710,7 +736,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       onClose();
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.response?.data?.msg || err.message || 'Failed to save Sales Order');
+      showToast(err.response?.data?.msg || err.message || 'Failed to save Sales Order', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -774,13 +800,6 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
         {/* ── SCROLLABLE BODY ── */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4" ref={dropdownContainerRef}>
-
-          {errorMsg && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-semibold flex items-center gap-2 animate-fadeIn">
-              <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-              <span>{errorMsg}</span>
-            </div>
-          )}
 
           {/* ── TOP SECTION: 3 WHITE CARDS (1:1 with Screenshot) ── */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
@@ -874,42 +893,64 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                 </div>
               </div>
 
-              {/* Customer Selection Box (Fixed h-[142px] - Customer details hidden directly; visible upon clicking View Customer) */}
+              {/* Customer Info Box & Financials (Fixed h-[142px]) */}
               {selectedCustomer ? (
-                <div className="h-[142px] p-3.5 bg-blue-50/40 rounded-xl border border-blue-100 flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded-md">
-                        Selected Customer
-                      </span>
-                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px]">
+                <div className="h-[142px] p-3 bg-blue-50/30 rounded-xl border border-blue-100/80 flex flex-col justify-between text-[11px] text-gray-600">
+                  <div className="space-y-1">
+                    <div className="flex items-start justify-between gap-1.5 text-gray-800">
+                      <div className="flex items-start gap-1.5 flex-1 min-w-0">
+                        <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                        <span className="line-clamp-2 leading-tight">
+                          {billingAddress.addressLine || selectedCustomer.address || 'Address not specified'}
+                          {billingAddress.city ? `, ${billingAddress.city}` : selectedCustomer.city ? `, ${selectedCustomer.city}` : ''}
+                          {billingAddress.state ? `, ${billingAddress.state}` : selectedCustomer.state ? `, ${selectedCustomer.state}` : ''}
+                          {billingAddress.pincode ? ` - ${billingAddress.pincode}` : selectedCustomer.pincode ? ` - ${selectedCustomer.pincode}` : ''}
+                        </span>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => setShowCustomerDetailsModal(true)}
+                        className="text-[10px] font-bold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer flex items-center gap-0.5 shrink-0"
+                      >
+                        <span>View Details</span>
+                        <Eye className="w-3 h-3" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-0.5">
+                      <div className="flex items-center gap-1 font-bold text-gray-900">
+                        <Phone className="w-3.5 h-3.5 text-blue-600" />
+                        <span>{billingAddress.phone || selectedCustomer.phone || selectedCustomer.mobile || '—'}</span>
+                      </div>
+                      {(selectedCustomer.phone || selectedCustomer.mobile || billingAddress.phone) && (
+                        <a 
+                          href={`https://wa.me/91${(selectedCustomer.phone || selectedCustomer.mobile || billingAddress.phone || '').replace(/\D/g, '')}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          title="Chat on WhatsApp"
+                        >
+                          <WhatsAppIcon className="w-3.5 h-3.5 text-emerald-500 hover:scale-110" />
+                        </a>
+                      )}
+                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px] ml-auto">
                         {selectedCustomer.status === 'inactive' ? 'Inactive' : 'Active'}
                       </span>
                     </div>
-                    <div className="font-extrabold text-gray-900 text-sm truncate">
-                      {selectedCustomer.firmName || selectedCustomer.ownerName || selectedCustomer.contactName}
-                    </div>
-                    <div className="text-[11px] text-gray-500 mt-1 flex items-center gap-1.5">
-                      <span className="font-medium text-gray-700">{selectedCustomer.ownerName || selectedCustomer.contactName || 'Primary Contact'}</span>
-                      {selectedCustomer.city && (
-                        <>
-                          <span className="text-gray-300">•</span>
-                          <span className="text-gray-600 font-medium">{selectedCustomer.city}</span>
-                        </>
-                      )}
-                    </div>
                   </div>
 
-                  <div className="pt-2 border-t border-blue-100/80 flex items-center justify-between">
-                    <span className="text-[10.5px] text-gray-500 font-medium">Customer details hidden</span>
-                    <button
-                      type="button"
-                      onClick={() => setShowCustomerDetailsModal(true)}
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-3xs hover:shadow-xs"
-                    >
-                      <Eye className="w-3.5 h-3.5 stroke-[2.5]" />
-                      <span>View Customer</span>
-                    </button>
+                  <div className="pt-2 border-t border-blue-100/70 grid grid-cols-3 gap-2 text-center">
+                    <div className="bg-white/90 p-1.5 rounded-lg border border-gray-100 shadow-3xs">
+                      <div className="text-[9px] text-gray-500 font-bold uppercase">Credit Limit</div>
+                      <div className="font-bold text-gray-900 text-xs mt-0.5">₹{(selectedCustomer.creditLimit || 0).toLocaleString('en-IN')}</div>
+                    </div>
+                    <div className="bg-white/90 p-1.5 rounded-lg border border-gray-100 shadow-3xs">
+                      <div className="text-[9px] text-gray-500 font-bold uppercase">Outstanding</div>
+                      <div className="font-bold text-rose-700 text-xs mt-0.5">₹{(selectedCustomer.outstandingBalance || selectedCustomer.outstanding || 0).toLocaleString('en-IN')}</div>
+                    </div>
+                    <div className="bg-white/90 p-1.5 rounded-lg border border-gray-100 shadow-3xs">
+                      <div className="text-[9px] text-gray-500 font-bold uppercase">City</div>
+                      <div className="font-bold text-blue-900 text-xs mt-0.5 truncate">{selectedCustomer.city || billingAddress.city || '—'}</div>
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -963,14 +1004,15 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                 <select
                   value={transporter}
                   onChange={(e) => setTransporter(e.target.value)}
-                  className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 >
                   <option value="">Select Transporter</option>
-                  <option value="Chennupati Cargo Services">Chennupati Cargo Services</option>
-                  <option value="VRL Logistics">VRL Logistics</option>
-                  <option value="Navata Road Transport">Navata Road Transport</option>
-                  <option value="Kranti Transport">Kranti Transport</option>
-                  <option value="Direct / Self Pickup">Direct / Self Pickup</option>
+                  {transporter && !transporterList.includes(transporter) && (
+                    <option value={transporter}>{transporter}</option>
+                  )}
+                  {transporterList.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
                 </select>
               </div>
 
@@ -1315,7 +1357,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
           </div>
 
           {/* ── MIDDLE SECTION: ORDER ITEMS TABLE (1:1 with Screenshot) ── */}
-          <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs space-y-3">
+          <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs space-y-3 relative z-30">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs font-bold text-gray-900">
                 <Package className="w-4 h-4 text-blue-600" />
@@ -1339,8 +1381,8 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
               </div>
             </div>
 
-            {/* Order Items Table (Prevent Clipping of Dropdown Popovers) */}
-            <div className="overflow-x-auto border border-gray-200 rounded-xl min-h-[380px] pb-44">
+            {/* Order Items Table (Compact Spacing & Dropdown in Front) */}
+            <div className="overflow-visible border border-gray-200 rounded-xl">
               <table className="w-full text-left border-collapse text-xs">
                 <thead className="bg-gray-50/80 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 select-none">
                   <tr>
@@ -1372,7 +1414,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                     );
 
                     return (
-                      <tr key={idx} className={`hover:bg-blue-50/30 transition-colors relative ${isDropdownActive ? 'z-[100]' : ''}`}>
+                      <tr key={idx} className={`hover:bg-blue-50/30 transition-colors relative ${isDropdownActive ? 'z-50' : ''}`}>
                         {/* # */}
                         <td className="py-2.5 px-2 text-center font-bold text-gray-500">
                           {idx + 1}
@@ -1437,7 +1479,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
                           {/* SKU Dropdown: Shows ALL products from Item Master with Active/Inactive status */}
                           {isDropdownActive && (
-                            <div className="absolute left-3 top-full mt-1 w-[460px] bg-white border border-gray-200 rounded-xl shadow-2xl z-[9999] max-h-64 overflow-y-auto divide-y divide-gray-100 p-1">
+                            <div className="absolute left-3 top-full mt-1 w-[460px] bg-white border border-gray-200 rounded-xl shadow-2xl z-[99999] max-h-64 overflow-y-auto divide-y divide-gray-100 p-1">
                               {filteredProductSkus.map(s => {
                                 const isInactive = (s.status || '').toLowerCase() === 'inactive';
                                 const onHandPcs = stockMap.get(s._id) ?? Number(s.presentStock || s.openingStock || 0);
