@@ -2007,9 +2007,6 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                       }`}>
                                         {s.status || 'Active'}
                                       </span>
-                                      <span className="text-[10.5px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
-                                        Stock: {stockGbl} GBL {definedConv > 0 ? `(${onHandPcs} Pcs)` : ''}
-                                      </span>
                                     </div>
                                   </div>
                                 );
