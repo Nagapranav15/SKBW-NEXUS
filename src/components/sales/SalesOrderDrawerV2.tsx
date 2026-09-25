@@ -283,13 +283,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   const [orderDate, setOrderDate] = useState<string>('');
   const [promisedDate, setPromisedDate] = useState<string>('');
   const [transporter, setTransporter] = useState<string>('');
-  const [transporterList, setTransporterList] = useState<string[]>([
-    'Chennupati Cargo Services',
-    'VRL Logistics',
-    'Navata Road Transport',
-    'Kranti Transport',
-    'Direct / Self Pickup'
-  ]);
+  const [transporterList, setTransporterList] = useState<string[]>([]);
   const [orderType, setOrderType] = useState<'' | 'Credit' | 'Cash'>('');
   const [orderStatus, setOrderStatus] = useState<string>('');
 
@@ -363,6 +357,8 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   useEffect(() => {
     if (isOpen) {
       setHighlightedCustomerIdx(0);
+      setActiveItemDropdownIdx(null);
+      setShowCustomerDropdown(false);
       const timer = setTimeout(() => {
         customerInputRef.current?.focus();
         customerInputRef.current?.select();
@@ -543,9 +539,6 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
               if (name && typeof name === 'string') extractedSet.add(name.trim());
             }
           });
-
-          // 3. Fallback standard transporters
-          ['Chennupati Cargo Services', 'VRL Logistics', 'Navata Road Transport', 'Kranti Transport', 'TCI Freight', 'ARC Transport', 'GATI KWE', 'Blue Dart Surface', 'SafeExpress', 'Direct / Self Pickup'].forEach(t => extractedSet.add(t));
 
           setTransporterList(Array.from(extractedSet));
         } catch (innerErr) {
@@ -1329,7 +1322,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                         setShowCustomerDropdown(true);
                         setHighlightedCustomerIdx(0);
                       }}
-                      onFocus={() => setShowCustomerDropdown(true)}
+                      onClick={() => setShowCustomerDropdown(true)}
                       placeholder="Search customer firm name..."
                       className="w-full pl-8 pr-10 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
                     />
@@ -1926,7 +1919,6 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                 setActiveItemDropdownIdx(idx);
                               }}
                               onClick={() => setActiveItemDropdownIdx(idx)}
-                              onFocus={() => setActiveItemDropdownIdx(idx)}
                               placeholder="Select product..."
                               className="w-full pl-7 pr-6 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer"
                             />
