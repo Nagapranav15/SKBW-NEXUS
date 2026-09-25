@@ -2285,20 +2285,6 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                               </button>
                             ))}
                           </div>
-                          <div className="px-3 py-1.5 bg-gray-50 flex items-center justify-between">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setPredefinedCharges(DEFAULT_PREDEFINED_CHARGES);
-                                try { localStorage.setItem('skbw_predefined_charges_v2', JSON.stringify(DEFAULT_PREDEFINED_CHARGES)); } catch (e) {}
-                                showToast('Reset charges to system defaults', 'info');
-                              }}
-                              className="text-[11px] font-bold text-gray-500 hover:text-blue-600 underline flex items-center gap-1 cursor-pointer"
-                            >
-                              <RotateCcw className="w-3 h-3 text-gray-400" />
-                              <span>Reset to Defaults</span>
-                            </button>
-                          </div>
                         </div>
                       )}
                     </div>
@@ -2852,18 +2838,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
             </div>
 
             {/* Modal Footer */}
-            <div className="flex justify-between items-center pt-2 border-t border-gray-100 text-xs">
-              <button
-                type="button"
-                onClick={() => {
-                  setPredefinedCharges(DEFAULT_PREDEFINED_CHARGES);
-                  try { localStorage.setItem('skbw_predefined_charges_v2', JSON.stringify(DEFAULT_PREDEFINED_CHARGES)); } catch (e) {}
-                  showToast('Reset to system default charges', 'info');
-                }}
-                className="text-gray-500 hover:text-gray-700 font-medium underline cursor-pointer"
-              >
-                Reset to Defaults
-              </button>
+            <div className="flex justify-end items-center pt-2 border-t border-gray-100 text-xs">
               <button
                 type="button"
                 onClick={() => setShowManageChargesModal(false)}
