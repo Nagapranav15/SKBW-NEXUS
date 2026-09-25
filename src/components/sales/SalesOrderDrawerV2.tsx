@@ -375,99 +375,123 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
   // Fetch SKUs and Customers from Backend & Merge cleanly
   useEffect(() => {
-    if (isOpen) {
-      Promise.all([
-        getSkusV2(companyId).catch(() => []),
-        getSkusV2('').catch(() => []),
-        companyId ? getBalancesV2(companyId).catch(() => []) : Promise.resolve([]),
-        getBalancesV2('').catch(() => []),
-        getParties({ limit: 10000, type: 'customer' })
-          .catch(() => getParties({ company: companyId, limit: 10000, type: 'customer' }))
-          .catch(() => getParties({ limit: 10000 }))
-          .catch(() => ({ data: { parties: [] } })),
-        getParties({ limit: 1000, type: 'transporter' })
-          .catch(() => getParties({ company: companyId, limit: 1000, type: 'transporter' }))
+    if (!isOpen) return;
+
+    // ── Helper: extract a usable array from any API response shape ──
+    const extractParties = (res: any): any[] => {
+      if (!res) return [];
+      const d = res.data ?? res;
+      if (Array.isArray(d)) return d;
+      if (Array.isArray(d?.parties)) return d.parties;
+      if (Array.isArray(d?.customers)) return d.customers;
+      if (Array.isArray(d?.data)) return d.data;
+      return [];
+    };
+
+    const fetchCustomers = companyId
+      ? getParties({ company: companyId, type: 'customer', limit: 10000 })
+          .catch(() => getParties({ type: 'customer', limit: 10000 }))
           .catch(() => ({ data: { parties: [] } }))
-      ]).then(([skus1, skus2, balances1, balances2, partiesRes, transportersRes]) => {
-        // Collect raw SKUs from both endpoints
-        const rawSkus: SkuV2[] = [
-          ...(Array.isArray(skus1) ? skus1 : []),
-          ...(Array.isArray(skus2) ? skus2 : [])
-        ];
+      : getParties({ type: 'customer', limit: 10000 })
+          .catch(() => ({ data: { parties: [] } }));
 
-        // Deduplicate SKUs and filter strictly for Products (Finished Goods)
-        const skuMap = new Map<string, SkuV2>();
-        rawSkus.forEach(s => {
-          if (s && !s.isDeleted && isOnlyProduct(s)) {
-            const key = (s.skuCode || s.name || s._id || '').toLowerCase().trim();
-            if (key && !skuMap.has(key)) {
-              skuMap.set(key, s);
+    const fetchTransporters = companyId
+      ? getParties({ company: companyId, type: 'transporter', limit: 1000 })
+          .catch(() => getParties({ type: 'transporter', limit: 1000 }))
+          .catch(() => ({ data: { parties: [] } }))
+      : getParties({ type: 'transporter', limit: 1000 })
+          .catch(() => ({ data: { parties: [] } }));
+
+    const fetchSkus = companyId
+      ? getSkusV2(companyId).catch(() => [] as SkuV2[])
+      : Promise.resolve([] as SkuV2[]);
+
+    const fetchBalances = companyId
+      ? getBalancesV2(companyId).catch(() => [])
+      : Promise.resolve([]);
+
+    Promise.all([fetchSkus, fetchBalances, fetchCustomers, fetchTransporters])
+      .then(([skus, balances, partiesRes, transportersRes]) => {
+        try {
+          // ── SKUs: merge API results with master product list ──
+          const rawSkus: SkuV2[] = Array.isArray(skus) ? skus : [];
+
+          const skuMap = new Map<string, SkuV2>();
+          rawSkus.forEach(s => {
+            if (s && !s.isDeleted && isOnlyProduct(s)) {
+              const key = (s.skuCode || s.name || s._id || '').toLowerCase().trim();
+              if (key && !skuMap.has(key)) skuMap.set(key, s);
             }
+          });
+          // Always ensure master products are present
+          MASTER_PRODUCT_SKUS.forEach(m => {
+            const key = (m.skuCode || m.name).toLowerCase().trim();
+            if (!skuMap.has(key)) skuMap.set(key, m);
+          });
+          const finalSkus = Array.from(skuMap.values());
+          setAvailableSkus(finalSkus);
+
+          // ── Balances: aggregate live stock ──
+          const bMap = new Map<string, number>();
+          const allBalances = Array.isArray(balances) ? balances : [];
+          allBalances.forEach((b: any) => {
+            const rawId = b.skuId || b.sku?._id;
+            const sId = rawId ? String((rawId as any)._id || rawId) : '';
+            const qty = Number(b.onHand) || Number(b.quantity) || 0;
+            if (sId) bMap.set(sId, (bMap.get(sId) || 0) + qty);
+          });
+          // Fallback to SKU's own presentStock/openingStock
+          finalSkus.forEach(s => {
+            if (s._id && !bMap.has(s._id)) {
+              const fallbackQty = Number(s.presentStock || s.openingStock || 0);
+              if (fallbackQty > 0) bMap.set(s._id, fallbackQty);
+            }
+          });
+          setStockMap(bMap);
+
+          // ── Customers: merge backend parties with system fallback list ──
+          const backendParties: any[] = extractParties(partiesRes);
+          const existingFirmNames = new Set(
+            backendParties.map(p => (p.firmName || p.name || '').toLowerCase().trim())
+          );
+          const combined = [...backendParties];
+          ALL_SYSTEM_CUSTOMERS.forEach(c => {
+            if (!existingFirmNames.has(c.firmName.toLowerCase().trim())) {
+              combined.push(c);
+            }
+          });
+          setCustomersList(combined.length > 0 ? combined : ALL_SYSTEM_CUSTOMERS);
+
+          // ── Transporters: merge backend transporters ──
+          const backendTransporters: any[] = extractParties(transportersRes);
+          const tNames = backendTransporters
+            .map((t: any) => t.firmName || t.name)
+            .filter(Boolean);
+          if (tNames.length > 0) {
+            setTransporterList(prev => Array.from(new Set([...prev, ...tNames])));
           }
-        });
-
-        // Add master finished goods if not already present
-        MASTER_PRODUCT_SKUS.forEach(m => {
-          const key = (m.skuCode || m.name).toLowerCase().trim();
-          if (!skuMap.has(key)) {
-            skuMap.set(key, m);
-          }
-        });
-
-        const finalSkus = Array.from(skuMap.values());
-        setAvailableSkus(finalSkus);
-
-        // Aggregate live balances
-        const bMap = new Map<string, number>();
-        const allBalances = [
-          ...(Array.isArray(balances1) ? balances1 : []),
-          ...(Array.isArray(balances2) ? balances2 : [])
-        ];
-        allBalances.forEach((b: any) => {
-          const rawId = b.skuId || b.sku?._id;
-          const sId = rawId ? String(rawId._id || rawId) : '';
-          const qty = Number(b.onHand) || Number(b.quantity) || 0;
-          if (sId) bMap.set(sId, (bMap.get(sId) || 0) + qty);
-        });
-
-        // Also fallback to SKU presentStock or openingStock if not in ledger
-        finalSkus.forEach(s => {
-          if (s._id && !bMap.has(s._id)) {
-            const fallbackQty = Number(s.presentStock || s.openingStock || 0);
-            if (fallbackQty > 0) bMap.set(s._id, fallbackQty);
-          }
-        });
-        setStockMap(bMap);
-
-        const backendParties: any[] = partiesRes?.data?.parties || partiesRes?.parties || partiesRes?.data || [];
-        
-        // Merge with all known customers so ALL customers appear in the module
-        const existingFirmNames = new Set(backendParties.map(p => (p.firmName || p.name || '').toLowerCase().trim()));
-        const combined = [...backendParties];
-        ALL_SYSTEM_CUSTOMERS.forEach(c => {
-          if (!existingFirmNames.has(c.firmName.toLowerCase().trim())) {
-            combined.push(c);
-          }
-        });
-        setCustomersList(combined);
-
-        // Merge transporters from backend
-        const backendTransporters: any[] = transportersRes?.data?.parties || transportersRes?.parties || transportersRes?.data || [];
-        const tNames = backendTransporters.map((t: any) => t.firmName || t.name).filter(Boolean);
-        if (tNames.length > 0) {
-          setTransporterList(prev => Array.from(new Set([...prev, ...tNames])));
+        } catch (innerErr) {
+          console.error('Error processing fetched data:', innerErr);
+          // Ensure fallback data is always shown even if processing fails
+          setAvailableSkus(MASTER_PRODUCT_SKUS);
+          setCustomersList(ALL_SYSTEM_CUSTOMERS);
         }
+      })
+      .catch(err => {
+        console.error('Data fetch error:', err);
+        setAvailableSkus(MASTER_PRODUCT_SKUS);
+        setCustomersList(ALL_SYSTEM_CUSTOMERS);
       });
 
-      if (!editOrder) {
-        if (companyId) {
-          getNextSalesOrderNumberV2(companyId).then(setOrderNumber).catch(() => setOrderNumber('SO-0004'));
-        } else {
-          setOrderNumber('SO-0004');
-        }
+    if (!editOrder) {
+      if (companyId) {
+        getNextSalesOrderNumberV2(companyId).then(setOrderNumber).catch(() => setOrderNumber('SO-0004'));
+      } else {
+        setOrderNumber('SO-0004');
       }
     }
   }, [isOpen, companyId, editOrder]);
+
 
   // Reset or Populate based on editOrder: NO DEFAULT HARDCODED VALUES FOR NEW ORDERS!
   useEffect(() => {
