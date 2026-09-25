@@ -352,7 +352,21 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   const [errorMsg, setErrorMsg] = useState('');
 
   const customerRef = useRef<HTMLDivElement>(null);
+  const customerInputRef = useRef<HTMLInputElement>(null);
+  const [highlightedCustomerIdx, setHighlightedCustomerIdx] = useState<number>(0);
   const dropdownContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-focus 1st field (Customer Search Input) upon opening form
+  useEffect(() => {
+    if (isOpen) {
+      setHighlightedCustomerIdx(0);
+      const timer = setTimeout(() => {
+        customerInputRef.current?.focus();
+        customerInputRef.current?.select();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -581,7 +595,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       // ── COMPLETELY BLANK VALUES FOR NEW ORDERS (NO DEFAULT VALUES) ──
       setSelectedCustomer(null);
       setCustomerSearch('');
-      setOrderDate('');
+      setOrderDate(new Date().toISOString().split('T')[0]);
       setPromisedDate('');
       setTransporter('');
       setOrderType('');
@@ -1029,27 +1043,74 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
     }
   };
 
-  // Keyboard navigation across form inputs using Enter key
+  // Keyboard navigation & control with Arrows, Tab & Enter
   const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'TEXTAREA' || target.tagName === 'BUTTON') return;
-      if (target.closest('.customer-dropdown-item')) return;
+    const target = e.target as HTMLElement;
+    if (!target) return;
 
-      e.preventDefault();
-
+    // Helper to shift focus across fields
+    const shiftFocus = (delta: number) => {
       const form = e.currentTarget;
       const focusables = Array.from(
         form.querySelectorAll<HTMLElement>(
           'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])'
         )
-      ).filter(el => el.offsetWidth > 0 || el.offsetHeight > 0 || el.getClientRects().length > 0);
+      ).filter(el => el.offsetWidth > 0 || el.offsetHeight > 0);
 
       const index = focusables.indexOf(target);
-      if (index > -1 && index < focusables.length - 1) {
-        focusables[index + 1].focus();
-      } else if (index === focusables.length - 1) {
+      const nextIdx = index + delta;
+      if (nextIdx >= 0 && nextIdx < focusables.length) {
+        focusables[nextIdx]?.focus();
+        if ('select' in focusables[nextIdx]) {
+          (focusables[nextIdx] as HTMLInputElement).select?.();
+        }
+      } else if (delta > 0 && index === focusables.length - 1) {
         handleAddItem();
+      }
+    };
+
+    // 1. Enter Key
+    if (e.key === 'Enter' && !e.shiftKey) {
+      if (target.tagName === 'TEXTAREA' || target.tagName === 'BUTTON') return;
+
+      // Handle Customer Dropdown Selection via Enter
+      if (showCustomerDropdown && filteredCustomers.length > 0) {
+        e.preventDefault();
+        const selected = filteredCustomers[highlightedCustomerIdx] || filteredCustomers[0];
+        if (selected) {
+          handleSelectCustomer(selected);
+          setTimeout(() => shiftFocus(1), 50);
+        }
+        return;
+      }
+
+      e.preventDefault();
+      shiftFocus(1);
+    }
+
+    // 2. Arrow Down
+    if (e.key === 'ArrowDown') {
+      if (showCustomerDropdown && filteredCustomers.length > 0) {
+        e.preventDefault();
+        setHighlightedCustomerIdx(prev => Math.min(prev + 1, filteredCustomers.length - 1));
+        return;
+      }
+      if (target.tagName === 'INPUT' && (target as HTMLInputElement).type !== 'date') {
+        e.preventDefault();
+        shiftFocus(1);
+      }
+    }
+
+    // 3. Arrow Up
+    if (e.key === 'ArrowUp') {
+      if (showCustomerDropdown && filteredCustomers.length > 0) {
+        e.preventDefault();
+        setHighlightedCustomerIdx(prev => Math.max(prev - 1, 0));
+        return;
+      }
+      if (target.tagName === 'INPUT' && (target as HTMLInputElement).type !== 'date') {
+        e.preventDefault();
+        shiftFocus(-1);
       }
     }
   };
@@ -1170,11 +1231,13 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                   <div className="relative">
                     <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
                     <input
+                      ref={customerInputRef}
                       type="text"
                       value={customerSearch}
                       onChange={(e) => {
                         setCustomerSearch(e.target.value);
                         setShowCustomerDropdown(true);
+                        setHighlightedCustomerIdx(0);
                       }}
                       onFocus={() => setShowCustomerDropdown(true)}
                       placeholder="Search customer firm name..."
@@ -1209,11 +1272,14 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                   {/* Customer Dropdown Popover */}
                   {showCustomerDropdown && (
                     <div className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-2xl z-[999] max-h-60 overflow-y-auto divide-y divide-gray-50 p-1">
-                      {filteredCustomers.map(c => (
+                      {filteredCustomers.map((c, idx) => (
                         <div
                           key={c._id || c.firmName}
                           onClick={() => handleSelectCustomer(c)}
-                          className="p-2.5 hover:bg-blue-50/70 cursor-pointer rounded-lg transition-colors flex items-center justify-between"
+                          onMouseEnter={() => setHighlightedCustomerIdx(idx)}
+                          className={`p-2.5 cursor-pointer rounded-lg transition-colors flex items-center justify-between ${
+                            highlightedCustomerIdx === idx ? 'bg-blue-100/90 text-blue-900 font-bold border border-blue-200' : 'hover:bg-blue-50/70'
+                          }`}
                         >
                           <div>
                             <div className="font-bold text-gray-900 text-xs">{c.firmName || c.ownerName || c.contactName}</div>
@@ -1313,10 +1379,11 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                   </label>
                   <input
                     type="date"
-                    value={orderDate}
-                    onChange={(e) => setOrderDate(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    required
+                    value={orderDate || new Date().toISOString().split('T')[0]}
+                    readOnly
+                    disabled
+                    className="w-full px-2.5 py-1.5 bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 cursor-not-allowed select-none opacity-80"
+                    title="Order Date is fixed to Today's Date"
                   />
                 </div>
                 <div>
