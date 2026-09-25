@@ -5,6 +5,7 @@ import {
   ChevronDown, SlidersHorizontal, RotateCcw, Copy, Printer, MoreVertical, 
   X, Check, IndianRupee, ArrowUpDown, ArrowUp, ArrowDown, Send, CheckCircle, Ban, Receipt
 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { 
   getSalesOrdersV2, 
@@ -24,6 +25,7 @@ import autoTable from 'jspdf-autotable';
 import { generateFullDashboardOrders, INITIAL_FEATURED_ORDERS } from './salesOrderSampleData';
 import { PendingOrdersProductionView } from './PendingOrdersProductionView';
 import { getCustomSalesOrders, saveCustomSalesOrder } from '../../utils/salesOrderStorage';
+import { formatDateDDMMYYYY } from '../../utils/dateUtils';
 
 // Custom SVG WhatsApp icon matching site vibe
 const WhatsAppIcon: React.FC<{ className?: string }> = ({ 
@@ -49,6 +51,7 @@ interface ColumnConfig {
 
 const SalesOrders: React.FC = () => {
   const { selectedCompany } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Core Data
   const [orders, setOrders] = useState<SalesOrderV2[]>([]);
@@ -57,7 +60,48 @@ const SalesOrders: React.FC = () => {
   // Filters State
   const [search, setSearch] = useState('');
   const [dateRangeFilter, setDateRangeFilter] = useState<string>('sep_2026'); // Matches screenshot '01/09/2026 - 30/09/2026'
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  // Initialize statusFilter from URL param or localStorage to preserve on refresh
+  const getInitialTab = (): string => {
+    const fromUrl = searchParams.get('tab');
+    if (fromUrl) {
+      const lower = fromUrl.toLowerCase();
+      if (lower === 'pending') return 'Pending';
+      if (lower === 'confirmed') return 'Confirmed';
+      if (lower === 'draft') return 'Draft';
+      if (lower === 'all') return 'all';
+    }
+    const fromStorage = localStorage.getItem('sales_orders_active_tab');
+    if (fromStorage) return fromStorage;
+    return 'all';
+  };
+
+  const [statusFilter, setStatusFilterState] = useState<string>(getInitialTab);
+
+  const setStatusFilter = (tab: string) => {
+    setStatusFilterState(tab);
+    localStorage.setItem('sales_orders_active_tab', tab);
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      if (tab === 'all') next.delete('tab');
+      else next.set('tab', tab.toLowerCase());
+      return next;
+    }, { replace: true });
+  };
+
+  // Sync URL on initial mount if tab was restored from storage
+  useEffect(() => {
+    const fromStorage = localStorage.getItem('sales_orders_active_tab');
+    const fromUrl = searchParams.get('tab');
+    if (!fromUrl && fromStorage && fromStorage !== 'all') {
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev);
+        next.set('tab', fromStorage.toLowerCase());
+        return next;
+      }, { replace: true });
+    }
+  }, []);
+
   const [regionFilter, setRegionFilter] = useState<string>('all');
   const [agentFilter, setAgentFilter] = useState<string>('all');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -466,13 +510,13 @@ const SalesOrders: React.FC = () => {
     const exportRows = sortedOrders.map((o, idx) => ({
       'S.No': idx + 1,
       'SO No.': o.orderNumber,
-      'Order Date': o.orderDate,
+      'Order Date': formatDateDDMMYYYY(o.orderDate),
       'Customer Name': o.customerName,
       'Mobile No.': o.customerPhone || '—',
       'City': o.city || '—',
       'Region / State': o.region || '—',
       'Agent': o.agent || '—',
-      'Expected Delivery': o.promisedDate || '—',
+      'Expected Delivery': formatDateDDMMYYYY(o.promisedDate),
       'Amount (₹)': o.grandTotal,
       'Fulfilment Status': o.fulfillmentStatus || 'Pending',
       'Order Status': o.status || 'Confirmed',
@@ -513,11 +557,11 @@ const SalesOrders: React.FC = () => {
       const tableData = sortedOrders.slice(0, 50).map((o, idx) => [
         idx + 1,
         o.orderNumber,
-        o.orderDate,
+        formatDateDDMMYYYY(o.orderDate),
         o.customerName,
         o.customerPhone || '—',
         o.city || '—',
-        o.promisedDate || '—',
+        formatDateDDMMYYYY(o.promisedDate),
         `Rs. ${(o.grandTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
         o.fulfillmentStatus || 'Pending',
         o.status || 'Confirmed'
@@ -1211,8 +1255,8 @@ const SalesOrders: React.FC = () => {
 
                     {/* Date */}
                     {isColVisible('orderDate') && (
-                      <td className="py-3.5 px-3 text-gray-600 font-medium whitespace-nowrap">
-                        {order.orderDate}
+                      <td className="py-3.5 px-3 text-gray-600 font-medium whitespace-nowrap font-mono">
+                        {formatDateDDMMYYYY(order.orderDate)}
                       </td>
                     )}
 
@@ -1242,8 +1286,8 @@ const SalesOrders: React.FC = () => {
 
                     {/* Expected Delivery */}
                     {isColVisible('promisedDate') && (
-                      <td className="py-3.5 px-3 text-gray-700 font-medium whitespace-nowrap">
-                        {order.promisedDate || '08/10/2026'}
+                      <td className="py-3.5 px-3 text-gray-700 font-medium whitespace-nowrap font-mono">
+                        {formatDateDDMMYYYY(order.promisedDate)}
                       </td>
                     )}
 

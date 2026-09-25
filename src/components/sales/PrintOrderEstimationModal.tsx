@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { X, Printer, Download, Minus, Plus, ChevronLeft } from 'lucide-react';
 import { SalesOrderV2 } from '../../api/salesOrderApiV2';
 import { useAuth } from '../../context/AuthContext';
+import { formatDateDDMMYYYY } from '../../utils/dateUtils';
 
 interface PrintOrderEstimationModalProps {
   order: SalesOrderV2;
@@ -62,12 +63,7 @@ const PrintOrderEstimationModal: React.FC<PrintOrderEstimationModalProps> = ({
 
   // ── Order date ──
   const fmtDatePrint = (d?: string) => {
-    if (!d) return '';
-    try {
-      const dt = new Date(d);
-      if (isNaN(dt.getTime())) return d;
-      return `${String(dt.getDate()).padStart(2, '0')}-${String(dt.getMonth() + 1).padStart(2, '0')}-${dt.getFullYear()}`;
-    } catch { return d; }
+    return formatDateDDMMYYYY(d);
   };
 
   // ── Table rows: items + charges merged ──

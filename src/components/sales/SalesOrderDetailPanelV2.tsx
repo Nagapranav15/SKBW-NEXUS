@@ -12,6 +12,7 @@ import { useAuth } from '../../context/AuthContext';
 import { getParties } from '../../api/partyApi';
 import { getBalancesV2, getSkusV2 } from '../../api/mfgApiV2';
 import { showToast } from '../ui/Toast';
+import { formatDateDDMMYYYY } from '../../utils/dateUtils';
 
 // WhatsApp Icon
 const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' }) => (
@@ -141,12 +142,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
   };
 
   const fmtDate = (d?: string) => {
-    if (!d) return '—';
-    try {
-      const dt = new Date(d);
-      if (isNaN(dt.getTime())) return d;
-      return `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}/${dt.getFullYear()}`;
-    } catch { return d; }
+    return formatDateDDMMYYYY(d);
   };
 
   const fmtMoney = (n?: number) =>

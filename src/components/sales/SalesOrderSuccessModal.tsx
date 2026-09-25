@@ -8,6 +8,7 @@ import { SalesOrderV2 } from '../../api/salesOrderApiV2';
 import { useAuth } from '../../context/AuthContext';
 import { getParties } from '../../api/partyApi';
 import { showToast } from '../ui/Toast';
+import { formatDateDDMMYYYY } from '../../utils/dateUtils';
 
 // Custom SVG WhatsApp icon
 const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' }) => (
@@ -87,17 +88,7 @@ export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
 
   // Safe Date Formatter
   const fmtDate = (d?: string) => {
-    if (!d) return '—';
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(d)) return d;
-    if (/^\d{4}-\d{2}-\d{2}/.test(d)) {
-      const [y, m, day] = d.slice(0, 10).split('-');
-      return `${day}/${m}/${y}`;
-    }
-    try {
-      const dt = new Date(d);
-      if (isNaN(dt.getTime())) return d;
-      return `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}/${dt.getFullYear()}`;
-    } catch { return d; }
+    return formatDateDDMMYYYY(d);
   };
 
   const fmtMoney = (n?: number) =>
