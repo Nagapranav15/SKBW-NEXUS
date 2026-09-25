@@ -446,7 +446,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
               }`}
             >
               <Factory className="w-3.5 h-3.5 text-blue-600" />
-              <span>Stock Item Production (Tally)</span>
+              <span>Production View</span>
               <span className="px-1.5 py-0.2 bg-blue-50 text-blue-700 rounded-md text-[10px] font-mono">
                 {filteredRequirements.length}
               </span>
@@ -460,8 +460,8 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              <Layers className="w-3.5 h-3.5 text-amber-600" />
-              <span>Order Outstandings</span>
+              <Building className="w-3.5 h-3.5 text-amber-600" />
+              <span>Customer View</span>
               <span className="px-1.5 py-0.2 bg-amber-50 text-amber-700 rounded-md text-[10px] font-mono">
                 {pendingOrders.length}
               </span>
