@@ -1,4 +1,14 @@
 require("dotenv").config();
+const dns = require("dns");
+
+// Enforce IPv4-first resolution for Node.js process to prevent ENOTFOUND on MongoDB Atlas shards
+try {
+  dns.setDefaultResultOrder("ipv4first");
+} catch (_) {}
+
+try {
+  dns.setServers(["8.8.8.8", "1.1.1.1", "8.8.4.4"]);
+} catch (_) {}
 
 // Ensure process default environment fallbacks so server never crashes on missing env vars
 process.env.JWT_SECRET = process.env.JWT_SECRET || "supersecret";

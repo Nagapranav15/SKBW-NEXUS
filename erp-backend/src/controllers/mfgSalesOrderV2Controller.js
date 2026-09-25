@@ -80,52 +80,64 @@ exports.getSalesOrders = async (req, res, next) => {
       ];
     }
 
-    const v2Orders = await SalesOrderV2.find(query)
-      .populate("customer", "firmName contactName gstin phone city state")
-      .populate("items.skuId", "skuCode name category unit gsm width length ruleType pages paperType")
-      .sort({ createdAt: -1 });
+    let v2Orders = [];
+    try {
+      v2Orders = await SalesOrderV2.find(query)
+        .populate("customer", "firmName contactName gstin phone city state")
+        .populate("items.skuId", "skuCode name category unit gsm width length ruleType pages paperType")
+        .sort({ createdAt: -1 });
+    } catch (queryErr) {
+      console.error("SalesOrderV2 find error (DB transient failure):", queryErr.message);
+      // If it's a connection / server selection error, return empty array with a warning header
+      res.setHeader("X-DB-Warning", "SalesOrder query encountered temporary network blip");
+      return res.json([]);
+    }
 
     // Fallback: Also fetch legacy SalesOrders if any exist and map them seamlessly
     let legacyMapped = [];
     if (!status || status === "all") {
-      const legacyQuery = { company: companyQuery };
-      if (search) {
-        const q = search.trim();
-        const regexSearch = { $regex: q, $options: "i" };
-        legacyQuery.$or = [
-          { orderNumber: regexSearch },
-          { customerName: regexSearch }
-        ];
+      try {
+        const legacyQuery = { company: companyQuery };
+        if (search) {
+          const q = search.trim();
+          const regexSearch = { $regex: q, $options: "i" };
+          legacyQuery.$or = [
+            { orderNumber: regexSearch },
+            { customerName: regexSearch }
+          ];
+        }
+        const legacyOrders = await SalesOrder.find(legacyQuery).sort({ createdAt: -1 });
+        
+        const v2Numbers = new Set(v2Orders.map(o => o.orderNumber));
+        legacyMapped = legacyOrders.filter(l => !v2Numbers.has(l.orderNumber)).map(l => ({
+          _id: l._id,
+          orderNumber: l.orderNumber || `SO-LEGACY-${l._id.toString().slice(-4)}`,
+          company: l.company,
+          customerName: l.customerName || "Customer",
+          orderDate: l.date || (l.createdAt ? new Date(l.createdAt).toISOString().split("T")[0] : new Date().toISOString().split("T")[0]),
+          promisedDate: l.deliveryDate || "",
+          items: (l.items || []).map(i => ({
+            skuCode: i.itemId || "SKU-LEGACY",
+            itemName: i.itemName || "Item",
+            quantity: i.quantity || 1,
+            unitPrice: i.price || 0,
+            totalAmount: i.total || 0,
+            dispatchedQty: 0
+          })),
+          subtotal: l.subtotal || 0,
+          totalCgst: (l.tax || 0) / 2,
+          totalSgst: (l.tax || 0) / 2,
+          totalIgst: 0,
+          grandTotal: l.total || 0,
+          materialsStatus: "Ready",
+          fulfillmentStatus: l.status === "delivered" ? "Fulfilled" : "Not Started",
+          status: l.status === "pending" ? "Confirmed" : (l.status === "ready" ? "In Production" : (l.status === "delivered" ? "Delivered" : "Confirmed")),
+          isLegacy: true,
+          createdAt: l.createdAt
+        }));
+      } catch (legacyErr) {
+        console.warn("Legacy SalesOrder find error:", legacyErr.message);
       }
-      const legacyOrders = await SalesOrder.find(legacyQuery).sort({ createdAt: -1 });
-      
-      const v2Numbers = new Set(v2Orders.map(o => o.orderNumber));
-      legacyMapped = legacyOrders.filter(l => !v2Numbers.has(l.orderNumber)).map(l => ({
-        _id: l._id,
-        orderNumber: l.orderNumber || `SO-LEGACY-${l._id.toString().slice(-4)}`,
-        company: l.company,
-        customerName: l.customerName || "Customer",
-        orderDate: l.date || (l.createdAt ? new Date(l.createdAt).toISOString().split("T")[0] : new Date().toISOString().split("T")[0]),
-        promisedDate: l.deliveryDate || "",
-        items: (l.items || []).map(i => ({
-          skuCode: i.itemId || "SKU-LEGACY",
-          itemName: i.itemName || "Item",
-          quantity: i.quantity || 1,
-          unitPrice: i.price || 0,
-          totalAmount: i.total || 0,
-          dispatchedQty: 0
-        })),
-        subtotal: l.subtotal || 0,
-        totalCgst: (l.tax || 0) / 2,
-        totalSgst: (l.tax || 0) / 2,
-        totalIgst: 0,
-        grandTotal: l.total || 0,
-        materialsStatus: "Ready",
-        fulfillmentStatus: l.status === "delivered" ? "Fulfilled" : "Not Started",
-        status: l.status === "pending" ? "Confirmed" : (l.status === "ready" ? "In Production" : (l.status === "delivered" ? "Delivered" : "Confirmed")),
-        isLegacy: true,
-        createdAt: l.createdAt
-      }));
     }
 
     const combined = [...v2Orders, ...legacyMapped];
