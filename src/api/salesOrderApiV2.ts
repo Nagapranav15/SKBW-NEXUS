@@ -27,6 +27,7 @@ export interface SalesOrderItemV2 {
 
 export interface OtherChargeItem {
   name: string;
+  chargeType?: 'per_gbl' | 'fixed' | string;
   quantity: number;
   rate: number;
   amount: number;

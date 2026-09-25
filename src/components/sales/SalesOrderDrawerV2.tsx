@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Save, Plus, Trash2, Search, ChevronDown, Calendar, User, Package, 
   AlertCircle, FileText, Check, Percent, X, MoreVertical, Edit2, 
-  Phone, MapPin, Receipt, Truck, Copy, ExternalLink, Eye, Building2
+  Phone, MapPin, Receipt, Truck, Copy, ExternalLink, Eye, Building2,
+  Settings, Zap, Sparkles, RefreshCw
 } from 'lucide-react';
 import Modal from '../ui/Modal';
 import { getSkusV2, getBalancesV2, SkuV2 } from '../../api/mfgApiV2';
@@ -136,6 +137,24 @@ const isOnlyProduct = (s: SkuV2) => {
   }
   return true;
 };
+
+export interface PredefinedCharge {
+  id: string;
+  name: string;
+  defaultRate: number;
+  calculationType: 'per_gbl' | 'fixed';
+}
+
+export const DEFAULT_PREDEFINED_CHARGES: PredefinedCharge[] = [
+  { id: 'ch-hamali', name: 'Hamali / Loading Charges', defaultRate: 5, calculationType: 'per_gbl' },
+  { id: 'ch-unloading', name: 'Unloading Charges', defaultRate: 5, calculationType: 'per_gbl' },
+  { id: 'ch-freight', name: 'Freight / Transport Charges', defaultRate: 15, calculationType: 'per_gbl' },
+  { id: 'ch-packing', name: 'Packing & Bundling Charges', defaultRate: 10, calculationType: 'per_gbl' },
+  { id: 'ch-cartage', name: 'Local Cartage / Auto', defaultRate: 250, calculationType: 'fixed' },
+  { id: 'ch-delivery', name: 'Door Delivery Charges', defaultRate: 300, calculationType: 'fixed' },
+  { id: 'ch-insurance', name: 'Transit Insurance', defaultRate: 100, calculationType: 'fixed' },
+  { id: 'ch-handling', name: 'Handling Charges', defaultRate: 4, calculationType: 'per_gbl' }
+];
 
 // Custom WhatsApp SVG Icon
 const WhatsAppIcon: React.FC<{ className?: string }> = ({ 
@@ -310,6 +329,25 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   const [overallDiscount, setOverallDiscount] = useState<number | string>('');
   const [internalNotes, setInternalNotes] = useState('');
 
+  // Predefined Charges Master State (persisted in localStorage)
+  const [predefinedCharges, setPredefinedCharges] = useState<PredefinedCharge[]>(() => {
+    try {
+      const stored = localStorage.getItem('skbw_predefined_charges_v2');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.warn('Failed to parse stored charges:', e);
+    }
+    return DEFAULT_PREDEFINED_CHARGES;
+  });
+
+  const [activeChargeDropdown, setActiveChargeDropdown] = useState<number | null>(null);
+  const [showManageChargesModal, setShowManageChargesModal] = useState(false);
+  const [showQuickPresetMenu, setShowQuickPresetMenu] = useState(false);
+  const [newPresetForm, setNewPresetForm] = useState({ name: '', defaultRate: '', calculationType: 'per_gbl' as 'per_gbl' | 'fixed' });
+
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -324,6 +362,11 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       }
       if (dropdownContainerRef.current && !dropdownContainerRef.current.contains(e.target as Node)) {
         setActiveItemDropdownIdx(null);
+      }
+      const target = e.target as HTMLElement;
+      if (!target.closest('.charge-name-cell') && !target.closest('.charge-preset-menu')) {
+        setActiveChargeDropdown(null);
+        setShowQuickPresetMenu(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -695,19 +738,127 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
     });
   };
 
-  // Add Other Charge
-  const handleAddCharge = () => {
+  // Calculate Total Order GBL across all products
+  const totalOrderGbl = useMemo(() => {
+    return items.reduce((sum, item) => {
+      const directGbl = Number(item.gbl) || 0;
+      if (directGbl > 0) return sum + directGbl;
+      const calcGbl = (Number(item.pcsPerGbl) > 0 && Number(item.totalPcs) > 0)
+        ? Math.floor(Number(item.totalPcs) / Number(item.pcsPerGbl))
+        : 0;
+      return sum + calcGbl;
+    }, 0);
+  }, [items]);
+
+  // Helper to save a new predefined charge into master list and localStorage
+  const saveNewPredefinedCharge = (name: string, calculationType: 'per_gbl' | 'fixed' = 'per_gbl', defaultRate: number = 0) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setPredefinedCharges(prev => {
+      const exists = prev.find(p => p.name.toLowerCase() === trimmed.toLowerCase());
+      if (exists) return prev;
+      const updated = [...prev, {
+        id: `ch-custom-${Date.now()}`,
+        name: trimmed,
+        defaultRate,
+        calculationType
+      }];
+      try {
+        localStorage.setItem('skbw_predefined_charges_v2', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  };
+
+  // Dynamic Quantity Sync: QTY acts according to total GBL ordered
+  useEffect(() => {
+    if (totalOrderGbl >= 0) {
+      setOtherCharges(prev => {
+        let changed = false;
+        const updated = prev.map(ch => {
+          const isPerGbl = ch.chargeType === 'per_gbl' || 
+            (!ch.chargeType && ch.name && (
+              ch.name.toLowerCase().includes('hamali') || 
+              ch.name.toLowerCase().includes('freight') || 
+              ch.name.toLowerCase().includes('loading') || 
+              ch.name.toLowerCase().includes('packing') ||
+              ch.name.toLowerCase().includes('gbl')
+            ));
+          if (isPerGbl) {
+            const targetQty = totalOrderGbl > 0 ? totalOrderGbl : 1;
+            if (ch.quantity !== targetQty || ch.chargeType !== 'per_gbl') {
+              changed = true;
+              const newAmt = Math.round(targetQty * (Number(ch.rate) || 0) * 100) / 100;
+              return { ...ch, chargeType: 'per_gbl', quantity: targetQty, amount: newAmt };
+            }
+          }
+          return ch;
+        });
+        return changed ? updated : prev;
+      });
+    }
+  }, [totalOrderGbl]);
+
+  // Add Other Charge (optionally with a preset)
+  const handleAddCharge = (preset?: PredefinedCharge) => {
+    const p = preset || predefinedCharges[0] || { name: 'Hamali / Loading Charges', defaultRate: 5, calculationType: 'per_gbl' };
+    const isPerGbl = p.calculationType === 'per_gbl';
+    const qty = isPerGbl ? (totalOrderGbl > 0 ? totalOrderGbl : 1) : 1;
+    const amt = Math.round(qty * (Number(p.defaultRate) || 0) * 100) / 100;
+
     setOtherCharges(prev => [
       ...prev,
-      { name: '', quantity: 1, rate: 0, amount: 0 }
+      {
+        name: p.name,
+        chargeType: p.calculationType,
+        quantity: qty,
+        rate: p.defaultRate,
+        amount: amt
+      }
     ]);
+    setShowQuickPresetMenu(false);
+  };
+
+  const handleSelectPresetCharge = (cIdx: number, p: PredefinedCharge) => {
+    const isPerGbl = p.calculationType === 'per_gbl';
+    const qty = isPerGbl ? (totalOrderGbl > 0 ? totalOrderGbl : 1) : 1;
+    const amt = Math.round(qty * (Number(p.defaultRate) || 0) * 100) / 100;
+
+    setOtherCharges(prev => {
+      const copy = [...prev];
+      copy[cIdx] = {
+        ...copy[cIdx],
+        name: p.name,
+        chargeType: p.calculationType,
+        quantity: qty,
+        rate: p.defaultRate,
+        amount: amt
+      };
+      return copy;
+    });
+    setActiveChargeDropdown(null);
+  };
+
+  const handleToggleChargeType = (cIdx: number, newType: 'per_gbl' | 'fixed') => {
+    setOtherCharges(prev => {
+      const copy = [...prev];
+      const ch = { ...copy[cIdx], chargeType: newType };
+      if (newType === 'per_gbl') {
+        ch.quantity = totalOrderGbl > 0 ? totalOrderGbl : 1;
+      } else {
+        ch.quantity = 1;
+      }
+      ch.amount = Math.round((Number(ch.quantity) || 0) * (Number(ch.rate) || 0) * 100) / 100;
+      copy[cIdx] = ch;
+      return copy;
+    });
   };
 
   const updateCharge = (idx: number, field: keyof OtherChargeItem, val: any) => {
     setOtherCharges(prev => {
       const copy = [...prev];
       const ch = { ...copy[idx], [field]: val };
-      ch.amount = (Number(ch.quantity) || 0) * (Number(ch.rate) || 0);
+      ch.amount = Math.round((Number(ch.quantity) || 0) * (Number(ch.rate) || 0) * 100) / 100;
       copy[idx] = ch;
       return copy;
     });
@@ -1732,84 +1883,258 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
             <div className="lg:col-span-8 space-y-4">
 
               {/* Order Charges (Optional) */}
+              {/* Order Charges Section */}
               <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs font-bold text-gray-900">
-                    <Package className="w-4 h-4 text-blue-600" />
-                    <span>Order Charges (Optional)</span>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                      <Package className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-gray-900 uppercase tracking-wide">Order Charges (Optional)</span>
+                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full font-mono text-[10.5px] font-bold border border-blue-200 flex items-center gap-1">
+                          <Zap className="w-3 h-3 text-amber-500 fill-amber-500" />
+                          <span>Total Order: {totalOrderGbl} GBL</span>
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-gray-500 font-medium mt-0.5">
+                        Charges set to <strong className="text-emerald-700">Per GBL</strong> automatically calculate QTY based on the total {totalOrderGbl} GBL ordered.
+                      </p>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleAddCharge}
-                    className="px-2.5 py-1 border border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-all shadow-3xs"
-                  >
-                    <Plus className="w-3 h-3 stroke-[3]" />
-                    <span>Add Charge</span>
-                  </button>
+
+                  <div className="flex items-center gap-1.5">
+                    {/* Quick Presets Dropdown */}
+                    <div className="relative charge-preset-menu">
+                      <button
+                        type="button"
+                        onClick={() => setShowQuickPresetMenu(!showQuickPresetMenu)}
+                        className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100/80 text-blue-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-blue-200 shadow-3xs"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                        <span>+ Add Preset Charge</span>
+                        <ChevronDown className="w-3 h-3 text-blue-500" />
+                      </button>
+
+                      {showQuickPresetMenu && (
+                        <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1 text-xs divide-y divide-gray-100">
+                          <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+                            <span>Predefined Charges</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowQuickPresetMenu(false);
+                                setShowManageChargesModal(true);
+                              }}
+                              className="text-blue-600 hover:underline flex items-center gap-0.5 cursor-pointer"
+                            >
+                              <Settings className="w-3 h-3" />
+                              <span>Manage</span>
+                            </button>
+                          </div>
+                          <div className="max-h-56 overflow-y-auto py-1">
+                            {predefinedCharges.map(p => (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => handleAddCharge(p)}
+                                className="w-full px-3 py-1.5 text-left hover:bg-blue-50 flex items-center justify-between group transition-colors cursor-pointer"
+                              >
+                                <span className="font-semibold text-gray-800 group-hover:text-blue-700">{p.name}</span>
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${p.calculationType === 'per_gbl' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'}`}>
+                                  {p.calculationType === 'per_gbl' ? `₹${p.defaultRate}/GBL` : `₹${p.defaultRate} Flat`}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleAddCharge()}
+                      className="px-2.5 py-1 border border-gray-200 hover:border-gray-300 text-gray-700 hover:bg-gray-50 font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-all shadow-3xs"
+                    >
+                      <Plus className="w-3 h-3 stroke-[3]" />
+                      <span>Custom Row</span>
+                    </button>
+                  </div>
                 </div>
 
-                <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                <div className="overflow-visible border border-gray-200 rounded-xl">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead className="bg-gray-50/80 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 select-none">
                       <tr>
                         <th className="py-2 px-3 w-8 text-center">#</th>
                         <th className="py-2 px-3">CHARGE NAME</th>
-                        <th className="py-2 px-3 text-center w-20">QTY</th>
-                        <th className="py-2 px-3 text-right w-28">RATE (₹)</th>
+                        <th className="py-2 px-3 text-center w-28">CALC MODE</th>
+                        <th className="py-2 px-3 text-center w-28">QTY</th>
+                        <th className="py-2 px-3 text-right w-24">RATE (₹)</th>
                         <th className="py-2 px-3 text-right w-28">AMOUNT (₹)</th>
-                        <th className="py-2 px-3 text-center w-16">ACTIONS</th>
+                        <th className="py-2 px-3 text-center w-14">ACTIONS</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 bg-white">
-                      {otherCharges.map((ch, cIdx) => (
-                        <tr key={cIdx} className="hover:bg-gray-50/60">
-                          <td className="py-2 px-3 text-center font-bold text-gray-400">
-                            {cIdx + 1}
-                          </td>
-                          <td className="py-2 px-3">
-                            <input
-                              type="text"
-                              placeholder="e.g. Packing, Freight..."
-                              value={ch.name}
-                              onChange={(e) => updateCharge(cIdx, 'name', e.target.value)}
-                              className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800"
-                            />
-                          </td>
-                          <td className="py-2 px-3 text-center">
-                            <input
-                              type="number"
-                              value={ch.quantity}
-                              onChange={(e) => updateCharge(cIdx, 'quantity', e.target.value)}
-                              className="w-16 px-1.5 py-1 text-center bg-white border border-gray-200 rounded-lg font-mono text-gray-800"
-                            />
-                          </td>
-                          <td className="py-2 px-3 text-right">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={ch.rate}
-                              onChange={(e) => updateCharge(cIdx, 'rate', e.target.value)}
-                              className="w-20 px-1.5 py-1 text-right bg-white border border-gray-200 rounded-lg font-mono text-gray-800"
-                            />
-                          </td>
-                          <td className="py-2 px-3 text-right font-black font-mono text-gray-900">
-                            {ch.amount.toFixed(2)}
-                          </td>
-                          <td className="py-2 px-3 text-center">
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteCharge(cIdx)}
-                              className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                      {otherCharges.map((ch, cIdx) => {
+                        const isPerGbl = ch.chargeType === 'per_gbl' || (!ch.chargeType && (ch.name.toLowerCase().includes('hamali') || ch.name.toLowerCase().includes('freight') || ch.name.toLowerCase().includes('loading') || ch.name.toLowerCase().includes('packing')));
+                        return (
+                          <tr key={cIdx} className="hover:bg-gray-50/60">
+                            <td className="py-2 px-3 text-center font-bold text-gray-400">
+                              {cIdx + 1}
+                            </td>
+                            
+                            {/* Charge Name with Dropdown & Inline Creator */}
+                            <td className="py-2 px-3 relative charge-name-cell">
+                              <div className="relative">
+                                <input
+                                  type="text"
+                                  placeholder="Select or type charge name..."
+                                  value={ch.name}
+                                  onFocus={() => setActiveChargeDropdown(cIdx)}
+                                  onChange={(e) => {
+                                    updateCharge(cIdx, 'name', e.target.value);
+                                    setActiveChargeDropdown(cIdx);
+                                  }}
+                                  className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                                />
+
+                                {activeChargeDropdown === cIdx && (
+                                  <div className="absolute left-0 top-full mt-1 w-72 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1.5 text-xs divide-y divide-gray-100">
+                                    <div className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+                                      <span>Predefined Charges</span>
+                                      <span 
+                                        className="text-blue-600 cursor-pointer hover:underline" 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setActiveChargeDropdown(null);
+                                          setShowManageChargesModal(true);
+                                        }}
+                                      >
+                                        Manage Presets
+                                      </span>
+                                    </div>
+                                    <div className="max-h-48 overflow-y-auto py-1">
+                                      {predefinedCharges
+                                        .filter(p => !ch.name.trim() || p.name.toLowerCase().includes(ch.name.toLowerCase()))
+                                        .map(p => (
+                                          <button
+                                            key={p.id}
+                                            type="button"
+                                            onClick={() => handleSelectPresetCharge(cIdx, p)}
+                                            className="w-full px-3 py-1.5 text-left hover:bg-blue-50 flex items-center justify-between group transition-colors cursor-pointer"
+                                          >
+                                            <span className="font-semibold text-gray-800 group-hover:text-blue-700">{p.name}</span>
+                                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${p.calculationType === 'per_gbl' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'}`}>
+                                              {p.calculationType === 'per_gbl' ? `₹${p.defaultRate}/GBL` : `₹${p.defaultRate} Flat`}
+                                            </span>
+                                          </button>
+                                        ))}
+
+                                      {/* Inline Creator for new charge */}
+                                      {ch.name.trim() && !predefinedCharges.some(p => p.name.toLowerCase() === ch.name.trim().toLowerCase()) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            saveNewPredefinedCharge(ch.name.trim(), 'per_gbl', Number(ch.rate) || 5);
+                                            setOtherCharges(prev => {
+                                              const copy = [...prev];
+                                              const targetQty = totalOrderGbl > 0 ? totalOrderGbl : 1;
+                                              copy[cIdx] = {
+                                                ...copy[cIdx],
+                                                name: ch.name.trim(),
+                                                chargeType: 'per_gbl',
+                                                quantity: targetQty,
+                                                rate: Number(copy[cIdx].rate) || 5,
+                                                amount: Math.round(targetQty * (Number(copy[cIdx].rate) || 5) * 100) / 100
+                                              };
+                                              return copy;
+                                            });
+                                            setActiveChargeDropdown(null);
+                                            showToast(`Saved "${ch.name.trim()}" to Predefined Charges`, 'success');
+                                          }}
+                                          className="w-full px-3 py-2 text-left bg-blue-50/70 hover:bg-blue-100/90 text-blue-700 font-bold flex items-center gap-1.5 text-xs border-t border-blue-100 cursor-pointer"
+                                        >
+                                          <Plus className="w-3.5 h-3.5 text-blue-600" />
+                                          <span>Save & Use "{ch.name.trim()}" (Per GBL)</span>
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Mode / Calc Type */}
+                            <td className="py-2 px-3 text-center">
+                              <button
+                                type="button"
+                                onClick={() => handleToggleChargeType(cIdx, isPerGbl ? 'fixed' : 'per_gbl')}
+                                title={isPerGbl ? 'Synced with total GBL. Click to switch to Flat / Fixed' : 'Fixed fee. Click to switch to Per GBL'}
+                                className={`px-2 py-0.5 rounded-lg text-[10px] font-bold cursor-pointer transition-all border ${
+                                  isPerGbl
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                    : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'
+                                }`}
+                              >
+                                {isPerGbl ? '⚡ Per GBL' : 'Fixed'}
+                              </button>
+                            </td>
+
+                            {/* QTY (auto-acts according to total GBL when Per GBL) */}
+                            <td className="py-2 px-3 text-center">
+                              <div className="relative inline-flex items-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={ch.quantity}
+                                  onChange={(e) => updateCharge(cIdx, 'quantity', e.target.value)}
+                                  className={`w-18 px-1.5 py-1 text-center bg-white border border-gray-200 rounded-lg font-mono text-gray-800 text-xs font-bold ${
+                                    isPerGbl ? 'bg-emerald-50/30 border-emerald-200 text-emerald-800' : ''
+                                  }`}
+                                />
+                                {isPerGbl && (
+                                  <span className="ml-1 text-[9.5px] font-bold text-emerald-600 font-mono">GBL</span>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Rate */}
+                            <td className="py-2 px-3 text-right">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={ch.rate}
+                                onChange={(e) => updateCharge(cIdx, 'rate', e.target.value)}
+                                className="w-20 px-1.5 py-1 text-right bg-white border border-gray-200 rounded-lg font-mono text-gray-800 text-xs font-bold"
+                              />
+                            </td>
+
+                            {/* Amount */}
+                            <td className="py-2 px-3 text-right font-black font-mono text-gray-900">
+                              ₹{ch.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+
+                            {/* Actions */}
+                            <td className="py-2 px-3 text-center">
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteCharge(cIdx)}
+                                className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+
                       {otherCharges.length === 0 && (
                         <tr>
-                          <td colSpan={6} className="py-4 text-center text-gray-400 italic">
-                            No additional charges added
+                          <td colSpan={7} className="py-5 text-center text-gray-400 italic">
+                            No additional charges added. Click "+ Add Preset Charge" or "+ Custom Row".
                           </td>
                         </tr>
                       )}
@@ -2096,6 +2421,113 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                 className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition-all cursor-pointer shadow-2xs"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── MANAGE PREDEFINED CHARGES MODAL ── */}
+      {showManageChargesModal && (
+        <Modal
+          isOpen={showManageChargesModal}
+          onClose={() => setShowManageChargesModal(false)}
+          title="Manage Predefined Charges"
+          maxWidth="max-w-lg"
+        >
+          <div className="space-y-4">
+            <p className="text-xs text-gray-500">
+              Predefined charges appear in the charge selector dropdown. Any charge set to <strong>Per GBL</strong> automatically computes quantity based on the total GBL ordered.
+            </p>
+
+            {/* List */}
+            <div className="max-h-60 overflow-y-auto border border-gray-100 rounded-xl divide-y divide-gray-100">
+              {predefinedCharges.map(p => (
+                <div key={p.id} className="p-2.5 flex items-center justify-between text-xs hover:bg-gray-50/80">
+                  <div>
+                    <span className="font-bold text-gray-800 block">{p.name}</span>
+                    <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-bold mt-0.5 ${p.calculationType === 'per_gbl' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>
+                      {p.calculationType === 'per_gbl' ? `Per GBL (₹${p.defaultRate}/GBL)` : `Fixed (₹${p.defaultRate})`}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const updated = predefinedCharges.filter(x => x.id !== p.id);
+                      setPredefinedCharges(updated);
+                      try { localStorage.setItem('skbw_predefined_charges_v2', JSON.stringify(updated)); } catch (e) {}
+                    }}
+                    className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Add new preset form */}
+            <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 space-y-2">
+              <span className="text-[11px] font-bold text-blue-900 block uppercase tracking-wide">+ Add New Charge Master</span>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+                <input
+                  type="text"
+                  placeholder="Charge Name (e.g. Loading)"
+                  value={newPresetForm.name}
+                  onChange={(e) => setNewPresetForm({ ...newPresetForm, name: e.target.value })}
+                  className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold"
+                />
+                <select
+                  value={newPresetForm.calculationType}
+                  onChange={(e) => setNewPresetForm({ ...newPresetForm, calculationType: e.target.value as any })}
+                  className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold"
+                >
+                  <option value="per_gbl">⚡ Per GBL</option>
+                  <option value="fixed">Fixed / Flat</option>
+                </select>
+                <div className="flex gap-1">
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="Rate (₹)"
+                    value={newPresetForm.defaultRate}
+                    onChange={(e) => setNewPresetForm({ ...newPresetForm, defaultRate: e.target.value })}
+                    className="w-20 px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!newPresetForm.name.trim()) return;
+                      saveNewPredefinedCharge(newPresetForm.name.trim(), newPresetForm.calculationType, Number(newPresetForm.defaultRate) || 0);
+                      setNewPresetForm({ name: '', defaultRate: '', calculationType: 'per_gbl' });
+                      showToast('New predefined charge added', 'success');
+                    }}
+                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs cursor-pointer flex-1"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex justify-between items-center pt-2 border-t border-gray-100 text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setPredefinedCharges(DEFAULT_PREDEFINED_CHARGES);
+                  try { localStorage.setItem('skbw_predefined_charges_v2', JSON.stringify(DEFAULT_PREDEFINED_CHARGES)); } catch (e) {}
+                  showToast('Reset to system default charges', 'info');
+                }}
+                className="text-gray-500 hover:text-gray-700 font-medium underline cursor-pointer"
+              >
+                Reset to Defaults
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowManageChargesModal(false)}
+                className="px-4 py-1.5 bg-gray-900 text-white font-bold rounded-xl text-xs cursor-pointer"
+              >
+                Done
               </button>
             </div>
           </div>
