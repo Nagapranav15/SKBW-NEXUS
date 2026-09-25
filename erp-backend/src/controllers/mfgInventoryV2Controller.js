@@ -29,11 +29,11 @@ const toObjectId = (id) => {
 exports.getSkus = async (req, res, next) => {
   try {
     const { companyId, category, search, status } = req.query;
-    if (!companyId) {
-      return res.status(400).json({ msg: "companyId query parameter is required" });
+    const query = {};
+    if (companyId) {
+      const cId = toObjectId(companyId);
+      if (cId) query.company = cId;
     }
-
-    const query = { company: toObjectId(companyId) };
     if (req.query.showDeleted === "true") {
       query.isDeleted = true;
     } else {
@@ -1801,9 +1801,6 @@ exports.recordTransfer = async (req, res, next) => {
 exports.getBalances = async (req, res, next) => {
   try {
     const { companyId, category, groupByBatch, skuId, batchNumber } = req.query;
-    if (!companyId) {
-      return res.status(400).json({ msg: "companyId query parameter is required" });
-    }
 
     const isGroupBatch = groupByBatch === 'true';
     const groupFields = isGroupBatch
@@ -1811,11 +1808,14 @@ exports.getBalances = async (req, res, next) => {
       : { skuId: "$skuId", locationId: "$locationId" };
 
     const matchObj = { 
-      company: toObjectId(companyId), 
       status: { $ne: "Cancelled" },
       referenceType: { $ne: "OpeningStock" },
       transactionType: { $nin: ["Opening Stock", "Opening Balance", "OPENING_BALANCE"] }
     };
+    if (companyId) {
+      const cId = toObjectId(companyId);
+      if (cId) matchObj.company = cId;
+    }
     if (skuId) matchObj.skuId = toObjectId(skuId);
     if (batchNumber) matchObj.batchNumber = batchNumber;
 

@@ -33,6 +33,7 @@ interface OrderItemRow {
   description: string;
   category: string;
   uom: string;
+  stockPcs?: number;
   stockGbl: number | null;
   gbl: number | string;
   pcsPerGbl: number | string;
@@ -103,18 +104,19 @@ const ALL_SYSTEM_CUSTOMERS: any[] = (() => {
 
 // Master Finished Goods products ensuring products are ALWAYS present in Item Master
 const MASTER_PRODUCT_SKUS: SkuV2[] = [
-  { _id: 'sku-p-1', skuCode: 'FG-001', name: '132P Happy Days Notebook (UR) · 57x70 CM', category: 'Finished Goods', unit: 'Pcs', status: 'Active', brand: 'Happy Days', gsm: 52 },
-  { _id: 'sku-p-2', skuCode: 'FG-002', name: '220P Classmate Longbook (SR) · 18x24 CM', category: 'Finished Goods', unit: 'Pcs', status: 'Active', brand: 'Classmate', gsm: 56 },
-  { _id: 'sku-p-3', skuCode: 'FG-003', name: 'Hardbound Executive Diary 2026', category: 'Finished Goods', unit: 'Pcs', status: 'Active', brand: 'Navneet', gsm: 70 },
-  { _id: 'sku-p-4', skuCode: 'FG-004', name: '192P Premium Drawing Book · A4', category: 'Finished Goods', unit: 'Pcs', status: 'Active', brand: 'Happy Days', gsm: 100 },
-  { _id: 'sku-p-5', skuCode: 'FG-005', name: '300P Hardbound Account Register', category: 'Finished Goods', unit: 'Pcs', status: 'Active', brand: 'Classmate' },
-  { _id: 'sku-p-6', skuCode: 'NB-A4-192', name: 'Classmate A4 Notebook 192 Pages Single Line', category: 'Notebooks', unit: 'Pcs', status: 'Active', brand: 'Classmate' },
-  { _id: 'sku-p-7', skuCode: 'NB-LB-160', name: 'Classmate Long Book 160 Pages Ruled', category: 'Notebooks', unit: 'Pcs', status: 'Active', brand: 'Classmate' },
-  { _id: 'sku-p-8', skuCode: 'GB-SP-64', name: 'Graph Book 64 Pages Spiral Bound', category: 'Finished Goods', unit: 'Pcs', status: 'Inactive', brand: 'SKBW Deluxe' },
-  { _id: 'sku-p-9', skuCode: 'PR-PHY-120', name: 'Practical Record Book Physics 120 Pages', category: 'Registers', unit: 'Pcs', status: 'Active', brand: 'Happy Days' },
-  { _id: 'sku-p-10', skuCode: 'DRY-EX-26', name: 'Executive Leather Diary 2026', category: 'Diaries', unit: 'Pcs', status: 'Inactive', brand: 'Navneet' },
-  { _id: 'sku-p-11', skuCode: 'NB-SP-240', name: 'Deluxe College Spiral Notebook 240 Pages', category: 'Notebooks', unit: 'Pcs', status: 'Active', brand: 'Classmate' },
-  { _id: 'sku-p-12', skuCode: 'SB-A3-32', name: 'Kids Activity Scrap Book A3 32 Pages', category: 'Drawing Books', unit: 'Pcs', status: 'Active', brand: 'Happy Days' }
+  { _id: 'sku-p-0', skuCode: 'FG-SK-112', name: '112P COLLGE STYLE KING (MR)', category: 'Finished Goods', unit: 'Pcs', booksGbl: 120, altUnitConversion: 120, status: 'Active', brand: 'Style King', pages: 112 },
+  { _id: 'sku-p-1', skuCode: 'FG-001', name: '132P Happy Days Notebook (UR) · 57x70 CM', category: 'Finished Goods', unit: 'Pcs', booksGbl: 120, altUnitConversion: 120, status: 'Active', brand: 'Happy Days', gsm: 52, pages: 132 },
+  { _id: 'sku-p-2', skuCode: 'FG-002', name: '220P Classmate Longbook (SR) · 18x24 CM', category: 'Finished Goods', unit: 'Pcs', booksGbl: 80, altUnitConversion: 80, status: 'Active', brand: 'Classmate', gsm: 56, pages: 220 },
+  { _id: 'sku-p-3', skuCode: 'FG-003', name: 'Hardbound Executive Diary 2026', category: 'Finished Goods', unit: 'Pcs', booksGbl: 50, altUnitConversion: 50, status: 'Active', brand: 'Navneet', gsm: 70, pages: 300 },
+  { _id: 'sku-p-4', skuCode: 'FG-004', name: '192P Premium Drawing Book · A4', category: 'Finished Goods', unit: 'Pcs', booksGbl: 100, altUnitConversion: 100, status: 'Active', brand: 'Happy Days', gsm: 100, pages: 192 },
+  { _id: 'sku-p-5', skuCode: 'FG-005', name: '300P Hardbound Account Register', category: 'Finished Goods', unit: 'Pcs', booksGbl: 40, altUnitConversion: 40, status: 'Active', brand: 'Classmate', pages: 300 },
+  { _id: 'sku-p-6', skuCode: 'NB-A4-192', name: 'Classmate A4 Notebook 192 Pages Single Line', category: 'Notebooks', unit: 'Pcs', booksGbl: 100, altUnitConversion: 100, status: 'Active', brand: 'Classmate', pages: 192 },
+  { _id: 'sku-p-7', skuCode: 'NB-LB-160', name: 'Classmate Long Book 160 Pages Ruled', category: 'Notebooks', unit: 'Pcs', booksGbl: 120, altUnitConversion: 120, status: 'Active', brand: 'Classmate', pages: 160 },
+  { _id: 'sku-p-8', skuCode: 'GB-SP-64', name: 'Graph Book 64 Pages Spiral Bound', category: 'Finished Goods', unit: 'Pcs', booksGbl: 150, altUnitConversion: 150, status: 'Inactive', brand: 'SKBW Deluxe', pages: 64 },
+  { _id: 'sku-p-9', skuCode: 'PR-PHY-120', name: 'Practical Record Book Physics 120 Pages', category: 'Registers', unit: 'Pcs', booksGbl: 80, altUnitConversion: 80, status: 'Active', brand: 'Happy Days', pages: 120 },
+  { _id: 'sku-p-10', skuCode: 'DRY-EX-26', name: 'Executive Leather Diary 2026', category: 'Diaries', unit: 'Pcs', booksGbl: 50, altUnitConversion: 50, status: 'Inactive', brand: 'Navneet', pages: 350 },
+  { _id: 'sku-p-11', skuCode: 'NB-SP-240', name: 'Deluxe College Spiral Notebook 240 Pages', category: 'Notebooks', unit: 'Pcs', booksGbl: 60, altUnitConversion: 60, status: 'Active', brand: 'Classmate', pages: 240 },
+  { _id: 'sku-p-12', skuCode: 'SB-A3-32', name: 'Kids Activity Scrap Book A3 32 Pages', category: 'Drawing Books', unit: 'Pcs', booksGbl: 120, altUnitConversion: 120, status: 'Active', brand: 'Happy Days', pages: 32 }
 ];
 
 // Helper to strictly ensure ONLY products itself are included (no raw materials, no semi-finished)
@@ -227,35 +229,63 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   useEffect(() => {
     if (isOpen) {
       Promise.all([
-        (companyId ? getSkusV2(companyId).catch(() => getSkusV2('')) : getSkusV2('')).catch(() => []),
-        (companyId ? getBalancesV2(companyId) : Promise.resolve([])).catch(() => []),
+        getSkusV2(companyId).catch(() => []),
+        getSkusV2('').catch(() => []),
+        companyId ? getBalancesV2(companyId).catch(() => []) : Promise.resolve([]),
+        getBalancesV2('').catch(() => []),
         getParties({ limit: 10000, type: 'customer' })
           .catch(() => getParties({ company: companyId, limit: 10000, type: 'customer' }))
           .catch(() => getParties({ limit: 10000 }))
           .catch(() => ({ data: { parties: [] } }))
-      ]).then(([skus, balances, partiesRes]) => {
-        // Filter ONLY products itself (Finished Goods), keeping both Active and Inactive
-        const rawSkus: SkuV2[] = Array.isArray(skus) ? skus : [];
-        const dbProducts = rawSkus.filter(s => !s.isDeleted && isOnlyProduct(s));
-        
-        const existingCodes = new Set(dbProducts.map(p => (p.skuCode || p.name).toLowerCase().trim()));
-        const combinedSkus = [...dbProducts];
-        MASTER_PRODUCT_SKUS.forEach(m => {
-          if (!existingCodes.has((m.skuCode || m.name).toLowerCase().trim())) {
-            combinedSkus.push(m);
+      ]).then(([skus1, skus2, balances1, balances2, partiesRes]) => {
+        // Collect raw SKUs from both endpoints
+        const rawSkus: SkuV2[] = [
+          ...(Array.isArray(skus1) ? skus1 : []),
+          ...(Array.isArray(skus2) ? skus2 : [])
+        ];
+
+        // Deduplicate SKUs and filter strictly for Products (Finished Goods)
+        const skuMap = new Map<string, SkuV2>();
+        rawSkus.forEach(s => {
+          if (s && !s.isDeleted && isOnlyProduct(s)) {
+            const key = (s.skuCode || s.name || s._id || '').toLowerCase().trim();
+            if (key && !skuMap.has(key)) {
+              skuMap.set(key, s);
+            }
           }
         });
-        setAvailableSkus(combinedSkus);
 
+        // Add master finished goods if not already present
+        MASTER_PRODUCT_SKUS.forEach(m => {
+          const key = (m.skuCode || m.name).toLowerCase().trim();
+          if (!skuMap.has(key)) {
+            skuMap.set(key, m);
+          }
+        });
+
+        const finalSkus = Array.from(skuMap.values());
+        setAvailableSkus(finalSkus);
+
+        // Aggregate live balances
         const bMap = new Map<string, number>();
-        if (Array.isArray(balances)) {
-          balances.forEach((b: any) => {
-            const rawId = b.skuId || b.sku?._id;
-            const sId = rawId ? String(rawId._id || rawId) : '';
-            const qty = Number(b.onHand) || Number(b.quantity) || 0;
-            if (sId) bMap.set(sId, (bMap.get(sId) || 0) + qty);
-          });
-        }
+        const allBalances = [
+          ...(Array.isArray(balances1) ? balances1 : []),
+          ...(Array.isArray(balances2) ? balances2 : [])
+        ];
+        allBalances.forEach((b: any) => {
+          const rawId = b.skuId || b.sku?._id;
+          const sId = rawId ? String(rawId._id || rawId) : '';
+          const qty = Number(b.onHand) || Number(b.quantity) || 0;
+          if (sId) bMap.set(sId, (bMap.get(sId) || 0) + qty);
+        });
+
+        // Also fallback to SKU presentStock or openingStock if not in ledger
+        finalSkus.forEach(s => {
+          if (s._id && !bMap.has(s._id)) {
+            const fallbackQty = Number(s.presentStock || s.openingStock || 0);
+            if (fallbackQty > 0) bMap.set(s._id, fallbackQty);
+          }
+        });
         setStockMap(bMap);
 
         const backendParties: any[] = partiesRes?.data?.parties || partiesRes?.parties || partiesRes?.data || [];
@@ -391,6 +421,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       description: '',
       category: '',
       uom: '',
+      stockPcs: 0,
       stockGbl: null,
       gbl: '',
       pcsPerGbl: '',
@@ -409,23 +440,31 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
     setCustomerSearch(firm);
     setShowCustomerDropdown(false);
 
-    // Build formatted address line
-    const addrParts = [
-      c.doorNo,
-      c.streetName,
+    // Build formatted complete street address
+    const streetParts = [
+      c.doorNo || c.flatNo ? `D.No: ${c.doorNo || c.flatNo}` : '',
+      c.streetName || c.street,
       c.address1,
-      c.area,
+      c.area || c.locality,
+      c.landmark ? `Near ${c.landmark}` : '',
       c.address
     ].filter(Boolean);
-    const fullAddr = addrParts.length > 0 ? addrParts.join(', ') : (c.city || '');
+
+    const uniqueStreet = Array.from(new Set(streetParts)).join(', ');
+    const resolvedStreet = uniqueStreet || c.city || 'Main Road';
+
+    const cityVal = c.city || c.district || c.assignedMarket || '';
+    const stateVal = c.state || 'Andhra Pradesh';
+    const pincodeVal = c.pincode || c.pinCode || '';
+    const phoneVal = c.phone || c.mobile || c.altPhone || '';
 
     const newAddr: AddressDetails = {
       attention: firm,
-      addressLine: fullAddr,
-      city: c.city || '',
-      state: c.state || '',
-      pincode: c.pincode || '',
-      phone: c.phone || c.mobile || ''
+      addressLine: resolvedStreet,
+      city: cityVal,
+      state: stateVal,
+      pincode: pincodeVal,
+      phone: phoneVal
     };
 
     setBillingAddress(newAddr);
@@ -441,6 +480,45 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
     }
   }, [sameAddress, billingAddress]);
 
+  // Handle selecting a product from Item Master dropdown
+  const handleSelectProduct = (idx: number, s: SkuV2) => {
+    const onHandPcs = stockMap.get(s._id) ?? Number(s.presentStock || s.openingStock || 0);
+    const definedConv = Number(s.booksGbl || s.altUnitConversion || (s as any).pcsPerGbl || 0);
+    const pcsPerGblVal = definedConv > 0 ? definedConv : '';
+    const stockGblVal = definedConv > 0 ? Math.floor(onHandPcs / definedConv) : onHandPcs;
+
+    setItems(prev => {
+      const copy = [...prev];
+      const row = { ...copy[idx] };
+      row.skuId = s._id;
+      row.skuCode = s.skuCode;
+      row.itemName = s.name;
+      row.description = s.description || `${s.category || 'Finished Goods'}${s.pages ? ` ${s.pages}pgs` : ''}`;
+      row.category = s.category || 'Finished Goods';
+      row.uom = s.unit || 'Pcs';
+      row.stockPcs = onHandPcs;
+      row.stockGbl = stockGblVal;
+      row.pcsPerGbl = pcsPerGblVal;
+
+      const gblNum = Number(row.gbl) || 0;
+      const pcsPerGblNum = Number(pcsPerGblVal) || 0;
+      if (gblNum > 0 && pcsPerGblNum > 0) {
+        row.totalPcs = gblNum * pcsPerGblNum;
+      } else if (gblNum > 0) {
+        row.totalPcs = gblNum;
+      } else {
+        row.totalPcs = 0;
+      }
+      row.amount = Math.round((row.totalPcs || 0) * (Number(row.rate) || 0) * 100) / 100;
+
+      copy[idx] = row;
+      return copy;
+    });
+
+    setRowSearchTerms(prev => ({ ...prev, [idx]: s.name }));
+    setActiveItemDropdownIdx(null);
+  };
+
   // Handle Item Row Calculations dynamically
   const updateRowField = (idx: number, field: keyof OrderItemRow, value: any) => {
     setItems(prev => {
@@ -454,9 +532,22 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       if (field === 'gbl' || field === 'pcsPerGbl') {
         if (gblNum > 0 && pcsPerGblNum > 0) {
           totalPcs = gblNum * pcsPerGblNum;
+        } else if (gblNum > 0) {
+          totalPcs = gblNum;
+        } else {
+          totalPcs = 0;
         }
       }
       row.totalPcs = totalPcs;
+
+      // Recalculate stock in GBL dynamically based on current pcsPerGbl conversion rate
+      if (row.stockPcs !== undefined && row.stockPcs !== null) {
+        if (pcsPerGblNum > 0) {
+          row.stockGbl = Math.floor(row.stockPcs / pcsPerGblNum);
+        } else {
+          row.stockGbl = row.stockPcs;
+        }
+      }
 
       const rateNum = Number(row.rate) || 0;
       const gross = totalPcs * rateNum;
@@ -783,57 +874,49 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                 </div>
               </div>
 
-              {/* Customer Info Box & Financials (Fixed h-[142px] - No Box Dynamic Change!) */}
+              {/* Customer Selection Box (Fixed h-[142px] - Customer details hidden directly; visible upon clicking View Customer) */}
               {selectedCustomer ? (
-                <div className="h-[142px] p-3 bg-blue-50/30 rounded-xl border border-blue-100/80 flex flex-col justify-between text-[11px] text-gray-600">
-                  <div className="space-y-1">
-                    <div className="flex items-start gap-1.5 text-gray-800">
-                      <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
-                      <span className="line-clamp-2 leading-tight">
-                        {selectedCustomer.address || billingAddress.addressLine || 'Address not specified'}, {selectedCustomer.city || billingAddress.city || ''}, {selectedCustomer.state || billingAddress.state || ''} {selectedCustomer.pincode ? `- ${selectedCustomer.pincode}` : ''}
+                <div className="h-[142px] p-3.5 bg-blue-50/40 rounded-xl border border-blue-100 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded-md">
+                        Selected Customer
+                      </span>
+                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px]">
+                        {selectedCustomer.status === 'inactive' ? 'Inactive' : 'Active'}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 pt-0.5">
-                      <div className="flex items-center gap-1 font-bold text-gray-900">
-                        <Phone className="w-3.5 h-3.5 text-blue-600" />
-                        <span>{selectedCustomer.phone || selectedCustomer.mobile || billingAddress.phone || '—'}</span>
-                      </div>
-                      {(selectedCustomer.phone || selectedCustomer.mobile) && (
-                        <a 
-                          href={`https://wa.me/91${(selectedCustomer.phone || selectedCustomer.mobile || '').replace(/\D/g, '')}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          title="Chat on WhatsApp"
-                        >
-                          <WhatsAppIcon className="w-3.5 h-3.5 text-emerald-500 hover:scale-110" />
-                        </a>
+                    <div className="font-extrabold text-gray-900 text-sm truncate">
+                      {selectedCustomer.firmName || selectedCustomer.ownerName || selectedCustomer.contactName}
+                    </div>
+                    <div className="text-[11px] text-gray-500 mt-1 flex items-center gap-1.5">
+                      <span className="font-medium text-gray-700">{selectedCustomer.ownerName || selectedCustomer.contactName || 'Primary Contact'}</span>
+                      {selectedCustomer.city && (
+                        <>
+                          <span className="text-gray-300">•</span>
+                          <span className="text-gray-600 font-medium">{selectedCustomer.city}</span>
+                        </>
                       )}
-                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px] ml-auto">
-                        {selectedCustomer.status === 'active' || !selectedCustomer.status ? 'Active' : selectedCustomer.status}
-                      </span>
                     </div>
                   </div>
 
-                  <div className="pt-2 border-t border-blue-100/70 grid grid-cols-3 gap-2 text-center">
-                    <div className="bg-white/90 p-1.5 rounded-lg border border-gray-100">
-                      <div className="text-[9px] text-gray-500 font-bold uppercase">Credit Limit</div>
-                      <div className="font-bold text-gray-900 text-xs mt-0.5">₹{(selectedCustomer.creditLimit || 0).toLocaleString('en-IN')}</div>
-                    </div>
-                    <div className="bg-white/90 p-1.5 rounded-lg border border-gray-100">
-                      <div className="text-[9px] text-gray-500 font-bold uppercase">Outstanding</div>
-                      <div className="font-bold text-rose-700 text-xs mt-0.5">₹{(selectedCustomer.outstandingBalance || selectedCustomer.outstanding || 0).toLocaleString('en-IN')}</div>
-                    </div>
-                    <div className="bg-white/90 p-1.5 rounded-lg border border-gray-100">
-                      <div className="text-[9px] text-gray-500 font-bold uppercase">City</div>
-                      <div className="font-bold text-blue-900 text-xs mt-0.5 truncate">{selectedCustomer.city || '—'}</div>
-                    </div>
+                  <div className="pt-2 border-t border-blue-100/80 flex items-center justify-between">
+                    <span className="text-[10.5px] text-gray-500 font-medium">Customer details hidden</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomerDetailsModal(true)}
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-3xs hover:shadow-xs"
+                    >
+                      <Eye className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span>View Customer</span>
+                    </button>
                   </div>
                 </div>
               ) : (
                 <div className="h-[142px] p-4 bg-gray-50/80 rounded-xl border border-dashed border-gray-200 flex flex-col items-center justify-center text-center text-gray-400">
                   <User className="w-7 h-7 text-gray-300 mb-1 stroke-[1.5]" />
                   <p className="text-xs font-semibold text-gray-500">No Customer Selected</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">Search and select a customer above to display contact, delivery address, and credit information.</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">Search and select a customer above to proceed with the sales order.</p>
                 </div>
               )}
             </div>
@@ -1156,14 +1239,28 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                           Edit
                         </button>
                       </div>
-                      <div className="text-gray-600 leading-snug line-clamp-3">
-                        {billingAddress.addressLine || 'Address line not entered'}
-                        {billingAddress.city ? `, ${billingAddress.city}` : ''}
-                        {billingAddress.state ? `, ${billingAddress.state}` : ''}
-                        {billingAddress.pincode ? ` - ${billingAddress.pincode}` : ''}
+                      <div className="text-gray-700 leading-snug line-clamp-3 text-[11px]">
+                        {billingAddress.addressLine ? (
+                          <>
+                            <span className="font-semibold text-gray-900">{billingAddress.addressLine}</span>
+                            {(billingAddress.city || billingAddress.state || billingAddress.pincode) && (
+                              <span className="text-gray-600">
+                                {billingAddress.city && !billingAddress.addressLine.includes(billingAddress.city) ? `, ${billingAddress.city}` : ''}
+                                {billingAddress.state && !billingAddress.addressLine.includes(billingAddress.state) ? `, ${billingAddress.state}` : ''}
+                                {billingAddress.pincode && !billingAddress.addressLine.includes(billingAddress.pincode) ? ` - ${billingAddress.pincode}` : ''}
+                              </span>
+                            )}
+                          </>
+                        ) : selectedCustomer ? (
+                          <span className="text-gray-600 font-medium">
+                            {[selectedCustomer.city, selectedCustomer.state, selectedCustomer.pincode].filter(Boolean).join(', ') || 'Address not specified'}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 italic">No customer selected</span>
+                        )}
                       </div>
                       <div className="text-gray-500 font-mono mt-1 text-[10.5px]">
-                        Mobile: {billingAddress.phone || selectedCustomer?.phone || '—'}
+                        Mobile: <span className="font-semibold text-gray-800">{billingAddress.phone || selectedCustomer?.phone || selectedCustomer?.mobile || '—'}</span>
                       </div>
                     </div>
                   ) : (
@@ -1178,14 +1275,28 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                           Edit
                         </button>
                       </div>
-                      <div className="text-gray-600 leading-snug line-clamp-3">
-                        {shippingAddress.addressLine || billingAddress.addressLine || 'Address line not entered'}
-                        {shippingAddress.city ? `, ${shippingAddress.city}` : ''}
-                        {shippingAddress.state ? `, ${shippingAddress.state}` : ''}
-                        {shippingAddress.pincode ? ` - ${shippingAddress.pincode}` : ''}
+                      <div className="text-gray-700 leading-snug line-clamp-3 text-[11px]">
+                        {(shippingAddress.addressLine || billingAddress.addressLine) ? (
+                          <>
+                            <span className="font-semibold text-gray-900">{shippingAddress.addressLine || billingAddress.addressLine}</span>
+                            {(shippingAddress.city || shippingAddress.state || shippingAddress.pincode) && (
+                              <span className="text-gray-600">
+                                {shippingAddress.city && !(shippingAddress.addressLine || '').includes(shippingAddress.city) ? `, ${shippingAddress.city}` : ''}
+                                {shippingAddress.state && !(shippingAddress.addressLine || '').includes(shippingAddress.state) ? `, ${shippingAddress.state}` : ''}
+                                {shippingAddress.pincode && !(shippingAddress.addressLine || '').includes(shippingAddress.pincode) ? ` - ${shippingAddress.pincode}` : ''}
+                              </span>
+                            )}
+                          </>
+                        ) : selectedCustomer ? (
+                          <span className="text-gray-600 font-medium">
+                            {[selectedCustomer.city, selectedCustomer.state, selectedCustomer.pincode].filter(Boolean).join(', ') || 'Address not specified'}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 italic">No customer selected</span>
+                        )}
                       </div>
                       <div className="text-gray-500 font-mono mt-1 text-[10.5px]">
-                        Mobile: {shippingAddress.phone || billingAddress.phone || '—'}
+                        Mobile: <span className="font-semibold text-gray-800">{shippingAddress.phone || billingAddress.phone || selectedCustomer?.phone || selectedCustomer?.mobile || '—'}</span>
                       </div>
                       {sameAddress && (
                         <span className="text-[9.5px] text-blue-600 font-bold block mt-0.5">
@@ -1228,8 +1339,8 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
               </div>
             </div>
 
-            {/* Order Items Table */}
-            <div className="overflow-x-auto border border-gray-200 rounded-xl">
+            {/* Order Items Table (Prevent Clipping of Dropdown Popovers) */}
+            <div className="overflow-x-auto border border-gray-200 rounded-xl min-h-[380px] pb-44">
               <table className="w-full text-left border-collapse text-xs">
                 <thead className="bg-gray-50/80 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 select-none">
                   <tr>
@@ -1238,7 +1349,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                     <th className="py-2.5 px-3 min-w-[160px]">ITEM DESCRIPTION</th>
                     <th className="py-2.5 px-2 text-center w-24">STOCK (GBL)</th>
                     <th className="py-2.5 px-2 text-center w-20">GBL <span className="text-red-500">*</span></th>
-                    <th className="py-2.5 px-2 text-center w-20">PCS / GBL</th>
+                    <th className="py-2.5 px-2 text-center w-24">PCS / GBL</th>
                     <th className="py-2.5 px-2 text-center w-24">TOTAL PCS</th>
                     <th className="py-2.5 px-2 text-right w-24">RATE (₹) <span className="text-red-500">*</span></th>
                     <th className="py-2.5 px-3 text-right w-36">FINAL TOTAL AMOUNT (₹)</th>
@@ -1261,7 +1372,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                     );
 
                     return (
-                      <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
+                      <tr key={idx} className={`hover:bg-blue-50/30 transition-colors relative ${isDropdownActive ? 'z-[100]' : ''}`}>
                         {/* # */}
                         <td className="py-2.5 px-2 text-center font-bold text-gray-500">
                           {idx + 1}
@@ -1279,9 +1390,10 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                 updateRowField(idx, 'itemName', e.target.value);
                                 setActiveItemDropdownIdx(idx);
                               }}
+                              onClick={() => setActiveItemDropdownIdx(idx)}
                               onFocus={() => setActiveItemDropdownIdx(idx)}
                               placeholder="Select product..."
-                              className="w-full pl-7 pr-6 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                              className="w-full pl-7 pr-6 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer"
                             />
                             {/* DOWN ARROW REMOVED IF AN ITEM IS IN THAT FIELD */}
                             <div className="absolute right-2 top-2.5 flex items-center">
@@ -1295,6 +1407,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                     updateRowField(idx, 'category', '');
                                     updateRowField(idx, 'uom', '');
                                     updateRowField(idx, 'description', '');
+                                    updateRowField(idx, 'stockPcs', 0);
                                     updateRowField(idx, 'stockGbl', null);
                                     updateRowField(idx, 'gbl', '');
                                     updateRowField(idx, 'pcsPerGbl', '');
@@ -1312,8 +1425,11 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                 </button>
                               ) : (
                                 <ChevronDown 
-                                  className="w-3.5 h-3.5 text-gray-400 cursor-pointer"
-                                  onClick={() => setActiveItemDropdownIdx(isDropdownActive ? null : idx)} 
+                                  className="w-3.5 h-3.5 text-gray-400 cursor-pointer hover:text-gray-700" 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveItemDropdownIdx(isDropdownActive ? null : idx);
+                                  }} 
                                 />
                               )}
                             </div>
@@ -1321,30 +1437,31 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
                           {/* SKU Dropdown: Shows ALL products from Item Master with Active/Inactive status */}
                           {isDropdownActive && (
-                            <div className="absolute left-3 top-full mt-1 w-96 bg-white border border-gray-200 rounded-xl shadow-2xl z-[999] max-h-56 overflow-y-auto divide-y divide-gray-50 p-1">
+                            <div className="absolute left-3 top-full mt-1 w-[460px] bg-white border border-gray-200 rounded-xl shadow-2xl z-[9999] max-h-64 overflow-y-auto divide-y divide-gray-100 p-1">
                               {filteredProductSkus.map(s => {
                                 const isInactive = (s.status || '').toLowerCase() === 'inactive';
+                                const onHandPcs = stockMap.get(s._id) ?? Number(s.presentStock || s.openingStock || 0);
+                                const definedConv = Number(s.booksGbl || s.altUnitConversion || (s as any).pcsPerGbl || 0);
+                                const stockGbl = definedConv > 0 ? Math.floor(onHandPcs / definedConv) : onHandPcs;
+
                                 return (
                                   <div
                                     key={s._id}
-                                    onClick={() => {
-                                      updateRowField(idx, 'skuId', s._id);
-                                      updateRowField(idx, 'skuCode', s.skuCode);
-                                      updateRowField(idx, 'itemName', s.name);
-                                      updateRowField(idx, 'description', `${s.category || 'Notebook'} ${s.pages || ''}pgs`);
-                                      updateRowField(idx, 'uom', s.unit || 'Pcs');
-                                      updateRowField(idx, 'stockGbl', Math.floor((stockMap.get(s._id) || 100) / 10));
-                                      setRowSearchTerms({ ...rowSearchTerms, [idx]: s.name });
-                                      setActiveItemDropdownIdx(null);
-                                    }}
+                                    onClick={() => handleSelectProduct(idx, s)}
                                     className="p-2.5 hover:bg-blue-50/80 cursor-pointer rounded-lg text-xs flex justify-between items-center transition-colors"
                                   >
-                                    <div className="flex-1 min-w-0 pr-2">
+                                    <div className="flex-1 min-w-0 pr-3">
                                       <div className="font-bold text-gray-900 truncate">{s.name}</div>
                                       <div className="flex items-center gap-2 mt-0.5">
                                         <span className="text-[10px] text-gray-400 font-mono">{s.skuCode}</span>
                                         <span className="text-[10px] text-gray-300">•</span>
                                         <span className="text-[10px] text-gray-500">{s.category || 'Finished Goods'}</span>
+                                        {definedConv > 0 && (
+                                          <>
+                                            <span className="text-[10px] text-gray-300">•</span>
+                                            <span className="text-[10px] font-semibold text-indigo-600">{definedConv} Pcs/GBL</span>
+                                          </>
+                                        )}
                                       </div>
                                     </div>
                                     <div className="flex items-center gap-1.5 shrink-0">
@@ -1355,8 +1472,8 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                       }`}>
                                         {s.status || 'Active'}
                                       </span>
-                                      <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
-                                        Stock: {stockMap.get(s._id) || 0}
+                                      <span className="text-[10.5px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                                        Stock: {stockGbl} GBL {definedConv > 0 ? `(${onHandPcs} Pcs)` : ''}
                                       </span>
                                     </div>
                                   </div>
@@ -1403,15 +1520,16 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                           />
                         </td>
 
-                        {/* PCS / GBL */}
+                        {/* PCS / GBL - Auto-populated from product conversion rate or freely editable */}
                         <td className="py-2.5 px-2 text-center">
                           <input
                             type="number"
                             min="1"
-                            placeholder="1"
+                            placeholder="e.g. 120"
                             value={row.pcsPerGbl}
                             onChange={(e) => updateRowField(idx, 'pcsPerGbl', e.target.value)}
-                            className="w-14 px-1.5 py-1 text-center bg-white border border-gray-200 rounded-lg font-mono text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            className="w-16 px-1.5 py-1 text-center bg-white border border-gray-200 rounded-lg font-bold font-mono text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            title="Pieces per GBL conversion rate. Auto-filled if configured on product, or type custom rate."
                           />
                         </td>
 
