@@ -22,6 +22,7 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { generateFullDashboardOrders, INITIAL_FEATURED_ORDERS } from './salesOrderSampleData';
+import { PendingOrdersProductionView } from './PendingOrdersProductionView';
 
 // Custom SVG WhatsApp icon matching site vibe
 const WhatsAppIcon: React.FC<{ className?: string }> = ({ 
@@ -859,7 +860,17 @@ const SalesOrders: React.FC = () => {
         </div>
       )}
 
-      {/* ── TABLE TOOLBAR: METADATA & ACTIONS (1:1 with Screenshot) ── */}
+      {/* ── CONTENT: TALLY PRODUCTION VIEW (IF PENDING) OR STANDARD TABLE ── */}
+      {statusFilter === 'Pending' ? (
+        <PendingOrdersProductionView
+          orders={orders}
+          onViewOrder={(order) => setSelectedOrderDetail(order)}
+          onEditOrder={(order) => { setEditingOrder(order); setShowDrawer(true); }}
+          onRefresh={fetchOrders}
+        />
+      ) : (
+        <>
+          {/* ── TABLE TOOLBAR: METADATA & ACTIONS (1:1 with Screenshot) ── */}
       <div className="flex items-center justify-between pt-1 text-xs">
         <div className="font-semibold text-gray-600">
           Showing all {sortedOrders.length} sales orders
@@ -1349,6 +1360,8 @@ const SalesOrders: React.FC = () => {
           </table>
         </div>
       </div>
+        </>
+      )}
 
       {/* ── CREATE / EDIT SALES ORDER MODAL FORM (Existing UI Preserved) ── */}
       <SalesOrderDrawerV2
