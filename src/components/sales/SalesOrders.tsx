@@ -1511,6 +1511,7 @@ const SalesOrders: React.FC = () => {
       {successOrder && !printEstimationOrder && (
         <SalesOrderSuccessModal
           order={successOrder}
+          onClose={() => setSuccessOrder(null)}
           onViewOrder={(ord) => {
             setSuccessOrder(null);
             setSelectedOrderDetail(ord);
@@ -1523,7 +1524,11 @@ const SalesOrders: React.FC = () => {
             setEditingOrder(null);
             setShowDrawer(true);
           }}
-          onGoToOrders={() => setSuccessOrder(null)}
+          onGoToOrders={() => {
+            setSuccessOrder(null);
+            setStatusFilter('all');
+            setSearch('');
+          }}
         />
       )}
 
