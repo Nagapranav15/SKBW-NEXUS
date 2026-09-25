@@ -3,7 +3,7 @@ import {
   Plus, Search, Edit, Trash2, RefreshCw, Download, FileText, Calendar, 
   Filter, CheckCircle2, Clock, Truck, Eye, ChevronRight, ChevronLeft, 
   ChevronDown, SlidersHorizontal, RotateCcw, Copy, Printer, MoreVertical, 
-  X, Check, IndianRupee, ArrowUpDown, ArrowUp, ArrowDown, Send, CheckCircle
+  X, Check, IndianRupee, ArrowUpDown, ArrowUp, ArrowDown, Send, CheckCircle, Ban, Receipt
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { 
@@ -551,253 +551,269 @@ const SalesOrders: React.FC = () => {
   };
 
   return (
-    <div className="p-3 sm:p-6 space-y-4 max-w-[1600px] mx-auto text-left font-sans animate-fadeIn">
-
-      {/* ── TOP HEADER (1:1 with Screenshot) ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0 shadow-xs">
-            <FileText className="w-6 h-6 stroke-[2.2]" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-black text-gray-900 tracking-tight">Sales Orders</h1>
-            <p className="text-xs font-medium text-gray-500 mt-0.5">Manage and track all customer sales orders</p>
-          </div>
-        </div>
-
-        {/* Primary Action Button */}
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={() => { setEditingOrder(null); setShowDrawer(true); }}
-            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white font-bold rounded-xl shadow-sm transition-all cursor-pointer flex items-center gap-2 text-xs sm:text-sm"
-            title="Create New Sales Order (Alt+C / F8)"
-          >
-            <Plus className="w-4 h-4 stroke-[3]" />
-            <span>New Sales Order</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ── METRIC SUMMARY CARDS (6 Cards Row - 1:1 with Screenshot) ── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-
-        {/* 1. Total Orders */}
-        <div className="bg-white rounded-2xl border border-gray-100/90 shadow-2xs hover:shadow-xs transition-all p-3.5 sm:p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-              <FileText className="w-4 h-4 stroke-[2.2]" />
-            </div>
-            <span className="text-[11px] font-semibold text-gray-500">Total Orders</span>
-          </div>
-          <div className="mt-2.5">
-            <div className="text-2xl font-black text-gray-900 tracking-tight">{metrics.totalOrders}</div>
-            <div className="flex items-center gap-1 text-[11px] mt-1 font-semibold text-emerald-600">
-              <span>↑ 12%</span>
-              <span className="text-gray-400 font-normal">vs last month</span>
+    <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
+      {/* Main Content Layout */}
+      <div className="transition-all duration-300">
+        <div className="space-y-4">
+          
+          {/* 1. Header Banner (Matching Purchase Batches Header Banner exactly) */}
+          <div className="flex flex-row items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs relative">
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 bg-blue-100/80 text-blue-700 rounded-2xl shadow-2xs">
+                <Receipt className="w-6 h-6 stroke-[2.2]" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+                  <span>Sales Orders</span>
+                  <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-bold transition-all">
+                    {metrics.totalOrders} Total
+                  </span>
+                </h1>
+                <p className="text-xs text-gray-500 font-medium">
+                  Unified master directory for customer sales orders, item dispatches, and order fulfillments.
+                </p>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* 2. Total Amount */}
-        <div className="bg-white rounded-2xl border border-gray-100/90 shadow-2xs hover:shadow-xs transition-all p-3.5 sm:p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <span className="text-base font-black">₹</span>
-            </div>
-            <span className="text-[11px] font-semibold text-gray-500">Total Amount</span>
-          </div>
-          <div className="mt-2.5">
-            <div className="text-2xl font-black text-gray-900 tracking-tight">
-              ₹{Math.round(metrics.totalAmount).toLocaleString('en-IN')}
-            </div>
-            <div className="flex items-center gap-1 text-[11px] mt-1 font-semibold text-emerald-600">
-              <span>↑ 18%</span>
-              <span className="text-gray-400 font-normal">vs last month</span>
-            </div>
-          </div>
-        </div>
-
-        {/* 3. Pending Orders */}
-        <div className="bg-white rounded-2xl border border-gray-100/90 shadow-2xs hover:shadow-xs transition-all p-3.5 sm:p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-              <Clock className="w-4 h-4 stroke-[2.2]" />
-            </div>
-            <span className="text-[11px] font-semibold text-gray-500">Pending Orders</span>
-          </div>
-          <div className="mt-2.5 flex items-baseline justify-between">
-            <div className="text-2xl font-black text-gray-900 tracking-tight">{metrics.pendingCount}</div>
-            <span className="bg-amber-50 text-amber-700 border border-amber-200/50 font-bold px-2 py-0.5 rounded-full text-[10.5px]">
-              {metrics.pendingPct}%
-            </span>
-          </div>
-        </div>
-
-        {/* 4. Partially Dispatched */}
-        <div className="bg-white rounded-2xl border border-gray-100/90 shadow-2xs hover:shadow-xs transition-all p-3.5 sm:p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-              <Truck className="w-4 h-4 stroke-[2.2]" />
-            </div>
-            <span className="text-[11px] font-semibold text-gray-500">Partially Dispatched</span>
-          </div>
-          <div className="mt-2.5 flex items-baseline justify-between">
-            <div className="text-2xl font-black text-gray-900 tracking-tight">{metrics.partialCount}</div>
-            <span className="bg-blue-50 text-blue-700 border border-blue-200/50 font-bold px-2 py-0.5 rounded-full text-[10.5px]">
-              {metrics.partialPct}%
-            </span>
-          </div>
-        </div>
-
-        {/* 5. Fully Dispatched */}
-        <div className="bg-white rounded-2xl border border-gray-100/90 shadow-2xs hover:shadow-xs transition-all p-3.5 sm:p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <CheckCircle2 className="w-4 h-4 stroke-[2.2]" />
-            </div>
-            <span className="text-[11px] font-semibold text-gray-500">Fully Dispatched</span>
-          </div>
-          <div className="mt-2.5 flex items-baseline justify-between">
-            <div className="text-2xl font-black text-gray-900 tracking-tight">{metrics.fullyCount}</div>
-            <span className="bg-emerald-50 text-emerald-700 border border-emerald-200/50 font-bold px-2 py-0.5 rounded-full text-[10.5px]">
-              {metrics.fullyPct}%
-            </span>
-          </div>
-        </div>
-
-        {/* 6. Draft Orders */}
-        <div className="bg-white rounded-2xl border border-gray-100/90 shadow-2xs hover:shadow-xs transition-all p-3.5 sm:p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <div className="w-9 h-9 rounded-xl bg-gray-100 text-gray-500 flex items-center justify-center">
-              <FileText className="w-4 h-4 stroke-[2.2]" />
-            </div>
-            <span className="text-[11px] font-semibold text-gray-500">Draft Orders</span>
-          </div>
-          <div className="mt-2.5 flex items-baseline justify-between">
-            <div className="text-2xl font-black text-gray-900 tracking-tight">{metrics.draftCount}</div>
-            <span className="bg-gray-100 text-gray-600 border border-gray-200/50 font-bold px-2 py-0.5 rounded-full text-[10.5px]">
-              {metrics.draftPct}%
-            </span>
-          </div>
-        </div>
-
-      </div>
-
-      {/* ── FILTER & SEARCH BAR (1:1 with Screenshot) ── */}
-      <div className="bg-white rounded-2xl border border-gray-200/90 p-3 sm:p-3.5 shadow-2xs flex flex-wrap items-center justify-between gap-3">
-
-        <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-[300px]">
-
-          {/* Search Input */}
-          <div className="relative flex-1 min-w-[240px] max-w-md">
-            <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by SO No., customer name, mobile, city..."
-              className="w-full pl-9 pr-8 py-2 text-xs bg-white border border-gray-200 rounded-xl font-medium text-gray-800 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
-            />
-            {search && (
-              <button 
-                onClick={() => setSearch('')}
-                className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600"
+          {/* 2. Top Navigation Tabs Bar & Action Toolbar (Exact match to Purchase Batches) */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 bg-white px-4 rounded-2xl shadow-2xs relative">
+            {/* Tab Selection */}
+            <div className="flex items-center gap-1 overflow-x-auto py-1 max-w-full">
+              {/* Tab 1: All Orders */}
+              <button
+                onClick={() => { setStatusFilter('all'); }}
+                className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+                  statusFilter === 'all'
+                    ? 'border-teal-700 text-teal-700 bg-transparent'
+                    : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
+                }`}
               >
-                <X className="w-3.5 h-3.5" />
+                <Receipt className={`w-4 h-4 ${statusFilter === 'all' ? 'text-teal-700' : 'text-slate-400'}`} />
+                <span>All Orders</span>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-teal-50 text-teal-800">{metrics.totalOrders}</span>
               </button>
-            )}
-          </div>
 
-          {/* Date Range Selector Dropdown */}
-          <div className="relative">
-            <div className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-50/80 transition-all">
-              <Calendar className="w-3.5 h-3.5 text-gray-500" />
-              <select
-                value={dateRangeFilter}
-                onChange={(e) => setDateRangeFilter(e.target.value)}
-                className="bg-transparent border-none text-xs font-semibold text-gray-700 cursor-pointer focus:outline-none pr-2"
+              {/* Tab 2: Confirmed */}
+              <button
+                onClick={() => { setStatusFilter('Confirmed'); }}
+                className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+                  statusFilter === 'Confirmed'
+                    ? 'border-teal-700 text-teal-700 bg-transparent'
+                    : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
+                }`}
               >
-                <option value="sep_2026">01/09/2026 – 30/09/2026</option>
-                <option value="this_month">This Month</option>
-                <option value="last_30d">Last 30 Days</option>
-                <option value="last_90d">Last 90 Days</option>
-                <option value="all">All Dates</option>
-              </select>
+                <CheckCircle className={`w-4 h-4 ${statusFilter === 'Confirmed' ? 'text-teal-700' : 'text-slate-400'}`} />
+                <span>Confirmed</span>
+              </button>
+
+              {/* Tab 3: Draft / Pending */}
+              <button
+                onClick={() => { setStatusFilter('Draft'); }}
+                className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+                  statusFilter === 'Draft'
+                    ? 'border-teal-700 text-teal-700 bg-transparent'
+                    : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
+                }`}
+              >
+                <Clock className={`w-4 h-4 ${statusFilter === 'Draft' ? 'text-teal-700' : 'text-slate-400'}`} />
+                <span>Draft / Pending</span>
+              </button>
+
+              {/* Tab 4: Cancelled */}
+              <button
+                onClick={() => { setStatusFilter('Cancelled'); }}
+                className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+                  statusFilter === 'Cancelled'
+                    ? 'border-teal-700 text-teal-700 bg-transparent'
+                    : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
+                }`}
+              >
+                <Ban className={`w-4 h-4 ${statusFilter === 'Cancelled' ? 'text-teal-700' : 'text-slate-400'}`} />
+                <span>Cancelled</span>
+              </button>
+            </div>
+
+            {/* Right Action Bar */}
+            <div className="py-2 flex items-center gap-2 flex-wrap shrink-0 relative z-40">
+              {/* Global Search Box */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search orders, customers..."
+                  className="pl-8 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl w-40 md:w-52 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+                />
+                {search && (
+                  <button 
+                    onClick={() => setSearch('')}
+                    className="absolute right-2 top-2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Activity Logs Button */}
+              <button
+                onClick={() => showToast('Activity Logs opened', 'info')}
+                className="px-3 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs bg-white hover:bg-blue-50/60 text-blue-600 border-gray-200 hover:border-blue-200"
+                title="View Activity Logs"
+              >
+                <Clock className="w-3.5 h-3.5 text-blue-600" />
+                <span>Activity Logs</span>
+              </button>
+
+              {/* Export Excel Button */}
+              <button
+                onClick={handleExportExcel}
+                className="px-3 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs bg-white hover:bg-emerald-50/60 text-emerald-700 border-gray-200 hover:border-emerald-200"
+                title="Export / Download Excel"
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Export Excel</span>
+              </button>
+
+              {/* Export PDF Button */}
+              <button
+                onClick={handlePrintReport}
+                className="px-3 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs bg-white hover:bg-red-50/60 text-red-700 border-gray-200 hover:border-red-200"
+                title="Export / Download PDF"
+              >
+                <FileText className="w-3.5 h-3.5 text-red-600" />
+                <span>Export PDF</span>
+              </button>
+
+              {/* + New Sales Order Button */}
+              <button
+                onClick={() => { setEditingOrder(null); setShowDrawer(true); }}
+                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/20 active:scale-[0.98] cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>New Sales Order</span>
+              </button>
             </div>
           </div>
 
-          {/* Status Dropdown */}
-          <div className="relative">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 cursor-pointer focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+          {/* 3. Statistics Cards (4 Cards Grid - Matching Purchase Batches UI) */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Card 1: TOTAL ORDERS */}
+            <button
+              onClick={() => { setStatusFilter('all'); }}
+              className={`w-full text-left rounded-2xl shadow-2xs border p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
+                statusFilter === 'all' 
+                  ? 'bg-blue-50/40 border-blue-400 ring-2 ring-blue-100' 
+                  : 'bg-white border-gray-200/80 hover:border-gray-300'
+              }`}
             >
-              <option value="all">All Status</option>
-              <option value="Confirmed">Confirmed</option>
-              <option value="In Production">In Production</option>
-              <option value="Partially Dispatched">Partially Dispatched</option>
-              <option value="Fully Dispatched">Fully Dispatched</option>
-              <option value="Draft">Draft</option>
-              <option value="Cancelled">Cancelled</option>
-            </select>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Total Orders</span>
+                <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+              </div>
+              <p className="text-2xl font-black text-gray-900 mt-1 font-mono">{metrics.totalOrders}</p>
+            </button>
+
+            {/* Card 2: CONFIRMED ORDERS */}
+            <button
+              onClick={() => { setStatusFilter('Confirmed'); }}
+              className={`w-full text-left rounded-2xl shadow-2xs border p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
+                statusFilter === 'Confirmed' 
+                  ? 'bg-emerald-50/40 border-emerald-400 ring-2 ring-emerald-100' 
+                  : 'bg-white border-gray-200/80 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Confirmed Orders</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+              </div>
+              <p className="text-2xl font-black text-emerald-600 mt-1 font-mono">{metrics.pendingCount + metrics.partialCount + metrics.fullyCount}</p>
+            </button>
+
+            {/* Card 3: PENDING / DRAFT ORDERS */}
+            <button
+              onClick={() => { setStatusFilter('Draft'); }}
+              className={`w-full text-left rounded-2xl shadow-2xs border p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
+                statusFilter === 'Draft' 
+                  ? 'bg-amber-50/40 border-amber-400 ring-2 ring-amber-100' 
+                  : 'bg-white border-gray-200/80 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Draft / Pending</span>
+                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+              </div>
+              <p className="text-2xl font-black text-amber-600 mt-1 font-mono">{metrics.draftCount}</p>
+            </button>
+
+            {/* Card 4: TOTAL VALUE */}
+            <div className="w-full text-left rounded-2xl shadow-2xs border p-4 bg-white border-gray-200/80">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Total Value</span>
+                <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+              </div>
+              <p className="text-2xl font-black text-purple-700 mt-1 font-mono">₹{Math.round(metrics.totalAmount).toLocaleString('en-IN')}</p>
+            </div>
           </div>
 
-          {/* Regions Dropdown */}
-          <div className="relative">
-            <select
-              value={regionFilter}
-              onChange={(e) => setRegionFilter(e.target.value)}
-              className="px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 cursor-pointer focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
-            >
-              <option value="all">All Regions</option>
-              {availableRegions.map(r => (
-                <option key={r} value={r}>{r}</option>
-              ))}
-            </select>
+          {/* 4. Table Card Container with Filter Toolbar */}
+          <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden space-y-0">
+            {/* Filter Sub-bar */}
+            <div className="bg-gray-50/50 border-b border-gray-200 px-4 py-2.5 flex items-center justify-between flex-wrap gap-2 text-xs font-semibold text-gray-600">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Region:</span>
+                <select
+                  value={regionFilter}
+                  onChange={e => setRegionFilter(e.target.value)}
+                  className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 shadow-2xs focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                >
+                  <option value="all">All Regions ({availableRegions.length})</option>
+                  {availableRegions.map(r => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+
+                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider ml-2">Agent:</span>
+                <select
+                  value={agentFilter}
+                  onChange={e => setAgentFilter(e.target.value)}
+                  className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 shadow-2xs focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                >
+                  <option value="all">All Agents ({availableAgents.length})</option>
+                  {availableAgents.map(a => (
+                    <option key={a} value={a}>{a}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Date Range:</span>
+                <div className="flex items-center gap-1.5 border border-gray-200 rounded-xl px-2.5 py-1 bg-white text-xs font-semibold shadow-2xs">
+                  <select
+                    value={dateRangeFilter}
+                    onChange={(e) => setDateRangeFilter(e.target.value)}
+                    className="bg-transparent border-none text-xs font-semibold text-gray-700 cursor-pointer focus:outline-none font-mono"
+                  >
+                    <option value="sep_2026">01/09/2026 – 30/09/2026</option>
+                    <option value="this_month">This Month</option>
+                    <option value="last_30d">Last 30 Days</option>
+                    <option value="last_90d">Last 90 Days</option>
+                    <option value="all">All Dates</option>
+                  </select>
+                </div>
+
+                {(search || statusFilter !== 'all' || regionFilter !== 'all' || agentFilter !== 'all' || dateRangeFilter !== 'sep_2026') && (
+                  <button
+                    onClick={handleResetFilters}
+                    className="text-blue-600 hover:text-blue-800 text-xs font-bold px-2 py-1 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                  >
+                    Clear Filters
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
-
-          {/* Agents Dropdown */}
-          <div className="relative">
-            <select
-              value={agentFilter}
-              onChange={(e) => setAgentFilter(e.target.value)}
-              className="px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 cursor-pointer focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
-            >
-              <option value="all">All Agents</option>
-              {availableAgents.map(a => (
-                <option key={a} value={a}>{a}</option>
-              ))}
-            </select>
-          </div>
-
-        </div>
-
-        {/* Right Action Buttons */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            className={`px-3 py-2 border rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              showAdvancedFilters || (statusFilter !== 'all' || regionFilter !== 'all' || agentFilter !== 'all')
-                ? 'bg-blue-50 border-blue-200 text-blue-700'
-                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5" />
-            <span>Filters</span>
-          </button>
-
-          <button
-            onClick={handleResetFilters}
-            className="px-3 py-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
-            title="Reset Filters"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reset</span>
-          </button>
-        </div>
-
-      </div>
 
       {/* ── ADVANCED FILTERS DRAWER (COLLAPSIBLE) ── */}
       {showAdvancedFilters && (
@@ -1485,6 +1501,8 @@ const SalesOrders: React.FC = () => {
         />
       )}
 
+        </div>
+      </div>
     </div>
   );
 };

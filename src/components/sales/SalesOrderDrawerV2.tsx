@@ -411,13 +411,13 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   // Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (customerRef.current && !customerRef.current.contains(e.target as Node)) {
+      const target = e.target as HTMLElement;
+      if (customerRef.current && !customerRef.current.contains(target)) {
         setShowCustomerDropdown(false);
       }
-      if (dropdownContainerRef.current && !dropdownContainerRef.current.contains(e.target as Node)) {
+      if (!target.closest('.item-product-cell')) {
         setActiveItemDropdownIdx(null);
       }
-      const target = e.target as HTMLElement;
       if (!target.closest('.charge-name-cell') && !target.closest('.charge-preset-menu')) {
         setActiveChargeDropdown(null);
         setShowQuickPresetMenu(false);
@@ -1908,7 +1908,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                         </td>
 
                         {/* Item / Product search input */}
-                        <td className="py-2.5 px-3 relative">
+                        <td className="py-2.5 px-3 relative item-product-cell">
                           <div className="relative">
                             <Search className="w-3 h-3 absolute left-2.5 top-2.5 text-gray-400" />
                             <input
