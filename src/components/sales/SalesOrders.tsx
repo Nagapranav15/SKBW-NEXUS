@@ -15,6 +15,8 @@ import {
 import { getParties } from '../../api/partyApi';
 import SalesOrderDrawerV2 from './SalesOrderDrawerV2';
 import SalesOrderDetailPanelV2 from './SalesOrderDetailPanelV2';
+import SalesOrderSuccessModal from './SalesOrderSuccessModal';
+import PrintOrderEstimationModal from './PrintOrderEstimationModal';
 import { showToast } from '../ui/Toast';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -91,11 +93,17 @@ const SalesOrders: React.FC = () => {
   const [cancellingOrder, setCancellingOrder] = useState<SalesOrderV2 | null>(null);
   const [cancelReason, setCancelReason] = useState('Customer Request');
 
-  // Print Order Estimation Modal State
+  // Print Order Estimation Modal State (for standalone print from actions menu)
   const [estimationOrder, setEstimationOrder] = useState<SalesOrderV2 | null>(null);
 
   // WhatsApp Prompt Modal State
   const [whatsappOrder, setWhatsappOrder] = useState<SalesOrderV2 | null>(null);
+
+  // Success page after order creation
+  const [successOrder, setSuccessOrder] = useState<SalesOrderV2 | null>(null);
+
+  // Print Estimation launched from success page
+  const [printEstimationOrder, setPrintEstimationOrder] = useState<SalesOrderV2 | null>(null);
 
   // Close menus on outside click
   useEffect(() => {
@@ -1277,7 +1285,8 @@ const SalesOrders: React.FC = () => {
             }
             return [saved, ...prev];
           });
-          showToast('Sales Order saved successfully!', 'success');
+          // Show the success page (replaces toast)
+          setSuccessOrder(saved);
         }}
       />
 
@@ -1348,128 +1357,12 @@ const SalesOrders: React.FC = () => {
         </div>
       )}
 
-      {/* ── PRINT ORDER ESTIMATION / INVOICE PREVIEW MODAL ── */}
+      {/* ── PRINT ORDER ESTIMATION (from actions menu) ── */}
       {estimationOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-fadeIn">
-          <div className="bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-8 shadow-2xl border border-gray-100 space-y-6 text-left max-h-[90vh] overflow-y-auto">
-
-            {/* Header controls */}
-            <div className="flex items-center justify-between pb-4 border-b border-gray-200">
-              <div className="flex items-center gap-2.5">
-                <Printer className="w-5 h-5 text-blue-600" />
-                <h3 className="text-lg font-black text-gray-900">Order Estimation Document</h3>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => window.print()}
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Print Document</span>
-                </button>
-                <button
-                  onClick={() => setEstimationOrder(null)}
-                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Printable Sheet */}
-            <div className="p-6 border border-gray-200 rounded-2xl bg-white space-y-6 text-xs text-gray-800">
-              {/* Document Banner */}
-              <div className="flex justify-between items-start">
-                <div>
-                  <h2 className="text-xl font-black text-blue-900">{selectedCompany?.name || 'SKBW CORE MANAGEMENT'}</h2>
-                  <p className="text-gray-500 font-medium">Manufacturers of Notebooks & School Stationery Supplies</p>
-                  <p className="text-[11px] text-gray-500 mt-1">GSTIN: 37AACCS1234F1Z8 | State: Andhra Pradesh (37)</p>
-                </div>
-                <div className="text-right">
-                  <span className="bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wider block mb-1">
-                    ORDER ESTIMATION
-                  </span>
-                  <div className="font-mono font-bold text-gray-900 text-sm">{estimationOrder.orderNumber}</div>
-                  <div className="text-gray-500 text-[11px]">Date: {estimationOrder.orderDate}</div>
-                </div>
-              </div>
-
-              {/* Parties Info */}
-              <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50/70 rounded-xl border border-gray-200/70">
-                <div>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Customer / Bill To:</span>
-                  <div className="font-bold text-gray-900 text-sm">{estimationOrder.customerName}</div>
-                  <div className="text-gray-600 text-xs mt-0.5">Phone: {estimationOrder.customerPhone || '—'}</div>
-                  <div className="text-gray-600 text-xs">Destination: {estimationOrder.city || '—'}, {estimationOrder.region || '—'}</div>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Order Details:</span>
-                  <div className="text-gray-600 text-xs">Delivery Due: <span className="font-bold text-gray-900">{estimationOrder.promisedDate || '—'}</span></div>
-                  <div className="text-gray-600 text-xs">Status: <span className="font-bold text-emerald-700">{estimationOrder.status}</span></div>
-                  <div className="text-gray-600 text-xs">Agent: {estimationOrder.agent || 'Direct'}</div>
-                </div>
-              </div>
-
-              {/* Items Table */}
-              <table className="w-full text-left border-collapse border border-gray-200 text-xs">
-                <thead className="bg-gray-100 text-[10.5px] font-bold text-gray-600 uppercase">
-                  <tr>
-                    <th className="p-2 border border-gray-200 text-center w-10">#</th>
-                    <th className="p-2 border border-gray-200">Item Description</th>
-                    <th className="p-2 border border-gray-200 text-right">Qty</th>
-                    <th className="p-2 border border-gray-200 text-right">Rate (₹)</th>
-                    <th className="p-2 border border-gray-200 text-right">Total (₹)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(estimationOrder.items && estimationOrder.items.length > 0 ? estimationOrder.items : [
-                    { itemName: 'School Notebook 192 Pages Single Line', quantity: 200, unitPrice: 31.45, totalAmount: 6289.40, uom: 'Pcs' }
-                  ]).map((it, idx) => (
-                    <tr key={idx} className="border-b border-gray-200">
-                      <td className="p-2 border border-gray-200 text-center font-mono">{idx + 1}</td>
-                      <td className="p-2 border border-gray-200 font-semibold">{it.itemName}</td>
-                      <td className="p-2 border border-gray-200 text-right font-mono">{it.quantity} {it.uom}</td>
-                      <td className="p-2 border border-gray-200 text-right font-mono">₹{it.unitPrice?.toFixed(2)}</td>
-                      <td className="p-2 border border-gray-200 text-right font-mono font-bold">₹{it.totalAmount?.toFixed(2)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              {/* Totals Breakdown */}
-              <div className="flex justify-end">
-                <div className="w-64 space-y-1.5 p-3 bg-gray-50 rounded-xl border border-gray-200 text-xs">
-                  <div className="flex justify-between text-gray-600">
-                    <span>Taxable Subtotal:</span>
-                    <span className="font-mono">₹{(estimationOrder.subtotal || estimationOrder.grandTotal * 0.847).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-gray-600">
-                    <span>GST (18%):</span>
-                    <span className="font-mono">₹{(estimationOrder.grandTotal - (estimationOrder.subtotal || estimationOrder.grandTotal * 0.847)).toFixed(2)}</span>
-                  </div>
-                  <div className="border-t border-gray-300 pt-1 flex justify-between font-black text-sm text-blue-900">
-                    <span>Grand Total:</span>
-                    <span className="font-mono">₹{estimationOrder.grandTotal?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Signatures */}
-              <div className="flex justify-between items-end pt-8">
-                <div className="text-[11px] text-gray-400">
-                  <p>Computer generated estimation quotation.</p>
-                  <p>Subject to Vijayawada jurisdiction.</p>
-                </div>
-                <div className="text-center">
-                  <div className="w-40 border-b border-gray-400 mb-1"></div>
-                  <span className="text-[11px] font-bold text-gray-600">Authorized Signatory</span>
-                </div>
-              </div>
-
-            </div>
-
-          </div>
-        </div>
+        <PrintOrderEstimationModal
+          order={estimationOrder}
+          onClose={() => setEstimationOrder(null)}
+        />
       )}
 
       {/* ── WHATSAPP MESSAGE PROMPT MODAL ── */}
@@ -1510,6 +1403,38 @@ const SalesOrders: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── ORDER CREATION SUCCESS MODAL ── */}
+      {successOrder && !printEstimationOrder && (
+        <SalesOrderSuccessModal
+          order={successOrder}
+          onViewOrder={(ord) => {
+            setSuccessOrder(null);
+            setSelectedOrderDetail(ord);
+          }}
+          onPrintOrder={(ord) => {
+            setPrintEstimationOrder(ord);
+          }}
+          onCreateNew={() => {
+            setSuccessOrder(null);
+            setEditingOrder(null);
+            setShowDrawer(true);
+          }}
+          onGoToOrders={() => setSuccessOrder(null)}
+        />
+      )}
+
+      {/* ── PRINT ORDER ESTIMATION (from success page) ── */}
+      {printEstimationOrder && (
+        <PrintOrderEstimationModal
+          order={printEstimationOrder}
+          onClose={() => {
+            setPrintEstimationOrder(null);
+            setSuccessOrder(null);
+          }}
+          onBack={() => setPrintEstimationOrder(null)}
+        />
       )}
 
     </div>
