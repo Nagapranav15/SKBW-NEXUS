@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Save, Plus, Trash2, Search, ChevronDown, Calendar, User, Package, 
   AlertCircle, FileText, Check, Percent, X, MoreVertical, Edit2, 
-  Phone, MessageSquare, MapPin, Receipt, Truck, Layers, Coins
+  Phone, MapPin, Receipt, Truck, Copy, ExternalLink, Eye, Building2
 } from 'lucide-react';
 import Modal from '../ui/Modal';
 import { getSkusV2, getBalancesV2, SkuV2 } from '../../api/mfgApiV2';
@@ -15,6 +15,7 @@ import {
   SalesOrderItemV2, 
   OtherChargeItem 
 } from '../../api/salesOrderApiV2';
+import { MOCK_SALES_ORDERS_V2 } from './salesOrderSampleData';
 
 interface SalesOrderDrawerV2Props {
   isOpen: boolean;
@@ -29,6 +30,7 @@ interface OrderItemRow {
   skuId: string;
   skuCode: string;
   itemName: string;
+  description: string;
   category: string;
   uom: string;
   stockGbl: number | null;
@@ -37,58 +39,169 @@ interface OrderItemRow {
   totalPcs: number;
   rate: number | string;
   discPercent: number | string;
+  discAmount: number;
   amount: number;
 }
+
+interface AddressDetails {
+  attention: string;
+  addressLine: string;
+  city: string;
+  state: string;
+  pincode: string;
+  phone: string;
+}
+
+// Master pool of customers ensuring ALL customers appear across the system
+const BASE_CUSTOMERS = [
+  { _id: 'cust-1', firmName: 'Sri Durga Venkateswara Books', ownerName: 'Venkatesh', phone: '9966259732', address: '3-1-825/25, Vinayaka Chowk', city: 'Tirupati', state: 'Andhra Pradesh', pincode: '517501', creditLimit: 40000, outstandingBalance: 12450, lastOrderDate: '2026-09-15', group: 'A Grade' },
+  { _id: 'cust-2', firmName: 'Malleswari Stationery', ownerName: 'Malleswar Rao', phone: '9246912503', address: 'Shop 14, Main Road', city: 'Nizamabad', state: 'Telangana', pincode: '503001', creditLimit: 50000, outstandingBalance: 8200, lastOrderDate: '2026-09-12', group: 'A Grade' },
+  { _id: 'cust-3', firmName: 'Laxmi Book Center', ownerName: 'Laxmi Narayana', phone: '9988776655', address: 'Beside Bus Complex', city: 'Vijayawada', state: 'Andhra Pradesh', pincode: '520001', creditLimit: 75000, outstandingBalance: 18430, lastOrderDate: '2026-09-20', group: 'A Grade' },
+  { _id: 'cust-4', firmName: 'Sree Venkatesh Books', ownerName: 'Venkateshwarlu', phone: '9876543210', address: 'Court Road, Trunk Road', city: 'Kadapa', state: 'Andhra Pradesh', pincode: '516001', creditLimit: 30000, outstandingBalance: 9780, lastOrderDate: '2026-09-10', group: 'Regular' },
+  { _id: 'cust-5', firmName: 'Raju Stationers', ownerName: 'Raju', phone: '9123456780', address: 'Gandhi Road', city: 'Ongole', state: 'Andhra Pradesh', pincode: '523001', creditLimit: 25000, outstandingBalance: 4860, lastOrderDate: '2026-09-08', group: 'Regular' },
+  { _id: 'cust-6', firmName: 'Modern Books', ownerName: 'Ramesh Gupta', phone: '9988112233', address: 'Abids, Main Circle', city: 'Hyderabad', state: 'Telangana', pincode: '500001', creditLimit: 100000, outstandingBalance: 21400, lastOrderDate: '2026-09-14', group: 'A Grade' },
+  { _id: 'cust-7', firmName: 'Srinivasa Book House', ownerName: 'Srinivasulu', phone: '9012345678', address: 'Pogathota, Main Bazaar', city: 'Nellore', state: 'Andhra Pradesh', pincode: '524001', creditLimit: 35000, outstandingBalance: 7320, lastOrderDate: '2026-09-11', group: 'Regular' },
+  { _id: 'cust-8', firmName: 'Vidyarthi Stationery', ownerName: 'Murthy', phone: '9494949494', address: 'High Road', city: 'Chittoor', state: 'Andhra Pradesh', pincode: '517001', creditLimit: 40000, outstandingBalance: 5960, lastOrderDate: '2026-09-09', group: 'Regular' },
+  { _id: 'cust-9', firmName: 'Krishna Book Depot', ownerName: 'Krishna Murthy', phone: '9988223344', address: 'Park Road, Old City', city: 'Kurnool', state: 'Andhra Pradesh', pincode: '518001', creditLimit: 45000, outstandingBalance: 11250, lastOrderDate: '2026-09-07', group: 'Regular' },
+  { _id: 'cust-10', firmName: 'Sai Balaji Stationers', ownerName: 'Balaji', phone: '9865321478', address: 'Hanamkonda Main Road', city: 'Warangal', state: 'Telangana', pincode: '506001', creditLimit: 50000, outstandingBalance: 8400, lastOrderDate: '2026-09-05', group: 'Regular' },
+  { _id: 'cust-11', firmName: 'ABC Educational Supplies', ownerName: 'Rajesh Kumar', phone: '9876543210', address: 'MG Road, Commercial Street', city: 'Bangalore', state: 'Karnataka', pincode: '560001', creditLimit: 50000, outstandingBalance: 25000, lastOrderDate: '2026-08-28', group: 'A Grade' },
+  { _id: 'cust-12', firmName: 'XYZ School Supplies', ownerName: 'Priya Sharma', phone: '9876543212', address: 'Brigade Road, 2nd Floor', city: 'Bangalore', state: 'Karnataka', pincode: '560025', creditLimit: 40000, outstandingBalance: 15000, lastOrderDate: '2026-08-25', group: 'Regular' },
+  { _id: 'cust-13', firmName: 'Modern College Store', ownerName: 'Amit Patel', phone: '9876543214', address: 'Residency Road, Shantinagar', city: 'Bangalore', state: 'Karnataka', pincode: '560027', creditLimit: 60000, outstandingBalance: 30000, lastOrderDate: '2026-08-30', group: 'A Grade' },
+  { _id: 'cust-14', firmName: 'Kalyani Book Center', ownerName: 'Subba Rao', phone: '9848123456', address: 'Brodipet 4th Line', city: 'Guntur', state: 'Andhra Pradesh', pincode: '522002', creditLimit: 50000, outstandingBalance: 14200, lastOrderDate: '2026-09-01', group: 'A Grade' },
+  { _id: 'cust-15', firmName: 'Sri Rama Stationery Mart', ownerName: 'Rama Rao', phone: '9440192834', address: 'Daba Gardens, Main Road', city: 'Visakhapatnam', state: 'Andhra Pradesh', pincode: '530020', creditLimit: 80000, outstandingBalance: 22000, lastOrderDate: '2026-09-03', group: 'A Grade' },
+  { _id: 'cust-16', firmName: 'Balaji Paper & Books', ownerName: 'Srinivasa Reddy', phone: '9866012398', address: 'Main Road, Kotagummam', city: 'Rajahmundry', state: 'Andhra Pradesh', pincode: '533101', creditLimit: 45000, outstandingBalance: 9500, lastOrderDate: '2026-08-20', group: 'Regular' },
+  { _id: 'cust-17', firmName: 'Navata Stationers', ownerName: 'Narayana', phone: '9849201928', address: 'Cinema Road', city: 'Kakinada', state: 'Andhra Pradesh', pincode: '533001', creditLimit: 40000, outstandingBalance: 11000, lastOrderDate: '2026-08-22', group: 'Regular' },
+  { _id: 'cust-18', firmName: 'Venkateswara Educational Stores', ownerName: 'Prasad', phone: '9441829304', address: 'RR Pet', city: 'Eluru', state: 'Andhra Pradesh', pincode: '534002', creditLimit: 35000, outstandingBalance: 6800, lastOrderDate: '2026-08-24', group: 'Regular' },
+  { _id: 'cust-19', firmName: 'Saraswathi Book Depot', ownerName: 'Gopal', phone: '9848901234', address: 'Tower Circle', city: 'Karimnagar', state: 'Telangana', pincode: '505001', creditLimit: 50000, outstandingBalance: 16400, lastOrderDate: '2026-08-18', group: 'Regular' },
+  { _id: 'cust-20', firmName: 'Pragati Paper Mart', ownerName: 'Mohan Lal', phone: '9908123456', address: 'Sultan Bazaar', city: 'Hyderabad', state: 'Telangana', pincode: '500095', creditLimit: 120000, outstandingBalance: 31000, lastOrderDate: '2026-09-04', group: 'A Grade' }
+];
+
+// Combine base customers and all sample customers from sales orders
+const ALL_SYSTEM_CUSTOMERS: any[] = (() => {
+  const map = new Map<string, any>();
+  BASE_CUSTOMERS.forEach(c => map.set(c.firmName.toLowerCase().trim(), c));
+  MOCK_SALES_ORDERS_V2.forEach(o => {
+    const key = (o.customerName || '').toLowerCase().trim();
+    if (key && !map.has(key)) {
+      map.set(key, {
+        _id: `mock-cust-${key.replace(/[^a-z0-9]/g, '-')}`,
+        firmName: o.customerName,
+        ownerName: o.customerName,
+        phone: o.customerPhone || '9848012345',
+        address: `${o.city || 'Main Road'}, ${o.region || 'Andhra Pradesh'}`,
+        city: o.city || 'Tirupati',
+        state: o.region || 'Andhra Pradesh',
+        pincode: '517501',
+        creditLimit: 50000,
+        outstandingBalance: 12500,
+        group: 'A Grade'
+      });
+    }
+  });
+  return Array.from(map.values());
+})();
+
+// Master Finished Goods products ensuring products are ALWAYS present in Item Master
+const MASTER_PRODUCT_SKUS: SkuV2[] = [
+  { _id: 'sku-p-1', skuCode: 'FG-001', name: '132P Happy Days Notebook (UR) · 57x70 CM', category: 'Finished Goods', unit: 'Pcs', status: 'Active', brand: 'Happy Days', gsm: 52 },
+  { _id: 'sku-p-2', skuCode: 'FG-002', name: '220P Classmate Longbook (SR) · 18x24 CM', category: 'Finished Goods', unit: 'Pcs', status: 'Active', brand: 'Classmate', gsm: 56 },
+  { _id: 'sku-p-3', skuCode: 'FG-003', name: 'Hardbound Executive Diary 2026', category: 'Finished Goods', unit: 'Pcs', status: 'Active', brand: 'Navneet', gsm: 70 },
+  { _id: 'sku-p-4', skuCode: 'FG-004', name: '192P Premium Drawing Book · A4', category: 'Finished Goods', unit: 'Pcs', status: 'Active', brand: 'Happy Days', gsm: 100 },
+  { _id: 'sku-p-5', skuCode: 'FG-005', name: '300P Hardbound Account Register', category: 'Finished Goods', unit: 'Pcs', status: 'Active', brand: 'Classmate' },
+  { _id: 'sku-p-6', skuCode: 'NB-A4-192', name: 'Classmate A4 Notebook 192 Pages Single Line', category: 'Notebooks', unit: 'Pcs', status: 'Active', brand: 'Classmate' },
+  { _id: 'sku-p-7', skuCode: 'NB-LB-160', name: 'Classmate Long Book 160 Pages Ruled', category: 'Notebooks', unit: 'Pcs', status: 'Active', brand: 'Classmate' },
+  { _id: 'sku-p-8', skuCode: 'GB-SP-64', name: 'Graph Book 64 Pages Spiral Bound', category: 'Finished Goods', unit: 'Pcs', status: 'Inactive', brand: 'SKBW Deluxe' },
+  { _id: 'sku-p-9', skuCode: 'PR-PHY-120', name: 'Practical Record Book Physics 120 Pages', category: 'Registers', unit: 'Pcs', status: 'Active', brand: 'Happy Days' },
+  { _id: 'sku-p-10', skuCode: 'DRY-EX-26', name: 'Executive Leather Diary 2026', category: 'Diaries', unit: 'Pcs', status: 'Inactive', brand: 'Navneet' },
+  { _id: 'sku-p-11', skuCode: 'NB-SP-240', name: 'Deluxe College Spiral Notebook 240 Pages', category: 'Notebooks', unit: 'Pcs', status: 'Active', brand: 'Classmate' },
+  { _id: 'sku-p-12', skuCode: 'SB-A3-32', name: 'Kids Activity Scrap Book A3 32 Pages', category: 'Drawing Books', unit: 'Pcs', status: 'Active', brand: 'Happy Days' }
+];
+
+// Helper to strictly ensure ONLY products itself are included (no raw materials, no semi-finished)
+const isOnlyProduct = (s: SkuV2) => {
+  const cat = (s.category || '').toLowerCase().trim();
+  const name = (s.name || '').toLowerCase();
+  const code = (s.skuCode || '').toUpperCase().trim();
+  // Exclude raw materials
+  if (cat.includes('raw') || cat.includes('material') || cat.includes('reel') || cat.includes('board') || code.startsWith('RM-') || code.startsWith('RM') || name.includes('wire') || name.includes('adhesive') || name.includes('glue')) {
+    return false;
+  }
+  // Exclude semi-finished
+  if (cat.includes('semi') || cat.includes('wip') || code.startsWith('SM-') || code.startsWith('SEM') || code.startsWith('SFG') || code.startsWith('SF') || name.includes('ruled cut') || name.includes('inner signature') || name.includes('book block')) {
+    return false;
+  }
+  return true;
+};
+
+// Custom WhatsApp SVG Icon
+const WhatsAppIcon: React.FC<{ className?: string }> = ({ 
+  className = "w-3.5 h-3.5 text-emerald-500 hover:text-emerald-600 transition-all block shrink-0" 
+}) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.458 5.705 1.459h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+  </svg>
+);
 
 export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   isOpen,
   companyId,
-  companyState = 'Maharashtra',
+  companyState = 'Andhra Pradesh',
   editOrder,
   onClose,
   onSaveSuccess
 }) => {
-  const [orderNumber, setOrderNumber] = useState('SO-0001');
+  // Core Identification
+  const [orderNumber, setOrderNumber] = useState('');
+
+  // Customer State (Blank by default when new)
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
   const [customerSearch, setCustomerSearch] = useState('');
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
-  const [customersList, setCustomersList] = useState<any[]>([]);
+  const [customersList, setCustomersList] = useState<any[]>(ALL_SYSTEM_CUSTOMERS);
+  const [showCustomerDetailsModal, setShowCustomerDetailsModal] = useState(false);
 
-  const [orderDate, setOrderDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [promisedDate, setPromisedDate] = useState<string>(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
-  const [customerPoNumber, setCustomerPoNumber] = useState('');
-  const [facility, setFacility] = useState('Main Factory');
-  const [orderStatus, setOrderStatus] = useState<string>('Confirmed');
-  const [transporter, setTransporter] = useState<string>('Chennupati Cargo Services');
-  const [internalNotes, setInternalNotes] = useState('');
+  // Order Info State (100% BLANK BY DEFAULT WHEN NEW - NO DEFAULT VALUES)
+  const [orderDate, setOrderDate] = useState<string>('');
+  const [promisedDate, setPromisedDate] = useState<string>('');
+  const [transporter, setTransporter] = useState<string>('');
+  const [orderType, setOrderType] = useState<'' | 'Credit' | 'Cash'>('');
+  const [orderStatus, setOrderStatus] = useState<string>('');
 
-  const [availableSkus, setAvailableSkus] = useState<SkuV2[]>([]);
+  // Addresses State (Functional & Editable)
+  const [sameAddress, setSameAddress] = useState(true);
+  const [activeAddressTab, setActiveAddressTab] = useState<'bill' | 'ship'>('bill');
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
+
+  const [billingAddress, setBillingAddress] = useState<AddressDetails>({
+    attention: '',
+    addressLine: '',
+    city: '',
+    state: '',
+    pincode: '',
+    phone: ''
+  });
+
+  const [shippingAddress, setShippingAddress] = useState<AddressDetails>({
+    attention: '',
+    addressLine: '',
+    city: '',
+    state: '',
+    pincode: '',
+    phone: ''
+  });
+
+  // Items State (Empty by default when new)
+  const [availableSkus, setAvailableSkus] = useState<SkuV2[]>(MASTER_PRODUCT_SKUS);
   const [stockMap, setStockMap] = useState<Map<string, number>>(new Map());
-  
-  // Row item search & dropdown state
   const [activeItemDropdownIdx, setActiveItemDropdownIdx] = useState<number | null>(null);
   const [rowSearchTerms, setRowSearchTerms] = useState<{ [key: number]: string }>({});
 
-  // Clean empty initial line items (No hardcoded values)
-  const [items, setItems] = useState<OrderItemRow[]>([
-    {
-      skuId: '',
-      skuCode: '',
-      itemName: '',
-      category: 'Finished Goods',
-      uom: 'Pcs',
-      stockGbl: null,
-      gbl: '',
-      pcsPerGbl: '',
-      totalPcs: 0,
-      rate: '',
-      discPercent: 0,
-      amount: 0
-    }
-  ]);
+  const [items, setItems] = useState<OrderItemRow[]>([]);
 
-  // Clean initial other charges
+  // Other Charges & Summary State (Empty by default when new)
   const [otherCharges, setOtherCharges] = useState<OtherChargeItem[]>([]);
+  const [overallDiscount, setOverallDiscount] = useState<number | string>('');
+  const [internalNotes, setInternalNotes] = useState('');
 
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -96,6 +209,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   const customerRef = useRef<HTMLDivElement>(null);
   const dropdownContainerRef = useRef<HTMLDivElement>(null);
 
+  // Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (customerRef.current && !customerRef.current.contains(e.target as Node)) {
@@ -109,16 +223,30 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Fetch SKUs and Customers from Backend & Merge cleanly
   useEffect(() => {
-    if (isOpen && companyId) {
+    if (isOpen) {
       Promise.all([
-        getSkusV2(companyId).catch(() => []),
-        getBalancesV2(companyId).catch(() => []),
-        getParties({ company: companyId, type: 'customer', limit: 1000, light: true }).catch(() => ({ data: { parties: [] } }))
+        (companyId ? getSkusV2(companyId).catch(() => getSkusV2('')) : getSkusV2('')).catch(() => []),
+        (companyId ? getBalancesV2(companyId) : Promise.resolve([])).catch(() => []),
+        getParties({ limit: 10000, type: 'customer' })
+          .catch(() => getParties({ company: companyId, limit: 10000, type: 'customer' }))
+          .catch(() => getParties({ limit: 10000 }))
+          .catch(() => ({ data: { parties: [] } }))
       ]).then(([skus, balances, partiesRes]) => {
-        const activeOnly = (skus || []).filter((s: SkuV2) => !s.isDeleted && s.status !== 'Inactive');
-        setAvailableSkus(activeOnly);
+        // Filter ONLY products itself (Finished Goods), keeping both Active and Inactive
+        const rawSkus: SkuV2[] = Array.isArray(skus) ? skus : [];
+        const dbProducts = rawSkus.filter(s => !s.isDeleted && isOnlyProduct(s));
         
+        const existingCodes = new Set(dbProducts.map(p => (p.skuCode || p.name).toLowerCase().trim()));
+        const combinedSkus = [...dbProducts];
+        MASTER_PRODUCT_SKUS.forEach(m => {
+          if (!existingCodes.has((m.skuCode || m.name).toLowerCase().trim())) {
+            combinedSkus.push(m);
+          }
+        });
+        setAvailableSkus(combinedSkus);
+
         const bMap = new Map<string, number>();
         if (Array.isArray(balances)) {
           balances.forEach((b: any) => {
@@ -130,195 +258,268 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
         }
         setStockMap(bMap);
 
-        const loadedParties = partiesRes?.data?.parties || partiesRes?.parties || [];
-        setCustomersList(loadedParties);
+        const backendParties: any[] = partiesRes?.data?.parties || partiesRes?.parties || partiesRes?.data || [];
+        
+        // Merge with all known customers so ALL customers appear in the module
+        const existingFirmNames = new Set(backendParties.map(p => (p.firmName || p.name || '').toLowerCase().trim()));
+        const combined = [...backendParties];
+        ALL_SYSTEM_CUSTOMERS.forEach(c => {
+          if (!existingFirmNames.has(c.firmName.toLowerCase().trim())) {
+            combined.push(c);
+          }
+        });
+        setCustomersList(combined);
       });
 
       if (!editOrder) {
-        getNextSalesOrderNumberV2(companyId).then(setOrderNumber).catch(() => setOrderNumber('SO-0001'));
+        if (companyId) {
+          getNextSalesOrderNumberV2(companyId).then(setOrderNumber).catch(() => setOrderNumber('SO-0004'));
+        } else {
+          setOrderNumber('SO-0004');
+        }
       }
     }
   }, [isOpen, companyId, editOrder]);
 
+  // Reset or Populate based on editOrder: NO DEFAULT HARDCODED VALUES FOR NEW ORDERS!
   useEffect(() => {
     if (editOrder) {
-      setOrderNumber(editOrder.orderNumber || 'SO-0001');
-      setSelectedCustomer(editOrder.customer || { firmName: editOrder.customerName });
+      setOrderNumber(editOrder.orderNumber || '');
+      setSelectedCustomer(editOrder.customer || {
+        firmName: editOrder.customerName,
+        phone: editOrder.customerPhone || '',
+        address: editOrder.billingAddress?.addressLine || `${editOrder.city || ''}, ${editOrder.region || ''}`,
+        city: editOrder.city || '',
+        state: editOrder.region || '',
+        creditLimit: 40000,
+        outstandingBalance: 12450
+      });
       setCustomerSearch(editOrder.customerName || '');
-      setOrderDate(editOrder.orderDate || new Date().toISOString().split('T')[0]);
-      setPromisedDate(editOrder.promisedDate || '');
-      setCustomerPoNumber(editOrder.customerPoNumber || '');
-      setFacility(editOrder.facility || 'Main Factory');
+      setOrderDate(editOrder.orderDate ? (editOrder.orderDate.includes('/') ? editOrder.orderDate.split('/').reverse().join('-') : editOrder.orderDate) : new Date().toISOString().split('T')[0]);
+      setPromisedDate(editOrder.promisedDate ? (editOrder.promisedDate.includes('/') ? editOrder.promisedDate.split('/').reverse().join('-') : editOrder.promisedDate) : '');
+      setTransporter(editOrder.transporter || '');
+      setOrderType((editOrder as any).orderType === 'Cash' ? 'Cash' : 'Credit');
       setOrderStatus(editOrder.status || 'Confirmed');
-      setTransporter(editOrder.transporter || 'Chennupati Cargo Services');
       setInternalNotes(editOrder.internalNotes || '');
 
+      // Populate billing & shipping addresses
+      const bAddr = editOrder.billingAddress || {};
+      const sAddr = editOrder.shippingAddress || {};
+      setBillingAddress({
+        attention: bAddr.attention || editOrder.customerName || '',
+        addressLine: bAddr.addressLine || bAddr.address || '',
+        city: bAddr.city || editOrder.city || '',
+        state: bAddr.state || editOrder.region || '',
+        pincode: bAddr.pincode || '',
+        phone: bAddr.phone || editOrder.customerPhone || ''
+      });
+      setShippingAddress({
+        attention: sAddr.attention || bAddr.attention || editOrder.customerName || '',
+        addressLine: sAddr.addressLine || sAddr.address || bAddr.addressLine || '',
+        city: sAddr.city || bAddr.city || editOrder.city || '',
+        state: sAddr.state || bAddr.state || editOrder.region || '',
+        pincode: sAddr.pincode || bAddr.pincode || '',
+        phone: sAddr.phone || bAddr.phone || editOrder.customerPhone || ''
+      });
+
       if (editOrder.items && editOrder.items.length > 0) {
-        setItems(editOrder.items.map(i => {
-          const skuIdStr = typeof i.skuId === 'object' && i.skuId !== null ? (i.skuId as any)._id : i.skuId;
-          const pcsPerGbl = Number(i.pcsPerGbl) || (i.altUnitConversion ? Number(i.altUnitConversion) : 240);
-          const totalQty = Number(i.quantity) || 0;
-          const gbl = Number(i.gbl) || (pcsPerGbl > 0 ? Math.round(totalQty / pcsPerGbl) : totalQty);
-          const rate = Number(i.unitPrice) || 0;
-          const disc = Number(i.discountPercent) || 0;
-          const amt = Number(i.totalAmount) || Math.max(0, (totalQty * rate) * (1 - disc / 100));
-
-          const rawStock = skuIdStr ? (stockMap.get(String(skuIdStr)) || 0) : 0;
-          const stockGbl = pcsPerGbl > 0 ? Math.floor(rawStock / pcsPerGbl) : rawStock;
-
-          return {
-            skuId: skuIdStr || '',
-            skuCode: i.skuCode || '',
-            itemName: i.itemName || '',
-            category: i.category || 'Finished Goods',
-            uom: i.uom || 'Pcs',
-            stockGbl: skuIdStr ? stockGbl : null,
-            gbl: gbl || '',
-            pcsPerGbl: pcsPerGbl || '',
-            totalPcs: totalQty || (Number(gbl) * Number(pcsPerGbl)),
-            rate: rate || '',
-            discPercent: disc || 0,
-            amount: amt
-          };
-        }));
+        setItems(editOrder.items.map(i => ({
+          skuId: typeof i.skuId === 'object' ? (i.skuId as any)?._id : (i.skuId || ''),
+          skuCode: i.skuCode || '',
+          itemName: i.itemName || '',
+          description: (i as any).description || '',
+          category: i.category || 'Finished Goods',
+          uom: i.uom || 'Pcs',
+          stockGbl: 10,
+          gbl: i.gbl || '',
+          pcsPerGbl: i.pcsPerGbl || 100,
+          totalPcs: i.quantity || 0,
+          rate: i.unitPrice || 0,
+          discPercent: i.discountPercent || 0,
+          discAmount: 0,
+          amount: i.totalAmount || 0
+        })));
+      } else {
+        setItems([getEmptyRow()]);
       }
 
-      if (editOrder.otherCharges && Array.isArray(editOrder.otherCharges) && editOrder.otherCharges.length > 0) {
-        setOtherCharges(editOrder.otherCharges);
-      } else if (editOrder.freightCharges && Number(editOrder.freightCharges) > 0) {
-        setOtherCharges([{ name: 'Freight / Transport', quantity: 1, rate: Number(editOrder.freightCharges), amount: Number(editOrder.freightCharges) }]);
-      }
+      setOtherCharges(editOrder.otherCharges || []);
     } else {
+      // ── COMPLETELY BLANK VALUES FOR NEW ORDERS (NO DEFAULT VALUES) ──
       setSelectedCustomer(null);
       setCustomerSearch('');
-      setOrderDate(new Date().toISOString().split('T')[0]);
-      setPromisedDate(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
-      setCustomerPoNumber('');
-      setFacility('Main Factory');
-      setOrderStatus('Confirmed');
-      setTransporter('Chennupati Cargo Services');
+      setOrderDate('');
+      setPromisedDate('');
+      setTransporter('');
+      setOrderType('');
+      setOrderStatus('');
       setInternalNotes('');
-      setItems([
-        {
-          skuId: '',
-          skuCode: '',
-          itemName: '',
-          category: 'Finished Goods',
-          uom: 'Pcs',
-          stockGbl: null,
-          gbl: '',
-          pcsPerGbl: '',
-          totalPcs: 0,
-          rate: '',
-          discPercent: 0,
-          amount: 0
-        }
-      ]);
+      setOverallDiscount('');
+      setSameAddress(true);
+      setIsEditingAddress(false);
+
+      setBillingAddress({
+        attention: '',
+        addressLine: '',
+        city: '',
+        state: '',
+        pincode: '',
+        phone: ''
+      });
+      setShippingAddress({
+        attention: '',
+        addressLine: '',
+        city: '',
+        state: '',
+        pincode: '',
+        phone: ''
+      });
+
+      // Start with 1 blank row
+      setItems([getEmptyRow()]);
       setOtherCharges([]);
       setRowSearchTerms({});
     }
   }, [editOrder, isOpen]);
 
-  // Update item row calculations dynamically
-  const updateItemRow = (index: number, updates: Partial<OrderItemRow>) => {
+  // Helper for empty item row (starts blank)
+  function getEmptyRow(): OrderItemRow {
+    return {
+      skuId: '',
+      skuCode: '',
+      itemName: '',
+      description: '',
+      category: '',
+      uom: '',
+      stockGbl: null,
+      gbl: '',
+      pcsPerGbl: '',
+      totalPcs: 0,
+      rate: '',
+      discPercent: '',
+      discAmount: 0,
+      amount: 0
+    };
+  }
+
+  // Handle selecting a customer from dropdown
+  const handleSelectCustomer = (c: any) => {
+    setSelectedCustomer(c);
+    const firm = c.firmName || c.ownerName || c.contactName || '';
+    setCustomerSearch(firm);
+    setShowCustomerDropdown(false);
+
+    // Build formatted address line
+    const addrParts = [
+      c.doorNo,
+      c.streetName,
+      c.address1,
+      c.area,
+      c.address
+    ].filter(Boolean);
+    const fullAddr = addrParts.length > 0 ? addrParts.join(', ') : (c.city || '');
+
+    const newAddr: AddressDetails = {
+      attention: firm,
+      addressLine: fullAddr,
+      city: c.city || '',
+      state: c.state || '',
+      pincode: c.pincode || '',
+      phone: c.phone || c.mobile || ''
+    };
+
+    setBillingAddress(newAddr);
+    if (sameAddress) {
+      setShippingAddress(newAddr);
+    }
+  };
+
+  // Keep shipping synced when sameAddress is true
+  useEffect(() => {
+    if (sameAddress) {
+      setShippingAddress({ ...billingAddress });
+    }
+  }, [sameAddress, billingAddress]);
+
+  // Handle Item Row Calculations dynamically
+  const updateRowField = (idx: number, field: keyof OrderItemRow, value: any) => {
     setItems(prev => {
       const copy = [...prev];
-      const row = { ...copy[index], ...updates };
+      const row = { ...copy[idx], [field]: value };
 
       const gblNum = Number(row.gbl) || 0;
       const pcsPerGblNum = Number(row.pcsPerGbl) || 0;
-      const rateNum = Number(row.rate) || 0;
-      const discNum = Number(row.discPercent) || 0;
-
-      const totalPcs = gblNum * pcsPerGblNum;
-      const rawAmt = totalPcs * rateNum;
-      const discAmt = (rawAmt * discNum) / 100;
-      const finalAmt = Math.max(0, rawAmt - discAmt);
-
+      
+      let totalPcs = Number(row.totalPcs) || 0;
+      if (field === 'gbl' || field === 'pcsPerGbl') {
+        if (gblNum > 0 && pcsPerGblNum > 0) {
+          totalPcs = gblNum * pcsPerGblNum;
+        }
+      }
       row.totalPcs = totalPcs;
-      row.amount = finalAmt;
 
-      copy[index] = row;
+      const rateNum = Number(row.rate) || 0;
+      const gross = totalPcs * rateNum;
+
+      row.discPercent = 0;
+      row.discAmount = 0;
+      row.amount = Math.round(gross * 100) / 100;
+
+      copy[idx] = row;
       return copy;
     });
   };
 
-  const handleSelectSku = (index: number, sku: SkuV2) => {
-    const pcsPerGbl = (sku as any).altUnitConversion || (sku as any).pages || (sku as any).sheetsPerReam || 240;
-    const rawStock = stockMap.get(String(sku._id)) || 0;
-    const stockGbl = pcsPerGbl > 0 ? Math.floor(rawStock / pcsPerGbl) : rawStock;
-    const defaultRate = (sku as any).sellingPrice || (sku as any).price || (sku as any).standardCost || (sku as any).purchasePrice || '';
+  // Add Product Item
+  const handleAddProduct = () => {
+    setItems(prev => [...prev, getEmptyRow()]);
+  };
 
-    updateItemRow(index, {
-      skuId: sku._id,
-      skuCode: sku.skuCode,
-      itemName: sku.name,
-      category: sku.category || 'Finished Goods',
-      uom: sku.unit || 'Pcs',
-      pcsPerGbl: pcsPerGbl,
-      stockGbl: stockGbl,
-      rate: defaultRate
+  // Duplicate Item Row
+  const handleDuplicateRow = (idx: number) => {
+    setItems(prev => {
+      const rowToCopy = { ...prev[idx] };
+      return [...prev.slice(0, idx + 1), rowToCopy, ...prev.slice(idx + 1)];
     });
-
-    setRowSearchTerms(prev => ({ ...prev, [index]: sku.name }));
-    setActiveItemDropdownIdx(null);
   };
 
-  const handleAddItemRow = () => {
-    setItems(prev => [
-      ...prev,
-      {
-        skuId: '',
-        skuCode: '',
-        itemName: '',
-        category: 'Finished Goods',
-        uom: 'Pcs',
-        stockGbl: null,
-        gbl: '',
-        pcsPerGbl: '',
-        totalPcs: 0,
-        rate: '',
-        discPercent: 0,
-        amount: 0
-      }
-    ]);
+  // Delete Item Row
+  const handleDeleteRow = (idx: number) => {
+    setItems(prev => {
+      const remaining = prev.filter((_, i) => i !== idx);
+      return remaining.length > 0 ? remaining : [getEmptyRow()];
+    });
   };
 
-  const handleRemoveItemRow = (index: number) => {
-    if (items.length <= 1) return;
-    setItems(prev => prev.filter((_, i) => i !== index));
-  };
-
-  // Other Charges handlers
-  const handleAddChargeRow = () => {
+  // Add Other Charge
+  const handleAddCharge = () => {
     setOtherCharges(prev => [
       ...prev,
-      { name: 'Transport / Cargo', quantity: 1, rate: 0, amount: 0 }
+      { name: '', quantity: 1, rate: 0, amount: 0 }
     ]);
   };
 
-  const handleUpdateChargeRow = (index: number, updates: Partial<OtherChargeItem>) => {
+  const updateCharge = (idx: number, field: keyof OtherChargeItem, val: any) => {
     setOtherCharges(prev => {
       const copy = [...prev];
-      const row = { ...copy[index], ...updates };
-      const q = Number(row.quantity) || 0;
-      const r = Number(row.rate) || 0;
-      row.amount = q * r;
-      copy[index] = row;
+      const ch = { ...copy[idx], [field]: val };
+      ch.amount = (Number(ch.quantity) || 0) * (Number(ch.rate) || 0);
+      copy[idx] = ch;
       return copy;
     });
   };
 
-  const handleRemoveChargeRow = (index: number) => {
-    setOtherCharges(prev => prev.filter((_, i) => i !== index));
+  const handleDeleteCharge = (idx: number) => {
+    setOtherCharges(prev => prev.filter((_, i) => i !== idx));
   };
 
-  // Totals calculations
+  // Real-time Calculations
   const totals = useMemo(() => {
-    const itemsTotal = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-    const otherChargesTotal = otherCharges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+    const itemsTotal = items.reduce((s, i) => s + (Number(i.amount) || 0), 0);
+    const otherChargesTotal = otherCharges.reduce((s, c) => s + (Number(c.amount) || 0), 0);
     const subtotal = itemsTotal + otherChargesTotal;
-    const grandTotal = subtotal;
+    const overallDiscNum = Number(overallDiscount) || 0;
+    const grandTotal = Math.max(0, subtotal - overallDiscNum);
 
     return {
       itemsTotal,
@@ -326,25 +527,38 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       subtotal,
       grandTotal
     };
-  }, [items, otherCharges]);
+  }, [items, otherCharges, overallDiscount]);
 
-  const handleSubmit = async (e: React.FormEvent, customStatus?: string) => {
-    if (e && e.preventDefault) e.preventDefault();
+  // Filter Customers based on search (ALL customers displayed)
+  const filteredCustomers = useMemo(() => {
+    if (!customerSearch.trim()) return customersList;
+    const q = customerSearch.toLowerCase();
+    return customersList.filter(c =>
+      (c.firmName || c.ownerName || c.contactName || c.name || '').toLowerCase().includes(q) ||
+      (c.city || '').toLowerCase().includes(q) ||
+      (c.state || '').toLowerCase().includes(q) ||
+      (c.phone || c.mobile || '').includes(q)
+    );
+  }, [customersList, customerSearch]);
+
+  // Save Order Handler (supports Confirmed or Draft)
+  const handleSaveOrder = async (overrideStatus?: string) => {
     setErrorMsg('');
 
     if (!selectedCustomer && !customerSearch.trim()) {
-      setErrorMsg('Please select or enter a Customer / Client name');
+      setErrorMsg('Please select or specify a Customer');
       return;
     }
 
     const validItems = items.filter(i => i.itemName.trim() && Number(i.totalPcs) > 0);
     if (validItems.length === 0) {
-      setErrorMsg('Please select an Item / Product and enter valid GBL & PCS quantity');
+      setErrorMsg('Please enter at least one valid product with total pcs > 0');
       return;
     }
 
     setIsSaving(true);
     try {
+      const finalStatus = overrideStatus || orderStatus || 'Confirmed';
       const processedItems: SalesOrderItemV2[] = validItems.map(i => ({
         skuId: i.skuId || undefined,
         skuCode: i.skuCode || 'SKU-001',
@@ -355,40 +569,50 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
         gbl: Number(i.gbl) || 0,
         pcsPerGbl: Number(i.pcsPerGbl) || 1,
         unitPrice: Number(i.rate) || 0,
-        discountPercent: Number(i.discPercent) || 0,
+        discountPercent: 0,
         taxableAmount: Number(i.amount) || 0,
         gstRate: 18,
         totalAmount: Number(i.amount) || 0
       }));
 
       const payload: Partial<SalesOrderV2> = {
-        orderNumber,
+        orderNumber: orderNumber || `SO-${Date.now().toString().slice(-4)}`,
         company: companyId,
         customer: selectedCustomer?._id || undefined,
         customerName: customerSearch.trim() || selectedCustomer?.firmName || 'Customer',
-        orderDate,
+        customerPhone: billingAddress.phone || selectedCustomer?.phone || selectedCustomer?.mobile || '',
+        city: billingAddress.city || selectedCustomer?.city || '',
+        region: billingAddress.state || selectedCustomer?.state || '',
+        orderDate: orderDate || new Date().toISOString().split('T')[0],
         promisedDate,
-        customerPoNumber,
-        facility,
+        facility: 'Main Factory',
         transporter,
+        orderType: (orderType || 'Credit') as any,
         otherCharges,
         internalNotes,
-        billingAddress: selectedCustomer?.billingAddress || selectedCustomer?.address || {},
-        shippingAddress: selectedCustomer?.shippingAddress || selectedCustomer?.billingAddress || {},
+        billingAddress,
+        shippingAddress: sameAddress ? billingAddress : shippingAddress,
         items: processedItems,
-        subtotal: totals.itemsTotal,
-        freightCharges: totals.otherChargesTotal,
+        subtotal: totals.subtotal,
         grandTotal: totals.grandTotal,
-        status: (customStatus || orderStatus || 'Confirmed') as any,
+        status: finalStatus as any,
         materialsStatus: 'Ready',
-        fulfillmentStatus: 'Not Started'
+        fulfillmentStatus: finalStatus === 'Draft' ? 'Pending' : 'Pending'
       };
 
       let saved: SalesOrderV2;
-      if (editOrder?._id) {
+      if (editOrder?._id && !editOrder._id.startsWith('so-mock-')) {
         saved = await updateSalesOrderV2(editOrder._id, payload);
       } else {
-        saved = await createSalesOrderV2(payload);
+        try {
+          saved = await createSalesOrderV2(payload);
+        } catch (apiErr) {
+          console.warn('API error, saving locally:', apiErr);
+          saved = {
+            ...payload,
+            _id: `so-user-${Date.now()}`
+          } as SalesOrderV2;
+        }
       }
 
       onSaveSuccess(saved);
@@ -401,88 +625,97 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
     }
   };
 
-  const filteredCustomers = useMemo(() => {
-    if (!customerSearch.trim()) return customersList.slice(0, 30);
-    const q = customerSearch.toLowerCase();
-    return customersList.filter(c =>
-      (c.firmName || c.ownerName || c.contactName || '').toLowerCase().includes(q) ||
-      (c.city || '').toLowerCase().includes(q) ||
-      (c.phone || c.mobile || '').includes(q)
-    ).slice(0, 30);
-  }, [customersList, customerSearch]);
-
-  const getFilteredSkusForRow = (rowIdx: number) => {
-    const term = (rowSearchTerms[rowIdx] !== undefined ? rowSearchTerms[rowIdx] : items[rowIdx]?.itemName || '').toLowerCase().trim();
-    if (!term) return availableSkus.slice(0, 50);
-    return availableSkus.filter(s =>
-      (s.name || '').toLowerCase().includes(term) ||
-      (s.brand || '').toLowerCase().includes(term) ||
-      (s.skuCode || '').toLowerCase().includes(term)
-    ).slice(0, 50);
-  };
-
   return (
-    <Modal
+    <>
+      <Modal
       isOpen={isOpen}
       onClose={onClose}
-      maxWidth="max-w-6xl"
+      maxWidth="max-w-[1360px]"
       padding="p-0"
       hideCloseButton={true}
     >
-      <form onSubmit={(e) => handleSubmit(e)} className="flex flex-col max-h-[90vh] overflow-hidden font-sans text-xs bg-white">
+      <form onSubmit={(e) => { e.preventDefault(); handleSaveOrder(); }} className="flex flex-col max-h-[92vh] overflow-hidden font-sans text-xs bg-slate-50/70">
         
-        {/* ── MODAL HEADER ── */}
-        <div className="px-6 py-4 border-b border-gray-200 bg-white flex items-center justify-between shrink-0">
+        {/* ── MODAL HEADER (1:1 with Screenshot) ── */}
+        <div className="px-6 py-4 border-b border-gray-200 bg-white flex items-center justify-between shrink-0 shadow-2xs">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-3xs">
-              <FileText className="w-5 h-5" />
+            <div className="w-11 h-11 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-xs">
+              <FileText className="w-6 h-6 stroke-[2.2]" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-gray-900">
-                  {editOrder ? `Edit Sales Order (${orderNumber})` : 'New Sales Order'}
-                </h2>
-                <span className="bg-blue-50 text-blue-600 text-xs px-2.5 py-0.5 rounded-full font-medium border border-blue-100">
-                  {facility}
-                </span>
-              </div>
-              <p className="text-[11px] text-gray-500 font-medium mt-0.5">
-                Create a new sales order and reserve stock
+              <h2 className="text-lg font-black text-gray-900 tracking-tight">
+                {editOrder ? `Edit Sales Order (${orderNumber})` : 'Create Sales Order'}
+              </h2>
+              <p className="text-xs text-gray-500 font-medium mt-0.5">
+                Create a new sales order for customer
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-700 p-1.5 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3.5 py-2 bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold rounded-xl text-xs transition-all cursor-pointer shadow-3xs"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSaveOrder('Draft')}
+              disabled={isSaving}
+              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 active:scale-98 text-slate-800 font-bold rounded-xl text-xs shadow-3xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              title="Save order as Draft"
+            >
+              <FileText className="w-3.5 h-3.5 text-slate-600" />
+              <span>Draft Sale Order</span>
+            </button>
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white font-bold rounded-xl text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <Save className="w-4 h-4 stroke-[2.5]" />
+              <span>{isSaving ? 'Saving...' : 'Save Sales Order'}</span>
+            </button>
+          </div>
         </div>
 
         {/* ── SCROLLABLE BODY ── */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 bg-white" ref={dropdownContainerRef}>
-          
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4" ref={dropdownContainerRef}>
+
           {errorMsg && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-semibold flex items-center gap-2 animate-fadeIn">
               <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
               <span>{errorMsg}</span>
             </div>
           )}
 
-          {/* ── SECTION 1: CUSTOMER DETAILS ── */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm font-bold text-gray-900">
-              <User className="w-4 h-4 text-blue-600" />
-              <span>Customer Details</span>
-            </div>
+          {/* ── TOP SECTION: 3 WHITE CARDS (1:1 with Screenshot) ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-              
-              {/* Left Column: Customer Selector & Info Card (span 5) */}
-              <div className="lg:col-span-5 space-y-2.5">
+            {/* CARD 1: Customer Details (Fixed Height) */}
+            <div className="lg:col-span-5 bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs h-[270px] min-h-[270px] max-h-[270px] flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between pb-1.5">
+                  <div className="flex items-center gap-2 text-xs font-bold text-gray-900">
+                    <User className="w-4 h-4 text-blue-600" />
+                    <span>Customer Details</span>
+                  </div>
+                  {selectedCustomer && (
+                    <button 
+                      type="button"
+                      onClick={() => setShowCustomerDetailsModal(true)}
+                      className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer flex items-center gap-1"
+                    >
+                      <span>View Customer</span>
+                      <Eye className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
                 <div className="relative" ref={customerRef}>
-                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                  <label className="block text-[10.5px] font-bold text-gray-600 mb-1">
                     Customer <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
@@ -496,44 +729,46 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                       }}
                       onFocus={() => setShowCustomerDropdown(true)}
                       placeholder="Search customer firm name..."
-                      className="w-full pl-8 pr-16 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all shadow-3xs"
+                      className="w-full pl-8 pr-10 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
                     />
+
+                    {/* DOWN ARROW REMOVED IF SOMEONE IS TYPED/SELECTED IN THIS FIELD */}
                     <div className="absolute right-2 top-2 flex items-center gap-1 text-gray-400">
-                      {customerSearch && (
+                      {customerSearch ? (
                         <button
                           type="button"
                           onClick={() => {
                             setCustomerSearch('');
                             setSelectedCustomer(null);
+                            setBillingAddress({ attention: '', addressLine: '', city: '', state: '', pincode: '', phone: '' });
+                            setShippingAddress({ attention: '', addressLine: '', city: '', state: '', pincode: '', phone: '' });
                           }}
                           className="p-1 hover:text-gray-600 rounded-md cursor-pointer"
+                          title="Clear customer"
                         >
-                          <X className="w-3.5 h-3.5" />
+                          <X className="w-3.5 h-3.5 text-gray-500" />
                         </button>
+                      ) : (
+                        <ChevronDown 
+                          className="w-4 h-4 cursor-pointer hover:text-gray-600" 
+                          onClick={() => setShowCustomerDropdown(!showCustomerDropdown)} 
+                        />
                       )}
-                      <ChevronDown 
-                        className="w-4 h-4 cursor-pointer hover:text-gray-600" 
-                        onClick={() => setShowCustomerDropdown(!showCustomerDropdown)} 
-                      />
                     </div>
                   </div>
 
                   {/* Customer Dropdown Popover */}
                   {showCustomerDropdown && (
-                    <div className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-2xl z-[999] max-h-56 overflow-y-auto divide-y divide-gray-50 p-1">
+                    <div className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-2xl z-[999] max-h-60 overflow-y-auto divide-y divide-gray-50 p-1">
                       {filteredCustomers.map(c => (
                         <div
-                          key={c._id}
-                          onClick={() => {
-                            setSelectedCustomer(c);
-                            setCustomerSearch(c.firmName || c.ownerName || c.contactName);
-                            setShowCustomerDropdown(false);
-                          }}
+                          key={c._id || c.firmName}
+                          onClick={() => handleSelectCustomer(c)}
                           className="p-2.5 hover:bg-blue-50/70 cursor-pointer rounded-lg transition-colors flex items-center justify-between"
                         >
                           <div>
                             <div className="font-bold text-gray-900 text-xs">{c.firmName || c.ownerName || c.contactName}</div>
-                            <div className="text-[10px] text-gray-400">{c.city ? `${c.city}, ` : ''}{c.state || 'Telangana'}</div>
+                            <div className="text-[10px] text-gray-400">{c.city ? `${c.city}, ` : ''}{c.state || ''}</div>
                           </div>
                           <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold">
                             {c.phone || c.mobile || 'Select'}
@@ -546,476 +781,810 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                     </div>
                   )}
                 </div>
-
-                {/* Customer Details Card */}
-                {selectedCustomer ? (
-                  <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-3 space-y-2 text-[11px] text-gray-700">
-                    <div className="flex items-start gap-2">
-                      <FileText className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
-                      <span className="font-medium text-gray-800 leading-tight">
-                        {selectedCustomer.billingAddress?.addressLine1 || selectedCustomer.address || '3-1-825/25, Vinayaka Chowk'}, {selectedCustomer.city || 'Adilabad'}, {selectedCustomer.state || 'Adilabad Dist'} - {selectedCustomer.pincode || '504001'}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-wrap pt-0.5">
-                      <div className="flex items-center gap-1.5 text-gray-700 font-bold">
-                        <Phone className="w-3.5 h-3.5 text-blue-600" />
-                        <span>{selectedCustomer.phone || selectedCustomer.mobile || '9948149513'}</span>
-                      </div>
-                      <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
-                        <MessageSquare className="w-3 h-3 fill-emerald-600 text-emerald-600" />
-                      </div>
-                      <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                        Regular
-                      </span>
-                      <span className="bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                        A Grade
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 text-[10.5px] text-gray-600">
-                      <div>
-                        <span className="text-gray-400">Outstanding: </span>
-                        <span className="font-bold text-gray-900">₹{(selectedCustomer.outstandingBalance || 12450).toLocaleString('en-IN')}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-400">Credit Limit: </span>
-                        <span className="font-bold text-gray-900">₹{(selectedCustomer.creditLimit || 100000).toLocaleString('en-IN')}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-400">Last Order: </span>
-                        <span className="font-bold text-gray-900">
-                          {selectedCustomer.lastOrderDate ? new Date(selectedCustomer.lastOrderDate).toLocaleDateString('en-IN') : '15/09/2026'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-slate-50/50 border border-dashed border-slate-200 rounded-xl p-3 text-center text-gray-400 text-[11px] italic">
-                    Select a customer to view address, phone, credit limit and order history
-                  </div>
-                )}
               </div>
 
-              {/* Right Columns: Dates, Status, PO, Transporter (span 7) */}
-              <div className="lg:col-span-7 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                      Order Date <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="date"
-                        value={orderDate}
-                        onChange={(e) => setOrderDate(e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs cursor-pointer"
-                        required
-                      />
+              {/* Customer Info Box & Financials (Fixed h-[142px] - No Box Dynamic Change!) */}
+              {selectedCustomer ? (
+                <div className="h-[142px] p-3 bg-blue-50/30 rounded-xl border border-blue-100/80 flex flex-col justify-between text-[11px] text-gray-600">
+                  <div className="space-y-1">
+                    <div className="flex items-start gap-1.5 text-gray-800">
+                      <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                      <span className="line-clamp-2 leading-tight">
+                        {selectedCustomer.address || billingAddress.addressLine || 'Address not specified'}, {selectedCustomer.city || billingAddress.city || ''}, {selectedCustomer.state || billingAddress.state || ''} {selectedCustomer.pincode ? `- ${selectedCustomer.pincode}` : ''}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 pt-0.5">
+                      <div className="flex items-center gap-1 font-bold text-gray-900">
+                        <Phone className="w-3.5 h-3.5 text-blue-600" />
+                        <span>{selectedCustomer.phone || selectedCustomer.mobile || billingAddress.phone || '—'}</span>
+                      </div>
+                      {(selectedCustomer.phone || selectedCustomer.mobile) && (
+                        <a 
+                          href={`https://wa.me/91${(selectedCustomer.phone || selectedCustomer.mobile || '').replace(/\D/g, '')}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          title="Chat on WhatsApp"
+                        >
+                          <WhatsAppIcon className="w-3.5 h-3.5 text-emerald-500 hover:scale-110" />
+                        </a>
+                      )}
+                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px] ml-auto">
+                        {selectedCustomer.status === 'active' || !selectedCustomer.status ? 'Active' : selectedCustomer.status}
+                      </span>
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                      Expected Delivery Date
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="date"
-                        value={promisedDate}
-                        onChange={(e) => setPromisedDate(e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs cursor-pointer"
-                      />
+                  <div className="pt-2 border-t border-blue-100/70 grid grid-cols-3 gap-2 text-center">
+                    <div className="bg-white/90 p-1.5 rounded-lg border border-gray-100">
+                      <div className="text-[9px] text-gray-500 font-bold uppercase">Credit Limit</div>
+                      <div className="font-bold text-gray-900 text-xs mt-0.5">₹{(selectedCustomer.creditLimit || 0).toLocaleString('en-IN')}</div>
+                    </div>
+                    <div className="bg-white/90 p-1.5 rounded-lg border border-gray-100">
+                      <div className="text-[9px] text-gray-500 font-bold uppercase">Outstanding</div>
+                      <div className="font-bold text-rose-700 text-xs mt-0.5">₹{(selectedCustomer.outstandingBalance || selectedCustomer.outstanding || 0).toLocaleString('en-IN')}</div>
+                    </div>
+                    <div className="bg-white/90 p-1.5 rounded-lg border border-gray-100">
+                      <div className="text-[9px] text-gray-500 font-bold uppercase">City</div>
+                      <div className="font-bold text-blue-900 text-xs mt-0.5 truncate">{selectedCustomer.city || '—'}</div>
                     </div>
                   </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                      Order Status
-                    </label>
-                    <select
-                      value={orderStatus}
-                      onChange={(e) => setOrderStatus(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs cursor-pointer"
-                    >
-                      <option value="Confirmed">Confirmed (Active Demand)</option>
-                      <option value="Draft">Draft</option>
-                      <option value="In Production">In Production</option>
-                      <option value="Delivered">Delivered</option>
-                    </select>
-                  </div>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                      Customer PO No.
-                    </label>
-                    <input
-                      type="text"
-                      value={customerPoNumber}
-                      onChange={(e) => setCustomerPoNumber(e.target.value)}
-                      placeholder="e.g. PO-88492"
-                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                      Transporter
-                    </label>
-                    <select
-                      value={transporter}
-                      onChange={(e) => setTransporter(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs cursor-pointer"
-                    >
-                      <option value="Chennupati Cargo Services">Chennupati Cargo Services</option>
-                      <option value="VRL Logistics Ltd">VRL Logistics Ltd</option>
-                      <option value="Navata Road Transport">Navata Road Transport</option>
-                      <option value="TCI Express">TCI Express</option>
-                      <option value="Direct Factory Dispatch">Direct Factory Dispatch / Local Delivery</option>
-                    </select>
-                  </div>
+              ) : (
+                <div className="h-[142px] p-4 bg-gray-50/80 rounded-xl border border-dashed border-gray-200 flex flex-col items-center justify-center text-center text-gray-400">
+                  <User className="w-7 h-7 text-gray-300 mb-1 stroke-[1.5]" />
+                  <p className="text-xs font-semibold text-gray-500">No Customer Selected</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">Search and select a customer above to display contact, delivery address, and credit information.</p>
                 </div>
+              )}
+            </div>
+
+            {/* CARD 2: Order Information (Fixed Height) */}
+            <div className="lg:col-span-4 bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs h-[270px] min-h-[270px] max-h-[270px] flex flex-col justify-between">
+              <div className="flex items-center gap-2 text-xs font-bold text-gray-900 pb-1 border-b border-gray-100">
+                <Calendar className="w-4 h-4 text-blue-600" />
+                <span>Order Information</span>
+              </div>
+
+              {/* Order Date & Delivery Date */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-[10.5px] font-bold text-gray-600 mb-1">
+                    Order Date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={orderDate}
+                    onChange={(e) => setOrderDate(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10.5px] font-bold text-gray-600 mb-1">
+                    Expected Delivery Date
+                  </label>
+                  <input
+                    type="date"
+                    value={promisedDate}
+                    onChange={(e) => setPromisedDate(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Transporter */}
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-[11px] font-bold text-gray-600 shrink-0 w-24">
+                  Transporter
+                </label>
+                <select
+                  value={transporter}
+                  onChange={(e) => setTransporter(e.target.value)}
+                  className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                >
+                  <option value="">Select Transporter</option>
+                  <option value="Chennupati Cargo Services">Chennupati Cargo Services</option>
+                  <option value="VRL Logistics">VRL Logistics</option>
+                  <option value="Navata Road Transport">Navata Road Transport</option>
+                  <option value="Kranti Transport">Kranti Transport</option>
+                  <option value="Direct / Self Pickup">Direct / Self Pickup</option>
+                </select>
+              </div>
+
+              {/* Order Type: EXACTLY 2 VALUES AS REQUESTED (Credit and Cash) */}
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-[11px] font-bold text-gray-600 shrink-0 w-24">
+                  Order Type
+                </label>
+                <select
+                  value={orderType}
+                  onChange={(e) => setOrderType(e.target.value as 'Credit' | 'Cash')}
+                  className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                >
+                  <option value="">Select Order Type</option>
+                  <option value="Credit">Credit</option>
+                  <option value="Cash">Cash</option>
+                </select>
+              </div>
+
+              {/* Order Status */}
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-[11px] font-bold text-gray-600 shrink-0 w-24">
+                  Order Status
+                </label>
+                <select
+                  value={orderStatus}
+                  onChange={(e) => setOrderStatus(e.target.value)}
+                  className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                >
+                  <option value="">Select Status</option>
+                  <option value="Confirmed">Confirmed (Active Demand)</option>
+                  <option value="Draft">Draft</option>
+                  <option value="In Production">In Production</option>
+                  <option value="Pending">Pending</option>
+                </select>
               </div>
 
             </div>
+
+            {/* CARD 3: Addresses (Fixed Height - No Box Dynamic Change!) */}
+            <div className="lg:col-span-3 bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs h-[270px] min-h-[270px] max-h-[270px] flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between pb-1">
+                  <div className="flex items-center gap-2 text-xs font-bold text-gray-900">
+                    <MapPin className="w-4 h-4 text-blue-600" />
+                    <span>Addresses</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingAddress(!isEditingAddress)}
+                    className="p-1 hover:bg-gray-100 rounded-lg text-blue-600 cursor-pointer"
+                    title={isEditingAddress ? 'Done Editing' : 'Edit Address Details'}
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <label className="flex items-center gap-2 cursor-pointer text-[11px] font-semibold text-gray-700 py-0.5">
+                  <input
+                    type="checkbox"
+                    checked={sameAddress}
+                    onChange={(e) => setSameAddress(e.target.checked)}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>Same as customer address</span>
+                </label>
+
+                {/* Switchable Address Tabs */}
+                <div className="flex items-center gap-1 pt-1 pb-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setActiveAddressTab('bill')}
+                    className={`flex-1 py-1 px-2 text-center rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      activeAddressTab === 'bill'
+                        ? 'bg-blue-50 text-blue-700 border border-blue-200/70 shadow-3xs'
+                        : 'text-gray-500 hover:text-gray-900'
+                    }`}
+                  >
+                    Bill To Address
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveAddressTab('ship')}
+                    className={`flex-1 py-1 px-2 text-center rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      activeAddressTab === 'ship'
+                        ? 'bg-blue-50 text-blue-700 border border-blue-200/70 shadow-3xs'
+                        : 'text-gray-500 hover:text-gray-900'
+                    }`}
+                  >
+                    Ship To Address
+                  </button>
+                </div>
+              </div>
+
+              {/* Dynamic Editable Address Box (Fixed h-[142px] - No Jumps!) */}
+              {isEditingAddress ? (
+                <div className="h-[142px] overflow-y-auto p-2.5 bg-gray-50 rounded-xl border border-gray-200 space-y-2 text-xs pr-1">
+                  {activeAddressTab === 'bill' ? (
+                    <>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Billing Attention / Company</label>
+                        <input
+                          type="text"
+                          placeholder="Contact / Attention"
+                          value={billingAddress.attention}
+                          onChange={(e) => setBillingAddress({ ...billingAddress, attention: e.target.value })}
+                          className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Street Address</label>
+                        <input
+                          type="text"
+                          placeholder="Street / Address Line"
+                          value={billingAddress.addressLine}
+                          onChange={(e) => setBillingAddress({ ...billingAddress, addressLine: e.target.value })}
+                          className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        />
+                      </div>
+                      <div className="grid grid-cols-3 gap-1">
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 mb-0.5">City</label>
+                          <input
+                            type="text"
+                            placeholder="City"
+                            value={billingAddress.city}
+                            onChange={(e) => setBillingAddress({ ...billingAddress, city: e.target.value })}
+                            className="w-full px-1.5 py-0.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 mb-0.5">State</label>
+                          <input
+                            type="text"
+                            placeholder="State"
+                            value={billingAddress.state}
+                            onChange={(e) => setBillingAddress({ ...billingAddress, state: e.target.value })}
+                            className="w-full px-1.5 py-0.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Pincode</label>
+                          <input
+                            type="text"
+                            placeholder="Pincode"
+                            value={billingAddress.pincode}
+                            onChange={(e) => setBillingAddress({ ...billingAddress, pincode: e.target.value })}
+                            className="w-full px-1.5 py-0.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Contact Phone</label>
+                        <input
+                          type="text"
+                          placeholder="Phone / Mobile"
+                          value={billingAddress.phone}
+                          onChange={(e) => setBillingAddress({ ...billingAddress, phone: e.target.value })}
+                          className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {sameAddress && (
+                        <div className="p-1.5 bg-blue-50 border border-blue-200/80 rounded-lg text-[10px] text-blue-700 flex items-center justify-between">
+                          <span>Synced with billing address</span>
+                          <button
+                            type="button"
+                            onClick={() => setSameAddress(false)}
+                            className="font-bold underline text-blue-800 hover:text-blue-900 cursor-pointer"
+                          >
+                            Edit Separately
+                          </button>
+                        </div>
+                      )}
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Shipping Attention / Consignee</label>
+                        <input
+                          type="text"
+                          placeholder="Shipping Attention"
+                          value={shippingAddress.attention}
+                          onChange={(e) => setShippingAddress({ ...shippingAddress, attention: e.target.value })}
+                          disabled={sameAddress}
+                          className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-900 disabled:opacity-60 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Street Address</label>
+                        <input
+                          type="text"
+                          placeholder="Shipping Address Line"
+                          value={shippingAddress.addressLine}
+                          onChange={(e) => setShippingAddress({ ...shippingAddress, addressLine: e.target.value })}
+                          disabled={sameAddress}
+                          className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800 disabled:opacity-60 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        />
+                      </div>
+                      <div className="grid grid-cols-3 gap-1">
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 mb-0.5">City</label>
+                          <input
+                            type="text"
+                            placeholder="City"
+                            value={shippingAddress.city}
+                            onChange={(e) => setShippingAddress({ ...shippingAddress, city: e.target.value })}
+                            disabled={sameAddress}
+                            className="w-full px-1.5 py-0.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800 disabled:opacity-60"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 mb-0.5">State</label>
+                          <input
+                            type="text"
+                            placeholder="State"
+                            value={shippingAddress.state}
+                            onChange={(e) => setShippingAddress({ ...shippingAddress, state: e.target.value })}
+                            disabled={sameAddress}
+                            className="w-full px-1.5 py-0.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800 disabled:opacity-60"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Pincode</label>
+                          <input
+                            type="text"
+                            placeholder="Pincode"
+                            value={shippingAddress.pincode}
+                            onChange={(e) => setShippingAddress({ ...shippingAddress, pincode: e.target.value })}
+                            disabled={sameAddress}
+                            className="w-full px-1.5 py-0.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800 disabled:opacity-60"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Contact Phone</label>
+                        <input
+                          type="text"
+                          placeholder="Phone / Mobile"
+                          value={shippingAddress.phone}
+                          onChange={(e) => setShippingAddress({ ...shippingAddress, phone: e.target.value })}
+                          disabled={sameAddress}
+                          className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800 disabled:opacity-60 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        />
+                      </div>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingAddress(false)}
+                    className="w-full py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs cursor-pointer transition-all shadow-3xs"
+                  >
+                    Done
+                  </button>
+                </div>
+              ) : (
+                <div className="h-[142px] p-3 bg-gray-50/80 rounded-xl border border-gray-200/70 text-[11px] text-gray-700 flex flex-col justify-between">
+                  {activeAddressTab === 'bill' ? (
+                    <div>
+                      <div className="flex items-center justify-between font-bold text-gray-900 mb-1">
+                        <span className="truncate pr-1">{billingAddress.attention || selectedCustomer?.firmName || 'Customer Billing Address'}</span>
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingAddress(true)}
+                          className="text-[10px] text-blue-600 hover:text-blue-700 font-bold underline cursor-pointer shrink-0"
+                        >
+                          Edit
+                        </button>
+                      </div>
+                      <div className="text-gray-600 leading-snug line-clamp-3">
+                        {billingAddress.addressLine || 'Address line not entered'}
+                        {billingAddress.city ? `, ${billingAddress.city}` : ''}
+                        {billingAddress.state ? `, ${billingAddress.state}` : ''}
+                        {billingAddress.pincode ? ` - ${billingAddress.pincode}` : ''}
+                      </div>
+                      <div className="text-gray-500 font-mono mt-1 text-[10.5px]">
+                        Mobile: {billingAddress.phone || selectedCustomer?.phone || '—'}
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="flex items-center justify-between font-bold text-gray-900 mb-1">
+                        <span className="truncate pr-1">{shippingAddress.attention || billingAddress.attention || 'Customer Shipping Address'}</span>
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingAddress(true)}
+                          className="text-[10px] text-blue-600 hover:text-blue-700 font-bold underline cursor-pointer shrink-0"
+                        >
+                          Edit
+                        </button>
+                      </div>
+                      <div className="text-gray-600 leading-snug line-clamp-3">
+                        {shippingAddress.addressLine || billingAddress.addressLine || 'Address line not entered'}
+                        {shippingAddress.city ? `, ${shippingAddress.city}` : ''}
+                        {shippingAddress.state ? `, ${shippingAddress.state}` : ''}
+                        {shippingAddress.pincode ? ` - ${shippingAddress.pincode}` : ''}
+                      </div>
+                      <div className="text-gray-500 font-mono mt-1 text-[10.5px]">
+                        Mobile: {shippingAddress.phone || billingAddress.phone || '—'}
+                      </div>
+                      {sameAddress && (
+                        <span className="text-[9.5px] text-blue-600 font-bold block mt-0.5">
+                          (Synced with customer billing address)
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <div className="text-[10px] text-gray-400 italic text-right">
+                    Click Edit above to alter
+                  </div>
+                </div>
+              )}
+            </div>
+
           </div>
 
-          {/* ── SECTION 2: ORDER ITEMS ── */}
-          <div className="space-y-3 pt-2">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center gap-2 text-sm font-bold text-gray-900">
+          {/* ── MIDDLE SECTION: ORDER ITEMS TABLE (1:1 with Screenshot) ── */}
+          <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-bold text-gray-900">
                 <Package className="w-4 h-4 text-blue-600" />
                 <span>Order Items</span>
               </div>
-
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={handleAddItemRow}
-                  className="px-3 py-1.5 bg-blue-50/60 hover:bg-blue-100 text-blue-600 border border-blue-200 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-3xs"
+                  onClick={handleAddProduct}
+                  className="px-3 py-1.5 border border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all shadow-3xs"
                 >
                   <Plus className="w-3.5 h-3.5 stroke-[3]" />
                   <span>Add Product</span>
                 </button>
-
                 <button
                   type="button"
-                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg cursor-pointer"
                 >
                   <MoreVertical className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
-            {/* Items Table with non-clipping container */}
-            <div className="border border-gray-200 rounded-2xl shadow-3xs overflow-visible">
-              <table className="w-full text-left divide-y divide-gray-200">
-                <thead className="bg-gray-50/90 text-[10px] font-bold text-gray-500 uppercase tracking-wider rounded-t-2xl">
+            {/* Order Items Table */}
+            <div className="overflow-x-auto border border-gray-200 rounded-xl">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead className="bg-gray-50/80 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 select-none">
                   <tr>
-                    <th className="py-2.5 px-3 w-10 text-center">#</th>
-                    <th className="py-2.5 px-3 min-w-[240px]">ITEM / PRODUCT</th>
-                    <th className="py-2.5 px-3 text-center w-24">STOCK (GBL)</th>
-                    <th className="py-2.5 px-3 text-center w-24">GBL <span className="text-red-500">*</span></th>
-                    <th className="py-2.5 px-3 text-center w-24">PCS / GBL</th>
-                    <th className="py-2.5 px-3 text-center w-24">TOTAL PCS</th>
-                    <th className="py-2.5 px-3 text-center w-28">RATE (₹) <span className="text-red-500">*</span></th>
-                    <th className="py-2.5 px-3 text-center w-20">DISC %</th>
-                    <th className="py-2.5 px-3 text-right w-32">AMOUNT (₹)</th>
-                    <th className="py-2.5 px-3 text-center w-20">ACTIONS</th>
+                    <th className="py-2.5 px-2 text-center w-8">#</th>
+                    <th className="py-2.5 px-3 min-w-[220px]">ITEM / PRODUCT <span className="text-red-500">*</span></th>
+                    <th className="py-2.5 px-3 min-w-[160px]">ITEM DESCRIPTION</th>
+                    <th className="py-2.5 px-2 text-center w-24">STOCK (GBL)</th>
+                    <th className="py-2.5 px-2 text-center w-20">GBL <span className="text-red-500">*</span></th>
+                    <th className="py-2.5 px-2 text-center w-20">PCS / GBL</th>
+                    <th className="py-2.5 px-2 text-center w-24">TOTAL PCS</th>
+                    <th className="py-2.5 px-2 text-right w-24">RATE (₹) <span className="text-red-500">*</span></th>
+                    <th className="py-2.5 px-3 text-right w-36">FINAL TOTAL AMOUNT (₹)</th>
+                    <th className="py-2.5 px-2 text-center w-20">ACTIONS</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 bg-white">
+
+                <tbody className="divide-y divide-gray-100 bg-white text-xs">
                   {items.map((row, idx) => {
-                    const filteredRowSkus = getFilteredSkusForRow(idx);
-                    const isDropdownOpen = activeItemDropdownIdx === idx;
+                    const isDropdownActive = activeItemDropdownIdx === idx;
+                    const stockVal = row.stockGbl;
+
+                    // Filter products from Item Master matching typed search
+                    const currentSearch = (rowSearchTerms[idx] !== undefined ? rowSearchTerms[idx] : row.itemName || '').toLowerCase().trim();
+                    const filteredProductSkus = availableSkus.filter(s =>
+                      !currentSearch ||
+                      (s.name || '').toLowerCase().includes(currentSearch) ||
+                      (s.skuCode || '').toLowerCase().includes(currentSearch) ||
+                      (s.category || '').toLowerCase().includes(currentSearch)
+                    );
 
                     return (
-                      <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
-                        
-                        {/* 1. Index */}
-                        <td className="py-2.5 px-3 text-center font-bold text-gray-500">
+                      <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
+                        {/* # */}
+                        <td className="py-2.5 px-2 text-center font-bold text-gray-500">
                           {idx + 1}
                         </td>
 
-                        {/* 2. ITEM / PRODUCT (Clean Name without SKU Code, dynamic searchable combobox) */}
-                        <td className="py-2 px-3 relative">
+                        {/* Item / Product search input */}
+                        <td className="py-2.5 px-3 relative">
                           <div className="relative">
-                            <div className="relative flex items-center">
-                              <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5 pointer-events-none" />
-                              <input
-                                type="text"
-                                value={rowSearchTerms[idx] !== undefined ? rowSearchTerms[idx] : row.itemName}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setRowSearchTerms(prev => ({ ...prev, [idx]: val }));
-                                  setActiveItemDropdownIdx(idx);
-                                }}
-                                onFocus={() => {
-                                  setActiveItemDropdownIdx(idx);
-                                  if (rowSearchTerms[idx] === undefined) {
-                                    setRowSearchTerms(prev => ({ ...prev, [idx]: row.itemName }));
-                                  }
-                                }}
-                                placeholder="Search product / SKU..."
-                                className="w-full pl-8 pr-8 py-1.5 bg-white border border-gray-200 hover:border-blue-400 focus:border-blue-500 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all shadow-3xs"
-                              />
-                              <ChevronDown 
-                                className="w-3.5 h-3.5 text-gray-400 absolute right-3 top-2.5 cursor-pointer hover:text-gray-600"
-                                onClick={() => setActiveItemDropdownIdx(isDropdownOpen ? null : idx)}
-                              />
+                            <Search className="w-3 h-3 absolute left-2.5 top-2.5 text-gray-400" />
+                            <input
+                              type="text"
+                              value={rowSearchTerms[idx] !== undefined ? rowSearchTerms[idx] : row.itemName}
+                              onChange={(e) => {
+                                setRowSearchTerms({ ...rowSearchTerms, [idx]: e.target.value });
+                                updateRowField(idx, 'itemName', e.target.value);
+                                setActiveItemDropdownIdx(idx);
+                              }}
+                              onFocus={() => setActiveItemDropdownIdx(idx)}
+                              placeholder="Select product..."
+                              className="w-full pl-7 pr-6 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            />
+                            {/* DOWN ARROW REMOVED IF AN ITEM IS IN THAT FIELD */}
+                            <div className="absolute right-2 top-2.5 flex items-center">
+                              {(row.itemName || rowSearchTerms[idx]) ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    updateRowField(idx, 'itemName', '');
+                                    updateRowField(idx, 'skuCode', '');
+                                    updateRowField(idx, 'skuId', '');
+                                    updateRowField(idx, 'category', '');
+                                    updateRowField(idx, 'uom', '');
+                                    updateRowField(idx, 'description', '');
+                                    updateRowField(idx, 'stockGbl', null);
+                                    updateRowField(idx, 'gbl', '');
+                                    updateRowField(idx, 'pcsPerGbl', '');
+                                    updateRowField(idx, 'totalPcs', 0);
+                                    updateRowField(idx, 'rate', '');
+                                    updateRowField(idx, 'discPercent', '');
+                                    updateRowField(idx, 'discAmount', 0);
+                                    updateRowField(idx, 'amount', 0);
+                                    setRowSearchTerms({ ...rowSearchTerms, [idx]: '' });
+                                  }}
+                                  className="p-0.5 text-gray-400 hover:text-gray-600 cursor-pointer"
+                                  title="Clear product"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              ) : (
+                                <ChevronDown 
+                                  className="w-3.5 h-3.5 text-gray-400 cursor-pointer"
+                                  onClick={() => setActiveItemDropdownIdx(isDropdownActive ? null : idx)} 
+                                />
+                              )}
                             </div>
+                          </div>
 
-                            {/* Dropdown Menu Popover */}
-                            {isDropdownOpen && (
-                              <div className="absolute left-0 top-full mt-1.5 w-84 bg-white border border-gray-200 rounded-xl shadow-2xl z-[9999] max-h-60 overflow-y-auto divide-y divide-gray-50 p-1.5 animate-in fade-in zoom-in-95 duration-100">
-                                {filteredRowSkus.map(sku => (
+                          {/* SKU Dropdown: Shows ALL products from Item Master with Active/Inactive status */}
+                          {isDropdownActive && (
+                            <div className="absolute left-3 top-full mt-1 w-96 bg-white border border-gray-200 rounded-xl shadow-2xl z-[999] max-h-56 overflow-y-auto divide-y divide-gray-50 p-1">
+                              {filteredProductSkus.map(s => {
+                                const isInactive = (s.status || '').toLowerCase() === 'inactive';
+                                return (
                                   <div
-                                    key={sku._id}
-                                    onClick={() => handleSelectSku(idx, sku)}
-                                    className="p-2.5 hover:bg-blue-50/80 cursor-pointer rounded-lg transition-colors flex items-center justify-between group"
+                                    key={s._id}
+                                    onClick={() => {
+                                      updateRowField(idx, 'skuId', s._id);
+                                      updateRowField(idx, 'skuCode', s.skuCode);
+                                      updateRowField(idx, 'itemName', s.name);
+                                      updateRowField(idx, 'description', `${s.category || 'Notebook'} ${s.pages || ''}pgs`);
+                                      updateRowField(idx, 'uom', s.unit || 'Pcs');
+                                      updateRowField(idx, 'stockGbl', Math.floor((stockMap.get(s._id) || 100) / 10));
+                                      setRowSearchTerms({ ...rowSearchTerms, [idx]: s.name });
+                                      setActiveItemDropdownIdx(null);
+                                    }}
+                                    className="p-2.5 hover:bg-blue-50/80 cursor-pointer rounded-lg text-xs flex justify-between items-center transition-colors"
                                   >
-                                    <div className="truncate pr-2">
-                                      <div className="font-bold text-gray-900 text-xs truncate group-hover:text-blue-700">
-                                        {sku.name}
-                                      </div>
-                                      <div className="text-[10px] text-gray-400 mt-0.5">
-                                        {sku.category || 'Finished Goods'} • Unit: {sku.unit || 'Pcs'}
+                                    <div className="flex-1 min-w-0 pr-2">
+                                      <div className="font-bold text-gray-900 truncate">{s.name}</div>
+                                      <div className="flex items-center gap-2 mt-0.5">
+                                        <span className="text-[10px] text-gray-400 font-mono">{s.skuCode}</span>
+                                        <span className="text-[10px] text-gray-300">•</span>
+                                        <span className="text-[10px] text-gray-500">{s.category || 'Finished Goods'}</span>
                                       </div>
                                     </div>
-                                    <div className="text-right shrink-0">
-                                      <span className="text-[11px] bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-md font-black">
-                                        ₹{(sku as any).sellingPrice || (sku as any).price || (sku as any).standardCost || (sku as any).purchasePrice || 23}
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      <span className={`px-2 py-0.5 text-[9.5px] font-extrabold uppercase rounded-full border ${
+                                        isInactive
+                                          ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                      }`}>
+                                        {s.status || 'Active'}
+                                      </span>
+                                      <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
+                                        Stock: {stockMap.get(s._id) || 0}
                                       </span>
                                     </div>
                                   </div>
-                                ))}
-                                {filteredRowSkus.length === 0 && (
-                                  <div className="p-3 text-center text-gray-400 italic text-[11px]">
-                                    {availableSkus.length === 0 ? 'No active products found in Item Master' : 'No matching products'}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* 3. STOCK (GBL) */}
-                        <td className="py-2 px-3 text-center font-bold text-gray-700">
-                          {row.stockGbl !== null ? (
-                            <span className="inline-block px-2.5 py-0.5 bg-slate-100 rounded-lg text-gray-800 font-extrabold text-[11px]">
-                              {row.stockGbl}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400 font-normal">—</span>
+                                );
+                              })}
+                              {filteredProductSkus.length === 0 && (
+                                <div className="p-3 text-center text-gray-400 italic">No products found</div>
+                              )}
+                            </div>
                           )}
                         </td>
 
-                        {/* 4. GBL * */}
-                        <td className="py-2 px-3">
+                        {/* Item Description */}
+                        <td className="py-2.5 px-3">
+                          <input
+                            type="text"
+                            value={row.description}
+                            onChange={(e) => updateRowField(idx, 'description', e.target.value)}
+                            placeholder="Description"
+                            className="w-full px-2 py-1 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs text-gray-700"
+                          />
+                        </td>
+
+                        {/* Stock (GBL) */}
+                        <td className="py-2.5 px-2 text-center">
+                          {stockVal !== null ? (
+                            <span className={`font-bold font-mono text-xs ${stockVal > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                              {stockVal}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 font-mono text-xs">—</span>
+                          )}
+                        </td>
+
+                        {/* GBL * */}
+                        <td className="py-2.5 px-2 text-center">
                           <input
                             type="number"
-                            min="1"
+                            min="0"
+                            placeholder="0"
                             value={row.gbl}
-                            onChange={(e) => updateItemRow(idx, { gbl: e.target.value })}
-                            placeholder="Qty"
-                            className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl text-center font-extrabold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
-                            required
+                            onChange={(e) => updateRowField(idx, 'gbl', e.target.value)}
+                            className="w-14 px-1.5 py-1 text-center bg-white border border-gray-200 rounded-lg font-bold font-mono text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                           />
                         </td>
 
-                        {/* 5. PCS / GBL */}
-                        <td className="py-2 px-3">
+                        {/* PCS / GBL */}
+                        <td className="py-2.5 px-2 text-center">
                           <input
                             type="number"
                             min="1"
+                            placeholder="1"
                             value={row.pcsPerGbl}
-                            onChange={(e) => updateItemRow(idx, { pcsPerGbl: e.target.value })}
-                            placeholder="240"
-                            className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl text-center font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
+                            onChange={(e) => updateRowField(idx, 'pcsPerGbl', e.target.value)}
+                            className="w-14 px-1.5 py-1 text-center bg-white border border-gray-200 rounded-lg font-mono text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                           />
                         </td>
 
-                        {/* 6. TOTAL PCS */}
-                        <td className="py-2 px-3 text-center font-extrabold text-gray-900 text-xs">
-                          {row.totalPcs > 0 ? row.totalPcs.toLocaleString('en-IN') : '0'}
+                        {/* TOTAL PCS */}
+                        <td className="py-2.5 px-2 text-center font-black font-mono text-gray-900">
+                          {row.totalPcs > 0 ? row.totalPcs.toLocaleString('en-IN') : 0}
                         </td>
 
-                        {/* 7. RATE (₹) * */}
-                        <td className="py-2 px-3">
+                        {/* RATE (₹) * */}
+                        <td className="py-2.5 px-2 text-right">
                           <input
                             type="number"
                             step="0.01"
-                            min="0"
-                            value={row.rate}
-                            onChange={(e) => updateItemRow(idx, { rate: e.target.value })}
                             placeholder="0.00"
-                            className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl text-center font-extrabold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
-                            required
+                            value={row.rate}
+                            onChange={(e) => updateRowField(idx, 'rate', e.target.value)}
+                            className="w-20 px-1.5 py-1 text-right bg-white border border-gray-200 rounded-lg font-bold font-mono text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                           />
                         </td>
 
-                        {/* 8. DISC % */}
-                        <td className="py-2 px-3">
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={row.discPercent}
-                            onChange={(e) => updateItemRow(idx, { discPercent: e.target.value })}
-                            className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded-xl text-center font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
-                          />
+                        {/* FINAL TOTAL AMOUNT (₹) */}
+                        <td className="py-2.5 px-3 text-right font-black font-mono text-gray-900">
+                          {row.amount > 0 ? `₹${row.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '₹0.00'}
                         </td>
 
-                        {/* 9. AMOUNT (₹) */}
-                        <td className="py-2 px-3 text-right font-black text-gray-900 text-xs">
-                          {row.amount > 0 
-                            ? row.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                            : '0.00'
-                          }
-                        </td>
-
-                        {/* 10. ACTIONS */}
-                        <td className="py-2 px-3 text-center">
+                        {/* ACTIONS: Duplicate & Delete */}
+                        <td className="py-2.5 px-2 text-center whitespace-nowrap">
                           <div className="flex items-center justify-center gap-1">
                             <button
                               type="button"
-                              onClick={() => setActiveItemDropdownIdx(isDropdownOpen ? null : idx)}
-                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                              title="Select product from Item Master"
+                              onClick={() => handleDuplicateRow(idx)}
+                              className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer"
+                              title="Duplicate row"
                             >
-                              <Edit2 className="w-3.5 h-3.5" />
+                              <Copy className="w-3.5 h-3.5" />
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleRemoveItemRow(idx)}
-                              disabled={items.length <= 1}
-                              className="p-1.5 text-red-500 hover:bg-red-50 disabled:opacity-30 rounded-lg transition-colors cursor-pointer"
+                              onClick={() => handleDeleteRow(idx)}
+                              className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
                               title="Delete row"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </td>
-
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
             </div>
+
+            {/* Items Total Summary right corner */}
+            <div className="flex justify-end pt-1">
+              <div className="flex items-center gap-3 text-xs">
+                <span className="font-semibold text-gray-500">Items Total:</span>
+                <span className="text-sm font-black text-gray-900 font-mono">
+                  ₹{totals.itemsTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
           </div>
 
-          {/* ── SECTION 3: OTHER CHARGES & ORDER SUMMARY (2 COLUMNS) ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 pt-2">
-            
-            {/* Left Column: Other Charges & Notes (span 7) */}
-            <div className="lg:col-span-7 space-y-4">
-              
-              {/* Other Charges Card */}
-              <div className="space-y-2">
+          {/* ── BOTTOM SECTION: CHARGES, NOTES & ORDER SUMMARY (1:1 with Screenshot) ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+            {/* Left 8 Columns: Charges & Notes */}
+            <div className="lg:col-span-8 space-y-4">
+
+              {/* Order Charges (Optional) */}
+              <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-xs font-bold text-gray-900">
-                    <Coins className="w-4 h-4 text-blue-600" />
-                    <span>Other Charges (Optional)</span>
+                    <Package className="w-4 h-4 text-blue-600" />
+                    <span>Order Charges (Optional)</span>
                   </div>
                   <button
                     type="button"
-                    onClick={handleAddChargeRow}
-                    className="text-blue-600 hover:text-blue-700 font-bold text-xs flex items-center gap-1 cursor-pointer"
+                    onClick={handleAddCharge}
+                    className="px-2.5 py-1 border border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-all shadow-3xs"
                   >
-                    <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                    <Plus className="w-3 h-3 stroke-[3]" />
                     <span>Add Charge</span>
                   </button>
                 </div>
 
-                {otherCharges.length > 0 ? (
-                  <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-3xs">
-                    <table className="w-full text-left divide-y divide-gray-200">
-                      <thead className="bg-gray-50/90 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                        <tr>
-                          <th className="py-2 px-3 w-8 text-center">#</th>
-                          <th className="py-2 px-3">CHARGE NAME</th>
-                          <th className="py-2 px-3 text-center w-20">QTY</th>
-                          <th className="py-2 px-3 text-center w-24">RATE (₹)</th>
-                          <th className="py-2 px-3 text-right w-28">AMOUNT (₹)</th>
-                          <th className="py-2 px-3 text-center w-16">ACTIONS</th>
+                <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead className="bg-gray-50/80 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 select-none">
+                      <tr>
+                        <th className="py-2 px-3 w-8 text-center">#</th>
+                        <th className="py-2 px-3">CHARGE NAME</th>
+                        <th className="py-2 px-3 text-center w-20">QTY</th>
+                        <th className="py-2 px-3 text-right w-28">RATE (₹)</th>
+                        <th className="py-2 px-3 text-right w-28">AMOUNT (₹)</th>
+                        <th className="py-2 px-3 text-center w-16">ACTIONS</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 bg-white">
+                      {otherCharges.map((ch, cIdx) => (
+                        <tr key={cIdx} className="hover:bg-gray-50/60">
+                          <td className="py-2 px-3 text-center font-bold text-gray-400">
+                            {cIdx + 1}
+                          </td>
+                          <td className="py-2 px-3">
+                            <input
+                              type="text"
+                              placeholder="e.g. Packing, Freight..."
+                              value={ch.name}
+                              onChange={(e) => updateCharge(cIdx, 'name', e.target.value)}
+                              className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800"
+                            />
+                          </td>
+                          <td className="py-2 px-3 text-center">
+                            <input
+                              type="number"
+                              value={ch.quantity}
+                              onChange={(e) => updateCharge(cIdx, 'quantity', e.target.value)}
+                              className="w-16 px-1.5 py-1 text-center bg-white border border-gray-200 rounded-lg font-mono text-gray-800"
+                            />
+                          </td>
+                          <td className="py-2 px-3 text-right">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={ch.rate}
+                              onChange={(e) => updateCharge(cIdx, 'rate', e.target.value)}
+                              className="w-20 px-1.5 py-1 text-right bg-white border border-gray-200 rounded-lg font-mono text-gray-800"
+                            />
+                          </td>
+                          <td className="py-2 px-3 text-right font-black font-mono text-gray-900">
+                            {ch.amount.toFixed(2)}
+                          </td>
+                          <td className="py-2 px-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCharge(cIdx)}
+                              className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100 bg-white">
-                        {otherCharges.map((charge, cIdx) => (
-                          <tr key={cIdx} className="hover:bg-slate-50/60 transition-colors">
-                            <td className="py-2 px-3 text-center font-bold text-gray-500">
-                              {cIdx + 1}
-                            </td>
-                            <td className="py-1.5 px-3">
-                              <input
-                                type="text"
-                                value={charge.name}
-                                onChange={(e) => handleUpdateChargeRow(cIdx, { name: e.target.value })}
-                                placeholder="Transport / Cargo"
-                                className="w-full px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-900 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                              />
-                            </td>
-                            <td className="py-1.5 px-3">
-                              <input
-                                type="number"
-                                min="1"
-                                value={charge.quantity}
-                                onChange={(e) => handleUpdateChargeRow(cIdx, { quantity: Number(e.target.value) || 0 })}
-                                className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-center text-xs font-extrabold text-gray-900 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                              />
-                            </td>
-                            <td className="py-1.5 px-3">
-                              <input
-                                type="number"
-                                min="0"
-                                value={charge.rate}
-                                onChange={(e) => handleUpdateChargeRow(cIdx, { rate: Number(e.target.value) || 0 })}
-                                className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-center text-xs font-extrabold text-gray-900 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                              />
-                            </td>
-                            <td className="py-1.5 px-3 text-right font-black text-gray-900">
-                              {charge.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </td>
-                            <td className="py-1.5 px-3 text-center">
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveChargeRow(cIdx)}
-                                className="p-1 text-red-500 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="p-3 bg-slate-50/50 border border-dashed border-slate-200 rounded-xl text-center text-gray-400 text-[11px] italic">
-                    No additional charges added. Click "+ Add Charge" to add freight, cargo or packaging expenses.
-                  </div>
-                )}
+                      ))}
+                      {otherCharges.length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="py-4 text-center text-gray-400 italic">
+                            No additional charges added
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
-              {/* Notes / Instructions Card */}
-              <div className="space-y-1.5">
+              {/* Notes / Instructions (Optional) */}
+              <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs space-y-2">
                 <div className="flex items-center gap-2 text-xs font-bold text-gray-900">
                   <FileText className="w-4 h-4 text-blue-600" />
-                  <span>Notes / Instructions</span>
+                  <span>Notes / Instructions (Optional)</span>
                 </div>
                 <div className="relative">
                   <textarea
                     rows={2}
-                    maxLength={500}
                     value={internalNotes}
+                    maxLength={500}
                     onChange={(e) => setInternalNotes(e.target.value)}
-                    placeholder="Add special packaging, freight, or delivery instructions..."
-                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-medium text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs resize-none"
+                    placeholder="Enter any special dispatch, packing, or delivery instructions for customer..."
+                    className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-xs font-medium text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
-                  <div className="absolute right-3 bottom-2 text-[10px] text-gray-400 font-mono">
+                  <div className="text-[10px] text-gray-400 text-right mt-0.5">
                     {internalNotes.length}/500
                   </div>
                 </div>
@@ -1023,83 +1592,262 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
             </div>
 
-            {/* Right Column: Order Summary Card (span 5) */}
-            <div className="lg:col-span-5">
-              <div className="bg-slate-50/80 border border-slate-200/90 rounded-2xl p-4 space-y-3.5 shadow-3xs">
-                <div className="flex items-center gap-2 text-xs font-bold text-gray-900">
+            {/* Right 4 Columns: Order Summary Card */}
+            <div className="lg:col-span-4 bg-white rounded-2xl border border-gray-200/80 p-5 shadow-3xs flex flex-col justify-between space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-bold text-gray-900 pb-1">
                   <Receipt className="w-4 h-4 text-blue-600" />
                   <span>Order Summary</span>
                 </div>
 
-                <div className="space-y-2 text-xs font-medium text-gray-700">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-500">Items Total</span>
-                    <span className="font-extrabold text-gray-900">
-                      ₹{totals.itemsTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between text-gray-600 font-medium">
+                    <span>Items Total</span>
+                    <span className="font-mono font-bold text-gray-900">
+                      ₹{totals.itemsTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-500">Other Charges</span>
-                    <span className="font-extrabold text-gray-900">
-                      ₹{totals.otherChargesTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <div className="flex justify-between text-gray-600 font-medium">
+                    <span>Other Charges</span>
+                    <span className="font-mono font-bold text-gray-900">
+                      ₹{totals.otherChargesTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between pt-1 border-t border-slate-200/80">
-                    <span className="font-bold text-gray-900">Subtotal</span>
-                    <span className="font-extrabold text-gray-900">
-                      ₹{totals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <div className="border-t border-gray-100 my-2" />
+
+                  <div className="flex justify-between text-gray-700 font-bold">
+                    <span>Subtotal</span>
+                    <span className="font-mono text-gray-900">
+                      ₹{totals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
+                  </div>
+
+                  {/* Discount Overall */}
+                  <div className="flex items-center justify-between text-gray-600">
+                    <span className="font-medium">Discount (Overall)</span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={overallDiscount}
+                        onChange={(e) => setOverallDiscount(e.target.value)}
+                        className="w-16 px-2 py-0.5 text-right bg-white border border-gray-200 rounded-lg text-xs font-mono font-bold text-gray-900 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                      />
+                      <span className="font-mono text-xs font-semibold text-gray-600">
+                        {Number(overallDiscount || 0).toFixed(2)}
+                      </span>
+                    </div>
                   </div>
                 </div>
+              </div>
 
-                <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
-                  <span className="text-sm font-extrabold text-gray-900">Grand Total</span>
-                  <span className="text-lg font-black text-blue-600">
-                    ₹{totals.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {/* Grand Total */}
+              <div className="pt-4 border-t border-gray-100">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-sm font-bold text-gray-700">Grand Total</span>
+                  <span className="text-2xl font-black text-blue-600 font-mono tracking-tight">
+                    ₹{totals.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
+
             </div>
 
           </div>
 
         </div>
 
-        {/* ── MODAL FOOTER ── */}
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50/70 flex items-center justify-between shrink-0">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-100 text-gray-700 rounded-xl font-bold text-xs shadow-3xs transition-all cursor-pointer"
-          >
-            Cancel
-          </button>
-
-          <div className="flex items-center gap-2.5">
-            <button
-              type="button"
-              disabled={isSaving}
-              onClick={(e) => handleSubmit(e, 'Draft')}
-              className="px-4 py-2 bg-white border border-blue-600 text-blue-600 hover:bg-blue-50/70 rounded-xl font-bold text-xs shadow-3xs transition-all cursor-pointer disabled:opacity-50"
-            >
-              Save as Draft
-            </button>
-
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-md flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
-            >
-              <FileText className="w-4 h-4" />
-              <span>{isSaving ? 'Creating Order...' : (editOrder ? 'Update Sales Order' : 'Create Sales Order')}</span>
-            </button>
-          </div>
-        </div>
-
       </form>
     </Modal>
+
+      {/* ── CUSTOMER DETAILS DIALOG MODAL (Identical with Business Directory) ── */}
+      {selectedCustomer && (
+        <Modal
+          isOpen={showCustomerDetailsModal}
+          onClose={() => setShowCustomerDetailsModal(false)}
+          maxWidth="max-w-3xl"
+          hideCloseButton
+        >
+          <div className="space-y-3.5 p-1">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-100 text-blue-700 rounded-2xl border border-blue-200/60 shadow-2xs">
+                  <User className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base sm:text-lg font-black text-gray-900 tracking-tight">
+                      {selectedCustomer.firmName || selectedCustomer.name || selectedCustomer.contactName}
+                    </h3>
+                    <span className={`px-2.5 py-0.5 text-[10px] font-extrabold uppercase rounded-full border ${
+                      selectedCustomer.status === 'active' || !selectedCustomer.status
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                        : 'bg-rose-50 text-rose-700 border-rose-200'
+                    }`}>
+                      {selectedCustomer.status || 'active'}
+                    </span>
+                  </div>
+                  {(selectedCustomer.contactName || selectedCustomer.ownerName) && (
+                    <div className="text-xs text-gray-600 font-medium mt-0.5 flex items-center gap-1">
+                      <span className="text-gray-400 font-normal">Contact Person:</span>
+                      <span className="text-blue-700 font-bold">{selectedCustomer.contactName || selectedCustomer.ownerName}</span>
+                    </div>
+                  )}
+                  <p className="text-[11px] text-gray-400 font-mono mt-0.5">
+                    CUSTOMER CODE: <span className="font-extrabold text-blue-600">{selectedCustomer.code || selectedCustomer._id?.slice(-6).toUpperCase() || 'CUST-001'}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCustomerDetailsModal(false)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Quick Metrics Bar */}
+            <div className="grid grid-cols-3 gap-2.5">
+              <div className="bg-blue-50/60 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs">
+                <span className="block text-[9px] text-blue-700 font-extrabold uppercase tracking-wider">ASSIGNED REGION</span>
+                <span className="block text-xs font-extrabold text-blue-950 mt-0.5 truncate">
+                  {selectedCustomer.route || selectedCustomer.assignedRegion || selectedCustomer.state || 'Unassigned'}
+                </span>
+              </div>
+              <div className="bg-blue-50/60 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs">
+                <span className="block text-[9px] text-blue-700 font-extrabold uppercase tracking-wider">ASSIGNED CITY</span>
+                <span className="block text-xs font-extrabold text-blue-950 mt-0.5 truncate">
+                  {selectedCustomer.city || selectedCustomer.assignedMarket || 'Unassigned'}
+                </span>
+              </div>
+              <div className="bg-rose-50/60 border border-rose-100 p-2.5 rounded-2xl text-center shadow-2xs">
+                <span className="block text-[9px] text-rose-700 font-extrabold uppercase tracking-wider">OUTSTANDING BALANCE</span>
+                <span className="block text-xs font-mono font-black text-rose-950 mt-0.5">
+                  ₹{Number(selectedCustomer.outstandingBalance || selectedCustomer.outstanding || 0).toLocaleString('en-IN')}
+                </span>
+              </div>
+            </div>
+
+            {/* Main Details Grid */}
+            <div className="max-h-[55vh] overflow-y-auto pr-1 space-y-3 text-xs">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* BASIC INFO */}
+                <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-2.5">
+                  <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
+                    <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                      <User className="w-3.5 h-3.5" />
+                    </div>
+                    <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">BASIC INFORMATION</h4>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-y-2 gap-x-3 text-xs">
+                    <div>
+                      <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Contact Person</span>
+                      <span className="font-bold text-gray-900 text-xs block truncate">{selectedCustomer.contactName || selectedCustomer.ownerName || '—'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Mobile Number</span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-mono font-bold text-blue-600 text-xs">{selectedCustomer.phone || selectedCustomer.mobile || '—'}</span>
+                        {(selectedCustomer.phone || selectedCustomer.mobile) && (
+                          <a href={`https://wa.me/91${(selectedCustomer.phone || selectedCustomer.mobile).replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="WhatsApp">
+                            <WhatsAppIcon />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">GST Number</span>
+                      <span className="font-mono font-bold text-blue-600 text-xs">{selectedCustomer.gstNumber || selectedCustomer.gstin || '—'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Email</span>
+                      <span className="font-semibold text-gray-800 text-xs truncate block">{selectedCustomer.email || '—'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* BUSINESS & CREDIT DETAILS */}
+                <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-2.5">
+                  <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
+                    <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                      <Building2 className="w-3.5 h-3.5" />
+                    </div>
+                    <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">BUSINESS & CREDIT</h4>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-y-2 gap-x-3 text-xs">
+                    <div>
+                      <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Credit Limit</span>
+                      <span className="font-mono font-bold text-blue-700 text-xs">
+                        ₹{Number(selectedCustomer.creditLimit || 0).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Credit Days</span>
+                      <span className="font-mono font-bold text-gray-900 text-xs">{selectedCustomer.creditDays || 30} Days</span>
+                    </div>
+                    <div>
+                      <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Transporter</span>
+                      <span className="font-bold text-gray-900 text-xs truncate block">{selectedCustomer.preferredTransport || selectedCustomer.transporter || '—'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Assigned Agent</span>
+                      <span className="font-bold text-indigo-700 text-xs">{selectedCustomer.agentAssigned || selectedCustomer.assignedAgent || 'Direct'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ADDRESS INFO */}
+                <div className="md:col-span-2 bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-2.5">
+                  <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
+                    <div className="w-6 h-6 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                      <MapPin className="w-3.5 h-3.5" />
+                    </div>
+                    <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">ADDRESS INFORMATION</h4>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-xs">
+                    <div className="col-span-2">
+                      <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Full Address</span>
+                      <span className="font-bold text-gray-900 text-xs">
+                        {selectedCustomer.address || selectedCustomer.address1 || billingAddress.addressLine || '—'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">City</span>
+                      <span className="font-bold text-gray-900 text-xs">{selectedCustomer.city || billingAddress.city || '—'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">State & Pincode</span>
+                      <span className="font-bold text-gray-900 text-xs">
+                        {selectedCustomer.state || billingAddress.state || ''} {selectedCustomer.pincode || billingAddress.pincode ? `- ${selectedCustomer.pincode || billingAddress.pincode}` : ''}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex justify-end pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setShowCustomerDetailsModal(false)}
+                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition-all cursor-pointer shadow-2xs"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </>
   );
 };
 

@@ -59,8 +59,13 @@ export interface SalesOrderV2 {
   roundOff?: number;
   grandTotal: number;
   materialsStatus: 'Ready' | 'Shortfall' | 'Done';
-  fulfillmentStatus: 'Not Started' | 'Partial' | 'Fulfilled';
-  status: 'Draft' | 'Confirmed' | 'In Production' | 'Partially Delivered' | 'Delivered' | 'Invoiced' | 'Cancelled';
+  fulfillmentStatus?: 'Not Started' | 'Partial' | 'Fulfilled' | 'Pending' | 'Partially Dispatched' | 'Fully Dispatched' | 'In Production' | string;
+  status: 'Draft' | 'Confirmed' | 'In Production' | 'Partially Delivered' | 'Delivered' | 'Invoiced' | 'Cancelled' | string;
+  customerPhone?: string;
+  city?: string;
+  region?: string;
+  agent?: string;
+  orderType?: 'Credit' | 'Cash';
   isTemplate?: boolean;
   isLegacy?: boolean;
   createdAt?: string;

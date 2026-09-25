@@ -167,6 +167,11 @@ const salesOrderV2Schema = new mongoose.Schema({
     type: String,
     default: ""
   },
+  orderType: {
+    type: String,
+    enum: ["Credit", "Cash"],
+    default: "Credit"
+  },
   otherCharges: {
     type: Array,
     default: []
@@ -191,8 +196,8 @@ const salesOrderV2Schema = new mongoose.Schema({
   },
   fulfillmentStatus: {
     type: String,
-    enum: ["Not Started", "Partial", "Fulfilled"],
-    default: "Not Started"
+    enum: ["Not Started", "Partial", "Fulfilled", "Pending", "Partially Dispatched", "Fully Dispatched", "In Production"],
+    default: "Pending"
   },
   status: {
     type: String,
