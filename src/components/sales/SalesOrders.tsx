@@ -605,9 +605,24 @@ const SalesOrders: React.FC = () => {
               >
                 <CheckCircle className={`w-4 h-4 ${statusFilter === 'Confirmed' ? 'text-teal-700' : 'text-slate-400'}`} />
                 <span>Confirmed</span>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800">{orders.filter(o => o.status === 'Confirmed').length}</span>
               </button>
 
-              {/* Tab 3: Draft / Pending */}
+              {/* Tab 3: Pending */}
+              <button
+                onClick={() => { setStatusFilter('Pending'); }}
+                className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+                  statusFilter === 'Pending'
+                    ? 'border-teal-700 text-teal-700 bg-transparent'
+                    : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
+                }`}
+              >
+                <Clock className={`w-4 h-4 ${statusFilter === 'Pending' ? 'text-teal-700' : 'text-slate-400'}`} />
+                <span>Pending</span>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-800">{metrics.pendingCount}</span>
+              </button>
+
+              {/* Tab 4: Draft */}
               <button
                 onClick={() => { setStatusFilter('Draft'); }}
                 className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
@@ -616,21 +631,9 @@ const SalesOrders: React.FC = () => {
                     : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
                 }`}
               >
-                <Clock className={`w-4 h-4 ${statusFilter === 'Draft' ? 'text-teal-700' : 'text-slate-400'}`} />
-                <span>Draft / Pending</span>
-              </button>
-
-              {/* Tab 4: Cancelled */}
-              <button
-                onClick={() => { setStatusFilter('Cancelled'); }}
-                className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
-                  statusFilter === 'Cancelled'
-                    ? 'border-teal-700 text-teal-700 bg-transparent'
-                    : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
-                }`}
-              >
-                <Ban className={`w-4 h-4 ${statusFilter === 'Cancelled' ? 'text-teal-700' : 'text-slate-400'}`} />
-                <span>Cancelled</span>
+                <FileText className={`w-4 h-4 ${statusFilter === 'Draft' ? 'text-teal-700' : 'text-slate-400'}`} />
+                <span>Draft</span>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700">{metrics.draftCount}</span>
               </button>
             </div>
 
@@ -697,12 +700,12 @@ const SalesOrders: React.FC = () => {
             </div>
           </div>
 
-          {/* 3. Statistics Cards (4 Cards Grid - Matching Purchase Batches UI) */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* 3. Statistics Cards (5 Cards Grid) */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
             {/* Card 1: TOTAL ORDERS */}
             <button
               onClick={() => { setStatusFilter('all'); }}
-              className={`w-full text-left rounded-2xl shadow-2xs border p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
+              className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
                 statusFilter === 'all' 
                   ? 'bg-blue-50/40 border-blue-400 ring-2 ring-blue-100' 
                   : 'bg-white border-gray-200/80 hover:border-gray-300'
@@ -718,37 +721,53 @@ const SalesOrders: React.FC = () => {
             {/* Card 2: CONFIRMED ORDERS */}
             <button
               onClick={() => { setStatusFilter('Confirmed'); }}
-              className={`w-full text-left rounded-2xl shadow-2xs border p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
+              className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
                 statusFilter === 'Confirmed' 
                   ? 'bg-emerald-50/40 border-emerald-400 ring-2 ring-emerald-100' 
                   : 'bg-white border-gray-200/80 hover:border-gray-300'
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Confirmed Orders</span>
+                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Confirmed</span>
                 <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
               </div>
-              <p className="text-2xl font-black text-emerald-600 mt-1 font-mono">{metrics.pendingCount + metrics.partialCount + metrics.fullyCount}</p>
+              <p className="text-2xl font-black text-emerald-600 mt-1 font-mono">{orders.filter(o => o.status === 'Confirmed').length}</p>
             </button>
 
-            {/* Card 3: PENDING / DRAFT ORDERS */}
+            {/* Card 3: PENDING ORDERS */}
             <button
-              onClick={() => { setStatusFilter('Draft'); }}
-              className={`w-full text-left rounded-2xl shadow-2xs border p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
-                statusFilter === 'Draft' 
+              onClick={() => { setStatusFilter('Pending'); }}
+              className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
+                statusFilter === 'Pending' 
                   ? 'bg-amber-50/40 border-amber-400 ring-2 ring-amber-100' 
                   : 'bg-white border-gray-200/80 hover:border-gray-300'
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Draft / Pending</span>
+                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Pending</span>
                 <span className="w-2 h-2 rounded-full bg-amber-500"></span>
               </div>
-              <p className="text-2xl font-black text-amber-600 mt-1 font-mono">{metrics.draftCount}</p>
+              <p className="text-2xl font-black text-amber-600 mt-1 font-mono">{metrics.pendingCount}</p>
             </button>
 
-            {/* Card 4: TOTAL VALUE */}
-            <div className="w-full text-left rounded-2xl shadow-2xs border p-4 bg-white border-gray-200/80">
+            {/* Card 4: DRAFT ORDERS */}
+            <button
+              onClick={() => { setStatusFilter('Draft'); }}
+              className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
+                statusFilter === 'Draft' 
+                  ? 'bg-slate-100/60 border-slate-400 ring-2 ring-slate-100' 
+                  : 'bg-white border-gray-200/80 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Draft</span>
+                <span className="w-2 h-2 rounded-full bg-slate-500"></span>
+              </div>
+              <p className="text-2xl font-black text-slate-700 mt-1 font-mono">{metrics.draftCount}</p>
+            </button>
+
+            {/* Card 5: TOTAL VALUE */}
+            <div className="w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 bg-white border-gray-200/80">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Total Value</span>
                 <span className="w-2 h-2 rounded-full bg-purple-600"></span>
