@@ -1368,8 +1368,14 @@ const SalesOrders: React.FC = () => {
             }
             return [saved, ...prev];
           });
-          // Show the success page (replaces toast)
-          setSuccessOrder(saved);
+
+          // For Draft sale orders: throw plain notification, do not show success page
+          if (saved.status === 'Draft') {
+            showToast(`Draft Sales Order ${saved.orderNumber} saved successfully`, 'success');
+          } else {
+            // Show the success page for confirmed / regular orders
+            setSuccessOrder(saved);
+          }
         }}
       />
 
