@@ -557,7 +557,32 @@ const SalesOrders: React.FC = () => {
       <div className="transition-all duration-300">
         <div className="space-y-4">
           
-          {/* 1. Header Banner (Matching Purchase Batches Header Banner exactly) */}
+          {/* ── IN-PAGE SUCCESS PAGE (Exact match to Screenshot 1:1) ── */}
+          {successOrder && !printEstimationOrder ? (
+            <SalesOrderSuccessModal
+              order={successOrder}
+              onClose={() => setSuccessOrder(null)}
+              onViewOrder={(ord) => {
+                setSuccessOrder(null);
+                setSelectedOrderDetail(ord);
+              }}
+              onPrintOrder={(ord) => {
+                setPrintEstimationOrder(ord);
+              }}
+              onCreateNew={() => {
+                setSuccessOrder(null);
+                setEditingOrder(null);
+                setShowDrawer(true);
+              }}
+              onGoToOrders={() => {
+                setSuccessOrder(null);
+                setStatusFilter('all');
+                setSearch('');
+              }}
+            />
+          ) : (
+            <>
+              {/* 1. Header Banner (Matching Purchase Batches Header Banner exactly) */}
           <div className="flex flex-row items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs relative">
             <div className="flex items-center gap-3.5">
               <div className="p-3 bg-blue-100/80 text-blue-700 rounded-2xl shadow-2xs">
@@ -1362,6 +1387,8 @@ const SalesOrders: React.FC = () => {
       </div>
         </>
       )}
+            </>
+          )}
 
       {/* ── CREATE / EDIT SALES ORDER MODAL FORM (Existing UI Preserved) ── */}
       <SalesOrderDrawerV2
@@ -1502,30 +1529,6 @@ const SalesOrders: React.FC = () => {
         </div>
       )}
 
-      {/* ── ORDER CREATION SUCCESS MODAL ── */}
-      {successOrder && !printEstimationOrder && (
-        <SalesOrderSuccessModal
-          order={successOrder}
-          onClose={() => setSuccessOrder(null)}
-          onViewOrder={(ord) => {
-            setSuccessOrder(null);
-            setSelectedOrderDetail(ord);
-          }}
-          onPrintOrder={(ord) => {
-            setPrintEstimationOrder(ord);
-          }}
-          onCreateNew={() => {
-            setSuccessOrder(null);
-            setEditingOrder(null);
-            setShowDrawer(true);
-          }}
-          onGoToOrders={() => {
-            setSuccessOrder(null);
-            setStatusFilter('all');
-            setSearch('');
-          }}
-        />
-      )}
 
       {/* ── PRINT ORDER ESTIMATION (from success page) ── */}
       {printEstimationOrder && (
