@@ -414,7 +414,11 @@ const PurchaseInvoicePage: React.FC = () => {
     quantity: ''
   });
   const [selectedReelsForAllocation, setSelectedReelsForAllocation] = useState<any[]>([]);
-  const [allocationsList, setAllocationsList] = useState<{ toLocationId: string; quantity: string; reels: any[] }[]>([]);
+  const [allocationsList, setAllocationsList] = useState<{ toLocationId: string; quantity: string; reels: any[] }[]>([
+    { toLocationId: '', quantity: '', reels: [] }
+  ]);
+  const [activeReelPickerRowIdx, setActiveReelPickerRowIdx] = useState<number | null>(null);
+  const [reelSearchText, setReelSearchText] = useState<string>('');
   const [splittingItemIdx, setSplittingItemIdx] = useState<number | null>(null);
   const [splitDraftLocId, setSplitDraftLocId] = useState<string>('');
   const [tempSplits, setTempSplits] = useState<{ locationId: string; quantity: string }[]>([]);
@@ -1660,29 +1664,23 @@ const PurchaseInvoicePage: React.FC = () => {
       : lotItem.locationId;
 
     // Build the list of rows to allocate
-    let itemsToAllocate: { toLocationId: string; quantity: number; reels: any[] }[] = [];
-    if (allocationsList.length > 0) {
-      itemsToAllocate = allocationsList.map(a => ({
-        toLocationId: a.toLocationId,
-        quantity: Number(a.quantity) || 0,
-        reels: a.reels
-      }));
-    } else {
-      const qty = Number(allocateForm.quantity);
-      if (isNaN(qty) || qty <= 0) {
-        setAllocateError('Please enter a valid allocation quantity or add items to the list first.');
-        return;
-      }
-      if (!allocateForm.toLocationId) {
-        setAllocateError('Please select a destination storage area');
-        return;
-      }
-      itemsToAllocate = [{
-        toLocationId: allocateForm.toLocationId,
-        quantity: qty,
-        reels: selectedReelsForAllocation
-      }];
+    const validRows = allocationsList.filter(a => a.toLocationId && Number(a.quantity) > 0);
+    if (validRows.length === 0) {
+      setAllocateError('Please select at least one destination Godown and enter a valid quantity.');
+      return;
     }
+
+    const missingGodownRow = allocationsList.findIndex(a => Number(a.quantity) > 0 && !a.toLocationId);
+    if (missingGodownRow !== -1) {
+      setAllocateError(`Row #${missingGodownRow + 1} has quantity entered but no Godown selected.`);
+      return;
+    }
+
+    const itemsToAllocate = validRows.map(a => ({
+      toLocationId: a.toLocationId,
+      quantity: Number(a.quantity) || 0,
+      reels: a.reels || []
+    }));
 
     setAllocateSubmitting(true);
     try {
@@ -1704,7 +1702,8 @@ const PurchaseInvoicePage: React.FC = () => {
       setShowAllocateModal(false);
       setAllocateForm({ itemIndex: 0, toLocationId: '', quantity: '' });
       setSelectedReelsForAllocation([]);
-      setAllocationsList([]);
+      setAllocationsList([{ toLocationId: '', quantity: '', reels: [] }]);
+      setActiveReelPickerRowIdx(null);
       loadBalances();
     } catch (err: any) {
       console.error(err);
@@ -4038,6 +4037,8 @@ const PurchaseInvoicePage: React.FC = () => {
         const selectedSkuId = lotItem ? (typeof lotItem.skuId === 'object' && lotItem.skuId !== null ? (lotItem.skuId as any)._id : lotItem.skuId) : '';
         const selectedSku = skus.find(s => s._id === selectedSkuId) || (lotItem && typeof lotItem.skuId === 'object' ? (lotItem.skuId as any) : null);
         const stdSheetsPerReam = selectedSku?.pages || 500;
+        const unitLabel = selectedSku?.paperType === 'Sheets' ? 'Sheets' : (selectedSku?.unit || 'KG');
+        const defaultLocName = locations.find(l => String(l._id) === String(defaultLocationId))?.name || 'Inward Receiving Bay';
         
         // Find remaining unallocated quantity at default location
         const unallocatedBal = inventoryBalances.find(
@@ -4046,316 +4047,529 @@ const PurchaseInvoicePage: React.FC = () => {
                (b.sku?._id || b.skuId) === selectedSkuId
         );
         const maxAllocatable = unallocatedBal ? unallocatedBal.onHand : 0;
+        const availableReels: any[] = unallocatedBal?.reels || [];
+        const hasReels = availableReels.length > 0;
 
-        const physicalLocations = locations.filter(loc => loc.level === 'Storage Location' && loc._id !== defaultLocationId);
-        const hasReels = unallocatedBal && unallocatedBal.reels && unallocatedBal.reels.length > 0;
+        // Ensure allocationsList has at least one row
+        const currentList = allocationsList.length > 0 ? allocationsList : [{ toLocationId: '', quantity: '', reels: [] }];
 
-        const handleReelToggle = (reel: any) => {
-          let newSelected = [...selectedReelsForAllocation];
-          if (newSelected.some(r => r.reelNumber === reel.reelNumber)) {
-            newSelected = newSelected.filter(r => r.reelNumber !== reel.reelNumber);
-          } else {
-            newSelected.push(reel);
-          }
-          setSelectedReelsForAllocation(newSelected);
-          const sumWeight = newSelected.reduce((sum, r) => sum + r.weight, 0);
-          setAllocateForm(prev => ({ ...prev, quantity: sumWeight > 0 ? String(sumWeight) : '' }));
+        const handleAddRow = () => {
+          setAllocationsList(prev => [...prev, { toLocationId: '', quantity: '', reels: [] }]);
         };
 
-        return typeof document !== 'undefined' ? createPortal(
-          <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={() => !allocateSubmitting && setShowAllocateModal(false)} />
+        const handleRemoveRow = (index: number) => {
+          if (allocationsList.length <= 1) {
+            setAllocationsList([{ toLocationId: '', quantity: '', reels: [] }]);
+          } else {
+            setAllocationsList(prev => prev.filter((_, i) => i !== index));
+          }
+        };
 
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-xl max-w-lg w-full relative z-10 animate-in zoom-in-95 duration-150 overflow-hidden flex flex-col max-h-[85vh]">
-              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
-                <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
-                  <MapPinIcon className="w-4 h-4 text-blue-600 animate-pulse" />
-                  Allocate Location & Reels
-                </h2>
+        const handleUpdateRow = (index: number, field: string, value: any) => {
+          const updated = [...currentList];
+          updated[index] = { ...updated[index], [field]: value };
+          if (field === 'reels') {
+            const reelsList = value || [];
+            const sumWt = reelsList.reduce((s: number, r: any) => s + (Number(r.weight || r.weightKg || r.netWeight) || 0), 0);
+            updated[index].quantity = sumWt > 0 ? String(sumWt) : '';
+          }
+          setAllocationsList(updated);
+        };
+
+        const handleDistributeEvenly = () => {
+          if (currentList.length === 0 || maxAllocatable <= 0) return;
+          const count = currentList.length;
+          const perRow = Math.floor((maxAllocatable / count) * 100) / 100;
+          const remainder = Math.round((maxAllocatable - (perRow * count)) * 100) / 100;
+          const updated = currentList.map((row, i) => ({
+            ...row,
+            quantity: String(i === 0 ? perRow + remainder : perRow)
+          }));
+          setAllocationsList(updated);
+        };
+
+        const handleAllocateRemaining = () => {
+          const curTotal = currentList.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
+          const rem = Math.max(0, maxAllocatable - curTotal);
+          if (rem <= 0) return;
+
+          const emptyIdx = currentList.findIndex(r => !r.quantity || Number(r.quantity) === 0);
+          if (emptyIdx !== -1) {
+            handleUpdateRow(emptyIdx, 'quantity', String(rem));
+          } else {
+            setAllocationsList([...currentList, { toLocationId: '', quantity: String(rem), reels: [] }]);
+          }
+        };
+
+        const totalAllocated = currentList.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
+        const remainingBalance = Math.round((maxAllocatable - totalAllocated) * 1000) / 1000;
+        const isOverallocated = remainingBalance < -0.001;
+        const isFullyAllocated = Math.abs(remainingBalance) <= 0.001 && totalAllocated > 0;
+        const hasValidAllocations = currentList.some(r => r.toLocationId && Number(r.quantity) > 0);
+
+        return typeof document !== 'undefined' ? createPortal(
+          <div className="fixed inset-0 z-[100000] flex items-center justify-center p-3 sm:p-5 pointer-events-none">
+            <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md pointer-events-auto cursor-pointer" onClick={() => !allocateSubmitting && setShowAllocateModal(false)} />
+
+            <div className="relative bg-white rounded-2xl shadow-2xl shadow-slate-950/20 border border-slate-200 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-modalPop font-sans text-xs pointer-events-auto">
+              {/* Modal Header matching app standard */}
+              <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-3xs">
+                    <MapPinIcon className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold uppercase tracking-wider text-gray-900">
+                      Allocate Location & Reels
+                    </h2>
+                    <p className="text-[10px] text-gray-500 font-medium">Multi-Godown Inventory Allocation & Distribution</p>
+                  </div>
+                </div>
                 <button
                   disabled={allocateSubmitting}
                   onClick={() => setShowAllocateModal(false)}
-                  className="p-1.5 hover:bg-gray-150 rounded-lg transition-colors text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-200 rounded-lg transition-colors cursor-pointer"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
               <form onSubmit={handleAllocateSubmit} className="flex flex-col flex-1 overflow-hidden">
-                <div className="p-6 space-y-4 text-left text-xs overflow-y-auto flex-1">
-                {allocateError && (
-                  <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-xs font-bold text-red-700 flex items-center gap-1.5">
-                    <HelpCircle className="w-4 h-4 shrink-0" />
-                    <span>{allocateError}</span>
-                  </div>
-                )}
+                <div className="p-5 sm:p-6 space-y-4 text-left text-xs overflow-y-auto flex-1 bg-white">
+                  {allocateError && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs font-bold text-red-700 flex items-center gap-2">
+                      <HelpCircle className="w-4 h-4 shrink-0 text-red-600" />
+                      <span>{allocateError}</span>
+                    </div>
+                  )}
 
-                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5 space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-gray-400 font-bold uppercase">Batch Number:</span>
-                    <span className="font-bold text-blue-600 font-mono">{selectedInvoice.invoiceNumber}</span>
+                  {/* Header batch summary cards matching main ERP modal style */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 shrink-0">
+                    {/* Card 1: Material Lot */}
+                    <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-3 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+                      <span className="block text-[10px] text-blue-600 font-bold uppercase tracking-wider leading-tight mb-1">
+                        Material Lot
+                      </span>
+                      {selectedInvoice.items && selectedInvoice.items.length > 1 ? (
+                        <select
+                          value={allocateForm.itemIndex}
+                          onChange={e => {
+                            const newIdx = Number(e.target.value);
+                            setAllocateForm({ itemIndex: newIdx, toLocationId: '', quantity: '' });
+                            setAllocationsList([{ toLocationId: '', quantity: '', reels: [] }]);
+                            setActiveReelPickerRowIdx(null);
+                          }}
+                          className="w-full px-2 py-1 border border-blue-200 rounded-lg text-xs font-bold text-gray-900 bg-white focus:ring-2 focus:ring-blue-500"
+                          disabled={allocateSubmitting}
+                        >
+                          {selectedInvoice.items.map((item, idx) => {
+                            const name = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any).name : 'Raw Material';
+                            const lotNo = item.lotNumber || `${selectedInvoice.invoiceNumber}-L0${idx + 1}`;
+                            return (
+                              <option key={idx} value={idx}>
+                                {name} ({lotNo})
+                              </option>
+                            );
+                          })}
+                        </select>
+                      ) : (
+                        <div className="font-extrabold text-gray-900 text-xs truncate">
+                          {typeof lotItem?.skuId === 'object' && lotItem?.skuId !== null ? (lotItem?.skuId as any).name : 'Raw Material'}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Card 2: Receiving Bay */}
+                    <div className="bg-indigo-50/40 border border-indigo-100 rounded-xl p-3 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+                      <span className="block text-[10px] text-indigo-650 font-bold uppercase tracking-wider leading-tight">
+                        Receiving Bay (From)
+                      </span>
+                      <span className="block text-xs text-indigo-900 font-extrabold mt-1 truncate">
+                        {defaultLocName}
+                      </span>
+                    </div>
+
+                    {/* Card 3: Available to Allocate */}
+                    <div className="bg-emerald-50/40 border border-emerald-100 rounded-xl p-3 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+                      <span className="block text-[10px] text-emerald-700 font-bold uppercase tracking-wider leading-tight">
+                        Available to Allocate
+                      </span>
+                      <span className="block text-sm text-emerald-900 font-extrabold mt-0.5 font-mono">
+                        {maxAllocatable.toLocaleString('en-IN')} {unitLabel}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400 font-bold uppercase">Available Unallocated:</span>
-                    <span className="font-black text-gray-900">
-                      {selectedSku?.paperType === 'Sheets' 
-                        ? `${maxAllocatable.toLocaleString('en-IN')} Sheets (${(maxAllocatable / stdSheetsPerReam).toLocaleString('en-IN', { maximumFractionDigits: 2 })} Reams)` 
-                        : `${maxAllocatable.toLocaleString('en-IN')} ${selectedSku?.unit || 'KG'}`}
-                    </span>
+
+                  {/* Allocation Table */}
+                  <div className="border border-gray-200 rounded-xl overflow-hidden shadow-3xs bg-white">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50 text-gray-500 uppercase font-black border-b border-gray-200 text-[10px] tracking-wider">
+                          <th className="py-2.5 px-3 w-10 text-center">#</th>
+                          <th className="py-2.5 px-3 min-w-[220px]">Target Godown / Storage Area *</th>
+                          {hasReels && (
+                            <th className="py-2.5 px-3 w-48 text-center">Reels Assigned</th>
+                          )}
+                          {selectedSku?.paperType === 'Sheets' && (
+                            <th className="py-2.5 px-3 w-28 text-right">Reams</th>
+                          )}
+                          <th className="py-2.5 px-3 w-36 text-right">
+                            Quantity ({unitLabel}) *
+                          </th>
+                          <th className="py-2.5 px-2 w-10 text-center"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 font-medium">
+                        {currentList.map((row, index) => {
+                          const rowReels = row.reels || [];
+                          const rowReelsWeight = rowReels.reduce((s: number, r: any) => s + (Number(r.weight || r.weightKg || r.netWeight) || 0), 0);
+                          const rowReams = selectedSku?.paperType === 'Sheets' && row.quantity ? (Number(row.quantity) / stdSheetsPerReam) : 0;
+
+                          return (
+                            <tr key={index} className="hover:bg-blue-50/20 transition-colors">
+                              <td className="py-2.5 px-3 text-center font-bold text-gray-400 text-xs">
+                                {index + 1}
+                              </td>
+
+                              <td className="py-2.5 px-3">
+                                <LocationSelectPopup
+                                  locations={locations}
+                                  locationId={row.toLocationId || ''}
+                                  onChange={(_w, _f, _z, locId) => handleUpdateRow(index, 'toLocationId', locId)}
+                                  variant="compact"
+                                  hideLabel
+                                  disabled={allocateSubmitting}
+                                />
+                              </td>
+
+                              {hasReels && (
+                                <td className="py-2.5 px-3 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => setActiveReelPickerRowIdx(index)}
+                                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border flex items-center justify-center gap-1.5 w-full transition-all cursor-pointer shadow-3xs ${
+                                      rowReels.length > 0
+                                        ? 'bg-blue-50 text-blue-800 border-blue-200 hover:bg-blue-100'
+                                        : 'bg-white text-gray-600 border-dashed border-gray-300 hover:border-blue-400 hover:text-blue-600'
+                                    }`}
+                                  >
+                                    <Layers className="w-3.5 h-3.5 text-blue-600" />
+                                    <span>
+                                      {rowReels.length > 0
+                                        ? `${rowReels.length} Reel${rowReels.length > 1 ? 's' : ''} (${rowReelsWeight} KG)`
+                                        : `+ Select Reels (${availableReels.length} Avail)`
+                                      }
+                                    </span>
+                                  </button>
+                                </td>
+                              )}
+
+                              {selectedSku?.paperType === 'Sheets' && (
+                                <td className="py-2.5 px-3">
+                                  <input
+                                    type="number"
+                                    step="any"
+                                    placeholder="0"
+                                    value={rowReams > 0 ? rowReams : ''}
+                                    onChange={e => {
+                                      const reams = Number(e.target.value) || 0;
+                                      handleUpdateRow(index, 'quantity', reams > 0 ? String(reams * stdSheetsPerReam) : '');
+                                    }}
+                                    className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-bold text-right text-gray-800 focus:ring-2 focus:ring-blue-500 bg-white"
+                                  />
+                                </td>
+                              )}
+
+                              <td className="py-2.5 px-3">
+                                <input
+                                  type="number"
+                                  step="any"
+                                  placeholder="0"
+                                  value={row.quantity || ''}
+                                  onChange={e => handleUpdateRow(index, 'quantity', e.target.value)}
+                                  disabled={hasReels}
+                                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-bold text-right text-blue-900 focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-slate-50 disabled:cursor-not-allowed"
+                                />
+                              </td>
+
+                              <td className="py-2.5 px-2 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveRow(index)}
+                                  className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                                  title="Delete godown row"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Table Control Buttons */}
+                  <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleAddRow}
+                      className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-3xs transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Add Godown Row
+                    </button>
+
+                    <div className="flex items-center gap-2">
+                      {!hasReels && currentList.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={handleDistributeEvenly}
+                          className="px-2.5 py-1.5 bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-3xs"
+                          title="Evenly distribute available quantity across godowns"
+                        >
+                          ⚡ Split Evenly
+                        </button>
+                      )}
+
+                      {!hasReels && remainingBalance > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleAllocateRemaining}
+                          className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-3xs"
+                          title="Allocate remaining balance to a godown row"
+                        >
+                          ⚡ Fill Remaining ({remainingBalance.toLocaleString('en-IN')} {unitLabel})
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase tracking-wider">Select Material Lot *</label>
-                    <select
-                      value={allocateForm.itemIndex}
-                      onChange={e => {
-                        setAllocateForm({ ...allocateForm, itemIndex: Number(e.target.value), quantity: '' });
-                        setSelectedReelsForAllocation([]);
-                      }}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-800"
-                      required
-                      disabled={allocateSubmitting}
-                    >
-                      {selectedInvoice.items?.map((item, idx) => {
-                        const name = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any).name : 'Raw Material';
-                        const lotNo = item.lotNumber || `${selectedInvoice.invoiceNumber}-L0${idx + 1}`;
-                        return (
-                          <option key={idx} value={idx}>
-                            {name} ({lotNo})
-                          </option>
-                        );
-                      })}
-                    </select>
+                {/* Balance Summary Footer matching ERP design */}
+                <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between flex-wrap gap-3 flex-shrink-0 rounded-b-2xl">
+                  <div className="flex items-center gap-4 text-xs">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-gray-400 block leading-tight">Available</span>
+                      <span className="font-mono font-bold text-gray-800 text-xs">
+                        {maxAllocatable.toLocaleString('en-IN')} {unitLabel}
+                      </span>
+                    </div>
+
+                    <div className="border-l border-gray-200 pl-4">
+                      <span className="text-[10px] uppercase font-bold text-gray-400 block leading-tight">Total Allocated</span>
+                      <span className="font-mono font-bold text-blue-650 text-xs">
+                        {totalAllocated.toLocaleString('en-IN')} {unitLabel}
+                      </span>
+                    </div>
+
+                    <div className="border-l border-gray-200 pl-4">
+                      <span className="text-[10px] uppercase font-bold text-gray-400 block leading-tight">Balance Remaining</span>
+                      <span className={`font-mono font-bold text-xs ${
+                        isFullyAllocated 
+                          ? 'text-emerald-600' 
+                          : isOverallocated 
+                            ? 'text-red-600' 
+                            : 'text-amber-600'
+                      }`}>
+                        {remainingBalance.toLocaleString('en-IN')} {unitLabel}
+                      </span>
+                    </div>
+
+                    <div>
+                      {isFullyAllocated && (
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-700">
+                          ✓ Fully Allocated
+                        </span>
+                      )}
+                      {remainingBalance > 0 && totalAllocated > 0 && (
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 border border-amber-200 text-amber-700">
+                          ⏳ Partial ({remainingBalance} {unitLabel} left)
+                        </span>
+                      )}
+                      {isOverallocated && (
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-50 border border-red-200 text-red-700">
+                          ⚠️ Overallocated
+                        </span>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Add Allocation Line Form */}
-                  <div className="bg-blue-50/20 border border-blue-100 rounded-xl p-3.5 space-y-3">
-                    <div className="text-[10px] font-black text-blue-800 uppercase tracking-wider">
-                      Add Location Allocation Line
-                    </div>
-                    <div>
-                      <label className="block text-[9px] font-bold text-gray-500 mb-1 uppercase tracking-wider">Destination Storage Location (Warehouse/Floor/Zone/Bin) *</label>
-                      <LocationSelectPopup
-                        locations={locations}
-                        locationId={allocateForm.toLocationId}
-                        onChange={(_w, _f, _z, locId) => setAllocateForm(prev => ({ ...prev, toLocationId: locId }))}
-                        variant="compact"
-                        hideLabel
-                        disabled={allocateSubmitting}
-                      />
-                    </div>
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      disabled={allocateSubmitting}
+                      onClick={() => setShowAllocateModal(false)}
+                      className="px-4 py-2 border border-gray-300 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-100 bg-white transition-colors cursor-pointer shadow-3xs disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={allocateSubmitting || !hasValidAllocations || isOverallocated}
+                      className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
+                    >
+                      {allocateSubmitting ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Allocating...
+                        </>
+                      ) : (
+                        <>
+                          <ArrowRight className="w-3.5 h-3.5" /> Allocate Stock
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </form>
 
-                    {hasReels && (
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center mb-1">
-                          <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider">
-                            Select Reels to Allocate ({selectedReelsForAllocation.length} of {unallocatedBal.reels.length} selected)
-                          </label>
-                          {unallocatedBal.reels.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const allSelected = selectedReelsForAllocation.length === unallocatedBal.reels.length;
-                                if (allSelected) {
-                                  setSelectedReelsForAllocation([]);
-                                  setAllocateForm(prev => ({ ...prev, quantity: '' }));
-                                } else {
-                                  setSelectedReelsForAllocation([...unallocatedBal.reels]);
-                                  const totalWeight = unallocatedBal.reels.reduce((sum: number, r: any) => sum + (r.weight || 0), 0);
-                                  setAllocateForm(prev => ({ ...prev, quantity: String(totalWeight) }));
-                                }
-                              }}
-                              className="text-blue-600 hover:text-blue-700 text-[9px] font-bold transition-colors"
-                            >
-                              {selectedReelsForAllocation.length === unallocatedBal.reels.length ? 'Deselect All' : 'Select All'}
-                            </button>
-                          )}
-                        </div>
-                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-2.5 max-h-36 overflow-y-auto space-y-1">
-                          {unallocatedBal.reels.map((r: any) => {
-                            const isChecked = selectedReelsForAllocation.some(sr => sr.reelNumber === r.reelNumber);
-                            return (
-                              <label key={r.reelNumber} className="flex items-center justify-between p-1.5 hover:bg-white rounded-lg border border-transparent hover:border-gray-200 transition-all cursor-pointer font-semibold text-gray-700">
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={() => handleReelToggle(r)}
-                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3 h-3"
-                                  />
-                                  <span className="text-[11px] text-gray-900">{r.reelNumber}</span>
-                                </div>
-                                <span className="text-[11px] text-blue-600 bg-blue-50/50 px-1.5 py-0.5 rounded font-black">
-                                  {r.weight} KG
-                                </span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
+              {/* ── SUB-MODAL: REEL SELECTOR FOR CURRENT ROW ─────────────────────── */}
+              {activeReelPickerRowIdx !== null && (() => {
+                const pickerRow = currentList[activeReelPickerRowIdx];
+                const godownName = locations.find(l => l._id === pickerRow?.toLocationId)?.name || `Godown #${activeReelPickerRowIdx + 1}`;
+                const chosenReels: any[] = pickerRow?.reels || [];
 
-                    {selectedSku?.paperType === 'Sheets' ? (
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-[9px] font-bold text-gray-500 mb-1 uppercase tracking-wider">Reams to Allocate</label>
-                          <input
-                            type="number"
-                            placeholder="e.g. 10"
-                            id="modal_reams_input"
-                            onChange={e => {
-                              const reams = Number(e.target.value) || 0;
-                              const sheets = reams * stdSheetsPerReam;
-                              setAllocateForm({ ...allocateForm, quantity: reams > 0 ? String(sheets) : '' });
-                            }}
-                            className="w-full px-2.5 py-1.5 border border-gray-200 bg-white rounded-lg text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[9px] font-bold text-gray-500 mb-1 uppercase tracking-wider">Sheets to Allocate *</label>
-                          <input
-                            type="number"
-                            placeholder="Total sheets quantity"
-                            value={allocateForm.quantity}
-                            onChange={e => setAllocateForm({ ...allocateForm, quantity: e.target.value })}
-                            className="w-full px-2.5 py-1.5 border border-gray-200 bg-white rounded-lg text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500"
-                            required={allocationsList.length === 0}
-                          />
-                        </div>
-                      </div>
-                    ) : (
-                      <div>
-                        <label className="block text-[9px] font-bold text-gray-500 mb-1.5 uppercase tracking-wider">
-                          Quantity to Allocate ({selectedSku?.unit || 'KG'}) *
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            step="any"
-                            min="0.001"
-                            max={maxAllocatable}
-                            placeholder={hasReels ? "Auto-calculated from selected reels" : `Max ${maxAllocatable.toLocaleString()} ${selectedSku?.unit || 'KG'}`}
-                            value={allocateForm.quantity}
-                            onChange={e => setAllocateForm({ ...allocateForm, quantity: e.target.value })}
-                            className="w-full pl-3 pr-12 py-2 border border-gray-200 rounded-lg text-xs font-bold text-gray-900 bg-white"
-                            required={allocationsList.length === 0}
-                            disabled={allocateSubmitting || maxAllocatable <= 0 || hasReels}
-                          />
-                          <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-[10px] font-black text-gray-400 uppercase">
-                            {selectedSku?.unit || 'KG'}
+                const filteredReels = availableReels.filter(r => {
+                  if (!reelSearchText) return true;
+                  return r.reelNumber?.toLowerCase().includes(reelSearchText.toLowerCase());
+                });
+
+                const totalWeightChosen = chosenReels.reduce((s: number, r: any) => s + (Number(r.weight || r.weightKg || r.netWeight) || 0), 0);
+
+                const handleToggleReel = (r: any) => {
+                  let next: any[];
+                  if (chosenReels.some(sr => sr.reelNumber === r.reelNumber)) {
+                    next = chosenReels.filter(sr => sr.reelNumber !== r.reelNumber);
+                  } else {
+                    next = [...chosenReels, r];
+                  }
+                  handleUpdateRow(activeReelPickerRowIdx, 'reels', next);
+                };
+
+                const handleSelectAllAvailable = () => {
+                  const unassigned = availableReels.filter(r => {
+                    const assignedRow = currentList.findIndex((other, oIdx) => oIdx !== activeReelPickerRowIdx && other.reels?.some(sr => sr.reelNumber === r.reelNumber));
+                    return assignedRow === -1;
+                  });
+                  handleUpdateRow(activeReelPickerRowIdx, 'reels', unassigned);
+                };
+
+                const handleClearReels = () => {
+                  handleUpdateRow(activeReelPickerRowIdx, 'reels', []);
+                };
+
+                return (
+                  <div className="fixed inset-0 z-[100010] flex items-center justify-center p-4">
+                    <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-xs" onClick={() => setActiveReelPickerRowIdx(null)} />
+                    <div className="bg-white rounded-2xl border border-gray-200 shadow-2xl max-w-lg w-full relative z-10 animate-in zoom-in-95 duration-150 overflow-hidden flex flex-col max-h-[80vh]">
+                      {/* Sub-Modal Header */}
+                      <div className="px-5 py-3.5 border-b border-gray-200 flex items-center justify-between bg-gray-50 shrink-0">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-3xs">
+                            <Layers className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <h3 className="text-xs font-bold text-gray-900">
+                              Select Reels for {godownName}
+                            </h3>
+                            <p className="text-[10px] text-gray-500 font-medium">Row #{activeReelPickerRowIdx + 1} Godown Allocation</p>
                           </div>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => setActiveReelPickerRowIdx(null)}
+                          className="p-1 hover:bg-gray-200 rounded-lg text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
                       </div>
-                    )}
 
-                    <div className="flex justify-end pt-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!allocateForm.toLocationId) {
-                            alert("Please select a destination storage location first.");
-                            return;
-                          }
-                          const qty = Number(allocateForm.quantity);
-                          if (isNaN(qty) || qty <= 0) {
-                            alert("Please enter a valid quantity to allocate.");
-                            return;
-                          }
-                          // Validate max unallocated remaining
-                          const alreadyAllocated = allocationsList.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
-                          if (alreadyAllocated + qty > maxAllocatable) {
-                            alert(`Cannot allocate more than available unallocated stock (${maxAllocatable.toLocaleString()}).`);
-                            return;
-                          }
+                      {/* Search & Bulk Selection Controls */}
+                      <div className="p-3 border-b border-gray-150 bg-white flex items-center justify-between gap-2">
+                        <input
+                          type="text"
+                          placeholder="Search reel number..."
+                          value={reelSearchText}
+                          onChange={e => setReelSearchText(e.target.value)}
+                          className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs bg-white text-gray-800 flex-1 focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSelectAllAvailable}
+                          className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded-lg text-[11px] font-bold cursor-pointer shadow-3xs"
+                        >
+                          Select All Available
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleClearReels}
+                          className="px-2.5 py-1.5 bg-white hover:bg-gray-100 border border-gray-200 text-gray-600 rounded-lg text-[11px] font-bold cursor-pointer shadow-3xs"
+                        >
+                          Clear
+                        </button>
+                      </div>
 
-                          setAllocationsList([
-                            ...allocationsList,
-                            {
-                              toLocationId: allocateForm.toLocationId,
-                              quantity: allocateForm.quantity,
-                              reels: [...selectedReelsForAllocation]
-                            }
-                          ]);
+                      {/* Reels List */}
+                      <div className="p-3 overflow-y-auto flex-1 space-y-1.5 max-h-80 bg-slate-50/50">
+                        {filteredReels.map((r: any) => {
+                          const isChecked = chosenReels.some(sr => sr.reelNumber === r.reelNumber);
+                          const assignedOtherIdx = currentList.findIndex((other, oIdx) => oIdx !== activeReelPickerRowIdx && other.reels?.some(sr => sr.reelNumber === r.reelNumber));
+                          const isAssignedOther = assignedOtherIdx !== -1;
+                          const rWeight = Number(r.weight || r.weightKg || r.netWeight) || 0;
 
-                          // Reset temporary inputs
-                          setAllocateForm(prev => ({ ...prev, toLocationId: '', quantity: '' }));
-                          setSelectedReelsForAllocation([]);
-                          const reamsInput = document.getElementById("modal_reams_input") as HTMLInputElement;
-                          if (reamsInput) reamsInput.value = '';
-                        }}
-                        className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-extrabold transition-all"
-                      >
-                        + Add Allocation Row
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Render Allocations List */}
-                  {allocationsList.length > 0 && (
-                    <div className="space-y-2 border-t pt-3">
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                        Allocations to Create ({allocationsList.length})
-                      </label>
-                      <div className="bg-gray-50 border border-gray-200 rounded-xl p-2.5 max-h-36 overflow-y-auto space-y-1.5">
-                        {allocationsList.map((row, index) => {
-                          const locName = locations.find(l => l._id === row.toLocationId)?.name || 'Unknown Location';
-                          const qtyVal = Number(row.quantity) || 0;
                           return (
-                            <div key={index} className="flex justify-between items-center bg-white px-3 py-2 rounded-lg border border-gray-150 text-xs">
-                              <div>
-                                <span className="font-bold text-gray-900">{locName}</span>
-                                <div className="text-[10px] text-gray-400">
-                                  {selectedSku?.paperType === 'Sheets' 
-                                    ? `${qtyVal.toLocaleString()} Sheets (${(qtyVal / stdSheetsPerReam).toLocaleString('en-IN', { maximumFractionDigits: 2 })} Reams)`
-                                    : `${qtyVal.toLocaleString()} ${selectedSku?.unit || 'KG'}`}
+                            <label
+                              key={r.reelNumber}
+                              className={`flex items-center justify-between p-2.5 rounded-xl border text-xs transition-all ${
+                                isAssignedOther
+                                  ? 'bg-slate-100/60 border-slate-200 text-gray-400 cursor-not-allowed opacity-60'
+                                  : isChecked
+                                    ? 'bg-blue-50 border-blue-300 text-blue-950 font-bold cursor-pointer shadow-3xs'
+                                    : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 cursor-pointer shadow-3xs'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  disabled={isAssignedOther}
+                                  onChange={() => handleToggleReel(r)}
+                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
+                                />
+                                <div>
+                                  <span className="font-mono font-bold text-xs">{r.reelNumber}</span>
+                                  {isAssignedOther && (
+                                    <span className="ml-2 text-[9px] font-semibold text-gray-400 italic">
+                                      (Assigned to Row #{assignedOtherIdx + 1})
+                                    </span>
+                                  )}
                                 </div>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setAllocationsList(allocationsList.filter((_, i) => i !== index));
-                                }}
-                                className="text-red-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
+
+                              <span className="font-mono font-black text-xs px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-800">
+                                {rWeight > 0 ? `${rWeight.toLocaleString()} KG` : '—'}
+                              </span>
+                            </label>
                           );
                         })}
                       </div>
+
+                      {/* Sub-Modal Footer */}
+                      <div className="px-5 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-700">
+                          Selected: <strong className="text-blue-700">{chosenReels.length}</strong> Reels ({totalWeightChosen.toLocaleString()} KG)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setActiveReelPickerRowIdx(null)}
+                          className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold cursor-pointer shadow-3xs"
+                        >
+                          Confirm & Done
+                        </button>
+                      </div>
                     </div>
-                  )}
-                </div>
-              </div>
-              
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-150 flex justify-end gap-3 flex-shrink-0">
-                  <button
-                    type="button"
-                    disabled={allocateSubmitting}
-                    onClick={() => setShowAllocateModal(false)}
-                    className="px-4 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-50 bg-white disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={allocateSubmitting || (allocationsList.length === 0 && (maxAllocatable <= 0 || !allocateForm.toLocationId || !allocateForm.quantity))}
-                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 transition-colors disabled:opacity-50"
-                  >
-                    {allocateSubmitting ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Allocating...
-                      </>
-                    ) : (
-                      <>
-                        <ArrowRight className="w-3.5 h-3.5" /> Allocate Stock
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
+                  </div>
+                );
+              })()}
             </div>
           </div>,
           document.body
