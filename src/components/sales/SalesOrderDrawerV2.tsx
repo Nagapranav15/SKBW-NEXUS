@@ -146,6 +146,102 @@ const WhatsAppIcon: React.FC<{ className?: string }> = ({
   </svg>
 );
 
+// Clean string helper: strips null, undefined, '-', '—', 'n/a' and outer commas/hyphens
+const cleanAddressVal = (val?: any): string => {
+  if (!val) return '';
+  const str = String(val).trim();
+  if (
+    str === '-' || 
+    str === '—' || 
+    str.toLowerCase() === 'null' || 
+    str.toLowerCase() === 'undefined' || 
+    str.toLowerCase() === 'n/a' || 
+    str.toLowerCase() === 'na' ||
+    str.toLowerCase() === 'none'
+  ) {
+    return '';
+  }
+  return str.replace(/^[,.\s-]+|[,.\s-]+$/g, '').trim();
+};
+
+export const formatCustomerStreetAddress = (c: any): string => {
+  if (!c) return '';
+  const door = cleanAddressVal(c.doorNo || c.flatNo);
+  const street = cleanAddressVal(c.streetName || c.street);
+  const addr1 = cleanAddressVal(c.address1);
+  const addrLegacy = cleanAddressVal(c.address);
+  const area = cleanAddressVal(c.area || c.locality);
+  const landmark = cleanAddressVal(c.landmark);
+
+  let formattedDoor = door;
+  if (formattedDoor && !formattedDoor.toLowerCase().startsWith('d.no') && !formattedDoor.toLowerCase().startsWith('no.') && !formattedDoor.toLowerCase().startsWith('flat') && !formattedDoor.toLowerCase().startsWith('door')) {
+    formattedDoor = `D.No: ${formattedDoor}`;
+  }
+
+  const parts = [
+    formattedDoor,
+    street,
+    addr1,
+    addrLegacy,
+    area,
+    landmark ? (landmark.toLowerCase().startsWith('near') || landmark.toLowerCase().startsWith('opp') ? landmark : `Near ${landmark}`) : ''
+  ];
+
+  const cleanParts: string[] = [];
+  const seen = new Set<string>();
+  parts.forEach(p => {
+    const val = cleanAddressVal(p);
+    if (!val) return;
+    const lower = val.toLowerCase();
+    if (!seen.has(lower)) {
+      seen.add(lower);
+      cleanParts.push(val);
+    }
+  });
+
+  return cleanParts.join(', ');
+};
+
+export const formatCustomerFullAddress = (c: any, fallback?: string): string => {
+  if (!c) {
+    const fb = cleanAddressVal(fallback);
+    return fb || '—';
+  }
+  
+  const street = formatCustomerStreetAddress(c);
+  const city = cleanAddressVal(c.city || c.assignedMarket);
+  const district = cleanAddressVal(c.district);
+  const state = cleanAddressVal(c.state);
+  const pincode = cleanAddressVal(c.pincode || c.pinCode);
+
+  const parts = [
+    street,
+    city,
+    district && district.toLowerCase() !== city.toLowerCase() ? district : '',
+    state,
+    pincode
+  ];
+
+  const cleanParts: string[] = [];
+  const seen = new Set<string>();
+  parts.forEach(p => {
+    const val = cleanAddressVal(p);
+    if (!val) return;
+    const lower = val.toLowerCase();
+    if (!seen.has(lower)) {
+      seen.add(lower);
+      cleanParts.push(val);
+    }
+  });
+
+  if (cleanParts.length > 0) {
+    return cleanParts.join(', ');
+  }
+
+  const fb = cleanAddressVal(fallback);
+  return fb || '—';
+};
+
 export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   isOpen,
   companyId,
@@ -459,23 +555,13 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
     setCustomerSearch(firm);
     setShowCustomerDropdown(false);
 
-    // Build formatted complete street address
-    const streetParts = [
-      c.doorNo || c.flatNo ? `D.No: ${c.doorNo || c.flatNo}` : '',
-      c.streetName || c.street,
-      c.address1,
-      c.area || c.locality,
-      c.landmark ? `Near ${c.landmark}` : '',
-      c.address
-    ].filter(Boolean);
+    // Build formatted complete street address without dummy dashes or empty parts
+    const resolvedStreet = formatCustomerStreetAddress(c) || cleanAddressVal(c.address) || cleanAddressVal(c.address1) || cleanAddressVal(c.city) || 'Main Road';
 
-    const uniqueStreet = Array.from(new Set(streetParts)).join(', ');
-    const resolvedStreet = uniqueStreet || c.city || 'Main Road';
-
-    const cityVal = c.city || c.district || c.assignedMarket || '';
-    const stateVal = c.state || 'Andhra Pradesh';
-    const pincodeVal = c.pincode || c.pinCode || '';
-    const phoneVal = c.phone || c.mobile || c.altPhone || '';
+    const cityVal = cleanAddressVal(c.city) || cleanAddressVal(c.district) || cleanAddressVal(c.assignedMarket) || '';
+    const stateVal = cleanAddressVal(c.state) || 'Andhra Pradesh';
+    const pincodeVal = cleanAddressVal(c.pincode || c.pinCode) || '';
+    const phoneVal = cleanAddressVal(c.phone || c.mobile || c.altPhone) || '';
 
     const newAddr: AddressDetails = {
       attention: firm,
@@ -901,10 +987,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                       <div className="flex items-start gap-1.5 flex-1 min-w-0">
                         <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
                         <span className="line-clamp-2 leading-tight">
-                          {billingAddress.addressLine || selectedCustomer.address || 'Address not specified'}
-                          {billingAddress.city ? `, ${billingAddress.city}` : selectedCustomer.city ? `, ${selectedCustomer.city}` : ''}
-                          {billingAddress.state ? `, ${billingAddress.state}` : selectedCustomer.state ? `, ${selectedCustomer.state}` : ''}
-                          {billingAddress.pincode ? ` - ${billingAddress.pincode}` : selectedCustomer.pincode ? ` - ${selectedCustomer.pincode}` : ''}
+                          {formatCustomerFullAddress(selectedCustomer, [billingAddress.addressLine, billingAddress.city, billingAddress.state, billingAddress.pincode].filter(Boolean).join(', '))}
                         </span>
                       </div>
                       <button 
@@ -1975,18 +2058,18 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-xs">
                     <div className="col-span-2">
                       <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Full Address</span>
-                      <span className="font-bold text-gray-900 text-xs">
-                        {selectedCustomer.address || selectedCustomer.address1 || billingAddress.addressLine || '—'}
+                      <span className="font-bold text-gray-900 text-xs leading-relaxed">
+                        {formatCustomerFullAddress(selectedCustomer, billingAddress.addressLine)}
                       </span>
                     </div>
                     <div>
                       <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">City</span>
-                      <span className="font-bold text-gray-900 text-xs">{selectedCustomer.city || billingAddress.city || '—'}</span>
+                      <span className="font-bold text-gray-900 text-xs">{cleanAddressVal(selectedCustomer.city) || cleanAddressVal(billingAddress.city) || '—'}</span>
                     </div>
                     <div>
                       <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">State & Pincode</span>
                       <span className="font-bold text-gray-900 text-xs">
-                        {selectedCustomer.state || billingAddress.state || ''} {selectedCustomer.pincode || billingAddress.pincode ? `- ${selectedCustomer.pincode || billingAddress.pincode}` : ''}
+                        {cleanAddressVal(selectedCustomer.state) || cleanAddressVal(billingAddress.state) || ''} {(cleanAddressVal(selectedCustomer.pincode) || cleanAddressVal(billingAddress.pincode)) ? `- ${cleanAddressVal(selectedCustomer.pincode) || cleanAddressVal(billingAddress.pincode)}` : ''}
                       </span>
                     </div>
                   </div>
