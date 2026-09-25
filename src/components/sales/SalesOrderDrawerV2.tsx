@@ -353,7 +353,10 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
   const customerRef = useRef<HTMLDivElement>(null);
   const customerInputRef = useRef<HTMLInputElement>(null);
+  const customerDropdownListRef = useRef<HTMLDivElement>(null);
+  const productDropdownRefMap = useRef<Record<number, HTMLDivElement | null>>({});
   const [highlightedCustomerIdx, setHighlightedCustomerIdx] = useState<number>(0);
+  const [highlightedProductIdxMap, setHighlightedProductIdxMap] = useState<Record<number, number>>({});
   const dropdownContainerRef = useRef<HTMLDivElement>(null);
 
   // Auto-focus 1st field (Customer Search Input) upon opening form
@@ -367,6 +370,47 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
+
+  // Scroll highlighted Customer dropdown item into view when navigating with Arrow keys
+  useEffect(() => {
+    if (showCustomerDropdown && customerDropdownListRef.current) {
+      const container = customerDropdownListRef.current;
+      const targetItem = container.children[highlightedCustomerIdx] as HTMLElement;
+      if (targetItem) {
+        const containerTop = container.scrollTop;
+        const containerBottom = containerTop + container.clientHeight;
+        const itemTop = targetItem.offsetTop;
+        const itemBottom = itemTop + targetItem.offsetHeight;
+
+        if (itemTop < containerTop) {
+          container.scrollTop = itemTop;
+        } else if (itemBottom > containerBottom) {
+          container.scrollTop = itemBottom - container.clientHeight;
+        }
+      }
+    }
+  }, [highlightedCustomerIdx, showCustomerDropdown]);
+
+  // Scroll highlighted Product dropdown item into view when navigating with Arrow keys
+  useEffect(() => {
+    if (activeItemDropdownIdx !== null) {
+      const container = productDropdownRefMap.current[activeItemDropdownIdx];
+      const hIdx = highlightedProductIdxMap[activeItemDropdownIdx] || 0;
+      if (container && container.children[hIdx]) {
+        const targetItem = container.children[hIdx] as HTMLElement;
+        const containerTop = container.scrollTop;
+        const containerBottom = containerTop + container.clientHeight;
+        const itemTop = targetItem.offsetTop;
+        const itemBottom = itemTop + targetItem.offsetHeight;
+
+        if (itemTop < containerTop) {
+          container.scrollTop = itemTop;
+        } else if (itemBottom > containerBottom) {
+          container.scrollTop = itemBottom - container.clientHeight;
+        }
+      }
+    }
+  }, [highlightedProductIdxMap, activeItemDropdownIdx]);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -1084,6 +1128,26 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
         return;
       }
 
+      // Handle Product Dropdown Selection via Enter
+      if (activeItemDropdownIdx !== null) {
+        const rowIdx = activeItemDropdownIdx;
+        const currentSearch = (rowSearchTerms[rowIdx] !== undefined ? rowSearchTerms[rowIdx] : items[rowIdx]?.itemName || '').toLowerCase().trim();
+        const filteredProductSkus = availableSkus.filter(s =>
+          !currentSearch ||
+          (s.name || '').toLowerCase().includes(currentSearch) ||
+          (s.skuCode || '').toLowerCase().includes(currentSearch) ||
+          (s.category || '').toLowerCase().includes(currentSearch)
+        );
+        const hIdx = highlightedProductIdxMap[rowIdx] || 0;
+        const selectedSku = filteredProductSkus[hIdx] || filteredProductSkus[0];
+        if (selectedSku) {
+          e.preventDefault();
+          handleSelectProduct(rowIdx, selectedSku);
+          setTimeout(() => shiftFocus(1), 50);
+          return;
+        }
+      }
+
       e.preventDefault();
       shiftFocus(1);
     }
@@ -1093,6 +1157,23 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       if (showCustomerDropdown && filteredCustomers.length > 0) {
         e.preventDefault();
         setHighlightedCustomerIdx(prev => Math.min(prev + 1, filteredCustomers.length - 1));
+        return;
+      }
+      if (activeItemDropdownIdx !== null) {
+        e.preventDefault();
+        const rowIdx = activeItemDropdownIdx;
+        const currentSearch = (rowSearchTerms[rowIdx] !== undefined ? rowSearchTerms[rowIdx] : items[rowIdx]?.itemName || '').toLowerCase().trim();
+        const filteredProductSkus = availableSkus.filter(s =>
+          !currentSearch ||
+          (s.name || '').toLowerCase().includes(currentSearch) ||
+          (s.skuCode || '').toLowerCase().includes(currentSearch) ||
+          (s.category || '').toLowerCase().includes(currentSearch)
+        );
+        const maxIdx = Math.max(0, filteredProductSkus.length - 1);
+        setHighlightedProductIdxMap(prev => ({
+          ...prev,
+          [rowIdx]: Math.min((prev[rowIdx] || 0) + 1, maxIdx)
+        }));
         return;
       }
       if (target.tagName === 'INPUT' && (target as HTMLInputElement).type !== 'date') {
@@ -1106,6 +1187,15 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       if (showCustomerDropdown && filteredCustomers.length > 0) {
         e.preventDefault();
         setHighlightedCustomerIdx(prev => Math.max(prev - 1, 0));
+        return;
+      }
+      if (activeItemDropdownIdx !== null) {
+        e.preventDefault();
+        const rowIdx = activeItemDropdownIdx;
+        setHighlightedProductIdxMap(prev => ({
+          ...prev,
+          [rowIdx]: Math.max((prev[rowIdx] || 0) - 1, 0)
+        }));
         return;
       }
       if (target.tagName === 'INPUT' && (target as HTMLInputElement).type !== 'date') {
@@ -1271,7 +1361,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
                   {/* Customer Dropdown Popover */}
                   {showCustomerDropdown && (
-                    <div className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-2xl z-[999] max-h-60 overflow-y-auto divide-y divide-gray-50 p-1">
+                    <div ref={customerDropdownListRef} className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-2xl z-[999] max-h-60 overflow-y-auto divide-y divide-gray-50 p-1">
                       {filteredCustomers.map((c, idx) => (
                         <div
                           key={c._id || c.firmName}
@@ -1882,18 +1972,25 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
                           {/* SKU Dropdown: Shows ALL products from Item Master with Active/Inactive status */}
                           {isDropdownActive && (
-                            <div className="absolute left-3 top-full mt-1 w-[460px] bg-white border border-gray-200 rounded-xl shadow-2xl z-[99999] max-h-64 overflow-y-auto divide-y divide-gray-100 p-1">
-                              {filteredProductSkus.map(s => {
+                            <div 
+                              ref={(el) => { productDropdownRefMap.current[idx] = el; }} 
+                              className="absolute left-3 top-full mt-1 w-[460px] bg-white border border-gray-200 rounded-xl shadow-2xl z-[99999] max-h-64 overflow-y-auto divide-y divide-gray-100 p-1"
+                            >
+                              {filteredProductSkus.map((s, sIdx) => {
                                 const isInactive = (s.status || '').toLowerCase() === 'inactive';
                                 const onHandPcs = stockMap.get(s._id) ?? Number(s.presentStock || s.openingStock || 0);
                                 const definedConv = Number(s.booksGbl || s.altUnitConversion || (s as any).pcsPerGbl || 0);
                                 const stockGbl = definedConv > 0 ? Math.floor(onHandPcs / definedConv) : onHandPcs;
+                                const isHighlighted = (highlightedProductIdxMap[idx] ?? 0) === sIdx;
 
                                 return (
                                   <div
                                     key={s._id}
                                     onClick={() => handleSelectProduct(idx, s)}
-                                    className="p-2.5 hover:bg-blue-50/80 cursor-pointer rounded-lg text-xs flex justify-between items-center transition-colors"
+                                    onMouseEnter={() => setHighlightedProductIdxMap(prev => ({ ...prev, [idx]: sIdx }))}
+                                    className={`p-2.5 cursor-pointer rounded-lg text-xs flex justify-between items-center transition-colors ${
+                                      isHighlighted ? 'bg-blue-100/90 font-bold border border-blue-200' : 'hover:bg-blue-50/80'
+                                    }`}
                                   >
                                     <div className="flex-1 min-w-0 pr-3">
                                       <div className="font-bold text-gray-900 truncate">{s.name}</div>
