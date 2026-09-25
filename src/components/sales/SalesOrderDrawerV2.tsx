@@ -3,7 +3,7 @@ import {
   Save, Plus, Trash2, Search, ChevronDown, Calendar, User, Package, 
   AlertCircle, FileText, Check, Percent, X, MoreVertical, Edit2, 
   Phone, MapPin, Receipt, Truck, Copy, ExternalLink, Eye, Building2,
-  Settings, Zap, Sparkles, RefreshCw
+  Settings, Zap, Sparkles, RefreshCw, RotateCcw
 } from 'lucide-react';
 import Modal from '../ui/Modal';
 import { getSkusV2, getBalancesV2, SkuV2 } from '../../api/mfgApiV2';
@@ -309,6 +309,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
     pincode: '',
     phone: ''
   });
+  const [selectedShipToParty, setSelectedShipToParty] = useState<any | null>(null);
 
   // Items State (Empty by default when new)
   const [availableSkus, setAvailableSkus] = useState<SkuV2[]>(MASTER_PRODUCT_SKUS);
@@ -1009,6 +1010,12 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       return;
     }
 
+    const validCharges = otherCharges.filter(c => c.name && c.name.trim() !== '');
+    if (validCharges.length === 0) {
+      showToast('Order Charges are mandatory. Please select at least one preset charge.', 'error');
+      return;
+    }
+
     setIsSaving(true);
     try {
       const finalStatus = overrideStatus || orderStatus || 'Confirmed';
@@ -1561,7 +1568,13 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                   <input
                     type="checkbox"
                     checked={sameAddress}
-                    onChange={(e) => setSameAddress(e.target.checked)}
+                    onChange={(e) => {
+                      const isChecked = e.target.checked;
+                      setSameAddress(isChecked);
+                      if (!isChecked) {
+                        setActiveAddressTab('ship');
+                      }
+                    }}
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
                   <span>Same as customer address</span>
@@ -1594,158 +1607,165 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                 </div>
               </div>
 
-              {/* Dynamic Editable Address Box (Fixed h-[142px] - No Jumps!) */}
-              {isEditingAddress ? (
-                <div className="h-[142px] overflow-y-auto p-2.5 bg-gray-50 rounded-xl border border-gray-200 space-y-2 text-xs pr-1">
-                  {activeAddressTab === 'bill' ? (
-                    <>
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Billing Attention / Company</label>
-                        <input
-                          type="text"
-                          placeholder="Contact / Attention"
-                          value={billingAddress.attention}
-                          onChange={(e) => setBillingAddress({ ...billingAddress, attention: e.target.value })}
-                          className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        />
+              {/* Dynamic Editable Address Box (Fixed h-[142px]) */}
+              {activeAddressTab === 'ship' ? (
+                <div className="h-[142px] overflow-y-auto p-2 bg-gray-50/90 rounded-xl border border-gray-200 text-xs">
+                  {sameAddress ? (
+                    <div className="p-3 bg-blue-50/80 border border-blue-200/80 rounded-xl text-xs text-blue-800 space-y-1">
+                      <div className="font-bold flex items-center justify-between">
+                        <span>Synced with Billing Address</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSameAddress(false);
+                            setActiveAddressTab('ship');
+                          }}
+                          className="text-[10.5px] font-bold text-blue-700 underline hover:text-blue-900 cursor-pointer"
+                        >
+                          Change Ship To
+                        </button>
                       </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Street Address</label>
-                        <input
-                          type="text"
-                          placeholder="Street / Address Line"
-                          value={billingAddress.addressLine}
-                          onChange={(e) => setBillingAddress({ ...billingAddress, addressLine: e.target.value })}
-                          className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        />
-                      </div>
-                      <div className="grid grid-cols-3 gap-1">
-                        <div>
-                          <label className="block text-[10px] font-bold text-gray-500 mb-0.5">City</label>
-                          <input
-                            type="text"
-                            placeholder="City"
-                            value={billingAddress.city}
-                            onChange={(e) => setBillingAddress({ ...billingAddress, city: e.target.value })}
-                            className="w-full px-1.5 py-0.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-gray-500 mb-0.5">State</label>
-                          <input
-                            type="text"
-                            placeholder="State"
-                            value={billingAddress.state}
-                            onChange={(e) => setBillingAddress({ ...billingAddress, state: e.target.value })}
-                            className="w-full px-1.5 py-0.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Pincode</label>
-                          <input
-                            type="text"
-                            placeholder="Pincode"
-                            value={billingAddress.pincode}
-                            onChange={(e) => setBillingAddress({ ...billingAddress, pincode: e.target.value })}
-                            className="w-full px-1.5 py-0.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Contact Phone</label>
-                        <input
-                          type="text"
-                          placeholder="Phone / Mobile"
-                          value={billingAddress.phone}
-                          onChange={(e) => setBillingAddress({ ...billingAddress, phone: e.target.value })}
-                          className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        />
-                      </div>
-                    </>
+                      <p className="text-[11px] text-blue-600 leading-tight">
+                        Ship To address is currently identical to Customer's Billing address. Uncheck "Same as customer address" to select a different shipping company/customer.
+                      </p>
+                    </div>
                   ) : (
-                    <>
-                      {sameAddress && (
-                        <div className="p-1.5 bg-blue-50 border border-blue-200/80 rounded-lg text-[10px] text-blue-700 flex items-center justify-between">
-                          <span>Synced with billing address</span>
-                          <button
-                            type="button"
-                            onClick={() => setSameAddress(false)}
-                            className="font-bold underline text-blue-800 hover:text-blue-900 cursor-pointer"
-                          >
-                            Edit Separately
-                          </button>
+                    <div className="space-y-1.5">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-600 mb-0.5 uppercase tracking-wider">
+                          Ship To Company / Customer
+                        </label>
+                        <select
+                          value={selectedShipToParty?._id || selectedShipToParty?.id || ''}
+                          onChange={(e) => {
+                            const partyId = e.target.value;
+                            const found = customersList.find(c => (c._id || c.id) === partyId || (c.firmName || c.name || '') === partyId);
+                            setSelectedShipToParty(found || null);
+                            if (found) {
+                              const street = formatCustomerStreetAddress(found) || found.address || '';
+                              const fullAddr = formatCustomerFullAddress(found);
+                              setShippingAddress({
+                                attention: found.firmName || found.name || found.companyName || found.ownerName || '',
+                                addressLine: street || fullAddr || '',
+                                city: found.city || found.assignedMarket || '',
+                                state: found.state || '',
+                                pincode: found.pincode || found.pinCode || '',
+                                phone: found.phone || found.mobile || ''
+                              });
+                            } else {
+                              setShippingAddress({ attention: '', addressLine: '', city: '', state: '', pincode: '', phone: '' });
+                            }
+                          }}
+                          className="w-full px-2 py-1 bg-white border border-gray-300 rounded-lg text-[11.5px] font-bold text-gray-900 focus:ring-1 focus:ring-blue-500 focus:outline-none shadow-3xs"
+                        >
+                          <option value="">-- Select Ship To Company / Customer --</option>
+                          {customersList.map(c => {
+                            const cId = c._id || c.id || c.firmName;
+                            const firm = c.firmName || c.name || c.companyName || 'Unknown';
+                            const owner = c.ownerName || c.contactPerson || c.contactName || '';
+                            const city = c.city || '';
+                            const label = `${firm}${owner ? ` (${owner})` : ''}${city ? ` - ${city}` : ''}`;
+                            return (
+                              <option key={cId} value={cId}>
+                                {label}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+
+                      {/* Selected Ship To Party Details Card */}
+                      {shippingAddress.attention || selectedShipToParty ? (
+                        <div className="p-2 bg-white rounded-lg border border-gray-200 text-[10.5px] space-y-0.5 shadow-3xs">
+                          <div className="font-bold text-gray-900 truncate">
+                            {shippingAddress.attention || selectedShipToParty?.firmName}
+                          </div>
+                          {selectedShipToParty?.ownerName && (
+                            <div className="text-gray-500 font-medium">
+                              Contact: <span className="text-gray-800 font-semibold">{selectedShipToParty.ownerName}</span>
+                            </div>
+                          )}
+                          <div className="text-gray-600 leading-tight truncate">
+                            {[shippingAddress.addressLine, shippingAddress.city, shippingAddress.state, shippingAddress.pincode].filter(Boolean).join(', ')}
+                          </div>
+                          {(shippingAddress.phone || selectedShipToParty?.phone) && (
+                            <div className="text-gray-500 font-mono text-[10px]">
+                              Phone: <span className="font-semibold text-gray-800">{shippingAddress.phone || selectedShipToParty?.phone}</span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="p-2 bg-amber-50/70 rounded-lg border border-amber-200 text-[10.5px] text-amber-800 italic text-center">
+                          Select a company/customer from the list above for ship-to details.
                         </div>
                       )}
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Shipping Attention / Consignee</label>
-                        <input
-                          type="text"
-                          placeholder="Shipping Attention"
-                          value={shippingAddress.attention}
-                          onChange={(e) => setShippingAddress({ ...shippingAddress, attention: e.target.value })}
-                          disabled={sameAddress}
-                          className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-900 disabled:opacity-60 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Street Address</label>
-                        <input
-                          type="text"
-                          placeholder="Shipping Address Line"
-                          value={shippingAddress.addressLine}
-                          onChange={(e) => setShippingAddress({ ...shippingAddress, addressLine: e.target.value })}
-                          disabled={sameAddress}
-                          className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800 disabled:opacity-60 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        />
-                      </div>
-                      <div className="grid grid-cols-3 gap-1">
-                        <div>
-                          <label className="block text-[10px] font-bold text-gray-500 mb-0.5">City</label>
-                          <input
-                            type="text"
-                            placeholder="City"
-                            value={shippingAddress.city}
-                            onChange={(e) => setShippingAddress({ ...shippingAddress, city: e.target.value })}
-                            disabled={sameAddress}
-                            className="w-full px-1.5 py-0.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800 disabled:opacity-60"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-gray-500 mb-0.5">State</label>
-                          <input
-                            type="text"
-                            placeholder="State"
-                            value={shippingAddress.state}
-                            onChange={(e) => setShippingAddress({ ...shippingAddress, state: e.target.value })}
-                            disabled={sameAddress}
-                            className="w-full px-1.5 py-0.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800 disabled:opacity-60"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Pincode</label>
-                          <input
-                            type="text"
-                            placeholder="Pincode"
-                            value={shippingAddress.pincode}
-                            onChange={(e) => setShippingAddress({ ...shippingAddress, pincode: e.target.value })}
-                            disabled={sameAddress}
-                            className="w-full px-1.5 py-0.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800 disabled:opacity-60"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Contact Phone</label>
-                        <input
-                          type="text"
-                          placeholder="Phone / Mobile"
-                          value={shippingAddress.phone}
-                          onChange={(e) => setShippingAddress({ ...shippingAddress, phone: e.target.value })}
-                          disabled={sameAddress}
-                          className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800 disabled:opacity-60 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        />
-                      </div>
-                    </>
+                    </div>
                   )}
+                </div>
+              ) : isEditingAddress ? (
+                <div className="h-[142px] overflow-y-auto p-2.5 bg-gray-50 rounded-xl border border-gray-200 space-y-2 text-xs pr-1">
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Billing Attention / Company</label>
+                    <input
+                      type="text"
+                      placeholder="Contact / Attention"
+                      value={billingAddress.attention}
+                      onChange={(e) => setBillingAddress({ ...billingAddress, attention: e.target.value })}
+                      className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Street Address</label>
+                    <input
+                      type="text"
+                      placeholder="Street / Address Line"
+                      value={billingAddress.addressLine}
+                      onChange={(e) => setBillingAddress({ ...billingAddress, addressLine: e.target.value })}
+                      className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-1">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 mb-0.5">City</label>
+                      <input
+                        type="text"
+                        placeholder="City"
+                        value={billingAddress.city}
+                        onChange={(e) => setBillingAddress({ ...billingAddress, city: e.target.value })}
+                        className="w-full px-1.5 py-0.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 mb-0.5">State</label>
+                      <input
+                        type="text"
+                        placeholder="State"
+                        value={billingAddress.state}
+                        onChange={(e) => setBillingAddress({ ...billingAddress, state: e.target.value })}
+                        className="w-full px-1.5 py-0.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Pincode</label>
+                      <input
+                        type="text"
+                        placeholder="Pincode"
+                        value={billingAddress.pincode}
+                        onChange={(e) => setBillingAddress({ ...billingAddress, pincode: e.target.value })}
+                        className="w-full px-1.5 py-0.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Contact Phone</label>
+                    <input
+                      type="text"
+                      placeholder="Phone / Mobile"
+                      value={billingAddress.phone}
+                      onChange={(e) => setBillingAddress({ ...billingAddress, phone: e.target.value })}
+                      className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    />
+                  </div>
                   <button
                     type="button"
                     onClick={() => setIsEditingAddress(false)}
@@ -1756,86 +1776,43 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                 </div>
               ) : (
                 <div className="h-[142px] p-3 bg-gray-50/80 rounded-xl border border-gray-200/70 text-[11px] text-gray-700 flex flex-col justify-between">
-                  {activeAddressTab === 'bill' ? (
-                    <div>
-                      <div className="flex items-center justify-between font-bold text-gray-900 mb-1">
-                        <span className="truncate pr-1">{billingAddress.attention || selectedCustomer?.firmName || 'Customer Billing Address'}</span>
-                        <button
-                          type="button"
-                          onClick={() => setIsEditingAddress(true)}
-                          className="text-[10px] text-blue-600 hover:text-blue-700 font-bold underline cursor-pointer shrink-0"
-                        >
-                          Edit
-                        </button>
-                      </div>
-                      <div className="text-gray-700 leading-snug line-clamp-3 text-[11px]">
-                        {billingAddress.addressLine ? (
-                          <>
-                            <span className="font-semibold text-gray-900">{billingAddress.addressLine}</span>
-                            {(billingAddress.city || billingAddress.state || billingAddress.pincode) && (
-                              <span className="text-gray-600">
-                                {billingAddress.city && !billingAddress.addressLine.includes(billingAddress.city) ? `, ${billingAddress.city}` : ''}
-                                {billingAddress.state && !billingAddress.addressLine.includes(billingAddress.state) ? `, ${billingAddress.state}` : ''}
-                                {billingAddress.pincode && !billingAddress.addressLine.includes(billingAddress.pincode) ? ` - ${billingAddress.pincode}` : ''}
-                              </span>
-                            )}
-                          </>
-                        ) : selectedCustomer ? (
-                          <span className="text-gray-600 font-medium">
-                            {[selectedCustomer.city, selectedCustomer.state, selectedCustomer.pincode].filter(Boolean).join(', ') || 'Address not specified'}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400 italic">No customer selected</span>
-                        )}
-                      </div>
-                      <div className="text-gray-500 font-mono mt-1 text-[10.5px]">
-                        Mobile: <span className="font-semibold text-gray-800">{billingAddress.phone || selectedCustomer?.phone || selectedCustomer?.mobile || '—'}</span>
-                      </div>
+                  <div>
+                    <div className="flex items-center justify-between font-bold text-gray-900 mb-1">
+                      <span className="truncate pr-1">{billingAddress.attention || selectedCustomer?.firmName || 'Customer Billing Address'}</span>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingAddress(true)}
+                        className="text-[10px] text-blue-600 hover:text-blue-700 font-bold underline cursor-pointer shrink-0"
+                      >
+                        Edit
+                      </button>
                     </div>
-                  ) : (
-                    <div>
-                      <div className="flex items-center justify-between font-bold text-gray-900 mb-1">
-                        <span className="truncate pr-1">{shippingAddress.attention || billingAddress.attention || 'Customer Shipping Address'}</span>
-                        <button
-                          type="button"
-                          onClick={() => setIsEditingAddress(true)}
-                          className="text-[10px] text-blue-600 hover:text-blue-700 font-bold underline cursor-pointer shrink-0"
-                        >
-                          Edit
-                        </button>
-                      </div>
-                      <div className="text-gray-700 leading-snug line-clamp-3 text-[11px]">
-                        {(shippingAddress.addressLine || billingAddress.addressLine) ? (
-                          <>
-                            <span className="font-semibold text-gray-900">{shippingAddress.addressLine || billingAddress.addressLine}</span>
-                            {(shippingAddress.city || shippingAddress.state || shippingAddress.pincode) && (
-                              <span className="text-gray-600">
-                                {shippingAddress.city && !(shippingAddress.addressLine || '').includes(shippingAddress.city) ? `, ${shippingAddress.city}` : ''}
-                                {shippingAddress.state && !(shippingAddress.addressLine || '').includes(shippingAddress.state) ? `, ${shippingAddress.state}` : ''}
-                                {shippingAddress.pincode && !(shippingAddress.addressLine || '').includes(shippingAddress.pincode) ? ` - ${shippingAddress.pincode}` : ''}
-                              </span>
-                            )}
-                          </>
-                        ) : selectedCustomer ? (
-                          <span className="text-gray-600 font-medium">
-                            {[selectedCustomer.city, selectedCustomer.state, selectedCustomer.pincode].filter(Boolean).join(', ') || 'Address not specified'}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400 italic">No customer selected</span>
-                        )}
-                      </div>
-                      <div className="text-gray-500 font-mono mt-1 text-[10.5px]">
-                        Mobile: <span className="font-semibold text-gray-800">{shippingAddress.phone || billingAddress.phone || selectedCustomer?.phone || selectedCustomer?.mobile || '—'}</span>
-                      </div>
-                      {sameAddress && (
-                        <span className="text-[9.5px] text-blue-600 font-bold block mt-0.5">
-                          (Synced with customer billing address)
+                    <div className="text-gray-700 leading-snug line-clamp-3 text-[11px]">
+                      {billingAddress.addressLine ? (
+                        <>
+                          <span className="font-semibold text-gray-900">{billingAddress.addressLine}</span>
+                          {(billingAddress.city || billingAddress.state || billingAddress.pincode) && (
+                            <span className="text-gray-600">
+                              {billingAddress.city && !billingAddress.addressLine.includes(billingAddress.city) ? `, ${billingAddress.city}` : ''}
+                              {billingAddress.state && !billingAddress.addressLine.includes(billingAddress.state) ? `, ${billingAddress.state}` : ''}
+                              {billingAddress.pincode && !billingAddress.addressLine.includes(billingAddress.pincode) ? ` - ${billingAddress.pincode}` : ''}
+                            </span>
+                          )}
+                        </>
+                      ) : selectedCustomer ? (
+                        <span className="text-gray-600 font-medium">
+                          {[selectedCustomer.city, selectedCustomer.state, selectedCustomer.pincode].filter(Boolean).join(', ') || 'Address not specified'}
                         </span>
+                      ) : (
+                        <span className="text-gray-400 italic">No customer selected</span>
                       )}
                     </div>
-                  )}
+                    <div className="text-gray-500 font-mono mt-1 text-[10.5px]">
+                      Mobile: <span className="font-semibold text-gray-800">{billingAddress.phone || selectedCustomer?.phone || selectedCustomer?.mobile || '—'}</span>
+                    </div>
+                  </div>
                   <div className="text-[10px] text-gray-400 italic text-right">
-                    Click Edit above to alter
+                    Click Edit above to alter billing details
                   </div>
                 </div>
               )}
@@ -2142,7 +2119,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-gray-900 uppercase tracking-wide">Order Charges (Optional)</span>
+                        <span className="text-xs font-bold text-gray-900 uppercase tracking-wide">Order Charges <span className="text-rose-600 font-bold">*</span></span>
                         <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full font-mono text-[10.5px] font-bold border border-blue-200 flex items-center gap-1">
                           <Zap className="w-3 h-3 text-amber-500 fill-amber-500" />
                           <span>Total Order: {totalOrderGbl} GBL</span>
@@ -2163,7 +2140,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                         className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100/80 text-blue-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-blue-200 shadow-3xs"
                       >
                         <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                        <span>+ Add Preset Charge</span>
+                        <span>Add Preset Charge</span>
                         <ChevronDown className="w-3 h-3 text-blue-500" />
                       </button>
 
@@ -2198,18 +2175,23 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                               </button>
                             ))}
                           </div>
+                          <div className="px-3 py-1.5 bg-gray-50 flex items-center justify-between">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPredefinedCharges(DEFAULT_PREDEFINED_CHARGES);
+                                try { localStorage.setItem('skbw_predefined_charges_v2', JSON.stringify(DEFAULT_PREDEFINED_CHARGES)); } catch (e) {}
+                                showToast('Reset charges to system defaults', 'info');
+                              }}
+                              className="text-[11px] font-bold text-gray-500 hover:text-blue-600 underline flex items-center gap-1 cursor-pointer"
+                            >
+                              <RotateCcw className="w-3 h-3 text-gray-400" />
+                              <span>Reset to Defaults</span>
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleAddCharge()}
-                      className="px-2.5 py-1 border border-gray-200 hover:border-gray-300 text-gray-700 hover:bg-gray-50 font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-all shadow-3xs"
-                    >
-                      <Plus className="w-3 h-3 stroke-[3]" />
-                      <span>Custom Row</span>
-                    </button>
                   </div>
                 </div>
 
@@ -2383,8 +2365,8 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
                       {otherCharges.length === 0 && (
                         <tr>
-                          <td colSpan={7} className="py-5 text-center text-gray-400 italic">
-                            No additional charges added. Click "+ Add Preset Charge" or "+ Custom Row".
+                          <td colSpan={7} className="py-5 text-center text-xs text-rose-500 font-medium italic bg-rose-50/20">
+                            No order charges added yet. Click <strong className="text-blue-600 font-semibold cursor-pointer" onClick={() => setShowQuickPresetMenu(true)}>"Add Preset Charge"</strong> above to select a charge.
                           </td>
                         </tr>
                       )}
