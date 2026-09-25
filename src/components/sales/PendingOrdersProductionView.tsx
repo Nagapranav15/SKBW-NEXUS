@@ -755,7 +755,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                                   e.stopPropagation();
                                   handleStartProduction(req.skuCode, req.skuName, req.shortfallGbl);
                                 }}
-                                className="px-2.5 py-1 bg-gray-900 hover:bg-black text-white rounded-lg text-xs font-medium transition-colors cursor-pointer"
+                                className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors cursor-pointer"
                                 title="Start production batch for this shortfall"
                               >
                                 Produce
