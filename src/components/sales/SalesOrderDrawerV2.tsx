@@ -462,14 +462,34 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
           });
           setCustomersList(combined.length > 0 ? combined : ALL_SYSTEM_CUSTOMERS);
 
-          // ── Transporters: merge backend transporters ──
+          // ── Transporters: merge backend transporters from Business Directory ──
           const backendTransporters: any[] = extractParties(transportersRes);
-          const tNames = backendTransporters
-            .map((t: any) => t.firmName || t.name)
-            .filter(Boolean);
-          if (tNames.length > 0) {
-            setTransporterList(prev => Array.from(new Set([...prev, ...tNames])));
-          }
+          const allParties: any[] = extractParties(partiesRes);
+          const extractedSet = new Set<string>();
+
+          // 1. From transporter API call
+          backendTransporters.forEach((t: any) => {
+            const name = t.firmName || t.name || t.transporterName || t.companyName;
+            if (name && typeof name === 'string') extractedSet.add(name.trim());
+          });
+
+          // 2. From all business directory parties
+          allParties.forEach((p: any) => {
+            if (
+              p.type === 'transporter' ||
+              p.partyType === 'transporter' ||
+              p.category === 'transporter' ||
+              (Array.isArray(p.roles) && p.roles.includes('transporter'))
+            ) {
+              const name = p.firmName || p.name || p.transporterName;
+              if (name && typeof name === 'string') extractedSet.add(name.trim());
+            }
+          });
+
+          // 3. Fallback standard transporters
+          ['Chennupati Cargo Services', 'VRL Logistics', 'Navata Road Transport', 'Kranti Transport', 'TCI Freight', 'ARC Transport', 'GATI KWE', 'Blue Dart Surface', 'SafeExpress', 'Direct / Self Pickup'].forEach(t => extractedSet.add(t));
+
+          setTransporterList(Array.from(extractedSet));
         } catch (innerErr) {
           console.error('Error processing fetched data:', innerErr);
           // Ensure fallback data is always shown even if processing fails
@@ -1009,6 +1029,54 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
     }
   };
 
+  // Keyboard navigation across form inputs using Enter key
+  const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'TEXTAREA' || target.tagName === 'BUTTON') return;
+      if (target.closest('.customer-dropdown-item')) return;
+
+      e.preventDefault();
+
+      const form = e.currentTarget;
+      const focusables = Array.from(
+        form.querySelectorAll<HTMLElement>(
+          'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])'
+        )
+      ).filter(el => el.offsetWidth > 0 || el.offsetHeight > 0 || el.getClientRects().length > 0);
+
+      const index = focusables.indexOf(target);
+      if (index > -1 && index < focusables.length - 1) {
+        focusables[index + 1].focus();
+      } else if (index === focusables.length - 1) {
+        handleAddItem();
+      }
+    }
+  };
+
+  // Keyboard Shortcuts for Sales Order Drawer (Esc, Ctrl+Enter, Alt+S, Alt+A)
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyboard = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        handleSaveOrder();
+      } else if (e.altKey && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        handleSaveOrder('Draft');
+      } else if (e.altKey && (e.key === 'a' || e.key === 'A')) {
+        e.preventDefault();
+        handleAddItem();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyboard);
+    return () => window.removeEventListener('keydown', handleKeyboard);
+  }, [isOpen, onClose]);
+
   return (
     <>
       <Modal
@@ -1018,7 +1086,11 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       padding="p-0"
       hideCloseButton={true}
     >
-      <form onSubmit={(e) => { e.preventDefault(); handleSaveOrder(); }} className="flex flex-col max-h-[92vh] overflow-hidden font-sans text-xs bg-slate-50/70">
+      <form 
+        onSubmit={(e) => { e.preventDefault(); handleSaveOrder(); }} 
+        onKeyDown={handleFormKeyDown}
+        className="flex flex-col max-h-[92vh] overflow-hidden font-sans text-xs bg-slate-50/70"
+      >
         
         {/* ── MODAL HEADER (1:1 with Screenshot) ── */}
         <div className="px-6 py-4 border-b border-gray-200 bg-white flex items-center justify-between shrink-0 shadow-2xs">

@@ -181,6 +181,44 @@ const SalesOrders: React.FC = () => {
     fetchOrders();
   }, [selectedCompany?._id]);
 
+  // Global Keyboard Shortcuts (Matching Purchase Batch UI)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isInput = document.activeElement?.tagName === 'INPUT' || 
+                      document.activeElement?.tagName === 'TEXTAREA' || 
+                      document.activeElement?.tagName === 'SELECT';
+
+      // Alt + C / F8: Open New Sales Order Drawer
+      if (((e.altKey && (e.key === 'c' || e.key === 'C')) || e.key === 'F8') && !isInput) {
+        e.preventDefault();
+        setEditingOrder(null);
+        setShowDrawer(true);
+      }
+
+      // Ctrl + F / Cmd + F: Focus Search Box
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+        const searchInput = document.querySelector('input[placeholder*="Search by SO No"]') as HTMLInputElement | null;
+        if (searchInput) {
+          e.preventDefault();
+          searchInput.focus();
+          searchInput.select();
+        }
+      }
+
+      // Escape: Close active drawer/modal
+      if (e.key === 'Escape') {
+        if (showDrawer) setShowDrawer(false);
+        if (selectedOrderDetail) setSelectedOrderDetail(null);
+        if (selectedPrintOrder) setSelectedPrintOrder(null);
+        if (showSuccessModal) setShowSuccessModal(false);
+        if (whatsappOrder) setWhatsappOrder(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showDrawer, selectedOrderDetail, selectedPrintOrder, showSuccessModal, whatsappOrder]);
+
   // Unique list of regions for dropdown
   const availableRegions = useMemo(() => {
     const set = new Set<string>();
@@ -530,9 +568,10 @@ const SalesOrders: React.FC = () => {
           <button
             onClick={() => { setEditingOrder(null); setShowDrawer(true); }}
             className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white font-bold rounded-xl shadow-sm transition-all cursor-pointer flex items-center gap-2 text-xs sm:text-sm"
+            title="Create New Sales Order (Alt+C / F8)"
           >
             <Plus className="w-4 h-4 stroke-[3]" />
-            <span>+ New Sales Order</span>
+            <span>New Sales Order</span>
           </button>
         </div>
       </div>
@@ -986,8 +1025,15 @@ const SalesOrders: React.FC = () => {
                 return (
                   <tr
                     key={order._id || order.orderNumber}
+                    tabIndex={0}
                     onClick={() => setSelectedOrderDetail(order)}
-                    className={`hover:bg-blue-50/40 transition-colors cursor-pointer group ${
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setSelectedOrderDetail(order);
+                      }
+                    }}
+                    className={`hover:bg-blue-50/40 focus:bg-blue-50/60 focus:outline-none transition-colors cursor-pointer group ${
                       isSelected ? 'bg-blue-50/60' : ''
                     }`}
                   >
