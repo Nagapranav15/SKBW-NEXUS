@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, X, FileText, Trash2, Download, HelpCircle, Check, Eye, Edit, ArrowRight, Layers, Clock, AlertTriangle, CheckCircle, Settings, User, MapPin as MapPinIcon, Ban, Save, Package, Receipt, AlertCircle, Building2, RotateCcw, Filter } from 'lucide-react';
+import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, X, FileText, Trash2, Download, HelpCircle, Check, Eye, Edit, ArrowRight, Layers, Clock, AlertTriangle, CheckCircle, Lock, Settings, User, MapPin as MapPinIcon, Ban, Save, Package, Receipt, AlertCircle, Building2, RotateCcw, Filter } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { getActivityLogs, createActivityLog } from '../../../api/activityLogApi';
@@ -138,6 +138,8 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
                 } else if (paperType === 'Reels') {
                   totalReelsCount += Number(item.reelsCount) || 1;
                   totalKgWeight += item.quantity || 0;
+                } else if (resolvedSku?.category === 'products' || fullSku?.category === 'products' || item.unit === 'GBL' || item.altUnit === 'PCS') {
+                  // Finished goods (tracked in GBL / PCS, not KG)
                 } else {
                   totalKgWeight += item.quantity || 0;
                 }
@@ -292,7 +294,8 @@ const PurchaseInvoicePage: React.FC = () => {
   };
 
   // Helper to determine Item Type of SKU matching SkuMasterV2 (Materials / Semi / Products)
-  const getItemType = (item: SkuV2): 'products' | 'materials' | 'semi' => {
+  const getItemType = (item?: SkuV2 | null): 'products' | 'materials' | 'semi' => {
+    if (!item) return 'materials';
     const cat = (item.category || '').toLowerCase().trim();
     const name = (item.name || '').toLowerCase().trim();
     const code = (item.skuCode || '').toUpperCase().trim();
@@ -364,7 +367,8 @@ const PurchaseInvoicePage: React.FC = () => {
     return 'materials';
   };
 
-  const isSkuMatchingType = (s: SkuV2, purchaseType: string): boolean => {
+  const isSkuMatchingType = (s?: SkuV2 | null, purchaseType?: string): boolean => {
+    if (!s) return false;
     const pType = (purchaseType || 'Raw Material').toLowerCase().trim();
     if (pType === 'all' || pType === 'all types' || pType === 'all items' || pType === '') {
       return true;
@@ -844,6 +848,8 @@ const PurchaseInvoicePage: React.FC = () => {
         } else if (item.reels && item.reels.length > 0) {
           const reelsWt = item.reels.reduce((s, r) => s + (Number(r.weight) || 0), 0);
           totalKgWeight += reelsWt > 0 ? reelsWt : (item.quantity || 0);
+        } else if (resolvedSku?.category === 'products' || fullSku?.category === 'products' || item.unit === 'GBL' || item.altUnit === 'PCS') {
+          // Finished goods (tracked in GBL / PCS, not KG)
         } else {
           totalKgWeight += item.quantity || 0;
         }
@@ -964,6 +970,8 @@ const PurchaseInvoicePage: React.FC = () => {
           } else if (paperType === 'Reels') {
             reelsCount += Number(item.reelsCount) || 1;
             totalKg += item.quantity || 0;
+          } else if (resolvedSku?.category === 'products' || fullSku?.category === 'products' || item.unit === 'GBL' || item.altUnit === 'PCS') {
+            // Finished goods (tracked in GBL / PCS, not KG)
           } else {
             totalKg += item.quantity || 0;
           }
@@ -1445,12 +1453,34 @@ const PurchaseInvoicePage: React.FC = () => {
         }));
       }
 
+      const isFg = invoiceForm.purchaseType === 'Finished Goods' || 
+                   getItemType(selectedSku) === 'products' || 
+                   (selectedSku?.unit || '').toUpperCase() === 'GBL' || 
+                   (selectedSku?.altUnit || '').toUpperCase() === 'GBL';
+
+      let itemTotalPrice = qty * price;
+      if (isFg) {
+        let totalPcs = qty;
+        if (selectedSku?.altUnit && selectedSku?.altUnitConversion) {
+          const normAlt = (selectedSku.altUnit || '').toUpperCase();
+          const normPri = (selectedSku.unit || '').toUpperCase();
+          if (normAlt === 'PCS' || normAlt === 'PC' || normAlt === 'NOS' || normAlt === 'NO' || normAlt === 'BOOK' || normAlt === 'BOOKS') {
+            totalPcs = Number(item.altQuantity) || convertPrimaryToAlt(qty, selectedSku);
+          } else if (normPri === 'PCS' || normPri === 'PC' || normPri === 'NOS' || normPri === 'NO' || normPri === 'BOOK' || normPri === 'BOOKS') {
+            totalPcs = qty;
+          } else {
+            totalPcs = Number(item.altQuantity) || qty;
+          }
+        }
+        itemTotalPrice = totalPcs * price;
+      }
+
       validatedItems.push({
         skuId: item.skuId,
         quantity: qty,
         unit: selectedSku?.unit || (isReels ? 'kg' : isSheets ? 'Sheets' : 'Pcs'),
         purchasePrice: price,
-        totalPrice: qty * price,
+        totalPrice: itemTotalPrice,
         lotNumber: item.lotNumber || finalInvoiceNumber,
         locationId: cleanedSplits[0]?.locationId || itemLocId || defaultStorageId,
         splits: cleanedSplits,
@@ -1759,7 +1789,48 @@ const PurchaseInvoicePage: React.FC = () => {
   });
 
   const formTotalWeight = invoiceForm.items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
-  const formMatTotal = invoiceForm.items.reduce((sum, item) => sum + ((Number(item.quantity) || 0) * (Number(item.purchasePrice) || 0)), 0);
+  const getItemSubtotal = (item: PurchaseInvoiceFormItem) => {
+    const sku = skus.find(s => s._id === item.skuId);
+    const paperType = sku?.paperType || 'None';
+    const isFg = invoiceForm.purchaseType === 'Finished Goods' || 
+                 getItemType(sku) === 'products' || 
+                 (sku?.unit || '').toUpperCase() === 'GBL' || 
+                 (sku?.altUnit || '').toUpperCase() === 'GBL';
+
+    const price = Number(item.purchasePrice) || 0;
+
+    if (paperType === 'Sheets') {
+      const stdSheets = Number(item.sheetsPerReam) || sku?.pages || 500;
+      const rw = Number(item.reamWeight) || (sku as any)?.reamWeight || getFallbackReamWeight(sku) || 0;
+      const rkg = Number(item.ratePerKg) || 0;
+      const totalSheets = Number(item.quantity) || 0;
+      const reams = stdSheets > 0 ? (totalSheets / stdSheets) : 0;
+      if (rw > 0 && rkg > 0) {
+        return reams * rw * rkg;
+      }
+      return totalSheets * price;
+    }
+
+    if (isFg) {
+      let totalPcs = Number(item.quantity) || 0;
+      if (sku?.altUnit && sku?.altUnitConversion) {
+        const normAlt = (sku.altUnit || '').toUpperCase();
+        const normPri = (sku.unit || '').toUpperCase();
+        if (normAlt === 'PCS' || normAlt === 'PC' || normAlt === 'NOS' || normAlt === 'NO' || normAlt === 'BOOK' || normAlt === 'BOOKS') {
+          totalPcs = Number(item.altQuantity) || convertPrimaryToAlt(Number(item.quantity) || 0, sku);
+        } else if (normPri === 'PCS' || normPri === 'PC' || normPri === 'NOS' || normPri === 'NO' || normPri === 'BOOK' || normPri === 'BOOKS') {
+          totalPcs = Number(item.quantity) || 0;
+        } else {
+          totalPcs = Number(item.altQuantity) || Number(item.quantity) || 0;
+        }
+      }
+      return totalPcs * price;
+    }
+
+    return (Number(item.quantity) || 0) * price;
+  };
+
+  const formMatTotal = invoiceForm.items.reduce((sum, item) => sum + getItemSubtotal(item), 0);
   const formOtherCharges = (Number(invoiceForm.freight) || 0) + (Number(invoiceForm.craneCharges) || 0) + (Number(invoiceForm.loadingUnloading) || 0) + (Number(invoiceForm.otherCharges) || 0);
 
   // Dashboard Stats (mocked or loaded)
@@ -2695,146 +2766,171 @@ const PurchaseInvoicePage: React.FC = () => {
                         );
                       })()}
 
-                      {paperType === 'None' && (
-                        <>
-                          {selectedSku?.altUnit && selectedSku?.altUnitConversion ? (
-                            <>
-                              <div className="col-span-1 sm:col-span-2">
-                                <label className="block text-[11px] font-semibold text-blue-600 mb-1">
-                                  QTY IN {unitLabel} *
-                                  <span className="text-[10px] font-normal text-gray-400 ml-1 font-mono">({formatUomFormula(selectedSku)})</span>
-                                </label>
-                                <input
-                                  type="number"
-                                  step="any"
-                                  placeholder="0"
-                                  value={item.quantity !== undefined && item.quantity !== null ? item.quantity : ''}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    const updatedItems = [...invoiceForm.items];
-                                    updatedItems[idx].quantity = val;
-                                    if (val === '' || val === null || val === undefined) {
-                                      updatedItems[idx].altQuantity = '';
-                                    } else {
-                                      const num = Number(val);
-                                      if (isNaN(num)) {
-                                        updatedItems[idx].altQuantity = '';
-                                      } else if (num === 0) {
-                                        updatedItems[idx].altQuantity = '0';
-                                      } else {
-                                        updatedItems[idx].altQuantity = String(convertPrimaryToAlt(num, selectedSku));
-                                      }
-                                    }
-                                    const firstStorage = locations.find(loc => loc.level === 'Storage Location');
-                                    const defaultLocId = updatedItems[idx].locationId || firstStorage?._id || '';
-                                    if (!updatedItems[idx].splits || updatedItems[idx].splits.length <= 1) {
-                                      updatedItems[idx].splits = [{ locationId: defaultLocId, quantity: val !== '' ? val : '0' }];
-                                    }
-                                    setInvoiceForm({ ...invoiceForm, items: updatedItems });
-                                  }}
-                                  disabled={Boolean(item.splits && item.splits.length > 1)}
-                                  className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-xs text-right font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
-                                  required
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-[11px] font-semibold text-gray-600 mb-1 flex items-center justify-between">
-                                  <span>TOTAL {selectedSku.altUnit}</span>
-                                </label>
-                                <input
-                                  type="number"
-                                  step="any"
-                                  placeholder="0"
-                                  value={
-                                    item.altQuantity !== undefined && item.altQuantity !== ''
-                                      ? item.altQuantity
-                                      : (item.quantity !== '' && item.quantity !== undefined
-                                          ? (Number(item.quantity) === 0 ? '0' : String(convertPrimaryToAlt(Number(item.quantity) || 0, selectedSku)))
-                                          : '')
-                                  }
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    const updatedItems = [...invoiceForm.items];
-                                    updatedItems[idx].altQuantity = val;
-                                    if (val === '' || val === null || val === undefined) {
-                                      updatedItems[idx].quantity = '';
-                                    } else {
-                                      const altNum = Number(val);
-                                      if (isNaN(altNum)) {
-                                        updatedItems[idx].quantity = '';
-                                      } else if (altNum === 0) {
-                                        updatedItems[idx].quantity = '0';
-                                      } else {
-                                        const primaryQty = convertAltToPrimary(altNum, selectedSku);
-                                        updatedItems[idx].quantity = String(primaryQty);
-                                      }
-                                    }
-                                    const firstStorage = locations.find(loc => loc.level === 'Storage Location');
-                                    const defaultLocId = updatedItems[idx].locationId || firstStorage?._id || '';
-                                    if (!updatedItems[idx].splits || updatedItems[idx].splits.length <= 1) {
-                                      updatedItems[idx].splits = [{ locationId: defaultLocId, quantity: updatedItems[idx].quantity !== '' ? updatedItems[idx].quantity : '0' }];
-                                    }
-                                    setInvoiceForm({ ...invoiceForm, items: updatedItems });
-                                  }}
-                                  disabled={Boolean(item.splits && item.splits.length > 1)}
-                                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs text-right font-black focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-60"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-[11px] font-semibold text-gray-600 mb-1">RATE / {unitLabel} (₹)</label>
-                                <input
-                                  type="number"
-                                  step="any"
-                                  value={item.purchasePrice !== undefined && item.purchasePrice !== null ? item.purchasePrice : ''}
-                                  onChange={e => handleItemRowChange(idx, 'purchasePrice', e.target.value)}
-                                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs text-right font-bold focus:ring-2 focus:ring-blue-500 bg-white"
-                                  placeholder="0.00"
-                                  required
-                                />
-                              </div>
-                            </>
-                          ) : (
-                            <>
-                              <div className="col-span-1 sm:col-span-2">
-                                <label className="block text-[11px] font-semibold text-gray-600 mb-1">TOTAL {unitLabel}</label>
-                                <input
-                                  type="number"
-                                  step="any"
-                                  value={item.quantity !== undefined && item.quantity !== null ? item.quantity : ''}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    const updatedItems = [...invoiceForm.items];
-                                    updatedItems[idx].quantity = val;
-                                    const firstStorage = locations.find(loc => loc.level === 'Storage Location');
-                                    const defaultLocId = updatedItems[idx].locationId || firstStorage?._id || '';
-                                    if (!updatedItems[idx].splits || updatedItems[idx].splits.length <= 1) {
-                                      updatedItems[idx].splits = [{ locationId: defaultLocId, quantity: val !== '' ? val : '0' }];
-                                    }
-                                    setInvoiceForm({ ...invoiceForm, items: updatedItems });
-                                  }}
-                                  disabled={Boolean(item.splits && item.splits.length > 1)}
-                                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs text-right font-black focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-60"
-                                  placeholder="0"
-                                  required
-                                />
-                              </div>
+                      {paperType === 'None' && (() => {
+                        const isFg = invoiceForm.purchaseType === 'Finished Goods' || 
+                                     getItemType(selectedSku) === 'products' || 
+                                     (selectedSku?.unit || '').toUpperCase() === 'GBL' || 
+                                     (selectedSku?.altUnit || '').toUpperCase() === 'GBL';
+                        
+                        let totalPcs = Number(item.quantity) || 0;
+                        if (selectedSku?.altUnit && selectedSku?.altUnitConversion) {
+                          const normAlt = (selectedSku.altUnit || '').toUpperCase();
+                          const normPri = (selectedSku.unit || '').toUpperCase();
+                          if (normAlt === 'PCS' || normAlt === 'PC' || normAlt === 'NOS' || normAlt === 'NO' || normAlt === 'BOOK' || normAlt === 'BOOKS') {
+                            totalPcs = Number(item.altQuantity) || convertPrimaryToAlt(Number(item.quantity) || 0, selectedSku);
+                          } else if (normPri === 'PCS' || normPri === 'PC' || normPri === 'NOS' || normPri === 'NO' || normPri === 'BOOK' || normPri === 'BOOKS') {
+                            totalPcs = Number(item.quantity) || 0;
+                          } else {
+                            totalPcs = Number(item.altQuantity) || Number(item.quantity) || 0;
+                          }
+                        }
 
-                              <div className="col-span-1 sm:col-span-2">
-                                <label className="block text-[11px] font-semibold text-gray-600 mb-1">RATE / {unitLabel} (₹)</label>
-                                <input
-                                  type="number"
-                                  step="any"
-                                  value={item.purchasePrice !== undefined && item.purchasePrice !== null ? item.purchasePrice : ''}
-                                  onChange={e => handleItemRowChange(idx, 'purchasePrice', e.target.value)}
-                                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs text-right font-bold focus:ring-2 focus:ring-blue-500 bg-white"
-                                  placeholder="0.00"
-                                  required
-                                />
-                              </div>
-                            </>
-                          )}
-                        </>
-                      )}
+                        const rateLabel = isFg ? 'RATE / PCS (₹)' : `RATE / ${unitLabel} (₹)`;
+                        const itemAmount = isFg ? (totalPcs * (Number(item.purchasePrice) || 0)) : ((Number(item.quantity) || 0) * (Number(item.purchasePrice) || 0));
+
+                        return (
+                          <>
+                            {selectedSku?.altUnit && selectedSku?.altUnitConversion ? (
+                              <>
+                                <div className="col-span-1 sm:col-span-2">
+                                  <label className="block text-[11px] font-semibold text-blue-600 mb-1">
+                                    QTY IN {isFg ? (selectedSku.unit || 'GBL') : unitLabel} *
+                                    <span className="text-[10px] font-normal text-gray-400 ml-1 font-mono">({formatUomFormula(selectedSku)})</span>
+                                  </label>
+                                  <input
+                                    type="number"
+                                    step="any"
+                                    placeholder="0"
+                                    value={item.quantity !== undefined && item.quantity !== null ? item.quantity : ''}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      const updatedItems = [...invoiceForm.items];
+                                      updatedItems[idx].quantity = val;
+                                      if (val === '' || val === null || val === undefined) {
+                                        updatedItems[idx].altQuantity = '';
+                                      } else {
+                                        const num = Number(val);
+                                        if (isNaN(num)) {
+                                          updatedItems[idx].altQuantity = '';
+                                        } else if (num === 0) {
+                                          updatedItems[idx].altQuantity = '0';
+                                        } else {
+                                          updatedItems[idx].altQuantity = String(convertPrimaryToAlt(num, selectedSku));
+                                        }
+                                      }
+                                      const firstStorage = locations.find(loc => loc.level === 'Storage Location');
+                                      const defaultLocId = updatedItems[idx].locationId || firstStorage?._id || '';
+                                      if (!updatedItems[idx].splits || updatedItems[idx].splits.length <= 1) {
+                                        updatedItems[idx].splits = [{ locationId: defaultLocId, quantity: val !== '' ? val : '0' }];
+                                      }
+                                      setInvoiceForm({ ...invoiceForm, items: updatedItems });
+                                    }}
+                                    disabled={Boolean(item.splits && item.splits.length > 1)}
+                                    className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-xs text-right font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+                                    required
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[11px] font-semibold text-gray-600 mb-1 flex items-center justify-between">
+                                    <span>TOTAL {isFg ? (selectedSku.altUnit || 'PCS') : selectedSku.altUnit}</span>
+                                  </label>
+                                  <input
+                                    type="number"
+                                    step="any"
+                                    placeholder="0"
+                                    value={
+                                      item.altQuantity !== undefined && item.altQuantity !== ''
+                                        ? item.altQuantity
+                                        : (item.quantity !== '' && item.quantity !== undefined
+                                            ? (Number(item.quantity) === 0 ? '0' : String(convertPrimaryToAlt(Number(item.quantity) || 0, selectedSku)))
+                                            : '')
+                                    }
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      const updatedItems = [...invoiceForm.items];
+                                      updatedItems[idx].altQuantity = val;
+                                      if (val === '' || val === null || val === undefined) {
+                                        updatedItems[idx].quantity = '';
+                                      } else {
+                                        const altNum = Number(val);
+                                        if (isNaN(altNum)) {
+                                          updatedItems[idx].quantity = '';
+                                        } else if (altNum === 0) {
+                                          updatedItems[idx].quantity = '0';
+                                        } else {
+                                          const primaryQty = convertAltToPrimary(altNum, selectedSku);
+                                          updatedItems[idx].quantity = String(primaryQty);
+                                        }
+                                      }
+                                      const firstStorage = locations.find(loc => loc.level === 'Storage Location');
+                                      const defaultLocId = updatedItems[idx].locationId || firstStorage?._id || '';
+                                      if (!updatedItems[idx].splits || updatedItems[idx].splits.length <= 1) {
+                                        updatedItems[idx].splits = [{ locationId: defaultLocId, quantity: updatedItems[idx].quantity !== '' ? updatedItems[idx].quantity : '0' }];
+                                      }
+                                      setInvoiceForm({ ...invoiceForm, items: updatedItems });
+                                    }}
+                                    disabled={Boolean(item.splits && item.splits.length > 1)}
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs text-right font-black focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-60"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                                    {rateLabel} *
+                                  </label>
+                                  <input
+                                    type="number"
+                                    step="any"
+                                    value={item.purchasePrice !== undefined && item.purchasePrice !== null ? item.purchasePrice : ''}
+                                    onChange={e => handleItemRowChange(idx, 'purchasePrice', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs text-right font-bold focus:ring-2 focus:ring-blue-500 bg-white"
+                                    placeholder="0.00"
+                                    required
+                                  />
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="col-span-1 sm:col-span-2">
+                                  <label className="block text-[11px] font-semibold text-gray-600 mb-1">TOTAL {unitLabel}</label>
+                                  <input
+                                    type="number"
+                                    step="any"
+                                    value={item.quantity !== undefined && item.quantity !== null ? item.quantity : ''}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      const updatedItems = [...invoiceForm.items];
+                                      updatedItems[idx].quantity = val;
+                                      const firstStorage = locations.find(loc => loc.level === 'Storage Location');
+                                      const defaultLocId = updatedItems[idx].locationId || firstStorage?._id || '';
+                                      if (!updatedItems[idx].splits || updatedItems[idx].splits.length <= 1) {
+                                        updatedItems[idx].splits = [{ locationId: defaultLocId, quantity: val !== '' ? val : '0' }];
+                                      }
+                                      setInvoiceForm({ ...invoiceForm, items: updatedItems });
+                                    }}
+                                    disabled={Boolean(item.splits && item.splits.length > 1)}
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs text-right font-black focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-60"
+                                    placeholder="0"
+                                    required
+                                  />
+                                </div>
+
+                                <div className="col-span-1 sm:col-span-2">
+                                  <label className="block text-[11px] font-semibold text-gray-600 mb-1">{rateLabel} *</label>
+                                  <input
+                                    type="number"
+                                    step="any"
+                                    value={item.purchasePrice !== undefined && item.purchasePrice !== null ? item.purchasePrice : ''}
+                                    onChange={e => handleItemRowChange(idx, 'purchasePrice', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs text-right font-bold focus:ring-2 focus:ring-blue-500 bg-white"
+                                    placeholder="0.00"
+                                    required
+                                  />
+                                </div>
+                              </>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
 
                     {/* Non-reels Godown / Location Allocation Matrix (Default Always Active) */}
@@ -2906,7 +3002,14 @@ const PurchaseInvoicePage: React.FC = () => {
                                   const splitSheets = Number(split.quantity) || 0;
                                   const splitReams = isSheets ? (splitSheets / stdSheets) : 0;
                                   const splitWeight = isSheets ? splitReams * (Number(item.reamWeight) || 0) : 0;
-                                  const splitAmount = splitSheets * (Number(item.purchasePrice) || 0);
+                                  const isFg = invoiceForm.purchaseType === 'Finished Goods' || 
+                                               getItemType(selectedSku) === 'products' || 
+                                               (selectedSku?.unit || '').toUpperCase() === 'GBL' || 
+                                               (selectedSku?.altUnit || '').toUpperCase() === 'GBL';
+                                  const splitPcs = isFg && selectedSku?.altUnit && selectedSku?.altUnitConversion 
+                                    ? convertPrimaryToAlt(splitSheets, selectedSku) 
+                                    : splitSheets;
+                                  const splitAmount = splitPcs * (Number(item.purchasePrice) || 0);
 
                                   return (
                                     <tr key={sIdx} className="hover:bg-blue-50/30 transition-colors">
@@ -2983,7 +3086,16 @@ const PurchaseInvoicePage: React.FC = () => {
                             <div className="flex items-center gap-2">
                               <span className="text-[10px] font-bold text-gray-500 uppercase">Lot Subtotal:</span>
                               <span className="font-black text-gray-900 text-sm">
-                                ₹{(totalAllocated * (Number(item.purchasePrice) || 0)).toLocaleString('en-IN')}
+                                {(() => {
+                                  const isFg = invoiceForm.purchaseType === 'Finished Goods' || 
+                                               getItemType(selectedSku) === 'products' || 
+                                               (selectedSku?.unit || '').toUpperCase() === 'GBL' || 
+                                               (selectedSku?.altUnit || '').toUpperCase() === 'GBL';
+                                  const lotPcs = isFg && selectedSku?.altUnit && selectedSku?.altUnitConversion 
+                                    ? convertPrimaryToAlt(totalAllocated, selectedSku) 
+                                    : totalAllocated;
+                                  return `₹${(lotPcs * (Number(item.purchasePrice) || 0)).toLocaleString('en-IN')}`;
+                                })()}
                               </span>
                             </div>
                           </div>
@@ -3284,12 +3396,15 @@ const PurchaseInvoicePage: React.FC = () => {
             let totalReamsCount = 0;
             let totalSheetsCount = 0;
             let totalKgWeight = 0;
+            let totalFgPcs = 0;
             let hasReels = false;
             let hasSheets = false;
+            let hasFg = false;
 
             selectedInvoice.items?.forEach(item => {
               const resolvedSku = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null;
               const fullSku = skus.find(s => s._id === (resolvedSku?._id || item.skuId)) || resolvedSku;
+              const isFgItem = (resolvedSku?.category === 'products') || (fullSku?.category === 'products') || (item.unit === 'GBL') || (item.altUnit === 'PCS');
               if (resolvedSku?.paperType === 'Sheets' || fullSku?.paperType === 'Sheets') {
                 hasSheets = true;
                 const stdSheets = resolvedSku?.pages || fullSku?.pages || 500;
@@ -3307,6 +3422,12 @@ const PurchaseInvoicePage: React.FC = () => {
                 hasReels = true;
                 totalReelsCount += Number(item.reelsCount) || 1;
                 totalKgWeight += item.quantity || 0;
+              } else if (isFgItem) {
+                hasFg = true;
+                const conv = resolvedSku?.conversionFactor || fullSku?.conversionFactor || 200;
+                const gblQty = item.unit === 'GBL' ? (item.quantity || 0) : (item.altUnit === 'GBL' ? (item.altQuantity || 0) : (item.quantity || 0));
+                const pcsQty = item.altUnit === 'PCS' ? (item.altQuantity || 0) : (item.unit === 'PCS' ? (item.quantity || 0) : (gblQty * conv));
+                totalFgPcs += pcsQty;
               } else {
                 totalKgWeight += item.quantity || 0;
               }
@@ -3320,7 +3441,7 @@ const PurchaseInvoicePage: React.FC = () => {
 
             return (
               <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 bg-white">
-                {/* Header batch summary cards (Dynamic for Reels, Sheets, or Both) */}
+                {/* Header batch summary cards (Dynamic for Reels, Sheets, FG, or Both) */}
                 <div className={`grid grid-cols-2 sm:grid-cols-4 ${hasReels && hasSheets ? 'lg:grid-cols-8' : 'lg:grid-cols-7'} gap-2.5 shrink-0`}>
                   {/* Card 1: Batch Number */}
                   <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
@@ -3379,19 +3500,35 @@ const PurchaseInvoicePage: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Card 7: Total Weight (KG) */}
-                  <div className="bg-red-50/40 border border-red-100 rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-                    <span className="block text-[10px] text-red-650 font-bold uppercase tracking-wider leading-tight">Total KG</span>
-                    <span className="block text-base text-red-900 font-extrabold mt-0.5">
-                      {totalKgWeight.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                    </span>
-                  </div>
+                  {/* Dynamic Card: Total FG Units (when batch has Finished Goods) */}
+                  {hasFg && (
+                    <div className="bg-emerald-50/40 border border-emerald-100 rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+                      <span className="block text-[10px] text-emerald-700 font-bold uppercase tracking-wider leading-tight">Total FG</span>
+                      <span className="block text-base text-emerald-900 font-extrabold mt-0.5">
+                        {totalFgPcs.toLocaleString('en-IN')} Pcs
+                      </span>
+                    </div>
+                  )}
 
-                  {/* Card 8: Landed Rate/KG (₹) */}
+                  {/* Card 7: Total Weight (KG) - displayed when batch has weight or non-FG */}
+                  {(!hasFg || totalKgWeight > 0) && (
+                    <div className="bg-red-50/40 border border-red-100 rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+                      <span className="block text-[10px] text-red-650 font-bold uppercase tracking-wider leading-tight">Total KG</span>
+                      <span className="block text-base text-red-900 font-extrabold mt-0.5">
+                        {totalKgWeight.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Card 8: Landed Rate (₹) */}
                   <div className="bg-purple-50/40 border border-purple-100 rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-                    <span className="block text-[10px] text-purple-700 font-bold uppercase tracking-wider leading-tight">Landed Rate/KG</span>
+                    <span className="block text-[10px] text-purple-700 font-bold uppercase tracking-wider leading-tight">
+                      {hasFg && !hasReels && !hasSheets ? 'Landed Rate/PCS' : 'Landed Rate/KG'}
+                    </span>
                     <span className="block text-base text-purple-900 font-extrabold mt-0.5 font-mono">
-                      ₹{batchAvgLandedRate.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      ₹{hasFg && !hasReels && !hasSheets
+                        ? (totalFgPcs > 0 ? (invoiceGrandTotal / totalFgPcs) : 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                        : batchAvgLandedRate.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>
@@ -3443,12 +3580,12 @@ const PurchaseInvoicePage: React.FC = () => {
                           <th className="px-3 py-2.5 text-center">GSM</th>
                           <th className="px-3 py-2.5 text-center">Width</th>
                           <th className="px-3 py-2.5 text-center">
-                            {hasSheets && !hasReels ? 'Reams' : hasReels && !hasSheets ? 'Reels' : 'Reels / Reams'}
+                            {hasSheets && !hasReels ? 'Reams' : hasReels && !hasSheets ? 'Reels' : hasFg && !hasReels && !hasSheets ? 'GBL' : 'Units'}
                           </th>
-                          <th className="px-3 py-2.5 text-right">Total KG</th>
-                          <th className="px-3 py-2.5 text-right">Rate/KG (₹)</th>
+                          <th className="px-3 py-2.5 text-right">{hasFg && !hasReels && !hasSheets ? 'Total Units' : 'Total KG'}</th>
+                          <th className="px-3 py-2.5 text-right">{hasFg && !hasReels && !hasSheets ? 'Rate/PCS (₹)' : 'Rate/KG (₹)'}</th>
                           <th className="px-3 py-2.5 text-right">Mat Amount (₹)</th>
-                          <th className="px-3 py-2.5 text-right">Landed Rate/KG (₹)</th>
+                          <th className="px-3 py-2.5 text-right">{hasFg && !hasReels && !hasSheets ? 'Landed Rate/PCS (₹)' : 'Landed Rate/KG (₹)'}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100 text-gray-700 font-medium">
@@ -3475,9 +3612,10 @@ const PurchaseInvoicePage: React.FC = () => {
                             if (widthMatch) widthVal = widthMatch[1];
                           }
 
-                          // Quantity KG resolution
+                          // Quantity KG / Units resolution
                           let displayQtyKg = item.quantity || 0;
                           const isSheets = (resolvedSku?.paperType === 'Sheets') || (fullSku?.paperType === 'Sheets');
+                          const isFgItem = (resolvedSku?.category === 'products') || (fullSku?.category === 'products') || (item.unit === 'GBL') || (item.altUnit === 'PCS');
                           let itemUnitDisplay = '—';
 
                           if (isSheets) {
@@ -3492,15 +3630,24 @@ const PurchaseInvoicePage: React.FC = () => {
                             const reelsTotalWt = item.reels.reduce((sum, r) => sum + (Number(r.weight) || 0), 0);
                             if (reelsTotalWt > 0) displayQtyKg = reelsTotalWt;
                             itemUnitDisplay = `${item.reels.length} ${item.reels.length === 1 ? 'Reel' : 'Reels'}`;
+                          } else if (isFgItem) {
+                            const conv = resolvedSku?.conversionFactor || fullSku?.conversionFactor || 200;
+                            const gblQty = item.unit === 'GBL' ? (item.quantity || 0) : (item.altUnit === 'GBL' ? (item.altQuantity || 0) : (item.quantity || 0));
+                            const pcsQty = item.altUnit === 'PCS' ? (item.altQuantity || 0) : (item.unit === 'PCS' ? (item.quantity || 0) : (gblQty * conv));
+                            displayQtyKg = pcsQty;
+                            itemUnitDisplay = `${gblQty} GBL`;
                           } else {
                             itemUnitDisplay = `1 Reel`;
                           }
 
-                          // Base Rate / KG
-                          const baseRatePerKg = item.ratePerKg || (displayQtyKg > 0 ? (item.totalPrice || 0) / displayQtyKg : (item.purchasePrice || 0));
+                          // Base Rate
+                          const baseRate = isFgItem 
+                            ? (Number(item.purchasePrice) || (displayQtyKg > 0 ? (item.totalPrice || 0) / displayQtyKg : 0))
+                            : (item.ratePerKg || (displayQtyKg > 0 ? (item.totalPrice || 0) / displayQtyKg : (item.purchasePrice || 0)));
 
-                          // Landed Rate / KG = Base Purchase Rate + Inward Freight/Crane Expenses per KG
-                          const landedRatePerKg = baseRatePerKg + extraInwardPerKg;
+                          // Landed Rate = Base Purchase Rate + Inward Freight/Crane Expenses per Unit
+                          const extraPerUnit = isFgItem ? (totalFreightCharges > 0 && displayQtyKg > 0 ? totalFreightCharges / displayQtyKg : 0) : extraInwardPerKg;
+                          const landedRate = baseRate + extraPerUnit;
 
                           return (
                             <tr key={idx} className="hover:bg-gray-50/50">
@@ -3519,16 +3666,16 @@ const PurchaseInvoicePage: React.FC = () => {
                                 {itemUnitDisplay}
                               </td>
                               <td className="px-3 py-2.5 text-right font-black text-gray-955">
-                                {displayQtyKg.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                                {displayQtyKg.toLocaleString('en-IN', { maximumFractionDigits: 2 })} {isFgItem ? 'Pcs' : ''}
                               </td>
                               <td className="px-3 py-2.5 text-right font-bold text-gray-800 font-mono">
-                                ₹{baseRatePerKg.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                ₹{baseRate.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
                               <td className="px-3 py-2.5 text-right font-black text-gray-955">
                                 ₹{(item.totalPrice || 0).toLocaleString('en-IN')}
                               </td>
                               <td className="px-3 py-2.5 text-right font-black text-blue-700 font-mono">
-                                ₹{landedRatePerKg.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                ₹{landedRate.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
                             </tr>
                           );
@@ -3571,15 +3718,50 @@ const PurchaseInvoicePage: React.FC = () => {
                           <p className="text-[10.5px] text-gray-500">Same item distributed across warehouse bins, bays, and racks</p>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setShowAllocateModal(true)}
-                        className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-xl border border-blue-200 transition-all cursor-pointer shadow-3xs"
-                        title="Allocate location & reels"
-                      >
-                        <MapPinIcon className="w-3.5 h-3.5 text-blue-600" />
-                        <span>Allocate Location & Reels</span>
-                      </button>
+                      {(() => {
+                        let isInvoiceFullyAllocated = false;
+                        if (selectedInvoice.items && selectedInvoice.items.length > 0) {
+                          const anyUnallocated = selectedInvoice.items.some(lot => {
+                            const defaultLocId = typeof lot.locationId === 'object' && lot.locationId !== null 
+                              ? (lot.locationId as any)._id 
+                              : lot.locationId;
+                            const skuId = typeof lot.skuId === 'object' && lot.skuId !== null 
+                              ? (lot.skuId as any)._id 
+                              : lot.skuId;
+                            const bal = inventoryBalances.find(
+                              b => String(b.location?._id || b.locationId) === String(defaultLocId) &&
+                                   b.batchNumber === selectedInvoice.invoiceNumber &&
+                                   String(b.sku?._id || b.skuId) === String(skuId)
+                            );
+                            return bal && bal.onHand > 0.001;
+                          });
+                          const anyInGodowns = inventoryBalances.some(
+                            b => b.batchNumber === selectedInvoice.invoiceNumber && b.onHand > 0
+                          );
+                          isInvoiceFullyAllocated = !anyUnallocated && anyInGodowns;
+                        }
+
+                        if (isInvoiceFullyAllocated) {
+                          return (
+                            <div className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 flex items-center gap-1.5 shadow-3xs" title="Stock and reels have been fully allocated to storage locations and locked">
+                              <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Allocated (Locked)</span>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => setShowAllocateModal(true)}
+                            className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-xl border border-blue-200 transition-all cursor-pointer shadow-3xs"
+                            title="Allocate location & reels"
+                          >
+                            <MapPinIcon className="w-3.5 h-3.5 text-blue-600" />
+                            <span>Allocate Location & Reels</span>
+                          </button>
+                        );
+                      })()}
                     </div>
 
                     <div className="divide-y divide-gray-100 overflow-x-auto">
@@ -4143,6 +4325,13 @@ const PurchaseInvoicePage: React.FC = () => {
                     </div>
                   )}
 
+                  {maxAllocatable <= 0 && (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs font-bold text-amber-800 flex items-center gap-2">
+                      <Lock className="w-4 h-4 shrink-0 text-amber-600" />
+                      <span>All stock and reels for this Material Lot have already been allocated to storage locations and locked. Further allocation is locked.</span>
+                    </div>
+                  )}
+
                   {/* Header batch summary cards matching main ERP modal style */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 shrink-0">
                     {/* Card 1: Material Lot */}
@@ -4405,7 +4594,7 @@ const PurchaseInvoicePage: React.FC = () => {
                     </button>
                     <button
                       type="submit"
-                      disabled={allocateSubmitting || !hasValidAllocations || isOverallocated}
+                      disabled={allocateSubmitting || !hasValidAllocations || isOverallocated || maxAllocatable <= 0}
                       className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
                     >
                       {allocateSubmitting ? (
@@ -4457,10 +4646,10 @@ const PurchaseInvoicePage: React.FC = () => {
                   handleUpdateRow(activeReelPickerRowIdx, 'reels', []);
                 };
 
-                return (
-                  <div className="fixed inset-0 z-[100010] flex items-center justify-center p-4">
-                    <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-xs" onClick={() => setActiveReelPickerRowIdx(null)} />
-                    <div className="bg-white rounded-2xl border border-gray-200 shadow-2xl max-w-lg w-full relative z-10 animate-in zoom-in-95 duration-150 overflow-hidden flex flex-col max-h-[80vh]">
+                return typeof document !== 'undefined' ? createPortal(
+                  <div className="fixed inset-0 z-[100050] flex items-center justify-center p-3 sm:p-5 pointer-events-none">
+                    <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs pointer-events-auto cursor-pointer" onClick={() => setActiveReelPickerRowIdx(null)} />
+                    <div className="relative bg-white rounded-2xl border border-gray-200 shadow-2xl shadow-slate-950/20 max-w-lg w-full z-10 animate-modalPop overflow-hidden flex flex-col max-h-[85vh] pointer-events-auto font-sans text-xs">
                       {/* Sub-Modal Header */}
                       <div className="px-5 py-3.5 border-b border-gray-200 flex items-center justify-between bg-gray-50 shrink-0">
                         <div className="flex items-center gap-2">
@@ -4484,7 +4673,7 @@ const PurchaseInvoicePage: React.FC = () => {
                       </div>
 
                       {/* Search & Bulk Selection Controls */}
-                      <div className="p-3 border-b border-gray-150 bg-white flex items-center justify-between gap-2">
+                      <div className="p-3 border-b border-gray-150 bg-white flex items-center justify-between gap-2 shrink-0">
                         <input
                           type="text"
                           placeholder="Search reel number..."
@@ -4509,7 +4698,7 @@ const PurchaseInvoicePage: React.FC = () => {
                       </div>
 
                       {/* Reels List */}
-                      <div className="p-3 overflow-y-auto flex-1 space-y-1.5 max-h-80 bg-slate-50/50">
+                      <div className="p-3 overflow-y-auto flex-1 space-y-1.5 max-h-[50vh] bg-slate-50/50">
                         {filteredReels.map((r: any) => {
                           const isChecked = chosenReels.some(sr => sr.reelNumber === r.reelNumber);
                           const assignedOtherIdx = currentList.findIndex((other, oIdx) => oIdx !== activeReelPickerRowIdx && other.reels?.some(sr => sr.reelNumber === r.reelNumber));
@@ -4554,7 +4743,7 @@ const PurchaseInvoicePage: React.FC = () => {
                       </div>
 
                       {/* Sub-Modal Footer */}
-                      <div className="px-5 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
+                      <div className="px-5 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
                         <span className="text-xs font-bold text-gray-700">
                           Selected: <strong className="text-blue-700">{chosenReels.length}</strong> Reels ({totalWeightChosen.toLocaleString()} KG)
                         </span>
@@ -4567,8 +4756,9 @@ const PurchaseInvoicePage: React.FC = () => {
                         </button>
                       </div>
                     </div>
-                  </div>
-                );
+                  </div>,
+                  document.body
+                ) : null;
               })()}
             </div>
           </div>,
