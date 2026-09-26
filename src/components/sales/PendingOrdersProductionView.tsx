@@ -1034,8 +1034,8 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                       </td>
 
                       {/* Items Required & Balance */}
-                      <td className="align-top py-3 px-4 min-w-[320px]">
-                        <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
+                      <td className="align-top py-2.5 px-4 min-w-[340px]">
+                        <div className="space-y-1 max-h-[220px] overflow-y-auto pr-1">
                           {items.map((item, iIdx) => {
                             const pcsPerGbl = item.pcsPerGbl || 100;
                             const orderedPcs = Number(item.quantity) || 0;
@@ -1050,29 +1050,44 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                             return (
                               <div
                                 key={item._id || item.skuCode || iIdx}
-                                className="flex items-center justify-between gap-3 px-2.5 py-1.5 rounded-lg bg-gray-50/90 hover:bg-gray-100/90 border border-gray-200/70 transition-colors"
+                                style={{ animationDelay: `${iIdx * 35}ms` }}
+                                title={`${item.itemName || item.skuCode} | Code: ${item.skuCode} | Conversion: ${pcsPerGbl} pcs/GBL | Pending: ${pendingGbl} GBL (${pendingPcs.toLocaleString()} pcs) | Stock: ${isInStock ? 'In Stock' : 'Needs Production'}`}
+                                className="group/item flex items-center justify-between gap-2 px-2.5 py-1 rounded-lg bg-slate-50/90 hover:bg-blue-50/60 border border-slate-200/70 hover:border-blue-300/80 shadow-3xs hover:shadow-2xs transition-all duration-150 animate-in fade-in"
                               >
                                 <div className="flex items-center gap-2 min-w-0">
+                                  {/* Cute live pulse status dot */}
+                                  <span className="relative flex h-2 w-2 shrink-0">
+                                    <span
+                                      className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-60 ${
+                                        isInStock ? 'bg-emerald-400' : 'bg-rose-400'
+                                      }`}
+                                    />
+                                    <span
+                                      className={`relative inline-flex rounded-full h-2 w-2 ${
+                                        isInStock ? 'bg-emerald-500' : 'bg-rose-500'
+                                      }`}
+                                    />
+                                  </span>
+
                                   <span
-                                    className={`w-2 h-2 rounded-full shrink-0 ${isInStock ? 'bg-emerald-500' : 'bg-rose-500'}`}
-                                    title={isInStock ? 'In Stock in warehouse' : 'Shortfall - Needs production'}
-                                  />
-                                  <div className="min-w-0">
-                                    <div className="font-semibold text-gray-900 text-xs truncate" title={item.itemName || item.skuCode}>
-                                      {item.itemName || item.skuCode}
-                                    </div>
-                                    <div className="text-[10px] text-gray-400 font-mono mt-0.5">
-                                      {pcsPerGbl} pcs/GBL
-                                    </div>
-                                  </div>
+                                    className="font-semibold text-slate-800 group-hover/item:text-blue-900 text-[11.5px] truncate"
+                                    title={item.itemName || item.skuCode}
+                                  >
+                                    {item.itemName || item.skuCode}
+                                  </span>
+
+                                  <span className="shrink-0 text-[9.5px] font-mono font-medium text-slate-500 bg-white/90 px-1.5 py-0.5 rounded border border-slate-200/70">
+                                    {pcsPerGbl} pcs/GBL
+                                  </span>
                                 </div>
 
-                                <div className="flex flex-col items-end shrink-0 pl-1 font-mono text-right">
-                                  <span className="font-bold text-gray-900 text-xs">
-                                    {pendingGbl} <span className="text-[10px] font-semibold text-gray-500">GBL</span>
+                                {/* Cute compact right quantity */}
+                                <div className="flex items-center gap-1.5 shrink-0 font-mono text-right pl-1">
+                                  <span className="font-bold text-blue-700 bg-white group-hover/item:bg-blue-50 px-1.5 py-0.5 rounded border border-slate-200/90 text-xs shadow-3xs transition-colors">
+                                    {pendingGbl} <span className="text-[9.5px] font-semibold text-slate-500">GBL</span>
                                   </span>
-                                  <span className="text-[10px] text-gray-400">
-                                    {pendingPcs.toLocaleString()} pcs
+                                  <span className="text-[10px] text-slate-400 font-medium">
+                                    ({pendingPcs.toLocaleString()} pcs)
                                   </span>
                                 </div>
                               </div>
