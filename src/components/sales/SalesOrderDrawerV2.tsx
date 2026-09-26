@@ -450,12 +450,20 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       return [];
     };
 
-    const fetchCustomers = companyId
-      ? getParties({ company: companyId, type: 'customer', limit: 10000 })
-          .catch(() => getParties({ type: 'customer', limit: 10000 }))
-          .catch(() => ({ data: { parties: [] } }))
-      : getParties({ type: 'customer', limit: 10000 })
-          .catch(() => ({ data: { parties: [] } }));
+    // Fetch all customers across the system so every customer in the directory/database is available in sales order
+    const fetchCustomers = (async () => {
+      try {
+        const [compRes, allRes] = await Promise.all([
+          companyId ? getParties({ company: companyId, type: 'customer', limit: 10000, light: true }).catch(() => ({ data: { parties: [] } })) : Promise.resolve({ data: { parties: [] } }),
+          getParties({ type: 'customer', limit: 10000, light: true }).catch(() => ({ data: { parties: [] } }))
+        ]);
+        const compList = extractParties(compRes);
+        const allList = extractParties(allRes);
+        return { data: { parties: [...compList, ...allList] } };
+      } catch {
+        return { data: { parties: [] } };
+      }
+    })();
 
     const fetchTransporters = companyId
       ? getParties({ company: companyId, type: 'transporter', limit: 1000 })
@@ -511,18 +519,39 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
           });
           setStockMap(bMap);
 
-          // ── Customers: merge backend parties with system fallback list ──
-          const backendParties: any[] = extractParties(partiesRes);
-          const existingFirmNames = new Set(
-            backendParties.map(p => (p.firmName || p.name || '').toLowerCase().trim())
-          );
-          const combined = [...backendParties];
-          ALL_SYSTEM_CUSTOMERS.forEach(c => {
-            if (!existingFirmNames.has(c.firmName.toLowerCase().trim())) {
-              combined.push(c);
+          // ── Customers: deduplicate all backend parties and fallback system customers ──
+          const rawBackendParties: any[] = extractParties(partiesRes);
+          const customerMap = new Map<string, any>();
+
+          rawBackendParties.forEach((p: any) => {
+            const name = (p.firmName || p.name || p.ownerName || '').trim();
+            if (!name) return;
+            const key = name.toLowerCase();
+            if (!customerMap.has(key)) {
+              customerMap.set(key, { ...p, firmName: name });
+            } else {
+              const existing = customerMap.get(key);
+              if (!existing.phone && p.phone) existing.phone = p.phone;
+              if (!existing.city && p.city) existing.city = p.city;
+              if (!existing.state && p.state) existing.state = p.state;
+              if (!existing.gstNumber && p.gstNumber) existing.gstNumber = p.gstNumber;
+              if (!existing.creditLimit && p.creditLimit) existing.creditLimit = p.creditLimit;
+              if (!existing.preferredTransport && p.preferredTransport) existing.preferredTransport = p.preferredTransport;
             }
           });
-          setCustomersList(combined.length > 0 ? combined : ALL_SYSTEM_CUSTOMERS);
+
+          // Always ensure master/mock customers are present if not in DB
+          ALL_SYSTEM_CUSTOMERS.forEach((c: any) => {
+            const key = (c.firmName || '').toLowerCase().trim();
+            if (key && !customerMap.has(key)) {
+              customerMap.set(key, c);
+            }
+          });
+
+          const allUniqueCustomers = Array.from(customerMap.values())
+            .sort((a, b) => (a.firmName || '').localeCompare(b.firmName || ''));
+
+          setCustomersList(allUniqueCustomers);
 
           // ── Transporters: merge backend transporters from Business Directory ──
           const backendTransporters: any[] = extractParties(transportersRes);
@@ -1389,9 +1418,14 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                 </div>
 
                 <div className="relative" ref={customerRef}>
-                  <label className="block text-[10.5px] font-bold text-gray-600 mb-1">
-                    Customer <span className="text-red-500">*</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[10.5px] font-bold text-gray-600">
+                      Customer <span className="text-red-500">*</span>
+                    </label>
+                    <span className="text-[10px] text-gray-400 font-mono">
+                      {customersList.length > 0 ? `${customersList.length.toLocaleString()} customers available` : 'Loading customers...'}
+                    </span>
+                  </div>
                   <div className="relative">
                     <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
                     <input
@@ -1436,10 +1470,10 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
                   {/* Customer Dropdown Popover */}
                   {showCustomerDropdown && (
-                    <div ref={customerDropdownListRef} className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-2xl z-[999] max-h-60 overflow-y-auto divide-y divide-gray-50 p-1">
-                      {filteredCustomers.map((c, idx) => (
+                    <div ref={customerDropdownListRef} className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-2xl z-[999] max-h-64 overflow-y-auto divide-y divide-gray-50 p-1">
+                      {filteredCustomers.slice(0, 200).map((c, idx) => (
                         <div
-                          key={c._id || c.firmName}
+                          key={c._id || `${c.firmName}-${idx}`}
                           onClick={() => handleSelectCustomer(c)}
                           onMouseEnter={() => setHighlightedCustomerIdx(idx)}
                           className={`p-2.5 cursor-pointer rounded-lg transition-colors flex items-center justify-between ${
@@ -1455,6 +1489,11 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                           </span>
                         </div>
                       ))}
+                      {filteredCustomers.length > 200 && (
+                        <div className="p-2 text-center text-gray-400 text-[10px] bg-gray-50 rounded-lg">
+                          Showing first 200 of {filteredCustomers.length} customers. Type in the search box to find specific customer.
+                        </div>
+                      )}
                       {filteredCustomers.length === 0 && (
                         <div className="p-3 text-center text-gray-400 italic">No customers found</div>
                       )}

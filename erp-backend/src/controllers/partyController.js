@@ -800,7 +800,13 @@ exports.getParties = async (req, res) => {
 
     const companyId = req.query.company;
     if (companyId) {
-      filter.company = companyId;
+      const companyFilter = {
+        $or: [
+          { company: companyId },
+          { companies: companyId }
+        ]
+      };
+      filter.$and = filter.$and ? [...filter.$and, companyFilter] : [companyFilter];
     }
 
     // Role-based filtering for logged-in sales agent/user
