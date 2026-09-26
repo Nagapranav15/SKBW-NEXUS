@@ -144,8 +144,19 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
         const code = (s.skuCode || '').toLowerCase().trim();
         const name = (s.name || '').toLowerCase().trim();
         const pcsPerGbl = Number(s.booksGbl || s.altUnitConversion || 100) || 100;
-        const pcs = skuPcsMap.get(sId) ?? (Number(s.presentStock || s.openingStock || 0));
-        const gbl = Math.floor(pcs / pcsPerGbl);
+        const rawOnHand = skuPcsMap.get(sId) ?? (Number(s.presentStock || s.openingStock || 0));
+        const unit = (s.unit || '').toUpperCase().trim();
+        const altUnit = (s.altUnit || '').toUpperCase().trim();
+
+        let gbl: number;
+        let pcs: number;
+        if (unit === 'GBL' || (altUnit && altUnit !== 'GBL' && unit.includes('GBL'))) {
+          gbl = rawOnHand;
+          pcs = rawOnHand * pcsPerGbl;
+        } else {
+          pcs = rawOnHand;
+          gbl = pcsPerGbl > 0 ? Math.floor(rawOnHand / pcsPerGbl) : rawOnHand;
+        }
 
         const val = { pcs, gbl };
         if (sId) smap.set(sId, val);

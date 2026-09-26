@@ -262,6 +262,32 @@ export const formatCustomerFullAddress = (c: any, fallback?: string): string => 
   return fb || '—';
 };
 
+// Calculate accurate stock in GBL and PCS exactly matching Stock & Inventory module
+export const computeSkuStock = (
+  rawOnHand: number,
+  sku?: SkuV2 | null,
+  customPcsPerGbl?: number | string
+): { stockGbl: number; stockPcs: number; pcsPerGbl: number } => {
+  const conv = Number(customPcsPerGbl) || 
+               Number(sku?.booksGbl || sku?.altUnitConversion || (sku as any)?.pcsPerGbl || 0) || 
+               1;
+  const unit = (sku?.unit || '').toUpperCase().trim();
+  const altUnit = (sku?.altUnit || '').toUpperCase().trim();
+
+  // If primary unit is GBL (standard in Stock & Inventory for notebooks/registers),
+  // rawOnHand is ALREADY in GBL!
+  if (unit === 'GBL' || (altUnit && altUnit !== 'GBL' && unit.includes('GBL'))) {
+    const stockGbl = rawOnHand;
+    const stockPcs = conv > 0 ? rawOnHand * conv : rawOnHand;
+    return { stockGbl, stockPcs, pcsPerGbl: conv };
+  }
+
+  // If primary unit is PCS/NOS/BOOK, rawOnHand is in PCS, so convert to GBL:
+  const stockPcs = rawOnHand;
+  const stockGbl = conv > 0 ? Math.floor(rawOnHand / conv) : rawOnHand;
+  return { stockGbl, stockPcs, pcsPerGbl: conv };
+};
+
 export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   isOpen,
   companyId,
@@ -528,7 +554,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
           const finalSkus = Array.from(skuMap.values());
           setAvailableSkus(finalSkus);
 
-          // ── Balances: aggregate live stock ──
+          // ── Balances: aggregate live stock matching Stock & Inventory module ──
           const bMap = new Map<string, number>();
           const allBalances = Array.isArray(balances) ? balances : [];
           allBalances.forEach((b: any) => {
@@ -541,15 +567,19 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
             if (sCode) bMap.set(sCode, (bMap.get(sCode) || 0) + qty);
             if (sName) bMap.set(sName, (bMap.get(sName) || 0) + qty);
           });
-          // Fallback to SKU's own presentStock/openingStock
+          // Ensure all available SKUs have their balances mapped across sId, sCode, and sName
           finalSkus.forEach(s => {
             const sId = s._id ? String(s._id) : '';
             const sCode = (s.skuCode || '').toLowerCase().trim();
             const sName = (s.name || '').toLowerCase().trim();
-            const fallbackQty = Number(s.presentStock || s.openingStock || 0);
-            if (sId && !bMap.has(sId)) bMap.set(sId, fallbackQty);
-            if (sCode && !bMap.has(sCode)) bMap.set(sCode, fallbackQty);
-            if (sName && !bMap.has(sName)) bMap.set(sName, fallbackQty);
+            const bal = (sId && bMap.has(sId)) ? bMap.get(sId) : 
+                        (sCode && bMap.has(sCode)) ? bMap.get(sCode) :
+                        (sName && bMap.has(sName)) ? bMap.get(sName) :
+                        Number(s.presentStock || s.openingStock || 0);
+            const finalQty = bal !== undefined ? bal : 0;
+            if (sId) bMap.set(sId, finalQty);
+            if (sCode) bMap.set(sCode, finalQty);
+            if (sName) bMap.set(sName, finalQty);
           });
           setStockMap(bMap);
 
@@ -808,24 +838,22 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
         const codeKey = (row.skuCode || matchedSku?.skuCode || '').toLowerCase().trim();
         const nameKey = (row.itemName || matchedSku?.name || '').toLowerCase().trim();
 
-        const onHandPcs = (idKey ? stockMap.get(idKey) : undefined) ??
+        const rawOnHand = (idKey ? stockMap.get(idKey) : undefined) ??
                           (codeKey ? stockMap.get(codeKey) : undefined) ??
                           (nameKey ? stockMap.get(nameKey) : undefined) ??
                           Number(matchedSku?.presentStock || matchedSku?.openingStock || 0);
 
-        const conv = Number(row.pcsPerGbl) || Number(matchedSku?.booksGbl || matchedSku?.altUnitConversion || (matchedSku as any)?.pcsPerGbl || 0);
-        const pcsPerGblVal = conv > 0 ? conv : (row.pcsPerGbl || '');
-        const stockGblVal = Number(pcsPerGblVal) > 0 ? Math.floor(onHandPcs / Number(pcsPerGblVal)) : onHandPcs;
+        const { stockGbl, stockPcs, pcsPerGbl } = computeSkuStock(rawOnHand, matchedSku, row.pcsPerGbl);
 
-        if (row.stockPcs !== onHandPcs || row.stockGbl !== stockGblVal || (!row.pcsPerGbl && conv > 0)) {
+        if (row.stockPcs !== stockPcs || row.stockGbl !== stockGbl || (!row.pcsPerGbl && pcsPerGbl > 0)) {
           changed = true;
           return {
             ...row,
             skuId: row.skuId || matchedSku?._id || '',
             skuCode: row.skuCode || matchedSku?.skuCode || '',
-            stockPcs: onHandPcs,
-            stockGbl: stockGblVal,
-            pcsPerGbl: row.pcsPerGbl || (conv > 0 ? conv : '')
+            stockPcs,
+            stockGbl,
+            pcsPerGbl: row.pcsPerGbl || (pcsPerGbl > 0 ? pcsPerGbl : '')
           };
         }
         return row;
@@ -839,13 +867,11 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
     const sId = s._id ? String(s._id) : '';
     const sCode = (s.skuCode || '').toLowerCase().trim();
     const sName = (s.name || '').toLowerCase().trim();
-    const onHandPcs = (sId ? stockMap.get(sId) : undefined) ??
+    const rawOnHand = (sId ? stockMap.get(sId) : undefined) ??
                       (sCode ? stockMap.get(sCode) : undefined) ??
                       (sName ? stockMap.get(sName) : undefined) ??
                       Number(s.presentStock || s.openingStock || 0);
-    const definedConv = Number(s.booksGbl || s.altUnitConversion || (s as any).pcsPerGbl || 0);
-    const pcsPerGblVal = definedConv > 0 ? definedConv : '';
-    const stockGblVal = definedConv > 0 ? Math.floor(onHandPcs / definedConv) : onHandPcs;
+    const { stockGbl, stockPcs, pcsPerGbl } = computeSkuStock(rawOnHand, s);
 
     setItems(prev => {
       const copy = [...prev];
@@ -855,13 +881,13 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       row.itemName = s.name;
       row.description = '';
       row.category = s.category || 'Finished Goods';
-      row.uom = s.unit || 'Pcs';
-      row.stockPcs = onHandPcs;
-      row.stockGbl = stockGblVal;
-      row.pcsPerGbl = pcsPerGblVal;
+      row.uom = s.unit || 'GBL';
+      row.stockPcs = stockPcs;
+      row.stockGbl = stockGbl;
+      row.pcsPerGbl = pcsPerGbl > 0 ? pcsPerGbl : '';
 
       const gblNum = Number(row.gbl) || 0;
-      const pcsPerGblNum = Number(pcsPerGblVal) || 0;
+      const pcsPerGblNum = Number(pcsPerGbl) || 0;
       if (gblNum > 0 && pcsPerGblNum > 0) {
         row.totalPcs = gblNum * pcsPerGblNum;
       } else if (gblNum > 0) {
@@ -901,13 +927,21 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       row.totalPcs = totalPcs;
 
       // Recalculate stock in GBL dynamically based on current pcsPerGbl conversion rate
-      if (row.stockPcs !== undefined && row.stockPcs !== null) {
-        if (pcsPerGblNum > 0) {
-          row.stockGbl = Math.floor(row.stockPcs / pcsPerGblNum);
-        } else {
-          row.stockGbl = row.stockPcs;
-        }
-      }
+      const matchedSku = availableSkus.find(s =>
+        (row.skuId && s._id === row.skuId) ||
+        (row.skuCode && s.skuCode?.toLowerCase().trim() === row.skuCode.toLowerCase().trim()) ||
+        (row.itemName && s.name?.toLowerCase().trim() === row.itemName.toLowerCase().trim())
+      );
+      const idKey = row.skuId || matchedSku?._id || '';
+      const codeKey = (row.skuCode || matchedSku?.skuCode || '').toLowerCase().trim();
+      const nameKey = (row.itemName || matchedSku?.name || '').toLowerCase().trim();
+      const rawOnHand = (idKey ? stockMap.get(idKey) : undefined) ??
+                        (codeKey ? stockMap.get(codeKey) : undefined) ??
+                        (nameKey ? stockMap.get(nameKey) : undefined) ??
+                        (row.stockPcs ?? 0);
+      const { stockGbl, stockPcs } = computeSkuStock(rawOnHand, matchedSku, pcsPerGblNum);
+      row.stockGbl = stockGbl;
+      row.stockPcs = stockPcs;
 
       const rateNum = Number(row.rate) || 0;
       const gross = totalPcs * rateNum;
@@ -2322,12 +2356,11 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                 const sId = s._id ? String(s._id) : '';
                                 const sCode = (s.skuCode || '').toLowerCase().trim();
                                 const sName = (s.name || '').toLowerCase().trim();
-                                const onHandPcs = (sId ? stockMap.get(sId) : undefined) ??
+                                const rawOnHand = (sId ? stockMap.get(sId) : undefined) ??
                                                   (sCode ? stockMap.get(sCode) : undefined) ??
                                                   (sName ? stockMap.get(sName) : undefined) ??
                                                   Number(s.presentStock || s.openingStock || 0);
-                                const definedConv = Number(s.booksGbl || s.altUnitConversion || (s as any).pcsPerGbl || 0);
-                                const stockGbl = definedConv > 0 ? Math.floor(onHandPcs / definedConv) : onHandPcs;
+                                const { stockGbl, stockPcs, pcsPerGbl } = computeSkuStock(rawOnHand, s);
                                 const isHighlighted = (highlightedProductIdxMap[idx] ?? 0) === sIdx;
 
                                 return (
@@ -2345,10 +2378,10 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                         <span className="text-[10px] text-gray-400 font-mono">{s.skuCode}</span>
                                         <span className="text-[10px] text-gray-300">•</span>
                                         <span className="text-[10px] text-gray-500">{s.category || 'Finished Goods'}</span>
-                                        {definedConv > 0 && (
+                                        {pcsPerGbl > 0 && (
                                           <>
                                             <span className="text-[10px] text-gray-300">•</span>
-                                            <span className="text-[10px] font-semibold text-indigo-600">{definedConv} Pcs/GBL</span>
+                                            <span className="text-[10px] font-semibold text-indigo-600">{pcsPerGbl} Pcs/GBL</span>
                                           </>
                                         )}
                                       </div>

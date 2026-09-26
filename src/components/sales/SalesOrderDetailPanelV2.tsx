@@ -106,8 +106,16 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
           const code = (s.skuCode || '').toLowerCase().trim();
           const name = (s.name || '').toLowerCase().trim();
           const pcsPerGbl = Number(s.booksGbl || s.altUnitConversion || 100) || 100;
-          const pcs = smap.get(sId) ?? (Number(s.presentStock || s.openingStock || 0));
-          const gbl = Math.floor(pcs / pcsPerGbl);
+          const rawOnHand = smap.get(sId) ?? (Number(s.presentStock || s.openingStock || 0));
+          const unit = (s.unit || '').toUpperCase().trim();
+          const altUnit = (s.altUnit || '').toUpperCase().trim();
+          
+          let gbl: number;
+          if (unit === 'GBL' || (altUnit && altUnit !== 'GBL' && unit.includes('GBL'))) {
+            gbl = rawOnHand;
+          } else {
+            gbl = pcsPerGbl > 0 ? Math.floor(rawOnHand / pcsPerGbl) : rawOnHand;
+          }
 
           if (sId) smap.set(sId, gbl);
           if (code) smap.set(code, gbl);
