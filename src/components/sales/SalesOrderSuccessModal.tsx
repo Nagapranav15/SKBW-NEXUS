@@ -66,7 +66,8 @@ export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
         }
       }
 
-      saveCustomSalesOrder(confirmedOrder);
+      const compId = (confirmedOrder.company as any)?._id || confirmedOrder.company;
+      saveCustomSalesOrder(confirmedOrder, compId);
       setOrder(confirmedOrder);
       showToast(`Sales Order ${order.orderNumber} confirmed successfully!`, 'success');
 
@@ -85,9 +86,10 @@ export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
   useEffect(() => {
     if (!order) return;
     const compId = selectedCompany?._id || order.company;
+    if (!compId) return;
 
-    getParties(compId ? { company: compId, limit: 10000 } : { limit: 10000 })
-      .catch(() => getParties({ limit: 10000 }))
+    getParties({ company: compId, limit: 10000 })
+      .catch(() => ({ data: { parties: [] } }))
       .then((res: any) => {
         const parties = res?.data?.parties || res?.data?.customers || res?.data || (Array.isArray(res) ? res : []);
         const partyId = typeof order.customer === 'string' ? order.customer : (order.customer as any)?._id;

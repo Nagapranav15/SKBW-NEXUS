@@ -169,88 +169,61 @@ const SalesOrders: React.FC = () => {
   const fetchOrders = async (showLoading = true) => {
     if (showLoading) setLoading(true);
     try {
-      let apiOrders: SalesOrderV2[] = [];
-      if (selectedCompany?._id) {
-        try {
-          apiOrders = await getSalesOrdersV2(selectedCompany._id);
-        } catch (e) {
-          console.warn('API getSalesOrdersV2 error, using fallback:', e);
-        }
+      if (!selectedCompany?._id) {
+        setOrders([]);
+        return;
       }
 
-      // If backend has orders, enrich them with customer phone/city/state
-      if (apiOrders && apiOrders.length > 0) {
-        // Fetch parties to fill any missing phone/city/region
-        let partyMap = new Map<string, any>();
-        if (selectedCompany?._id) {
-          try {
-            const pRes = await getParties({ company: selectedCompany._id, type: 'customer', limit: 1000, light: true });
-            const pList = pRes.data?.parties || pRes.data || [];
-            if (Array.isArray(pList)) {
-              pList.forEach((p: any) => {
-                partyMap.set(p._id, p);
-                if (p.firmName) partyMap.set(p.firmName.toLowerCase(), p);
-              });
-            }
-          } catch (pe) {
-            console.warn('Party fetch error:', pe);
-          }
-        }
+      let apiOrders: SalesOrderV2[] = [];
+      try {
+        apiOrders = await getSalesOrdersV2(selectedCompany._id);
+      } catch (e) {
+        console.warn('API getSalesOrdersV2 error:', e);
+      }
 
-        const enriched = apiOrders.map(o => {
-          const custParty = o.customerId ? partyMap.get(o.customerId) : partyMap.get((o.customerName || '').toLowerCase());
-          return {
-            ...o,
-            customerPhone: o.customerPhone || o.customer?.phone || custParty?.phone || custParty?.mobile || '9988776655',
-            city: o.city || o.customer?.city || custParty?.city || 'Vijayawada',
-            region: o.region || o.customer?.state || custParty?.state || 'Andhra Pradesh',
-            agent: o.agent || custParty?.agent || 'Suresh Reddy',
-            fulfillmentStatus: o.fulfillmentStatus || 'Pending'
-          };
+      // Fetch parties to fill any missing phone/city/region
+      let partyMap = new Map<string, any>();
+      try {
+        const pRes = await getParties({ company: selectedCompany._id, type: 'customer', limit: 1000, light: true });
+        const pList = pRes.data?.parties || pRes.data || [];
+        if (Array.isArray(pList)) {
+          pList.forEach((p: any) => {
+            if (p._id) partyMap.set(p._id, p);
+            if (p.firmName) partyMap.set(p.firmName.toLowerCase(), p);
+          });
+        }
+      } catch (pe) {
+        console.warn('Party fetch error:', pe);
+      }
+
+      const enriched = apiOrders.map(o => {
+        const custParty = o.customerId ? partyMap.get(o.customerId) : partyMap.get((o.customerName || '').toLowerCase());
+        return {
+          ...o,
+          customerPhone: o.customerPhone || o.customer?.phone || custParty?.phone || custParty?.mobile || '',
+          city: o.city || o.customer?.city || custParty?.city || '',
+          region: o.region || o.customer?.state || custParty?.state || '',
+          agent: o.agent || custParty?.agent || '',
+          fulfillmentStatus: o.fulfillmentStatus || 'Pending'
+        };
+      });
+
+      const customOrders = getCustomSalesOrders(selectedCompany._id);
+      if (customOrders.length > 0) {
+        const merged = [...customOrders];
+        enriched.forEach(bo => {
+          if (!merged.some(co => (co._id && bo._id && co._id === bo._id) || (co.orderNumber && bo.orderNumber && co.orderNumber === bo.orderNumber))) {
+            merged.push(bo);
+          }
         });
-        setOrders(enriched);
-        const customOrders = getCustomSalesOrders();
-        if (customOrders.length > 0) {
-          const merged = [...customOrders];
-          enriched.forEach(bo => {
-            if (!merged.some(co => (co._id && bo._id && co._id === bo._id) || (co.orderNumber && bo.orderNumber && co.orderNumber === bo.orderNumber))) {
-              merged.push(bo);
-            }
-          });
-          setOrders(merged);
-        } else {
-          setOrders(enriched);
-        }
+        setOrders(merged);
       } else {
-        // Use realistic sample dataset of 124 records matching the screenshot dashboard perfectly
-        const mockDashboardOrders = generateFullDashboardOrders();
-        const customOrders = getCustomSalesOrders();
-        if (customOrders.length > 0) {
-          const merged = [...customOrders];
-          mockDashboardOrders.forEach(bo => {
-            if (!merged.some(co => (co._id && bo._id && co._id === bo._id) || (co.orderNumber && bo.orderNumber && co.orderNumber === bo.orderNumber))) {
-              merged.push(bo);
-            }
-          });
-          setOrders(merged);
-        } else {
-          setOrders(mockDashboardOrders);
-        }
+        setOrders(enriched);
       }
     } catch (err) {
-      console.error(err);
-      if (showLoading) {
-        showToast('Loaded demo sales orders', 'info');
-      }
-      const customOrders = getCustomSalesOrders();
-      const mockDashboardOrders = generateFullDashboardOrders();
-      const merged = [...customOrders];
-      mockDashboardOrders.forEach(bo => {
-        if (!merged.some(co => (co._id && bo._id && co._id === bo._id) || (co.orderNumber && bo.orderNumber && co.orderNumber === bo.orderNumber))) {
-          merged.push(bo);
-        }
-      });
-      setOrders(merged);
+      console.error('Fetch orders error:', err);
+      const customOrders = getCustomSalesOrders(selectedCompany?._id);
+      setOrders(customOrders);
     } finally {
       if (showLoading) {
         setLoading(false);
@@ -640,7 +613,7 @@ const SalesOrders: React.FC = () => {
         fulfillmentStatus: 'Cancelled' as any,
         updatedAt: new Date().toISOString()
       };
-      saveCustomSalesOrder(updatedCancelled);
+      saveCustomSalesOrder(updatedCancelled, selectedCompany?._id);
       setOrders(prev => prev.map(o => (o._id === cancellingOrder._id || (cancellingOrder.orderNumber && o.orderNumber === cancellingOrder.orderNumber)) ? updatedCancelled : o));
       if (selectedOrderDetail && (selectedOrderDetail._id === cancellingOrder._id || selectedOrderDetail.orderNumber === cancellingOrder.orderNumber)) {
         setSelectedOrderDetail(updatedCancelled);
@@ -672,7 +645,7 @@ const SalesOrders: React.FC = () => {
         }
       }
 
-      saveCustomSalesOrder(confirmedOrder);
+      saveCustomSalesOrder(confirmedOrder, selectedCompany?._id);
       setOrders(prev => {
         const idx = prev.findIndex(o => o._id === confirmedOrder._id || o.orderNumber === confirmedOrder.orderNumber);
         if (idx >= 0) {
@@ -1585,7 +1558,7 @@ const SalesOrders: React.FC = () => {
         onSaveSuccess={(saved) => {
           setShowDrawer(false);
           setEditingOrder(null);
-          saveCustomSalesOrder(saved);
+          saveCustomSalesOrder(saved, selectedCompany?._id);
           // Prepend newly created/updated order
           setOrders(prev => {
             const idx = prev.findIndex(o => o._id === saved._id || o.orderNumber === saved.orderNumber);
@@ -1618,7 +1591,7 @@ const SalesOrders: React.FC = () => {
           setShowDrawer(true);
         }}
         onOrderUpdated={(updated) => {
-          saveCustomSalesOrder(updated);
+          saveCustomSalesOrder(updated, selectedCompany?._id);
           setOrders(prev => {
             const idx = prev.findIndex(o => o._id === updated._id || o.orderNumber === updated.orderNumber);
             if (idx >= 0) {

@@ -4,11 +4,13 @@ const ActivityLog = require('../models/activityLogModel');
 
 exports.getRoutes = async (req, res) => {
   try {
-    const filter = { isDeleted: { $ne: true } };
-    if (req.query.status) filter.status = req.query.status;
-    if (req.query.company) filter.company = req.query.company;
-
     const companyId = req.query.company || (req.user && req.user.company);
+    if (!companyId) {
+      return res.status(400).json({ success: false, message: 'company parameter is required' });
+    }
+
+    const filter = { isDeleted: { $ne: true }, company: companyId };
+    if (req.query.status) filter.status = req.query.status;
     let routeNames = [];
     let routeRegexes = [];
     let agentRegex = null;
@@ -490,8 +492,11 @@ exports.bulkDeleteRoutes = async (req, res) => {
 
 exports.getDeletedRoutes = async (req, res) => {
   try {
-    const filter = { isDeleted: true };
-    if (req.query.company) filter.company = req.query.company;
+    const companyId = req.query.company || (req.user && req.user.company);
+    if (!companyId) {
+      return res.status(400).json({ success: false, message: 'company parameter is required' });
+    }
+    const filter = { isDeleted: true, company: companyId };
     const routes = await Route.find(filter).sort({ updatedAt: -1 });
     res.json(routes);
   } catch (err) {

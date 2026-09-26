@@ -29,11 +29,15 @@ const toObjectId = (id) => {
 exports.getSkus = async (req, res, next) => {
   try {
     const { companyId, category, search, status } = req.query;
-    const query = {};
-    if (companyId) {
-      const cId = toObjectId(companyId);
-      if (cId) query.company = cId;
+    const activeCompanyId = companyId || (req.user && req.user.company);
+    if (!activeCompanyId) {
+      return res.status(400).json({ success: false, message: 'companyId query parameter is required' });
     }
+    const cId = toObjectId(activeCompanyId);
+    if (!cId) {
+      return res.status(400).json({ success: false, message: 'Invalid companyId' });
+    }
+    const query = { company: cId };
     if (req.query.showDeleted === "true") {
       query.isDeleted = true;
     } else {
@@ -2734,15 +2738,9 @@ exports.getSkuStockDetails = async (req, res, next) => {
     const companyObjId = toObjectId(companyId);
     const skuObjId = toObjectId(skuId);
 
-    let sku = null;
-    if (skuObjId && companyObjId) {
-      sku = await SkuV2.findOne({ _id: skuObjId, company: companyObjId });
-    }
+    const sku = await SkuV2.findOne({ _id: skuObjId, company: companyObjId });
     if (!sku) {
-      sku = await SkuV2.findById(skuObjId || skuId);
-    }
-    if (!sku) {
-      return res.status(404).json({ msg: "SKU not found" });
+      return res.status(404).json({ msg: "SKU not found for this company" });
     }
 
     // 1. Location Balances with full hierarchy

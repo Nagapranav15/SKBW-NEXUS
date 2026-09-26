@@ -789,24 +789,28 @@ const enrichPartyObj = async (party) => {
 
 exports.getParties = async (req, res) => {
   try {
-    const filter = { isDeleted: { $ne: true } };
+    const companyId = req.query.company || (req.user && req.user.company);
+    if (!companyId) {
+      return res.status(400).json({ success: false, message: "Company ID is strictly required to query parties" });
+    }
+
+    const mongoose = require("mongoose");
+    const toObjId = (id) => {
+      try { return new mongoose.Types.ObjectId(id); } catch { return null; }
+    };
+    const cObj = toObjId(companyId);
+
+    const filter = { 
+      isDeleted: { $ne: true },
+      company: cObj ? { $in: [cObj, String(companyId)] } : companyId
+    };
+
     if (req.query.type) {
       if (req.query.type === 'vendor') {
         filter.type = { $in: ['vendor', 'supplier'] };
       } else {
         filter.type = req.query.type;
       }
-    }
-
-    const companyId = req.query.company;
-    if (companyId) {
-      const companyFilter = {
-        $or: [
-          { company: companyId },
-          { companies: companyId }
-        ]
-      };
-      filter.$and = filter.$and ? [...filter.$and, companyFilter] : [companyFilter];
     }
 
     // Role-based filtering for logged-in sales agent/user
@@ -1254,11 +1258,21 @@ exports.getParties = async (req, res) => {
 
 exports.getPartyStats = async (req, res) => {
   try {
-    const filter = { isDeleted: { $ne: true } };
-    if (req.query.type) filter.type = req.query.type;
-    if (req.query.company) {
-      filter.company = req.query.company;
+    const companyId = req.query.company || (req.user && req.user.company);
+    if (!companyId) {
+      return res.status(400).json({ success: false, message: "Company ID is strictly required for party stats" });
     }
+    const mongoose = require("mongoose");
+    const toObjId = (id) => {
+      try { return new mongoose.Types.ObjectId(id); } catch { return null; }
+    };
+    const cObj = toObjId(companyId);
+
+    const filter = { 
+      isDeleted: { $ne: true },
+      company: cObj ? { $in: [cObj, String(companyId)] } : companyId
+    };
+    if (req.query.type) filter.type = req.query.type;
 
     const [total, active, inactive, onHold] = await Promise.all([
       Party.countDocuments(filter),
@@ -1287,10 +1301,14 @@ exports.getPartyById = async (req, res) => {
 exports.createParty = async (req, res) => {
   try {
     const data = { ...req.body };
-    if (data.company && (!data.companies || data.companies.length === 0)) {
-      data.companies = [data.company];
+    const companyId = data.company || (req.user && req.user.company);
+    if (!companyId) {
+      return res.status(400).json({ success: false, message: "Company ID is strictly required to create a party" });
     }
-    await ensureRouteAndMarket(data, data.company, req.user ? req.user.fullName : 'System');
+    data.company = companyId;
+    data.companies = [companyId];
+
+    await ensureRouteAndMarket(data, companyId, req.user ? req.user.fullName : 'System');
     if (data.type === 'customer' && !data.code) {
       data.code = await generateCustomerCode(data);
     }

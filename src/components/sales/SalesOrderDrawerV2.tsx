@@ -276,8 +276,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   // Customer State (Blank by default when new)
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
   const [customerSearch, setCustomerSearch] = useState('');
-  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
-  const [customersList, setCustomersList] = useState<any[]>(ALL_SYSTEM_CUSTOMERS);
+  const [customersList, setCustomersList] = useState<any[]>([]);
   const [showCustomerDetailsModal, setShowCustomerDetailsModal] = useState(false);
 
   // Order Info State (100% BLANK BY DEFAULT WHEN NEW - NO DEFAULT VALUES)
@@ -450,27 +449,19 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       return [];
     };
 
-    // Fetch all customers across the system so every customer in the directory/database is available in sales order
+    // Fetch only customers belonging strictly to the selected company
     const fetchCustomers = (async () => {
       try {
-        const [compRes, allRes] = await Promise.all([
-          companyId ? getParties({ company: companyId, type: 'customer', limit: 10000, light: true }).catch(() => ({ data: { parties: [] } })) : Promise.resolve({ data: { parties: [] } }),
-          getParties({ type: 'customer', limit: 10000, light: true }).catch(() => ({ data: { parties: [] } }))
-        ]);
-        const compList = extractParties(compRes);
-        const allList = extractParties(allRes);
-        return { data: { parties: [...compList, ...allList] } };
+        if (!companyId) return { data: { parties: [] } };
+        return await getParties({ company: companyId, type: 'customer', limit: 10000, light: true }).catch(() => ({ data: { parties: [] } }));
       } catch {
         return { data: { parties: [] } };
       }
     })();
 
     const fetchTransporters = companyId
-      ? getParties({ company: companyId, type: 'transporter', limit: 1000 })
-          .catch(() => getParties({ type: 'transporter', limit: 1000 }))
-          .catch(() => ({ data: { parties: [] } }))
-      : getParties({ type: 'transporter', limit: 1000 })
-          .catch(() => ({ data: { parties: [] } }));
+      ? getParties({ company: companyId, type: 'transporter', limit: 1000 }).catch(() => ({ data: { parties: [] } }))
+      : Promise.resolve({ data: { parties: [] } });
 
     const fetchSkus = companyId
       ? getSkusV2(companyId).catch(() => [] as SkuV2[])
@@ -483,7 +474,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
     Promise.all([fetchSkus, fetchBalances, fetchCustomers, fetchTransporters])
       .then(([skus, balances, partiesRes, transportersRes]) => {
         try {
-          // ── SKUs: merge API results with master product list ──
+          // ── SKUs: only use products for this company ──
           const rawSkus: SkuV2[] = Array.isArray(skus) ? skus : [];
 
           const skuMap = new Map<string, SkuV2>();
@@ -492,11 +483,6 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
               const key = (s.skuCode || s.name || s._id || '').toLowerCase().trim();
               if (key && !skuMap.has(key)) skuMap.set(key, s);
             }
-          });
-          // Always ensure master products are present
-          MASTER_PRODUCT_SKUS.forEach(m => {
-            const key = (m.skuCode || m.name).toLowerCase().trim();
-            if (!skuMap.has(key)) skuMap.set(key, m);
           });
           const finalSkus = Array.from(skuMap.values());
           setAvailableSkus(finalSkus);
@@ -519,7 +505,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
           });
           setStockMap(bMap);
 
-          // ── Customers: deduplicate all backend parties and fallback system customers ──
+          // ── Customers: strictly isolated to the selected company's parties ──
           const rawBackendParties: any[] = extractParties(partiesRes);
           const customerMap = new Map<string, any>();
 
@@ -540,20 +526,12 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
             }
           });
 
-          // Always ensure master/mock customers are present if not in DB
-          ALL_SYSTEM_CUSTOMERS.forEach((c: any) => {
-            const key = (c.firmName || '').toLowerCase().trim();
-            if (key && !customerMap.has(key)) {
-              customerMap.set(key, c);
-            }
-          });
-
           const allUniqueCustomers = Array.from(customerMap.values())
             .sort((a, b) => (a.firmName || '').localeCompare(b.firmName || ''));
 
           setCustomersList(allUniqueCustomers);
 
-          // ── Transporters: merge backend transporters from Business Directory ──
+          // ── Transporters: merge backend transporters for this company ──
           const backendTransporters: any[] = extractParties(transportersRes);
           const allParties: any[] = extractParties(partiesRes);
           const extractedSet = new Set<string>();
@@ -580,15 +558,10 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
           setTransporterList(Array.from(extractedSet));
         } catch (innerErr) {
           console.error('Error processing fetched data:', innerErr);
-          // Ensure fallback data is always shown even if processing fails
-          setAvailableSkus(MASTER_PRODUCT_SKUS);
-          setCustomersList(ALL_SYSTEM_CUSTOMERS);
         }
       })
       .catch(err => {
         console.error('Data fetch error:', err);
-        setAvailableSkus(MASTER_PRODUCT_SKUS);
-        setCustomersList(ALL_SYSTEM_CUSTOMERS);
       });
 
     if (!editOrder) {
@@ -1177,7 +1150,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       }
 
       // Persist to custom localStorage so drafts & updates survive refresh
-      saveCustomSalesOrder(saved);
+      saveCustomSalesOrder(saved, companyId);
       showToast(isDraft ? 'Draft Sales Order saved successfully' : 'Sales Order saved successfully', 'success');
 
       onSaveSuccess(saved);

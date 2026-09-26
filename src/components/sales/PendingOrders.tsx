@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { getSalesOrdersV2, SalesOrderV2, updateSalesOrderV2Status } from '../../api/salesOrderApiV2';
-import { saveCustomSalesOrder } from '../../utils/salesOrderStorage';
-import { generateFullDashboardOrders } from './salesOrderSampleData';
+import { saveCustomSalesOrder, getCustomSalesOrders } from '../../utils/salesOrderStorage';
 import { PendingOrdersProductionView } from './PendingOrdersProductionView';
 import SalesOrderDetailPanelV2 from './SalesOrderDetailPanelV2';
 import SalesOrderDrawerV2 from './SalesOrderDrawerV2';
@@ -38,7 +37,7 @@ const PendingOrders: React.FC = () => {
         }
       }
 
-      saveCustomSalesOrder(confirmedOrder);
+      saveCustomSalesOrder(confirmedOrder, selectedCompany?._id);
       setOrders(prev => {
         const idx = prev.findIndex(o => o._id === confirmedOrder._id || o.orderNumber === confirmedOrder.orderNumber);
         if (idx >= 0) {
@@ -60,13 +59,15 @@ const PendingOrders: React.FC = () => {
   const fetchOrders = async (showLoading = true) => {
     try {
       if (showLoading) setLoading(true);
-      const res = await getSalesOrdersV2(selectedCompany?._id, { limit: 1000 }).catch(() => null);
-      const customOrders = getCustomSalesOrders();
+      if (!selectedCompany?._id) {
+        setOrders([]);
+        return;
+      }
+      const res = await getSalesOrdersV2(selectedCompany._id, { limit: 1000 }).catch(() => null);
+      const customOrders = getCustomSalesOrders(selectedCompany._id);
       let baseOrders: SalesOrderV2[] = [];
-      if (res && res.data && res.data.length > 0) {
+      if (res && res.data && Array.isArray(res.data)) {
         baseOrders = res.data;
-      } else {
-        baseOrders = generateFullDashboardOrders();
       }
 
       if (customOrders.length > 0) {
@@ -81,7 +82,8 @@ const PendingOrders: React.FC = () => {
         setOrders(baseOrders);
       }
     } catch {
-      setOrders(generateFullDashboardOrders());
+      const customOrders = getCustomSalesOrders(selectedCompany?._id);
+      setOrders(customOrders);
     } finally {
       if (showLoading) {
         setLoading(false);

@@ -60,10 +60,9 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
 
     const compId = selectedCompany?._id || order.company;
 
-    // 1. Fetch parties to obtain accurate credit limit, outstanding balance, group, etc.
-    const partyParams = compId ? { company: compId, limit: 10000 } : { limit: 10000 };
-    getParties(partyParams)
-      .catch(() => getParties({ limit: 10000 }))
+    if (!compId) return;
+    getParties({ company: compId, limit: 10000 })
+      .catch(() => ({ data: { parties: [] } }))
       .then((res: any) => {
         const parties = res?.data?.parties || res?.data?.customers || res?.data || (Array.isArray(res) ? res : []);
         const partyId = typeof order.customer === 'string' ? order.customer : (order.customer as any)?._id;
@@ -228,7 +227,8 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
         }
       }
 
-      saveCustomSalesOrder(confirmedOrder);
+      const compId = (confirmedOrder.company as any)?._id || confirmedOrder.company;
+      saveCustomSalesOrder(confirmedOrder, compId);
       showToast(`Sales Order ${order.orderNumber} confirmed successfully!`, 'success');
 
       if (onOrderUpdated) {
