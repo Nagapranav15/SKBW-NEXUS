@@ -3361,7 +3361,7 @@ const PurchaseInvoicePage: React.FC = () => {
 
           {/* Modal Container */}
           <div className="fixed inset-0 overflow-y-auto flex items-center justify-center p-3 sm:p-5 pointer-events-none">
-            <div className="relative bg-white rounded-2xl shadow-2xl shadow-slate-950/20 border border-slate-200 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-modalPop font-sans text-xs pointer-events-auto">
+            <div className="relative bg-white rounded-2xl shadow-2xl shadow-slate-950/20 border border-slate-200 w-full max-w-5xl xl:max-w-6xl max-h-[92vh] flex flex-col overflow-hidden animate-modalPop font-sans text-xs pointer-events-auto">
             {/* Header */}
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
               <div>
