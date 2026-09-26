@@ -1,53 +1,94 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, ChevronDown, Settings, Trash2, Plus, RotateCcw, X, Check, Search } from 'lucide-react';
+import { Sparkles, ChevronDown, Settings, Trash2, Plus, RotateCcw, X, Check, Search, MapPin } from 'lucide-react';
 import { showToast } from '../ui/Toast';
+import { WarehouseLocationV2 } from '../../api/mfgApiV2';
+
+export interface PresetItem {
+  id?: string;
+  name: string;
+  locationId?: string;
+  locationName?: string;
+  warehouseId?: string;
+  floorId?: string;
+  zoneId?: string;
+}
 
 export interface PresetFieldProps {
   label: string;
   value: string;
   onChange: (value: string) => void;
   storageKey: string;
-  defaultPresets: string[];
+  defaultPresets?: (string | PresetItem)[];
   placeholder?: string;
   required?: boolean;
   className?: string;
   helperText?: string;
+  hideLabel?: boolean;
+  locations?: WarehouseLocationV2[];
+  selectedLocationId?: string;
+  onSelectLocation?: (location: {
+    warehouseId?: string;
+    floorId?: string;
+    zoneId?: string;
+    locationId: string;
+    locationName: string;
+  }) => void;
 }
+
+const normalizeItem = (item: any): PresetItem => {
+  if (typeof item === 'string') {
+    return { id: item, name: item };
+  }
+  return {
+    id: item.id || item.name,
+    name: item.name || '',
+    locationId: item.locationId || item.defaultLocationId || '',
+    locationName: item.locationName || item.defaultLocationName || '',
+    warehouseId: item.warehouseId || '',
+    floorId: item.floorId || '',
+    zoneId: item.zoneId || ''
+  };
+};
 
 export const PresetField: React.FC<PresetFieldProps> = ({
   label,
   value,
   onChange,
   storageKey,
-  defaultPresets,
+  defaultPresets = [],
   placeholder = 'Select or enter value...',
   required = false,
   className = '',
-  helperText
+  helperText,
+  hideLabel = false,
+  locations = [],
+  onSelectLocation
 }) => {
   // Load presets from localStorage with persistent fallback
-  const [presets, setPresets] = useState<string[]>(() => {
+  const [presets, setPresets] = useState<PresetItem[]>(() => {
     try {
       const stored = localStorage.getItem(storageKey);
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.filter(Boolean);
+          return parsed.map(normalizeItem);
         }
       }
-      // Initialize localStorage with defaults so it persists across reloads
       if (defaultPresets && defaultPresets.length > 0) {
-        localStorage.setItem(storageKey, JSON.stringify(defaultPresets));
+        const normalizedDefaults = defaultPresets.map(normalizeItem);
+        localStorage.setItem(storageKey, JSON.stringify(normalizedDefaults));
+        return normalizedDefaults;
       }
     } catch (e) {
       console.warn(`Failed to parse presets for key ${storageKey}:`, e);
     }
-    return defaultPresets;
+    return defaultPresets.map(normalizeItem);
   });
 
   const [showDropdown, setShowDropdown] = useState(false);
   const [showManageModal, setShowManageModal] = useState(false);
   const [newPresetInput, setNewPresetInput] = useState('');
+  const [newPresetLocationId, setNewPresetLocationId] = useState('');
   const [filterQuery, setFilterQuery] = useState('');
   const [highlightedIdx, setHighlightedIdx] = useState(0);
 
@@ -55,14 +96,14 @@ export const PresetField: React.FC<PresetFieldProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  // Sync with storage events from other tabs or components
+  // Sync with storage events from other tabs
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === storageKey && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setPresets(parsed);
+            setPresets(parsed.map(normalizeItem));
           }
         } catch {}
       }
@@ -82,7 +123,7 @@ export const PresetField: React.FC<PresetFieldProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const savePresets = (newPresetsList: string[]) => {
+  const savePresets = (newPresetsList: PresetItem[]) => {
     setPresets(newPresetsList);
     try {
       localStorage.setItem(storageKey, JSON.stringify(newPresetsList));
@@ -91,34 +132,64 @@ export const PresetField: React.FC<PresetFieldProps> = ({
     }
   };
 
-  const handleAddPreset = (text: string) => {
+  const handleSelectPreset = (item: PresetItem) => {
+    onChange(item.name);
+    setShowDropdown(false);
+
+    if (item.locationId && onSelectLocation) {
+      onSelectLocation({
+        warehouseId: item.warehouseId,
+        floorId: item.floorId,
+        zoneId: item.zoneId,
+        locationId: item.locationId,
+        locationName: item.locationName || ''
+      });
+      showToast(`Selected "${item.name}" (Auto-filled location: ${item.locationName})`, 'success');
+    }
+  };
+
+  const handleAddPreset = (text: string, locId?: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
-    if (presets.some(p => p.toLowerCase() === trimmed.toLowerCase())) {
+    if (presets.some(p => p.name.toLowerCase() === trimmed.toLowerCase())) {
       showToast('This preset already exists', 'info');
       return;
     }
-    const updated = [trimmed, ...presets];
+
+    const locObj = locations.find(l => String(l._id || l.id) === String(locId));
+    const locName = locObj ? (locObj.name || locObj.code || '') : '';
+
+    const newPreset: PresetItem = {
+      id: `preset-${Date.now()}`,
+      name: trimmed,
+      locationId: locId || '',
+      locationName: locName,
+      warehouseId: locObj ? String(locObj._id || locObj.id) : ''
+    };
+
+    const updated = [newPreset, ...presets];
     savePresets(updated);
     setNewPresetInput('');
+    setNewPresetLocationId('');
     showToast(`Added "${trimmed}" to presets`, 'success');
   };
 
-  const handleRemovePreset = (presetToRemove: string) => {
-    const updated = presets.filter(p => p !== presetToRemove);
+  const handleRemovePreset = (itemToRemove: PresetItem) => {
+    const updated = presets.filter(p => p.name !== itemToRemove.name);
     savePresets(updated);
-    showToast(`Removed preset "${presetToRemove}"`, 'info');
+    showToast(`Removed preset "${itemToRemove.name}"`, 'info');
   };
 
   const handleResetDefaults = () => {
-    savePresets(defaultPresets);
+    const normalizedDefaults = defaultPresets.map(normalizeItem);
+    savePresets(normalizedDefaults);
     showToast('Reset to default presets', 'info');
   };
 
-  const isCurrentValueInPresets = value.trim() && presets.some(p => p.toLowerCase() === value.trim().toLowerCase());
+  const isCurrentValueInPresets = value.trim() && presets.some(p => p.name.toLowerCase() === value.trim().toLowerCase());
 
   const filteredPresets = presets.filter(p => 
-    !filterQuery.trim() || p.toLowerCase().includes(filterQuery.toLowerCase())
+    !filterQuery.trim() || p.name.toLowerCase().includes(filterQuery.toLowerCase())
   );
 
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -138,8 +209,7 @@ export const PresetField: React.FC<PresetFieldProps> = ({
     } else if (e.key === 'Enter') {
       if (showDropdown && filteredPresets.length > 0 && highlightedIdx >= 0 && highlightedIdx < filteredPresets.length) {
         e.preventDefault();
-        onChange(filteredPresets[highlightedIdx]);
-        setShowDropdown(false);
+        handleSelectPreset(filteredPresets[highlightedIdx]);
       }
     } else if (e.key === 'Escape') {
       if (showDropdown) {
@@ -153,26 +223,28 @@ export const PresetField: React.FC<PresetFieldProps> = ({
   return (
     <div className={`relative ${className}`} ref={containerRef}>
       {/* Label and Presets Trigger */}
-      <div className="flex items-center justify-between mb-1.5">
-        <label className="block text-xs font-semibold text-gray-700">
-          {label} {required && <span className="text-rose-500">*</span>}
-        </label>
+      {!hideLabel && (
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="block text-xs font-semibold text-gray-700">
+            {label} {required && <span className="text-rose-500">*</span>}
+          </label>
 
-        <button
-          type="button"
-          onClick={() => {
-            setFilterQuery('');
-            setShowDropdown(!showDropdown);
-            setHighlightedIdx(0);
-          }}
-          className="text-[11px] font-bold text-blue-600 hover:text-blue-700 flex items-center space-x-1 cursor-pointer transition-colors"
-          title="Press Alt+P to toggle presets"
-        >
-          <Sparkles className="w-3 h-3 text-blue-500" />
-          <span>Presets ({presets.length})</span>
-          <ChevronDown className={`w-3 h-3 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={() => {
+              setFilterQuery('');
+              setShowDropdown(!showDropdown);
+              setHighlightedIdx(0);
+            }}
+            className="text-[11px] font-bold text-blue-600 hover:text-blue-700 flex items-center space-x-1 cursor-pointer transition-colors"
+            title="Press Alt+P to toggle presets"
+          >
+            <Sparkles className="w-3 h-3 text-blue-500" />
+            <span>Presets ({presets.length})</span>
+            <ChevronDown className={`w-3 h-3 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
+          </button>
+        </div>
+      )}
 
       {/* Main Text Input with quick dropdown toggle */}
       <div className="relative">
@@ -189,7 +261,7 @@ export const PresetField: React.FC<PresetFieldProps> = ({
               setHighlightedIdx(0);
             }
           }}
-          className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 font-medium focus:outline-none focus:border-blue-500 transition-colors"
+          className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 font-medium focus:outline-none focus:border-blue-500 transition-colors h-[38px]"
         />
 
         <button
@@ -222,7 +294,7 @@ export const PresetField: React.FC<PresetFieldProps> = ({
                   setShowDropdown(false);
                   setShowManageModal(true);
                 }}
-                className="text-blue-600 hover:underline flex items-center gap-1 cursor-pointer font-bold lowercase first-letter:uppercase"
+                className="text-blue-600 hover:underline flex items-center space-x-0.5 cursor-pointer font-bold"
               >
                 <Settings className="w-3 h-3" />
                 <span>Manage</span>
@@ -230,7 +302,7 @@ export const PresetField: React.FC<PresetFieldProps> = ({
             </div>
           </div>
 
-          {/* Search filter if more than 5 presets */}
+          {/* Quick Filter Search */}
           {presets.length > 5 && (
             <div className="p-2 border-b border-gray-100 bg-white shrink-0">
               <div className="relative">
@@ -243,8 +315,8 @@ export const PresetField: React.FC<PresetFieldProps> = ({
                     setHighlightedIdx(0);
                   }}
                   placeholder="Filter presets..."
+                  className="w-full pl-7 pr-2 py-1 text-[11px] bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:border-blue-500"
                   autoFocus
-                  className="w-full pl-7 pr-2 py-1 text-[11px] bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:bg-white focus:border-blue-500"
                 />
               </div>
             </div>
@@ -275,16 +347,13 @@ export const PresetField: React.FC<PresetFieldProps> = ({
               </div>
             ) : (
               filteredPresets.map((presetItem, pIdx) => {
-                const isSelected = value.toLowerCase() === presetItem.toLowerCase();
+                const isSelected = value.toLowerCase() === presetItem.name.toLowerCase();
                 const isHighlighted = highlightedIdx === pIdx;
                 return (
                   <button
-                    key={presetItem}
+                    key={presetItem.name}
                     type="button"
-                    onClick={() => {
-                      onChange(presetItem);
-                      setShowDropdown(false);
-                    }}
+                    onClick={() => handleSelectPreset(presetItem)}
                     onMouseEnter={() => setHighlightedIdx(pIdx)}
                     className={`w-full text-left px-3 py-2 text-xs font-medium flex items-center justify-between transition-colors cursor-pointer ${
                       isHighlighted 
@@ -294,7 +363,15 @@ export const PresetField: React.FC<PresetFieldProps> = ({
                           : 'text-gray-800 hover:bg-blue-50'
                     }`}
                   >
-                    <span className="truncate">{presetItem}</span>
+                    <div className="min-w-0 pr-2">
+                      <div className="truncate font-semibold">{presetItem.name}</div>
+                      {presetItem.locationName && (
+                        <div className="text-[10px] text-blue-600 font-medium flex items-center gap-1 mt-0.5">
+                          <MapPin className="w-2.5 h-2.5 shrink-0" />
+                          <span className="truncate">{presetItem.locationName}</span>
+                        </div>
+                      )}
+                    </div>
                     {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
                   </button>
                 );
@@ -306,8 +383,8 @@ export const PresetField: React.FC<PresetFieldProps> = ({
 
       {/* Manage Presets Modal */}
       {showManageModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-200 w-full max-w-md overflow-hidden flex flex-col animate-modalPop">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-xs p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-200 w-full max-w-lg overflow-hidden flex flex-col animate-modalPop">
             {/* Header */}
             <div className="p-4 border-b border-gray-150 flex items-center justify-between bg-gray-50/50">
               <div>
@@ -324,29 +401,53 @@ export const PresetField: React.FC<PresetFieldProps> = ({
             </div>
 
             {/* Modal Body */}
-            <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
+            <div className="p-4 space-y-4 max-h-[65vh] overflow-y-auto custom-scrollbar">
               {/* Add form */}
               <form 
                 onSubmit={e => {
                   e.preventDefault();
-                  handleAddPreset(newPresetInput);
+                  handleAddPreset(newPresetInput, newPresetLocationId);
                 }} 
-                className="flex gap-2"
+                className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 space-y-2.5"
               >
-                <input
-                  type="text"
-                  value={newPresetInput}
-                  onChange={e => setNewPresetInput(e.target.value)}
-                  placeholder={`New ${label.toLowerCase()} preset...`}
-                  className="flex-1 text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
-                />
-                <button
-                  type="submit"
-                  disabled={!newPresetInput.trim()}
-                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-lg text-xs cursor-pointer shrink-0 transition-colors"
-                >
-                  Add
-                </button>
+                <span className="text-[11px] font-bold text-blue-900 block uppercase tracking-wide">
+                  + Add New Preset
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    value={newPresetInput}
+                    onChange={e => setNewPresetInput(e.target.value)}
+                    placeholder={`Preset name...`}
+                    className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+                    required
+                  />
+
+                  {locations.length > 0 ? (
+                    <select
+                      value={newPresetLocationId}
+                      onChange={e => setNewPresetLocationId(e.target.value)}
+                      className="w-full text-xs text-gray-700 bg-white border border-gray-200 rounded-lg px-2.5 py-2 focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="">Assign Default Location (Optional)...</option>
+                      {locations.map(loc => (
+                        <option key={loc._id || loc.id} value={loc._id || loc.id}>
+                          {loc.name || loc.code} {loc.level ? `(${loc.level})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={!newPresetInput.trim()}
+                    className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-lg text-xs cursor-pointer shrink-0 transition-colors shadow-3xs"
+                  >
+                    Add Preset
+                  </button>
+                </div>
               </form>
 
               {/* Presets List */}
@@ -357,15 +458,57 @@ export const PresetField: React.FC<PresetFieldProps> = ({
                   </div>
                 ) : (
                   presets.map(item => (
-                    <div key={item} className="p-2.5 flex items-center justify-between hover:bg-gray-50 text-xs">
-                      <span className="font-semibold text-gray-800">{item}</span>
+                    <div key={item.name} className="p-3 flex items-center justify-between hover:bg-gray-50 text-xs gap-3">
+                      <div className="min-w-0 flex-1">
+                        <span className="font-semibold text-gray-800 block text-xs">{item.name}</span>
+                        {/* Location assignment selector in list */}
+                        {locations.length > 0 ? (
+                          <div className="mt-1 flex items-center gap-1.5">
+                            <span className="text-[10px] text-gray-400 font-medium">Default Location:</span>
+                            <select
+                              value={item.locationId || ''}
+                              onChange={e => {
+                                const selectedId = e.target.value;
+                                const locObj = locations.find(l => String(l._id || l.id) === String(selectedId));
+                                const updated = presets.map(p => {
+                                  if (p.name === item.name) {
+                                    return {
+                                      ...p,
+                                      locationId: selectedId,
+                                      locationName: locObj ? (locObj.name || locObj.code || '') : '',
+                                      warehouseId: locObj ? String(locObj._id || locObj.id) : ''
+                                    };
+                                  }
+                                  return p;
+                                });
+                                savePresets(updated);
+                                showToast(`Updated default location for "${item.name}"`, 'success');
+                              }}
+                              className="text-[11px] bg-white border border-gray-200 rounded px-2 py-0.5 font-medium text-gray-700 focus:border-blue-500"
+                            >
+                              <option value="">No location assigned</option>
+                              {locations.map(loc => (
+                                <option key={loc._id || loc.id} value={loc._id || loc.id}>
+                                  {loc.name || loc.code} {loc.level ? `(${loc.level})` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        ) : item.locationName ? (
+                          <div className="text-[10px] text-blue-600 font-medium flex items-center gap-1 mt-0.5">
+                            <MapPin className="w-2.5 h-2.5" />
+                            <span>{item.locationName}</span>
+                          </div>
+                        ) : null}
+                      </div>
+
                       <button
                         type="button"
                         onClick={() => handleRemovePreset(item)}
-                        className="p-1 text-rose-500 hover:bg-rose-50 rounded cursor-pointer transition-colors"
+                        className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors shrink-0"
                         title="Delete preset"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   ))
@@ -390,7 +533,7 @@ export const PresetField: React.FC<PresetFieldProps> = ({
               <button
                 type="button"
                 onClick={() => setShowManageModal(false)}
-                className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white font-bold rounded-lg text-xs cursor-pointer transition-colors"
+                className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white font-bold rounded-xl text-xs cursor-pointer transition-colors"
               >
                 Done
               </button>
