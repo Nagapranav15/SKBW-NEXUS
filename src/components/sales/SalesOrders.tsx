@@ -460,14 +460,6 @@ const SalesOrders: React.FC = () => {
     });
   }, [filteredOrders, sortField, sortOrder]);
 
-  // Active Total Amount for currently displayed table rows (excluding cancelled)
-  const activeTableTotal = useMemo(() => {
-    return filteredOrders
-      .filter(o => o.status !== 'Cancelled')
-      .reduce((sum, o) => sum + (Number(o.grandTotal) || 0), 0);
-  }, [filteredOrders]);
-
-
   // Toggle sort field
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -967,9 +959,6 @@ const SalesOrders: React.FC = () => {
                   <span className="w-2 h-2 rounded-full bg-purple-600"></span>
                 </div>
                 <p className="text-2xl font-black text-purple-700 mt-1 font-mono">₹{Math.round(metrics.totalAmount).toLocaleString('en-IN')}</p>
-                {metrics.cancelledCount > 0 && (
-                  <p className="text-[10px] text-gray-400 mt-0.5 font-medium">Excludes {metrics.cancelledCount} cancelled</p>
-                )}
               </div>
             </div>
           )}
@@ -1567,40 +1556,6 @@ const SalesOrders: React.FC = () => {
                     </div>
                   </td>
                 </tr>
-              )}
-              {/* Table Summary Footer */}
-              {sortedOrders.length > 0 && (
-                <tfoot className="bg-gray-50/90 border-t-2 border-gray-200 text-xs font-bold text-gray-800">
-                  <tr>
-                    <td className="py-3 px-3.5 text-center text-gray-400">Σ</td>
-                    {isColVisible('orderNumber') && (
-                      <td className="py-3 px-3 font-semibold text-gray-600">
-                        {sortedOrders.filter(o => o.status !== 'Cancelled').length} Active
-                        {sortedOrders.some(o => o.status === 'Cancelled') && (
-                          <span className="text-[11px] text-rose-600 font-normal ml-1">
-                            ({sortedOrders.filter(o => o.status === 'Cancelled').length} cancelled)
-                          </span>
-                        )}
-                      </td>
-                    )}
-                    {isColVisible('orderDate') && <td className="py-3 px-3"></td>}
-                    {isColVisible('customer') && (
-                      <td className="py-3 px-4 font-semibold text-gray-600">
-                        Total
-                      </td>
-                    )}
-                    {isColVisible('cityRegion') && <td className="py-3 px-3"></td>}
-                    {isColVisible('promisedDate') && <td className="py-3 px-3"></td>}
-                    {isColVisible('grandTotal') && (
-                      <td className="py-3 px-3 text-right font-mono font-black text-gray-900 whitespace-nowrap">
-                        ₹{activeTableTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                    )}
-                    {isColVisible('fulfillmentStatus') && <td className="py-3 px-3"></td>}
-                    {isColVisible('status') && <td className="py-3 px-3"></td>}
-                    {isColVisible('actions') && <td className="py-3 px-3"></td>}
-                  </tr>
-                </tfoot>
               )}
             </tbody>
           </table>
