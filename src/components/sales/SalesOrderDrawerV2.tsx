@@ -2052,16 +2052,16 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
               <table className="w-full text-left border-collapse text-xs">
                 <thead className="bg-gray-50/80 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 select-none">
                   <tr>
-                    <th className="py-2.5 px-2 text-center w-8">#</th>
-                    <th className="py-2.5 px-3 min-w-[220px]">ITEM / PRODUCT <span className="text-red-500">*</span></th>
-                    <th className="py-2.5 px-3 min-w-[160px]">ITEM DESCRIPTION</th>
-                    <th className="py-2.5 px-2 text-center w-24">STOCK (GBL)</th>
-                    <th className="py-2.5 px-2 text-center w-20">GBL <span className="text-red-500">*</span></th>
-                    <th className="py-2.5 px-2 text-center w-24">PCS / GBL</th>
-                    <th className="py-2.5 px-2 text-center w-24">TOTAL GBL</th>
-                    <th className="py-2.5 px-2 text-right w-24">RATE (₹) <span className="text-red-500">*</span></th>
-                    <th className="py-2.5 px-3 text-right w-36">FINAL TOTAL AMOUNT (₹)</th>
-                    <th className="py-2.5 px-2 text-center w-20">ACTIONS</th>
+                    <th className="py-2.5 px-2 text-center w-8 whitespace-nowrap">#</th>
+                    <th className="py-2.5 px-3 min-w-[220px] whitespace-nowrap">ITEM / PRODUCT <span className="text-red-500">*</span></th>
+                    <th className="py-2.5 px-3 min-w-[160px] whitespace-nowrap">ITEM DESCRIPTION</th>
+                    <th className="py-2.5 px-2 text-center whitespace-nowrap">STOCK (GBL)</th>
+                    <th className="py-2.5 px-2 text-center whitespace-nowrap">GBL <span className="text-red-500">*</span></th>
+                    <th className="py-2.5 px-2 text-center whitespace-nowrap">PCS / GBL</th>
+                    <th className="py-2.5 px-2 text-center whitespace-nowrap">TOTAL PCS</th>
+                    <th className="py-2.5 px-2 text-right whitespace-nowrap">RATE (₹) <span className="text-red-500">*</span></th>
+                    <th className="py-2.5 px-3 text-right whitespace-nowrap">FINAL TOTAL AMOUNT (₹)</th>
+                    <th className="py-2.5 px-2 text-center whitespace-nowrap">ACTIONS</th>
                   </tr>
                 </thead>
 
