@@ -616,6 +616,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                 <tr>
                   <th className="py-3 px-3 w-8 text-center">#</th>
                   <th className="py-3 px-4">Stock Item / SKU Description</th>
+                  <th className="py-3 px-3 text-center">Conversion</th>
                   <th className="py-3 px-3 text-center">Stock In Hand</th>
                   <th className="py-3 px-3 text-center">Total Ordered</th>
                   <th className="py-3 px-3 text-center">Dispatched</th>
@@ -623,7 +624,6 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                   <th className="py-3 px-4 text-center bg-rose-50/50 text-rose-900 border-x border-rose-100">
                     Production Shortfall
                   </th>
-                  <th className="py-3 px-3 text-center">Due On</th>
                   <th className="py-3 px-3 text-center">Status</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
@@ -655,15 +655,19 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
 
                         {/* Stock Item Name & Code */}
                         <td className="py-2.5 px-4">
-                          <div className="font-semibold text-gray-900 flex items-center gap-1.5">
-                            <span>{req.skuName}</span>
-                            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-gray-100 text-gray-600 border border-gray-200">
-                              {req.pcsPerGbl} pcs/GBL
-                            </span>
+                          <div className="font-semibold text-gray-900">
+                            {req.skuName}
                           </div>
                           <div className="text-[10.5px] text-gray-400 font-mono mt-0.5">
                             {req.skuCode} • {req.orderCount} pending order{req.orderCount > 1 ? 's' : ''}
                           </div>
+                        </td>
+
+                        {/* Conversion */}
+                        <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                          <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-semibold inline-block">
+                            {req.pcsPerGbl} pcs/GBL
+                          </span>
                         </td>
 
                         {/* Stock In Hand */}
@@ -722,11 +726,6 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                               In Stock
                             </span>
                           )}
-                        </td>
-
-                        {/* Due On */}
-                        <td className="py-2.5 px-3 text-center font-mono text-xs text-gray-600">
-                          {formatDateDDMMYYYY(req.earliestDueDate)}
                         </td>
 
                         {/* Status */}
