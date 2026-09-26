@@ -276,6 +276,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   // Customer State (Blank by default when new)
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
   const [customerSearch, setCustomerSearch] = useState('');
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [customersList, setCustomersList] = useState<any[]>([]);
   const [showCustomerDetailsModal, setShowCustomerDetailsModal] = useState(false);
 
