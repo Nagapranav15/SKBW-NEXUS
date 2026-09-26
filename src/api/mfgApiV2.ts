@@ -297,6 +297,11 @@ export const updateMetadataV2 = async (metadataData: {
   return response.data;
 };
 
+export const getPurchaseInvoicesV2 = async (params: { companyId: string; limit?: number; page?: number }): Promise<any> => {
+  const response = await api.get('/v2/purchases/invoices', { params });
+  return response.data;
+};
+
 export const getNextInvoiceNumberV2 = async (companyId: string): Promise<string> => {
   const response = await api.get('/v2/purchases/next-number', {
     params: { companyId }

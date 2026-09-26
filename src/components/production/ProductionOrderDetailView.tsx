@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ArrowLeft, Printer, Layers, Package, Plus, CheckCircle2, 
-  Clock, IndianRupee, Box, Check, ExternalLink, AlertCircle, FileText, History
+  Clock, IndianRupee, Box, Check, ExternalLink, AlertCircle, FileText, History, RefreshCw
 } from 'lucide-react';
 import { ProductionOrder } from '../../types/production';
 import { showToast } from '../ui/Toast';
 import { formatOrderNo } from './ProductionOrdersList';
+import { fetchStockCostings, resolveComponentCosting, StockCostingData } from '../../utils/inventoryCosting';
 
 interface ProductionOrderDetailViewProps {
   order: ProductionOrder;
@@ -25,9 +26,44 @@ export const ProductionOrderDetailView: React.FC<ProductionOrderDetailViewProps>
   onCompleteOrder
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'bom' | 'entries' | 'issues' | 'batch' | 'history'>('overview');
+  const [stockCostings, setStockCostings] = useState<StockCostingData | null>(null);
 
-  // Compute total material cost
-  const totalCost = (order.bomItems || []).reduce((acc, curr) => acc + (curr.amount || 0), 0);
+  // Fetch dynamic live rates and stocks from Inventory modules
+  useEffect(() => {
+    const cId = order.company || (order as any).companyId;
+    if (cId) {
+      fetchStockCostings(String(cId)).then(res => setStockCostings(res)).catch(() => {});
+    }
+  }, [order.company]);
+
+  // Compute dynamic BOM item costings and live stock from Stock & Inventory
+  const resolvedBomItems = useMemo(() => {
+    return (order.bomItems || []).map(item => {
+      const costing = resolveComponentCosting({
+        code: item.code,
+        component: item.component,
+        rate: item.rate,
+        availableStock: item.availableStock
+      }, stockCostings);
+
+      const dynamicRate = costing.rate > 0 ? costing.rate : (item.rate || 0);
+      const dynamicAmount = item.amount > 0 && costing.source === 'manual'
+        ? item.amount
+        : Math.round(item.totalRequired * dynamicRate * 100) / 100;
+      const dynamicStock = costing.availableStock;
+
+      return {
+        ...item,
+        dynamicRate,
+        dynamicAmount,
+        dynamicStock,
+        costingSource: costing.source
+      };
+    });
+  }, [order.bomItems, stockCostings]);
+
+  // Compute dynamic total material cost from live stock & inventory rates
+  const totalCost = resolvedBomItems.reduce((acc, curr) => acc + (curr.dynamicAmount || 0), 0);
   const isCompleted = order.status === 'Completed';
 
   // Global Keyboard Shortcuts for Production Order Detail View
@@ -211,6 +247,115 @@ export const ProductionOrderDetailView: React.FC<ProductionOrderDetailViewProps>
 
       {/* Main Content Area */}
       <div className="p-6 max-w-7xl mx-auto w-full space-y-6">
+        {activeTab === 'bom' ? (
+          <div className="space-y-6">
+            {/* Header banner */}
+            <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Bill of Materials</span>
+                  <span className="text-xs text-gray-300">•</span>
+                  <span className="text-xs font-semibold text-blue-600">{order.bomType || 'Standard BOM'}</span>
+                </div>
+                <h2 className="text-lg font-bold text-gray-900 mt-1">{order.itemName}</h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Production Batch: <span className="font-semibold text-gray-800">{order.plannedQty} {order.plannedUom} ({order.plannedPcs.toLocaleString()} PCS)</span>
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="text-left md:text-right">
+                  <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">Estimated Material Cost</span>
+                  <span className="text-xl font-black text-blue-600 font-mono block">
+                    ₹ {totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                  <span className="text-[10px] text-emerald-600 font-semibold flex items-center md:justify-end gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
+                    Live from Stock & Inventory
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Detailed BOM Table */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-2xs overflow-hidden">
+              <div className="p-4 border-b border-gray-150 flex items-center justify-between">
+                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Required Components & Costing Breakdown</h3>
+                <span className="text-xs text-gray-500 font-medium">{resolvedBomItems.length} Components</span>
+              </div>
+
+              <div className="overflow-x-auto custom-scrollbar">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-gray-50/70 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                      <th className="py-2.5 px-3 w-8 text-center">#</th>
+                      <th className="py-2.5 px-3">Component / Material</th>
+                      <th className="py-2.5 px-3">Classification</th>
+                      <th className="py-2.5 px-3">Total Required</th>
+                      <th className="py-2.5 px-3">UOM</th>
+                      <th className="py-2.5 px-3">Live Stock</th>
+                      <th className="py-2.5 px-3">Unit Cost (₹)</th>
+                      <th className="py-2.5 px-3 text-right">Total Cost (₹)</th>
+                      <th className="py-2.5 px-3 text-center">Stock Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {resolvedBomItems.map((item, idx) => (
+                      <tr key={item.id} className="hover:bg-gray-50/60 transition-colors">
+                        <td className="py-3 px-3 text-center font-semibold text-gray-500">{idx + 1}</td>
+                        <td className="py-3 px-3 font-semibold text-gray-900">
+                          <div>{item.component}</div>
+                          {item.code && <div className="text-[10px] text-gray-400 font-mono">{item.code}</div>}
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                            item.type === 'Semi'
+                              ? 'bg-sky-50 text-sky-700 border border-sky-200/60'
+                              : 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                          }`}>
+                            {item.type === 'Semi' ? 'Semi-Finished' : 'Raw Material'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 font-bold text-gray-900">{item.totalRequired.toLocaleString()}</td>
+                        <td className="py-3 px-3 text-gray-600 font-medium">{item.uom}</td>
+                        <td className="py-3 px-3 font-semibold text-gray-700">{item.dynamicStock.toLocaleString()}</td>
+                        <td className="py-3 px-3 font-mono font-medium text-gray-800">
+                          {item.dynamicRate > 0 ? `₹${item.dynamicRate.toFixed(2)}` : '₹0.00'}
+                        </td>
+                        <td className="py-3 px-3 font-mono font-bold text-gray-900 text-right">
+                          {item.dynamicAmount > 0 ? `₹${item.dynamicAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '₹0.00'}
+                        </td>
+                        <td className="py-3 px-3 text-center">
+                          {item.dynamicStock >= item.totalRequired ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              Available
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                              Shortage
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-gray-50/80 border-t border-gray-200 font-bold text-xs">
+                      <td colSpan={7} className="py-3 px-4 text-gray-800 text-left uppercase tracking-wide">
+                        Total Material Cost (Dynamic from Stock & Inventory)
+                      </td>
+                      <td className="py-3 px-4 text-right text-blue-600 text-sm font-black font-mono">
+                        ₹ {totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-6">
         {/* 4 Stat Metric Cards (Matching Screen 4) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Card 1: Production Quantity */}
@@ -261,10 +406,10 @@ export const ProductionOrderDetailView: React.FC<ProductionOrderDetailViewProps>
           <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs flex items-center justify-between">
             <div>
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Total Material Cost</p>
-              <h3 className="text-xl font-black text-gray-900 mt-1">
+              <h3 className="text-xl font-black text-gray-900 mt-1 font-mono">
                 ₹ {totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </h3>
-              <p className="text-[11px] text-emerald-600 font-semibold">(Estimated)</p>
+              <p className="text-[11px] text-emerald-600 font-semibold">(Live Stock & Inventory)</p>
             </div>
             <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-600">
               <Layers className="w-5 h-5 stroke-[2.2]" />
@@ -437,19 +582,30 @@ export const ProductionOrderDetailView: React.FC<ProductionOrderDetailViewProps>
                       <th className="py-2 px-2.5 w-8">#</th>
                       <th className="py-2 px-2.5">Component</th>
                       <th className="py-2 px-2.5">Required Qty</th>
-                      <th className="py-2 px-2.5">Issued Qty</th>
                       <th className="py-2 px-2.5">UOM</th>
+                      <th className="py-2 px-2.5">Live Stock</th>
+                      <th className="py-2 px-2.5">Unit Cost (₹)</th>
+                      <th className="py-2 px-2.5">Total Cost (₹)</th>
                       <th className="py-2 px-2.5">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {order.bomItems?.map((item, idx) => (
+                    {resolvedBomItems.map((item, idx) => (
                       <tr key={item.id} className="hover:bg-gray-50/50">
                         <td className="py-2.5 px-2.5 text-gray-500 font-semibold">{idx + 1}</td>
-                        <td className="py-2.5 px-2.5 font-semibold text-gray-900">{item.component}</td>
+                        <td className="py-2.5 px-2.5 font-semibold text-gray-900">
+                          <div>{item.component}</div>
+                          {item.code && <div className="text-[10px] text-gray-400 font-mono">{item.code}</div>}
+                        </td>
                         <td className="py-2.5 px-2.5 font-bold text-gray-800">{item.totalRequired.toLocaleString()}</td>
-                        <td className="py-2.5 px-2.5 font-bold text-gray-800">{item.issuedQty?.toLocaleString() || item.totalRequired.toLocaleString()}</td>
                         <td className="py-2.5 px-2.5 text-gray-600">{item.uom}</td>
+                        <td className="py-2.5 px-2.5 font-semibold text-gray-700">{item.dynamicStock.toLocaleString()}</td>
+                        <td className="py-2.5 px-2.5 font-mono font-medium text-gray-800">
+                          {item.dynamicRate > 0 ? `₹${item.dynamicRate.toFixed(2)}` : '₹0.00'}
+                        </td>
+                        <td className="py-2.5 px-2.5 font-mono font-bold text-gray-900">
+                          {item.dynamicAmount > 0 ? `₹${item.dynamicAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '₹0.00'}
+                        </td>
                         <td className="py-2.5 px-2.5">
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                             {item.issuedStatus || 'Issued'}
@@ -515,6 +671,8 @@ export const ProductionOrderDetailView: React.FC<ProductionOrderDetailViewProps>
             </div>
           </div>
         </div>
+        </div>
+        )}
       </div>
     </div>
   );

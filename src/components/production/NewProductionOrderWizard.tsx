@@ -13,6 +13,7 @@ import { PresetField, PresetItem } from './PresetField';
 import { BulkEditBomModal } from './BulkEditBomModal';
 import { LocationSelectPopup } from '../stock_v2/LocationSelectPopup';
 import { Modal } from '../ui/Modal';
+import { fetchStockCostings, resolveComponentCosting, StockCostingData } from '../../utils/inventoryCosting';
 
 interface NewProductionOrderWizardProps {
   onCancel: () => void;
@@ -163,6 +164,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   const [backendSkus, setBackendSkus] = useState<SkuV2[]>([]);
   const [factories, setFactories] = useState<string[]>([]);
   const [warehouseLocations, setWarehouseLocations] = useState<WarehouseLocationV2[]>([]);
+  const [stockCostings, setStockCostings] = useState<StockCostingData | null>(null);
 
   // Bulk Edit BOM Modal state (opens exact Item Master recipe editor)
   const [showBulkEditBomModal, setShowBulkEditBomModal] = useState<boolean>(false);
@@ -275,13 +277,19 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         setLoadingInitial(true);
         if (!companyId) return;
 
-        const [skusRes, warehouseRes, nextNumRes] = await Promise.allSettled([
+        const [skusRes, warehouseRes, nextNumRes, costingsRes] = await Promise.allSettled([
           getSkusV2(companyId),
           getWarehouseHierarchyV2(companyId),
-          getNextProductionOrderNumber(companyId)
+          getNextProductionOrderNumber(companyId),
+          fetchStockCostings(companyId)
         ]);
 
         if (!isMounted) return;
+
+        // Dynamic Stock & Inventory Costing
+        if (costingsRes.status === 'fulfilled' && costingsRes.value) {
+          setStockCostings(costingsRes.value);
+        }
 
         // SKUs
         if (skusRes.status === 'fulfilled' && Array.isArray(skusRes.value)) {
@@ -408,9 +416,19 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
       const qtyPerBatch = Number(raw.qty) || Number(raw.qtyPerBatch) || 1;
       const totalReq = (qtyPerBatch / yieldBasis) * targetPcs;
-      const stock = compSku ? (compSku.presentStock ?? compSku.openingStock ?? 0) : (raw.inStock ?? 0);
-      const rate = Number(raw.rate) || 1.00;
-      const amount = totalReq * rate;
+
+      // Dynamically resolve costing and available on-hand stock from Stock & Inventory
+      const costing = resolveComponentCosting({
+        skuId: raw.skuId || compSku?._id,
+        skuCode: raw.skuCode || compSku?.skuCode,
+        name: raw.name || raw.itemName || compSku?.name,
+        rate: Number(raw.rate) || 0,
+        availableStock: raw.inStock
+      }, stockCostings);
+
+      const stock = costing.availableStock;
+      const rate = costing.rate;
+      const amount = Math.round(totalReq * rate * 100) / 100;
 
       let compType: 'Raw' | 'Semi' | 'Finished' = 'Raw';
       if (compSku) {
@@ -436,6 +454,29 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
     setBomItems(items);
   };
+
+  // Synchronize BOM item costs and stock when stockCostings finishes loading
+  useEffect(() => {
+    if (!stockCostings || bomItems.length === 0) return;
+    setBomItems(prev => prev.map(item => {
+      const costing = resolveComponentCosting({
+        code: item.code,
+        component: item.component,
+        rate: item.rate,
+        availableStock: item.availableStock
+      }, stockCostings);
+
+      const newRate = costing.rate > 0 ? costing.rate : item.rate;
+      const newStock = costing.availableStock;
+      return {
+        ...item,
+        rate: newRate,
+        amount: Math.round(item.totalRequired * newRate * 100) / 100,
+        availableStock: newStock,
+        stockStatus: newStock >= item.totalRequired ? 'Available' : 'Shortage'
+      };
+    }));
+  }, [stockCostings]);
 
   // When a Finished Product is chosen
   const handleSelectProduct = (sku: SkuV2) => {
@@ -497,8 +538,19 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   // Add Component from Catalog (Raw and Semi Materials ONLY)
   const handleSelectCatalogComponent = (compSku: SkuV2) => {
     const pcs = totalPlannedPcs > 0 ? totalPlannedPcs : 1;
-    const stock = compSku.presentStock ?? compSku.openingStock ?? 0;
     const compType = getItemClassification(compSku) === 'semi' ? 'Semi' : 'Raw';
+
+    // Dynamically resolve costing and stock from Stock & Inventory
+    const costing = resolveComponentCosting({
+      skuId: compSku._id,
+      skuCode: compSku.skuCode,
+      name: compSku.name,
+      rate: Number((compSku as any).purchasePrice || (compSku as any).rate || (compSku as any).avgRate || 0),
+      availableStock: compSku.presentStock ?? compSku.openingStock ?? 0
+    }, stockCostings);
+
+    const liveRate = costing.rate;
+    const liveStock = costing.availableStock;
 
     const newItem: ProductionBomItem = {
       id: `bom-add-${Date.now()}`,
@@ -508,10 +560,10 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       qtyPerBatch: 1,
       totalRequired: 1 * pcs,
       uom: compSku.unit || 'PCS',
-      availableStock: stock,
-      stockStatus: stock >= (1 * pcs) ? 'Available' : 'Shortage',
-      rate: 1.00,
-      amount: 1 * pcs * 1.00,
+      availableStock: liveStock,
+      stockStatus: liveStock >= (1 * pcs) ? 'Available' : 'Shortage',
+      rate: liveRate,
+      amount: Math.round(1 * pcs * liveRate * 100) / 100,
       issuedQty: 0,
       issuedStatus: 'Pending'
     };
@@ -1266,6 +1318,8 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                         <th className="py-2.5 px-3">Total Required</th>
                         <th className="py-2.5 px-3">UOM</th>
                         <th className="py-2.5 px-3">Available Stock</th>
+                        <th className="py-2.5 px-3">Unit Cost (₹)</th>
+                        <th className="py-2.5 px-3">Total Cost (₹)</th>
                         <th className="py-2.5 px-3">Stock Status</th>
                         <th className="py-2.5 px-3 text-center">Actions</th>
                       </tr>
@@ -1273,7 +1327,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                     <tbody className="divide-y divide-gray-100">
                       {bomItems.length === 0 ? (
                         <tr>
-                          <td colSpan={9} className="py-8 text-center text-gray-400">
+                          <td colSpan={11} className="py-8 text-center text-gray-400">
                             {!selectedSku ? (
                               'Please select an Item to Produce above to load its BOM.'
                             ) : (
@@ -1343,6 +1397,12 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                             <td className="py-3 px-3 font-semibold text-gray-700">
                               {item.availableStock.toLocaleString()}
                             </td>
+                            <td className="py-3 px-3 font-mono font-medium text-gray-800">
+                              {item.rate > 0 ? `₹${item.rate.toFixed(2)}` : '₹0.00'}
+                            </td>
+                            <td className="py-3 px-3 font-mono font-bold text-gray-900">
+                              {item.amount > 0 ? `₹${item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '₹0.00'}
+                            </td>
                             <td className="py-3 px-3">
                               {item.stockStatus === 'Available' ? (
                                 <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -1372,6 +1432,18 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                         ))
                       )}
                     </tbody>
+                    {bomItems.length > 0 && (
+                      <tfoot>
+                        <tr className="bg-gray-50/80 border-t border-gray-200 font-bold text-xs">
+                          <td colSpan={8} className="py-2.5 px-3 text-gray-700 uppercase tracking-wider">
+                            Estimated Material Cost (Dynamic from Stock & Inventory)
+                          </td>
+                          <td colSpan={3} className="py-2.5 px-3 text-right font-black text-blue-600 text-sm font-mono">
+                            ₹ {bomStats.totalEstimatedCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    )}
                   </table>
                 </div>
 

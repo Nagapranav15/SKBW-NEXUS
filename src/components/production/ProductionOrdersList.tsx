@@ -541,10 +541,11 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                     return (
                       <tr 
                         key={order._id}
-                        className={`hover:bg-blue-50/30 transition-colors group ${isSelected ? 'bg-blue-50/50' : ''}`}
+                        onClick={() => onViewOrder(order)}
+                        className={`hover:bg-blue-50/40 transition-colors group cursor-pointer ${isSelected ? 'bg-blue-50/60' : ''}`}
                       >
                         {/* Checkbox */}
-                        <td className="py-3.5 px-3.5 text-center">
+                        <td className="py-3.5 px-3.5 text-center" onClick={(e) => e.stopPropagation()}>
                           <input
                             type="checkbox"
                             checked={isSelected}
@@ -693,7 +694,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                         </td>
 
                         {/* Actions */}
-                        <td className="py-3.5 px-3 text-center whitespace-nowrap">
+                        <td className="py-3.5 px-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-center space-x-1">
                             {/* View / Eye */}
                             <button
