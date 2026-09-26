@@ -1,16 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   X, Edit, Printer, FileText, MoreHorizontal,
   User, Calendar, Truck, Tag, MapPin, Phone, Package,
   ChevronRight, Plus, Trash2, CheckCircle, Clock,
-  AlertCircle, CreditCard, IndianRupee
+  AlertCircle, CreditCard, IndianRupee, Play, Send, Check
 } from 'lucide-react';
 import { SalesOrderV2, updateSalesOrderV2Status } from '../../api/salesOrderApiV2';
 import { saveCustomSalesOrder } from '../../utils/salesOrderStorage';
 import { useAuth } from '../../context/AuthContext';
 import { getParties } from '../../api/partyApi';
 import { getBalancesV2, getSkusV2 } from '../../api/mfgApiV2';
+import { createProductionOrder, getProductionOrders, completeProductionOrder } from '../../api/productionApi';
+import { createDeliveryChallan, getDeliveryChallans } from '../../api/deliveryChallanApi';
 import { showToast } from '../ui/Toast';
 import { formatDateDDMMYYYY } from '../../utils/dateUtils';
 
@@ -37,10 +39,21 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
   onOrderUpdated,
 }) => {
   const { selectedCompany, user } = useAuth();
+  const [localOrder, setLocalOrder] = useState<SalesOrderV2 | null>(order);
+  const [productionOrders, setProductionOrders] = useState<any[]>([]);
+  const [deliveryChallans, setDeliveryChallans] = useState<any[]>([]);
+  const [isProcessingAction, setIsProcessingAction] = useState<string | null>(null);
+
   const [addressTab, setAddressTab] = useState<'billing' | 'delivery'>('billing');
   const [customerDetails, setCustomerDetails] = useState<any | null>(null);
   const [stockMap, setStockMap] = useState<Map<string, number>>(new Map());
   const [isConfirming, setIsConfirming] = useState(false);
+
+  useEffect(() => {
+    setLocalOrder(order);
+  }, [order]);
+
+  const activeOrder = localOrder || order;
 
   // Lock body scroll while modal is open
   useEffect(() => {
@@ -125,9 +138,25 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
         setStockMap(smap);
       }).catch(() => {});
     }
-  }, [isOpen, order, selectedCompany?._id]);
+  }, [isOpen, activeOrder, selectedCompany?._id]);
 
-  if (!isOpen || !order) return null;
+  // Fetch linked production orders & delivery challans to make order progress dynamic
+  useEffect(() => {
+    if (!isOpen || !activeOrder) return;
+    const compId = (activeOrder.company as any)?._id || activeOrder.company || selectedCompany?._id;
+    if (compId) {
+      getProductionOrders({ companyId: compId }).then(res => {
+        if (Array.isArray(res)) setProductionOrders(res);
+      }).catch(() => {});
+
+      getDeliveryChallans(compId).then((res: any) => {
+        const list = res?.data || (Array.isArray(res) ? res : []);
+        if (Array.isArray(list)) setDeliveryChallans(list);
+      }).catch(() => {});
+    }
+  }, [isOpen, activeOrder?._id, activeOrder?.company, selectedCompany?._id]);
+
+  if (!isOpen || !activeOrder) return null;
 
   // ── Clean Address Formatter without trailing ", - Pincode" ──
   const formatAddr = (a: any) => {
@@ -155,26 +184,26 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
   const fmtMoney = (n?: number) =>
     n != null ? `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—';
 
-  const custObj = customerDetails || (typeof order.customer === 'object' ? order.customer : null);
-  const ba = order.billingAddress as any;
-  const sa = order.shippingAddress as any;
+  const custObj = customerDetails || (typeof activeOrder.customer === 'object' ? activeOrder.customer : null);
+  const ba = activeOrder.billingAddress as any;
+  const sa = activeOrder.shippingAddress as any;
 
-  const billingAddrStr = formatAddr(ba) || formatAddr(custObj) || [order.city, order.region].filter(Boolean).join(', ') || '—';
+  const billingAddrStr = formatAddr(ba) || formatAddr(custObj) || [activeOrder.city, activeOrder.region].filter(Boolean).join(', ') || '—';
   const deliveryAddrStr = formatAddr(sa) || billingAddrStr;
   const sameAddr = !sa?.addressLine || sa?.addressLine === ba?.addressLine || deliveryAddrStr === billingAddrStr;
 
   // Accurate Customer Financials & Identity
   const creditLimitVal = custObj?.creditLimit ? fmtMoney(custObj.creditLimit) : '₹50,000.00';
   const outstandingVal = custObj?.outstandingBalance !== undefined ? fmtMoney(custObj.outstandingBalance) : '₹12,450.00';
-  const lastOrderVal = custObj?.lastOrderDate ? fmtDate(custObj.lastOrderDate) : fmtDate(order.orderDate);
+  const lastOrderVal = custObj?.lastOrderDate ? fmtDate(custObj.lastOrderDate) : fmtDate(activeOrder.orderDate);
   const customerGroup = custObj?.group || custObj?.category || 'Regular';
 
   // Totals
-  const itemsTotal = (order.items || []).reduce((s, i) => s + (i.totalAmount || 0), 0);
-  const chargesTotal = (order.otherCharges || []).reduce((s, c) => s + (c.amount || 0), 0);
+  const itemsTotal = (activeOrder.items || []).reduce((s, i) => s + (i.totalAmount || 0), 0);
+  const chargesTotal = (activeOrder.otherCharges || []).reduce((s, c) => s + (c.amount || 0), 0);
   const subtotal = itemsTotal + chargesTotal;
-  const discAmount = order.discountAmount || 0;
-  const grandTotal = order.grandTotal || (subtotal - discAmount);
+  const discAmount = activeOrder.discountAmount || 0;
+  const grandTotal = activeOrder.grandTotal || (subtotal - discAmount);
 
   // Status badge
   const statusBadge = (status: string) => {
@@ -184,19 +213,10 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
       case 'Delivered': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
       case 'Cancelled': return 'bg-rose-50 text-rose-700 border-rose-200';
       case 'In Production': return 'bg-purple-50 text-purple-700 border-purple-200';
+      case 'Invoiced': return 'bg-indigo-50 text-indigo-700 border-indigo-200';
       default: return 'bg-gray-100 text-gray-600 border-gray-200';
     }
   };
-
-  // Order progress steps
-  const progressSteps = [
-    { id: 1, label: 'Order Created', status: order.status === 'Draft' ? 'Draft' : 'Confirmed', date: fmtDate(order.orderDate), done: true, color: 'emerald' },
-    { id: 2, label: 'Production', status: order.fulfillmentStatus === 'In Production' ? 'In Production' : 'Pending', date: '', done: order.fulfillmentStatus === 'In Production' || order.fulfillmentStatus === 'Partially Dispatched' || order.fulfillmentStatus === 'Fully Dispatched', color: 'amber' },
-    { id: 3, label: 'Dispatch', status: order.fulfillmentStatus === 'Partially Dispatched' ? 'Partial' : order.fulfillmentStatus === 'Fully Dispatched' ? 'Done' : 'Pending', date: '', done: order.fulfillmentStatus === 'Fully Dispatched', color: 'blue' },
-    { id: 4, label: 'Delivery', status: order.fulfillmentStatus === 'Fully Dispatched' ? 'Done' : 'Pending', date: fmtDate(order.promisedDate), done: false, color: 'indigo' },
-    { id: 5, label: 'Invoice', status: order.status === 'Invoiced' ? 'Done' : 'Pending', date: '', done: order.status === 'Invoiced', color: 'violet' },
-    { id: 6, label: 'Payment', status: 'Pending', date: '', done: false, color: 'purple' },
-  ];
 
   const stepColorMap: Record<string, { bg: string; ring: string; text: string }> = {
     emerald: { bg: 'bg-emerald-100', ring: 'ring-emerald-400', text: 'text-emerald-600' },
@@ -205,31 +225,63 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
     indigo:  { bg: 'bg-indigo-100',  ring: 'ring-indigo-400',  text: 'text-indigo-600'  },
     violet:  { bg: 'bg-violet-100',  ring: 'ring-violet-400',  text: 'text-violet-600'  },
     purple:  { bg: 'bg-purple-100',  ring: 'ring-purple-400',  text: 'text-purple-600'  },
+    gray:    { bg: 'bg-gray-100',    ring: 'ring-gray-300',    text: 'text-gray-400'    },
   };
 
   const stepStatusBadge = (status: string) => {
-    if (status === 'Confirmed' || status === 'Done' || status === 'Partial') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-    if (status === 'In Production') return 'bg-amber-50 text-amber-700 border-amber-200';
-    if (status === 'Draft') return 'bg-gray-100 text-gray-600 border-gray-200';
+    if (status === 'Confirmed' || status === 'Done' || status === 'Dispatched' || status === 'Delivered' || status === 'Invoiced' || status === 'Paid' || status === 'Completed') {
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    }
+    if (status === 'In Production' || status === 'Partial') {
+      return 'bg-amber-50 text-amber-700 border-amber-200';
+    }
+    if (status === 'Planned') {
+      return 'bg-blue-50 text-blue-700 border-blue-200';
+    }
+    if (status === 'Draft') {
+      return 'bg-gray-100 text-gray-600 border-gray-200';
+    }
     return 'bg-gray-100 text-gray-500 border-gray-200';
   };
 
-  // Confirm Order Handler (converts Draft -> Confirmed)
+  // Find linked production order or delivery challan
+  const linkedProductionOrder = useMemo(() => {
+    if (!productionOrders.length || !activeOrder) return null;
+    const orderNum = (activeOrder.orderNumber || '').toLowerCase().trim();
+    return productionOrders.find(po => {
+      const pNum = (po.orderNumber || '').toLowerCase();
+      const notes = (po.notes || '').toLowerCase();
+      const source = (po.source || '').toLowerCase();
+      return pNum.includes(orderNum) || notes.includes(orderNum) || source.includes(orderNum);
+    });
+  }, [productionOrders, activeOrder]);
+
+  const linkedDeliveryChallan = useMemo(() => {
+    if (!deliveryChallans.length || !activeOrder) return null;
+    const orderNum = (activeOrder.orderNumber || '').toLowerCase().trim();
+    return deliveryChallans.find((dc: any) => {
+      const dcNum = (dc.dcNumber || dc.orderNumber || '').toLowerCase();
+      const cust = (dc.customerName || dc.customer || '').toLowerCase();
+      return dcNum.includes(orderNum) || (cust && cust === (activeOrder.customerName || '').toLowerCase());
+    });
+  }, [deliveryChallans, activeOrder]);
+
+  // 1. Confirm Order Handler (converts Draft -> Confirmed)
   const handleConfirmOrder = async () => {
-    if (!order) return;
+    if (!activeOrder) return;
     setIsConfirming(true);
     try {
       const confirmedOrder: SalesOrderV2 = {
-        ...order,
+        ...activeOrder,
         status: 'Confirmed',
-        fulfillmentStatus: order.fulfillmentStatus === 'Draft' ? 'Pending' : (order.fulfillmentStatus || 'Pending'),
+        fulfillmentStatus: activeOrder.fulfillmentStatus === 'Draft' ? 'Pending' : (activeOrder.fulfillmentStatus || 'Pending'),
         updatedAt: new Date().toISOString()
       };
 
-      const isLocalId = !order._id || order._id.startsWith('so-mock-') || order._id.startsWith('so-user-');
-      if (order._id && !isLocalId) {
+      const isLocalId = !activeOrder._id || activeOrder._id.startsWith('so-mock-') || activeOrder._id.startsWith('so-user-');
+      if (activeOrder._id && !isLocalId) {
         try {
-          await updateSalesOrderV2Status(order._id, { status: 'Confirmed' });
+          await updateSalesOrderV2Status(activeOrder._id, { status: 'Confirmed' });
         } catch (apiErr) {
           console.warn('Backend updateSalesOrderV2Status failed, proceeding locally:', apiErr);
         }
@@ -237,7 +289,8 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
 
       const compId = (confirmedOrder.company as any)?._id || confirmedOrder.company;
       saveCustomSalesOrder(confirmedOrder, compId);
-      showToast(`Sales Order ${order.orderNumber} confirmed successfully!`, 'success');
+      setLocalOrder(confirmedOrder);
+      showToast(`Sales Order ${activeOrder.orderNumber} confirmed successfully!`, 'success');
 
       if (onOrderUpdated) {
         onOrderUpdated(confirmedOrder);
@@ -250,15 +303,345 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
     }
   };
 
+  // 2. Dynamic Progression: Proceed to Production
+  const handleProceedProduction = async () => {
+    if (!activeOrder) return;
+    setIsProcessingAction('production');
+    try {
+      const compId = (activeOrder.company as any)?._id || activeOrder.company || selectedCompany?._id;
+      const firstItem = activeOrder.items?.[0];
+      const totalQty = activeOrder.items?.reduce((s, i) => s + (Number(i.quantity) || 0), 0) || 100;
+      const skuIdVal = typeof firstItem?.skuId === 'object' && firstItem?.skuId !== null ? (firstItem.skuId as any)._id : firstItem?.skuId;
+
+      // Create Production Order in backend
+      try {
+        const newProd = await createProductionOrder({
+          companyId: compId,
+          orderNumber: `PROD-${activeOrder.orderNumber}`,
+          notes: `Sales Order ${activeOrder.orderNumber} for ${activeOrder.customerName}`,
+          source: activeOrder.orderNumber,
+          itemName: firstItem?.itemName || 'Finished Goods',
+          skuId: skuIdVal,
+          plannedQty: totalQty,
+          plannedUom: firstItem?.uom || 'Pcs',
+          status: 'In Progress',
+          startDate: new Date().toISOString().slice(0, 10),
+          dueDate: activeOrder.promisedDate || new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+          department: 'Manufacturing',
+          productionEntries: []
+        });
+        if (newProd) {
+          setProductionOrders(prev => [newProd, ...prev]);
+        }
+      } catch (prodErr) {
+        console.warn('Backend createProductionOrder note:', prodErr);
+      }
+
+      // Update Sales Order fulfillmentStatus to 'In Production'
+      const updatedOrder: SalesOrderV2 = {
+        ...activeOrder,
+        fulfillmentStatus: 'In Production',
+        updatedAt: new Date().toISOString()
+      };
+
+      const isLocalId = !activeOrder._id || activeOrder._id.startsWith('so-mock-') || activeOrder._id.startsWith('so-user-');
+      if (activeOrder._id && !isLocalId) {
+        try {
+          await updateSalesOrderV2Status(activeOrder._id, { fulfillmentStatus: 'In Production' });
+        } catch (apiErr) {
+          console.warn('Backend status update note:', apiErr);
+        }
+      }
+
+      saveCustomSalesOrder(updatedOrder, compId);
+      setLocalOrder(updatedOrder);
+      if (onOrderUpdated) onOrderUpdated(updatedOrder);
+      showToast(`Order ${activeOrder.orderNumber} sent to Production (PROD-${activeOrder.orderNumber})!`, 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to send to Production', 'error');
+    } finally {
+      setIsProcessingAction(null);
+    }
+  };
+
+  // Complete Production
+  const handleCompleteProduction = async () => {
+    if (!activeOrder) return;
+    setIsProcessingAction('production-complete');
+    try {
+      const compId = (activeOrder.company as any)?._id || activeOrder.company || selectedCompany?._id;
+      if (linkedProductionOrder?._id) {
+        try {
+          await completeProductionOrder(linkedProductionOrder._id, user?.fullName || 'Admin');
+        } catch (e) {}
+      }
+
+      const updatedOrder: SalesOrderV2 = {
+        ...activeOrder,
+        fulfillmentStatus: 'Ready for Dispatch',
+        updatedAt: new Date().toISOString()
+      };
+
+      const isLocalId = !activeOrder._id || activeOrder._id.startsWith('so-mock-') || activeOrder._id.startsWith('so-user-');
+      if (activeOrder._id && !isLocalId) {
+        try {
+          await updateSalesOrderV2Status(activeOrder._id, { fulfillmentStatus: 'Ready for Dispatch' });
+        } catch (e) {}
+      }
+
+      saveCustomSalesOrder(updatedOrder, compId);
+      setLocalOrder(updatedOrder);
+      if (onOrderUpdated) onOrderUpdated(updatedOrder);
+      showToast(`Production completed! Order ${activeOrder.orderNumber} is ready for Dispatch.`, 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to complete Production', 'error');
+    } finally {
+      setIsProcessingAction(null);
+    }
+  };
+
+  // 3. Dynamic Progression: Proceed to Dispatch
+  const handleProceedDispatch = async () => {
+    if (!activeOrder) return;
+    setIsProcessingAction('dispatch');
+    try {
+      const compId = (activeOrder.company as any)?._id || activeOrder.company || selectedCompany?._id;
+      
+      try {
+        const dcRes = await createDeliveryChallan({
+          company: compId,
+          orderNumber: activeOrder.orderNumber,
+          customerName: activeOrder.customerName,
+          customerPhone: activeOrder.customerPhone,
+          items: activeOrder.items,
+          date: new Date().toISOString().slice(0, 10),
+          status: 'dispatched',
+          dcNumber: `DC-${activeOrder.orderNumber}`
+        });
+        if (dcRes?.data) {
+          setDeliveryChallans(prev => [dcRes.data, ...prev]);
+        }
+      } catch (dcErr) {
+        console.warn('Delivery Challan create note:', dcErr);
+      }
+
+      const updatedOrder: SalesOrderV2 = {
+        ...activeOrder,
+        fulfillmentStatus: 'Fully Dispatched',
+        updatedAt: new Date().toISOString()
+      };
+
+      const isLocalId = !activeOrder._id || activeOrder._id.startsWith('so-mock-') || activeOrder._id.startsWith('so-user-');
+      if (activeOrder._id && !isLocalId) {
+        try {
+          await updateSalesOrderV2Status(activeOrder._id, { fulfillmentStatus: 'Fully Dispatched' });
+        } catch (e) {}
+      }
+
+      saveCustomSalesOrder(updatedOrder, compId);
+      setLocalOrder(updatedOrder);
+      if (onOrderUpdated) onOrderUpdated(updatedOrder);
+      showToast(`Delivery Challan created & Order ${activeOrder.orderNumber} marked as Dispatched!`, 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to dispatch order', 'error');
+    } finally {
+      setIsProcessingAction(null);
+    }
+  };
+
+  // 4. Dynamic Progression: Proceed to Delivery
+  const handleProceedDelivery = async () => {
+    if (!activeOrder) return;
+    setIsProcessingAction('delivery');
+    try {
+      const compId = (activeOrder.company as any)?._id || activeOrder.company || selectedCompany?._id;
+      const updatedOrder: SalesOrderV2 = {
+        ...activeOrder,
+        status: 'Delivered',
+        fulfillmentStatus: 'Fully Dispatched',
+        updatedAt: new Date().toISOString()
+      };
+
+      const isLocalId = !activeOrder._id || activeOrder._id.startsWith('so-mock-') || activeOrder._id.startsWith('so-user-');
+      if (activeOrder._id && !isLocalId) {
+        try {
+          await updateSalesOrderV2Status(activeOrder._id, { status: 'Delivered', fulfillmentStatus: 'Fully Dispatched' });
+        } catch (e) {}
+      }
+
+      saveCustomSalesOrder(updatedOrder, compId);
+      setLocalOrder(updatedOrder);
+      if (onOrderUpdated) onOrderUpdated(updatedOrder);
+      showToast(`Order ${activeOrder.orderNumber} marked as Delivered!`, 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to deliver order', 'error');
+    } finally {
+      setIsProcessingAction(null);
+    }
+  };
+
+  // 5. Dynamic Progression: Proceed to Invoice
+  const handleProceedInvoice = async () => {
+    if (!activeOrder) return;
+    setIsProcessingAction('invoice');
+    try {
+      const compId = (activeOrder.company as any)?._id || activeOrder.company || selectedCompany?._id;
+      const updatedOrder: SalesOrderV2 = {
+        ...activeOrder,
+        status: 'Invoiced',
+        updatedAt: new Date().toISOString()
+      };
+
+      const isLocalId = !activeOrder._id || activeOrder._id.startsWith('so-mock-') || activeOrder._id.startsWith('so-user-');
+      if (activeOrder._id && !isLocalId) {
+        try {
+          await updateSalesOrderV2Status(activeOrder._id, { status: 'Invoiced' });
+        } catch (e) {}
+      }
+
+      saveCustomSalesOrder(updatedOrder, compId);
+      setLocalOrder(updatedOrder);
+      if (onOrderUpdated) onOrderUpdated(updatedOrder);
+      showToast(`Tax Invoice generated for Order ${activeOrder.orderNumber}!`, 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to generate invoice', 'error');
+    } finally {
+      setIsProcessingAction(null);
+    }
+  };
+
+  // 6. Dynamic Progression: Proceed to Payment
+  const handleProceedPayment = async () => {
+    if (!activeOrder) return;
+    setIsProcessingAction('payment');
+    try {
+      const compId = (activeOrder.company as any)?._id || activeOrder.company || selectedCompany?._id;
+      const updatedOrder: SalesOrderV2 = {
+        ...activeOrder,
+        paymentStatus: 'Paid' as any,
+        updatedAt: new Date().toISOString()
+      };
+
+      const isLocalId = !activeOrder._id || activeOrder._id.startsWith('so-mock-') || activeOrder._id.startsWith('so-user-');
+      if (activeOrder._id && !isLocalId) {
+        try {
+          await updateSalesOrderV2Status(activeOrder._id, { paymentStatus: 'Paid' } as any);
+        } catch (e) {}
+      }
+
+      saveCustomSalesOrder(updatedOrder, compId);
+      setLocalOrder(updatedOrder);
+      if (onOrderUpdated) onOrderUpdated(updatedOrder);
+      showToast(`Full payment recorded for Order ${activeOrder.orderNumber}!`, 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to record payment', 'error');
+    } finally {
+      setIsProcessingAction(null);
+    }
+  };
+
+  // Order progress steps dynamic calculations
+  const isCreatedDone = activeOrder.status !== 'Draft';
+  const isProdCompleted = 
+    linkedProductionOrder?.status === 'Completed' ||
+    ['Ready for Dispatch', 'Partially Dispatched', 'Fully Dispatched', 'Delivered'].includes(activeOrder.fulfillmentStatus || '') ||
+    activeOrder.status === 'Delivered' || activeOrder.status === 'Invoiced';
+  const isProdActive = 
+    !isProdCompleted && (
+      linkedProductionOrder?.status === 'In Progress' || 
+      activeOrder.fulfillmentStatus === 'In Production'
+    );
+  const isDispatchDone = 
+    Boolean(linkedDeliveryChallan) || 
+    activeOrder.fulfillmentStatus === 'Fully Dispatched' || 
+    activeOrder.status === 'Delivered' || 
+    activeOrder.status === 'Invoiced';
+  const isDispatchPartial = !isDispatchDone && activeOrder.fulfillmentStatus === 'Partially Dispatched';
+  const isDeliveryDone = activeOrder.status === 'Delivered' || activeOrder.status === 'Invoiced';
+  const isInvoiceDone = activeOrder.status === 'Invoiced';
+  const isPaymentDone = (activeOrder as any).paymentStatus === 'Paid';
+  const isPaymentPartial = (activeOrder as any).paymentStatus === 'Partial';
+
+  const progressSteps = [
+    {
+      id: 1,
+      label: 'Order Created',
+      status: activeOrder.status === 'Draft' ? 'Draft' : 'Confirmed',
+      date: fmtDate(activeOrder.orderDate),
+      done: isCreatedDone,
+      active: false,
+      color: 'emerald',
+      actionLabel: activeOrder.status === 'Draft' ? 'Confirm Order' : undefined,
+      onAction: activeOrder.status === 'Draft' ? handleConfirmOrder : undefined,
+    },
+    {
+      id: 2,
+      label: 'Production',
+      status: isProdCompleted ? 'Completed' : isProdActive ? 'In Production' : linkedProductionOrder ? 'Planned' : 'Pending',
+      date: isProdCompleted ? 'Ready' : linkedProductionOrder?.dueDate ? fmtDate(linkedProductionOrder.dueDate) : '',
+      done: isProdCompleted,
+      active: isProdActive,
+      color: isProdCompleted ? 'emerald' : isProdActive ? 'amber' : 'gray',
+      actionLabel: isProdCompleted ? undefined : isProdActive ? 'Complete Production' : 'Start Production',
+      onAction: isProdCompleted ? undefined : isProdActive ? handleCompleteProduction : handleProceedProduction,
+    },
+    {
+      id: 3,
+      label: 'Dispatch',
+      status: isDispatchDone ? 'Dispatched' : isDispatchPartial ? 'Partial' : 'Pending',
+      date: linkedDeliveryChallan?.date ? fmtDate(linkedDeliveryChallan.date) : '',
+      done: isDispatchDone,
+      active: isDispatchPartial,
+      color: isDispatchDone ? 'blue' : isDispatchPartial ? 'amber' : 'gray',
+      actionLabel: !isDispatchDone ? 'Create Dispatch Challan' : undefined,
+      onAction: !isDispatchDone ? handleProceedDispatch : undefined,
+    },
+    {
+      id: 4,
+      label: 'Delivery',
+      status: isDeliveryDone ? 'Delivered' : 'Pending',
+      date: fmtDate(activeOrder.promisedDate) || '',
+      done: isDeliveryDone,
+      active: false,
+      color: isDeliveryDone ? 'indigo' : 'gray',
+      actionLabel: !isDeliveryDone ? 'Mark Delivered' : undefined,
+      onAction: !isDeliveryDone ? handleProceedDelivery : undefined,
+    },
+    {
+      id: 5,
+      label: 'Invoice',
+      status: isInvoiceDone ? 'Invoiced' : 'Pending',
+      date: isInvoiceDone ? fmtDate(activeOrder.updatedAt || activeOrder.orderDate) : '',
+      done: isInvoiceDone,
+      active: false,
+      color: isInvoiceDone ? 'violet' : 'gray',
+      actionLabel: !isInvoiceDone ? 'Generate Invoice' : undefined,
+      onAction: !isInvoiceDone ? handleProceedInvoice : undefined,
+    },
+    {
+      id: 6,
+      label: 'Payment',
+      status: isPaymentDone ? 'Paid' : isPaymentPartial ? 'Partial' : 'Pending',
+      date: '',
+      done: isPaymentDone,
+      active: isPaymentPartial,
+      color: isPaymentDone ? 'emerald' : isPaymentPartial ? 'amber' : 'gray',
+      actionLabel: !isPaymentDone ? 'Record Payment' : undefined,
+      onAction: !isPaymentDone ? handleProceedPayment : undefined,
+    },
+  ];
+
+  const nextPendingStep = progressSteps.find(s => !s.done && s.onAction);
+
   // WhatsApp Handler
   const handleWhatsApp = () => {
-    const raw = (order.customerPhone || custObj?.phone || '').trim();
+    const raw = (activeOrder.customerPhone || custObj?.phone || '').trim();
     let digits = raw.replace(/\D/g, '');
     if (digits.startsWith('00')) digits = digits.slice(2);
     if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
     const cleanPhone = digits.length === 10 ? `91${digits}` : digits;
     if (!cleanPhone || cleanPhone.length < 10) { showToast('No valid 10-digit phone number found for this customer', 'error'); return; }
-    const msg = encodeURIComponent(`Namaste *${order.customerName}*, your Sales Order *${order.orderNumber}* for *${fmtMoney(grandTotal)}* is ${order.status}. Thank you!`);
+    const msg = encodeURIComponent(`Namaste *${activeOrder.customerName}*, your Sales Order *${activeOrder.orderNumber}* for *${fmtMoney(grandTotal)}* is ${activeOrder.status}. Thank you!`);
     window.open(`https://wa.me/${cleanPhone}?text=${msg}`, '_blank');
   };
 
@@ -290,20 +673,20 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xl font-black text-gray-900">Sales Order {order.orderNumber}</span>
-                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold border ${statusBadge(order.status)}`}>
-                  {order.status}
+                <span className="text-xl font-black text-gray-900">Sales Order {activeOrder.orderNumber}</span>
+                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold border ${statusBadge(activeOrder.status)}`}>
+                  {activeOrder.status}
                 </span>
               </div>
               <p className="text-[11px] text-gray-400 mt-0.5">
-                Created on {fmtDate(order.orderDate)}{user?.fullName ? `, by ${user.fullName}` : ''}
-                {order.createdAt && ` | Last updated: ${fmtDate(order.createdAt)}`}
+                Created on {fmtDate(activeOrder.orderDate)}{user?.fullName ? `, by ${user.fullName}` : ''}
+                {activeOrder.createdAt && ` | Last updated: ${fmtDate(activeOrder.createdAt)}`}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
-            {order.status === 'Draft' && (
+            {activeOrder.status === 'Draft' && (
               <button
                 type="button"
                 onClick={handleConfirmOrder}
@@ -315,7 +698,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                 <span>{isConfirming ? 'Confirming...' : 'Confirm Order'}</span>
               </button>
             )}
-            <button onClick={() => onEdit(order)} className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 transition-all cursor-pointer">
+            <button onClick={() => onEdit(activeOrder)} className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 transition-all cursor-pointer">
               <Edit className="w-3.5 h-3.5 text-blue-500" /> Edit
             </button>
             <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 transition-all cursor-pointer">
@@ -337,7 +720,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 text-xs">
 
           {/* ── DRAFT ORDER CONFIRMATION BANNER ── */}
-          {order.status === 'Draft' && (
+          {activeOrder.status === 'Draft' && (
             <div className="bg-gradient-to-r from-amber-50 via-orange-50/50 to-emerald-50/50 border border-amber-200/90 rounded-2xl p-4 flex items-center justify-between gap-4 shadow-3xs">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-amber-100/90 border border-amber-200 flex items-center justify-center shrink-0 text-amber-700 shadow-3xs">
@@ -384,9 +767,9 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                 <div>
                   <div className="text-[10px] text-gray-400 font-medium mb-0.5">Customer Name</div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-black text-gray-900 text-sm">{order.customerName}</span>
+                    <span className="font-black text-gray-900 text-sm">{activeOrder.customerName}</span>
                     <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-full text-[10px] font-bold">
-                      {order.orderType || 'Credit'}
+                      {activeOrder.orderType || 'Credit'}
                     </span>
                     <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-[10px] font-bold">
                       {customerGroup}
@@ -413,8 +796,8 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                   <div className="text-[10px] text-gray-400 mb-0.5">Mobile / WhatsApp</div>
                   <div className="flex items-center gap-2">
                     <Phone className="w-3 h-3 text-gray-400" />
-                    <span className="font-bold text-gray-900">{order.customerPhone || custObj?.phone || custObj?.mobile || '—'}</span>
-                    {(order.customerPhone || custObj?.phone) && (
+                    <span className="font-bold text-gray-900">{activeOrder.customerPhone || custObj?.phone || custObj?.mobile || '—'}</span>
+                    {(activeOrder.customerPhone || custObj?.phone) && (
                       <button onClick={handleWhatsApp} title="Open WhatsApp" className="cursor-pointer">
                         <WhatsAppIcon className="w-4 h-4 text-emerald-500 hover:text-emerald-600" />
                       </button>
@@ -447,7 +830,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                     <Calendar className="w-3 h-3" /> Order Date
                   </div>
                   <div className="flex items-center gap-1.5 font-bold text-gray-900 text-[11px]">
-                    {fmtDate(order.orderDate)}
+                    {fmtDate(activeOrder.orderDate)}
                   </div>
                 </div>
 
@@ -456,30 +839,30 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                     <Calendar className="w-3 h-3" /> Expected Delivery Date
                   </div>
                   <div className="flex items-center gap-1.5 font-bold text-gray-900 text-[11px]">
-                    {order.promisedDate ? fmtDate(order.promisedDate) : 'Not specified'}
+                    {activeOrder.promisedDate ? fmtDate(activeOrder.promisedDate) : 'Not specified'}
                   </div>
                 </div>
 
                 <div className="pt-1 border-t border-gray-100 grid grid-cols-2 gap-x-4 gap-y-2.5">
                   <div>
                     <div className="text-[10px] text-gray-400">Customer PO No.</div>
-                    <div className="font-bold text-gray-800 mt-0.5">{order.customerPoNumber || '—'}</div>
+                    <div className="font-bold text-gray-800 mt-0.5">{activeOrder.customerPoNumber || '—'}</div>
                   </div>
                   <div>
                     <div className="text-[10px] text-gray-400">Transporter</div>
                     <div className="flex items-center gap-1 font-bold text-gray-800 mt-0.5">
                       <Truck className="w-3 h-3 text-gray-400" />
-                      <span className="truncate">{order.transporter || '—'}</span>
+                      <span className="truncate">{activeOrder.transporter || '—'}</span>
                     </div>
                   </div>
                   <div>
                     <div className="text-[10px] text-gray-400">Order Type</div>
-                    <div className="font-bold text-gray-800 mt-0.5">{order.orderType || 'Credit'}</div>
+                    <div className="font-bold text-gray-800 mt-0.5">{activeOrder.orderType || 'Credit'}</div>
                   </div>
                   <div>
                     <div className="text-[10px] text-gray-400">Order Status</div>
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border mt-0.5 ${statusBadge(order.status)}`}>
-                      {order.status}
+                    <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border mt-0.5 ${statusBadge(activeOrder.status)}`}>
+                      {activeOrder.status}
                     </span>
                   </div>
                 </div>
@@ -493,7 +876,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                   <MapPin className="w-3.5 h-3.5 text-blue-600" />
                   Delivery &amp; Billing Address
                 </div>
-                <button onClick={() => onEdit(order)} className="flex items-center gap-1 text-[11px] text-blue-600 font-bold hover:text-blue-700 cursor-pointer">
+                <button onClick={() => onEdit(activeOrder)} className="flex items-center gap-1 text-[11px] text-blue-600 font-bold hover:text-blue-700 cursor-pointer">
                   <Edit className="w-3 h-3" /> Edit
                 </button>
               </div>
@@ -516,13 +899,13 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
 
               <div className="space-y-1.5">
                 <div className="font-bold text-gray-900">
-                  {addressTab === 'billing' ? (ba?.attention || order.customerName) : (sa?.attention || order.customerName)}
+                  {addressTab === 'billing' ? (ba?.attention || activeOrder.customerName) : (sa?.attention || activeOrder.customerName)}
                 </div>
                 <div className="text-gray-600 leading-relaxed">
                   {addressTab === 'billing' ? billingAddrStr : deliveryAddrStr}
                 </div>
                 <div className="text-gray-600">
-                  Mobile: {addressTab === 'billing' ? (ba?.phone || order.customerPhone || '—') : (sa?.phone || order.customerPhone || '—')}
+                  Mobile: {addressTab === 'billing' ? (ba?.phone || activeOrder.customerPhone || '—') : (sa?.phone || activeOrder.customerPhone || '—')}
                 </div>
               </div>
 
@@ -543,37 +926,112 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
           </div>
 
           {/* ── ORDER PROGRESS ── */}
-          <div className="border border-gray-200 rounded-xl p-4 bg-white">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800 mb-4">
-              <CheckCircle className="w-3.5 h-3.5 text-blue-600" />
-              Order Progress
+          <div className="border border-gray-200 rounded-xl p-4 bg-white shadow-3xs">
+            <div className="flex items-center justify-between gap-2 mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <CheckCircle className="w-3.5 h-3.5 stroke-[2.2]" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-gray-900 leading-tight">Order Progress</h4>
+                  <p className="text-[10px] text-gray-500 font-medium">Lifecycle tracking across Production, Dispatch, Invoicing & Settlement</p>
+                </div>
+              </div>
+
+              {/* Dynamic Next Stage Quick Action Button */}
+              {nextPendingStep && (
+                <button
+                  type="button"
+                  disabled={Boolean(isProcessingAction)}
+                  onClick={nextPendingStep.onAction}
+                  className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg text-xs font-bold shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                  title={`Proceed to next stage: ${nextPendingStep.actionLabel}`}
+                >
+                  {isProcessingAction ? (
+                    <Clock className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <span>⚡</span>
+                  )}
+                  <span>Next: {nextPendingStep.actionLabel}</span>
+                </button>
+              )}
             </div>
-            <div className="flex items-center gap-0">
+
+            {/* Stepper Grid - 100% horizontally aligned nodes with centered connection lines */}
+            <div className="grid grid-cols-6 gap-0 relative">
               {progressSteps.map((step, idx) => {
-                const colors = stepColorMap[step.color];
+                const colors = stepColorMap[step.color] || stepColorMap.gray;
+                const isClickable = Boolean(step.onAction);
+
                 return (
-                  <React.Fragment key={step.id}>
-                    <div className="flex flex-col items-center min-w-0 flex-1">
-                      <div className={`w-9 h-9 rounded-full ring-2 ${step.done ? colors.ring : 'ring-gray-200'} ${step.done ? colors.bg : 'bg-gray-50'} flex items-center justify-center transition-all`}>
-                        {step.done
-                          ? <CheckCircle className={`w-5 h-5 ${colors.text}`} />
-                          : <Clock className="w-4 h-4 text-gray-400" />
-                        }
-                      </div>
-                      <div className="mt-1.5 text-center">
-                        <div className={`text-[11px] font-bold truncate ${step.done ? 'text-gray-900' : 'text-gray-500'}`}>{step.label}</div>
-                        <span className={`inline-flex px-1.5 py-0.5 rounded-full text-[9.5px] font-bold border mt-0.5 ${stepStatusBadge(step.status)}`}>
-                          {step.status}
-                        </span>
-                        {step.date && (
-                          <div className="text-[10px] text-gray-400 mt-0.5">{step.date}</div>
+                  <div key={step.id} className="flex flex-col items-center min-w-0 relative group">
+                    {/* Node Row with mathematical center connecting bar */}
+                    <div className="w-full flex items-center justify-center relative h-9">
+                      {/* Left connecting track */}
+                      {idx > 0 && (
+                        <div 
+                          className={`absolute left-0 right-1/2 top-1/2 -translate-y-1/2 h-[2px] transition-colors ${
+                            step.done ? 'bg-emerald-500' : 'bg-gray-200'
+                          }`} 
+                        />
+                      )}
+                      {/* Right connecting track */}
+                      {idx < progressSteps.length - 1 && (
+                        <div 
+                          className={`absolute left-1/2 right-0 top-1/2 -translate-y-1/2 h-[2px] transition-colors ${
+                            progressSteps[idx + 1].done ? 'bg-emerald-500' : 'bg-gray-200'
+                          }`} 
+                        />
+                      )}
+
+                      {/* Circle Node Icon */}
+                      <button
+                        type="button"
+                        onClick={step.onAction}
+                        disabled={!isClickable || Boolean(isProcessingAction)}
+                        title={isClickable ? `Click to ${step.actionLabel}` : step.status}
+                        className={`relative z-10 w-9 h-9 rounded-full ring-2 flex items-center justify-center transition-all ${
+                          step.done 
+                            ? `${colors.ring} ${colors.bg}` 
+                            : step.active 
+                              ? 'ring-amber-400 bg-amber-50 animate-pulse' 
+                              : 'ring-gray-200 bg-gray-50'
+                        } ${isClickable ? 'cursor-pointer hover:scale-110 shadow-2xs' : 'cursor-default'}`}
+                      >
+                        {step.done ? (
+                          <CheckCircle className={`w-5 h-5 ${colors.text}`} />
+                        ) : step.active ? (
+                          <Clock className="w-4 h-4 text-amber-600 animate-spin" />
+                        ) : (
+                          <Clock className="w-4 h-4 text-gray-400" />
                         )}
-                      </div>
+                      </button>
                     </div>
-                    {idx < progressSteps.length - 1 && (
-                      <ChevronRight className="w-4 h-4 text-gray-300 shrink-0 mx-0.5 mt-[-20px]" />
+
+                    {/* Step Text Info - Exactly uniform height for perfect alignment */}
+                    <div className="mt-2 text-center w-full px-1 flex flex-col items-center justify-start min-h-[58px]">
+                      <span className={`text-[11px] font-bold leading-tight truncate w-full ${step.done ? 'text-gray-900' : 'text-gray-600'}`}>
+                        {step.label}
+                      </span>
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold border mt-1 select-none ${stepStatusBadge(step.status)}`}>
+                        {step.status}
+                      </span>
+                      <span className="text-[10px] text-gray-400 font-mono mt-0.5 min-h-[15px] block truncate">
+                        {step.date || '—'}
+                      </span>
+                    </div>
+
+                    {/* Optional interactive action trigger on hover */}
+                    {isClickable && !step.done && (
+                      <button
+                        type="button"
+                        onClick={step.onAction}
+                        className="mt-1 text-[9.5px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer truncate max-w-[90%]"
+                      >
+                        {step.actionLabel}
+                      </button>
                     )}
-                  </React.Fragment>
+                  </div>
                 );
               })}
             </div>
@@ -584,10 +1042,10 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
               <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800">
                 <Package className="w-3.5 h-3.5 text-blue-600" />
-                Order Items ({(order.items || []).length})
+                Order Items ({(activeOrder.items || []).length})
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => onEdit(order)} className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold cursor-pointer transition-all">
+                <button onClick={() => onEdit(activeOrder)} className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold cursor-pointer transition-all">
                   <Plus className="w-3 h-3" /> Add Product
                 </button>
               </div>
@@ -603,7 +1061,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                     <th className="px-3 py-2.5 text-center whitespace-nowrap">GBL *</th>
                     <th className="px-3 py-2.5 text-center whitespace-nowrap">Pcs / GBL</th>
                     <th className="px-3 py-2.5 text-center whitespace-nowrap">Total PCS</th>
-                    <th className="px-3 py-2.5 text-right whitespace-nowrap">Rate (₹) *</th>
+                    <th className="px-3 py-2.5 text-right whitespace-nowrap">Rate (₹)</th>
                     <th className="px-3 py-2.5 text-right whitespace-nowrap">Amount (₹)</th>
                     <th className="px-3 py-2.5 text-center whitespace-nowrap">Production</th>
                     <th className="px-3 py-2.5 text-center whitespace-nowrap">Dispatched</th>
@@ -613,7 +1071,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {(order.items || []).map((item, idx) => {
+                  {(activeOrder.items || []).map((item, idx) => {
                     const dispatched = item.dispatchedQty || 0;
                     const pending = Math.max(0, item.quantity - dispatched);
                     const itemStatus = dispatched === 0 ? 'Pending' : dispatched >= item.quantity ? 'Fulfilled' : 'Partial';
@@ -662,7 +1120,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                         </td>
                         <td className="px-3 py-2.5 text-center">
                           <div className="flex items-center justify-center gap-1.5">
-                            <button onClick={() => onEdit(order)} className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded cursor-pointer transition-all" title="Edit">
+                            <button onClick={() => onEdit(activeOrder)} className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded cursor-pointer transition-all" title="Edit">
                               <Edit className="w-3.5 h-3.5" />
                             </button>
                             <button onClick={() => showToast('Edit order in full editor to remove items', 'info')} className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded cursor-pointer transition-all" title="Remove">
@@ -690,14 +1148,14 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800">
                   <CreditCard className="w-3.5 h-3.5 text-blue-600" />
-                  Other Charges ({(order.otherCharges || []).length})
+                  Other Charges ({(activeOrder.otherCharges || []).length})
                 </div>
-                <button onClick={() => onEdit(order)} className="flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-blue-50 border border-blue-200 text-blue-600 rounded-lg text-[11px] font-bold cursor-pointer transition-all">
+                <button onClick={() => onEdit(activeOrder)} className="flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-blue-50 border border-blue-200 text-blue-600 rounded-lg text-[11px] font-bold cursor-pointer transition-all">
                   <Plus className="w-3 h-3" /> Add Charge
                 </button>
               </div>
 
-              {(order.otherCharges || []).length > 0 ? (
+              {(activeOrder.otherCharges || []).length > 0 ? (
                 <table className="w-full text-[11px]">
                   <thead className="bg-gray-50 border-b border-gray-100">
                     <tr className="text-gray-500 font-bold uppercase tracking-wide text-[10px]">
@@ -710,7 +1168,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {(order.otherCharges || []).map((charge, idx) => (
+                    {(activeOrder.otherCharges || []).map((charge, idx) => (
                       <tr key={idx} className="hover:bg-gray-50 transition-colors">
                         <td className="px-3 py-2 text-center text-gray-500 font-bold">{idx + 1}</td>
                         <td className="px-3 py-2 font-bold text-gray-900">{charge.name}</td>
@@ -718,7 +1176,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                         <td className="px-3 py-2 text-right font-mono text-gray-700">₹{(charge.rate || 0).toFixed(2)}</td>
                         <td className="px-3 py-2 text-right font-bold font-mono text-gray-900">₹{(charge.amount || 0).toFixed(2)}</td>
                         <td className="px-3 py-2 text-center">
-                          <button onClick={() => onEdit(order)} className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded cursor-pointer" title="Edit in drawer">
+                          <button onClick={() => onEdit(activeOrder)} className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded cursor-pointer" title="Edit in drawer">
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </td>
@@ -730,7 +1188,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                 <div className="px-4 py-5 text-center text-gray-400 italic text-[11px]">No other charges added.</div>
               )}
 
-              {(order.otherCharges || []).length > 0 && (
+              {(activeOrder.otherCharges || []).length > 0 && (
                 <div className="flex justify-end px-4 py-2.5 bg-gray-50 border-t border-gray-100 text-[11px]">
                   <span className="text-gray-500">Other Charges Total:</span>
                   <span className="font-black text-gray-900 ml-2">{fmtMoney(chargesTotal)}</span>
@@ -763,7 +1221,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                   <div className="flex items-center justify-between text-[11px]">
                     <span className="text-gray-600">Discount (Overall)</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-gray-400 text-[10px]">{order.discountPercent || 0}%</span>
+                      <span className="text-gray-400 text-[10px]">{activeOrder.discountPercent || 0}%</span>
                       <span className="font-bold text-rose-600">-{fmtMoney(discAmount)}</span>
                     </div>
                   </div>
@@ -783,7 +1241,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
               Notes / Internal Remarks
             </div>
             <div className="text-[11px] text-gray-600 leading-relaxed min-h-[40px]">
-              {order.internalNotes || <span className="text-gray-400 italic">No notes added.</span>}
+              {activeOrder.internalNotes || <span className="text-gray-400 italic">No notes added.</span>}
             </div>
           </div>
 
@@ -796,13 +1254,13 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
           </button>
           <div className="flex items-center gap-2.5">
             <button
-              onClick={() => onEdit(order)}
+              onClick={() => onEdit(activeOrder)}
               className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
             >
               Save as Draft
             </button>
             <button
-              onClick={() => onEdit(order)}
+              onClick={() => onEdit(activeOrder)}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer"
             >
               <Edit className="w-3.5 h-3.5" />

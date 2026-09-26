@@ -1038,7 +1038,14 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   }, [totalOrderGbl]);
 
   // Add Other Charge (optionally with a preset)
+  const lastAddChargeTimestampRef = useRef<number>(0);
   const handleAddCharge = (preset?: PredefinedCharge) => {
+    const now = Date.now();
+    if (now - lastAddChargeTimestampRef.current < 250) {
+      return;
+    }
+    lastAddChargeTimestampRef.current = now;
+
     const p = preset || predefinedCharges[0] || { name: 'Hamali / Loading Charges', defaultRate: 5, calculationType: 'per_gbl' };
     const isPerGbl = p.calculationType === 'per_gbl';
     const qty = isPerGbl ? (totalOrderGbl > 0 ? totalOrderGbl : 1) : 1;
@@ -2262,7 +2269,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                     <th className="py-2.5 px-2 text-center whitespace-nowrap">GBL <span className="text-red-500">*</span></th>
                     <th className="py-2.5 px-2 text-center whitespace-nowrap">PCS / GBL</th>
                     <th className="py-2.5 px-2 text-center whitespace-nowrap">TOTAL PCS</th>
-                    <th className="py-2.5 px-2 text-right whitespace-nowrap">RATE (₹) <span className="text-red-500">*</span></th>
+                    <th className="py-2.5 px-2 text-right whitespace-nowrap">RATE (₹)</th>
                     <th className="py-2.5 px-3 text-right whitespace-nowrap">FINAL TOTAL AMOUNT (₹)</th>
                     <th className="py-2.5 px-2 text-center whitespace-nowrap">ACTIONS</th>
                   </tr>
@@ -2546,16 +2553,6 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                           setShowQuickPresetMenu(!showQuickPresetMenu);
                           setHighlightedQuickPresetIdx(0);
                         }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            if (showQuickPresetMenu && predefinedCharges.length > 0) {
-                              e.preventDefault();
-                              const p = predefinedCharges[highlightedQuickPresetIdx] || predefinedCharges[0];
-                              if (p) handleAddCharge(p);
-                              setShowQuickPresetMenu(false);
-                            }
-                          }
-                        }}
                         className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100/80 text-blue-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-blue-200 shadow-3xs"
                       >
                         <Sparkles className="w-3.5 h-3.5 text-blue-600" />
@@ -2594,13 +2591,6 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                   type="button"
                                   id={`quick-preset-opt-${pIdx}`}
                                   onClick={() => handleAddCharge(p)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                      e.preventDefault();
-                                      handleAddCharge(p);
-                                      setShowQuickPresetMenu(false);
-                                    }
-                                  }}
                                   onMouseEnter={() => setHighlightedQuickPresetIdx(pIdx)}
                                   className={`w-full px-3 py-1.5 text-left flex items-center justify-between group transition-colors cursor-pointer ${
                                     isSelected
