@@ -643,7 +643,6 @@ const PurchaseInvoicePage: React.FC = () => {
   }, [selectedCompany?._id]);
 
   useEffect(() => {
-    if (!selectedCompany?._id) return;
     loadInvoices(true);
 
     const interval = setInterval(() => {

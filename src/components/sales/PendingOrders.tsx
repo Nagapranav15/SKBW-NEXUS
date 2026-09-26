@@ -57,24 +57,46 @@ const PendingOrders: React.FC = () => {
     }
   };
 
-  const fetchOrders = async () => {
+  const fetchOrders = async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       const res = await getSalesOrdersV2(selectedCompany?._id, { limit: 1000 }).catch(() => null);
+      const customOrders = getCustomSalesOrders();
+      let baseOrders: SalesOrderV2[] = [];
       if (res && res.data && res.data.length > 0) {
-        setOrders(res.data);
+        baseOrders = res.data;
       } else {
-        setOrders(generateFullDashboardOrders());
+        baseOrders = generateFullDashboardOrders();
+      }
+
+      if (customOrders.length > 0) {
+        const merged = [...customOrders];
+        baseOrders.forEach(bo => {
+          if (!merged.some(co => (co._id && bo._id && co._id === bo._id) || (co.orderNumber && bo.orderNumber && co.orderNumber === bo.orderNumber))) {
+            merged.push(bo);
+          }
+        });
+        setOrders(merged);
+      } else {
+        setOrders(baseOrders);
       }
     } catch {
       setOrders(generateFullDashboardOrders());
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
-    fetchOrders();
+    fetchOrders(true);
+
+    const interval = setInterval(() => {
+      fetchOrders(false);
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, [selectedCompany?._id]);
 
   if (loading) {

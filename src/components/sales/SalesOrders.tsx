@@ -166,8 +166,8 @@ const SalesOrders: React.FC = () => {
   }, []);
 
   // Fetch orders from API and enrich with parties or sample data
-  const fetchOrders = async () => {
-    setLoading(true);
+  const fetchOrders = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       let apiOrders: SalesOrderV2[] = [];
       if (selectedCompany?._id) {
@@ -239,7 +239,9 @@ const SalesOrders: React.FC = () => {
       }
     } catch (err) {
       console.error(err);
-      showToast('Loaded demo sales orders', 'info');
+      if (showLoading) {
+        showToast('Loaded demo sales orders', 'info');
+      }
       const customOrders = getCustomSalesOrders();
       const mockDashboardOrders = generateFullDashboardOrders();
       const merged = [...customOrders];
@@ -250,12 +252,20 @@ const SalesOrders: React.FC = () => {
       });
       setOrders(merged);
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
-    fetchOrders();
+    fetchOrders(true);
+
+    const interval = setInterval(() => {
+      fetchOrders(false);
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, [selectedCompany?._id]);
 
   // Global Keyboard Shortcuts (Matching Purchase Batch UI)
