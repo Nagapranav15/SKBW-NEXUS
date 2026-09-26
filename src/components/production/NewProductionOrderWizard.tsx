@@ -355,6 +355,12 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     return backendSkus.find(s => s._id === selectedSkuId);
   }, [selectedSkuId, backendSkus]);
 
+  // Item type derived from selected SKU (Finished Good or Semi Finished)
+  const itemType = useMemo<'Finished Good' | 'Semi Finished'>(() => {
+    if (!selectedSku) return 'Finished Good';
+    return getItemClassification(selectedSku) === 'semi' ? 'Semi Finished' : 'Finished Good';
+  }, [selectedSku]);
+
   // Conversion rate computation
   const conversionRate = useMemo(() => {
     if (!selectedSku) return 1;
