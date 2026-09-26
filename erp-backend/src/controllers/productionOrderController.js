@@ -2,21 +2,21 @@ const ProductionOrder = require("../models/productionOrderModel");
 const SkuV2 = require("../models/skuV2Model");
 const mongoose = require("mongoose");
 
-// Helper to generate next Order Number: PR-0001, PR-0002...
+// Helper to generate next Order Number: PO-001, PO-002... up to 100,000+
 const generateNextOrderNumber = async (companyId) => {
-  const prefix = "PR-";
+  const prefix = "PO-";
 
-  // Find all orders starting with PR- for this company
+  // Find all orders starting with PO- or legacy PR- for this company
   const orders = await ProductionOrder.find({
     company: companyId,
-    orderNumber: new RegExp(`^${prefix}\\d+`)
+    orderNumber: /^(?:PO|PR)-\d+/
   }).select("orderNumber").lean();
 
   let maxSeq = 0;
   orders.forEach(o => {
     if (o.orderNumber) {
-      // Match PR-0001 or PR-2026-0001
-      const match = o.orderNumber.match(/^PR-(?:[0-9]{4}-)?([0-9]+)$/);
+      // Match PO-001, PO-100000, PR-0001, etc.
+      const match = o.orderNumber.match(/^(?:PO|PR)-(?:[0-9]{4}-)?([0-9]+)$/);
       if (match && match[1]) {
         const num = parseInt(match[1], 10);
         if (!isNaN(num) && num > maxSeq) {
@@ -27,7 +27,9 @@ const generateNextOrderNumber = async (companyId) => {
   });
 
   const nextSeq = maxSeq + 1;
-  return `${prefix}${String(nextSeq).padStart(4, "0")}`;
+  // Standard format PO-001, seamlessly accommodates > 1 lakh orders (e.g. PO-100000)
+  const padLength = Math.max(3, String(nextSeq).length);
+  return `${prefix}${String(nextSeq).padStart(padLength, "0")}`;
 };
 
 // GET /api/production-orders

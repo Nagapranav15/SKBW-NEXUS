@@ -71,7 +71,7 @@ export const ProductionPrintModal: React.FC<ProductionPrintModalProps> = ({ orde
             </div>
 
             <div>
-              <span className="text-[10px] text-gray-400 font-bold uppercase block">Department / Factory</span>
+              <span className="text-[10px] text-gray-400 font-bold uppercase block">Department / Location</span>
               <span className="font-bold text-gray-900 block">{order.department}</span>
               <span className="text-[10px] text-gray-500">{order.factory}</span>
             </div>

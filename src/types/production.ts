@@ -68,7 +68,12 @@ export interface ProductionOrder {
   status: ProductionStatus;
   progress: number; // 0 to 100
   department: string; // e.g. 'Notebook Manufacturing'
-  factory: string; // e.g. 'Main Factory'
+  factory: string; // e.g. 'Main Factory' / Location name
+  locationId?: string;
+  locationName?: string;
+  warehouseId?: string;
+  floorId?: string;
+  zoneId?: string;
   plannedStartDate: string; // e.g. '2026-09-23'
   requiredCompletionDate: string; // e.g. '2026-09-25'
   actualCompletionDate?: string; // e.g. '25 Sep 2026, 04:30 PM'

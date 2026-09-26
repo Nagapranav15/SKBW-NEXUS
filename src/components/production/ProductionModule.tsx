@@ -507,7 +507,7 @@ export const ProductionModule: React.FC = () => {
     let globalIdx = 0;
     return orders.map((o) => {
       globalIdx++;
-      const orderNo = o.orderNumber || `PR-${String(globalIdx).padStart(4, '0')}`;
+      const orderNo = o.orderNumber || `PO-${String(globalIdx).padStart(3, '0')}`;
       const itemCode = o.itemCode || `FG-${String(((globalIdx - 1) % 8) + 1).padStart(3, '0')}`;
       const plannedQty = Number(o.plannedQty) || 10;
       const plannedUom = o.plannedUom || 'GBL';

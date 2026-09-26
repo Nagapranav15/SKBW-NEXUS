@@ -215,7 +215,7 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
         </div>
 
         <div className="flex items-center space-x-1.5">
-          <span className="text-gray-400">Factory:</span>
+          <span className="text-gray-400">Location:</span>
           <span className="font-semibold text-gray-800">{order.factory}</span>
         </div>
 

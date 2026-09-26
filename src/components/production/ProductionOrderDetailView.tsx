@@ -298,7 +298,7 @@ export const ProductionOrderDetailView: React.FC<ProductionOrderDetailViewProps>
                 </div>
 
                 <div>
-                  <span className="text-[11px] text-gray-400 font-medium block">Factory</span>
+                  <span className="text-[11px] text-gray-400 font-medium block">Location</span>
                   <span className="font-semibold text-gray-700 mt-0.5 block">{order.factory}</span>
                 </div>
 

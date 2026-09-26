@@ -11,6 +11,8 @@ import { getSkusV2, getWarehouseHierarchyV2, SkuV2, WarehouseLocationV2, getMeta
 import { showToast } from '../ui/Toast';
 import { PresetField } from './PresetField';
 import { BulkEditBomModal } from './BulkEditBomModal';
+import { LocationSelectPopup } from '../stock_v2/LocationSelectPopup';
+import { Modal } from '../ui/Modal';
 
 interface NewProductionOrderWizardProps {
   onCancel: () => void;
@@ -63,16 +65,80 @@ export const getItemClassification = (sku: SkuV2): 'products' | 'semi' | 'materi
   return 'products';
 };
 
-// Default department presets matching sales order preset styling
-const DEFAULT_DEPARTMENT_PRESETS = [
-  'Notebook Manufacturing',
-  'Ruling Department',
-  'Index Department',
-  'Cover Department',
-  'Binding Department',
-  'Printing Department',
-  'Packing Department',
-  'Dispatch Department'
+// Production Preset interface supporting assigned locations
+export interface ProductionPreset {
+  id: string;
+  name: string;
+  department: string;
+  locationId?: string;
+  locationName?: string;
+  warehouseId?: string;
+  floorId?: string;
+  zoneId?: string;
+}
+
+// Default production presets matching sales order preset styling with location bindings
+export const DEFAULT_PRODUCTION_PRESETS: ProductionPreset[] = [
+  {
+    id: 'prod-preset-notebook',
+    name: 'Notebook Manufacturing',
+    department: 'Notebook Manufacturing',
+    locationName: 'SKBW',
+    warehouseId: 'fact-skbw',
+    floorId: 'floor-ground',
+    zoneId: 'zone-a',
+    locationId: 'loc-top'
+  },
+  {
+    id: 'prod-preset-ruling',
+    name: 'Ruling & Cutting Line',
+    department: 'Ruling Department',
+    locationName: 'SKBW - Ground Floor',
+    warehouseId: 'fact-skbw',
+    floorId: 'floor-ground',
+    zoneId: 'zone-m',
+    locationId: 'loc-m-top'
+  },
+  {
+    id: 'prod-preset-binding',
+    name: 'Binding & Stitching Section',
+    department: 'Binding Department',
+    locationName: 'SKBW - 1st Floor',
+    warehouseId: 'fact-skbw',
+    floorId: 'floor-1st',
+    zoneId: '',
+    locationId: ''
+  },
+  {
+    id: 'prod-preset-cover',
+    name: 'Index & Cover Prep',
+    department: 'Cover Department',
+    locationName: 'LOM Warehouse',
+    warehouseId: 'fact-lom',
+    floorId: '',
+    zoneId: '',
+    locationId: ''
+  },
+  {
+    id: 'prod-preset-printing',
+    name: 'Printing & Folding Unit',
+    department: 'Printing Department',
+    locationName: 'SKBW - Ground Floor',
+    warehouseId: 'fact-skbw',
+    floorId: 'floor-ground',
+    zoneId: 'zone-a',
+    locationId: 'loc-bottom'
+  },
+  {
+    id: 'prod-preset-packing',
+    name: 'Final Packing & Dispatch Bay',
+    department: 'Packing Department',
+    locationName: 'SKBW - Ground Floor',
+    warehouseId: 'fact-skbw',
+    floorId: 'floor-ground',
+    zoneId: 'zone-s',
+    locationId: 'loc-s1'
+  }
 ];
 
 export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> = ({
@@ -88,12 +154,13 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   // Backend data
   const [backendSkus, setBackendSkus] = useState<SkuV2[]>([]);
   const [factories, setFactories] = useState<string[]>([]);
+  const [warehouseLocations, setWarehouseLocations] = useState<WarehouseLocationV2[]>([]);
 
   // Bulk Edit BOM Modal state (opens exact Item Master recipe editor)
   const [showBulkEditBomModal, setShowBulkEditBomModal] = useState<boolean>(false);
 
-  // Form Fields - ALL START EMPTY as requested
-  const [orderNumber, setOrderNumber] = useState<string>('PR-0001');
+  // Form Fields - PO-001 (Accommodates > 1 lakh orders)
+  const [orderNumber, setOrderNumber] = useState<string>('PO-001');
   const [selectedSkuId, setSelectedSkuId] = useState<string>(''); // Empty by default
   const [productSearchQuery, setProductSearchQuery] = useState<string>('');
   const [showProductDropdown, setShowProductDropdown] = useState<boolean>(false);
@@ -101,13 +168,46 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
   const [productionQty, setProductionQty] = useState<number | ''>(''); // Empty by default
   const [productionUom, setProductionUom] = useState<string>('PCS');
-  const [factory, setFactory] = useState<string>(''); // Empty by default
-  const [department, setDepartment] = useState<string>(''); // Empty by default
+  
+  // Location hierarchy selection
+  const [factory, setFactory] = useState<string>('SKBW'); // Backward compatible string
+  const [locationId, setLocationId] = useState<string>('loc-top');
+  const [warehouseId, setWarehouseId] = useState<string>('fact-skbw');
+  const [floorId, setFloorId] = useState<string>('floor-ground');
+  const [zoneId, setZoneId] = useState<string>('zone-a');
+  const [locationName, setLocationName] = useState<string>('SKBW');
+
+  const [department, setDepartment] = useState<string>('Notebook Manufacturing');
   const [plannedStartDate, setPlannedStartDate] = useState<string>(''); // Empty by default
   const [requiredCompletionDate, setRequiredCompletionDate] = useState<string>(''); // Empty by default
   const [priority, setPriority] = useState<PriorityLevel>('Normal');
   const [remarks, setRemarks] = useState<string>(''); // Empty by default
   const [reference, setReference] = useState<string>(''); // Empty by default
+
+  // Production Presets (Exact same UI as Sales Order)
+  const [productionPresets, setProductionPresets] = useState<ProductionPreset[]>(() => {
+    try {
+      const stored = localStorage.getItem('skbw_production_presets_v2');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return DEFAULT_PRODUCTION_PRESETS;
+  });
+
+  const [showQuickPresetMenu, setShowQuickPresetMenu] = useState<boolean>(false);
+  const [showManagePresetsModal, setShowManagePresetsModal] = useState<boolean>(false);
+  const [highlightedPresetIdx, setHighlightedPresetIdx] = useState<number>(0);
+  const quickPresetMenuRef = useRef<HTMLDivElement>(null);
+  const quickPresetListRef = useRef<HTMLDivElement>(null);
+
+  // New preset form in Manage Modal
+  const [newPresetForm, setNewPresetForm] = useState({
+    name: '',
+    department: '',
+    locationId: ''
+  });
 
   // BOM Configuration
   const [bomType, setBomType] = useState<'Default BOM' | 'Custom BOM (Production Order Only)'>('Default BOM');
@@ -146,6 +246,9 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       if (productDropdownRef.current && !productDropdownRef.current.contains(target)) {
         setShowProductDropdown(false);
       }
+      if (quickPresetMenuRef.current && !quickPresetMenuRef.current.contains(target)) {
+        setShowQuickPresetMenu(false);
+      }
     };
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
@@ -172,25 +275,30 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           setBackendSkus(skusRes.value);
         }
 
-        // Factories
+        // Warehouse Locations & Factories
         if (warehouseRes.status === 'fulfilled' && Array.isArray(warehouseRes.value)) {
+          setWarehouseLocations(warehouseRes.value);
           const factoryLocs = warehouseRes.value.filter(l => l.level === 'Factory');
           const factoryNames = factoryLocs.map(f => f.name.trim()).filter(Boolean);
           if (factoryNames.length > 0) {
             setFactories(factoryNames);
+            if (!locationName) setLocationName(factoryNames[0]);
+            if (!factory) setFactory(factoryNames[0]);
           } else if (warehouseRes.value.length > 0) {
             const rootNames = warehouseRes.value.map(f => f.name.trim()).filter(Boolean);
             setFactories(rootNames);
+            if (!locationName) setLocationName(rootNames[0]);
+            if (!factory) setFactory(rootNames[0]);
           } else {
             setFactories(['Main Factory']);
           }
         }
 
-        // Order Number sequence starting at PR-0001
+        // Order Number sequence starting at PO-001 (Seamless for > 1 lakh orders)
         if (nextNumRes.status === 'fulfilled' && nextNumRes.value) {
           setOrderNumber(nextNumRes.value);
         } else {
-          setOrderNumber('PR-0001');
+          setOrderNumber('PO-001');
         }
       } catch (err) {
         console.error('Failed to load initial data from backend:', err);
@@ -203,9 +311,35 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     return () => { isMounted = false; };
   }, [companyId]);
 
-  // Finished Goods list ONLY (items -> products tab)
-  const finishedProductsList = useMemo(() => {
-    return backendSkus.filter(sku => getItemClassification(sku) === 'products');
+  // Production Presets Handlers
+  const saveProductionPresets = (list: ProductionPreset[]) => {
+    setProductionPresets(list);
+    try {
+      localStorage.setItem('skbw_production_presets_v2', JSON.stringify(list));
+    } catch (e) {}
+  };
+
+  const handleApplyPreset = (p: ProductionPreset) => {
+    if (p.department) setDepartment(p.department);
+    if (p.locationId) setLocationId(p.locationId);
+    if (p.warehouseId) setWarehouseId(p.warehouseId);
+    if (p.floorId) setFloorId(p.floorId);
+    if (p.zoneId) setZoneId(p.zoneId);
+
+    const locName = p.locationName || (p.locationId ? warehouseLocations.find(l => l._id === p.locationId)?.name : '') || 'SKBW';
+    setLocationName(locName);
+    setFactory(locName);
+
+    setShowQuickPresetMenu(false);
+    showToast(`Applied Preset "${p.name}" (Auto-filled Location: ${locName})`, 'success');
+  };
+
+  // Items to Produce: BOTH Finished Goods and Semi-Finished Goods
+  const producibleItemsList = useMemo(() => {
+    return backendSkus.filter(sku => {
+      const cls = getItemClassification(sku);
+      return cls === 'products' || cls === 'semi';
+    });
   }, [backendSkus]);
 
   // Raw & Semi-Finished Materials list ONLY (for Add Component)
@@ -398,7 +532,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       return;
     }
     if (!selectedSku) {
-      showToast('Please select a finished product to produce', 'error');
+      showToast('Please select an item to produce', 'error');
       return;
     }
     const qty = Number(productionQty);
@@ -406,8 +540,8 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       showToast('Please enter a valid production quantity (> 0)', 'error');
       return;
     }
-    if (!factory.trim()) {
-      showToast('Please select or specify a Factory', 'error');
+    if (!locationName.trim() && !factory.trim()) {
+      showToast('Please select or specify a Location', 'error');
       return;
     }
     if (!department.trim()) {
@@ -426,13 +560,15 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       setSubmitting(true);
       const qty = Number(productionQty) || 1;
       const materialStatus = bomStats.shortageCount > 0 ? 'Shortage' : 'Ready';
+      const isSemi = getItemClassification(selectedSku) === 'semi';
+      const finalItemType = isSemi ? 'Semi Finished' : 'Finished Good';
 
       const payload: Partial<ProductionOrder> = {
         orderNumber: orderNumber.trim(),
         itemId: selectedSku._id as any,
         itemName: selectedSku.name,
         itemCode: selectedSku.skuCode,
-        itemType: 'Finished Good',
+        itemType: finalItemType as any,
         plannedQty: qty,
         plannedUom: productionUom,
         plannedPcs: totalPlannedPcs,
@@ -445,7 +581,12 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         status: 'Planned',
         progress: 0,
         department: department.trim(),
-        factory: factory.trim(),
+        factory: locationName.trim() || factory.trim() || 'Main Factory',
+        locationId: locationId || undefined,
+        locationName: locationName.trim() || undefined,
+        warehouseId: warehouseId || undefined,
+        floorId: floorId || undefined,
+        zoneId: zoneId || undefined,
         plannedStartDate: plannedStartDate || '',
         requiredCompletionDate: requiredCompletionDate || '',
         priority: priority,
@@ -563,8 +704,8 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       // 5. Alt+P: Presets toggle
       if (e.altKey && (e.key === 'p' || e.key === 'P')) {
         e.preventDefault();
-        const presetBtn = document.querySelector('button[title*="Alt+P"]') as HTMLButtonElement;
-        presetBtn?.click();
+        setShowQuickPresetMenu(prev => !prev);
+        setHighlightedPresetIdx(0);
         return;
       }
     };
@@ -694,25 +835,102 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           <>
             {/* 1. Basic Information */}
             <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-2xs space-y-5">
-              <h2 className="text-sm font-bold text-gray-900 tracking-wide uppercase">1. Basic Information</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-gray-900 tracking-wide uppercase">1. Basic Information</h2>
+
+                {/* Quick Presets Dropdown - Matching Sales Order UI */}
+                <div className="relative" ref={quickPresetMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowQuickPresetMenu(!showQuickPresetMenu);
+                      setHighlightedPresetIdx(0);
+                    }}
+                    className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100/80 text-blue-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-blue-200 shadow-3xs"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Presets</span>
+                    <ChevronDown className="w-3 h-3 text-blue-500" />
+                  </button>
+
+                  {showQuickPresetMenu && (
+                    <div 
+                      className="absolute right-0 top-full mt-1 w-80 max-h-[80vh] bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1 text-xs divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100"
+                      role="menu"
+                    >
+                      <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <span>Production Presets</span>
+                          <kbd className="font-mono text-[9px] bg-gray-100 text-gray-600 px-1 py-0.5 rounded border border-gray-200">Alt+P</kbd>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowQuickPresetMenu(false);
+                            setShowManagePresetsModal(true);
+                          }}
+                          className="text-blue-600 hover:underline flex items-center gap-0.5 cursor-pointer font-bold"
+                        >
+                          <Settings className="w-3 h-3" />
+                          <span>Manage</span>
+                        </button>
+                      </div>
+                      <div className="max-h-60 overflow-y-auto py-1 scroll-smooth" ref={quickPresetListRef}>
+                        {productionPresets.map((p, pIdx) => {
+                          const isSelected = pIdx === highlightedPresetIdx;
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => handleApplyPreset(p)}
+                              onMouseEnter={() => setHighlightedPresetIdx(pIdx)}
+                              className={`w-full px-3 py-2 text-left flex items-center justify-between group transition-colors cursor-pointer ${
+                                isSelected
+                                  ? 'bg-blue-100/90 text-blue-900 font-bold ring-1 ring-inset ring-blue-400'
+                                  : 'hover:bg-blue-50/70 text-gray-800'
+                              }`}
+                              role="menuitem"
+                            >
+                              <div className="min-w-0 pr-2">
+                                <div className="font-bold text-gray-900 truncate">{p.name}</div>
+                                <div className="text-[11px] text-gray-500 font-medium">Dept: {p.department}</div>
+                              </div>
+                              {p.locationName && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-mono shrink-0">
+                                  📍 {p.locationName}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                        {productionPresets.length === 0 && (
+                          <div className="p-3 text-center text-xs text-gray-400">
+                            No presets configured. Click Manage to add one.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                {/* Order No - Starts with PR-0001 */}
+                {/* Order No - Starts with PO-001 (Scales > 100,000 orders) */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1.5">Order No.</label>
                   <input
                     type="text"
                     value={orderNumber}
                     onChange={e => setOrderNumber(e.target.value)}
-                    placeholder="PR-0001"
+                    placeholder="PO-001"
                     className="w-full text-xs text-gray-900 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 font-mono font-bold focus:bg-white focus:outline-none focus:border-blue-500"
                   />
                 </div>
 
-                {/* Item to Produce - ONLY Finished Products (items -> products tab) */}
+                {/* Item to Produce - Finished Products & Semi Finished Goods */}
                 <div className="relative" ref={productDropdownRef}>
                   <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                    Item to Produce (Finished Goods) <span className="text-rose-500">*</span>
+                    Item to Produce (Finished & Semi-Finished) <span className="text-rose-500">*</span>
                   </label>
                   
                   <div
@@ -726,8 +944,19 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                     }}
                     className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 font-semibold flex items-center justify-between cursor-pointer hover:border-gray-300 focus:outline-none focus:border-blue-500"
                   >
-                    <span className={selectedSku ? 'font-bold text-gray-900' : 'text-gray-400 font-normal'}>
-                      {selectedSku ? `${selectedSku.name} (${selectedSku.skuCode})` : 'Select finished product...'}
+                    <span className={selectedSku ? 'font-bold text-gray-900 flex items-center gap-1.5' : 'text-gray-400 font-normal'}>
+                      {selectedSku ? (
+                        <>
+                          <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                            itemType === 'Semi Finished' ? 'bg-purple-100 text-purple-700' : 'bg-emerald-100 text-emerald-700'
+                          }`}>
+                            {itemType === 'Semi Finished' ? 'Semi' : 'FG'}
+                          </span>
+                          <span>{selectedSku.name} ({selectedSku.skuCode})</span>
+                        </>
+                      ) : (
+                        'Select product or semi-finished good...'
+                      )}
                     </span>
                     <div className="flex items-center space-x-1.5 text-gray-400">
                       <span className="text-[10px] font-mono">[Enter]</span>
@@ -750,7 +979,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                               setHighlightedProductIdx(0);
                             }}
                             onKeyDown={e => {
-                              const filteredList = finishedProductsList.filter(s => {
+                              const filteredList = producibleItemsList.filter(s => {
                                 if (!productSearchQuery.trim()) return true;
                                 const q = productSearchQuery.toLowerCase();
                                 return s.name.toLowerCase().includes(q) || s.skuCode.toLowerCase().includes(q);
@@ -776,7 +1005,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                                 setShowProductDropdown(false);
                               }
                             }}
-                            placeholder="Search products... [↑/↓ to navigate, Enter to select]"
+                            placeholder="Search finished & semi-finished items... [↑/↓ to navigate, Enter to select]"
                             autoFocus
                             className="w-full pl-8 pr-3 py-1.5 text-xs text-gray-900 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
                           />
@@ -784,7 +1013,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                       </div>
 
                       <div className="overflow-y-auto flex-1 divide-y divide-gray-100 custom-scrollbar">
-                        {finishedProductsList
+                        {producibleItemsList
                           .filter(s => {
                             if (!productSearchQuery.trim()) return true;
                             const q = productSearchQuery.toLowerCase();
@@ -793,6 +1022,8 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                           .map((sku, pIdx) => {
                             const hasBom = Array.isArray(sku.bomItems) && sku.bomItems.length > 0;
                             const isHighlighted = highlightedProductIdx === pIdx;
+                            const cls = getItemClassification(sku);
+                            const isSemi = cls === 'semi';
                             return (
                               <div
                                 key={sku._id}
@@ -814,8 +1045,17 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                                 }`}
                               >
                                 <div>
-                                  <div className="text-xs font-bold text-gray-900">{sku.name}</div>
-                                  <div className="text-[11px] text-gray-400 font-mono">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-xs font-bold text-gray-900">{sku.name}</span>
+                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                      isSemi 
+                                        ? 'bg-purple-100 text-purple-700 border border-purple-200' 
+                                        : 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                                    }`}>
+                                      {isSemi ? 'Semi-Finished' : 'Finished Good'}
+                                    </span>
+                                  </div>
+                                  <div className="text-[11px] text-gray-400 font-mono mt-0.5">
                                     {sku.skuCode} • {sku.unit} {sku.booksGbl ? `• ${sku.booksGbl} bks/GBL` : ''}
                                   </div>
                                 </div>
@@ -834,11 +1074,12 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   )}
                 </div>
 
-                {/* Item Type - Read-only derived */}
+                {/* Item Type - Derived with status badge */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1.5">Item Type</label>
-                  <div className="w-full text-xs text-gray-800 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 font-semibold">
-                    Finished Good
+                  <div className="w-full text-xs text-gray-800 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 font-semibold flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full ${itemType === 'Semi Finished' ? 'bg-purple-600' : 'bg-emerald-600'}`} />
+                    <span>{itemType}</span>
                   </div>
                 </div>
 
@@ -883,21 +1124,27 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   )}
                 </div>
 
-                {/* Factory - Empty by default */}
+                {/* Location - Warehouse Hierarchy Modal */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                    Factory <span className="text-rose-500">*</span>
-                  </label>
-                  <select
-                    value={factory}
-                    onChange={e => setFactory(e.target.value)}
-                    className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 font-medium focus:outline-none focus:border-blue-500 cursor-pointer"
-                  >
-                    <option value="">Select Factory...</option>
-                    {factories.map(f => (
-                      <option key={f} value={f}>{f}</option>
-                    ))}
-                  </select>
+                  <LocationSelectPopup
+                    label="Location"
+                    required
+                    locations={warehouseLocations}
+                    warehouseId={warehouseId}
+                    floorId={floorId}
+                    zoneId={zoneId}
+                    locationId={locationId}
+                    onChange={(wId, fId, zId, lId) => {
+                      setWarehouseId(wId);
+                      setFloorId(fId);
+                      setZoneId(zId);
+                      setLocationId(lId);
+                      const found = warehouseLocations.find(l => l._id === lId || l.id === lId);
+                      const name = found ? (found.name || found.code) : '';
+                      setLocationName(name || 'Selected Location');
+                      setFactory(name || 'SKBW');
+                    }}
+                  />
                 </div>
 
                 {/* Manufacturing Department - Reusable PresetField with persistent storage */}
@@ -1271,15 +1518,19 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   <span className="text-[11px] font-semibold text-gray-400 block uppercase">Item to Produce</span>
                   <div className="mt-0.5">
                     <span className="font-bold text-gray-900 block">{selectedSku?.name}</span>
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 mt-0.5">
-                      Finished Good
+                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold mt-0.5 border ${
+                      itemType === 'Semi Finished'
+                        ? 'bg-purple-50 text-purple-700 border-purple-200'
+                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    }`}>
+                      {itemType}
                     </span>
                   </div>
                 </div>
 
                 <div>
-                  <span className="text-[11px] font-semibold text-gray-400 block uppercase">Factory</span>
-                  <span className="font-bold text-gray-900 mt-0.5 block">{factory}</span>
+                  <span className="text-[11px] font-semibold text-gray-400 block uppercase">Location</span>
+                  <span className="font-bold text-gray-900 mt-0.5 block">{locationName || factory || 'Not specified'}</span>
                 </div>
 
                 <div>
@@ -1598,6 +1849,157 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           }}
         />
       )}
+
+      {/* Manage Production Presets Modal (Matching Sales Order Drawer UI) */}
+      {showManagePresetsModal && (
+        <Modal
+          isOpen={showManagePresetsModal}
+          onClose={() => setShowManagePresetsModal(false)}
+          title="Manage Production Presets"
+          maxWidth="max-w-xl"
+        >
+          <div className="space-y-4">
+            <p className="text-xs text-gray-500">
+              Presets allow you to quickly apply frequently used production configurations. You can assign both a <strong>Manufacturing Department</strong> and a <strong>Warehouse Location</strong> so selecting a preset auto-populates the entire setup.
+            </p>
+
+            {/* List */}
+            <div className="max-h-64 overflow-y-auto border border-gray-150 rounded-xl divide-y divide-gray-100">
+              {productionPresets.map(p => (
+                <div key={p.id} className="p-3 flex items-center justify-between text-xs hover:bg-gray-50/80 transition-colors">
+                  <div className="min-w-0 pr-2">
+                    <span className="font-bold text-gray-900 block">{p.name}</span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[11px] text-gray-600 font-medium">Dept: <strong>{p.department}</strong></span>
+                      {p.locationName && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                          📍 {p.locationName}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const updated = productionPresets.filter(x => x.id !== p.id);
+                      saveProductionPresets(updated);
+                      showToast(`Removed preset "${p.name}"`, 'info');
+                    }}
+                    className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors shrink-0"
+                    title="Delete Preset"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+              {productionPresets.length === 0 && (
+                <div className="p-4 text-center text-xs text-gray-400">
+                  No presets defined yet. Add one below.
+                </div>
+              )}
+            </div>
+
+            {/* Add new preset form */}
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!newPresetForm.name.trim() || !newPresetForm.department.trim()) {
+                  showToast('Please enter preset name and department', 'error');
+                  return;
+                }
+                const selectedLocObj = warehouseLocations.find(l => String(l._id) === String(newPresetForm.locationId) || String(l.id) === String(newPresetForm.locationId));
+                const newPreset: ProductionPreset = {
+                  id: `prod-preset-${Date.now()}`,
+                  name: newPresetForm.name.trim(),
+                  department: newPresetForm.department.trim(),
+                  locationName: selectedLocObj ? (selectedLocObj.name || selectedLocObj.code) : '',
+                  warehouseId: selectedLocObj ? String(selectedLocObj._id || selectedLocObj.id) : '',
+                  locationId: newPresetForm.locationId
+                };
+                const updated = [...productionPresets, newPreset];
+                saveProductionPresets(updated);
+                setNewPresetForm({ name: '', department: '', locationId: '' });
+                showToast('New production preset added', 'success');
+              }}
+              className="p-3.5 bg-blue-50/50 rounded-xl border border-blue-100 space-y-3"
+            >
+              <span className="text-[11px] font-bold text-blue-900 block uppercase tracking-wide">
+                + Add New Production Preset
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-600 mb-1">Preset Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Line 1 - Softcover"
+                    value={newPresetForm.name}
+                    onChange={(e) => setNewPresetForm({ ...newPresetForm, name: e.target.value })}
+                    className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-600 mb-1">Department</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Notebook Mfg"
+                    value={newPresetForm.department}
+                    onChange={(e) => setNewPresetForm({ ...newPresetForm, department: e.target.value })}
+                    className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-600 mb-1">Assign Location</label>
+                  <select
+                    value={newPresetForm.locationId}
+                    onChange={(e) => setNewPresetForm({ ...newPresetForm, locationId: e.target.value })}
+                    className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="">Select Location...</option>
+                    {warehouseLocations.map(loc => (
+                      <option key={loc._id || loc.id} value={loc._id || loc.id}>
+                        {loc.name || loc.code} {loc.level ? `(${loc.level})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-1">
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs cursor-pointer shadow-sm transition-colors"
+                >
+                  Add Preset
+                </button>
+              </div>
+            </form>
+
+            {/* Modal Footer */}
+            <div className="flex justify-between items-center pt-2 border-t border-gray-150 text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  saveProductionPresets(DEFAULT_PRODUCTION_PRESETS);
+                  showToast('Reset to default production presets', 'info');
+                }}
+                className="text-gray-500 hover:text-gray-700 font-semibold"
+              >
+                Reset Defaults
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowManagePresetsModal(false)}
+                className="px-4 py-1.5 bg-gray-900 text-white font-bold rounded-xl text-xs cursor-pointer hover:bg-gray-800 transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {/* Tally Keyboard Shortcut Status Bar */}
       <div className="bg-slate-900 text-slate-300 px-6 py-2 border-t border-slate-800 text-xs flex flex-wrap items-center justify-between gap-3 shadow-inner select-none shrink-0">
         <div className="flex items-center space-x-3 text-[11px] overflow-x-auto py-0.5">
