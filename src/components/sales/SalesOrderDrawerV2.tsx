@@ -286,7 +286,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   const [transporter, setTransporter] = useState<string>('');
   const [transporterList, setTransporterList] = useState<string[]>([]);
   const [orderType, setOrderType] = useState<'' | 'Credit' | 'Cash'>('');
-  const [orderStatus, setOrderStatus] = useState<string>('');
+  const [orderStatus, setOrderStatus] = useState<string>('Confirmed');
 
   // Addresses State (Functional & Editable)
   const [sameAddress, setSameAddress] = useState(true);
@@ -345,6 +345,8 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   const [activeChargeDropdown, setActiveChargeDropdown] = useState<number | null>(null);
   const [showManageChargesModal, setShowManageChargesModal] = useState(false);
   const [showQuickPresetMenu, setShowQuickPresetMenu] = useState(false);
+  const [highlightedQuickPresetIdx, setHighlightedQuickPresetIdx] = useState<number>(0);
+  const [highlightedChargePresetIdx, setHighlightedChargePresetIdx] = useState<number>(0);
   const [newPresetForm, setNewPresetForm] = useState({ name: '', defaultRate: '', calculationType: 'per_gbl' as 'per_gbl' | 'fixed' });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -647,7 +649,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       setPromisedDate('');
       setTransporter('');
       setOrderType('');
-      setOrderStatus('');
+      setOrderStatus('Confirmed');
       setInternalNotes('');
       setOverallDiscount('');
       setSameAddress(true);
@@ -1194,6 +1196,52 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
     if (e.key === 'Enter' && !e.shiftKey) {
       if (target.tagName === 'TEXTAREA' || target.tagName === 'BUTTON') return;
 
+      // Handle Quick Preset Menu Selection via Enter
+      if (showQuickPresetMenu && predefinedCharges.length > 0) {
+        e.preventDefault();
+        const p = predefinedCharges[highlightedQuickPresetIdx] || predefinedCharges[0];
+        if (p) {
+          handleAddCharge(p);
+        }
+        setShowQuickPresetMenu(false);
+        return;
+      }
+
+      // Handle Charge Name Cell Preset Dropdown Selection via Enter
+      if (activeChargeDropdown !== null) {
+        e.preventDefault();
+        const cIdx = activeChargeDropdown;
+        const currentChargeName = (otherCharges[cIdx]?.name || '').toLowerCase().trim();
+        const filteredPresets = predefinedCharges.filter(p => !currentChargeName || p.name.toLowerCase().includes(currentChargeName));
+        const canInlineCreate = currentChargeName && !predefinedCharges.some(p => p.name.toLowerCase() === currentChargeName);
+        
+        if (highlightedChargePresetIdx < filteredPresets.length) {
+          const selectedPreset = filteredPresets[highlightedChargePresetIdx] || filteredPresets[0];
+          if (selectedPreset) {
+            handleSelectPresetCharge(cIdx, selectedPreset);
+          }
+        } else if (canInlineCreate) {
+          saveNewPredefinedCharge(otherCharges[cIdx].name.trim(), 'per_gbl', Number(otherCharges[cIdx].rate) || 5);
+          setOtherCharges(prev => {
+            const copy = [...prev];
+            const targetQty = totalOrderGbl > 0 ? totalOrderGbl : 1;
+            copy[cIdx] = {
+              ...copy[cIdx],
+              name: otherCharges[cIdx].name.trim(),
+              chargeType: 'per_gbl',
+              quantity: targetQty,
+              rate: Number(copy[cIdx].rate) || 5,
+              amount: Math.round(targetQty * (Number(copy[cIdx].rate) || 5) * 100) / 100
+            };
+            return copy;
+          });
+          showToast(`Saved "${otherCharges[cIdx].name.trim()}" to Predefined Charges`, 'success');
+        }
+        setActiveChargeDropdown(null);
+        setTimeout(() => shiftFocus(1), 50);
+        return;
+      }
+
       // Handle Customer Dropdown Selection via Enter
       if (showCustomerDropdown && filteredCustomers.length > 0) {
         e.preventDefault();
@@ -1231,6 +1279,23 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
     // 2. Arrow Down
     if (e.key === 'ArrowDown') {
+      if (showQuickPresetMenu && predefinedCharges.length > 0) {
+        e.preventDefault();
+        setHighlightedQuickPresetIdx(prev => Math.min(prev + 1, predefinedCharges.length - 1));
+        return;
+      }
+      if (activeChargeDropdown !== null) {
+        e.preventDefault();
+        const cIdx = activeChargeDropdown;
+        const currentChargeName = (otherCharges[cIdx]?.name || '').toLowerCase().trim();
+        const filteredPresets = predefinedCharges.filter(p => !currentChargeName || p.name.toLowerCase().includes(currentChargeName));
+        const canInlineCreate = currentChargeName && !predefinedCharges.some(p => p.name.toLowerCase() === currentChargeName);
+        const totalCount = filteredPresets.length + (canInlineCreate ? 1 : 0);
+        if (totalCount > 0) {
+          setHighlightedChargePresetIdx(prev => Math.min(prev + 1, totalCount - 1));
+        }
+        return;
+      }
       if (showCustomerDropdown && filteredCustomers.length > 0) {
         e.preventDefault();
         setHighlightedCustomerIdx(prev => Math.min(prev + 1, filteredCustomers.length - 1));
@@ -1261,6 +1326,16 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
     // 3. Arrow Up
     if (e.key === 'ArrowUp') {
+      if (showQuickPresetMenu && predefinedCharges.length > 0) {
+        e.preventDefault();
+        setHighlightedQuickPresetIdx(prev => Math.max(prev - 1, 0));
+        return;
+      }
+      if (activeChargeDropdown !== null) {
+        e.preventDefault();
+        setHighlightedChargePresetIdx(prev => Math.max(prev - 1, 0));
+        return;
+      }
       if (showCustomerDropdown && filteredCustomers.length > 0) {
         e.preventDefault();
         setHighlightedCustomerIdx(prev => Math.max(prev - 1, 0));
@@ -1282,13 +1357,32 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
     }
   };
 
-  // Keyboard Shortcuts for Sales Order Drawer (Esc, Ctrl+Enter, Alt+S, Alt+A)
+  // Keyboard Shortcuts for Sales Order Drawer (Esc, Ctrl+Enter, Alt+S, Alt+A, Alt+P)
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyboard = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        if (showQuickPresetMenu) {
+          e.preventDefault();
+          setShowQuickPresetMenu(false);
+          return;
+        }
+        if (activeChargeDropdown !== null) {
+          e.preventDefault();
+          setActiveChargeDropdown(null);
+          return;
+        }
+        if (showManageChargesModal) {
+          e.preventDefault();
+          setShowManageChargesModal(false);
+          return;
+        }
         e.preventDefault();
         onClose();
+      } else if (e.altKey && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        setShowQuickPresetMenu(prev => !prev);
+        setHighlightedQuickPresetIdx(0);
       } else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault();
         handleSaveOrder();
@@ -1303,7 +1397,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
     window.addEventListener('keydown', handleKeyboard);
     return () => window.removeEventListener('keydown', handleKeyboard);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, showQuickPresetMenu, activeChargeDropdown, showManageChargesModal]);
 
   return (
     <>
@@ -1619,11 +1713,10 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                   Order Status
                 </label>
                 <select
-                  value={orderStatus}
+                  value={orderStatus || 'Confirmed'}
                   onChange={(e) => setOrderStatus(e.target.value)}
                   className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 >
-                  <option value="">Select Status</option>
                   <option value="Confirmed">Confirmed (Active Demand)</option>
                   <option value="Draft">Draft</option>
                 </select>
@@ -2321,35 +2414,56 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                       </button>
 
                       {showQuickPresetMenu && (
-                        <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1 text-xs divide-y divide-gray-100">
+                        <div 
+                          className="absolute right-0 top-full mt-1 w-72 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1 text-xs divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100"
+                          role="menu"
+                        >
                           <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
-                            <span>Predefined Charges</span>
+                            <span className="flex items-center gap-1.5">
+                              <span>Predefined Charges</span>
+                              <kbd className="font-mono text-[9px] bg-gray-100 text-gray-600 px-1 py-0.5 rounded border border-gray-200">Alt+P</kbd>
+                            </span>
                             <button
                               type="button"
                               onClick={() => {
                                 setShowQuickPresetMenu(false);
                                 setShowManageChargesModal(true);
                               }}
-                              className="text-blue-600 hover:underline flex items-center gap-0.5 cursor-pointer"
+                              className="text-blue-600 hover:underline flex items-center gap-0.5 cursor-pointer font-bold"
                             >
                               <Settings className="w-3 h-3" />
                               <span>Manage</span>
                             </button>
                           </div>
-                          <div className="max-h-56 overflow-y-auto py-1">
-                            {predefinedCharges.map(p => (
-                              <button
-                                key={p.id}
-                                type="button"
-                                onClick={() => handleAddCharge(p)}
-                                className="w-full px-3 py-1.5 text-left hover:bg-blue-50 flex items-center justify-between group transition-colors cursor-pointer"
-                              >
-                                <span className="font-semibold text-gray-800 group-hover:text-blue-700">{p.name}</span>
-                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${p.calculationType === 'per_gbl' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'}`}>
-                                  {p.calculationType === 'per_gbl' ? `₹${p.defaultRate}/GBL` : `₹${p.defaultRate} Flat`}
-                                </span>
-                              </button>
-                            ))}
+                          <div className="max-h-56 overflow-y-auto py-1" id="quick-preset-list">
+                            {predefinedCharges.map((p, pIdx) => {
+                              const isSelected = pIdx === highlightedQuickPresetIdx;
+                              return (
+                                <button
+                                  key={p.id}
+                                  type="button"
+                                  id={`quick-preset-opt-${pIdx}`}
+                                  onClick={() => handleAddCharge(p)}
+                                  onMouseEnter={() => setHighlightedQuickPresetIdx(pIdx)}
+                                  className={`w-full px-3 py-1.5 text-left flex items-center justify-between group transition-colors cursor-pointer ${
+                                    isSelected
+                                      ? 'bg-blue-100/90 text-blue-900 font-bold ring-1 ring-inset ring-blue-400'
+                                      : 'hover:bg-blue-50/70 text-gray-800'
+                                  }`}
+                                  role="menuitem"
+                                  aria-selected={isSelected}
+                                >
+                                  <span className="font-semibold truncate">{p.name}</span>
+                                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 ml-2 ${p.calculationType === 'per_gbl' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'}`}>
+                                    {p.calculationType === 'per_gbl' ? `₹${p.defaultRate}/GBL` : `₹${p.defaultRate} Flat`}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div className="px-3 py-1 bg-gray-50 text-[10px] text-gray-500 flex items-center justify-between">
+                            <span>Use <kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-bold">↑</kbd><kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-bold ml-0.5">↓</kbd></span>
+                            <span><kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-bold">Enter</kbd> to add</span>
                           </div>
                         </div>
                       )}
@@ -2386,20 +2500,27 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                   type="text"
                                   placeholder="Select or type charge name..."
                                   value={ch.name}
-                                  onFocus={() => setActiveChargeDropdown(cIdx)}
+                                  onFocus={() => {
+                                    setActiveChargeDropdown(cIdx);
+                                    setHighlightedChargePresetIdx(0);
+                                  }}
                                   onChange={(e) => {
                                     updateCharge(cIdx, 'name', e.target.value);
                                     setActiveChargeDropdown(cIdx);
+                                    setHighlightedChargePresetIdx(0);
                                   }}
                                   className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 focus:ring-1 focus:ring-blue-500 focus:outline-none"
                                 />
 
                                 {activeChargeDropdown === cIdx && (
-                                  <div className="absolute left-0 top-full mt-1 w-72 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1.5 text-xs divide-y divide-gray-100">
+                                  <div 
+                                    className="absolute left-0 top-full mt-1 w-72 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1.5 text-xs divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100"
+                                    role="listbox"
+                                  >
                                     <div className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
                                       <span>Predefined Charges</span>
                                       <span 
-                                        className="text-blue-600 cursor-pointer hover:underline" 
+                                        className="text-blue-600 cursor-pointer hover:underline font-bold" 
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           setActiveChargeDropdown(null);
@@ -2412,19 +2533,30 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                     <div className="max-h-48 overflow-y-auto py-1">
                                       {predefinedCharges
                                         .filter(p => !ch.name.trim() || p.name.toLowerCase().includes(ch.name.toLowerCase()))
-                                        .map(p => (
-                                          <button
-                                            key={p.id}
-                                            type="button"
-                                            onClick={() => handleSelectPresetCharge(cIdx, p)}
-                                            className="w-full px-3 py-1.5 text-left hover:bg-blue-50 flex items-center justify-between group transition-colors cursor-pointer"
-                                          >
-                                            <span className="font-semibold text-gray-800 group-hover:text-blue-700">{p.name}</span>
-                                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${p.calculationType === 'per_gbl' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'}`}>
-                                              {p.calculationType === 'per_gbl' ? `₹${p.defaultRate}/GBL` : `₹${p.defaultRate} Flat`}
-                                            </span>
-                                          </button>
-                                        ))}
+                                        .map((p, pIdx) => {
+                                          const isSelected = pIdx === highlightedChargePresetIdx;
+                                          return (
+                                            <button
+                                              key={p.id}
+                                              type="button"
+                                              id={`charge-preset-opt-${cIdx}-${pIdx}`}
+                                              onClick={() => handleSelectPresetCharge(cIdx, p)}
+                                              onMouseEnter={() => setHighlightedChargePresetIdx(pIdx)}
+                                              className={`w-full px-3 py-1.5 text-left flex items-center justify-between group transition-colors cursor-pointer ${
+                                                isSelected
+                                                  ? 'bg-blue-100/90 text-blue-900 font-bold ring-1 ring-inset ring-blue-400'
+                                                  : 'hover:bg-blue-50/70 text-gray-800'
+                                              }`}
+                                              role="option"
+                                              aria-selected={isSelected}
+                                            >
+                                              <span className="font-semibold truncate">{p.name}</span>
+                                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 ml-2 ${p.calculationType === 'per_gbl' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'}`}>
+                                                {p.calculationType === 'per_gbl' ? `₹${p.defaultRate}/GBL` : `₹${p.defaultRate} Flat`}
+                                              </span>
+                                            </button>
+                                          );
+                                        })}
 
                                       {/* Inline Creator for new charge */}
                                       {ch.name.trim() && !predefinedCharges.some(p => p.name.toLowerCase() === ch.name.trim().toLowerCase()) && (
@@ -2454,6 +2586,10 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                           <span>Save & Use "{ch.name.trim()}" (Per GBL)</span>
                                         </button>
                                       )}
+                                    </div>
+                                    <div className="px-3 py-1 bg-gray-50 text-[10px] text-gray-500 flex items-center justify-between">
+                                      <span>Use <kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-bold">↑</kbd><kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-bold ml-0.5">↓</kbd></span>
+                                      <span><kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-bold">Enter</kbd> to select</span>
                                     </div>
                                   </div>
                                 )}
@@ -2860,20 +2996,29 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
             </div>
 
             {/* Add new preset form */}
-            <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 space-y-2">
-              <span className="text-[11px] font-bold text-blue-900 block uppercase tracking-wide">+ Add New Charge Master</span>
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!newPresetForm.name.trim()) return;
+                saveNewPredefinedCharge(newPresetForm.name.trim(), newPresetForm.calculationType, Number(newPresetForm.defaultRate) || 0);
+                setNewPresetForm({ name: '', defaultRate: '', calculationType: 'per_gbl' });
+                showToast('New predefined charge added', 'success');
+              }}
+              className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 space-y-2"
+            >
+              <span className="text-[11px] font-bold text-blue-900 block uppercase tracking-wide">+ Add New Charge Master (Press Enter to Add)</span>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
                 <input
                   type="text"
                   placeholder="Charge Name (e.g. Loading)"
                   value={newPresetForm.name}
                   onChange={(e) => setNewPresetForm({ ...newPresetForm, name: e.target.value })}
-                  className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold"
+                  className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500"
                 />
                 <select
                   value={newPresetForm.calculationType}
                   onChange={(e) => setNewPresetForm({ ...newPresetForm, calculationType: e.target.value as any })}
-                  className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold"
+                  className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500"
                 >
                   <option value="per_gbl">⚡ Per GBL</option>
                   <option value="fixed">Fixed / Flat</option>
@@ -2885,23 +3030,17 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                     placeholder="Rate (₹)"
                     value={newPresetForm.defaultRate}
                     onChange={(e) => setNewPresetForm({ ...newPresetForm, defaultRate: e.target.value })}
-                    className="w-20 px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-mono"
+                    className="w-20 px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-mono focus:ring-1 focus:ring-blue-500"
                   />
                   <button
-                    type="button"
-                    onClick={() => {
-                      if (!newPresetForm.name.trim()) return;
-                      saveNewPredefinedCharge(newPresetForm.name.trim(), newPresetForm.calculationType, Number(newPresetForm.defaultRate) || 0);
-                      setNewPresetForm({ name: '', defaultRate: '', calculationType: 'per_gbl' });
-                      showToast('New predefined charge added', 'success');
-                    }}
+                    type="submit"
                     className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs cursor-pointer flex-1"
                   >
                     Add
                   </button>
                 </div>
               </div>
-            </div>
+            </form>
 
             {/* Modal Footer */}
             <div className="flex justify-end items-center pt-2 border-t border-gray-100 text-xs">

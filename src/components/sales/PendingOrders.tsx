@@ -40,12 +40,9 @@ const PendingOrders: React.FC = () => {
       saveCustomSalesOrder(confirmedOrder, selectedCompany?._id);
       setOrders(prev => {
         const idx = prev.findIndex(o => o._id === confirmedOrder._id || o.orderNumber === confirmedOrder.orderNumber);
-        if (idx >= 0) {
-          const copy = [...prev];
-          copy[idx] = confirmedOrder;
-          return copy;
-        }
-        return [confirmedOrder, ...prev];
+        const updated = idx >= 0 ? [...prev] : [...prev, confirmedOrder];
+        if (idx >= 0) updated[idx] = confirmedOrder;
+        return updated.sort((a, b) => (String(b.orderNumber || '')).localeCompare(String(a.orderNumber || ''), undefined, { numeric: true, sensitivity: 'base' }));
       });
 
       showToast(`Sales Order ${order.orderNumber} confirmed successfully!`, 'success');
@@ -70,17 +67,19 @@ const PendingOrders: React.FC = () => {
         baseOrders = res.data;
       }
 
+      let merged: SalesOrderV2[] = [];
       if (customOrders.length > 0) {
-        const merged = [...customOrders];
+        merged = [...customOrders];
         baseOrders.forEach(bo => {
           if (!merged.some(co => (co._id && bo._id && co._id === bo._id) || (co.orderNumber && bo.orderNumber && co.orderNumber === bo.orderNumber))) {
             merged.push(bo);
           }
         });
-        setOrders(merged);
       } else {
-        setOrders(baseOrders);
+        merged = [...baseOrders];
       }
+      merged.sort((a, b) => (String(b.orderNumber || '')).localeCompare(String(a.orderNumber || ''), undefined, { numeric: true, sensitivity: 'base' }));
+      setOrders(merged);
     } catch {
       const customOrders = getCustomSalesOrders(selectedCompany?._id);
       setOrders(customOrders);

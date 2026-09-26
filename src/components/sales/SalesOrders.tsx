@@ -106,8 +106,8 @@ const SalesOrders: React.FC = () => {
   const [agentFilter, setAgentFilter] = useState<string>('all');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
-  // Table Sorting & Selection
-  const [sortField, setSortField] = useState<SortField>('orderDate');
+  // Table Sorting & Selection - Default to orderNumber descending so orders sit strictly according to numbering
+  const [sortField, setSortField] = useState<SortField>('orderNumber');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
 
@@ -209,17 +209,20 @@ const SalesOrders: React.FC = () => {
       });
 
       const customOrders = getCustomSalesOrders(selectedCompany._id);
+      let merged: SalesOrderV2[] = [];
       if (customOrders.length > 0) {
-        const merged = [...customOrders];
+        merged = [...customOrders];
         enriched.forEach(bo => {
           if (!merged.some(co => (co._id && bo._id && co._id === bo._id) || (co.orderNumber && bo.orderNumber && co.orderNumber === bo.orderNumber))) {
             merged.push(bo);
           }
         });
-        setOrders(merged);
       } else {
-        setOrders(enriched);
+        merged = [...enriched];
       }
+      // Always keep orders seated according to their order numbering
+      merged.sort((a, b) => (String(b.orderNumber || '')).localeCompare(String(a.orderNumber || ''), undefined, { numeric: true, sensitivity: 'base' }));
+      setOrders(merged);
     } catch (err) {
       console.error('Fetch orders error:', err);
       const customOrders = getCustomSalesOrders(selectedCompany?._id);
@@ -413,6 +416,12 @@ const SalesOrders: React.FC = () => {
   // Sorting
   const sortedOrders = useMemo(() => {
     return [...filteredOrders].sort((a, b) => {
+      // Natural order number sorting
+      if (sortField === 'orderNumber') {
+        const numCompare = (String(a.orderNumber || '')).localeCompare(String(b.orderNumber || ''), undefined, { numeric: true, sensitivity: 'base' });
+        return sortOrder === 'asc' ? numCompare : -numCompare;
+      }
+
       let valA: any = a[sortField];
       let valB: any = b[sortField];
 
@@ -439,7 +448,10 @@ const SalesOrders: React.FC = () => {
 
       if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
       if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
-      return 0;
+      
+      // Secondary tie-breaker: ALWAYS sort by order numbering so orders sit according to their numbering
+      const tieBreaker = (String(a.orderNumber || '')).localeCompare(String(b.orderNumber || ''), undefined, { numeric: true, sensitivity: 'base' });
+      return sortOrder === 'asc' ? tieBreaker : -tieBreaker;
     });
   }, [filteredOrders, sortField, sortOrder]);
 
@@ -614,7 +626,10 @@ const SalesOrders: React.FC = () => {
         updatedAt: new Date().toISOString()
       };
       saveCustomSalesOrder(updatedCancelled, selectedCompany?._id);
-      setOrders(prev => prev.map(o => (o._id === cancellingOrder._id || (cancellingOrder.orderNumber && o.orderNumber === cancellingOrder.orderNumber)) ? updatedCancelled : o));
+      setOrders(prev => {
+        const updated = prev.map(o => (o._id === cancellingOrder._id || (cancellingOrder.orderNumber && o.orderNumber === cancellingOrder.orderNumber)) ? updatedCancelled : o);
+        return [...updated].sort((a, b) => (String(b.orderNumber || '')).localeCompare(String(a.orderNumber || ''), undefined, { numeric: true, sensitivity: 'base' }));
+      });
       if (selectedOrderDetail && (selectedOrderDetail._id === cancellingOrder._id || selectedOrderDetail.orderNumber === cancellingOrder.orderNumber)) {
         setSelectedOrderDetail(updatedCancelled);
       }

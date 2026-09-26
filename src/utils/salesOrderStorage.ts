@@ -79,8 +79,10 @@ export const saveCustomSalesOrder = (order: SalesOrderV2, targetCompanyId?: stri
       updated = [...existing];
       updated[idx] = { ...existing[idx], ...orderWithCompany };
     } else {
-      updated = [orderWithCompany, ...existing];
+      updated = [...existing, orderWithCompany];
     }
+
+    updated.sort((a, b) => (String(b.orderNumber || '')).localeCompare(String(a.orderNumber || ''), undefined, { numeric: true, sensitivity: 'base' }));
 
     localStorage.setItem(scopedKey, JSON.stringify(updated));
   } catch (err) {
