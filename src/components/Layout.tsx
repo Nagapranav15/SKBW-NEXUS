@@ -14,7 +14,8 @@ import {
   Database,
   Building2,
   ChevronLeft, 
-  ChevronRight
+  ChevronRight,
+  Factory
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DataManager from './DataManager';
@@ -117,6 +118,10 @@ const Layout: React.FC = () => {
             e.preventDefault();
             handleNavigate('/company-selection');
             break;
+          case 'p':
+            e.preventDefault();
+            handleNavigate('/production');
+            break;
           default:
             break;
         }
@@ -148,6 +153,9 @@ const Layout: React.FC = () => {
     }
     if (path === '/sales/orders') {
       return location.pathname.startsWith('/sales/orders') || location.pathname.startsWith('/sales/quotes') || location.pathname.startsWith('/sales/pending');
+    }
+    if (path === '/production') {
+      return location.pathname.startsWith('/production');
     }
     if (path === '/dashboard') {
       return location.pathname === '/dashboard' || location.pathname === '/';
@@ -238,6 +246,7 @@ const Layout: React.FC = () => {
       items: [
         { label: 'Purchase Batches', path: '/inventory-v2/purchases', icon: Receipt, permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
         { label: 'Sale Orders', path: '/sales/orders', icon: ShoppingBag, permission: ['MANAGE_ORDERS', 'VIEW_ORDERS'] },
+        { label: 'Production', path: '/production', icon: Factory, permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS', 'MANAGE_ORDERS', 'VIEW_ORDERS'] },
       ]
     }
   ];

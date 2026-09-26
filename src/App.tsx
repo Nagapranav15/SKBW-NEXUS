@@ -19,6 +19,7 @@ const DeliveryChallan = lazy(() => import('./components/sales/DeliveryChallan'))
 const SalesReports = lazy(() => import('./components/sales/SalesReports'));
 const TransactionTools = lazy(() => import('./components/TransactionTools'));
 const AnalyzerDashboard = lazy(() => import('./components/AnalyzerDashboard'));
+const ProductionModule = lazy(() => import('./components/production/ProductionModule'));
 
 // Inventory V2 (Beta) sub-pages
 const DashboardV2 = lazy(() => import('./components/inventory_v2/DashboardV2'));
@@ -90,6 +91,8 @@ function App() {
                 <Route path="sales/pending" element={<PendingOrders />} />
                 <Route path="sales/delivery-challan" element={<DeliveryChallan />} />
                 <Route path="sales/reports" element={<SalesReports />} />
+                <Route path="production/*" element={<ProductionModule />} />
+                <Route path="production" element={<ProductionModule />} />
                 <Route path="transactions" element={<TransactionTools />} />
                 <Route path="analyzer" element={<AnalyzerDashboard />} />
 
