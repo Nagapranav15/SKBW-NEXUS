@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Factory, Plus, Search, SlidersHorizontal, ArrowUpDown, Download, 
   RotateCcw, Eye, Pencil, MoreHorizontal, Calendar, Package, 
@@ -49,9 +49,6 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   // Active row dropdown action menu
   const [actionMenuOrderId, setActionMenuOrderId] = useState<string | null>(null);
-  // Highlighted row for keyboard navigation (Tally style)
-  const [highlightedRowIdx, setHighlightedRowIdx] = useState<number>(0);
-  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Dynamic filter lists from backend data
   const dynamicDepartments = useMemo(() => {
@@ -110,91 +107,6 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
   const totalPages = Math.max(1, Math.ceil(totalOrders / rowsPerPage));
   const startIndex = (currentPage - 1) * rowsPerPage;
   const paginatedOrders = filteredOrders.slice(startIndex, startIndex + rowsPerPage);
-
-  // Keyboard navigation & Tally shortcuts across orders list
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const activeTag = (document.activeElement?.tagName || '').toLowerCase();
-      const isInputActive = activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select';
-
-      // 1. Search focus with / or Alt+F
-      if ((e.key === '/' || (e.altKey && (e.key === 'f' || e.key === 'F'))) && !isInputActive) {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-        return;
-      }
-
-      // 2. Escape: clear search or blur
-      if (e.key === 'Escape') {
-        if (isInputActive) {
-          (document.activeElement as HTMLElement)?.blur();
-          return;
-        }
-        if (searchTerm) {
-          setSearchTerm('');
-          return;
-        }
-        if (actionMenuOrderId) {
-          setActionMenuOrderId(null);
-          return;
-        }
-      }
-
-      // 3. Alt+C or Alt+N: New Production Order
-      if (e.altKey && (e.key === 'c' || e.key === 'C' || e.key === 'n' || e.key === 'N')) {
-        e.preventDefault();
-        onNewOrder();
-        return;
-      }
-
-      // If typing in input, don't hijack table arrow keys
-      if (isInputActive) return;
-
-      // 4. Arrow Down: navigate rows
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setHighlightedRowIdx(prev => Math.min(prev + 1, Math.max(0, paginatedOrders.length - 1)));
-        return;
-      }
-
-      // 5. Arrow Up: navigate rows
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setHighlightedRowIdx(prev => Math.max(prev - 1, 0));
-        return;
-      }
-
-      // 6. Enter: View highlighted order
-      if (e.key === 'Enter') {
-        if (paginatedOrders.length > 0 && highlightedRowIdx >= 0 && highlightedRowIdx < paginatedOrders.length) {
-          e.preventDefault();
-          onViewOrder(paginatedOrders[highlightedRowIdx]);
-        }
-        return;
-      }
-
-      // 7. Alt+E: Record Entries for highlighted order
-      if (e.altKey && (e.key === 'e' || e.key === 'E')) {
-        if (paginatedOrders.length > 0 && highlightedRowIdx >= 0 && highlightedRowIdx < paginatedOrders.length) {
-          e.preventDefault();
-          onRecordEntries(paginatedOrders[highlightedRowIdx]);
-        }
-        return;
-      }
-
-      // 8. Alt+P: Print highlighted order
-      if (e.altKey && (e.key === 'p' || e.key === 'P')) {
-        if (paginatedOrders.length > 0 && highlightedRowIdx >= 0 && highlightedRowIdx < paginatedOrders.length) {
-          e.preventDefault();
-          onPrintOrder(paginatedOrders[highlightedRowIdx]);
-        }
-        return;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [paginatedOrders, highlightedRowIdx, actionMenuOrderId, searchTerm, onNewOrder, onViewOrder, onRecordEntries, onPrintOrder]);
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
@@ -271,7 +183,6 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
           >
             <Plus className="w-4 h-4" />
             <span>New Production Order</span>
-            <kbd className="px-1.5 py-0.5 bg-blue-700/80 rounded text-[10px] font-mono text-blue-100 hidden sm:inline">Alt+C</kbd>
           </button>
         </div>
       </div>
@@ -382,11 +293,10 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
             <div className="relative">
               <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
-                ref={searchInputRef}
                 type="text"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                placeholder="Search orders... [/ or Alt+F]"
+                placeholder="Search production orders..."
                 className="w-56 lg:w-64 pl-8 pr-3 py-1.5 text-xs text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 shadow-2xs"
               />
             </div>
@@ -522,20 +432,11 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                     const rowNumber = startIndex + idx + 1;
                     const isSelected = selectedIds.has(order._id);
                     const isDualUom = order.plannedUom === 'GBL';
-                    const isHighlighted = highlightedRowIdx === idx;
 
                     return (
                       <tr 
                         key={order._id}
-                        onMouseEnter={() => setHighlightedRowIdx(idx)}
-                        onDoubleClick={() => onViewOrder(order)}
-                        className={`transition-colors cursor-pointer group ${
-                          isHighlighted 
-                            ? 'bg-blue-100/70 border-l-4 border-blue-600 font-medium' 
-                            : isSelected 
-                              ? 'bg-blue-50/50' 
-                              : 'hover:bg-blue-50/30'
-                        }`}
+                        className={`hover:bg-blue-50/30 transition-colors group ${isSelected ? 'bg-blue-50/50' : ''}`}
                       >
                         {/* Checkbox */}
                         <td className="py-3.5 px-3.5 text-center">
@@ -826,44 +727,6 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
-            </div>
-          </div>
-
-          {/* Tally Keyboard Shortcut Status Bar */}
-          <div className="bg-slate-900 text-slate-300 px-4 py-2 border-t border-slate-800 text-xs flex flex-wrap items-center justify-between gap-3 select-none">
-            <div className="flex items-center space-x-3 text-[11px] overflow-x-auto py-0.5">
-              <span className="flex items-center space-x-1">
-                <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] font-mono text-amber-400 font-bold">Alt+C</kbd>
-                <span className="text-slate-300">New Order</span>
-              </span>
-              <span className="text-slate-700">•</span>
-              <span className="flex items-center space-x-1">
-                <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] font-mono text-amber-400 font-bold">↑ / ↓</kbd>
-                <span className="text-slate-300">Navigate Rows</span>
-              </span>
-              <span className="text-slate-700">•</span>
-              <span className="flex items-center space-x-1">
-                <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] font-mono text-amber-400 font-bold">↵ Enter</kbd>
-                <span className="text-slate-300">View Details</span>
-              </span>
-              <span className="text-slate-700">•</span>
-              <span className="flex items-center space-x-1">
-                <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] font-mono text-amber-400 font-bold">Alt+E</kbd>
-                <span className="text-slate-300">Record Entry</span>
-              </span>
-              <span className="text-slate-700">•</span>
-              <span className="flex items-center space-x-1">
-                <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] font-mono text-amber-400 font-bold">Alt+P</kbd>
-                <span className="text-slate-300">Print</span>
-              </span>
-              <span className="text-slate-700">•</span>
-              <span className="flex items-center space-x-1">
-                <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] font-mono text-amber-400 font-bold">/</kbd>
-                <span className="text-slate-300">Search</span>
-              </span>
-            </div>
-            <div className="text-[11px] text-slate-400">
-              Showing <strong className="text-white">{startIndex + 1}</strong> - <strong className="text-white">{Math.min(startIndex + rowsPerPage, totalOrders)}</strong> of <strong className="text-white">{totalOrders}</strong>
             </div>
           </div>
         </div>
