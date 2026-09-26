@@ -1652,8 +1652,6 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                   <option value="">Select Status</option>
                   <option value="Confirmed">Confirmed (Active Demand)</option>
                   <option value="Draft">Draft</option>
-                  <option value="In Production">In Production</option>
-                  <option value="Pending">Pending</option>
                 </select>
               </div>
 
