@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { 
@@ -2925,7 +2926,14 @@ export const BusinessDirectoryV2: React.FC = () => {
                               <div className="flex items-center gap-2">
                                 <Users className="w-4 h-4 text-blue-600 shrink-0" />
                                 <div className="flex flex-col">
-                                  <span className="font-bold text-gray-900">{item.firmName}</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-bold text-gray-900">{item.firmName}</span>
+                                    {item.code && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200/80">
+                                        {item.code}
+                                      </span>
+                                    )}
+                                  </div>
                                   {(item.contactName || item.ownerName || item.contactPersons?.[0]?.name) && (
                                     <span className="text-[11px] text-gray-500 font-medium">{item.contactName || item.ownerName || item.contactPersons?.[0]?.name}</span>
                                   )}
@@ -3469,6 +3477,7 @@ export const BusinessDirectoryV2: React.FC = () => {
           onClose={() => setShowModal(false)}
           maxWidth={activeMainTab === 'customers' ? 'max-w-4xl' : activeMainTab === 'vendors' ? 'max-w-3xl' : 'max-w-xl'}
           hideCloseButton
+          zIndex={showDuplicatesModal ? "z-[10020]" : "z-[9999]"}
         >
           <form onSubmit={handleSaveItem} className="space-y-4 p-1">
             
@@ -3479,9 +3488,16 @@ export const BusinessDirectoryV2: React.FC = () => {
                   <span className="text-base">{getItemIcon()}</span>
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-gray-900 tracking-tight">
-                    {editingItem ? 'Edit' : 'Add'} {activeMainTab === 'customers' ? 'Customer Master' : activeMainTab === 'vendors' ? 'Vendor Master' : activeMainTab === 'agents' ? 'Agent Master' : activeMainTab === 'regions' ? 'Route / Region Master' : activeMainTab === 'cities' ? 'Market / City Master' : 'Transporter Master'}
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-gray-900 tracking-tight">
+                      {editingItem ? 'Edit' : 'Add'} {activeMainTab === 'customers' ? 'Customer Master' : activeMainTab === 'vendors' ? 'Vendor Master' : activeMainTab === 'agents' ? 'Agent Master' : activeMainTab === 'regions' ? 'Route / Region Master' : activeMainTab === 'cities' ? 'Market / City Master' : 'Transporter Master'}
+                    </h3>
+                    {activeMainTab === 'customers' && (
+                      <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded-md">
+                        {editingItem?.code ? editingItem.code : 'Auto: CU-XXXX'}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[11px] text-gray-400 font-medium">Enter master details below</p>
                 </div>
               </div>
@@ -6195,8 +6211,15 @@ export const BusinessDirectoryV2: React.FC = () => {
                                   {idx + 1}
                                 </td>
                                 <td className="py-3 px-4">
-                                  <div className="font-bold text-gray-900 group-hover:text-blue-700 transition-colors text-xs">
-                                    {cust.firmName || cust.name || 'Unnamed Customer'}
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-bold text-gray-900 group-hover:text-blue-700 transition-colors text-xs">
+                                      {cust.firmName || cust.name || 'Unnamed Customer'}
+                                    </span>
+                                    {cust.code && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200/80">
+                                        {cust.code}
+                                      </span>
+                                    )}
                                   </div>
                                   {(cust.contactName || cust.ownerName || cust.contactPersons?.[0]?.name) && (
                                     <div className="text-[11px] text-gray-500 font-medium mt-0.5">
@@ -6447,10 +6470,15 @@ export const BusinessDirectoryV2: React.FC = () => {
                         return (
                           <div key={item._id} className="flex justify-between items-center bg-white p-3.5 border border-gray-200 rounded-xl text-xs hover:border-gray-300 transition-colors">
                             <div className="space-y-1">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <p className="font-bold text-gray-900 text-sm">
                                   {activeMainTab === 'regions' ? item.name : (item.firmName || item.contactName || item.name)}
                                 </p>
+                                {item.code && (
+                                  <span className="font-mono text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200/80 px-1.5 py-0.5 rounded">
+                                    {item.code}
+                                  </span>
+                                )}
                                 <span className={`inline-flex px-2 py-0.5 text-[10px] font-bold rounded-full ${
                                   isActive ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-gray-100 text-gray-700 border border-gray-200'
                                 }`}>
@@ -6555,8 +6583,8 @@ export const BusinessDirectoryV2: React.FC = () => {
       )}
 
       {/* ── COMPARE DUPLICATES MODAL (View Both) ── */}
-      {compareGroup && (
-        <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-4 bg-gray-950/80 backdrop-blur-md animate-in fade-in duration-200">
+      {compareGroup && createPortal(
+        <div className="fixed inset-0 z-[10010] overflow-y-auto flex items-center justify-center p-4 bg-gray-950/80 backdrop-blur-md animate-in fade-in duration-200">
           <div className="relative bg-white rounded-2xl max-w-4xl w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
               <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
@@ -6591,6 +6619,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {[
+                    { label: 'Customer / Party Code', key: 'code' },
                     { label: 'Firm/Company Name', key: 'firmName' },
                     { label: 'Owner Name', key: 'ownerName' },
                     { label: 'Contact Name', key: 'contactName' },
@@ -6624,6 +6653,10 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 val === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-700'
                               }`}>
                                 {val || 'active'}
+                              </span>
+                            ) : row.key === 'code' && val ? (
+                              <span className="font-mono font-bold text-blue-700 bg-blue-50 border border-blue-200/80 px-1.5 py-0.5 rounded">
+                                {val}
                               </span>
                             ) : (
                               val || <span className="text-gray-400 italic text-[11px]">Empty</span>
@@ -6659,12 +6692,13 @@ export const BusinessDirectoryV2: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── MERGE SELECTION MODAL WITH DIFF (BALANCE AND ACTIVE STATUS) ── */}
-      {mergeGroup && (
-        <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-4 bg-gray-950/80 backdrop-blur-md animate-in fade-in duration-200">
+      {mergeGroup && createPortal(
+        <div className="fixed inset-0 z-[10010] overflow-y-auto flex items-center justify-center p-4 bg-gray-950/80 backdrop-blur-md animate-in fade-in duration-200">
           <div className="relative bg-white rounded-2xl max-w-3xl w-full shadow-2xl flex flex-col border border-gray-100 animate-in fade-in zoom-in-95 duration-200 overflow-hidden max-h-[90vh]">
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
               <div>
@@ -6743,7 +6777,14 @@ export const BusinessDirectoryV2: React.FC = () => {
 
                           {/* Firm Name & Status */}
                           <div className="pt-1">
-                            <h4 className="font-bold text-gray-900 text-sm">{item.firmName || item.name}</h4>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-bold text-gray-900 text-sm">{item.firmName || item.name}</h4>
+                              {item.code && (
+                                <span className="font-mono text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200/80 px-1.5 py-0.5 rounded">
+                                  {item.code}
+                                </span>
+                              )}
+                            </div>
                             <div className="flex items-center gap-2 mt-1">
                               <span className={`inline-flex px-2 py-0.5 text-[10px] font-bold rounded-full ${
                                 isActive ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-gray-100 text-gray-700 border border-gray-200'
@@ -6843,7 +6884,8 @@ export const BusinessDirectoryV2: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── BULK EDIT MODAL ── */}

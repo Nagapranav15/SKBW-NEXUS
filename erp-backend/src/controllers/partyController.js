@@ -583,61 +583,51 @@ const ensureRouteAndMarket = async (partyData, companyId, userFullName) => {
 };
 
 const generateCustomerCode = async (partyData) => {
-  const state = (partyData.state || "Andhra Pradesh").trim();
-  const stateCode = stateMap[state.toLowerCase()] || state.substring(0, 2).toUpperCase();
-  
-  // Look up route code from database Route collection
-  let routeCode = "GEN";
-  if (partyData.route) {
-    const routeDoc = await Route.findOne({ name: partyData.route });
-    if (routeDoc && routeDoc.code) {
-      routeCode = routeDoc.code.trim().toUpperCase();
-    } else {
-      routeCode = getRouteCode(partyData.route);
-    }
-  }
-  
-  const cityCode = getCityCode(partyData.city);
-  const prefix = `${stateCode}-${routeCode}-${cityCode}-`;
-  
-  // Find or initialize Sequence document for the prefix
-  let seqDoc = await Sequence.findOne({ prefix });
+  const companyId = partyData.company ? String(partyData.company._id || partyData.company) : '';
+  const seqPrefix = companyId ? `${companyId}_CUSTOMER` : 'GLOBAL_CUSTOMER';
+
+  const Sequence = require('../models/sequenceModel');
+  let seqDoc = await Sequence.findOne({ prefix: seqPrefix });
   if (!seqDoc) {
-    // Find the max number currently in the database for existing records
-    const customers = await Party.find({
-      type: 'customer',
-      code: { $regex: '^' + prefix }
-    }, { code: 1 });
-    
+    const filter = { type: 'customer', code: { $regex: '^CU-\\d+$' } };
+    if (companyId) filter.company = toObjectId(companyId);
+
+    const customers = await Party.find(filter, { code: 1 }).lean();
     let maxNum = 0;
     customers.forEach(c => {
       if (c.code) {
-        const parts = c.code.split('-');
-        const lastPart = parts[parts.length - 1];
-        const num = parseInt(lastPart, 10);
-        if (!isNaN(num) && num > maxNum) {
-          maxNum = num;
+        const match = c.code.match(/CU-(\d+)/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > maxNum) {
+            maxNum = num;
+          }
         }
       }
     });
-    
-    // Create sequence starting at maxNum
+
+    if (maxNum === 0) {
+      const countFilter = { type: 'customer' };
+      if (companyId) countFilter.company = toObjectId(companyId);
+      maxNum = await Party.countDocuments(countFilter);
+    }
+
     seqDoc = await Sequence.findOneAndUpdate(
-      { prefix },
+      { prefix: seqPrefix },
       { $setOnInsert: { sequence: maxNum } },
       { returnDocument: 'after', upsert: true }
     );
   }
-  
+
   // Increment and get next sequence number
   seqDoc = await Sequence.findOneAndUpdate(
-    { prefix },
+    { prefix: seqPrefix },
     { $inc: { sequence: 1 } },
     { returnDocument: 'after' }
   );
-  
+
   const runningNum = String(seqDoc.sequence).padStart(4, '0');
-  return prefix + runningNum;
+  return `CU-${runningNum}`;
 };
 
 const enrichPartyObj = async (party) => {
@@ -1392,21 +1382,6 @@ exports.updateParty = async (req, res) => {
 
         // Update all customers under this city
         await Party.updateMany(customerFilter, { $set: customerUpdate });
-
-        // Regenerate customer codes if city or region changed
-        if (nameChanged || routeChanged) {
-          const newCityName = nameChanged ? data.firmName : existingParty.firmName;
-          const newRouteName = routeChanged ? data.route : existingParty.route;
-          const customersToUpdate = await Party.find({ type: 'customer', city: newCityName });
-          for (const customer of customersToUpdate) {
-            const newCode = await generateCustomerCode({
-              state: customer.state,
-              route: newRouteName,
-              city: newCityName
-            });
-            await Party.findByIdAndUpdate(customer._id, { code: newCode });
-          }
-        }
       }
     }
     
@@ -1902,62 +1877,38 @@ exports.importParties = async (req, res) => {
     }
 
     // 3. Resolve Customer prefixes and fetch existing sequence counters
-    const partiesWithPrefixes = parties.map(p => {
-      const data = { ...p };
-      if (data.type === 'customer' && !data.code && data.company) {
-        const state = (data.state || "Andhra Pradesh").trim();
-        const stateCode = stateMap[state.toLowerCase()] || state.substring(0, 2).toUpperCase();
-        
-        let routeCode = "GEN";
-        if (data.route) {
-          const routeKey = `${data.company}:${data.route.toLowerCase()}`;
-          const routeDoc = routesMap.get(routeKey);
-          if (routeDoc && routeDoc.code) {
-            routeCode = routeDoc.code.trim().toUpperCase();
-          } else {
-            routeCode = getRouteCode(data.route);
-          }
-        }
-        const cityCode = getCityCode(data.city);
-        const prefix = `${stateCode}-${routeCode}-${cityCode}-`;
-        return { data, prefix };
-      }
-      return { data, prefix: null };
-    });
-
-    const uniquePrefixes = [...new Set(partiesWithPrefixes.map(x => x.prefix).filter(Boolean))];
     const Sequence = require('../models/sequenceModel');
-    const existingSeqs = await Sequence.find({ prefix: { $in: uniquePrefixes } });
     const seqsMap = new Map();
-    existingSeqs.forEach(s => seqsMap.set(s.prefix, s.sequence));
 
-    // Find max counter for prefixes that don't have sequence documents in MongoDB yet
-    for (const prefix of uniquePrefixes) {
-      if (!seqsMap.has(prefix)) {
-        const customers = await Party.find({
-          type: 'customer',
-          code: { $regex: '^' + prefix }
-        }, { code: 1 });
-
+    for (const compId of companyIds) {
+      const prefix = `${compId}_CUSTOMER`;
+      let seqDoc = await Sequence.findOne({ prefix });
+      if (!seqDoc) {
+        const filter = { type: 'customer', code: { $regex: '^CU-\\d+$' }, company: toObjectId(compId) };
+        const customers = await Party.find(filter, { code: 1 }).lean();
         let maxNum = 0;
         customers.forEach(c => {
           if (c.code) {
-            const parts = c.code.split('-');
-            const lastPart = parts[parts.length - 1];
-            const num = parseInt(lastPart, 10);
-            if (!isNaN(num) && num > maxNum) {
-              maxNum = num;
+            const match = c.code.match(/CU-(\d+)/);
+            if (match) {
+              const num = parseInt(match[1], 10);
+              if (!isNaN(num) && num > maxNum) maxNum = num;
             }
           }
         });
+        if (maxNum === 0) {
+          maxNum = await Party.countDocuments({ type: 'customer', company: toObjectId(compId) });
+        }
         seqsMap.set(prefix, maxNum);
+      } else {
+        seqsMap.set(prefix, seqDoc.sequence || 0);
       }
     }
 
     // 4. Generate customer codes and build processedParties list
     const processedParties = [];
-    for (const item of partiesWithPrefixes) {
-      const data = item.data;
+    for (const p of parties) {
+      const data = { ...p };
       if (data.company && (!data.companies || data.companies.length === 0)) {
         data.companies = [data.company];
       }
@@ -1999,13 +1950,14 @@ exports.importParties = async (req, res) => {
             if (transporterDoc) data.preferredTransport = transporterDoc.firmName;
           }
 
-          if (!data.code && item.prefix) {
-            const currentCounter = seqsMap.get(item.prefix) || 0;
+          if (!data.code) {
+            const seqKey = `${companyId}_CUSTOMER`;
+            const currentCounter = seqsMap.get(seqKey) || 0;
             const nextCounter = currentCounter + 1;
-            seqsMap.set(item.prefix, nextCounter);
+            seqsMap.set(seqKey, nextCounter);
 
             const runningNum = String(nextCounter).padStart(4, '0');
-            data.code = item.prefix + runningNum;
+            data.code = `CU-${runningNum}`;
           }
         }
       }
@@ -2013,11 +1965,11 @@ exports.importParties = async (req, res) => {
     }
 
     // 5. Bulk write sequence updates back to database
-    if (uniquePrefixes.length > 0) {
-      const bulkOps = uniquePrefixes.map(prefix => ({
+    if (seqsMap.size > 0) {
+      const bulkOps = Array.from(seqsMap.entries()).map(([prefix, sequence]) => ({
         updateOne: {
           filter: { prefix },
-          update: { $set: { sequence: seqsMap.get(prefix) } },
+          update: { $set: { sequence } },
           upsert: true
         }
       }));
