@@ -141,6 +141,15 @@ export const DEFAULT_PRODUCTION_PRESETS: ProductionPreset[] = [
   }
 ];
 
+const DEFAULT_DEPARTMENT_PRESETS: string[] = [
+  'Notebook Manufacturing',
+  'Ruling Department',
+  'Binding Department',
+  'Cover Department',
+  'Printing Department',
+  'Packing Department'
+];
+
 export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> = ({
   onCancel,
   onCreated,
