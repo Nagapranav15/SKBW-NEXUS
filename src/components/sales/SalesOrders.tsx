@@ -1485,15 +1485,6 @@ const SalesOrders: React.FC = () => {
 
                                     <button
                                       type="button"
-                                      onClick={() => { handleDuplicateOrder(order); setActiveMenuOrderId(null); }}
-                                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
-                                    >
-                                      <Copy className="w-4 h-4 text-blue-600" />
-                                      <span>Duplicate</span>
-                                    </button>
-
-                                    <button
-                                      type="button"
                                       onClick={() => { setEstimationOrder(order); setActiveMenuOrderId(null); }}
                                       className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
                                     >
