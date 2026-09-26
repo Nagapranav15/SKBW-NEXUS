@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { getSalesOrdersV2, SalesOrderV2 } from '../../api/salesOrderApiV2';
+import { getSalesOrdersV2, SalesOrderV2, updateSalesOrderV2Status } from '../../api/salesOrderApiV2';
+import { saveCustomSalesOrder } from '../../utils/salesOrderStorage';
 import { generateFullDashboardOrders } from './salesOrderSampleData';
 import { PendingOrdersProductionView } from './PendingOrdersProductionView';
 import SalesOrderDetailPanelV2 from './SalesOrderDetailPanelV2';
 import SalesOrderDrawerV2 from './SalesOrderDrawerV2';
 import PrintOrderEstimationModal from './PrintOrderEstimationModal';
 import SalesOrderSuccessModal from './SalesOrderSuccessModal';
+import { showToast } from '../ui/Toast';
 
 const PendingOrders: React.FC = () => {
   const { selectedCompany } = useAuth();
@@ -17,6 +19,43 @@ const PendingOrders: React.FC = () => {
   const [showDrawer, setShowDrawer] = useState(false);
   const [printEstimationOrder, setPrintEstimationOrder] = useState<SalesOrderV2 | null>(null);
   const [successOrder, setSuccessOrder] = useState<SalesOrderV2 | null>(null);
+
+  const handleConfirmDraftOrder = async (order: SalesOrderV2) => {
+    try {
+      const confirmedOrder: SalesOrderV2 = {
+        ...order,
+        status: 'Confirmed',
+        fulfillmentStatus: order.fulfillmentStatus === 'Draft' ? 'Pending' : (order.fulfillmentStatus || 'Pending'),
+        updatedAt: new Date().toISOString()
+      };
+
+      const isLocalId = !order._id || order._id.startsWith('so-mock-') || order._id.startsWith('so-user-');
+      if (order._id && !isLocalId) {
+        try {
+          await updateSalesOrderV2Status(order._id, { status: 'Confirmed' });
+        } catch (apiErr) {
+          console.warn('API updateSalesOrderV2Status failed, confirming locally:', apiErr);
+        }
+      }
+
+      saveCustomSalesOrder(confirmedOrder);
+      setOrders(prev => {
+        const idx = prev.findIndex(o => o._id === confirmedOrder._id || o.orderNumber === confirmedOrder.orderNumber);
+        if (idx >= 0) {
+          const copy = [...prev];
+          copy[idx] = confirmedOrder;
+          return copy;
+        }
+        return [confirmedOrder, ...prev];
+      });
+
+      showToast(`Sales Order ${order.orderNumber} confirmed successfully!`, 'success');
+      setSuccessOrder(confirmedOrder);
+    } catch (err: any) {
+      console.error(err);
+      showToast('Failed to confirm order', 'error');
+    }
+  };
 
   const fetchOrders = async () => {
     try {
@@ -107,6 +146,7 @@ const PendingOrders: React.FC = () => {
             setSuccessOrder(null);
             setSelectedOrderDetail(ord);
           }}
+          onConfirmOrder={handleConfirmDraftOrder}
           onPrintOrder={(ord) => {
             setPrintEstimationOrder(ord);
           }}

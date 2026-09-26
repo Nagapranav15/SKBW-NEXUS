@@ -4,7 +4,8 @@ import {
   User, MapPin, Phone, Calendar, Truck, Tag,
   Package, IndianRupee, ChevronDown, CheckCircle
 } from 'lucide-react';
-import { SalesOrderV2 } from '../../api/salesOrderApiV2';
+import { SalesOrderV2, updateSalesOrderV2Status } from '../../api/salesOrderApiV2';
+import { saveCustomSalesOrder } from '../../utils/salesOrderStorage';
 import { useAuth } from '../../context/AuthContext';
 import { getParties } from '../../api/partyApi';
 import { showToast } from '../ui/Toast';
@@ -28,15 +29,57 @@ interface SalesOrderSuccessModalProps {
 }
 
 export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
-  order,
+  order: initialOrder,
   onClose,
   onViewOrder,
+  onConfirmOrder,
   onPrintOrder,
   onCreateNew,
   onGoToOrders,
 }) => {
   const { selectedCompany, user } = useAuth();
+  const [order, setOrder] = useState<SalesOrderV2>(initialOrder);
   const [customerDetails, setCustomerDetails] = useState<any | null>(null);
+  const [isConfirming, setIsConfirming] = useState(false);
+
+  useEffect(() => {
+    setOrder(initialOrder);
+  }, [initialOrder]);
+
+  const handleConfirmClick = async () => {
+    if (isConfirming) return;
+    setIsConfirming(true);
+    try {
+      const confirmedOrder: SalesOrderV2 = {
+        ...order,
+        status: 'Confirmed',
+        fulfillmentStatus: order.fulfillmentStatus === 'Draft' ? 'Pending' : (order.fulfillmentStatus || 'Pending'),
+        updatedAt: new Date().toISOString()
+      };
+
+      const isLocalId = !order._id || order._id.startsWith('so-mock-') || order._id.startsWith('so-user-');
+      if (order._id && !isLocalId) {
+        try {
+          await updateSalesOrderV2Status(order._id, { status: 'Confirmed' });
+        } catch (apiErr) {
+          console.warn('API updateSalesOrderV2Status failed:', apiErr);
+        }
+      }
+
+      saveCustomSalesOrder(confirmedOrder);
+      setOrder(confirmedOrder);
+      showToast(`Sales Order ${order.orderNumber} confirmed successfully!`, 'success');
+
+      if (onConfirmOrder) {
+        onConfirmOrder(confirmedOrder);
+      }
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.message || 'Failed to confirm order', 'error');
+    } finally {
+      setIsConfirming(false);
+    }
+  };
 
   // Fetch real customer info from parties
   useEffect(() => {
@@ -355,13 +398,14 @@ export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
       {/* ── BOTTOM ACTION BUTTONS (Matching Screenshot 1:1) ── */}
       <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
         {/* Button 0: Confirm Order (if currently Draft) */}
-        {order.status === 'Draft' && onConfirmOrder && (
+        {order.status === 'Draft' && (
           <button
-            onClick={() => onConfirmOrder(order)}
-            className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+            onClick={handleConfirmClick}
+            disabled={isConfirming}
+            className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
           >
             <Check className="w-4 h-4 stroke-[3]" />
-            <span>Confirm Order</span>
+            <span>{isConfirming ? 'Confirming...' : 'Confirm Order'}</span>
           </button>
         )}
 
