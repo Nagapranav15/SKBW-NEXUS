@@ -276,12 +276,6 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     const preferredUom = sku.unit || 'PCS';
     setProductionUom(preferredUom);
 
-    // If department is still empty, auto-suggest SKU group/category or first preset
-    if (!department) {
-      if (sku.group) setDepartment(sku.group);
-      else if (sku.category) setDepartment(sku.category);
-    }
-
     // Load dynamic BOM from Item Master
     const pcs = totalPlannedPcs > 0 ? totalPlannedPcs : (Number(productionQty) || 1) * (preferredUom === 'GBL' ? (sku.booksGbl || 140) : 1);
     loadBomFromItemMaster(sku, pcs);
