@@ -393,34 +393,469 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
     showToast(`Production batch scheduled for ${skuName} (${shortfallGbl} GBL)`, 'success');
   };
 
-  // Export to Excel (Tally Alt+E)
-  const handleExportExcel = () => {
-    const exportData = filteredRequirements.map(req => ({
-      'Stock Item': req.skuName,
-      'SKU Code': req.skuCode,
-      'Stock in Hand (GBL)': req.stockInHandGbl,
-      'Stock in Hand (Pcs)': req.stockInHandPcs,
-      'Total Ordered (GBL)': req.totalOrderedGbl,
-      'Total Dispatched (GBL)': req.totalDispatchedGbl,
-      'Balance Pending (GBL)': req.balancePendingGbl,
-      'Balance Pending (Pcs)': req.balancePendingPcs,
-      'Shortfall / To Produce (GBL)': req.shortfallGbl,
-      'Shortfall / To Produce (Pcs)': req.shortfallPcs,
-      'Earliest Due Date': req.earliestDueDate,
-      'Pending Orders Count': req.orderCount,
-      'Production Status': req.productionStatus
-    }));
+  // Helper for report dates (DD-MM-YYYY)
+  const formatReportDate = (d?: string) => {
+    if (!d) return '—';
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return d;
+    return `${dt.getDate()}-${dt.getMonth() + 1}-${dt.getFullYear()}`;
+  };
 
-    const ws = XLSX.utils.json_to_sheet(exportData);
+  // Helper for report date range (e.g. 1-Jan-26 to 25-Sep-26)
+  const getReportDateRangeText = () => {
+    const dates = filteredCustomerOrders
+      .map(o => o.orderDate)
+      .filter(Boolean)
+      .map(d => new Date(d).getTime())
+      .filter(t => !isNaN(t));
+
+    const today = new Date();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const fmt = (d: Date) => `${d.getDate()}-${months[d.getMonth()]}-${String(d.getFullYear()).slice(-2)}`;
+
+    if (dates.length === 0) {
+      return `1-Jan-${String(today.getFullYear()).slice(-2)} to ${fmt(today)}`;
+    }
+    const minD = new Date(Math.min(...dates));
+    const maxD = new Date(Math.max(...dates, today.getTime()));
+    return `${fmt(minD)} to ${fmt(maxD)}`;
+  };
+
+  // Export to Excel (Tally Alt+E) - Production View matches user screenshot exactly:
+  // Stock Item | SKU Code | Stock | Pending | Produce | Produce | Status
+  const handleExportExcel = () => {
+    if (viewMode === 'order_wise') {
+      const headers = ['Date', 'Ledger Name', 'Order No', 'Item Name', 'Pending Qty (GBL)', 'Pending Qty (Pcs)', 'Overdue Days'];
+      const today = new Date();
+      const rows: any[] = [];
+      filteredCustomerOrders.forEach(order => {
+        const orderDateObj = order.orderDate ? new Date(order.orderDate) : today;
+        const diffDays = Math.max(0, Math.floor((today.getTime() - orderDateObj.getTime()) / (1000 * 60 * 60 * 24)));
+        const overdueDaysStr = `( ${diffDays} days)`;
+        const items = order.items || [];
+        const totalPendingGbl = items.reduce((sum, item) => {
+          const pcsPerGbl = item.pcsPerGbl || 100;
+          const pendingPcs = Math.max(0, (item.quantity || 0) - (item.dispatchedQty || 0));
+          return sum + Math.ceil(pendingPcs / pcsPerGbl);
+        }, 0);
+
+        // Header row for customer order
+        rows.push([
+          formatReportDate(order.orderDate),
+          order.customerName,
+          order.orderNumber,
+          '',
+          totalPendingGbl,
+          '',
+          overdueDaysStr
+        ]);
+
+        // Detail rows for each item
+        items.forEach(item => {
+          const pcsPerGbl = item.pcsPerGbl || 100;
+          const pendingPcs = Math.max(0, (item.quantity || 0) - (item.dispatchedQty || 0));
+          const pendingGbl = item.gbl || Math.ceil(pendingPcs / pcsPerGbl);
+          rows.push([
+            '',
+            `   ${item.itemName || item.skuCode}`,
+            '',
+            item.itemName || item.skuCode,
+            pendingGbl,
+            pendingPcs,
+            ''
+          ]);
+        });
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+      ws['!cols'] = [
+        { wch: 14 },
+        { wch: 42 },
+        { wch: 14 },
+        { wch: 35 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 16 }
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Pending Orders');
+      XLSX.writeFile(wb, `Pending_Sales_Orders_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      showToast('Exported Pending Orders to Excel', 'success');
+      return;
+    }
+
+    // View 1 (Production View): exactly matches the screenshot headers:
+    // Stock Item | SKU Code | Stock | Pending | Produce | Produce | Status
+    const headers = ['Stock Item', 'SKU Code', 'Stock', 'Pending', 'Produce', 'Produce', 'Status'];
+    const rows = filteredRequirements.map(req => [
+      req.skuName,
+      req.skuCode,
+      req.stockInHandGbl,
+      req.balancePendingGbl,
+      req.shortfallGbl,
+      req.shortfallPcs,
+      req.productionStatus
+    ]);
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    ws['!cols'] = [
+      { wch: 42 }, // Stock Item
+      { wch: 20 }, // SKU Code
+      { wch: 10 }, // Stock
+      { wch: 10 }, // Pending
+      { wch: 10 }, // Produce (GBL)
+      { wch: 12 }, // Produce (Pcs)
+      { wch: 18 }  // Status
+    ];
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Production Plan');
     XLSX.writeFile(wb, `Sales_Orders_Production_Plan_${new Date().toISOString().slice(0, 10)}.xlsx`);
     showToast('Exported Production Schedule to Excel', 'success');
   };
 
-  // Print (Tally Alt+P)
+  // Print (Tally Alt+P): Identical to the attached Tally ERP printouts
   const handlePrint = () => {
-    window.print();
+    const printWin = window.open('', '', 'width=950,height=1150');
+    if (!printWin) {
+      showToast('Pop-up blocked. Please allow pop-ups to print.', 'error');
+      return;
+    }
+
+    const companyName = (selectedCompany?.name || 'SRI KRISHNA BINDING WORKS').toUpperCase();
+    const companyAddress = (selectedCompany?.address || '4TH CROSS ROAD , R R NAGAR , VIJAYAWADA').toUpperCase();
+    const companyEmail = (selectedCompany?.email || 'SKBW.VIJAYAWADA@GMAIL.COM').toUpperCase();
+    const dateRange = getReportDateRangeText();
+    const today = new Date();
+
+    let html = '';
+
+    if (viewMode === 'order_wise') {
+      // ══════════════════════════════════════════════════════════════
+      // REPORT 1: PENDING SALES ORDER (CUSTOMER ORDER WISE VIEW)
+      // ══════════════════════════════════════════════════════════════
+      let grandTotalPendingGbl = 0;
+
+      const orderRowsHtml = filteredCustomerOrders.map(order => {
+        const orderDateObj = order.orderDate ? new Date(order.orderDate) : today;
+        const diffDays = Math.max(0, Math.floor((today.getTime() - orderDateObj.getTime()) / (1000 * 60 * 60 * 24)));
+        const items = order.items || [];
+        const totalPendingGbl = items.reduce((sum, item) => {
+          const pcsPerGbl = item.pcsPerGbl || 100;
+          const pendingPcs = Math.max(0, (item.quantity || 0) - (item.dispatchedQty || 0));
+          return sum + Math.ceil(pendingPcs / pcsPerGbl);
+        }, 0);
+        grandTotalPendingGbl += totalPendingGbl;
+
+        const mainRow = `
+          <tr class="order-main-row">
+            <td class="col-date">${formatReportDate(order.orderDate)}</td>
+            <td class="col-ledger-main">${order.customerName}</td>
+            <td class="col-orderno">${order.orderNumber}</td>
+            <td class="col-pending-main">${totalPendingGbl} GBL</td>
+            <td class="col-overdue">( ${diffDays} days)</td>
+          </tr>
+        `;
+
+        const itemRows = items.map(item => {
+          const pcsPerGbl = item.pcsPerGbl || 100;
+          const pendingPcs = Math.max(0, (item.quantity || 0) - (item.dispatchedQty || 0));
+          const pendingGbl = item.gbl || Math.ceil(pendingPcs / pcsPerGbl);
+          return `
+            <tr class="order-item-row">
+              <td class="col-date"></td>
+              <td class="col-ledger-item">${item.itemName || item.skuCode}</td>
+              <td class="col-orderno"></td>
+              <td class="col-pending-item">${pendingGbl} GBL</td>
+              <td class="col-overdue"></td>
+            </tr>
+          `;
+        }).join('');
+
+        return mainRow + itemRows;
+      }).join('');
+
+      html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Pending Sales Order</title>
+          <style>
+            @media print {
+              @page { size: A4 portrait; margin: 10mm 12mm 12mm 12mm; }
+              body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              .page-break { page-break-after: always; }
+            }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              color: #000;
+              margin: 20px;
+              background: #fff;
+            }
+            .header-wrap { text-align: center; margin-bottom: 4px; }
+            .company-name { font-size: 15pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
+            .report-title { font-size: 13.5pt; font-weight: bold; text-decoration: underline; margin-top: 3px; }
+            .date-range-bar { text-align: right; font-size: 9.5pt; font-weight: bold; margin-top: 8px; margin-bottom: 4px; }
+            table.tally-table {
+              width: 100%;
+              border-collapse: collapse;
+              border: 1px solid #000;
+              font-size: 9pt;
+            }
+            table.tally-table thead th {
+              border: 1px solid #000;
+              padding: 4px 6px;
+              font-weight: bold;
+              text-align: center;
+              background: #fff;
+              line-height: 1.2;
+            }
+            table.tally-table td {
+              border-right: 1px solid #000;
+              padding: 2px 6px;
+            }
+            table.tally-table td:last-child {
+              border-right: none;
+            }
+            .order-main-row td {
+              border-top: 1px solid #000;
+              padding-top: 4px;
+              vertical-align: top;
+            }
+            .order-item-row td {
+              padding-top: 1.5px;
+              padding-bottom: 1.5px;
+              vertical-align: top;
+            }
+            .col-date { width: 12%; text-align: left; }
+            .col-ledger-main { width: 48%; text-align: left; font-weight: bold; text-transform: uppercase; }
+            .col-ledger-item { width: 48%; text-align: left; padding-left: 20px !important; text-transform: uppercase; }
+            .col-orderno { width: 12%; text-align: left; }
+            .col-pending-main { width: 14%; text-align: right; font-weight: bold; white-space: nowrap; }
+            .col-pending-item { width: 14%; text-align: right; white-space: nowrap; }
+            .col-overdue { width: 14%; text-align: center; white-space: nowrap; }
+            .total-row td {
+              border-top: 1px solid #000;
+              border-bottom: 1px solid #000;
+              font-weight: bold;
+              padding: 4px 6px;
+            }
+            .continued-footer {
+              text-align: right;
+              font-size: 8.5pt;
+              margin-top: 6px;
+              font-style: italic;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header-wrap">
+            <div class="company-name">${companyName}</div>
+            <div class="report-title">Pending Sales Order</div>
+          </div>
+          <div class="date-range-bar">${dateRange}</div>
+          <table class="tally-table">
+            <thead>
+              <tr>
+                <th style="width: 12%;">Date</th>
+                <th style="width: 48%;">Ledger Name</th>
+                <th style="width: 12%;">Order No</th>
+                <th style="width: 14%;">Pending<br/>Qty</th>
+                <th style="width: 14%;">OverDue<br/>Days</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${orderRowsHtml}
+            </tbody>
+            <tfoot>
+              <tr class="total-row">
+                <td colspan="3" style="text-align: right; letter-spacing: 1px;">TOTAL</td>
+                <td style="text-align: right; white-space: nowrap;">${grandTotalPendingGbl} GBL</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+          <div class="continued-footer">continued ...</div>
+        </body>
+        </html>
+      `;
+    } else {
+      // ══════════════════════════════════════════════════════════════
+      // REPORT 2: STOCK CATEGORY OUTSTANDINGS (PRODUCTION VIEW)
+      // ══════════════════════════════════════════════════════════════
+      const totalPendingGbl = kpis.totalPendingGbl;
+      const totalPendingPcs = kpis.totalPendingPcs;
+
+      const itemsHtml = filteredRequirements.map(req => `
+        <tr class="item-row">
+          <td class="col-item">${req.skuName}</td>
+          <td class="col-qty">
+            <span class="qty-gbl">${req.balancePendingGbl} GBL</span>
+            <span class="qty-pcs">(${req.balancePendingPcs.toLocaleString()} PCS)</span>
+          </td>
+        </tr>
+      `).join('');
+
+      html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Stock Category Outstandings</title>
+          <style>
+            @media print {
+              @page { size: A4 portrait; margin: 10mm 12mm 12mm 12mm; }
+              body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              color: #000;
+              margin: 20px;
+              background: #fff;
+            }
+            .header-wrap { text-align: center; line-height: 1.3; }
+            .company-name { font-size: 14pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
+            .company-address { font-size: 9pt; font-weight: bold; margin-top: 2px; }
+            .company-email { font-size: 9pt; font-weight: bold; margin-top: 1px; }
+            .category-subtitle { font-size: 9.5pt; margin-top: 6px; }
+            .report-title { font-size: 12.5pt; font-weight: bold; margin-top: 3px; }
+            .date-range { font-size: 9pt; font-weight: bold; margin-top: 3px; }
+            .sub-info-bar {
+              display: flex;
+              justify-content: space-between;
+              font-size: 8.5pt;
+              margin-top: 8px;
+              margin-bottom: 2px;
+            }
+            table.tally-table {
+              width: 100%;
+              border-collapse: collapse;
+              border: 1px solid #000;
+              font-size: 9pt;
+            }
+            table.tally-table thead th {
+              border: 1px solid #000;
+              padding: 4px 8px;
+              font-weight: bold;
+              background: #fff;
+            }
+            .th-particulars { width: 62%; text-align: left; letter-spacing: 2px; }
+            .th-pending { width: 38%; text-align: right; }
+            .sub-hdr {
+              display: flex;
+              justify-content: flex-end;
+              gap: 35px;
+              font-size: 8.5pt;
+              font-weight: normal;
+              margin-top: 2px;
+            }
+            table.tally-table td {
+              padding: 2.5px 8px;
+            }
+            .col-item-head {
+              width: 62%;
+              border-right: 1px solid #000;
+              font-weight: bold;
+              letter-spacing: 0.5px;
+            }
+            .col-qty-head {
+              width: 38%;
+              text-align: right;
+              font-weight: bold;
+            }
+            .col-item {
+              width: 62%;
+              border-right: 1px solid #000;
+              padding-left: 22px !important;
+              text-transform: uppercase;
+            }
+            .col-qty {
+              width: 38%;
+              text-align: right;
+            }
+            .qty-wrap {
+              display: flex;
+              justify-content: flex-end;
+              gap: 35px;
+            }
+            .qty-gbl {
+              display: inline-block;
+              width: 75px;
+              text-align: right;
+              font-family: inherit;
+            }
+            .qty-pcs {
+              display: inline-block;
+              width: 110px;
+              text-align: right;
+              font-family: inherit;
+            }
+            .grand-total-row td {
+              border-top: 1px solid #000;
+              border-bottom: 1px solid #000;
+              font-weight: bold;
+              padding: 4px 8px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header-wrap">
+            <div class="company-name">${companyName}</div>
+            <div class="company-address">${companyAddress}</div>
+            <div class="company-email">E-Mail : ${companyEmail}</div>
+            <div class="category-subtitle">All Stock Categories</div>
+            <div class="report-title">Stock Category Outstandings</div>
+            <div class="date-range">${dateRange}</div>
+          </div>
+          <div class="sub-info-bar">
+            <div style="font-style: italic; font-weight: bold;">Sales Orders Outstanding</div>
+            <div style="font-weight: bold;">Page 1</div>
+          </div>
+          <table class="tally-table">
+            <thead>
+              <tr>
+                <th class="th-particulars">Particulars</th>
+                <th class="th-pending">
+                  <div style="text-align: right;">Pending Orders</div>
+                  <div class="sub-hdr">
+                    <span style="width: 75px; text-align: right;">Quantity</span>
+                    <span style="width: 110px; text-align: right;">(Alt. Units)</span>
+                  </div>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="font-weight: bold;">
+                <td class="col-item-head">FINISHED GOODS</td>
+                <td class="col-qty-head">
+                  <span class="qty-gbl">${totalPendingGbl} GBL</span>
+                  <span class="qty-pcs">(${totalPendingPcs.toLocaleString()} PCS)</span>
+                </td>
+              </tr>
+              ${itemsHtml}
+            </tbody>
+            <tfoot>
+              <tr class="grand-total-row">
+                <td class="col-item-head" style="letter-spacing: 2px;">Grand Total</td>
+                <td class="col-qty-head">
+                  <span class="qty-gbl">${totalPendingGbl} GBL</span>
+                  <span class="qty-pcs">(${totalPendingPcs.toLocaleString()} PCS)</span>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </body>
+        </html>
+      `;
+    }
+
+    printWin.document.open();
+    printWin.document.write(html);
+    printWin.document.close();
+    printWin.focus();
+    setTimeout(() => {
+      printWin.print();
+      printWin.close();
+    }, 350);
   };
 
   // WhatsApp quick notification
