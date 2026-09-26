@@ -156,6 +156,28 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
     }
   }, [isOpen, activeOrder?._id, activeOrder?.company, selectedCompany?._id]);
 
+  // Find linked production order or delivery challan (Called unconditionally before early return)
+  const linkedProductionOrder = useMemo(() => {
+    if (!productionOrders.length || !activeOrder) return null;
+    const orderNum = (activeOrder.orderNumber || '').toLowerCase().trim();
+    return productionOrders.find(po => {
+      const pNum = (po.orderNumber || '').toLowerCase();
+      const notes = (po.notes || '').toLowerCase();
+      const source = (po.source || '').toLowerCase();
+      return pNum.includes(orderNum) || notes.includes(orderNum) || source.includes(orderNum);
+    });
+  }, [productionOrders, activeOrder]);
+
+  const linkedDeliveryChallan = useMemo(() => {
+    if (!deliveryChallans.length || !activeOrder) return null;
+    const orderNum = (activeOrder.orderNumber || '').toLowerCase().trim();
+    return deliveryChallans.find((dc: any) => {
+      const dcNum = (dc.dcNumber || dc.orderNumber || '').toLowerCase();
+      const cust = (dc.customerName || dc.customer || '').toLowerCase();
+      return dcNum.includes(orderNum) || (cust && cust === (activeOrder.customerName || '').toLowerCase());
+    });
+  }, [deliveryChallans, activeOrder]);
+
   if (!isOpen || !activeOrder) return null;
 
   // ── Clean Address Formatter without trailing ", - Pincode" ──
@@ -243,28 +265,6 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
     }
     return 'bg-gray-100 text-gray-500 border-gray-200';
   };
-
-  // Find linked production order or delivery challan
-  const linkedProductionOrder = useMemo(() => {
-    if (!productionOrders.length || !activeOrder) return null;
-    const orderNum = (activeOrder.orderNumber || '').toLowerCase().trim();
-    return productionOrders.find(po => {
-      const pNum = (po.orderNumber || '').toLowerCase();
-      const notes = (po.notes || '').toLowerCase();
-      const source = (po.source || '').toLowerCase();
-      return pNum.includes(orderNum) || notes.includes(orderNum) || source.includes(orderNum);
-    });
-  }, [productionOrders, activeOrder]);
-
-  const linkedDeliveryChallan = useMemo(() => {
-    if (!deliveryChallans.length || !activeOrder) return null;
-    const orderNum = (activeOrder.orderNumber || '').toLowerCase().trim();
-    return deliveryChallans.find((dc: any) => {
-      const dcNum = (dc.dcNumber || dc.orderNumber || '').toLowerCase();
-      const cust = (dc.customerName || dc.customer || '').toLowerCase();
-      return dcNum.includes(orderNum) || (cust && cust === (activeOrder.customerName || '').toLowerCase());
-    });
-  }, [deliveryChallans, activeOrder]);
 
   // 1. Confirm Order Handler (converts Draft -> Confirmed)
   const handleConfirmOrder = async () => {
