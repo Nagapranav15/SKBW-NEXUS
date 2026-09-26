@@ -1423,7 +1423,6 @@ export const ProductionModule: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
 
         {/* Modal: New Production Entry Order Selector */}
         {showNewEntryModal && (
