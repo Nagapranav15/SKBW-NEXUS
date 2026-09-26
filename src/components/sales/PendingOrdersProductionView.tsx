@@ -295,6 +295,41 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
     });
   }, [itemWiseRequirements, filterMode, searchTerm]);
 
+  // Filtered Customer Orders based on Search and Filter Mode
+  const filteredCustomerOrders = useMemo(() => {
+    return pendingOrders.filter(order => {
+      const items = order.items || [];
+      if (filterMode === 'shortfall') {
+        const hasShortfall = items.some(item => {
+          const code = (item.skuCode || '').toLowerCase().trim();
+          const req = itemWiseRequirements.find(r => r.skuCode.toLowerCase() === code);
+          return req ? req.shortfallGbl > 0 : true;
+        });
+        if (!hasShortfall) return false;
+      } else if (filterMode === 'in_stock') {
+        const allInStock = items.length > 0 && items.every(item => {
+          const code = (item.skuCode || '').toLowerCase().trim();
+          const req = itemWiseRequirements.find(r => r.skuCode.toLowerCase() === code);
+          return req ? req.shortfallGbl === 0 : false;
+        });
+        if (!allInStock) return false;
+      }
+
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase().trim();
+        const mNum = (order.orderNumber || '').toLowerCase().includes(q);
+        const mCust = (order.customerName || '').toLowerCase().includes(q);
+        const mCity = (order.city || order.region || '').toLowerCase().includes(q);
+        const mItems = items.some(i => 
+          (i.itemName || '').toLowerCase().includes(q) || 
+          (i.skuCode || '').toLowerCase().includes(q)
+        );
+        if (!mNum && !mCust && !mCity && !mItems) return false;
+      }
+      return true;
+    });
+  }, [pendingOrders, filterMode, searchTerm, itemWiseRequirements]);
+
   // Aggregate KPI Metrics
   const kpis = useMemo(() => {
     let totalPendingGbl = 0;
@@ -531,7 +566,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            All ({itemWiseRequirements.length})
+            All ({viewMode === 'item_wise' ? itemWiseRequirements.length : pendingOrders.length})
           </button>
           <button
             onClick={() => setFilterMode('shortfall')}
@@ -541,7 +576,13 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            Shortfall Only ({itemWiseRequirements.filter(r => r.shortfallGbl > 0).length})
+            Shortfall Only ({viewMode === 'item_wise' 
+              ? itemWiseRequirements.filter(r => r.shortfallGbl > 0).length 
+              : pendingOrders.filter(o => (o.items || []).some(item => {
+                  const code = (item.skuCode || '').toLowerCase().trim();
+                  const req = itemWiseRequirements.find(r => r.skuCode.toLowerCase() === code);
+                  return req ? req.shortfallGbl > 0 : true;
+                })).length})
           </button>
           <button
             onClick={() => setFilterMode('in_stock')}
@@ -551,7 +592,16 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            In Stock ({itemWiseRequirements.filter(r => r.shortfallGbl === 0).length})
+            In Stock ({viewMode === 'item_wise' 
+              ? itemWiseRequirements.filter(r => r.shortfallGbl === 0).length 
+              : pendingOrders.filter(o => {
+                  const items = o.items || [];
+                  return items.length > 0 && items.every(item => {
+                    const code = (item.skuCode || '').toLowerCase().trim();
+                    const req = itemWiseRequirements.find(r => r.skuCode.toLowerCase() === code);
+                    return req ? req.shortfallGbl === 0 : false;
+                  });
+                }).length})
           </button>
         </div>
 
@@ -901,19 +951,19 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
             <table className="w-full text-left divide-y divide-gray-200">
               <thead className="bg-gray-50/90 text-[11px] font-bold text-gray-600 uppercase tracking-wider select-none">
                 <tr>
-                  <th className="py-3.5 px-4">SO No.</th>
-                  <th className="py-3.5 px-3">Order Date</th>
-                  <th className="py-3.5 px-4">Party / Customer Name</th>
-                  <th className="py-3.5 px-3">City / Region</th>
-                  <th className="py-3.5 px-3 text-center">Due On</th>
-                  <th className="py-3.5 px-4">Items Required & Balance</th>
-                  <th className="py-3.5 px-3 text-center">Stock Coverage</th>
-                  <th className="py-3.5 px-3 text-right">Amount (₹)</th>
-                  <th className="py-3.5 px-4 text-center">Actions</th>
+                  <th className="py-3.5 px-4 w-28 whitespace-nowrap">SO No.</th>
+                  <th className="py-3.5 px-3 w-28 text-center whitespace-nowrap">Order Date</th>
+                  <th className="py-3.5 px-4 min-w-[190px]">Party / Customer Name</th>
+                  <th className="py-3.5 px-3 w-28 whitespace-nowrap">City / Region</th>
+                  <th className="py-3.5 px-3 w-28 text-center whitespace-nowrap">Due On</th>
+                  <th className="py-3.5 px-4 min-w-[320px]">Items Required & Balance</th>
+                  <th className="py-3.5 px-3 w-28 text-center whitespace-nowrap">Stock Coverage</th>
+                  <th className="py-3.5 px-3 w-32 text-right whitespace-nowrap">Amount (₹)</th>
+                  <th className="py-3.5 px-4 w-24 text-center whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-150 text-xs font-medium">
-                {pendingOrders.map(order => {
+                {filteredCustomerOrders.map(order => {
                   const items = order.items || [];
                   const totalPendingGbl = items.reduce((sum, item) => {
                     const pcsPerGbl = item.pcsPerGbl || 100;
@@ -936,7 +986,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                       className="hover:bg-gray-50/70 transition-colors cursor-pointer border-b border-gray-100"
                     >
                       {/* SO Number */}
-                      <td className="py-2.5 px-4">
+                      <td className="align-top py-3 px-4 w-28 whitespace-nowrap">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -949,13 +999,15 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                       </td>
 
                       {/* Date */}
-                      <td className="py-2.5 px-3 font-mono text-xs text-gray-600">{formatDateDDMMYYYY(order.orderDate)}</td>
+                      <td className="align-top py-3 px-3 w-28 text-center whitespace-nowrap font-mono text-xs text-gray-600">
+                        {formatDateDDMMYYYY(order.orderDate)}
+                      </td>
 
                       {/* Customer */}
-                      <td className="py-2.5 px-4">
+                      <td className="align-top py-3 px-4 min-w-[190px]">
                         <div className="font-semibold text-gray-900">{order.customerName}</div>
                         {order.customerPhone && (
-                          <div className="mt-0.5">
+                          <div className="mt-1">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -972,26 +1024,68 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                       </td>
 
                       {/* City */}
-                      <td className="py-2.5 px-3 text-gray-600">{order.city || order.region || '—'}</td>
+                      <td className="align-top py-3 px-3 w-28 whitespace-nowrap text-gray-600">
+                        {order.city || order.region || '—'}
+                      </td>
 
                       {/* Due On */}
-                      <td className="py-2.5 px-3 text-center font-mono text-xs text-gray-600">
+                      <td className="align-top py-3 px-3 w-28 text-center whitespace-nowrap font-mono text-xs text-gray-600">
                         {formatDateDDMMYYYY(order.promisedDate)}
                       </td>
 
-                      {/* Items Required */}
-                      <td className="py-2.5 px-4">
-                        <div className="font-medium text-gray-900">
-                          {items.length} SKU{items.length > 1 ? 's' : ''} • {totalPendingGbl} GBL Pending
-                        </div>
-                        <div className="text-[10px] text-gray-400 truncate max-w-xs mt-0.5">
-                          {items.map(i => i.itemName || i.skuCode).slice(0, 2).join(', ')}
-                          {items.length > 2 && ` +${items.length - 2} more`}
+                      {/* Items Required & Balance */}
+                      <td className="align-top py-3 px-4 min-w-[320px]">
+                        <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
+                          {items.map((item, iIdx) => {
+                            const pcsPerGbl = item.pcsPerGbl || 100;
+                            const orderedPcs = Number(item.quantity) || 0;
+                            const dispatchedPcs = Number(item.dispatchedQty) || 0;
+                            const pendingPcs = Math.max(0, orderedPcs - dispatchedPcs);
+                            const pendingGbl = item.gbl || Math.ceil(pendingPcs / pcsPerGbl);
+
+                            const code = (item.skuCode || '').toLowerCase().trim();
+                            const req = itemWiseRequirements.find(r => r.skuCode.toLowerCase() === code);
+                            const isInStock = req ? req.shortfallGbl === 0 : false;
+
+                            return (
+                              <div
+                                key={item._id || item.skuCode || iIdx}
+                                className="flex items-center justify-between gap-3 px-2.5 py-1.5 rounded-lg bg-gray-50/90 hover:bg-gray-100/90 border border-gray-200/70 transition-colors"
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span
+                                    className={`w-2 h-2 rounded-full shrink-0 ${isInStock ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                                    title={isInStock ? 'In Stock in warehouse' : 'Shortfall - Needs production'}
+                                  />
+                                  <div className="min-w-0">
+                                    <div className="font-semibold text-gray-900 text-xs truncate" title={item.itemName || item.skuCode}>
+                                      {item.itemName || item.skuCode}
+                                    </div>
+                                    <div className="text-[10px] text-gray-400 font-mono mt-0.5">
+                                      {pcsPerGbl} pcs/GBL
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="flex flex-col items-end shrink-0 pl-1 font-mono text-right">
+                                  <span className="font-bold text-gray-900 text-xs">
+                                    {pendingGbl} <span className="text-[10px] font-semibold text-gray-500">GBL</span>
+                                  </span>
+                                  <span className="text-[10px] text-gray-400">
+                                    {pendingPcs.toLocaleString()} pcs
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {items.length === 0 && (
+                            <span className="text-gray-400 italic text-xs">No items listed</span>
+                          )}
                         </div>
                       </td>
 
                       {/* Stock Coverage */}
-                      <td className="py-2.5 px-3 text-center">
+                      <td className="align-top py-3 px-3 w-28 text-center whitespace-nowrap">
                         <div className="flex flex-col items-center">
                           <span className={`text-xs font-mono font-semibold ${
                             readinessPct === 100 ? 'text-emerald-700' : readinessPct > 50 ? 'text-amber-700' : 'text-rose-700'
@@ -1005,12 +1099,12 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                       </td>
 
                       {/* Amount */}
-                      <td className="py-2.5 px-3 text-right font-semibold font-mono text-gray-900">
+                      <td className="align-top py-3 px-3 w-32 text-right whitespace-nowrap font-semibold font-mono text-gray-900">
                         ₹{(order.grandTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
 
                       {/* Actions */}
-                      <td className="py-2.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                      <td className="align-top py-3 px-4 w-24 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-1">
                           <button
                             onClick={(e) => {
@@ -1027,11 +1121,12 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                   );
                 })}
 
-                {pendingOrders.length === 0 && (
+                {filteredCustomerOrders.length === 0 && (
                   <tr>
                     <td colSpan={9} className="py-12 text-center text-gray-500">
                       <CheckCircle2 className="w-10 h-10 mx-auto text-emerald-400 mb-2" />
                       <p className="font-bold text-sm text-gray-800">No pending sales orders!</p>
+                      <p className="text-xs text-gray-400">No orders match the current filter or search criteria.</p>
                     </td>
                   </tr>
                 )}
