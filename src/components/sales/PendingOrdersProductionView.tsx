@@ -947,7 +947,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                   <th className="py-3.5 px-4 min-w-[190px]">Party / Customer Name</th>
                   <th className="py-3.5 px-3 w-28 whitespace-nowrap">City / Region</th>
                   <th className="py-3.5 px-3 w-28 text-center whitespace-nowrap">Due On</th>
-                  <th className="py-3.5 px-4 min-w-[320px]">Items Required & Balance</th>
+                  <th className="py-3.5 px-4 min-w-[360px]">Items Required & Balance</th>
                   <th className="py-3.5 px-3 w-32 text-right whitespace-nowrap">Amount (₹)</th>
                 </tr>
               </thead>
@@ -1015,7 +1015,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                       </td>
 
                       {/* Items Required & Balance */}
-                      <td className="align-middle py-2.5 px-4 min-w-[340px]">
+                      <td className="align-middle py-2.5 px-4 min-w-[360px]">
                         <div className="space-y-1 max-h-[220px] overflow-y-auto pr-1">
                           {items.map((item, iIdx) => {
                             const pcsPerGbl = item.pcsPerGbl || 100;
@@ -1033,9 +1033,9 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                                 key={item._id || item.skuCode || iIdx}
                                 style={{ animationDelay: `${iIdx * 35}ms` }}
                                 title={`${item.itemName || item.skuCode} | Code: ${item.skuCode} | Conversion: ${pcsPerGbl} pcs/GBL | Pending: ${pendingGbl} GBL (${pendingPcs.toLocaleString()} pcs) | Stock: ${isInStock ? 'In Stock' : 'Needs Production'}`}
-                                className="group/item flex items-center justify-between gap-2 px-2.5 py-1 rounded-lg bg-slate-50/90 hover:bg-blue-50/60 border border-slate-200/70 hover:border-blue-300/80 shadow-3xs hover:shadow-2xs transition-all duration-150 animate-in fade-in"
+                                className="group/item flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-slate-50/90 hover:bg-blue-50/60 border border-slate-200/70 hover:border-blue-300/80 shadow-3xs hover:shadow-2xs transition-all duration-150 animate-in fade-in"
                               >
-                                <div className="flex items-center gap-2 min-w-0">
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
                                   {/* Cute live pulse status dot */}
                                   <span className="relative flex h-2 w-2 shrink-0">
                                     <span
@@ -1051,14 +1051,10 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                                   </span>
 
                                   <span
-                                    className="font-semibold text-slate-800 group-hover/item:text-blue-900 text-[11.5px] truncate"
+                                    className="font-semibold text-slate-800 group-hover/item:text-blue-900 text-[11.5px] leading-tight whitespace-normal break-words"
                                     title={item.itemName || item.skuCode}
                                   >
                                     {item.itemName || item.skuCode}
-                                  </span>
-
-                                  <span className="shrink-0 text-[9.5px] font-mono font-medium text-slate-500 bg-white/90 px-1.5 py-0.5 rounded border border-slate-200/70">
-                                    {pcsPerGbl} pcs/GBL
                                   </span>
                                 </div>
 
