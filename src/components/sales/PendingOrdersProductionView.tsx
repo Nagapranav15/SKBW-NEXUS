@@ -948,9 +948,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                   <th className="py-3.5 px-3 w-28 whitespace-nowrap">City / Region</th>
                   <th className="py-3.5 px-3 w-28 text-center whitespace-nowrap">Due On</th>
                   <th className="py-3.5 px-4 min-w-[320px]">Items Required & Balance</th>
-                  <th className="py-3.5 px-3 w-28 text-center whitespace-nowrap">Stock Coverage</th>
                   <th className="py-3.5 px-3 w-32 text-right whitespace-nowrap">Amount (₹)</th>
-                  <th className="py-3.5 px-4 w-24 text-center whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-150 text-xs font-medium">
@@ -962,14 +960,6 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                     return sum + Math.ceil(pendingPcs / pcsPerGbl);
                   }, 0);
 
-                  // Calculate stock readiness (% of items in stock)
-                  const itemsReady = items.filter(item => {
-                    const code = (item.skuCode || '').toLowerCase().trim();
-                    const req = itemWiseRequirements.find(r => r.skuCode.toLowerCase() === code);
-                    return req ? req.shortfallGbl === 0 : false;
-                  }).length;
-                  const readinessPct = items.length > 0 ? Math.round((itemsReady / items.length) * 100) : 100;
-
                   return (
                     <tr 
                       key={order._id || order.orderNumber} 
@@ -977,7 +967,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                       className="hover:bg-gray-50/70 transition-colors cursor-pointer border-b border-gray-100"
                     >
                       {/* SO Number */}
-                      <td className="align-top py-3 px-4 w-28 whitespace-nowrap">
+                      <td className="align-middle py-3 px-4 w-28 whitespace-nowrap">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -990,12 +980,12 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                       </td>
 
                       {/* Date */}
-                      <td className="align-top py-3 px-3 w-28 text-center whitespace-nowrap font-mono text-xs text-gray-600">
+                      <td className="align-middle py-3 px-3 w-28 text-center whitespace-nowrap font-mono text-xs text-gray-600">
                         {formatDateDDMMYYYY(order.orderDate)}
                       </td>
 
                       {/* Customer */}
-                      <td className="align-top py-3 px-4 min-w-[190px]">
+                      <td className="align-middle py-3 px-4 min-w-[190px]">
                         <div className="font-semibold text-gray-900">{order.customerName}</div>
                         {order.customerPhone && (
                           <div className="mt-1">
@@ -1015,17 +1005,17 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                       </td>
 
                       {/* City */}
-                      <td className="align-top py-3 px-3 w-28 whitespace-nowrap text-gray-600">
+                      <td className="align-middle py-3 px-3 w-28 whitespace-nowrap text-gray-600">
                         {order.city || order.region || '—'}
                       </td>
 
                       {/* Due On */}
-                      <td className="align-top py-3 px-3 w-28 text-center whitespace-nowrap font-mono text-xs text-gray-600">
+                      <td className="align-middle py-3 px-3 w-28 text-center whitespace-nowrap font-mono text-xs text-gray-600">
                         {formatDateDDMMYYYY(order.promisedDate)}
                       </td>
 
                       {/* Items Required & Balance */}
-                      <td className="align-top py-2.5 px-4 min-w-[340px]">
+                      <td className="align-middle py-2.5 px-4 min-w-[340px]">
                         <div className="space-y-1 max-h-[220px] overflow-y-auto pr-1">
                           {items.map((item, iIdx) => {
                             const pcsPerGbl = item.pcsPerGbl || 100;
@@ -1090,38 +1080,9 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                         </div>
                       </td>
 
-                      {/* Stock Coverage */}
-                      <td className="align-top py-3 px-3 w-28 text-center whitespace-nowrap">
-                        <div className="flex flex-col items-center">
-                          <span className={`text-xs font-mono font-semibold ${
-                            readinessPct === 100 ? 'text-emerald-700' : readinessPct > 50 ? 'text-amber-700' : 'text-rose-700'
-                          }`}>
-                            {readinessPct}%
-                          </span>
-                          <span className="text-[10px] text-gray-400">
-                            {readinessPct === 100 ? 'Ready to Dispatch' : `${itemsReady}/${items.length} in stock`}
-                          </span>
-                        </div>
-                      </td>
-
                       {/* Amount */}
-                      <td className="align-top py-3 px-3 w-32 text-right whitespace-nowrap font-semibold font-mono text-gray-900">
+                      <td className="align-middle py-3 px-3 w-32 text-right whitespace-nowrap font-semibold font-mono text-gray-900">
                         ₹{(order.grandTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </td>
-
-                      {/* Actions */}
-                      <td className="align-top py-3 px-4 w-24 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onViewOrder(order);
-                            }}
-                            className="px-2.5 py-1 text-blue-600 hover:text-blue-800 text-xs font-semibold cursor-pointer hover:underline"
-                          >
-                            View Order
-                          </button>
-                        </div>
                       </td>
                     </tr>
                   );
@@ -1129,7 +1090,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
 
                 {filteredCustomerOrders.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="py-12 text-center text-gray-500">
+                    <td colSpan={7} className="py-12 text-center text-gray-500">
                       <CheckCircle2 className="w-10 h-10 mx-auto text-emerald-400 mb-2" />
                       <p className="font-bold text-sm text-gray-800">No pending sales orders!</p>
                       <p className="text-xs text-gray-400">No orders match the current filter or search criteria.</p>
