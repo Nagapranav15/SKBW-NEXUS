@@ -534,15 +534,22 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
           allBalances.forEach((b: any) => {
             const rawId = b.skuId || b.sku?._id;
             const sId = rawId ? String((rawId as any)._id || rawId) : '';
+            const sCode = (b.sku?.skuCode || b.skuCode || '').toLowerCase().trim();
+            const sName = (b.sku?.name || b.name || '').toLowerCase().trim();
             const qty = Number(b.onHand) || Number(b.quantity) || 0;
             if (sId) bMap.set(sId, (bMap.get(sId) || 0) + qty);
+            if (sCode) bMap.set(sCode, (bMap.get(sCode) || 0) + qty);
+            if (sName) bMap.set(sName, (bMap.get(sName) || 0) + qty);
           });
           // Fallback to SKU's own presentStock/openingStock
           finalSkus.forEach(s => {
-            if (s._id && !bMap.has(s._id)) {
-              const fallbackQty = Number(s.presentStock || s.openingStock || 0);
-              if (fallbackQty > 0) bMap.set(s._id, fallbackQty);
-            }
+            const sId = s._id ? String(s._id) : '';
+            const sCode = (s.skuCode || '').toLowerCase().trim();
+            const sName = (s.name || '').toLowerCase().trim();
+            const fallbackQty = Number(s.presentStock || s.openingStock || 0);
+            if (sId && !bMap.has(sId)) bMap.set(sId, fallbackQty);
+            if (sCode && !bMap.has(sCode)) bMap.set(sCode, fallbackQty);
+            if (sName && !bMap.has(sName)) bMap.set(sName, fallbackQty);
           });
           setStockMap(bMap);
 
@@ -664,7 +671,8 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
           description: (i as any).description || '',
           category: i.category || 'Finished Goods',
           uom: i.uom || 'Pcs',
-          stockGbl: 10,
+          stockPcs: 0,
+          stockGbl: null,
           gbl: i.gbl || '',
           pcsPerGbl: i.pcsPerGbl || 100,
           totalPcs: i.quantity || 0,
@@ -782,9 +790,59 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
     }
   }, [sameAddress, billingAddress]);
 
+  // Dynamically sync warehouse inventory stock to items in order
+  useEffect(() => {
+    if (stockMap.size === 0 && availableSkus.length === 0) return;
+    setItems(prevItems => {
+      let changed = false;
+      const updated = prevItems.map(row => {
+        if (!row.skuId && !row.skuCode && !row.itemName) return row;
+
+        const matchedSku = availableSkus.find(s =>
+          (row.skuId && s._id === row.skuId) ||
+          (row.skuCode && s.skuCode?.toLowerCase().trim() === row.skuCode.toLowerCase().trim()) ||
+          (row.itemName && s.name?.toLowerCase().trim() === row.itemName.toLowerCase().trim())
+        );
+
+        const idKey = row.skuId || matchedSku?._id || '';
+        const codeKey = (row.skuCode || matchedSku?.skuCode || '').toLowerCase().trim();
+        const nameKey = (row.itemName || matchedSku?.name || '').toLowerCase().trim();
+
+        const onHandPcs = (idKey ? stockMap.get(idKey) : undefined) ??
+                          (codeKey ? stockMap.get(codeKey) : undefined) ??
+                          (nameKey ? stockMap.get(nameKey) : undefined) ??
+                          Number(matchedSku?.presentStock || matchedSku?.openingStock || 0);
+
+        const conv = Number(row.pcsPerGbl) || Number(matchedSku?.booksGbl || matchedSku?.altUnitConversion || (matchedSku as any)?.pcsPerGbl || 0);
+        const pcsPerGblVal = conv > 0 ? conv : (row.pcsPerGbl || '');
+        const stockGblVal = Number(pcsPerGblVal) > 0 ? Math.floor(onHandPcs / Number(pcsPerGblVal)) : onHandPcs;
+
+        if (row.stockPcs !== onHandPcs || row.stockGbl !== stockGblVal || (!row.pcsPerGbl && conv > 0)) {
+          changed = true;
+          return {
+            ...row,
+            skuId: row.skuId || matchedSku?._id || '',
+            skuCode: row.skuCode || matchedSku?.skuCode || '',
+            stockPcs: onHandPcs,
+            stockGbl: stockGblVal,
+            pcsPerGbl: row.pcsPerGbl || (conv > 0 ? conv : '')
+          };
+        }
+        return row;
+      });
+      return changed ? updated : prevItems;
+    });
+  }, [stockMap, availableSkus]);
+
   // Handle selecting a product from Item Master dropdown
   const handleSelectProduct = (idx: number, s: SkuV2) => {
-    const onHandPcs = stockMap.get(s._id) ?? Number(s.presentStock || s.openingStock || 0);
+    const sId = s._id ? String(s._id) : '';
+    const sCode = (s.skuCode || '').toLowerCase().trim();
+    const sName = (s.name || '').toLowerCase().trim();
+    const onHandPcs = (sId ? stockMap.get(sId) : undefined) ??
+                      (sCode ? stockMap.get(sCode) : undefined) ??
+                      (sName ? stockMap.get(sName) : undefined) ??
+                      Number(s.presentStock || s.openingStock || 0);
     const definedConv = Number(s.booksGbl || s.altUnitConversion || (s as any).pcsPerGbl || 0);
     const pcsPerGblVal = definedConv > 0 ? definedConv : '';
     const stockGblVal = definedConv > 0 ? Math.floor(onHandPcs / definedConv) : onHandPcs;
@@ -1232,8 +1290,6 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
     // 1. Enter Key
     if (e.key === 'Enter' && !e.shiftKey) {
-      if (target.tagName === 'TEXTAREA' || target.tagName === 'BUTTON') return;
-
       // Handle Quick Preset Menu Selection via Enter
       if (showQuickPresetMenu && predefinedCharges.length > 0) {
         e.preventDefault();
@@ -1310,6 +1366,8 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
           return;
         }
       }
+
+      if (target.tagName === 'TEXTAREA' || target.tagName === 'BUTTON') return;
 
       e.preventDefault();
       shiftFocus(1);
@@ -2261,7 +2319,13 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                             >
                               {filteredProductSkus.map((s, sIdx) => {
                                 const isInactive = (s.status || '').toLowerCase() === 'inactive';
-                                const onHandPcs = stockMap.get(s._id) ?? Number(s.presentStock || s.openingStock || 0);
+                                const sId = s._id ? String(s._id) : '';
+                                const sCode = (s.skuCode || '').toLowerCase().trim();
+                                const sName = (s.name || '').toLowerCase().trim();
+                                const onHandPcs = (sId ? stockMap.get(sId) : undefined) ??
+                                                  (sCode ? stockMap.get(sCode) : undefined) ??
+                                                  (sName ? stockMap.get(sName) : undefined) ??
+                                                  Number(s.presentStock || s.openingStock || 0);
                                 const definedConv = Number(s.booksGbl || s.altUnitConversion || (s as any).pcsPerGbl || 0);
                                 const stockGbl = definedConv > 0 ? Math.floor(onHandPcs / definedConv) : onHandPcs;
                                 const isHighlighted = (highlightedProductIdxMap[idx] ?? 0) === sIdx;
@@ -2290,6 +2354,13 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                       </div>
                                     </div>
                                     <div className="flex items-center gap-1.5 shrink-0">
+                                      <span className={`px-2 py-0.5 text-[10px] font-bold rounded-md border ${
+                                        stockGbl > 0 
+                                          ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                                          : 'bg-gray-100 text-gray-500 border-gray-200'
+                                      }`}>
+                                        {stockGbl} GBL
+                                      </span>
                                       <span className={`px-2 py-0.5 text-[9.5px] font-extrabold uppercase rounded-full border ${
                                         isInactive
                                           ? 'bg-amber-50 text-amber-700 border-amber-200'
@@ -2456,6 +2527,16 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                           setShowQuickPresetMenu(!showQuickPresetMenu);
                           setHighlightedQuickPresetIdx(0);
                         }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            if (showQuickPresetMenu && predefinedCharges.length > 0) {
+                              e.preventDefault();
+                              const p = predefinedCharges[highlightedQuickPresetIdx] || predefinedCharges[0];
+                              if (p) handleAddCharge(p);
+                              setShowQuickPresetMenu(false);
+                            }
+                          }
+                        }}
                         className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100/80 text-blue-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-blue-200 shadow-3xs"
                       >
                         <Sparkles className="w-3.5 h-3.5 text-blue-600" />
@@ -2494,6 +2575,13 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                   type="button"
                                   id={`quick-preset-opt-${pIdx}`}
                                   onClick={() => handleAddCharge(p)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      handleAddCharge(p);
+                                      setShowQuickPresetMenu(false);
+                                    }
+                                  }}
                                   onMouseEnter={() => setHighlightedQuickPresetIdx(pIdx)}
                                   className={`w-full px-3 py-1.5 text-left flex items-center justify-between group transition-colors cursor-pointer ${
                                     isSelected
@@ -2599,6 +2687,12 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                                   type="button"
                                                   id={`charge-preset-opt-${cIdx}-${pIdx}`}
                                                   onClick={() => handleSelectPresetCharge(cIdx, p)}
+                                                  onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' || e.key === ' ') {
+                                                      e.preventDefault();
+                                                      handleSelectPresetCharge(cIdx, p);
+                                                    }
+                                                  }}
                                                   onMouseEnter={() => setHighlightedChargePresetIdx(pIdx)}
                                                   className={`w-full px-3 py-1.5 text-left flex items-center justify-between group transition-colors cursor-pointer ${
                                                     isSelected

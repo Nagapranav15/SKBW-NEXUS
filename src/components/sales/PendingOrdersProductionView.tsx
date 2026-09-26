@@ -189,13 +189,19 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
         const pendingPcs = Math.max(0, orderedPcs - dispatchedPcs);
         const pendingGbl = Math.ceil(pendingPcs / pcsPerGbl);
 
-        // Fetch live warehouse stock or generate realistic stock
+        // Fetch live warehouse stock dynamically from inventory
         let stockInHandPcs = 0;
         let stockInHandGbl = 0;
+        const rawSkuId = typeof item.skuId === 'object' ? (item.skuId as any)?._id : item.skuId;
+        const sIdLookup = rawSkuId ? String(rawSkuId) : '';
         const lookupKey = code.toLowerCase();
         const nameLookup = name.toLowerCase();
 
-        if (stockMap.has(lookupKey)) {
+        if (sIdLookup && stockMap.has(sIdLookup)) {
+          const s = stockMap.get(sIdLookup)!;
+          stockInHandPcs = s.pcs;
+          stockInHandGbl = s.gbl;
+        } else if (stockMap.has(lookupKey)) {
           const s = stockMap.get(lookupKey)!;
           stockInHandPcs = s.pcs;
           stockInHandGbl = s.gbl;
@@ -204,10 +210,8 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
           stockInHandPcs = s.pcs;
           stockInHandGbl = s.gbl;
         } else {
-          // Fallback realistic stock based on hash
-          const pseudoStock = ((code.charCodeAt(0) || 65) * 7) % 35;
-          stockInHandGbl = pseudoStock;
-          stockInHandPcs = pseudoStock * pcsPerGbl;
+          stockInHandGbl = 0;
+          stockInHandPcs = 0;
         }
 
         if (!map.has(key)) {

@@ -244,10 +244,14 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
 
   // WhatsApp Handler
   const handleWhatsApp = () => {
-    const phone = (order.customerPhone || custObj?.phone || '').replace(/\D/g, '');
-    if (!phone) { showToast('No phone number found for this customer', 'error'); return; }
+    const raw = (order.customerPhone || custObj?.phone || '').trim();
+    let digits = raw.replace(/\D/g, '');
+    if (digits.startsWith('00')) digits = digits.slice(2);
+    if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
+    const cleanPhone = digits.length === 10 ? `91${digits}` : digits;
+    if (!cleanPhone || cleanPhone.length < 10) { showToast('No valid 10-digit phone number found for this customer', 'error'); return; }
     const msg = encodeURIComponent(`Namaste *${order.customerName}*, your Sales Order *${order.orderNumber}* for *${fmtMoney(grandTotal)}* is ${order.status}. Thank you!`);
-    window.open(`https://wa.me/91${phone}?text=${msg}`, '_blank');
+    window.open(`https://wa.me/${cleanPhone}?text=${msg}`, '_blank');
   };
 
   // Use createPortal to mount directly on document.body, covering the entire viewport completely
