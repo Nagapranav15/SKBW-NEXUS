@@ -318,25 +318,37 @@ const SalesOrders: React.FC = () => {
 
   // Dynamic Metrics Calculation (Overall or Current period)
   const metrics = useMemo(() => {
+    // Non-cancelled orders for accurate sales/revenue & active pipeline metrics
+    const nonCancelledOrders = orders.filter(o => o.status !== 'Cancelled');
     const totalCount = orders.length;
-    const totalVal = orders.reduce((sum, o) => sum + (o.grandTotal || 0), 0);
 
-    const pendingOrders = orders.filter(o => 
-      o.fulfillmentStatus === 'Pending' || 
-      o.fulfillmentStatus === 'Not Started' ||
-      (o.status === 'Confirmed' && o.fulfillmentStatus !== 'Fully Dispatched' && o.fulfillmentStatus !== 'Partially Dispatched')
+    // Total Value strictly tallies active orders (excludes Cancelled)
+    const totalVal = nonCancelledOrders.reduce((sum, o) => sum + (Number(o.grandTotal) || 0), 0);
+
+    const confirmedOrders = orders.filter(o => o.status === 'Confirmed');
+
+    const pendingOrders = nonCancelledOrders.filter(o => 
+      o.status !== 'Draft' && (
+        o.fulfillmentStatus === 'Pending' || 
+        o.fulfillmentStatus === 'Not Started' ||
+        (o.status === 'Confirmed' && o.fulfillmentStatus !== 'Fully Dispatched' && o.fulfillmentStatus !== 'Partially Dispatched')
+      )
     );
 
-    const partialOrders = orders.filter(o => 
+    const partialOrders = nonCancelledOrders.filter(o => 
       o.fulfillmentStatus === 'Partially Dispatched' || o.fulfillmentStatus === 'Partial'
     );
 
-    const fullyOrders = orders.filter(o => 
+    const fullyOrders = nonCancelledOrders.filter(o => 
       o.fulfillmentStatus === 'Fully Dispatched' || o.fulfillmentStatus === 'Fulfilled' || o.status === 'Delivered'
     );
 
     const draftOrders = orders.filter(o => 
       o.status === 'Draft'
+    );
+
+    const cancelledOrders = orders.filter(o =>
+      o.status === 'Cancelled'
     );
 
     const pendingPct = totalCount > 0 ? Math.round((pendingOrders.length / totalCount) * 100) : 0;
@@ -347,6 +359,7 @@ const SalesOrders: React.FC = () => {
     return {
       totalOrders: totalCount,
       totalAmount: totalVal,
+      confirmedCount: confirmedOrders.length,
       pendingCount: pendingOrders.length,
       pendingPct,
       partialCount: partialOrders.length,
@@ -354,9 +367,17 @@ const SalesOrders: React.FC = () => {
       fullyCount: fullyOrders.length,
       fullyPct,
       draftCount: draftOrders.length,
-      draftPct
+      draftPct,
+      cancelledCount: cancelledOrders.length
     };
   }, [orders]);
+
+  // Active Total Amount for currently displayed table rows (excluding cancelled)
+  const activeTableTotal = useMemo(() => {
+    return filteredOrders
+      .filter(o => o.status !== 'Cancelled')
+      .reduce((sum, o) => sum + (Number(o.grandTotal) || 0), 0);
+  }, [filteredOrders]);
 
   // Filtered Orders
   const filteredOrders = useMemo(() => {
@@ -611,9 +632,17 @@ const SalesOrders: React.FC = () => {
           console.warn('API error cancelling order:', apiErr);
         }
       }
-      const updatedCancelled = { ...cancellingOrder, status: 'Cancelled' as const };
+      const updatedCancelled: SalesOrderV2 = { 
+        ...cancellingOrder, 
+        status: 'Cancelled',
+        fulfillmentStatus: 'Cancelled' as any,
+        updatedAt: new Date().toISOString()
+      };
       saveCustomSalesOrder(updatedCancelled);
-      setOrders(prev => prev.map(o => o._id === cancellingOrder._id ? updatedCancelled : o));
+      setOrders(prev => prev.map(o => (o._id === cancellingOrder._id || (cancellingOrder.orderNumber && o.orderNumber === cancellingOrder.orderNumber)) ? updatedCancelled : o));
+      if (selectedOrderDetail && (selectedOrderDetail._id === cancellingOrder._id || selectedOrderDetail.orderNumber === cancellingOrder.orderNumber)) {
+        setSelectedOrderDetail(updatedCancelled);
+      }
       showToast(`Sales Order ${cancellingOrder.orderNumber} cancelled successfully`, 'success');
       setCancellingOrder(null);
     } catch (err) {
@@ -753,7 +782,7 @@ const SalesOrders: React.FC = () => {
               >
                 <CheckCircle className={`w-4 h-4 ${statusFilter === 'Confirmed' ? 'text-teal-700' : 'text-slate-400'}`} />
                 <span>Confirmed</span>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800">{orders.filter(o => o.status === 'Confirmed').length}</span>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800">{metrics.confirmedCount}</span>
               </button>
 
               {/* Tab 3: Pending */}
@@ -783,6 +812,22 @@ const SalesOrders: React.FC = () => {
                 <span>Draft</span>
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700">{metrics.draftCount}</span>
               </button>
+
+              {/* Tab 5: Cancelled */}
+              {metrics.cancelledCount > 0 && (
+                <button
+                  onClick={() => { setStatusFilter('Cancelled'); }}
+                  className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+                    statusFilter === 'Cancelled'
+                      ? 'border-rose-600 text-rose-600 bg-transparent'
+                      : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
+                  }`}
+                >
+                  <Ban className={`w-4 h-4 ${statusFilter === 'Cancelled' ? 'text-rose-600' : 'text-slate-400'}`} />
+                  <span>Cancelled</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700">{metrics.cancelledCount}</span>
+                </button>
+              )}
             </div>
 
             {/* Right Action Bar */}
@@ -922,6 +967,9 @@ const SalesOrders: React.FC = () => {
                   <span className="w-2 h-2 rounded-full bg-purple-600"></span>
                 </div>
                 <p className="text-2xl font-black text-purple-700 mt-1 font-mono">₹{Math.round(metrics.totalAmount).toLocaleString('en-IN')}</p>
+                {metrics.cancelledCount > 0 && (
+                  <p className="text-[10px] text-gray-400 mt-0.5 font-medium">Excludes {metrics.cancelledCount} cancelled</p>
+                )}
               </div>
             </div>
           )}
@@ -1233,7 +1281,7 @@ const SalesOrders: React.FC = () => {
                       }
                     }}
                     className={`hover:bg-blue-50/40 focus:bg-blue-50/60 focus:outline-none transition-colors cursor-pointer group ${
-                      isSelected ? 'bg-blue-50/60' : ''
+                      order.status === 'Cancelled' ? 'bg-rose-50/25 opacity-75' : isSelected ? 'bg-blue-50/60' : ''
                     }`}
                   >
                     {/* Checkbox */}
@@ -1294,7 +1342,9 @@ const SalesOrders: React.FC = () => {
                     {/* Amount (₹) */}
                     {isColVisible('grandTotal') && (
                       <td className="py-3.5 px-3 text-right font-black text-gray-900 font-mono whitespace-nowrap">
-                        ₹{(order.grandTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        <span className={order.status === 'Cancelled' ? 'line-through text-gray-400 font-normal' : ''}>
+                          ₹{(order.grandTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
                       </td>
                     )}
 
@@ -1518,6 +1568,40 @@ const SalesOrders: React.FC = () => {
                   </td>
                 </tr>
               )}
+              {/* Table Summary Footer */}
+              {sortedOrders.length > 0 && (
+                <tfoot className="bg-gray-50/90 border-t-2 border-gray-200 text-xs font-bold text-gray-800">
+                  <tr>
+                    <td className="py-3 px-3.5 text-center text-gray-400">Σ</td>
+                    {isColVisible('orderNumber') && (
+                      <td className="py-3 px-3 font-semibold text-gray-600">
+                        {sortedOrders.filter(o => o.status !== 'Cancelled').length} Active
+                        {sortedOrders.some(o => o.status === 'Cancelled') && (
+                          <span className="text-[11px] text-rose-600 font-normal ml-1">
+                            ({sortedOrders.filter(o => o.status === 'Cancelled').length} cancelled)
+                          </span>
+                        )}
+                      </td>
+                    )}
+                    {isColVisible('orderDate') && <td className="py-3 px-3"></td>}
+                    {isColVisible('customer') && (
+                      <td className="py-3 px-4 font-semibold text-gray-600">
+                        Total
+                      </td>
+                    )}
+                    {isColVisible('cityRegion') && <td className="py-3 px-3"></td>}
+                    {isColVisible('promisedDate') && <td className="py-3 px-3"></td>}
+                    {isColVisible('grandTotal') && (
+                      <td className="py-3 px-3 text-right font-mono font-black text-gray-900 whitespace-nowrap">
+                        ₹{activeTableTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                    )}
+                    {isColVisible('fulfillmentStatus') && <td className="py-3 px-3"></td>}
+                    {isColVisible('status') && <td className="py-3 px-3"></td>}
+                    {isColVisible('actions') && <td className="py-3 px-3"></td>}
+                  </tr>
+                </tfoot>
+              )}
             </tbody>
           </table>
         </div>
@@ -1535,6 +1619,7 @@ const SalesOrders: React.FC = () => {
         onClose={() => setShowDrawer(false)}
         onSaveSuccess={(saved) => {
           setShowDrawer(false);
+          setEditingOrder(null);
           saveCustomSalesOrder(saved);
           // Prepend newly created/updated order
           setOrders(prev => {
@@ -1547,8 +1632,13 @@ const SalesOrders: React.FC = () => {
             return [saved, ...prev];
           });
 
-          // Show the success page for both drafted SO and new SO
-          setSuccessOrder(saved);
+          // Draft sale order do not need any success page, give a simple notification
+          if (saved.status === 'Draft') {
+            showToast(`Draft Order ${saved.orderNumber} saved successfully`, 'info');
+            setSuccessOrder(null);
+          } else {
+            setSuccessOrder(saved);
+          }
         }}
       />
 
@@ -1574,7 +1664,12 @@ const SalesOrders: React.FC = () => {
             return [updated, ...prev];
           });
           setSelectedOrderDetail(null);
-          setSuccessOrder(updated);
+          if (updated.status !== 'Draft') {
+            setSuccessOrder(updated);
+          } else {
+            setSuccessOrder(null);
+            showToast(`Draft Order ${updated.orderNumber} saved successfully`, 'info');
+          }
         }}
       />
 

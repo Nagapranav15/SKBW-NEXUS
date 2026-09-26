@@ -134,7 +134,12 @@ const PendingOrders: React.FC = () => {
             }
             return [saved, ...prev];
           });
-          setSuccessOrder(saved);
+          if (saved.status === 'Draft') {
+            showToast(`Draft Order ${saved.orderNumber} saved successfully`, 'info');
+            setSuccessOrder(null);
+          } else {
+            setSuccessOrder(saved);
+          }
         }}
       />
 
