@@ -372,13 +372,6 @@ const SalesOrders: React.FC = () => {
     };
   }, [orders]);
 
-  // Active Total Amount for currently displayed table rows (excluding cancelled)
-  const activeTableTotal = useMemo(() => {
-    return filteredOrders
-      .filter(o => o.status !== 'Cancelled')
-      .reduce((sum, o) => sum + (Number(o.grandTotal) || 0), 0);
-  }, [filteredOrders]);
-
   // Filtered Orders
   const filteredOrders = useMemo(() => {
     return orders.filter(o => {
@@ -466,6 +459,13 @@ const SalesOrders: React.FC = () => {
       return 0;
     });
   }, [filteredOrders, sortField, sortOrder]);
+
+  // Active Total Amount for currently displayed table rows (excluding cancelled)
+  const activeTableTotal = useMemo(() => {
+    return filteredOrders
+      .filter(o => o.status !== 'Cancelled')
+      .reduce((sum, o) => sum + (Number(o.grandTotal) || 0), 0);
+  }, [filteredOrders]);
 
 
   // Toggle sort field
