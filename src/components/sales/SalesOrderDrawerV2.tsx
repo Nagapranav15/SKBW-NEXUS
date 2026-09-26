@@ -2353,14 +2353,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                             >
                               {filteredProductSkus.map((s, sIdx) => {
                                 const isInactive = (s.status || '').toLowerCase() === 'inactive';
-                                const sId = s._id ? String(s._id) : '';
-                                const sCode = (s.skuCode || '').toLowerCase().trim();
-                                const sName = (s.name || '').toLowerCase().trim();
-                                const rawOnHand = (sId ? stockMap.get(sId) : undefined) ??
-                                                  (sCode ? stockMap.get(sCode) : undefined) ??
-                                                  (sName ? stockMap.get(sName) : undefined) ??
-                                                  Number(s.presentStock || s.openingStock || 0);
-                                const { stockGbl, stockPcs, pcsPerGbl } = computeSkuStock(rawOnHand, s);
+                                const definedConv = Number(s.booksGbl || s.altUnitConversion || (s as any).pcsPerGbl || 0);
                                 const isHighlighted = (highlightedProductIdxMap[idx] ?? 0) === sIdx;
 
                                 return (
@@ -2378,22 +2371,15 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                         <span className="text-[10px] text-gray-400 font-mono">{s.skuCode}</span>
                                         <span className="text-[10px] text-gray-300">•</span>
                                         <span className="text-[10px] text-gray-500">{s.category || 'Finished Goods'}</span>
-                                        {pcsPerGbl > 0 && (
+                                        {definedConv > 0 && (
                                           <>
                                             <span className="text-[10px] text-gray-300">•</span>
-                                            <span className="text-[10px] font-semibold text-indigo-600">{pcsPerGbl} Pcs/GBL</span>
+                                            <span className="text-[10px] font-semibold text-indigo-600">{definedConv} Pcs/GBL</span>
                                           </>
                                         )}
                                       </div>
                                     </div>
                                     <div className="flex items-center gap-1.5 shrink-0">
-                                      <span className={`px-2 py-0.5 text-[10px] font-bold rounded-md border ${
-                                        stockGbl > 0 
-                                          ? 'bg-blue-50 text-blue-700 border-blue-200' 
-                                          : 'bg-gray-100 text-gray-500 border-gray-200'
-                                      }`}>
-                                        {stockGbl} GBL
-                                      </span>
                                       <span className={`px-2 py-0.5 text-[9.5px] font-extrabold uppercase rounded-full border ${
                                         isInactive
                                           ? 'bg-amber-50 text-amber-700 border-amber-200'
