@@ -805,7 +805,7 @@ export const ProductionModule: React.FC = () => {
     return orders.filter(o => o.status === 'In Progress').length;
   }, [orders]);
 
-  // Tab Header Bar Definition
+  // Tab Header Bar Definition & Counts
   const TAB_ITEMS = [
     { id: 'orders', label: 'Production Orders', icon: Calendar },
     { id: 'entries', label: 'Production Entries', icon: Package },
@@ -814,26 +814,44 @@ export const ProductionModule: React.FC = () => {
     { id: 'history', label: 'History', icon: History }
   ];
 
+  const tabCounts: Record<string, number> = {
+    orders: orders.length,
+    entries: allEntries.length,
+    materials: orderRequirementsList.length,
+    bom: skusWithBom.length,
+    history: orders.length
+  };
+
   const renderTabNavigation = () => (
-    <div className="bg-white border-b border-gray-200 px-6 shrink-0 flex items-center space-x-2 py-2 overflow-x-auto custom-scrollbar">
-      {TAB_ITEMS.map(tab => {
-        const Icon = tab.icon;
-        const active = activeTab === tab.id;
-        return (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`inline-flex items-center space-x-2 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap ${
-              active 
-                ? 'bg-blue-50/90 text-blue-600 border border-blue-100 shadow-2xs font-bold'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/70 border border-transparent'
-            }`}
-          >
-            <Icon className={`w-3.5 h-3.5 ${active ? 'text-blue-600' : 'text-gray-400'}`} />
-            <span>{tab.label}</span>
-          </button>
-        );
-      })}
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 bg-white px-4 rounded-2xl shadow-2xs relative">
+      <div className="flex items-center gap-1 overflow-x-auto py-1 max-w-full">
+        {TAB_ITEMS.map(tab => {
+          const Icon = tab.icon;
+          const active = activeTab === tab.id;
+          const count = tabCounts[tab.id];
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+                active 
+                  ? 'border-teal-700 text-teal-700 bg-transparent'
+                  : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
+              }`}
+            >
+              <Icon className={`w-4 h-4 ${active ? 'text-teal-700' : 'text-slate-400'}`} />
+              <span>{tab.label}</span>
+              {count !== undefined && (
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                  active ? 'bg-teal-50 text-teal-800' : 'bg-slate-100 text-slate-700'
+                }`}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 
@@ -885,20 +903,25 @@ export const ProductionModule: React.FC = () => {
   // -------------------------------------------------------------
   if (activeTab === 'entries') {
     return (
-      <div className="flex flex-col h-full bg-slate-50/60 overflow-y-auto custom-scrollbar">
-        {/* Header matching reference image */}
-        <div className="bg-white border-b border-gray-150 px-6 py-4 flex items-center justify-between shrink-0 shadow-2xs">
-          <div className="flex items-center space-x-3.5">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-2xs">
-              <Activity className="w-5 h-5 stroke-[2.2]" />
+      <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
+        {/* 1. Header Banner (Matching Sales Orders Header Banner) */}
+        <div className="flex flex-row items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs relative">
+          <div className="flex items-center gap-3.5">
+            <div className="p-3 bg-blue-100/80 text-blue-700 rounded-2xl shadow-2xs">
+              <Activity className="w-6 h-6 stroke-[2.2]" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900 tracking-tight">Production Entries</h1>
-              <p className="text-xs text-gray-500 font-medium">Record and manage actual production output into finished goods inventory</p>
+              <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+                <span>Production Entries</span>
+                <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-bold transition-all">
+                  {allEntries.length} Total
+                </span>
+              </h1>
+              <p className="text-xs text-gray-500 font-medium">Record and manage actual production output into finished goods inventory.</p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => {
                 const activeOrders = orders.filter(o => o.status !== 'Completed' && o.status !== 'Cancelled');
@@ -908,133 +931,132 @@ export const ProductionModule: React.FC = () => {
                   setShowNewEntryModal(true);
                 }
               }}
-              className="inline-flex items-center space-x-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-lg shadow-sm hover:shadow transition-all cursor-pointer"
+              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/20 active:scale-[0.98] cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3.5 h-3.5" />
               <span>New Production Entry</span>
             </button>
           </div>
         </div>
 
-        {/* Tab Navigation */}
+        {/* 2. Tab Navigation */}
         {renderTabNavigation()}
 
-        {/* Main Content Area - Full boxed width */}
-        <div className="p-6 flex-1 flex flex-col min-w-0 space-y-4">
-          {/* Top 6 KPI Cards (Exact UI from screenshot) */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
-            {/* Card 1: Total Entries */}
-            <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                  <Package className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Entries</p>
-                  <h3 className="text-lg font-bold text-gray-900">{totalEntriesCount}</h3>
-                </div>
+        {/* 3. Top 6 KPI Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
+          {/* Card 1: Total Entries */}
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <Package className="w-4 h-4" />
               </div>
-              <div className="mt-2 text-[10px] font-semibold text-emerald-600 flex items-center space-x-0.5">
-                <span>↑ 12%</span>
-                <span className="text-gray-400 font-normal">vs last month</span>
+              <div>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Entries</p>
+                <h3 className="text-lg font-bold text-gray-900 font-mono">{totalEntriesCount}</h3>
               </div>
             </div>
-
-            {/* Card 2: Total Good Qty */}
-            <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                  <Boxes className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Good Qty</p>
-                  <h3 className="text-lg font-bold text-gray-900">{totalGoodQty.toLocaleString()} PCS</h3>
-                </div>
-              </div>
-              <div className="mt-2 text-[10px] font-semibold text-emerald-600 flex items-center space-x-0.5">
-                <span>↑ 18%</span>
-                <span className="text-gray-400 font-normal">vs last month</span>
-              </div>
-            </div>
-
-            {/* Card 3: Total Wastage */}
-            <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                    <AlertTriangle className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Wastage</p>
-                    <h3 className="text-lg font-bold text-gray-900">{totalWastage.toLocaleString()} PCS</h3>
-                  </div>
-                </div>
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                  {wastagePercent}%
-                </span>
-              </div>
-            </div>
-
-            {/* Card 4: Completed Orders */}
-            <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                    <CheckCircle className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Completed Orders</p>
-                    <h3 className="text-lg font-bold text-gray-900">{completedOrdersCount}</h3>
-                  </div>
-                </div>
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                  {completedPercent}%
-                </span>
-              </div>
-            </div>
-
-            {/* Card 5: In Progress */}
-            <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
-                    <Clock className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">In Progress</p>
-                    <h3 className="text-lg font-bold text-gray-900">{inProgressCount}</h3>
-                  </div>
-                </div>
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  {inProgressPercent}%
-                </span>
-              </div>
-            </div>
-
-            {/* Card 6: Draft Entries */}
-            <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 rounded-lg bg-gray-100 text-gray-600 flex items-center justify-center shrink-0">
-                    <FileText className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Draft Entries</p>
-                    <h3 className="text-lg font-bold text-gray-900">{draftEntriesCount}</h3>
-                  </div>
-                </div>
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200">
-                  {draftPercent}%
-                </span>
-              </div>
+            <div className="mt-2 text-[10px] font-semibold text-emerald-600 flex items-center space-x-0.5">
+              <span>↑ 12%</span>
+              <span className="text-gray-400 font-normal">vs last month</span>
             </div>
           </div>
 
-          {/* Filter Toolbar (Exact match with reference image) */}
-          <div className="bg-white rounded-xl border border-gray-200 p-3 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+          {/* Card 2: Total Good Qty */}
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <Boxes className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Good Qty</p>
+                <h3 className="text-lg font-bold text-gray-900 font-mono">{totalGoodQty.toLocaleString()} PCS</h3>
+              </div>
+            </div>
+            <div className="mt-2 text-[10px] font-semibold text-emerald-600 flex items-center space-x-0.5">
+              <span>↑ 18%</span>
+              <span className="text-gray-400 font-normal">vs last month</span>
+            </div>
+          </div>
+
+          {/* Card 3: Total Wastage */}
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Wastage</p>
+                  <h3 className="text-lg font-bold text-gray-900 font-mono">{totalWastage.toLocaleString()} PCS</h3>
+                </div>
+              </div>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                {wastagePercent}%
+              </span>
+            </div>
+          </div>
+
+          {/* Card 4: Completed Orders */}
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                  <CheckCircle className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Completed Orders</p>
+                  <h3 className="text-lg font-bold text-gray-900 font-mono">{completedOrdersCount}</h3>
+                </div>
+              </div>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                {completedPercent}%
+              </span>
+            </div>
+          </div>
+
+          {/* Card 5: In Progress */}
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+                  <Clock className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">In Progress</p>
+                  <h3 className="text-lg font-bold text-gray-900 font-mono">{inProgressCount}</h3>
+                </div>
+              </div>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                {inProgressPercent}%
+              </span>
+            </div>
+          </div>
+
+          {/* Card 6: Draft Entries */}
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 rounded-xl bg-gray-100 text-gray-600 flex items-center justify-center shrink-0">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Draft Entries</p>
+                  <h3 className="text-lg font-bold text-gray-900 font-mono">{draftEntriesCount}</h3>
+                </div>
+              </div>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200">
+                {draftPercent}%
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* 4. Filter Toolbar Card */}
+        <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden space-y-0">
+          <div className="bg-gray-50/50 border-b border-gray-200 px-4 py-2.5 flex items-center justify-between flex-wrap gap-2 text-xs font-semibold text-gray-600">
             <div className="flex flex-wrap items-center gap-2.5 flex-1">
               {/* Search */}
-              <div className="relative min-w-[260px] flex-1 max-w-sm">
+              <div className="relative min-w-[240px] flex-1 max-w-sm">
                 <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
@@ -1043,8 +1065,8 @@ export const ProductionModule: React.FC = () => {
                     setEntriesSearch(e.target.value);
                     setCurrentPage(1);
                   }}
-                  placeholder="Search by Entry No., Production Order, product name..."
-                  className="w-full pl-8 pr-8 py-1.5 text-xs text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 shadow-2xs"
+                  placeholder="Search by Entry No., order, product..."
+                  className="w-full pl-8 pr-8 py-1.5 text-xs text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 shadow-2xs font-medium"
                 />
                 {entriesSearch && (
                   <button 
@@ -1056,21 +1078,6 @@ export const ProductionModule: React.FC = () => {
                 )}
               </div>
 
-              {/* Date Range Selector Pill */}
-              <div className="flex items-center space-x-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs text-gray-700 shadow-2xs cursor-pointer hover:bg-gray-50">
-                <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                <span className="font-medium">
-                  {(() => {
-                    const now = new Date();
-                    const m = String(now.getMonth() + 1).padStart(2, '0');
-                    const y = now.getFullYear();
-                    const lastD = String(new Date(y, now.getMonth() + 1, 0).getDate()).padStart(2, '0');
-                    return `01/${m}/${y} – ${lastD}/${m}/${y}`;
-                  })()}
-                </span>
-                <ChevronDown className="w-3 h-3 text-gray-400" />
-              </div>
-
               {/* Status Filter Dropdown */}
               <select
                 value={entriesStatusFilter}
@@ -1078,7 +1085,7 @@ export const ProductionModule: React.FC = () => {
                   setEntriesStatusFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-700 shadow-2xs focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
               >
                 <option value="ALL">All Status</option>
                 <option value="Posted">Posted</option>
@@ -1093,9 +1100,9 @@ export const ProductionModule: React.FC = () => {
                   setEntriesDeptFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-700 shadow-2xs focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
               >
-                <option value="ALL">All Departments</option>
+                <option value="ALL">All Departments ({distinctEntriesDepartments.length})</option>
                 {distinctEntriesDepartments.map(d => (
                   <option key={d} value={d}>{d}</option>
                 ))}
@@ -1108,9 +1115,9 @@ export const ProductionModule: React.FC = () => {
                   setEntriesProductFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-700 shadow-2xs focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer max-w-[200px] truncate"
+                className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer max-w-[200px] truncate"
               >
-                <option value="ALL">All Products</option>
+                <option value="ALL">All Products ({distinctProducts.length})</option>
                 {distinctProducts.map(p => (
                   <option key={p} value={p}>{p}</option>
                 ))}
@@ -1121,57 +1128,45 @@ export const ProductionModule: React.FC = () => {
             <div className="flex items-center space-x-2 shrink-0">
               <button
                 onClick={handleResetFilters}
-                className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 shadow-2xs transition-colors cursor-pointer"
+                className="text-blue-600 hover:text-blue-800 text-xs font-bold px-2 py-1 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
               >
-                <Filter className="w-3.5 h-3.5 text-gray-500" />
-                <span>Filters</span>
-              </button>
-              <button
-                onClick={handleResetFilters}
-                className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 shadow-2xs transition-colors cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5 text-gray-500" />
-                <span>Reset</span>
+                Clear Filters
               </button>
             </div>
           </div>
+        </div>
 
-          {/* Sub-toolbar: count & Export/Print tools */}
-          <div className="flex items-center justify-between text-xs text-gray-500 px-0.5">
-            <div>
-              Showing <strong className="text-gray-900">{filteredEntries.length === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + rowsPerPage, filteredEntries.length)}</strong> of <strong className="text-gray-900">{filteredEntries.length}</strong> production entries
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <button 
-                onClick={() => showToast('Column customization is available', 'info')}
-                className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 shadow-2xs transition-colors cursor-pointer"
-              >
-                <LayoutGrid className="w-3.5 h-3.5 text-gray-500" />
-                <span>Columns</span>
-              </button>
-              <button 
-                onClick={handleExportExcel}
-                className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 shadow-2xs transition-colors cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5 text-gray-500" />
-                <span>Export</span>
-              </button>
-              <button 
-                onClick={() => window.print()}
-                className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 shadow-2xs transition-colors cursor-pointer"
-              >
-                <Printer className="w-3.5 h-3.5 text-gray-500" />
-                <span>Print</span>
-              </button>
-            </div>
+        {/* 5. Sub-toolbar: count & Export/Print tools */}
+        <div className="flex items-center justify-between pt-1 text-xs">
+          <div className="font-semibold text-gray-600">
+            Showing all {filteredEntries.length} production entries
           </div>
 
-          {/* Production Entries Table (Exact Column Match from Reference Image) */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-2xs overflow-hidden flex flex-col flex-1">
-            <div className="overflow-x-auto custom-scrollbar flex-1">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
+          <div className="flex items-center space-x-2">
+            <button 
+              onClick={handleExportExcel}
+              className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              title="Export to Excel Spreadsheet"
+            >
+              <Download className="w-3.5 h-3.5 text-gray-500" />
+              <span>Export</span>
+            </button>
+            <button 
+              onClick={() => window.print()}
+              className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              title="Print Report"
+            >
+              <Printer className="w-3.5 h-3.5 text-gray-500" />
+              <span>Print</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 6. Production Entries Main Table */}
+        <div className="bg-white border border-gray-200/90 rounded-2xl overflow-hidden shadow-2xs">
+          <div className="overflow-x-auto min-h-[380px]">
+            <table className="w-full text-left divide-y divide-gray-200">
+              <thead className="bg-gray-50/80 text-[11px] font-bold text-gray-600 uppercase tracking-wider select-none border-b border-gray-200">
                   <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
                     <th className="py-3 px-3 w-8 text-center">
                       <input 
@@ -1373,8 +1368,8 @@ export const ProductionModule: React.FC = () => {
               </table>
             </div>
 
-            {/* Pagination Footer (Exact Match with Reference Image) */}
-            <div className="bg-white px-4 py-3 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-600">
+            {/* Pagination Footer */}
+            <div className="bg-white px-4 py-3 border-t border-gray-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500 rounded-b-2xl">
               <div className="flex items-center space-x-2">
                 <span>Show</span>
                 <select
@@ -1674,20 +1669,25 @@ export const ProductionModule: React.FC = () => {
   // -------------------------------------------------------------
   if (activeTab === 'materials') {
     return (
-      <div className="flex flex-col h-full bg-slate-50/60 overflow-y-auto custom-scrollbar">
-        {/* Header */}
-        <div className="bg-white border-b border-gray-150 px-6 py-4 flex items-center justify-between shrink-0 shadow-2xs">
-          <div className="flex items-center space-x-3.5">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-2xs">
-              <Layers className="w-5 h-5 stroke-[2.2]" />
+      <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
+        {/* 1. Header Banner (Matching Sales Orders Header Banner) */}
+        <div className="flex flex-row items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs relative">
+          <div className="flex items-center gap-3.5">
+            <div className="p-3 bg-blue-100/80 text-blue-700 rounded-2xl shadow-2xs">
+              <Layers className="w-6 h-6 stroke-[2.2]" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900 tracking-tight">Material Requirements</h1>
+              <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+                <span>Material Requirements</span>
+                <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-bold transition-all">
+                  {orderRequirementsList.length} Active Orders
+                </span>
+              </h1>
               <p className="text-xs text-gray-500 font-medium">Check material requirements for production orders and track availability.</p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => {
                 const activeOrders = orders.filter(o => o.status !== 'Completed' && o.status !== 'Cancelled');
@@ -1697,95 +1697,94 @@ export const ProductionModule: React.FC = () => {
                   setShowNewRequirementModal(true);
                 }
               }}
-              className="inline-flex items-center space-x-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-lg shadow-sm hover:shadow transition-all cursor-pointer"
+              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/20 active:scale-[0.98] cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3.5 h-3.5" />
               <span>New Material Requirement</span>
             </button>
           </div>
         </div>
 
-        {/* Tab Navigation */}
+        {/* 2. Tab Navigation */}
         {renderTabNavigation()}
 
-        {/* Main Content Area - Full boxed width matching Production Orders */}
-        <div className="p-6 flex-1 flex flex-col min-w-0 space-y-4">
-          {/* Top 4 KPI Summary Cards (Exact UI from screenshot) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Card 1: Total Requirements */}
-            <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                  <Layers className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Requirements</p>
-                  <h3 className="text-lg font-bold text-gray-900">{totalRequirementsCount}</h3>
-                  <div className="flex items-center space-x-1 mt-0.5">
-                    <span className="text-[10px] font-semibold text-emerald-600">↑ 12%</span>
-                    <span className="text-[10px] text-gray-400 font-medium">vs last month</span>
-                  </div>
-                </div>
+        {/* 3. Top 4 KPI Summary Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          {/* Card 1: Total Requirements */}
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <Layers className="w-4 h-4" />
               </div>
-            </div>
-
-            {/* Card 2: Ready for Production */}
-            <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                  <CheckCircle className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Ready for Production</p>
-                  <h3 className="text-lg font-bold text-gray-900">{readyRequirementsCount}</h3>
-                  <div className="flex items-center space-x-1 mt-0.5">
-                    <span className="text-[10px] font-semibold text-emerald-600">↑ 20%</span>
-                    <span className="text-[10px] text-gray-400 font-medium">vs last month</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Card 3: Partial Materials */}
-            <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                  <Clock className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Partial Materials</p>
-                  <h3 className="text-lg font-bold text-gray-900">{partialRequirementsCount}</h3>
-                  <div className="flex items-center space-x-1 mt-0.5">
-                    <span className="text-[10px] font-semibold text-emerald-600">↑ 8%</span>
-                    <span className="text-[10px] text-gray-400 font-medium">vs last month</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Card 4: Material Shortages */}
-            <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
-                  <AlertTriangle className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Material Shortages</p>
-                  <h3 className="text-lg font-bold text-gray-900">{shortageRequirementsCount}</h3>
-                  <div className="flex items-center space-x-1 mt-0.5">
-                    <span className="text-[10px] font-semibold text-rose-600">↑ 25%</span>
-                    <span className="text-[10px] text-gray-400 font-medium">vs last month</span>
-                  </div>
+              <div>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Requirements</p>
+                <h3 className="text-lg font-bold text-gray-900 font-mono">{totalRequirementsCount}</h3>
+                <div className="flex items-center space-x-1 mt-0.5">
+                  <span className="text-[10px] font-semibold text-emerald-600">↑ 12%</span>
+                  <span className="text-[10px] text-gray-400 font-medium">vs last month</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Filter Toolbar (Exact match with reference screenshot) */}
-          <div className="bg-white rounded-xl border border-gray-200 p-3 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+          {/* Card 2: Ready for Production */}
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <CheckCircle className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Ready for Production</p>
+                <h3 className="text-lg font-bold text-gray-900 font-mono">{readyRequirementsCount}</h3>
+                <div className="flex items-center space-x-1 mt-0.5">
+                  <span className="text-[10px] font-semibold text-emerald-600">↑ 20%</span>
+                  <span className="text-[10px] text-gray-400 font-medium">vs last month</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: Partial Materials */}
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                <Clock className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Partial Materials</p>
+                <h3 className="text-lg font-bold text-gray-900 font-mono">{partialRequirementsCount}</h3>
+                <div className="flex items-center space-x-1 mt-0.5">
+                  <span className="text-[10px] font-semibold text-emerald-600">↑ 8%</span>
+                  <span className="text-[10px] text-gray-400 font-medium">vs last month</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 4: Material Shortages */}
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Material Shortages</p>
+                <h3 className="text-lg font-bold text-gray-900 font-mono">{shortageRequirementsCount}</h3>
+                <div className="flex items-center space-x-1 mt-0.5">
+                  <span className="text-[10px] font-semibold text-rose-600">↑ 25%</span>
+                  <span className="text-[10px] text-gray-400 font-medium">vs last month</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 4. Filter Toolbar Card */}
+        <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden space-y-0">
+          <div className="bg-gray-50/50 border-b border-gray-200 px-4 py-2.5 flex items-center justify-between flex-wrap gap-2 text-xs font-semibold text-gray-600">
             <div className="flex flex-wrap items-center gap-2.5 flex-1">
               {/* Search */}
-              <div className="relative min-w-[260px] flex-1 max-w-sm">
+              <div className="relative min-w-[240px] flex-1 max-w-sm">
                 <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
@@ -1794,8 +1793,8 @@ export const ProductionModule: React.FC = () => {
                     setMaterialsSearch(e.target.value);
                     setMatCurrentPage(1);
                   }}
-                  placeholder="Search by PR No., product name, material name..."
-                  className="w-full pl-8 pr-8 py-1.5 text-xs text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 shadow-2xs"
+                  placeholder="Search PR No., product, material..."
+                  className="w-full pl-8 pr-8 py-1.5 text-xs text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 shadow-2xs font-medium"
                 />
                 {materialsSearch && (
                   <button 
@@ -1807,21 +1806,6 @@ export const ProductionModule: React.FC = () => {
                 )}
               </div>
 
-              {/* Date Range Selector Pill */}
-              <div className="flex items-center space-x-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs text-gray-700 shadow-2xs cursor-pointer hover:bg-gray-50">
-                <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                <span className="font-medium">
-                  {(() => {
-                    const now = new Date();
-                    const m = String(now.getMonth() + 1).padStart(2, '0');
-                    const y = now.getFullYear();
-                    const lastD = String(new Date(y, now.getMonth() + 1, 0).getDate()).padStart(2, '0');
-                    return `01/${m}/${y} – ${lastD}/${m}/${y}`;
-                  })()}
-                </span>
-                <ChevronDown className="w-3 h-3 text-gray-400" />
-              </div>
-
               {/* Status Filter Dropdown */}
               <select
                 value={materialsStatusFilter}
@@ -1829,7 +1813,7 @@ export const ProductionModule: React.FC = () => {
                   setMaterialsStatusFilter(e.target.value);
                   setMatCurrentPage(1);
                 }}
-                className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-700 shadow-2xs focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
               >
                 <option value="ALL">All Status</option>
                 <option value="Ready">Ready</option>
@@ -1844,7 +1828,7 @@ export const ProductionModule: React.FC = () => {
                   setMaterialsTypeFilter(e.target.value);
                   setMatCurrentPage(1);
                 }}
-                className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-700 shadow-2xs focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
               >
                 <option value="ALL">All Material Types</option>
                 {distinctReqMaterialTypes.map(t => (
@@ -1859,9 +1843,9 @@ export const ProductionModule: React.FC = () => {
                   setMaterialsDeptFilter(e.target.value);
                   setMatCurrentPage(1);
                 }}
-                className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-700 shadow-2xs focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
               >
-                <option value="ALL">All Departments</option>
+                <option value="ALL">All Departments ({distinctReqDepartments.length})</option>
                 {distinctReqDepartments.map(d => (
                   <option key={d} value={d}>{d}</option>
                 ))}
@@ -1872,26 +1856,45 @@ export const ProductionModule: React.FC = () => {
             <div className="flex items-center space-x-2 shrink-0">
               <button
                 onClick={handleResetMatFilters}
-                className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 shadow-2xs transition-colors cursor-pointer"
+                className="text-blue-600 hover:text-blue-800 text-xs font-bold px-2 py-1 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
               >
-                <Filter className="w-3.5 h-3.5 text-gray-500" />
-                <span>Filters</span>
-              </button>
-              <button
-                onClick={handleResetMatFilters}
-                className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 shadow-2xs transition-colors cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5 text-gray-500" />
-                <span>Reset</span>
+                Clear Filters
               </button>
             </div>
           </div>
+        </div>
 
-          {/* Main Table: Material Requirements */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-2xs overflow-hidden flex flex-col flex-1">
-            <div className="overflow-x-auto custom-scrollbar flex-1">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
+        {/* 5. Sub-toolbar: count & Export/Print tools */}
+        <div className="flex items-center justify-between pt-1 text-xs">
+          <div className="font-semibold text-gray-600">
+            Showing all {filteredOrderRequirements.length} material requirements
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <button 
+              onClick={() => showToast('Requirements exported to Excel', 'success')}
+              className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              title="Export Requirements"
+            >
+              <Download className="w-3.5 h-3.5 text-gray-500" />
+              <span>Export</span>
+            </button>
+            <button 
+              onClick={() => window.print()}
+              className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              title="Print Requirements"
+            >
+              <Printer className="w-3.5 h-3.5 text-gray-500" />
+              <span>Print</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 6. Main Table: Material Requirements */}
+        <div className="bg-white border border-gray-200/90 rounded-2xl overflow-hidden shadow-2xs">
+          <div className="overflow-x-auto min-h-[380px]">
+            <table className="w-full text-left divide-y divide-gray-200">
+              <thead className="bg-gray-50/80 text-[11px] font-bold text-gray-600 uppercase tracking-wider select-none border-b border-gray-200">
                   <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
                     <th className="py-3 px-3 w-8 text-center">
                       <input 
@@ -2209,7 +2212,7 @@ export const ProductionModule: React.FC = () => {
             </div>
 
             {/* Pagination Controls */}
-            <div className="px-4 py-3 border-t border-gray-200 flex flex-wrap items-center justify-between gap-3 text-xs bg-white">
+            <div className="px-4 py-3 border-t border-gray-200/80 flex flex-wrap items-center justify-between gap-3 text-xs bg-white rounded-b-2xl text-gray-500">
               <div className="flex items-center space-x-2">
                 <span className="text-gray-500">Show</span>
                 <select
@@ -2218,7 +2221,7 @@ export const ProductionModule: React.FC = () => {
                     setMatRowsPerPage(Number(e.target.value));
                     setMatCurrentPage(1);
                   }}
-                  className="px-2 py-1 bg-white border border-gray-300 rounded font-medium text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                  className="px-2 py-1 bg-white border border-gray-300 rounded-lg font-medium text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer shadow-2xs"
                 >
                   <option value={10}>10</option>
                   <option value={25}>25</option>
@@ -2233,7 +2236,7 @@ export const ProductionModule: React.FC = () => {
                 <button
                   disabled={matCurrentPage === 1}
                   onClick={() => setMatCurrentPage(prev => Math.max(1, prev - 1))}
-                  className="px-2.5 py-1 rounded border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                  className="px-2.5 py-1 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer shadow-2xs"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
                 </button>
@@ -2251,10 +2254,10 @@ export const ProductionModule: React.FC = () => {
                     <button
                       key={page}
                       onClick={() => setMatCurrentPage(Number(page))}
-                      className={`min-w-[28px] h-7 px-2 text-xs font-semibold rounded transition-colors cursor-pointer ${
+                      className={`min-w-[28px] h-7 px-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
                         isCurrent
-                          ? 'bg-blue-600 text-white font-bold'
-                          : 'border border-gray-200 text-gray-700 hover:bg-gray-50'
+                          ? 'bg-blue-600 text-white font-bold shadow-2xs'
+                          : 'border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-2xs'
                       }`}
                     >
                       {page}
@@ -2265,14 +2268,13 @@ export const ProductionModule: React.FC = () => {
                 <button
                   disabled={matCurrentPage === matTotalPages || matTotalPages === 0}
                   onClick={() => setMatCurrentPage(prev => Math.min(matTotalPages, prev + 1))}
-                  className="px-2.5 py-1 rounded border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                  className="px-2.5 py-1 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer shadow-2xs"
                 >
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
           </div>
-        </div>
 
         {/* Modal: New Material Requirement Order Selector */}
         {showNewRequirementModal && (
@@ -2354,95 +2356,98 @@ export const ProductionModule: React.FC = () => {
   // -------------------------------------------------------------
   if (activeTab === 'bom') {
     return (
-      <div className="flex flex-col h-full bg-slate-50/60 overflow-y-auto custom-scrollbar">
-        {/* Header */}
-        <div className="bg-white border-b border-gray-150 px-6 py-4 flex items-center justify-between shrink-0 shadow-2xs">
-          <div className="flex items-center space-x-3.5">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-2xs">
-              <LayoutGrid className="w-5 h-5 stroke-[2.2]" />
+      <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
+        {/* 1. Header Banner (Matching Sales Orders Header Banner) */}
+        <div className="flex flex-row items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs relative">
+          <div className="flex items-center gap-3.5">
+            <div className="p-3 bg-blue-100/80 text-blue-700 rounded-2xl shadow-2xs">
+              <LayoutGrid className="w-6 h-6 stroke-[2.2]" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900 tracking-tight">Bill of Materials (BOM) Master</h1>
+              <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+                <span>Bill of Materials (BOM) Master</span>
+                <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-bold transition-all">
+                  {skusWithBom.length} Formulations
+                </span>
+              </h1>
               <p className="text-xs text-gray-500 font-medium">Standard BOM formulations configured for finished goods in Item Master.</p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => {
                 setEditingBomSkuId(null);
                 setShowBomModal(true);
               }}
-              className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded-lg shadow-2xs transition-colors cursor-pointer"
+              className="px-3.5 py-2 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
             >
               <Edit3 className="w-3.5 h-3.5" />
               <span>Bulk Edit BOMs</span>
             </button>
             <button
               onClick={handleOpenNewOrder}
-              className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-2xs transition-colors cursor-pointer"
+              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/20 active:scale-[0.98] cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>New Order</span>
             </button>
             <button
               onClick={() => setActiveTab('orders')}
-              className="px-3.5 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+              className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer text-xs"
             >
               ← Back to Orders
             </button>
           </div>
         </div>
 
-        {/* Tab Navigation */}
+        {/* 2. Tab Navigation */}
         {renderTabNavigation()}
 
-        {/* Main Content Area - Full boxed width matching Production Orders */}
-        <div className="p-6 flex-1 flex flex-col min-w-0 space-y-4">
-          {/* Dynamic KPI Summary Header */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs flex items-center space-x-3.5">
-              <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                <LayoutGrid className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Configured BOM Recipes</p>
-                <h3 className="text-xl font-bold text-gray-900">{skusWithBom.length} Formulations</h3>
-              </div>
+        {/* 3. Dynamic KPI Summary Header */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all flex items-center space-x-3.5">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <LayoutGrid className="w-5 h-5" />
             </div>
-
-            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs flex items-center space-x-3.5">
-              <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                <CheckCircle className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Finished Products</p>
-                <h3 className="text-xl font-bold text-gray-900">{backendSkus.length} SKUs in Master</h3>
-              </div>
-            </div>
-
-            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs flex items-center space-x-3.5">
-              <div className="w-10 h-10 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-                <Calculator className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Dynamic Batch Simulator</p>
-                <span className="text-xs font-semibold text-purple-700">Active across cards</span>
-              </div>
+            <div>
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Configured BOM Recipes</p>
+              <h3 className="text-xl font-bold text-gray-900 font-mono">{skusWithBom.length} Formulations</h3>
             </div>
           </div>
 
-          {/* Search Bar */}
-          <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between shadow-2xs">
-            <div className="relative w-full max-w-md">
-              <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={bomSearch}
-                onChange={e => setBomSearch(e.target.value)}
-                placeholder="Search BOM by finished product name, SKU code, category..."
-                className="w-full pl-8 pr-8 py-1.5 text-xs text-gray-900 placeholder-gray-400 bg-gray-50/70 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 shadow-2xs"
-              />
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all flex items-center space-x-3.5">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <CheckCircle className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Finished Products</p>
+              <h3 className="text-xl font-bold text-gray-900 font-mono">{backendSkus.length} SKUs in Master</h3>
+            </div>
+          </div>
+
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all flex items-center space-x-3.5">
+            <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+              <Calculator className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Dynamic Batch Simulator</p>
+              <span className="text-xs font-bold text-purple-700 font-mono">Active across cards</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 4. Search Bar */}
+        <div className="bg-white border border-gray-200/80 rounded-2xl px-4 py-3 flex items-center justify-between shadow-2xs">
+          <div className="relative w-full max-w-md">
+            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={bomSearch}
+              onChange={e => setBomSearch(e.target.value)}
+              placeholder="Search BOM by finished product name, SKU code, category..."
+              className="w-full pl-8 pr-8 py-1.5 text-xs text-gray-900 placeholder-gray-400 bg-gray-50/70 border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 shadow-2xs font-medium"
+            />
               {bomSearch && (
                 <button 
                   onClick={() => setBomSearch('')}
@@ -2598,7 +2603,6 @@ export const ProductionModule: React.FC = () => {
               );
             })
           )}
-        </div>
 
         {/* Bulk BOM Edit Modal */}
         {showBomModal && selectedCompany?._id && (
@@ -2621,215 +2625,218 @@ export const ProductionModule: React.FC = () => {
   // -------------------------------------------------------------
   if (activeTab === 'history') {
     return (
-      <div className="flex flex-col h-full bg-slate-50/60 overflow-y-auto custom-scrollbar">
-        {/* Header */}
-        <div className="bg-white border-b border-gray-150 px-6 py-4 flex items-center justify-between shrink-0 shadow-2xs">
-          <div className="flex items-center space-x-3.5">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-2xs">
+      <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
+        {/* 1. Header Banner */}
+        <div className="flex flex-row items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs relative">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-blue-100/80 text-blue-700 rounded-2xl shadow-2xs">
               <History className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900 tracking-tight">Production Audit Log</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-bold text-gray-900 tracking-tight">Production Audit Log</h1>
+                <span className="text-[11px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">
+                  {orders.length} Logged
+                </span>
+              </div>
               <p className="text-xs text-gray-500 font-medium">Activity timeline of manufacturing orders in backend database.</p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-2">
             <button
               onClick={handleOpenNewOrder}
-              className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-2xs transition-colors cursor-pointer"
+              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/20 active:scale-[0.98] cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>New Order</span>
             </button>
             <button
               onClick={() => setActiveTab('orders')}
-              className="px-3.5 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+              className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer text-xs"
             >
               ← Back to Orders
             </button>
           </div>
         </div>
 
-        {/* Tab Navigation */}
+        {/* 2. Tab Navigation */}
         {renderTabNavigation()}
 
-        {/* Main Content Area - Full boxed width matching Production Orders */}
-        <div className="p-6 flex-1 flex flex-col min-w-0 space-y-4">
-          {/* Dynamic KPI Summary Header */}
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs flex items-center space-x-3.5">
-              <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                <History className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Total Orders Logged</p>
-                <h3 className="text-xl font-bold text-gray-900">{orders.length}</h3>
-              </div>
+        {/* 3. Dynamic KPI Summary Header */}
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3.5">
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all flex items-center space-x-3.5">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <History className="w-5 h-5" />
             </div>
-
-            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs flex items-center space-x-3.5">
-              <div className="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                <Clock className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">In Progress</p>
-                <h3 className="text-xl font-bold text-amber-700">{historyInProgressCount}</h3>
-              </div>
-            </div>
-
-            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs flex items-center space-x-3.5">
-              <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                <CheckCircle className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Completed Orders</p>
-                <h3 className="text-xl font-bold text-emerald-700">{historyCompletedCount}</h3>
-              </div>
-            </div>
-
-            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs flex items-center space-x-3.5">
-              <div className="w-10 h-10 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-                <TrendingUp className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Active Departments</p>
-                <h3 className="text-xl font-bold text-gray-900">{distinctHistoryDepts.length || 1}</h3>
-              </div>
+            <div>
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Total Orders Logged</p>
+              <h3 className="text-xl font-bold text-gray-900 font-mono">{orders.length}</h3>
             </div>
           </div>
 
-          {/* Activity Timeline List */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-2xs p-6 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-150 pb-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-bold text-gray-700 flex items-center space-x-1 mr-1">
-                  <Filter className="w-3.5 h-3.5 text-gray-400" />
-                  <span>Filters:</span>
-                </span>
-
-                {/* Status Filter */}
-                <select
-                  value={historyStatusFilter}
-                  onChange={e => setHistoryStatusFilter(e.target.value)}
-                  className="text-xs font-semibold text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                >
-                  <option value="ALL">All Statuses</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Completed">Completed</option>
-                  <option value="Planned">Planned</option>
-                  <option value="Cancelled">Cancelled</option>
-                </select>
-
-                {/* Department Filter */}
-                <select
-                  value={historyDeptFilter}
-                  onChange={e => setHistoryDeptFilter(e.target.value)}
-                  className="text-xs font-semibold text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                >
-                  <option value="ALL">All Departments</option>
-                  {distinctHistoryDepts.map(d => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Search */}
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={historySearch}
-                  onChange={e => setHistorySearch(e.target.value)}
-                  placeholder="Search activity log by order or product..."
-                  className="w-full sm:w-64 pl-8 pr-8 py-1.5 text-xs text-gray-900 placeholder-gray-400 bg-gray-50/70 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 shadow-2xs"
-                />
-                {historySearch && (
-                  <button 
-                    onClick={() => setHistorySearch('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all flex items-center space-x-3.5">
+            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+              <Clock className="w-5 h-5" />
             </div>
+            <div>
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">In Progress</p>
+              <h3 className="text-xl font-bold text-amber-700 font-mono">{historyInProgressCount}</h3>
+            </div>
+          </div>
 
-            {filteredHistoryOrders.length === 0 ? (
-              <div className="py-8 text-center text-gray-400 text-xs">
-                {historySearch ? 'No activities matching your search.' : 'No production activity recorded in backend database yet.'}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {filteredHistoryOrders.map((o) => {
-                  const statusColors: Record<string, string> = {
-                    'Completed': 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                    'In Progress': 'bg-blue-50 text-blue-700 border-blue-200',
-                    'Planned': 'bg-amber-50 text-amber-700 border-amber-200',
-                    'Cancelled': 'bg-rose-50 text-rose-700 border-rose-200'
-                  };
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all flex items-center space-x-3.5">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <CheckCircle className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Completed Orders</p>
+              <h3 className="text-xl font-bold text-emerald-700 font-mono">{historyCompletedCount}</h3>
+            </div>
+          </div>
 
-                  return (
-                    <div 
-                      key={o._id} 
-                      className="p-4 rounded-xl border border-gray-200/80 bg-gray-50/40 hover:bg-gray-50 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4"
-                    >
-                      <div className="flex-1 space-y-1.5">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-mono font-bold text-blue-600 text-sm">{o.orderNumber}</span>
-                          <span className="text-gray-300">•</span>
-                          <span className="font-bold text-gray-900 text-sm">{o.itemName}</span>
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusColors[o.status] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
-                            {o.status}
-                          </span>
-                          <span className="text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded font-semibold">
-                            Dept: {o.department || 'General'}
-                          </span>
-                        </div>
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all flex items-center space-x-3.5">
+            <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+              <TrendingUp className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Active Departments</p>
+              <h3 className="text-xl font-bold text-gray-900 font-mono">{distinctHistoryDepts.length || 1}</h3>
+            </div>
+          </div>
+        </div>
 
-                        <div className="flex items-center space-x-3 text-xs text-gray-600">
-                          <span>Target: <strong>{o.plannedQty.toLocaleString()} {o.plannedUom}</strong></span>
-                          <span>•</span>
-                          <span>Produced: <strong className="text-gray-900">{o.producedQty.toLocaleString()} {o.plannedUom}</strong> ({o.producedPcs.toLocaleString()} PCS)</span>
-                          <span>•</span>
-                          <span>Shifts Logged: <strong>{o.productionEntries?.length || 0}</strong></span>
-                        </div>
+        {/* 4. Filter & Search Toolbar */}
+        <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-bold text-gray-700 flex items-center space-x-1 mr-1">
+              <Filter className="w-3.5 h-3.5 text-gray-400" />
+              <span>Filters:</span>
+            </span>
 
-                        {/* Progress Bar */}
-                        <div className="w-full max-w-md flex items-center space-x-2 pt-1">
-                          <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div 
-                              className={`h-full rounded-full transition-all ${
-                                o.status === 'Completed' ? 'bg-emerald-500' : 'bg-blue-600'
-                              }`}
-                              style={{ width: `${Math.min(100, o.progress || 0)}%` }}
-                            />
-                          </div>
-                          <span className="text-[11px] font-bold text-gray-700">{o.progress || 0}%</span>
-                        </div>
-                      </div>
+            {/* Status Filter */}
+            <select
+              value={historyStatusFilter}
+              onChange={e => setHistoryStatusFilter(e.target.value)}
+              className="text-xs font-semibold text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+            >
+              <option value="ALL">All Statuses</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+              <option value="Planned">Planned</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
 
-                      {/* Right action buttons */}
-                      <div className="flex items-center space-x-2 shrink-0">
-                        <button
-                          onClick={() => handleOpenRecordEntries(o)}
-                          className="px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer"
-                        >
-                          Entries ({o.productionEntries?.length || 0})
-                        </button>
-                        <button
-                          onClick={() => handleOpenOrderDetail(o)}
-                          className="px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white hover:bg-gray-100 border border-gray-300 rounded-lg transition-colors cursor-pointer"
-                        >
-                          View Details
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+            {/* Department Filter */}
+            <select
+              value={historyDeptFilter}
+              onChange={e => setHistoryDeptFilter(e.target.value)}
+              className="text-xs font-semibold text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+            >
+              <option value="ALL">All Departments</option>
+              {distinctHistoryDepts.map(d => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Search */}
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={historySearch}
+              onChange={e => setHistorySearch(e.target.value)}
+              placeholder="Search activity log by order or product..."
+              className="w-full sm:w-72 pl-8 pr-8 py-1.5 text-xs text-gray-900 placeholder-gray-400 bg-gray-50/70 border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 shadow-2xs"
+            />
+            {historySearch && (
+              <button 
+                onClick={() => setHistorySearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
             )}
           </div>
+        </div>
+
+        {/* 5. Activity Timeline List */}
+        <div className="bg-white rounded-2xl border border-gray-200/90 shadow-2xs p-5 space-y-3">
+          {filteredHistoryOrders.length === 0 ? (
+            <div className="py-12 text-center text-gray-400 text-xs">
+              {historySearch ? 'No activities matching your search.' : 'No production activity recorded in backend database yet.'}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredHistoryOrders.map((o) => {
+                const statusColors: Record<string, string> = {
+                  'Completed': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                  'In Progress': 'bg-blue-50 text-blue-700 border-blue-200',
+                  'Planned': 'bg-amber-50 text-amber-700 border-amber-200',
+                  'Cancelled': 'bg-rose-50 text-rose-700 border-rose-200'
+                };
+
+                return (
+                  <div 
+                    key={o._id} 
+                    className="p-4 rounded-xl border border-gray-200/80 bg-gray-50/40 hover:bg-gray-50/80 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4"
+                  >
+                    <div className="flex-1 space-y-1.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono font-bold text-blue-600 text-sm">{o.orderNumber}</span>
+                        <span className="text-gray-300">•</span>
+                        <span className="font-bold text-gray-900 text-sm">{o.itemName}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusColors[o.status] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
+                          {o.status}
+                        </span>
+                        <span className="text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full font-semibold">
+                          Dept: {o.department || 'General'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center space-x-3 text-xs text-gray-600">
+                        <span>Target: <strong>{o.plannedQty.toLocaleString()} {o.plannedUom}</strong></span>
+                        <span>•</span>
+                        <span>Produced: <strong className="text-gray-900">{o.producedQty.toLocaleString()} {o.plannedUom}</strong> ({o.producedPcs.toLocaleString()} PCS)</span>
+                        <span>•</span>
+                        <span>Shifts Logged: <strong>{o.productionEntries?.length || 0}</strong></span>
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div className="w-full max-w-md flex items-center space-x-2 pt-1">
+                        <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full transition-all ${
+                              o.status === 'Completed' ? 'bg-emerald-500' : 'bg-blue-600'
+                            }`}
+                            style={{ width: `${Math.min(100, o.progress || 0)}%` }}
+                          />
+                        </div>
+                        <span className="text-[11px] font-bold text-gray-700">{o.progress || 0}%</span>
+                      </div>
+                    </div>
+
+                    {/* Right action buttons */}
+                    <div className="flex items-center space-x-2 shrink-0">
+                      <button
+                        onClick={() => handleOpenRecordEntries(o)}
+                        className="px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-colors cursor-pointer"
+                      >
+                        Entries ({o.productionEntries?.length || 0})
+                      </button>
+                      <button
+                        onClick={() => handleOpenOrderDetail(o)}
+                        className="px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white hover:bg-gray-100 border border-gray-300 rounded-xl transition-colors cursor-pointer shadow-2xs"
+                      >
+                        View Details
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -2848,6 +2855,7 @@ export const ProductionModule: React.FC = () => {
         onPrintOrder={setPrintOrder}
         onDeleteOrder={handleDeleteOrder}
         onRefresh={loadOrders}
+        tabCounts={tabCounts}
       />
       <ProductionPrintModal order={printOrder} onClose={() => setPrintOrder(null)} />
     </>

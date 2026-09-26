@@ -19,6 +19,7 @@ interface ProductionOrdersListProps {
   onPrintOrder: (order: ProductionOrder) => void;
   onDeleteOrder: (orderId: string) => void;
   onRefresh: () => void;
+  tabCounts?: Record<string, number>;
 }
 
 export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
@@ -30,7 +31,8 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
   onRecordEntries,
   onPrintOrder,
   onDeleteOrder,
-  onRefresh
+  onRefresh,
+  tabCounts
 }) => {
   // Period filter
   const [period, setPeriod] = useState<string>('All');
@@ -163,39 +165,46 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-50/60 overflow-y-auto custom-scrollbar">
-      {/* Top Banner / Header matching Makoro clean design */}
-      <div className="bg-white border-b border-gray-150 px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0 shadow-2xs">
-        <div className="flex items-center space-x-3.5">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-2xs">
-            <Factory className="w-5 h-5 stroke-[2.2]" />
+    <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
+      {/* 1. Header Banner (Matching Sales Orders Header Banner) */}
+      <div className="flex flex-row items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs relative">
+        <div className="flex items-center gap-3.5">
+          <div className="p-3 bg-blue-100/80 text-blue-700 rounded-2xl shadow-2xs">
+            <Factory className="w-6 h-6 stroke-[2.2]" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900 tracking-tight leading-tight">Production</h1>
-            <p className="text-xs text-gray-500 font-medium">Plan, manufacture and track finished & semi-finished goods.</p>
+            <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+              <span>Production Orders</span>
+              <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-bold transition-all">
+                {orders.length} Total
+              </span>
+            </h1>
+            <p className="text-xs text-gray-500 font-medium">
+              Unified master directory for manufacturing batches, stage-wise operations, and finished goods output.
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={onNewOrder}
-            className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-semibold px-4 py-2.5 rounded-lg shadow-sm hover:shadow transition-all cursor-pointer"
+            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/20 active:scale-[0.98] cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-3.5 h-3.5" />
             <span>New Production Order</span>
           </button>
         </div>
       </div>
 
-      {/* Tabs Bar */}
-      <div className="bg-white border-b border-gray-200 px-6 shrink-0 flex items-center justify-between">
-        <div className="flex space-x-1 sm:space-x-2 overflow-x-auto custom-scrollbar py-2">
+      {/* 2. Top Navigation Tabs Bar (Exact match to Sales Orders tab bar) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 bg-white px-4 rounded-2xl shadow-2xs relative">
+        <div className="flex items-center gap-1 overflow-x-auto py-1 max-w-full">
           {[
-            { id: 'orders', label: 'Production Orders', icon: Calendar },
-            { id: 'entries', label: 'Production Entries', icon: Package },
-            { id: 'materials', label: 'Material Requirements', icon: FileText },
-            { id: 'bom', label: 'BOM', icon: LayoutGrid },
-            { id: 'history', label: 'History', icon: History }
+            { id: 'orders', label: 'Production Orders', icon: Calendar, count: orders.length },
+            { id: 'entries', label: 'Production Entries', icon: Package, count: tabCounts?.entries },
+            { id: 'materials', label: 'Material Requirements', icon: FileText, count: tabCounts?.materials },
+            { id: 'bom', label: 'BOM', icon: LayoutGrid, count: tabCounts?.bom },
+            { id: 'history', label: 'History', icon: History, count: tabCounts?.history }
           ].map(tab => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -203,46 +212,125 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`inline-flex items-center space-x-2 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
                   active 
-                    ? 'bg-blue-50/90 text-blue-600 border border-blue-100 shadow-2xs font-bold'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/70 border border-transparent'
+                    ? 'border-teal-700 text-teal-700 bg-transparent'
+                    : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
                 }`}
               >
-                <Icon className={`w-3.5 h-3.5 ${active ? 'text-blue-600' : 'text-gray-400'}`} />
+                <Icon className={`w-4 h-4 ${active ? 'text-teal-700' : 'text-slate-400'}`} />
                 <span>{tab.label}</span>
+                {tab.count !== undefined && (
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                    active ? 'bg-teal-50 text-teal-800' : 'bg-slate-100 text-slate-700'
+                  }`}>
+                    {tab.count}
+                  </span>
+                )}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="p-6 flex-1 flex flex-col min-w-0">
-        {/* Filter & Toolbar Area */}
-        <div className="bg-white rounded-xl border border-gray-200 p-3.5 mb-4 shadow-2xs flex flex-wrap items-center justify-between gap-3">
-          {/* Left: Period pill selector & Select All box */}
-          <div className="flex items-center flex-wrap gap-2.5">
-            <div className="flex items-center pl-1 pr-2">
-              <input
-                type="checkbox"
-                onChange={handleSelectAll}
-                checked={paginatedOrders.length > 0 && paginatedOrders.every(o => selectedIds.has(o._id))}
-                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                title="Select all on current page"
-              />
-            </div>
+      {/* 3. Statistics Cards (5 Cards Grid - Exact match to Sales Orders) */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
+        {/* Card 1: Total Orders */}
+        <button
+          onClick={() => setStatusFilter('All')}
+          className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
+            statusFilter === 'All' 
+              ? 'bg-blue-50/40 border-blue-400 ring-2 ring-blue-100' 
+              : 'bg-white border-gray-200/80 hover:border-gray-300'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Total Orders</span>
+            <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+          </div>
+          <p className="text-2xl font-black text-gray-900 mt-1 font-mono">{orders.length}</p>
+        </button>
 
-            <div className="flex items-center space-x-1 bg-gray-100/80 p-0.5 rounded-lg border border-gray-200/60">
-              <span className="text-[11px] font-medium text-gray-500 px-2">Period:</span>
-              {['All', '30d', '60d', '90d', 'Custom'].map(p => (
+        {/* Card 2: In Production */}
+        <button
+          onClick={() => setStatusFilter('In Production')}
+          className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
+            statusFilter === 'In Production' 
+              ? 'bg-amber-50/40 border-amber-400 ring-2 ring-amber-100' 
+              : 'bg-white border-gray-200/80 hover:border-gray-300'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">In Production</span>
+            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+          </div>
+          <p className="text-2xl font-black text-amber-700 mt-1 font-mono">
+            {orders.filter(o => o.status === 'In Production').length}
+          </p>
+        </button>
+
+        {/* Card 3: Planned */}
+        <button
+          onClick={() => setStatusFilter('Planned')}
+          className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
+            statusFilter === 'Planned' 
+              ? 'bg-indigo-50/40 border-indigo-400 ring-2 ring-indigo-100' 
+              : 'bg-white border-gray-200/80 hover:border-gray-300'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Planned</span>
+            <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
+          </div>
+          <p className="text-2xl font-black text-indigo-700 mt-1 font-mono">
+            {orders.filter(o => o.status === 'Planned').length}
+          </p>
+        </button>
+
+        {/* Card 4: Completed */}
+        <button
+          onClick={() => setStatusFilter('Completed')}
+          className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
+            statusFilter === 'Completed' 
+              ? 'bg-emerald-50/40 border-emerald-400 ring-2 ring-emerald-100' 
+              : 'bg-white border-gray-200/80 hover:border-gray-300'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Completed</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+          </div>
+          <p className="text-2xl font-black text-emerald-700 mt-1 font-mono">
+            {orders.filter(o => o.status === 'Completed').length}
+          </p>
+        </button>
+
+        {/* Card 5: Target Output Qty */}
+        <div className="rounded-2xl shadow-2xs border border-gray-200/80 p-3.5 sm:p-4 bg-white transition-all duration-200 hover:border-gray-300">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Target Qty</span>
+            <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+          </div>
+          <p className="text-2xl font-black text-purple-700 mt-1 font-mono">
+            {orders.reduce((sum, o) => sum + (o.plannedPcs || o.plannedQuantity || 0), 0).toLocaleString('en-IN')}
+          </p>
+        </div>
+      </div>
+
+      {/* 4. Filter Toolbar Card */}
+      <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden space-y-0">
+        <div className="bg-gray-50/50 border-b border-gray-200 px-4 py-2.5 flex items-center justify-between flex-wrap gap-2 text-xs font-semibold text-gray-600">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Period:</span>
+            <div className="flex items-center space-x-1 bg-white p-0.5 rounded-xl border border-gray-200">
+              {['All', '30d', '60d', '90d'].map(p => (
                 <button
                   key={p}
                   onClick={() => setPeriod(p)}
-                  className={`text-[11px] font-medium px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                  className={`text-xs font-semibold px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
                     period === p
-                      ? 'bg-blue-600 text-white font-semibold shadow-2xs'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                   }`}
                 >
                   {p}
@@ -250,103 +338,108 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
               ))}
             </div>
 
-            {/* Dropdown Filters */}
-            <div className="flex items-center space-x-2">
-              <select
-                value={typeFilter}
-                onChange={e => setTypeFilter(e.target.value)}
-                className="text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer"
-              >
-                <option value="All">All Types</option>
-                {dynamicTypes.map(t => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
+            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider ml-2">Type:</span>
+            <select
+              value={typeFilter}
+              onChange={e => setTypeFilter(e.target.value)}
+              className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 shadow-2xs focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            >
+              <option value="All">All Types ({dynamicTypes.length})</option>
+              {dynamicTypes.map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
 
-              <select
-                value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value)}
-                className="text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer"
-              >
-                <option value="All">All Status</option>
-                <option value="In Production">In Production</option>
-                <option value="Planned">Planned</option>
-                <option value="Completed">Completed</option>
-                <option value="Not Started">Not Started</option>
-              </select>
+            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider ml-2">Status:</span>
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 shadow-2xs focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            >
+              <option value="All">All Statuses</option>
+              <option value="In Production">In Production</option>
+              <option value="Planned">Planned</option>
+              <option value="Completed">Completed</option>
+              <option value="Not Started">Not Started</option>
+            </select>
 
-              <select
-                value={deptFilter}
-                onChange={e => setDeptFilter(e.target.value)}
-                className="text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer"
-              >
-                <option value="All">All Departments</option>
-                {dynamicDepartments.map(d => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
-            </div>
+            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider ml-2">Dept:</span>
+            <select
+              value={deptFilter}
+              onChange={e => setDeptFilter(e.target.value)}
+              className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 shadow-2xs focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            >
+              <option value="All">All Departments ({dynamicDepartments.length})</option>
+              {dynamicDepartments.map(d => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
           </div>
 
-          {/* Right: Search, Filter, Sort, Download, Refresh */}
-          <div className="flex items-center space-x-2 ml-auto">
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                placeholder="Search production orders..."
-                className="w-56 lg:w-64 pl-8 pr-3 py-1.5 text-xs text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 shadow-2xs"
-              />
-            </div>
-
+          {(searchTerm || period !== 'All' || typeFilter !== 'All' || statusFilter !== 'All' || deptFilter !== 'All') && (
             <button
               onClick={() => {
+                setPeriod('All');
                 setTypeFilter('All');
                 setStatusFilter('All');
                 setDeptFilter('All');
                 setSearchTerm('');
-                showToast('Filters cleared', 'info');
               }}
-              title="Reset Filters"
-              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors cursor-pointer"
+              className="text-blue-600 hover:text-blue-800 text-xs font-bold px-2 py-1 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
             >
-              <SlidersHorizontal className="w-4 h-4" />
+              Clear Filters
             </button>
+          )}
+        </div>
+      </div>
 
-            <button
-              onClick={() => handleSort('orderNumber')}
-              title={`Sort by Order Number (${sortAsc ? 'Ascending' : 'Descending'})`}
-              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors cursor-pointer"
-            >
-              <ArrowUpDown className="w-4 h-4" />
-            </button>
-
-            <button
-              onClick={handleExportExcel}
-              title="Export to Excel"
-              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors cursor-pointer"
-            >
-              <Download className="w-4 h-4" />
-            </button>
-
-            <button
-              onClick={onRefresh}
-              title="Refresh"
-              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors cursor-pointer"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
-          </div>
+      {/* 5. Table Sub-bar: Metadata & Actions (Exact match to Sales Orders) */}
+      <div className="flex items-center justify-between pt-1 text-xs">
+        <div className="font-semibold text-gray-600">
+          Showing all {filteredOrders.length} production orders
         </div>
 
-        {/* Data Table Container */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-2xs overflow-hidden flex flex-col flex-1">
-          <div className="overflow-x-auto flex-1 custom-scrollbar">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider select-none">
+        <div className="flex items-center gap-2">
+          {/* Global Search Box */}
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder="Search orders, items, codes..."
+              className="pl-8 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl w-44 md:w-56 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+            />
+          </div>
+
+          {/* Export Button */}
+          <button
+            onClick={handleExportExcel}
+            className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            title="Export to Excel Spreadsheet"
+          >
+            <Download className="w-3.5 h-3.5 text-gray-500" />
+            <span>Export</span>
+          </button>
+
+          {/* Refresh Button */}
+          <button
+            onClick={onRefresh}
+            className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            title="Refresh Data"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-gray-500" />
+            <span>Refresh</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 6. Main Data Table Container */}
+      <div className="bg-white border border-gray-200/90 rounded-2xl overflow-hidden shadow-2xs">
+        <div className="overflow-x-auto min-h-[380px]">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider select-none">
                   <th className="py-3 px-3.5 w-10 text-center">
                     <input
                       type="checkbox"
@@ -684,7 +777,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
           </div>
 
           {/* Table Footer with Pagination */}
-          <div className="px-6 py-3.5 bg-white border-t border-gray-200 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500">
+          <div className="px-4 py-3 border-t border-gray-200/80 flex flex-wrap items-center justify-between gap-3 text-xs bg-white rounded-b-2xl text-gray-500">
             <div>
               Showing <span className="font-semibold text-gray-700">{totalOrders === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + rowsPerPage, totalOrders)}</span> of <span className="font-semibold text-gray-700">{totalOrders}</span> orders
             </div>
@@ -698,7 +791,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                     setRowsPerPage(Number(e.target.value));
                     setCurrentPage(1);
                   }}
-                  className="bg-white border border-gray-200 rounded px-2 py-1 text-xs text-gray-700 focus:outline-none focus:border-blue-500 cursor-pointer"
+                  className="bg-white border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-700 focus:outline-none focus:border-blue-500 cursor-pointer shadow-2xs"
                 >
                   <option value={10}>10</option>
                   <option value={25}>25</option>
@@ -715,14 +808,14 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                 <button
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                   disabled={currentPage === 1}
-                  className="p-1 rounded border border-gray-200 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed text-gray-600"
+                  className="p-1 rounded-lg border border-gray-200 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed text-gray-600 shadow-2xs cursor-pointer"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                   disabled={currentPage === totalPages}
-                  className="p-1 rounded border border-gray-200 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed text-gray-600"
+                  className="p-1 rounded-lg border border-gray-200 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed text-gray-600 shadow-2xs cursor-pointer"
                 >
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
@@ -730,7 +823,6 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
             </div>
           </div>
         </div>
-      </div>
     </div>
   );
 };
