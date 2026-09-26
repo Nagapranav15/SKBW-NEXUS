@@ -1381,157 +1381,159 @@ const SalesOrders: React.FC = () => {
                       </td>
                     )}
 
-                    {/* Actions: View, Edit, Duplicate, Print, WhatsApp, More dropdown */}
+                    {/* Actions: Edit, Print, Download, WhatsApp, More dropdown (Cancel extra); Cancelled shows only View */}
                     {isColVisible('actions') && (
                       <td className="py-3.5 px-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-1">
-
-                          {/* 1. View */}
-                          <button
-                            type="button"
-                            onClick={() => setSelectedOrderDetail(order)}
-                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                            title="View Order"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-
-                          {/* 2. Edit */}
-                          <button
-                            type="button"
-                            onClick={() => { setEditingOrder(order); setShowDrawer(true); }}
-                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                            title="Edit Order"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-
-                          {/* 3. Duplicate */}
-                          <button
-                            type="button"
-                            onClick={() => handleDuplicateOrder(order)}
-                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                            title="Duplicate Order"
-                          >
-                            <Copy className="w-4 h-4" />
-                          </button>
-
-                          {/* 4. Print */}
-                          <button
-                            type="button"
-                            onClick={() => setEstimationOrder(order)}
-                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                            title="Print Order Estimation"
-                          >
-                            <Printer className="w-4 h-4" />
-                          </button>
-
-                          {/* 5. WhatsApp */}
-                          <button
-                            type="button"
-                            onClick={() => setWhatsappOrder(order)}
-                            className="p-1.5 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
-                            title="Send on WhatsApp"
-                          >
-                            <WhatsAppIcon className="w-4 h-4 text-emerald-500 hover:text-emerald-600" />
-                          </button>
-
-                          {/* 6. Three-dots More Menu */}
-                          <div className="relative">
+                          {order.status === 'Cancelled' ? (
+                            /* In Cancelled orders, only show View */
                             <button
                               type="button"
-                              onClick={() => setActiveMenuOrderId(isMenuOpen ? null : (order._id || ''))}
-                              className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
-                              title="More Options"
+                              onClick={() => setSelectedOrderDetail(order)}
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                              title="View Order"
                             >
-                              <MoreVertical className="w-4 h-4" />
+                              <Eye className="w-4 h-4" />
                             </button>
-
-                            {/* Dropdown Menu (1:1 with Screenshot) */}
-                            {isMenuOpen && (
-                              <div 
-                                ref={actionMenuRef}
-                                className="absolute right-0 mt-1 w-52 bg-white rounded-2xl shadow-xl border border-gray-200/90 py-1.5 z-50 animate-fadeIn text-left"
+                          ) : (
+                            <>
+                              {/* 1. Edit */}
+                              <button
+                                type="button"
+                                onClick={() => { setEditingOrder(order); setShowDrawer(true); }}
+                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                title="Edit Order"
                               >
+                                <Edit className="w-4 h-4" />
+                              </button>
+
+                              {/* 2. Print */}
+                              <button
+                                type="button"
+                                onClick={() => setEstimationOrder(order)}
+                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                title="Print Order Estimation"
+                              >
+                                <Printer className="w-4 h-4" />
+                              </button>
+
+                              {/* 3. Download */}
+                              <button
+                                type="button"
+                                onClick={() => setEstimationOrder(order)}
+                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                title="Download PDF"
+                              >
+                                <Download className="w-4 h-4" />
+                              </button>
+
+                              {/* 4. WhatsApp */}
+                              <button
+                                type="button"
+                                onClick={() => setWhatsappOrder(order)}
+                                className="p-1.5 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                                title="Send on WhatsApp"
+                              >
+                                <WhatsAppIcon className="w-4 h-4 text-emerald-500 hover:text-emerald-600" />
+                              </button>
+
+                              {/* 5. Three-dots More Menu */}
+                              <div className="relative">
                                 <button
                                   type="button"
-                                  onClick={() => { setSelectedOrderDetail(order); setActiveMenuOrderId(null); }}
-                                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                                  onClick={() => setActiveMenuOrderId(isMenuOpen ? null : (order._id || ''))}
+                                  className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                                  title="More Options"
                                 >
-                                  <Eye className="w-4 h-4 text-blue-600" />
-                                  <span>View</span>
+                                  <MoreVertical className="w-4 h-4" />
                                 </button>
 
-                                {order.status === 'Draft' && (
-                                  <button
-                                    type="button"
-                                    onClick={() => { handleConfirmDraftOrder(order); setActiveMenuOrderId(null); }}
-                                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50 transition-colors"
+                                {/* Dropdown Menu */}
+                                {isMenuOpen && (
+                                  <div 
+                                    ref={actionMenuRef}
+                                    className="absolute right-0 mt-1 w-52 bg-white rounded-2xl shadow-xl border border-gray-200/90 py-1.5 z-50 animate-fadeIn text-left"
                                   >
-                                    <Check className="w-4 h-4 text-emerald-600 stroke-[3]" />
-                                    <span>Confirm Order</span>
-                                  </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => { setSelectedOrderDetail(order); setActiveMenuOrderId(null); }}
+                                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                                    >
+                                      <Eye className="w-4 h-4 text-blue-600" />
+                                      <span>View Order</span>
+                                    </button>
+
+                                    {order.status === 'Draft' && (
+                                      <button
+                                        type="button"
+                                        onClick={() => { handleConfirmDraftOrder(order); setActiveMenuOrderId(null); }}
+                                        className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50 transition-colors"
+                                      >
+                                        <Check className="w-4 h-4 text-emerald-600 stroke-[3]" />
+                                        <span>Confirm Order</span>
+                                      </button>
+                                    )}
+
+                                    <button
+                                      type="button"
+                                      onClick={() => { setEditingOrder(order); setShowDrawer(true); setActiveMenuOrderId(null); }}
+                                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                                    >
+                                      <Edit className="w-4 h-4 text-blue-600" />
+                                      <span>Edit</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => { handleDuplicateOrder(order); setActiveMenuOrderId(null); }}
+                                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                                    >
+                                      <Copy className="w-4 h-4 text-blue-600" />
+                                      <span>Duplicate</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => { setEstimationOrder(order); setActiveMenuOrderId(null); }}
+                                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                                    >
+                                      <Printer className="w-4 h-4 text-blue-600" />
+                                      <span>Print Order Estimation</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => { setEstimationOrder(order); setActiveMenuOrderId(null); }}
+                                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                                    >
+                                      <Download className="w-4 h-4 text-blue-600" />
+                                      <span>Download PDF</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => { setWhatsappOrder(order); setActiveMenuOrderId(null); }}
+                                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                                    >
+                                      <WhatsAppIcon className="w-4 h-4 text-emerald-500" />
+                                      <span>Send on WhatsApp</span>
+                                    </button>
+
+                                    <div className="border-t border-gray-100 my-1" />
+
+                                    <button
+                                      type="button"
+                                      onClick={() => { setCancellingOrder(order); setActiveMenuOrderId(null); }}
+                                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors"
+                                    >
+                                      <Trash2 className="w-4 h-4 text-rose-600" />
+                                      <span>Cancel Order</span>
+                                    </button>
+                                  </div>
                                 )}
-
-                                <button
-                                  type="button"
-                                  onClick={() => { setEditingOrder(order); setShowDrawer(true); setActiveMenuOrderId(null); }}
-                                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
-                                >
-                                  <Edit className="w-4 h-4 text-blue-600" />
-                                  <span>Edit</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => { handleDuplicateOrder(order); }}
-                                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
-                                >
-                                  <Copy className="w-4 h-4 text-blue-600" />
-                                  <span>Duplicate</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => { setEstimationOrder(order); setActiveMenuOrderId(null); }}
-                                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
-                                >
-                                  <Printer className="w-4 h-4 text-blue-600" />
-                                  <span>Print Order Estimation</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => { setEstimationOrder(order); setActiveMenuOrderId(null); }}
-                                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
-                                >
-                                  <Download className="w-4 h-4 text-blue-600" />
-                                  <span>Download PDF</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => { setWhatsappOrder(order); setActiveMenuOrderId(null); }}
-                                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
-                                >
-                                  <WhatsAppIcon className="w-4 h-4 text-emerald-500" />
-                                  <span>Send on WhatsApp</span>
-                                </button>
-
-                                <div className="border-t border-gray-100 my-1" />
-
-                                <button
-                                  type="button"
-                                  onClick={() => { setCancellingOrder(order); setActiveMenuOrderId(null); }}
-                                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors"
-                                >
-                                  <Trash2 className="w-4 h-4 text-rose-600" />
-                                  <span>Cancel Order</span>
-                                </button>
                               </div>
-                            )}
-                          </div>
-
+                            </>
+                          )}
                         </div>
                       </td>
                     )}
