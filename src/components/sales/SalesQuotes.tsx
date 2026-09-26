@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, RefreshCw } from 'lucide-react';
+import { Plus, Search, Edit, Trash2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getQuotes, createQuote, updateQuote, deleteQuote, updateQuoteStatus } from '../../api/quoteApi';
 import { getParties } from '../../api/partyApi';
@@ -255,11 +255,6 @@ const SalesQuotes: React.FC = () => {
             </select>
           </div>
           <div className="flex items-center space-x-2">
-            <button onClick={fetchData}
-              className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200"
-              title="Refresh Quotes">
-              <RefreshCw className="w-4 h-4" />
-            </button>
             {canCreate && (
               <button onClick={() => setShowForm(true)}
                 className="flex items-center gap-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">

@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
   Factory, Package, AlertTriangle, CheckCircle2, Clock,
   ChevronDown, ChevronRight, Search, Download, Printer,
-  Eye, Play, RefreshCw, Layers, Calendar, Filter, ArrowUpDown,
+  Eye, Play, Layers, Calendar, Filter, ArrowUpDown,
   Building, Phone, ArrowRight, ShieldCheck, Box, Sparkles,
   TrendingUp, Check, MessageSquare, Tag, Zap, X
 } from 'lucide-react';
@@ -642,15 +642,6 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
             <Printer className="w-4 h-4" />
           </button>
 
-          {onRefresh && (
-            <button
-              onClick={onRefresh}
-              className="p-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-gray-600 cursor-pointer transition-colors"
-              title="Refresh Orders & Stock"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
-          )}
         </div>
       </div>
 

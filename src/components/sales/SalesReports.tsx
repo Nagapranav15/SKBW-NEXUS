@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart3, TrendingUp, FileText, ShoppingCart, RefreshCw } from 'lucide-react';
+import { BarChart3, TrendingUp, FileText, ShoppingCart } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getSalesReport } from '../../api/dashboardApi';
 
@@ -41,7 +41,6 @@ const SalesReports: React.FC = () => {
           <div><label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
             <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg" /></div>
           <button onClick={handleFilter} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">Apply Filter</button>
-          <button onClick={fetchReport} className="p-2.5 text-gray-600 hover:bg-gray-100 border border-gray-300 rounded-lg transition-colors bg-white shadow-sm" title="Refresh report"><RefreshCw className="w-4 h-4" /></button>
         </div>
       </div>
 

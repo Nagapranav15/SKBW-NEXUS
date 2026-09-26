@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, RefreshCw } from 'lucide-react';
+import { Plus, Search, Edit, Trash2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getDeliveryChallans, createDeliveryChallan, updateDeliveryChallan, deleteDeliveryChallan } from '../../api/deliveryChallanApi';
 import { getSalesOrders } from '../../api/salesOrderApi';
@@ -98,7 +98,6 @@ const DeliveryChallan: React.FC = () => {
             <input type="text" placeholder="Search challans..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg" />
           </div>
           <div className="flex items-center space-x-2">
-            <button onClick={fetchData} className="p-2 text-gray-600 hover:bg-gray-100 border border-gray-300 rounded-lg transition-colors bg-white shadow-sm" title="Refresh page"><RefreshCw className="w-4 h-4" /></button>
             {canManage && <button onClick={() => setShowForm(true)} className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"><Plus className="w-4 h-4" /><span>New Challan</span></button>}
           </div>
         </div>

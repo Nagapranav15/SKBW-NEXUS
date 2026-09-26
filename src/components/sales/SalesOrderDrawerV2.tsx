@@ -3,7 +3,7 @@ import {
   Save, Plus, Trash2, Search, ChevronDown, Calendar, User, Package, 
   AlertCircle, FileText, Check, Percent, X, MoreVertical, Edit2, 
   Phone, MapPin, Receipt, Truck, Copy, ExternalLink, Eye, Building2,
-  Settings, Zap, Sparkles, RefreshCw, RotateCcw
+  Settings, Zap, Sparkles, RotateCcw
 } from 'lucide-react';
 import Modal from '../ui/Modal';
 import { getSkusV2, getBalancesV2, SkuV2 } from '../../api/mfgApiV2';
@@ -359,6 +359,10 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   const [highlightedCustomerIdx, setHighlightedCustomerIdx] = useState<number>(0);
   const [highlightedProductIdxMap, setHighlightedProductIdxMap] = useState<Record<number, number>>({});
   const dropdownContainerRef = useRef<HTMLDivElement>(null);
+  const quickPresetListRef = useRef<HTMLDivElement>(null);
+  const chargePresetListRef = useRef<HTMLDivElement>(null);
+  const [quickPresetOpenUpwards, setQuickPresetOpenUpwards] = useState(false);
+  const [chargeDropdownOpenUpwards, setChargeDropdownOpenUpwards] = useState(false);
 
   // Auto-focus 1st field (Customer Search Input) & Open Customer Dropdown by default upon opening form
   useEffect(() => {
@@ -414,6 +418,40 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       }
     }
   }, [highlightedProductIdxMap, activeItemDropdownIdx]);
+
+  // Scroll highlighted Quick Preset dropdown item into view when navigating with Arrow keys
+  useEffect(() => {
+    if (showQuickPresetMenu && quickPresetListRef.current) {
+      const container = quickPresetListRef.current;
+      const targetItem = container.children[highlightedQuickPresetIdx] as HTMLElement;
+      if (targetItem) {
+        const containerRect = container.getBoundingClientRect();
+        const itemRect = targetItem.getBoundingClientRect();
+        if (itemRect.top < containerRect.top) {
+          container.scrollTop -= (containerRect.top - itemRect.top);
+        } else if (itemRect.bottom > containerRect.bottom) {
+          container.scrollTop += (itemRect.bottom - containerRect.bottom);
+        }
+      }
+    }
+  }, [highlightedQuickPresetIdx, showQuickPresetMenu]);
+
+  // Scroll highlighted Charge Table Preset item into view when navigating with Arrow keys
+  useEffect(() => {
+    if (activeChargeDropdown !== null && chargePresetListRef.current) {
+      const container = chargePresetListRef.current;
+      const targetItem = container.children[highlightedChargePresetIdx] as HTMLElement;
+      if (targetItem) {
+        const containerRect = container.getBoundingClientRect();
+        const itemRect = targetItem.getBoundingClientRect();
+        if (itemRect.top < containerRect.top) {
+          container.scrollTop -= (containerRect.top - itemRect.top);
+        } else if (itemRect.bottom > containerRect.bottom) {
+          container.scrollTop += (itemRect.bottom - containerRect.bottom);
+        }
+      }
+    }
+  }, [highlightedChargePresetIdx, activeChargeDropdown]);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -1381,6 +1419,12 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
         onClose();
       } else if (e.altKey && (e.key === 'p' || e.key === 'P')) {
         e.preventDefault();
+        const btn = document.querySelector('.charge-preset-menu button') as HTMLElement;
+        if (btn) {
+          const rect = btn.getBoundingClientRect();
+          const spaceBelow = window.innerHeight - rect.bottom;
+          setQuickPresetOpenUpwards(spaceBelow < 280 && rect.top > 280);
+        }
         setShowQuickPresetMenu(prev => !prev);
         setHighlightedQuickPresetIdx(0);
       } else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -2405,7 +2449,13 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                     <div className="relative charge-preset-menu">
                       <button
                         type="button"
-                        onClick={() => setShowQuickPresetMenu(!showQuickPresetMenu)}
+                        onClick={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const spaceBelow = window.innerHeight - rect.bottom;
+                          setQuickPresetOpenUpwards(spaceBelow < 280 && rect.top > 280);
+                          setShowQuickPresetMenu(!showQuickPresetMenu);
+                          setHighlightedQuickPresetIdx(0);
+                        }}
                         className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100/80 text-blue-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-blue-200 shadow-3xs"
                       >
                         <Sparkles className="w-3.5 h-3.5 text-blue-600" />
@@ -2415,7 +2465,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
                       {showQuickPresetMenu && (
                         <div 
-                          className="absolute right-0 top-full mt-1 w-72 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1 text-xs divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100"
+                          className={`absolute right-0 ${quickPresetOpenUpwards ? 'bottom-full mb-1' : 'top-full mt-1'} w-72 max-h-[80vh] bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1 text-xs divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100`}
                           role="menu"
                         >
                           <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
@@ -2435,7 +2485,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                               <span>Manage</span>
                             </button>
                           </div>
-                          <div className="max-h-56 overflow-y-auto py-1" id="quick-preset-list">
+                          <div className="max-h-56 overflow-y-auto py-1 scroll-smooth" id="quick-preset-list" ref={quickPresetListRef}>
                             {predefinedCharges.map((p, pIdx) => {
                               const isSelected = pIdx === highlightedQuickPresetIdx;
                               return (
@@ -2500,11 +2550,17 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                   type="text"
                                   placeholder="Select or type charge name..."
                                   value={ch.name}
-                                  onFocus={() => {
+                                  onFocus={(e) => {
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    const spaceBelow = window.innerHeight - rect.bottom;
+                                    setChargeDropdownOpenUpwards(spaceBelow < 250 && rect.top > 250);
                                     setActiveChargeDropdown(cIdx);
                                     setHighlightedChargePresetIdx(0);
                                   }}
                                   onChange={(e) => {
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    const spaceBelow = window.innerHeight - rect.bottom;
+                                    setChargeDropdownOpenUpwards(spaceBelow < 250 && rect.top > 250);
                                     updateCharge(cIdx, 'name', e.target.value);
                                     setActiveChargeDropdown(cIdx);
                                     setHighlightedChargePresetIdx(0);
@@ -2514,7 +2570,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
                                 {activeChargeDropdown === cIdx && (
                                   <div 
-                                    className="absolute left-0 top-full mt-1 w-72 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1.5 text-xs divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100"
+                                    className={`absolute left-0 ${chargeDropdownOpenUpwards ? 'bottom-full mb-1' : 'top-full mt-1'} w-72 max-h-[80vh] bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1.5 text-xs divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100`}
                                     role="listbox"
                                   >
                                     <div className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
@@ -2530,62 +2586,73 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                         Manage Presets
                                       </span>
                                     </div>
-                                    <div className="max-h-48 overflow-y-auto py-1">
-                                      {predefinedCharges
-                                        .filter(p => !ch.name.trim() || p.name.toLowerCase().includes(ch.name.toLowerCase()))
-                                        .map((p, pIdx) => {
-                                          const isSelected = pIdx === highlightedChargePresetIdx;
-                                          return (
-                                            <button
-                                              key={p.id}
-                                              type="button"
-                                              id={`charge-preset-opt-${cIdx}-${pIdx}`}
-                                              onClick={() => handleSelectPresetCharge(cIdx, p)}
-                                              onMouseEnter={() => setHighlightedChargePresetIdx(pIdx)}
-                                              className={`w-full px-3 py-1.5 text-left flex items-center justify-between group transition-colors cursor-pointer ${
-                                                isSelected
-                                                  ? 'bg-blue-100/90 text-blue-900 font-bold ring-1 ring-inset ring-blue-400'
-                                                  : 'hover:bg-blue-50/70 text-gray-800'
-                                              }`}
-                                              role="option"
-                                              aria-selected={isSelected}
-                                            >
-                                              <span className="font-semibold truncate">{p.name}</span>
-                                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 ml-2 ${p.calculationType === 'per_gbl' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'}`}>
-                                                {p.calculationType === 'per_gbl' ? `₹${p.defaultRate}/GBL` : `₹${p.defaultRate} Flat`}
-                                              </span>
-                                            </button>
-                                          );
-                                        })}
+                                    <div className="max-h-48 overflow-y-auto py-1 scroll-smooth" ref={chargePresetListRef}>
+                                      {(() => {
+                                        const filteredPresets = predefinedCharges.filter(p => !ch.name.trim() || p.name.toLowerCase().includes(ch.name.toLowerCase()));
+                                        return (
+                                          <>
+                                            {filteredPresets.map((p, pIdx) => {
+                                              const isSelected = pIdx === highlightedChargePresetIdx;
+                                              return (
+                                                <button
+                                                  key={p.id}
+                                                  type="button"
+                                                  id={`charge-preset-opt-${cIdx}-${pIdx}`}
+                                                  onClick={() => handleSelectPresetCharge(cIdx, p)}
+                                                  onMouseEnter={() => setHighlightedChargePresetIdx(pIdx)}
+                                                  className={`w-full px-3 py-1.5 text-left flex items-center justify-between group transition-colors cursor-pointer ${
+                                                    isSelected
+                                                      ? 'bg-blue-100/90 text-blue-900 font-bold ring-1 ring-inset ring-blue-400'
+                                                      : 'hover:bg-blue-50/70 text-gray-800'
+                                                  }`}
+                                                  role="option"
+                                                  aria-selected={isSelected}
+                                                >
+                                                  <span className="font-semibold truncate">{p.name}</span>
+                                                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 ml-2 ${p.calculationType === 'per_gbl' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'}`}>
+                                                    {p.calculationType === 'per_gbl' ? `₹${p.defaultRate}/GBL` : `₹${p.defaultRate} Flat`}
+                                                  </span>
+                                                </button>
+                                              );
+                                            })}
 
-                                      {/* Inline Creator for new charge */}
-                                      {ch.name.trim() && !predefinedCharges.some(p => p.name.toLowerCase() === ch.name.trim().toLowerCase()) && (
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            saveNewPredefinedCharge(ch.name.trim(), 'per_gbl', Number(ch.rate) || 5);
-                                            setOtherCharges(prev => {
-                                              const copy = [...prev];
-                                              const targetQty = totalOrderGbl > 0 ? totalOrderGbl : 1;
-                                              copy[cIdx] = {
-                                                ...copy[cIdx],
-                                                name: ch.name.trim(),
-                                                chargeType: 'per_gbl',
-                                                quantity: targetQty,
-                                                rate: Number(copy[cIdx].rate) || 5,
-                                                amount: Math.round(targetQty * (Number(copy[cIdx].rate) || 5) * 100) / 100
-                                              };
-                                              return copy;
-                                            });
-                                            setActiveChargeDropdown(null);
-                                            showToast(`Saved "${ch.name.trim()}" to Predefined Charges`, 'success');
-                                          }}
-                                          className="w-full px-3 py-2 text-left bg-blue-50/70 hover:bg-blue-100/90 text-blue-700 font-bold flex items-center gap-1.5 text-xs border-t border-blue-100 cursor-pointer"
-                                        >
-                                          <Plus className="w-3.5 h-3.5 text-blue-600" />
-                                          <span>Save & Use "{ch.name.trim()}" (Per GBL)</span>
-                                        </button>
-                                      )}
+                                            {/* Inline Creator for new charge */}
+                                            {ch.name.trim() && !predefinedCharges.some(p => p.name.toLowerCase() === ch.name.trim().toLowerCase()) && (
+                                              <button
+                                                type="button"
+                                                id={`charge-preset-opt-${cIdx}-${filteredPresets.length}`}
+                                                onMouseEnter={() => setHighlightedChargePresetIdx(filteredPresets.length)}
+                                                onClick={() => {
+                                                  saveNewPredefinedCharge(ch.name.trim(), 'per_gbl', Number(ch.rate) || 5);
+                                                  setOtherCharges(prev => {
+                                                    const copy = [...prev];
+                                                    const targetQty = totalOrderGbl > 0 ? totalOrderGbl : 1;
+                                                    copy[cIdx] = {
+                                                      ...copy[cIdx],
+                                                      name: ch.name.trim(),
+                                                      chargeType: 'per_gbl',
+                                                      quantity: targetQty,
+                                                      rate: Number(copy[cIdx].rate) || 5,
+                                                      amount: Math.round(targetQty * (Number(copy[cIdx].rate) || 5) * 100) / 100
+                                                    };
+                                                    return copy;
+                                                  });
+                                                  setActiveChargeDropdown(null);
+                                                  showToast(`Saved "${ch.name.trim()}" to Predefined Charges`, 'success');
+                                                }}
+                                                className={`w-full px-3 py-2 text-left flex items-center gap-1.5 text-xs border-t border-blue-100 cursor-pointer ${
+                                                  highlightedChargePresetIdx === filteredPresets.length
+                                                    ? 'bg-blue-100 text-blue-900 font-bold ring-1 ring-inset ring-blue-400'
+                                                    : 'bg-blue-50/70 hover:bg-blue-100/90 text-blue-700 font-bold'
+                                                }`}
+                                              >
+                                                <Plus className="w-3.5 h-3.5 text-blue-600" />
+                                                <span>Save & Use "{ch.name.trim()}" (Per GBL)</span>
+                                              </button>
+                                            )}
+                                          </>
+                                        );
+                                      })()}
                                     </div>
                                     <div className="px-3 py-1 bg-gray-50 text-[10px] text-gray-500 flex items-center justify-between">
                                       <span>Use <kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-bold">↑</kbd><kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-bold ml-0.5">↓</kbd></span>
