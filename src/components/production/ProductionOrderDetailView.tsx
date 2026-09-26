@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { ProductionOrder } from '../../types/production';
 import { showToast } from '../ui/Toast';
+import { formatOrderNo } from './ProductionOrdersList';
 
 interface ProductionOrderDetailViewProps {
   order: ProductionOrder;
@@ -73,7 +74,7 @@ export const ProductionOrderDetailView: React.FC<ProductionOrderDetailViewProps>
         <div className="flex items-center space-x-2 text-[11px] text-gray-400 font-medium mb-2">
           <button onClick={onBack} className="hover:text-blue-600 cursor-pointer">Production Orders</button>
           <span>›</span>
-          <span className="text-gray-600 font-semibold">{order.orderNumber}</span>
+          <span className="text-gray-600 font-semibold">{formatOrderNo(order.orderNumber)}</span>
           <span>›</span>
           <span className="text-blue-600 font-bold">{order.status}</span>
         </div>
@@ -88,7 +89,7 @@ export const ProductionOrderDetailView: React.FC<ProductionOrderDetailViewProps>
             </button>
             <div>
               <div className="flex items-center space-x-2.5">
-                <h1 className="text-xl font-bold text-gray-900 tracking-tight">{order.orderNumber}</h1>
+                <h1 className="text-xl font-bold text-gray-900 tracking-tight font-mono">{formatOrderNo(order.orderNumber)}</h1>
                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${
                   order.status === 'Completed'
                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
@@ -284,7 +285,7 @@ export const ProductionOrderDetailView: React.FC<ProductionOrderDetailViewProps>
               <div className="grid grid-cols-2 gap-y-3.5 text-xs">
                 <div>
                   <span className="text-[11px] text-gray-400 font-medium block">Order No.</span>
-                  <span className="font-bold text-gray-900 font-mono mt-0.5 block">{order.orderNumber}</span>
+                  <span className="font-bold text-gray-900 font-mono mt-0.5 block">{formatOrderNo(order.orderNumber)}</span>
                 </div>
 
                 <div>

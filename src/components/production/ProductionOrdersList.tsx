@@ -22,6 +22,17 @@ interface ProductionOrdersListProps {
   tabCounts?: Record<string, number>;
 }
 
+export const formatOrderNo = (raw?: string): string => {
+  if (!raw) return '';
+  const match = raw.match(/^(?:PR|PO)-(?:[0-9]{4}-)?([0-9]+)$/);
+  if (match && match[1]) {
+    const num = parseInt(match[1], 10);
+    const padLength = Math.max(3, String(num).length);
+    return `PO-${String(num).padStart(padLength, '0')}`;
+  }
+  return raw.replace(/^PR-/, 'PO-');
+};
+
 export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
   orders,
   activeTab,
@@ -85,7 +96,8 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
       // Search
       if (searchTerm.trim()) {
         const query = searchTerm.toLowerCase();
-        const matchNumber = order.orderNumber.toLowerCase().includes(query);
+        const formattedNum = formatOrderNo(order.orderNumber).toLowerCase();
+        const matchNumber = order.orderNumber.toLowerCase().includes(query) || formattedNum.includes(query);
         const matchItem = order.itemName.toLowerCase().includes(query);
         const matchCode = order.itemCode.toLowerCase().includes(query);
         const matchDept = order.department.toLowerCase().includes(query);
@@ -138,7 +150,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
     try {
       const exportData = filteredOrders.map((o, idx) => ({
         '#': idx + 1,
-        'Order No': o.orderNumber,
+        'Order No': formatOrderNo(o.orderNumber),
         'Item Name': o.itemName,
         'Item Code': o.itemCode,
         'Type': o.itemType,
@@ -548,9 +560,9 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                         <td className="py-3.5 px-3 font-bold text-gray-900 whitespace-nowrap">
                           <button
                             onClick={() => onViewOrder(order)}
-                            className="hover:text-blue-600 hover:underline transition-colors text-left font-bold cursor-pointer"
+                            className="hover:text-blue-600 hover:underline transition-colors text-left font-bold cursor-pointer font-mono"
                           >
-                            {order.orderNumber}
+                            {formatOrderNo(order.orderNumber)}
                           </button>
                         </td>
 
@@ -754,7 +766,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                                   <button
                                     onClick={() => {
                                       setActionMenuOrderId(null);
-                                      if (window.confirm(`Delete production order ${order.orderNumber}?`)) {
+                                      if (window.confirm(`Delete production order ${formatOrderNo(order.orderNumber)}?`)) {
                                         onDeleteOrder(order._id);
                                       }
                                     }}

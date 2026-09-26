@@ -68,7 +68,19 @@ exports.getProductionOrders = async (req, res) => {
       .sort({ createdAt: -1, orderNumber: -1 })
       .lean();
 
-    res.json(orders);
+    // Ensure all order numbers display standard PO- format
+    const normalized = orders.map(o => {
+      if (o.orderNumber && o.orderNumber.startsWith("PR-")) {
+        const match = o.orderNumber.match(/^PR-(\d+)$/);
+        const newNo = match 
+          ? `PO-${String(parseInt(match[1], 10)).padStart(Math.max(3, String(parseInt(match[1], 10)).length), "0")}`
+          : o.orderNumber.replace(/^PR-/, "PO-");
+        return { ...o, orderNumber: newNo };
+      }
+      return o;
+    });
+
+    res.json(normalized);
   } catch (err) {
     console.error("Error fetching production orders:", err);
     res.status(500).json({ msg: "Failed to fetch production orders", error: err.message });
@@ -99,12 +111,20 @@ exports.getProductionOrderById = async (req, res) => {
     if (mongoose.Types.ObjectId.isValid(id)) {
       query = { _id: id };
     } else {
-      query = { orderNumber: id };
+      const altId = id.startsWith("PO-") ? id.replace(/^PO-0*/, "PR-0") : id.replace(/^PR-0*/, "PO-0");
+      query = { $or: [{ orderNumber: id }, { orderNumber: altId }] };
     }
 
     const order = await ProductionOrder.findOne(query).lean();
     if (!order) {
       return res.status(404).json({ msg: "Production order not found" });
+    }
+
+    if (order.orderNumber && order.orderNumber.startsWith("PR-")) {
+      const match = order.orderNumber.match(/^PR-(\d+)$/);
+      order.orderNumber = match
+        ? `PO-${String(parseInt(match[1], 10)).padStart(Math.max(3, String(parseInt(match[1], 10)).length), "0")}`
+        : order.orderNumber.replace(/^PR-/, "PO-");
     }
 
     res.json(order);
