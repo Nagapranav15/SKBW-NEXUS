@@ -186,11 +186,16 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   const [locationName, setLocationName] = useState<string>('');
 
   const [department, setDepartment] = useState<string>('');
-  const [plannedStartDate, setPlannedStartDate] = useState<string>(''); // Empty by default
+  const [plannedStartDate] = useState<string>(() => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  });
   const [requiredCompletionDate, setRequiredCompletionDate] = useState<string>(''); // Empty by default
   const [priority, setPriority] = useState<PriorityLevel>('Normal');
   const [remarks, setRemarks] = useState<string>(''); // Empty by default
-  const [reference, setReference] = useState<string>(''); // Empty by default
 
   // Production Presets (Exact same UI as Sales Order)
   const [productionPresets, setProductionPresets] = useState<ProductionPreset[]>(() => {
@@ -600,7 +605,6 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         plannedStartDate: plannedStartDate || '',
         requiredCompletionDate: requiredCompletionDate || '',
         priority: priority,
-        reference: reference || 'Not Selected',
         remarks: remarks || '-',
         bomType: bomType,
         bomItems: bomItems,
@@ -1101,14 +1105,15 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   }}
                 />
 
-                {/* Planned Start Date - Empty by default */}
+                {/* Planned Start Date - Today's date (uneditable) */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1.5">Planned Start Date</label>
                   <input
                     type="date"
                     value={plannedStartDate}
-                    onChange={e => setPlannedStartDate(e.target.value)}
-                    className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 font-medium focus:outline-none focus:border-blue-500"
+                    readOnly
+                    disabled
+                    className="w-full text-xs text-gray-700 bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 font-semibold cursor-not-allowed select-none h-[38px]"
                   />
                 </div>
 
@@ -1119,7 +1124,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                     type="date"
                     value={requiredCompletionDate}
                     onChange={e => setRequiredCompletionDate(e.target.value)}
-                    className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 font-medium focus:outline-none focus:border-blue-500"
+                    className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 font-medium focus:outline-none focus:border-blue-500 h-[38px]"
                   />
                 </div>
 
@@ -1129,7 +1134,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   <select
                     value={priority}
                     onChange={e => setPriority(e.target.value as PriorityLevel)}
-                    className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 font-medium focus:outline-none focus:border-blue-500 cursor-pointer"
+                    className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 font-medium focus:outline-none focus:border-blue-500 cursor-pointer h-[38px]"
                   >
                     <option value="Normal">Normal</option>
                     <option value="High">High</option>
@@ -1138,27 +1143,15 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   </select>
                 </div>
 
-                {/* Reference */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Reference (Optional)</label>
-                  <input
-                    type="text"
-                    value={reference}
-                    onChange={e => setReference(e.target.value)}
-                    placeholder="e.g. Sales Order #SO-1029"
-                    className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
                 {/* Remarks */}
-                <div className="md:col-span-2">
+                <div className="md:col-span-3">
                   <label className="block text-xs font-semibold text-gray-700 mb-1.5">Remarks</label>
                   <input
                     type="text"
                     value={remarks}
                     onChange={e => setRemarks(e.target.value)}
                     placeholder="Add any notes..."
-                    className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+                    className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500 h-[38px]"
                   />
                 </div>
               </div>
@@ -1508,12 +1501,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   <span className="font-semibold text-gray-900 mt-0.5 block">{requiredCompletionDate || '-'}</span>
                 </div>
 
-                <div>
-                  <span className="text-[11px] font-semibold text-gray-400 block uppercase">Reference</span>
-                  <span className="font-semibold text-gray-900 mt-0.5 block">{reference || 'Not Selected'}</span>
-                </div>
-
-                <div className="md:col-span-2">
+                <div className="md:col-span-3">
                   <span className="text-[11px] font-semibold text-gray-400 block uppercase">Remarks</span>
                   <span className="text-gray-700 mt-0.5 block">{remarks || '-'}</span>
                 </div>

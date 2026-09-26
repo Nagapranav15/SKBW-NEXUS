@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, ChevronDown, Settings, Trash2, Plus, RotateCcw, X, Check, Search, MapPin } from 'lucide-react';
 import { showToast } from '../ui/Toast';
 import { WarehouseLocationV2 } from '../../api/mfgApiV2';
+import { LocationSelectPopup } from '../stock_v2/LocationSelectPopup';
 
 export interface PresetItem {
   id?: string;
@@ -413,29 +414,28 @@ export const PresetField: React.FC<PresetFieldProps> = ({
                 <span className="text-[11px] font-bold text-blue-900 block uppercase tracking-wide">
                   + Add New Preset
                 </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-center">
                   <input
                     type="text"
                     value={newPresetInput}
                     onChange={e => setNewPresetInput(e.target.value)}
-                    placeholder={`Preset name...`}
-                    className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+                    placeholder={`Preset name (e.g. Binding Department)...`}
+                    className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500 h-[38px]"
                     required
                   />
 
                   {locations.length > 0 ? (
-                    <select
-                      value={newPresetLocationId}
-                      onChange={e => setNewPresetLocationId(e.target.value)}
-                      className="w-full text-xs text-gray-700 bg-white border border-gray-200 rounded-lg px-2.5 py-2 focus:outline-none focus:border-blue-500"
-                    >
-                      <option value="">Assign Default Location (Optional)...</option>
-                      {locations.map(loc => (
-                        <option key={loc._id || loc.id} value={loc._id || loc.id}>
-                          {loc.name || loc.code} {loc.level ? `(${loc.level})` : ''}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="w-full">
+                      <LocationSelectPopup
+                        hideLabel
+                        variant="compact"
+                        locations={locations}
+                        locationId={newPresetLocationId}
+                        onChange={(wId, fId, zId, lId) => {
+                          setNewPresetLocationId(lId);
+                        }}
+                      />
+                    </div>
                   ) : null}
                 </div>
 
@@ -461,46 +461,45 @@ export const PresetField: React.FC<PresetFieldProps> = ({
                     <div key={item.name} className="p-3 flex items-center justify-between hover:bg-gray-50 text-xs gap-3">
                       <div className="min-w-0 flex-1">
                         <span className="font-semibold text-gray-800 block text-xs">{item.name}</span>
-                        {/* Location assignment selector in list */}
-                        {locations.length > 0 ? (
-                          <div className="mt-1 flex items-center gap-1.5">
-                            <span className="text-[10px] text-gray-400 font-medium">Default Location:</span>
-                            <select
-                              value={item.locationId || ''}
-                              onChange={e => {
-                                const selectedId = e.target.value;
-                                const locObj = locations.find(l => String(l._id || l.id) === String(selectedId));
-                                const updated = presets.map(p => {
-                                  if (p.name === item.name) {
-                                    return {
-                                      ...p,
-                                      locationId: selectedId,
-                                      locationName: locObj ? (locObj.name || locObj.code || '') : '',
-                                      warehouseId: locObj ? String(locObj._id || locObj.id) : ''
-                                    };
-                                  }
-                                  return p;
-                                });
-                                savePresets(updated);
-                                showToast(`Updated default location for "${item.name}"`, 'success');
-                              }}
-                              className="text-[11px] bg-white border border-gray-200 rounded px-2 py-0.5 font-medium text-gray-700 focus:border-blue-500"
-                            >
-                              <option value="">No location assigned</option>
-                              {locations.map(loc => (
-                                <option key={loc._id || loc.id} value={loc._id || loc.id}>
-                                  {loc.name || loc.code} {loc.level ? `(${loc.level})` : ''}
-                                </option>
-                              ))}
-                            </select>
+                        {item.locationName ? (
+                          <div className="text-[10px] text-blue-600 font-medium flex items-center gap-1 mt-0.5 truncate">
+                            <MapPin className="w-2.5 h-2.5 shrink-0" />
+                            <span className="truncate">Default: {item.locationName}</span>
                           </div>
-                        ) : item.locationName ? (
-                          <div className="text-[10px] text-blue-600 font-medium flex items-center gap-1 mt-0.5">
-                            <MapPin className="w-2.5 h-2.5" />
-                            <span>{item.locationName}</span>
-                          </div>
-                        ) : null}
+                        ) : (
+                          <span className="text-[10px] text-gray-400 italic">No default location assigned</span>
+                        )}
                       </div>
+
+                      {locations.length > 0 && (
+                        <div className="w-48 sm:w-56 shrink-0">
+                          <LocationSelectPopup
+                            hideLabel
+                            variant="compact"
+                            locations={locations}
+                            locationId={item.locationId || ''}
+                            onChange={(wId, fId, zId, lId) => {
+                              const locObj = locations.find(l => String(l._id || l.id) === String(lId));
+                              const locTitle = locObj ? (locObj.name || locObj.code || '') : '';
+                              const updated = presets.map(p => {
+                                if (p.name === item.name) {
+                                  return {
+                                    ...p,
+                                    locationId: lId,
+                                    locationName: locTitle,
+                                    warehouseId: wId || (locObj ? String(locObj._id || locObj.id) : ''),
+                                    floorId: fId || '',
+                                    zoneId: zId || ''
+                                  };
+                                }
+                                return p;
+                              });
+                              savePresets(updated);
+                              showToast(`Assigned location to "${item.name}"`, 'success');
+                            }}
+                          />
+                        </div>
+                      )}
 
                       <button
                         type="button"
