@@ -1,17 +1,18 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Factory, Package, AlertTriangle, CheckCircle2, Clock,
   ChevronDown, ChevronRight, Search, Download, Printer,
   Eye, Play, Layers, Calendar, Filter, ArrowUpDown,
   Building, Phone, ArrowRight, ShieldCheck, Box, Sparkles,
-  TrendingUp, Check, MessageSquare, Tag, Zap, X
+  TrendingUp, Check, MessageSquare, Tag, Zap, X, FileText
 } from 'lucide-react';
 import { SalesOrderV2 } from '../../api/salesOrderApiV2';
 import { getBalancesV2, getSkusV2 } from '../../api/mfgApiV2';
 import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../ui/Toast';
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
 import { formatDateDDMMYYYY } from '../../utils/dateUtils';
 
 interface PendingOrdersProductionViewProps {
@@ -24,6 +25,7 @@ interface PendingOrdersProductionViewProps {
 interface SkuProductionRequirement {
   skuCode: string;
   skuName: string;
+  category?: string;
   skuId?: string;
   pcsPerGbl: number;
   totalOrderedPcs: number;
@@ -101,6 +103,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedSkus, setExpandedSkus] = useState<Set<string>>(new Set());
   const [stockMap, setStockMap] = useState<Map<string, { pcs: number; gbl: number }>>(new Map());
+  const [categoryMap, setCategoryMap] = useState<Map<string, string>>(new Map());
   const [loadingStock, setLoadingStock] = useState(false);
   const [inProductionSkus, setInProductionSkus] = useState<Set<string>>(new Set());
 
@@ -124,6 +127,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
       getSkusV2(compId).catch(() => [])
     ]).then(([bals, skus]) => {
       const smap = new Map<string, { pcs: number; gbl: number }>();
+      const catMap = new Map<string, string>();
       const bList = Array.isArray(bals) ? bals : [];
       const sList = Array.isArray(skus) ? skus : [];
 
@@ -147,9 +151,17 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
         if (sId) smap.set(sId, val);
         if (code) smap.set(code, val);
         if (name) smap.set(name, val);
+
+        const cat = s.category || s.stockCategory || '';
+        if (cat) {
+          if (sId) catMap.set(sId, cat);
+          if (code) catMap.set(code, cat);
+          if (name) catMap.set(name, cat);
+        }
       });
 
       setStockMap(smap);
+      setCategoryMap(catMap);
     }).catch(err => {
       console.warn('Failed to load stock balances:', err);
     }).finally(() => {
@@ -167,6 +179,8 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
         const name = item.itemName || code;
         const key = code || name;
         const pcsPerGbl = item.pcsPerGbl || 100;
+        const rawCat = (item as any).category || (item as any).stockCategory || categoryMap.get(code.toLowerCase()) || categoryMap.get(name.toLowerCase()) || '';
+        const category = rawCat || (code.includes('112P') || name.toUpperCase().includes('112P') ? 'FINISHED GOODS' : '');
 
         const orderedPcs = Number(item.quantity) || 0;
         const orderedGbl = item.gbl || Math.ceil(orderedPcs / pcsPerGbl);
@@ -200,6 +214,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
           map.set(key, {
             skuCode: code,
             skuName: name,
+            category,
             skuId: item.skuId ? String(item.skuId) : undefined,
             pcsPerGbl,
             totalOrderedPcs: 0,
@@ -514,6 +529,296 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
     showToast('Exported Production Schedule to Excel', 'success');
   };
 
+  // Export PDF Report dynamically matching Tally ERP format (Stock Category Outstandings or Pending Sales Order)
+  const handleExportPdf = () => {
+    try {
+      const companyName = (selectedCompany?.name || 'SRI KRISHNA BINDING WORKS').toUpperCase();
+      const companyAddress = (selectedCompany?.address || '4TH CROSS ROAD , R R NAGAR , VIJAYAWADA').toUpperCase();
+      const companyEmail = (selectedCompany?.email || 'SKBW.VIJAYAWADA@GMAIL.COM').toUpperCase();
+      const dateRange = getReportDateRangeText();
+      const today = new Date();
+
+      if (viewMode === 'order_wise') {
+        // ══════════════════════════════════════════════════════════════
+        // PDF REPORT 1: PENDING SALES ORDER (CUSTOMER ORDER WISE)
+        // ══════════════════════════════════════════════════════════════
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        let curY = 15;
+        let curPage = 1;
+
+        // Centered Header
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text(companyName, 105, curY, { align: 'center' });
+        curY += 6;
+        doc.setFontSize(12);
+        doc.text('Pending Sales Order', 105, curY, { align: 'center' });
+        const titleW = doc.getTextWidth('Pending Sales Order');
+        doc.setLineWidth(0.3);
+        doc.line(105 - titleW / 2, curY + 0.8, 105 + titleW / 2, curY + 0.8);
+        curY += 7;
+
+        // Date range
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.text(dateRange, 195, curY, { align: 'right' });
+        curY += 3;
+
+        const renderOrderTableHeader = () => {
+          doc.setLineWidth(0.2);
+          doc.line(15, curY, 195, curY);
+          curY += 3.5;
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(8);
+          doc.text('Date', 16, curY);
+          doc.text('Ledger Name', 40, curY);
+          doc.text('Order No', 135, curY);
+          doc.text('Pending Qty', 168, curY, { align: 'right' });
+          doc.text('OverDue Days', 193, curY, { align: 'right' });
+          curY += 2;
+          doc.line(15, curY, 195, curY);
+          curY += 4;
+        };
+
+        renderOrderTableHeader();
+
+        let grandTotalPendingGbl = 0;
+
+        filteredCustomerOrders.forEach(order => {
+          const orderDateObj = order.orderDate ? new Date(order.orderDate) : today;
+          const diffDays = Math.max(0, Math.floor((today.getTime() - orderDateObj.getTime()) / (1000 * 60 * 60 * 24)));
+          const items = order.items || [];
+          const totalPendingGbl = items.reduce((sum, item) => {
+            const pcsPerGbl = item.pcsPerGbl || 100;
+            const pendingPcs = Math.max(0, (item.quantity || 0) - (item.dispatchedQty || 0));
+            return sum + Math.ceil(pendingPcs / pcsPerGbl);
+          }, 0);
+          grandTotalPendingGbl += totalPendingGbl;
+
+          if (curY + 12 + items.length * 4 > 275) {
+            doc.setFont('helvetica', 'italic');
+            doc.setFontSize(8);
+            doc.text('continued ...', 195, 285, { align: 'right' });
+            doc.addPage();
+            curPage++;
+            curY = 15;
+            renderOrderTableHeader();
+          }
+
+          // Main Order Row
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8);
+          doc.text(formatReportDate(order.orderDate), 16, curY);
+          doc.setFont('helvetica', 'bold');
+          doc.text((order.customerName || '—').toUpperCase(), 40, curY);
+          doc.setFont('helvetica', 'normal');
+          doc.text(order.orderNumber || '—', 135, curY);
+          doc.setFont('helvetica', 'bold');
+          doc.text(`${totalPendingGbl} GBL`, 168, curY, { align: 'right' });
+          doc.setFont('helvetica', 'normal');
+          doc.text(`( ${diffDays} days)`, 193, curY, { align: 'right' });
+          curY += 4.2;
+
+          // Indented Items
+          items.forEach(item => {
+            const pcsPerGbl = item.pcsPerGbl || 100;
+            const pendingPcs = Math.max(0, (item.quantity || 0) - (item.dispatchedQty || 0));
+            const pendingGbl = item.gbl || Math.ceil(pendingPcs / pcsPerGbl);
+
+            if (curY > 275) {
+              doc.setFont('helvetica', 'italic');
+              doc.setFontSize(8);
+              doc.text('continued ...', 195, 285, { align: 'right' });
+              doc.addPage();
+              curPage++;
+              curY = 15;
+              renderOrderTableHeader();
+            }
+
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(7.8);
+            doc.text((item.itemName || item.skuCode || '—').toUpperCase(), 45, curY);
+            doc.text(`${pendingGbl} GBL`, 168, curY, { align: 'right' });
+            curY += 3.8;
+          });
+
+          doc.setDrawColor(210, 210, 210);
+          doc.line(15, curY, 195, curY);
+          doc.setDrawColor(0, 0, 0);
+          curY += 2;
+        });
+
+        // Total row
+        if (curY > 270) {
+          doc.addPage();
+          curY = 15;
+        }
+        doc.line(15, curY, 195, curY);
+        curY += 4.5;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.text('TOTAL', 135, curY);
+        doc.text(`${grandTotalPendingGbl} GBL`, 168, curY, { align: 'right' });
+        curY += 2;
+        doc.line(15, curY, 195, curY);
+
+        doc.save(`Pending_Sales_Order_${new Date().toISOString().slice(0, 10)}.pdf`);
+        showToast('Exported Pending Sales Order PDF successfully', 'success');
+      } else {
+        // ══════════════════════════════════════════════════════════════
+        // PDF REPORT 2: STOCK CATEGORY OUTSTANDINGS (PRODUCTION VIEW)
+        // ══════════════════════════════════════════════════════════════
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        let curY = 14;
+        let curPage = 1;
+
+        // Centered Header
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(13);
+        doc.text(companyName, 105, curY, { align: 'center' });
+        curY += 4.8;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.5);
+        doc.text(companyAddress, 105, curY, { align: 'center' });
+        curY += 4.2;
+
+        doc.text(`E-Mail : ${companyEmail}`, 105, curY, { align: 'center' });
+        curY += 5.2;
+
+        doc.text('All Stock Categories', 105, curY, { align: 'center' });
+        curY += 4.8;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11.5);
+        doc.text('Stock Category Outstandings', 105, curY, { align: 'center' });
+        curY += 4.5;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.5);
+        doc.text(dateRange, 105, curY, { align: 'center' });
+        curY += 4;
+
+        // Table Header with right-aligned Page 1 and Sales Orders Outstanding
+        const renderTableHeader = (pageNo: number) => {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8);
+          doc.text(`Page ${pageNo}`, 195, curY, { align: 'right' });
+          curY += 3.6;
+          doc.text('Sales Orders Outstanding', 195, curY, { align: 'right' });
+          const titleWidth = doc.getTextWidth('Sales Orders Outstanding');
+          doc.setLineWidth(0.2);
+          doc.line(195 - titleWidth, curY + 0.8, 195, curY + 0.8);
+          curY += 2.5;
+
+          // Top divider line across page
+          doc.line(15, curY, 195, curY);
+          curY += 3.5;
+
+          // Header texts
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(8.5);
+          doc.text('P a r t i c u l a r s', 16, curY + 2);
+          doc.text('Pending Orders', 193, curY, { align: 'right' });
+          curY += 3.8;
+          doc.setFont('helvetica', 'normal');
+          doc.text('Quantity', 158, curY, { align: 'right' });
+          doc.text('(Alt. Units)', 193, curY, { align: 'right' });
+          curY += 2;
+
+          // Bottom divider line across page
+          doc.line(15, curY, 195, curY);
+          curY += 4;
+        };
+
+        renderTableHeader(curPage);
+
+        // Group items:
+        // Categorized items (e.g. 'FINISHED GOODS') and uncategorized items
+        const categorizedMap = new Map<string, typeof filteredRequirements>();
+        const uncategorizedItems: typeof filteredRequirements = [];
+
+        filteredRequirements.forEach(req => {
+          const cat = req.category || (req.skuCode?.toUpperCase().includes('112P') ? 'FINISHED GOODS' : '');
+          if (cat) {
+            if (!categorizedMap.has(cat)) categorizedMap.set(cat, []);
+            categorizedMap.get(cat)!.push(req);
+          } else {
+            uncategorizedItems.push(req);
+          }
+        });
+
+        const checkPageBreak = (neededHeight: number) => {
+          if (curY + neededHeight > 275) {
+            doc.addPage();
+            curPage++;
+            curY = 15;
+            renderTableHeader(curPage);
+          }
+        };
+
+        // Render categorized groups
+        categorizedMap.forEach((items, catName) => {
+          const catGbl = items.reduce((s, i) => s + i.balancePendingGbl, 0);
+          const catPcs = items.reduce((s, i) => s + i.balancePendingPcs, 0);
+
+          checkPageBreak(5);
+          // Category header
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(8.5);
+          doc.text(catName.toUpperCase(), 16, curY);
+          doc.text(`${catGbl} GBL`, 158, curY, { align: 'right' });
+          doc.text(`(${catPcs.toLocaleString()} PCS)`, 193, curY, { align: 'right' });
+          curY += 4.2;
+
+          // Indented items
+          items.forEach(req => {
+            checkPageBreak(4);
+            doc.setFont('helvetica', 'italic');
+            doc.setFontSize(8);
+            doc.text(req.skuName.toUpperCase(), 22, curY);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`${req.balancePendingGbl} GBL`, 158, curY, { align: 'right' });
+            doc.text(`(${req.balancePendingPcs.toLocaleString()} PCS)`, 193, curY, { align: 'right' });
+            curY += 4;
+          });
+        });
+
+        // Render uncategorized items
+        uncategorizedItems.forEach(req => {
+          checkPageBreak(4);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8);
+          doc.text(req.skuName.toUpperCase(), 16, curY);
+          doc.text(`${req.balancePendingGbl} GBL`, 158, curY, { align: 'right' });
+          doc.text(`(${req.balancePendingPcs.toLocaleString()} PCS)`, 193, curY, { align: 'right' });
+          curY += 4;
+        });
+
+        // Grand Total row
+        checkPageBreak(8);
+        doc.line(15, curY, 195, curY);
+        curY += 4.2;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.text('G r a n d   T o t a l', 16, curY);
+        doc.text(`${kpis.totalPendingGbl} GBL`, 158, curY, { align: 'right' });
+        doc.text(`(${kpis.totalPendingPcs.toLocaleString()} PCS)`, 193, curY, { align: 'right' });
+
+        curY += 1.8;
+        doc.line(15, curY, 195, curY);
+        doc.line(15, curY + 0.6, 195, curY + 0.6);
+
+        doc.save(`Stock_Category_Outstandings_${new Date().toISOString().slice(0, 10)}.pdf`);
+        showToast('Exported Stock Category Outstandings PDF successfully', 'success');
+      }
+    } catch (err: any) {
+      console.error('PDF Export Error:', err);
+      showToast('Failed to export PDF: ' + (err.message || 'Unknown error'), 'error');
+    }
+  };
+
   // Print (Tally Alt+P): Identical to the attached Tally ERP printouts
   const handlePrint = () => {
     const printWin = window.open('', '', 'width=950,height=1150');
@@ -686,15 +991,53 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
       const totalPendingGbl = kpis.totalPendingGbl;
       const totalPendingPcs = kpis.totalPendingPcs;
 
-      const itemsHtml = filteredRequirements.map(req => `
-        <tr class="item-row">
-          <td class="col-item">${req.skuName}</td>
-          <td class="col-qty">
-            <span class="qty-gbl">${req.balancePendingGbl} GBL</span>
-            <span class="qty-pcs">(${req.balancePendingPcs.toLocaleString()} PCS)</span>
-          </td>
-        </tr>
-      `).join('');
+      const categorizedMap = new Map<string, typeof filteredRequirements>();
+      const uncategorizedItems: typeof filteredRequirements = [];
+
+      filteredRequirements.forEach(req => {
+        const cat = req.category || (req.skuCode?.toUpperCase().includes('112P') ? 'FINISHED GOODS' : '');
+        if (cat) {
+          if (!categorizedMap.has(cat)) categorizedMap.set(cat, []);
+          categorizedMap.get(cat)!.push(req);
+        } else {
+          uncategorizedItems.push(req);
+        }
+      });
+
+      let groupedRowsHtml = '';
+
+      categorizedMap.forEach((items, catName) => {
+        const catGbl = items.reduce((s, i) => s + i.balancePendingGbl, 0);
+        const catPcs = items.reduce((s, i) => s + i.balancePendingPcs, 0);
+
+        groupedRowsHtml += `
+          <tr class="cat-row">
+            <td class="col-item-cat">${catName.toUpperCase()}</td>
+            <td class="col-qty-cat">${catGbl} GBL</td>
+            <td class="col-alt-cat">(${catPcs.toLocaleString()} PCS)</td>
+          </tr>
+        `;
+
+        items.forEach(req => {
+          groupedRowsHtml += `
+            <tr class="cat-item-row">
+              <td class="col-item-indented">${req.skuName.toUpperCase()}</td>
+              <td class="col-qty-indented">${req.balancePendingGbl} GBL</td>
+              <td class="col-alt-indented">(${req.balancePendingPcs.toLocaleString()} PCS)</td>
+            </tr>
+          `;
+        });
+      });
+
+      uncategorizedItems.forEach(req => {
+        groupedRowsHtml += `
+          <tr class="item-row">
+            <td class="col-item-direct">${req.skuName.toUpperCase()}</td>
+            <td class="col-qty-direct">${req.balancePendingGbl} GBL</td>
+            <td class="col-alt-direct">(${req.balancePendingPcs.toLocaleString()} PCS)</td>
+          </tr>
+        `;
+      });
 
       html = `
         <!DOCTYPE html>
@@ -703,97 +1046,127 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
           <title>Stock Category Outstandings</title>
           <style>
             @media print {
-              @page { size: A4 portrait; margin: 10mm 12mm 12mm 12mm; }
+              @page { size: A4 portrait; margin: 12mm 14mm 12mm 14mm; }
               body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             }
             body {
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
               color: #000;
-              margin: 20px;
+              margin: 15px;
               background: #fff;
             }
-            .header-wrap { text-align: center; line-height: 1.3; }
-            .company-name { font-size: 14pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
-            .company-address { font-size: 9pt; font-weight: bold; margin-top: 2px; }
-            .company-email { font-size: 9pt; font-weight: bold; margin-top: 1px; }
-            .category-subtitle { font-size: 9.5pt; margin-top: 6px; }
-            .report-title { font-size: 12.5pt; font-weight: bold; margin-top: 3px; }
-            .date-range { font-size: 9pt; font-weight: bold; margin-top: 3px; }
+            .header-wrap { text-align: center; line-height: 1.35; }
+            .company-name { font-size: 13.5pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
+            .company-address { font-size: 8.5pt; font-weight: normal; margin-top: 2px; }
+            .company-email { font-size: 8.5pt; font-weight: normal; margin-top: 1px; }
+            .category-subtitle { font-size: 9pt; margin-top: 5px; }
+            .report-title { font-size: 12pt; font-weight: bold; margin-top: 2px; }
+            .date-range { font-size: 8.5pt; font-weight: bold; margin-top: 2px; }
+            
             .sub-info-bar {
               display: flex;
-              justify-content: space-between;
-              font-size: 8.5pt;
+              justify-content: flex-end;
+              text-align: right;
+              font-size: 8pt;
               margin-top: 8px;
               margin-bottom: 2px;
             }
+            .sub-info-right {
+              text-align: right;
+            }
+            .page-no {
+              font-size: 8.5pt;
+            }
+            .outstanding-title {
+              font-size: 8.5pt;
+              text-decoration: underline;
+              margin-top: 1px;
+            }
+
             table.tally-table {
               width: 100%;
               border-collapse: collapse;
-              border: 1px solid #000;
-              font-size: 9pt;
-            }
-            table.tally-table thead th {
-              border: 1px solid #000;
-              padding: 4px 8px;
-              font-weight: bold;
-              background: #fff;
-            }
-            .th-particulars { width: 62%; text-align: left; letter-spacing: 2px; }
-            .th-pending { width: 38%; text-align: right; }
-            .sub-hdr {
-              display: flex;
-              justify-content: flex-end;
-              gap: 35px;
               font-size: 8.5pt;
-              font-weight: normal;
               margin-top: 2px;
             }
-            table.tally-table td {
-              padding: 2.5px 8px;
-            }
-            .col-item-head {
-              width: 62%;
-              border-right: 1px solid #000;
-              font-weight: bold;
-              letter-spacing: 0.5px;
-            }
-            .col-qty-head {
-              width: 38%;
-              text-align: right;
-              font-weight: bold;
-            }
-            .col-item {
-              width: 62%;
-              border-right: 1px solid #000;
-              padding-left: 22px !important;
-              text-transform: uppercase;
-            }
-            .col-qty {
-              width: 38%;
-              text-align: right;
-            }
-            .qty-wrap {
-              display: flex;
-              justify-content: flex-end;
-              gap: 35px;
-            }
-            .qty-gbl {
-              display: inline-block;
-              width: 75px;
-              text-align: right;
-              font-family: inherit;
-            }
-            .qty-pcs {
-              display: inline-block;
-              width: 110px;
-              text-align: right;
-              font-family: inherit;
-            }
-            .grand-total-row td {
+            table.tally-table thead {
               border-top: 1px solid #000;
               border-bottom: 1px solid #000;
+            }
+            table.tally-table th {
+              padding: 2.5px 6px;
+              background: #fff;
               font-weight: bold;
-              padding: 4px 8px;
+              border: none;
+            }
+            .th-particulars {
+              width: 64%;
+              text-align: left;
+              letter-spacing: 2px;
+              vertical-align: middle;
+            }
+            .th-pending-title {
+              text-align: right;
+              padding-bottom: 0px;
+            }
+            .th-qty {
+              text-align: right;
+              width: 16%;
+              font-weight: normal;
+              padding-top: 0px;
+            }
+            .th-alt {
+              text-align: right;
+              width: 20%;
+              font-weight: normal;
+              padding-top: 0px;
+            }
+
+            table.tally-table td {
+              padding: 1.5px 6px;
+              border: none;
+            }
+            .cat-row td {
+              font-weight: bold;
+              padding-top: 4px;
+            }
+            .col-item-cat {
+              text-transform: uppercase;
+            }
+            .col-qty-cat, .col-alt-cat {
+              text-align: right;
+              font-weight: bold;
+            }
+            .cat-item-row td {
+              font-style: italic;
+            }
+            .col-item-indented {
+              padding-left: 20px !important;
+              text-transform: uppercase;
+            }
+            .col-qty-indented, .col-alt-indented {
+              text-align: right;
+            }
+            .col-item-direct {
+              text-transform: uppercase;
+            }
+            .col-qty-direct, .col-alt-direct {
+              text-align: right;
+            }
+
+            .grand-total-row td {
+              border-top: 1px solid #000;
+              border-bottom: 3px double #000;
+              font-weight: bold;
+              padding: 3.5px 6px;
+            }
+            .col-total-title {
+              letter-spacing: 3px;
+              font-weight: bold;
+            }
+            .col-total-qty, .col-total-alt {
+              text-align: right;
+              font-weight: bold;
             }
           </style>
         </head>
@@ -807,39 +1180,31 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
             <div class="date-range">${dateRange}</div>
           </div>
           <div class="sub-info-bar">
-            <div style="font-style: italic; font-weight: bold;">Sales Orders Outstanding</div>
-            <div style="font-weight: bold;">Page 1</div>
+            <div></div>
+            <div class="sub-info-right">
+              <div class="page-no">Page 1</div>
+              <div class="outstanding-title">Sales Orders Outstanding</div>
+            </div>
           </div>
           <table class="tally-table">
             <thead>
               <tr>
-                <th class="th-particulars">Particulars</th>
-                <th class="th-pending">
-                  <div style="text-align: right;">Pending Orders</div>
-                  <div class="sub-hdr">
-                    <span style="width: 75px; text-align: right;">Quantity</span>
-                    <span style="width: 110px; text-align: right;">(Alt. Units)</span>
-                  </div>
-                </th>
+                <th class="th-particulars" rowspan="2">P a r t i c u l a r s</th>
+                <th class="th-pending-title" colspan="2">Pending Orders</th>
+              </tr>
+              <tr>
+                <th class="th-qty">Quantity</th>
+                <th class="th-alt">(Alt. Units)</th>
               </tr>
             </thead>
             <tbody>
-              <tr style="font-weight: bold;">
-                <td class="col-item-head">FINISHED GOODS</td>
-                <td class="col-qty-head">
-                  <span class="qty-gbl">${totalPendingGbl} GBL</span>
-                  <span class="qty-pcs">(${totalPendingPcs.toLocaleString()} PCS)</span>
-                </td>
-              </tr>
-              ${itemsHtml}
+              ${groupedRowsHtml}
             </tbody>
             <tfoot>
               <tr class="grand-total-row">
-                <td class="col-item-head" style="letter-spacing: 2px;">Grand Total</td>
-                <td class="col-qty-head">
-                  <span class="qty-gbl">${totalPendingGbl} GBL</span>
-                  <span class="qty-pcs">(${totalPendingPcs.toLocaleString()} PCS)</span>
-                </td>
+                <td class="col-total-title">G r a n d &nbsp; T o t a l</td>
+                <td class="col-total-qty">${totalPendingGbl} GBL</td>
+                <td class="col-total-alt">(${totalPendingPcs.toLocaleString()} PCS)</td>
               </tr>
             </tfoot>
           </table>
@@ -857,6 +1222,21 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
       printWin.close();
     }, 350);
   };
+
+  // Keyboard shortcuts (Alt+E for Excel, Alt+P for Print)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey && (e.key === 'e' || e.key === 'E')) {
+        e.preventDefault();
+        handleExportExcel();
+      } else if (e.altKey && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        handlePrint();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleExportExcel, handlePrint]);
 
   // WhatsApp quick notification
   const openWhatsAppChat = (customerName: string, phone?: string, orderNumber?: string, balanceGbl?: number, dueDate?: string) => {
@@ -1061,20 +1441,34 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
             )}
           </div>
 
+          {/* Export to Excel (Alt+E) */}
           <button
             onClick={handleExportExcel}
-            className="p-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-gray-600 cursor-pointer transition-colors"
+            className="px-2.5 py-1.5 bg-white hover:bg-emerald-50/70 border border-gray-200 hover:border-emerald-200 rounded-lg text-emerald-700 text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1.5 shadow-2xs"
             title="Export to Excel (Alt+E)"
           >
-            <Download className="w-4 h-4" />
+            <Download className="w-3.5 h-3.5 text-emerald-600" />
+            <span className="hidden sm:inline">Excel</span>
           </button>
 
+          {/* Export PDF */}
+          <button
+            onClick={handleExportPdf}
+            className="px-2.5 py-1.5 bg-white hover:bg-rose-50/70 border border-gray-200 hover:border-rose-200 rounded-lg text-rose-700 text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1.5 shadow-2xs"
+            title="Export / Download PDF Report"
+          >
+            <FileText className="w-3.5 h-3.5 text-rose-600" />
+            <span className="hidden sm:inline">Export PDF</span>
+          </button>
+
+          {/* Print (Alt+P) */}
           <button
             onClick={handlePrint}
-            className="p-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-gray-600 cursor-pointer transition-colors"
-            title="Print (Alt+P)"
+            className="px-2.5 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-gray-700 text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1.5 shadow-2xs"
+            title="Print Report (Alt+P)"
           >
-            <Printer className="w-4 h-4" />
+            <Printer className="w-3.5 h-3.5 text-gray-600" />
+            <span className="hidden sm:inline">Print</span>
           </button>
 
         </div>
