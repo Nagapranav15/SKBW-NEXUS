@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ArrowLeft, Printer, Pencil, Layers, Check, Calendar, 
   Trash2, Plus, Clock, AlertCircle, RotateCcw
@@ -40,6 +40,60 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
   const conversion = order.conversionFactor || 1;
   const isGbl = producedUom === 'GBL';
   const producedPcs = isGbl ? (Number(producedQty) || 0) * conversion : (Number(producedQty) || 0);
+
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // Tally Keyboard Navigation: shift focus forward/backward across entry fields
+  const shiftFocus = (delta: number) => {
+    if (!formRef.current) return;
+    const focusables = Array.from(
+      formRef.current.querySelectorAll<HTMLElement>(
+        'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button[type="submit"]'
+      )
+    ).filter(el => el.offsetWidth > 0 || el.offsetHeight > 0);
+
+    const activeEl = document.activeElement as HTMLElement;
+    const index = focusables.indexOf(activeEl);
+    const nextIdx = index + delta;
+    if (nextIdx >= 0 && nextIdx < focusables.length) {
+      focusables[nextIdx]?.focus();
+      if ('select' in focusables[nextIdx]) {
+        (focusables[nextIdx] as HTMLInputElement).select?.();
+      }
+    }
+  };
+
+  const handleFormKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'TEXTAREA' || target.tagName === 'BUTTON') return;
+      e.preventDefault();
+      shiftFocus(1);
+    }
+  };
+
+  // Global Keyboard Shortcuts (Esc, Alt+P, Alt+O, Ctrl+A / Ctrl+Enter)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onBack();
+      } else if (e.altKey && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        onPrint(order);
+      } else if (e.altKey && (e.key === 'o' || e.key === 'O')) {
+        e.preventDefault();
+        onViewOverview(order);
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A' || e.key === 'Enter')) {
+        e.preventDefault();
+        const submitBtn = document.querySelector('button[type="submit"]') as HTMLButtonElement;
+        submitBtn?.click();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [order, onBack, onPrint, onViewOverview]);
 
   const handleClear = () => {
     setProducedQty('');
@@ -256,7 +310,12 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
             </div>
           </div>
 
-          <form onSubmit={handleAddEntry} className="space-y-4">
+          <form 
+            ref={formRef}
+            onKeyDown={handleFormKeyDown}
+            onSubmit={handleAddEntry} 
+            className="space-y-4"
+          >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               {/* Produced Quantity */}
               <div>
@@ -333,6 +392,7 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
               >
                 <Plus className="w-4 h-4" />
                 <span>Add Production Entry</span>
+                <kbd className="px-1.5 py-0.5 bg-blue-700/80 rounded text-[10px] font-mono text-blue-100 hidden sm:inline">Ctrl+↵</kbd>
               </button>
             </div>
           </form>

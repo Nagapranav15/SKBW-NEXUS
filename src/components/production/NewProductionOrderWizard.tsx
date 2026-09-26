@@ -117,6 +117,28 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   const [showAddComponentModal, setShowAddComponentModal] = useState<boolean>(false);
   const [componentSearchQuery, setComponentSearchQuery] = useState<string>('');
 
+  // Keyboard navigation & Tally shortcuts
+  const [highlightedProductIdx, setHighlightedProductIdx] = useState<number>(0);
+  const [highlightedCatalogIdx, setHighlightedCatalogIdx] = useState<number>(0);
+  const wizardContainerRef = useRef<HTMLDivElement>(null);
+  const productSearchInputRef = useRef<HTMLInputElement>(null);
+  const catalogSearchInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus search input when product dropdown or catalog modal opens
+  useEffect(() => {
+    if (showProductDropdown) {
+      setHighlightedProductIdx(0);
+      setTimeout(() => productSearchInputRef.current?.focus(), 50);
+    }
+  }, [showProductDropdown]);
+
+  useEffect(() => {
+    if (showAddComponentModal) {
+      setHighlightedCatalogIdx(0);
+      setTimeout(() => catalogSearchInputRef.current?.focus(), 50);
+    }
+  }, [showAddComponentModal]);
+
   // Close menus on outside click
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
@@ -446,6 +468,125 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     }
   };
 
+  // Tally Keyboard Navigation: shift focus forward/backward across inputs & selects
+  const shiftFocus = (delta: number) => {
+    if (!wizardContainerRef.current) return;
+    const focusables = Array.from(
+      wizardContainerRef.current.querySelectorAll<HTMLElement>(
+        'input:not([type="hidden"]):not([disabled]):not([data-skip-tab]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]'
+      )
+    ).filter(el => el.offsetWidth > 0 || el.offsetHeight > 0);
+
+    const activeEl = document.activeElement as HTMLElement;
+    const index = focusables.indexOf(activeEl);
+    const nextIdx = index + delta;
+    if (nextIdx >= 0 && nextIdx < focusables.length) {
+      focusables[nextIdx]?.focus();
+      if ('select' in focusables[nextIdx]) {
+        (focusables[nextIdx] as HTMLInputElement).select?.();
+      }
+    }
+  };
+
+  const handleFormKeyDown = (e: React.KeyboardEvent) => {
+    const target = e.target as HTMLElement;
+    if (!target) return;
+
+    if (e.key === 'Enter') {
+      if (showProductDropdown) return; // handled by product search input
+      if (showAddComponentModal) return; // handled by catalog input
+      if (target.tagName === 'TEXTAREA' || target.tagName === 'BUTTON') return;
+      if (target.getAttribute('data-bom-idx') !== null) return; // handled by BOM input
+
+      e.preventDefault();
+      shiftFocus(1);
+    }
+  };
+
+  // Global Tally Keyboard Shortcuts (Esc, Ctrl+A / Ctrl+Enter, Alt+C, Alt+B, Alt+P)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // 1. Esc: close modals, dropdowns or cancel/back
+      if (e.key === 'Escape') {
+        if (showBulkEditBomModal) {
+          e.preventDefault();
+          setShowBulkEditBomModal(false);
+          return;
+        }
+        if (showAddComponentModal) {
+          e.preventDefault();
+          setShowAddComponentModal(false);
+          return;
+        }
+        if (showProductDropdown) {
+          e.preventDefault();
+          setShowProductDropdown(false);
+          return;
+        }
+        if (currentStep === 3) {
+          e.preventDefault();
+          setCurrentStep(1);
+          return;
+        }
+        e.preventDefault();
+        onCancel();
+        return;
+      }
+
+      // 2. Ctrl+A or Ctrl+Enter: Universal Tally Accept
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A' || e.key === 'Enter')) {
+        e.preventDefault();
+        if (currentStep === 1) {
+          handleSaveAndContinue();
+        } else if (currentStep === 3) {
+          handleCreateOrder();
+        }
+        return;
+      }
+
+      // 3. Alt+C or Alt+A: Add Component (Tally Create/Add)
+      if (e.altKey && (e.key === 'c' || e.key === 'C' || e.key === 'a' || e.key === 'A')) {
+        e.preventDefault();
+        setBomType('Custom BOM (Production Order Only)');
+        setShowAddComponentModal(true);
+        setHighlightedCatalogIdx(0);
+        return;
+      }
+
+      // 4. Alt+B: View Item Master BOM
+      if (e.altKey && (e.key === 'b' || e.key === 'B')) {
+        e.preventDefault();
+        setShowBulkEditBomModal(true);
+        return;
+      }
+
+      // 5. Alt+P: Presets toggle
+      if (e.altKey && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        const presetBtn = document.querySelector('button[title*="Alt+P"]') as HTMLButtonElement;
+        presetBtn?.click();
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [
+    currentStep,
+    showBulkEditBomModal,
+    showAddComponentModal,
+    showProductDropdown,
+    selectedSku,
+    productionQty,
+    factory,
+    department,
+    orderNumber,
+    onCancel,
+    bomStats,
+    bomType,
+    bomItems
+  ]);
+
   if (loadingInitial) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] w-full">
@@ -544,7 +685,11 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       )}
 
       {/* Form Content */}
-      <div className="p-6 max-w-7xl mx-auto w-full space-y-6">
+      <div 
+        ref={wizardContainerRef}
+        onKeyDown={handleFormKeyDown}
+        className="production-wizard-container p-6 max-w-7xl mx-auto w-full space-y-6"
+      >
         {currentStep === 1 ? (
           <>
             {/* 1. Basic Information */}
@@ -571,26 +716,67 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   </label>
                   
                   <div
+                    tabIndex={0}
                     onClick={() => setShowProductDropdown(!showProductDropdown)}
-                    className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 font-semibold flex items-center justify-between cursor-pointer hover:border-gray-300"
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        setShowProductDropdown(true);
+                      }
+                    }}
+                    className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 font-semibold flex items-center justify-between cursor-pointer hover:border-gray-300 focus:outline-none focus:border-blue-500"
                   >
                     <span className={selectedSku ? 'font-bold text-gray-900' : 'text-gray-400 font-normal'}>
                       {selectedSku ? `${selectedSku.name} (${selectedSku.skuCode})` : 'Select finished product...'}
                     </span>
-                    <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                    <div className="flex items-center space-x-1.5 text-gray-400">
+                      <span className="text-[10px] font-mono">[Enter]</span>
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </div>
                   </div>
 
                   {/* Searchable Product Dropdown */}
                   {showProductDropdown && (
                     <div className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl z-40 max-h-64 flex flex-col animate-modalPop">
-                      <div className="p-2 border-b border-gray-150 bg-gray-50">
-                        <div className="relative">
+                      <div className="p-2 border-b border-gray-150 bg-gray-50 flex items-center justify-between gap-2">
+                        <div className="relative flex-1">
                           <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                           <input
+                            ref={productSearchInputRef}
                             type="text"
                             value={productSearchQuery}
-                            onChange={e => setProductSearchQuery(e.target.value)}
-                            placeholder="Search finished products..."
+                            onChange={e => {
+                              setProductSearchQuery(e.target.value);
+                              setHighlightedProductIdx(0);
+                            }}
+                            onKeyDown={e => {
+                              const filteredList = finishedProductsList.filter(s => {
+                                if (!productSearchQuery.trim()) return true;
+                                const q = productSearchQuery.toLowerCase();
+                                return s.name.toLowerCase().includes(q) || s.skuCode.toLowerCase().includes(q);
+                              });
+                              if (e.key === 'ArrowDown') {
+                                e.preventDefault();
+                                setHighlightedProductIdx(prev => Math.min(prev + 1, filteredList.length - 1));
+                              } else if (e.key === 'ArrowUp') {
+                                e.preventDefault();
+                                setHighlightedProductIdx(prev => Math.max(prev - 1, 0));
+                              } else if (e.key === 'Enter') {
+                                e.preventDefault();
+                                if (filteredList.length > 0 && highlightedProductIdx >= 0 && highlightedProductIdx < filteredList.length) {
+                                  handleSelectProduct(filteredList[highlightedProductIdx]);
+                                  setTimeout(() => {
+                                    const qtyInput = document.querySelector('input[name="productionQty"]') as HTMLInputElement;
+                                    qtyInput?.focus();
+                                    qtyInput?.select();
+                                  }, 50);
+                                }
+                              } else if (e.key === 'Escape') {
+                                e.preventDefault();
+                                setShowProductDropdown(false);
+                              }
+                            }}
+                            placeholder="Search products... [↑/↓ to navigate, Enter to select]"
                             autoFocus
                             className="w-full pl-8 pr-3 py-1.5 text-xs text-gray-900 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
                           />
@@ -604,14 +790,27 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                             const q = productSearchQuery.toLowerCase();
                             return s.name.toLowerCase().includes(q) || s.skuCode.toLowerCase().includes(q);
                           })
-                          .map(sku => {
+                          .map((sku, pIdx) => {
                             const hasBom = Array.isArray(sku.bomItems) && sku.bomItems.length > 0;
+                            const isHighlighted = highlightedProductIdx === pIdx;
                             return (
                               <div
                                 key={sku._id}
-                                onClick={() => handleSelectProduct(sku)}
-                                className={`p-2.5 hover:bg-blue-50/60 cursor-pointer flex items-center justify-between transition-colors ${
-                                  selectedSkuId === sku._id ? 'bg-blue-50/80 font-bold' : ''
+                                onClick={() => {
+                                  handleSelectProduct(sku);
+                                  setTimeout(() => {
+                                    const qtyInput = document.querySelector('input[name="productionQty"]') as HTMLInputElement;
+                                    qtyInput?.focus();
+                                    qtyInput?.select();
+                                  }, 50);
+                                }}
+                                onMouseEnter={() => setHighlightedProductIdx(pIdx)}
+                                className={`p-2.5 cursor-pointer flex items-center justify-between transition-colors ${
+                                  isHighlighted 
+                                    ? 'bg-blue-100/90 text-blue-900 font-bold border-l-4 border-blue-600'
+                                    : selectedSkuId === sku._id 
+                                      ? 'bg-blue-50/80 font-bold' 
+                                      : 'hover:bg-blue-50/60'
                                 }`}
                               >
                                 <div>
@@ -652,6 +851,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                     <input
                       type="number"
                       min={1}
+                      name="productionQty"
                       value={productionQty}
                       onChange={e => setProductionQty(e.target.value === '' ? '' : Number(e.target.value))}
                       placeholder="Enter quantity"
@@ -925,8 +1125,31 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                                 type="number"
                                 min={0.01}
                                 step="any"
+                                data-bom-idx={idx}
                                 value={item.qtyPerBatch}
                                 onChange={e => handleUpdateQtyPerBatch(idx, Math.max(0.01, Number(e.target.value) || 0.01))}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    const next = document.querySelector(`input[data-bom-idx="${idx + 1}"]`) as HTMLInputElement;
+                                    if (next) {
+                                      next.focus();
+                                      next.select();
+                                    } else {
+                                      shiftFocus(1);
+                                    }
+                                  } else if (e.key === 'ArrowDown') {
+                                    e.preventDefault();
+                                    const next = document.querySelector(`input[data-bom-idx="${idx + 1}"]`) as HTMLInputElement;
+                                    next?.focus();
+                                    next?.select();
+                                  } else if (e.key === 'ArrowUp') {
+                                    e.preventDefault();
+                                    const prev = document.querySelector(`input[data-bom-idx="${idx - 1}"]`) as HTMLInputElement;
+                                    prev?.focus();
+                                    prev?.select();
+                                  }
+                                }}
                                 className="w-20 px-2 py-1 text-xs font-semibold bg-white border border-gray-200 rounded text-center focus:border-blue-500 focus:outline-none"
                               />
                             </td>
@@ -1269,16 +1492,43 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
               </button>
             </div>
 
-            <div className="p-3 border-b border-gray-100 bg-gray-50">
-              <div className="relative">
+            <div className="p-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between gap-2">
+              <div className="relative flex-1">
                 <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
+                  ref={catalogSearchInputRef}
                   type="text"
                   value={componentSearchQuery}
-                  onChange={e => setComponentSearchQuery(e.target.value)}
-                  placeholder="Search raw materials or semi-finished components..."
+                  onChange={e => {
+                    setComponentSearchQuery(e.target.value);
+                    setHighlightedCatalogIdx(0);
+                  }}
+                  onKeyDown={e => {
+                    const filteredCatalog = rawAndSemiMaterialsList.filter(s => {
+                      if (!componentSearchQuery.trim()) return true;
+                      const q = componentSearchQuery.toLowerCase();
+                      return s.name.toLowerCase().includes(q) || s.skuCode.toLowerCase().includes(q) || (s.category && s.category.toLowerCase().includes(q));
+                    }).slice(0, 60);
+
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      setHighlightedCatalogIdx(prev => Math.min(prev + 1, filteredCatalog.length - 1));
+                    } else if (e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      setHighlightedCatalogIdx(prev => Math.max(prev - 1, 0));
+                    } else if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (filteredCatalog.length > 0 && highlightedCatalogIdx >= 0 && highlightedCatalogIdx < filteredCatalog.length) {
+                        handleSelectCatalogComponent(filteredCatalog[highlightedCatalogIdx]);
+                      }
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault();
+                      setShowAddComponentModal(false);
+                    }
+                  }}
+                  placeholder="Search materials... [↑/↓ to navigate, Enter to add, Esc to close]"
                   autoFocus
-                  className="w-full pl-8 pr-3 py-1.5 text-xs text-gray-900 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                  className="w-full pl-9 pr-3 py-1.5 text-xs text-gray-900 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
                 />
               </div>
             </div>
@@ -1291,13 +1541,19 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   return s.name.toLowerCase().includes(q) || s.skuCode.toLowerCase().includes(q) || (s.category && s.category.toLowerCase().includes(q));
                 })
                 .slice(0, 60)
-                .map(compSku => {
+                .map((compSku, cIdx) => {
                   const classification = getItemClassification(compSku);
+                  const isHighlighted = highlightedCatalogIdx === cIdx;
                   return (
                     <div
                       key={compSku._id}
                       onClick={() => handleSelectCatalogComponent(compSku)}
-                      className="p-2.5 hover:bg-blue-50/60 rounded-lg flex items-center justify-between cursor-pointer transition-colors"
+                      onMouseEnter={() => setHighlightedCatalogIdx(cIdx)}
+                      className={`p-2.5 rounded-lg flex items-center justify-between cursor-pointer transition-colors ${
+                        isHighlighted 
+                          ? 'bg-blue-100/90 text-blue-900 font-bold border-l-4 border-blue-600'
+                          : 'hover:bg-blue-50/60'
+                      }`}
                     >
                       <div>
                         <div className="text-xs font-bold text-gray-900">{compSku.name}</div>
@@ -1342,6 +1598,44 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           }}
         />
       )}
+      {/* Tally Keyboard Shortcut Status Bar */}
+      <div className="bg-slate-900 text-slate-300 px-6 py-2 border-t border-slate-800 text-xs flex flex-wrap items-center justify-between gap-3 shadow-inner select-none shrink-0">
+        <div className="flex items-center space-x-3 text-[11px] overflow-x-auto py-0.5">
+          <span className="flex items-center space-x-1.5">
+            <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] font-mono text-amber-400 font-bold">↵ Enter</kbd>
+            <span className="text-slate-300">Next Field</span>
+          </span>
+          <span className="text-slate-700">•</span>
+          <span className="flex items-center space-x-1.5">
+            <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] font-mono text-amber-400 font-bold">↑ / ↓</kbd>
+            <span className="text-slate-300">Navigate Lists</span>
+          </span>
+          <span className="text-slate-700">•</span>
+          <span className="flex items-center space-x-1.5">
+            <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] font-mono text-emerald-400 font-bold">Ctrl+A / Ctrl+↵</kbd>
+            <span className="text-emerald-400 font-semibold">{currentStep === 1 ? 'Save & Continue' : 'Create Order'}</span>
+          </span>
+          <span className="text-slate-700">•</span>
+          <span className="flex items-center space-x-1.5">
+            <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] font-mono text-amber-400 font-bold">Alt+C</kbd>
+            <span className="text-slate-300">Add Component</span>
+          </span>
+          <span className="text-slate-700">•</span>
+          <span className="flex items-center space-x-1.5">
+            <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] font-mono text-amber-400 font-bold">Alt+B</kbd>
+            <span className="text-slate-300">Item Master BOM</span>
+          </span>
+          <span className="text-slate-700">•</span>
+          <span className="flex items-center space-x-1.5">
+            <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] font-mono text-amber-400 font-bold">Alt+P</kbd>
+            <span className="text-slate-300">Presets</span>
+          </span>
+        </div>
+        <div className="flex items-center space-x-1.5 text-[11px]">
+          <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] font-mono text-amber-400 font-bold">Esc</kbd>
+          <span className="text-slate-300">{currentStep === 3 ? 'Back to Edit' : 'Cancel'}</span>
+        </div>
+      </div>
     </div>
   );
 };

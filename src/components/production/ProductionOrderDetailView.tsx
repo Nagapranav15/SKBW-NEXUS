@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ArrowLeft, Printer, Layers, Package, Plus, CheckCircle2, 
   Clock, IndianRupee, Box, Check, ExternalLink, AlertCircle, FileText, History
@@ -28,6 +28,34 @@ export const ProductionOrderDetailView: React.FC<ProductionOrderDetailViewProps>
   // Compute total material cost
   const totalCost = (order.bomItems || []).reduce((acc, curr) => acc + (curr.amount || 0), 0);
   const isCompleted = order.status === 'Completed';
+
+  // Global Keyboard Shortcuts for Production Order Detail View
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onBack();
+      } else if (e.altKey && (e.key === 'e' || e.key === 'E')) {
+        e.preventDefault();
+        onRecordEntries(order);
+      } else if (e.altKey && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        onPrint(order);
+      } else if (e.altKey && (e.key === 'b' || e.key === 'B')) {
+        e.preventDefault();
+        setActiveTab('bom');
+      } else if (e.altKey && (e.key === 'o' || e.key === 'O')) {
+        e.preventDefault();
+        setActiveTab('overview');
+      } else if (e.altKey && (e.key === 'c' || e.key === 'C' || e.key === 'n' || e.key === 'N')) {
+        e.preventDefault();
+        onNewOrder();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [order, onBack, onRecordEntries, onPrint, onNewOrder]);
 
   // Duration computation
   const getDurationText = () => {
@@ -78,26 +106,29 @@ export const ProductionOrderDetailView: React.FC<ProductionOrderDetailViewProps>
           <div className="flex items-center space-x-2.5">
             <button
               onClick={() => onPrint(order)}
-              className="inline-flex items-center space-x-1.5 px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+              className="inline-flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
             >
               <Printer className="w-3.5 h-3.5 text-gray-500" />
               <span>Print</span>
+              <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-[9.5px] font-mono text-gray-500 hidden sm:inline">Alt+P</kbd>
             </button>
 
             <button
               onClick={() => setActiveTab('bom')}
-              className="inline-flex items-center space-x-1.5 px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+              className="inline-flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
             >
               <Layers className="w-3.5 h-3.5 text-gray-500" />
               <span>View BOM</span>
+              <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-[9.5px] font-mono text-gray-500 hidden sm:inline">Alt+B</kbd>
             </button>
 
             <button
               onClick={() => onRecordEntries(order)}
-              className="inline-flex items-center space-x-1.5 px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+              className="inline-flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
             >
               <Package className="w-3.5 h-3.5 text-gray-500" />
-              <span>View Entries</span>
+              <span>Record Entries</span>
+              <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-[9.5px] font-mono text-gray-500 hidden sm:inline">Alt+E</kbd>
             </button>
 
             {!isCompleted && onCompleteOrder && (
@@ -115,7 +146,8 @@ export const ProductionOrderDetailView: React.FC<ProductionOrderDetailViewProps>
               className="inline-flex items-center space-x-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm hover:shadow transition-colors cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Create New Order</span>
+              <span>New Order</span>
+              <kbd className="px-1.5 py-0.5 bg-blue-700/80 rounded text-[10px] font-mono text-blue-100 hidden sm:inline">Alt+C</kbd>
             </button>
           </div>
         </div>

@@ -49,9 +49,11 @@ export const PresetField: React.FC<PresetFieldProps> = ({
   const [showManageModal, setShowManageModal] = useState(false);
   const [newPresetInput, setNewPresetInput] = useState('');
   const [filterQuery, setFilterQuery] = useState('');
+  const [highlightedIdx, setHighlightedIdx] = useState(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   // Sync with storage events from other tabs or components
   useEffect(() => {
@@ -119,6 +121,35 @@ export const PresetField: React.FC<PresetFieldProps> = ({
     !filterQuery.trim() || p.toLowerCase().includes(filterQuery.toLowerCase())
   );
 
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown') {
+      if (!showDropdown) {
+        setShowDropdown(true);
+        setHighlightedIdx(0);
+      } else if (filteredPresets.length > 0) {
+        setHighlightedIdx(prev => Math.min(prev + 1, filteredPresets.length - 1));
+      }
+      e.preventDefault();
+    } else if (e.key === 'ArrowUp') {
+      if (showDropdown && filteredPresets.length > 0) {
+        setHighlightedIdx(prev => Math.max(prev - 1, 0));
+        e.preventDefault();
+      }
+    } else if (e.key === 'Enter') {
+      if (showDropdown && filteredPresets.length > 0 && highlightedIdx >= 0 && highlightedIdx < filteredPresets.length) {
+        e.preventDefault();
+        onChange(filteredPresets[highlightedIdx]);
+        setShowDropdown(false);
+      }
+    } else if (e.key === 'Escape') {
+      if (showDropdown) {
+        e.preventDefault();
+        e.stopPropagation();
+        setShowDropdown(false);
+      }
+    }
+  };
+
   return (
     <div className={`relative ${className}`} ref={containerRef}>
       {/* Label and Presets Trigger */}
@@ -132,8 +163,10 @@ export const PresetField: React.FC<PresetFieldProps> = ({
           onClick={() => {
             setFilterQuery('');
             setShowDropdown(!showDropdown);
+            setHighlightedIdx(0);
           }}
           className="text-[11px] font-bold text-blue-600 hover:text-blue-700 flex items-center space-x-1 cursor-pointer transition-colors"
+          title="Press Alt+P to toggle presets"
         >
           <Sparkles className="w-3 h-3 text-blue-500" />
           <span>Presets ({presets.length})</span>
@@ -148,16 +181,23 @@ export const PresetField: React.FC<PresetFieldProps> = ({
           type="text"
           value={value}
           onChange={e => onChange(e.target.value)}
+          onKeyDown={handleInputKeyDown}
           placeholder={placeholder}
           onFocus={() => {
-            if (!value) setShowDropdown(true);
+            if (!value) {
+              setShowDropdown(true);
+              setHighlightedIdx(0);
+            }
           }}
           className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 font-medium focus:outline-none focus:border-blue-500 transition-colors"
         />
 
         <button
           type="button"
-          onClick={() => setShowDropdown(!showDropdown)}
+          onClick={() => {
+            setShowDropdown(!showDropdown);
+            setHighlightedIdx(0);
+          }}
           className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 rounded cursor-pointer"
         >
           <ChevronDown className="w-3.5 h-3.5" />
@@ -174,17 +214,20 @@ export const PresetField: React.FC<PresetFieldProps> = ({
           {/* Header */}
           <div className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between border-b border-gray-100 bg-gray-50/70 shrink-0">
             <span>{label} Presets</span>
-            <button
-              type="button"
-              onClick={() => {
-                setShowDropdown(false);
-                setShowManageModal(true);
-              }}
-              className="text-blue-600 hover:underline flex items-center gap-1 cursor-pointer font-bold lowercase first-letter:uppercase"
-            >
-              <Settings className="w-3 h-3" />
-              <span>Manage</span>
-            </button>
+            <div className="flex items-center space-x-2">
+              <span className="text-[9px] text-gray-400 font-mono hidden sm:inline">[↑/↓ to navigate, Enter to select]</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDropdown(false);
+                  setShowManageModal(true);
+                }}
+                className="text-blue-600 hover:underline flex items-center gap-1 cursor-pointer font-bold lowercase first-letter:uppercase"
+              >
+                <Settings className="w-3 h-3" />
+                <span>Manage</span>
+              </button>
+            </div>
           </div>
 
           {/* Search filter if more than 5 presets */}
@@ -195,7 +238,10 @@ export const PresetField: React.FC<PresetFieldProps> = ({
                 <input
                   type="text"
                   value={filterQuery}
-                  onChange={e => setFilterQuery(e.target.value)}
+                  onChange={e => {
+                    setFilterQuery(e.target.value);
+                    setHighlightedIdx(0);
+                  }}
                   placeholder="Filter presets..."
                   autoFocus
                   className="w-full pl-7 pr-2 py-1 text-[11px] bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:bg-white focus:border-blue-500"
@@ -222,14 +268,15 @@ export const PresetField: React.FC<PresetFieldProps> = ({
           )}
 
           {/* List of Presets */}
-          <div className="overflow-y-auto flex-1 divide-y divide-gray-50 custom-scrollbar">
+          <div ref={listRef} className="overflow-y-auto flex-1 divide-y divide-gray-50 custom-scrollbar">
             {filteredPresets.length === 0 ? (
               <div className="p-3 text-center text-xs text-gray-400 italic">
                 No matching presets
               </div>
             ) : (
-              filteredPresets.map(presetItem => {
+              filteredPresets.map((presetItem, pIdx) => {
                 const isSelected = value.toLowerCase() === presetItem.toLowerCase();
+                const isHighlighted = highlightedIdx === pIdx;
                 return (
                   <button
                     key={presetItem}
@@ -238,8 +285,13 @@ export const PresetField: React.FC<PresetFieldProps> = ({
                       onChange(presetItem);
                       setShowDropdown(false);
                     }}
-                    className={`w-full text-left px-3 py-2 hover:bg-blue-50 text-xs font-medium text-gray-800 flex items-center justify-between transition-colors cursor-pointer ${
-                      isSelected ? 'bg-blue-50/80 text-blue-700 font-bold' : ''
+                    onMouseEnter={() => setHighlightedIdx(pIdx)}
+                    className={`w-full text-left px-3 py-2 text-xs font-medium flex items-center justify-between transition-colors cursor-pointer ${
+                      isHighlighted 
+                        ? 'bg-blue-100/80 text-blue-900 font-bold border-l-2 border-blue-600'
+                        : isSelected 
+                          ? 'bg-blue-50/60 text-blue-700 font-semibold' 
+                          : 'text-gray-800 hover:bg-blue-50'
                     }`}
                   >
                     <span className="truncate">{presetItem}</span>
