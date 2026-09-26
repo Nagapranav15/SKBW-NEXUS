@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  X, Edit, Copy, Printer, FileText, MoreHorizontal,
+  X, Edit, Printer, FileText, MoreHorizontal,
   User, Calendar, Truck, Tag, MapPin, Phone, Package,
   ChevronRight, Plus, Trash2, CheckCircle, Clock,
   AlertCircle, CreditCard, IndianRupee
@@ -306,9 +306,6 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
             <button onClick={() => onEdit(order)} className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 transition-all cursor-pointer">
               <Edit className="w-3.5 h-3.5 text-blue-500" /> Edit
             </button>
-            <button onClick={() => showToast('Order duplicated into Draft mode', 'info')} className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 transition-all cursor-pointer">
-              <Copy className="w-3.5 h-3.5 text-gray-500" /> Duplicate
-            </button>
             <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 transition-all cursor-pointer">
               <Printer className="w-3.5 h-3.5 text-gray-500" /> Print
             </button>
@@ -369,7 +366,6 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                   <User className="w-3.5 h-3.5 text-blue-600" />
                   Customer Details
                 </div>
-                <span className="text-[11px] text-blue-600 font-bold">Verified Party</span>
               </div>
 
               <div className="space-y-2.5">
@@ -594,9 +590,8 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                     <th className="px-3 py-2.5 text-center w-24">Stock (GBL)</th>
                     <th className="px-3 py-2.5 text-center w-16">GBL *</th>
                     <th className="px-3 py-2.5 text-center w-20">Pcs / GBL</th>
-                    <th className="px-3 py-2.5 text-center w-24">Total Pcs</th>
+                    <th className="px-3 py-2.5 text-center w-24">Total GBL</th>
                     <th className="px-3 py-2.5 text-right w-24">Rate (₹) *</th>
-                    <th className="px-3 py-2.5 text-right w-16">Disc %</th>
                     <th className="px-3 py-2.5 text-right w-28">Amount (₹)</th>
                     <th className="px-3 py-2.5 text-center w-24">Production</th>
                     <th className="px-3 py-2.5 text-center w-24">Dispatched</th>
@@ -642,7 +637,6 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                         <td className="px-3 py-2.5 text-center font-mono text-gray-700">{pcsPerGbl || '—'}</td>
                         <td className="px-3 py-2.5 text-center font-black font-mono text-gray-900">{item.quantity.toLocaleString('en-IN')}</td>
                         <td className="px-3 py-2.5 text-right font-mono text-gray-800">₹{(item.unitPrice || 0).toFixed(2)}</td>
-                        <td className="px-3 py-2.5 text-right font-mono text-gray-600">{item.discountPercent || 0}</td>
                         <td className="px-3 py-2.5 text-right font-bold font-mono text-gray-900">₹{(item.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                         <td className="px-3 py-2.5 text-center">
                           <span className="font-bold text-gray-700 font-mono">{(item as any).producedQty || 0}</span>
@@ -753,13 +747,15 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                   <span className="text-gray-600">Subtotal</span>
                   <span className="font-bold text-gray-900">{fmtMoney(subtotal)}</span>
                 </div>
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-gray-600">Discount (Overall)</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-400 text-[10px]">{order.discountPercent || 0}%</span>
-                    <span className="font-bold text-rose-600">{discAmount > 0 ? `-${fmtMoney(discAmount)}` : '0.00'}</span>
+                {discAmount > 0 && (
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-gray-600">Discount (Overall)</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400 text-[10px]">{order.discountPercent || 0}%</span>
+                      <span className="font-bold text-rose-600">-{fmtMoney(discAmount)}</span>
+                    </div>
                   </div>
-                </div>
+                )}
                 <div className="flex items-center justify-between pt-3 border-t border-gray-200 mt-1">
                   <span className="text-sm font-black text-gray-900">Grand Total</span>
                   <span className="text-xl font-black text-blue-700">{fmtMoney(grandTotal)}</span>

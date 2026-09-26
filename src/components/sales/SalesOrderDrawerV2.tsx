@@ -2021,7 +2021,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                     <th className="py-2.5 px-2 text-center w-24">STOCK (GBL)</th>
                     <th className="py-2.5 px-2 text-center w-20">GBL <span className="text-red-500">*</span></th>
                     <th className="py-2.5 px-2 text-center w-24">PCS / GBL</th>
-                    <th className="py-2.5 px-2 text-center w-24">TOTAL PCS</th>
+                    <th className="py-2.5 px-2 text-center w-24">TOTAL GBL</th>
                     <th className="py-2.5 px-2 text-right w-24">RATE (₹) <span className="text-red-500">*</span></th>
                     <th className="py-2.5 px-3 text-right w-36">FINAL TOTAL AMOUNT (₹)</th>
                     <th className="py-2.5 px-2 text-center w-20">ACTIONS</th>
