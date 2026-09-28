@@ -4,7 +4,7 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "test": "node -e \"require('./src/app')\" && echo ok",
+    "test": "node test_backend.js",
     "start": "node server.js",
     "dev": "node --watch server.js",
     "seed": "node seed.js"

@@ -113,7 +113,7 @@ function validateUomConversion(primaryUnit, altUnit, conversionFactor) {
   const normAlt = normalizeUnit(altUnit);
 
   if (normPrimary === normAlt) {
-    return { valid: true, isRedundant: true };
+    return { valid: false, error: 'Alternative Unit cannot be the same as Primary Unit' };
   }
 
   if (conversionFactor !== undefined && conversionFactor !== null && conversionFactor !== '') {

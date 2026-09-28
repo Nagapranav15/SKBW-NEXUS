@@ -125,7 +125,7 @@ const canonicalDistricts = {
 
 const getRouteCode = (routeName) => {
   if (!routeName) return "GEN";
-  const cleaned = routeName.trim().toUpperCase();
+  const cleaned = String(routeName).trim().toUpperCase();
   const routeMatch = cleaned.match(/^ROUTE\s*(\w+)/i);
   if (routeMatch) {
     return "RT" + routeMatch[1];
@@ -136,7 +136,7 @@ const getRouteCode = (routeName) => {
 
 const getCityCode = (cityName) => {
   if (!cityName) return "GEN";
-  const cleaned = cityName.trim().toUpperCase();
+  const cleaned = String(cityName).trim().toUpperCase();
   const cityDict = {
     "TIRUPATI": "TPT",
     "SECUNDERABAD": "SEC",
@@ -249,12 +249,12 @@ const canonicalRoutes = {
 
 const toTitleCase = (str) => {
   if (!str) return "";
-  return str.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+  return String(str).trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
 };
 
 const getNormalizedRouteName = (routeName) => {
   if (!routeName) return "";
-  const cleaned = routeName.trim();
+  const cleaned = String(routeName).trim();
   const lower = cleaned.toLowerCase();
   if (canonicalRoutes[lower]) return canonicalRoutes[lower];
   return toTitleCase(cleaned);
@@ -262,7 +262,7 @@ const getNormalizedRouteName = (routeName) => {
 
 const getNormalizedCityName = (cityName) => {
   if (!cityName) return "";
-  const cleaned = cityName.trim();
+  const cleaned = String(cityName).trim();
   const lower = cleaned.toLowerCase();
   if (canonicalCities[lower]) return canonicalCities[lower];
   return toTitleCase(cleaned);
@@ -270,7 +270,7 @@ const getNormalizedCityName = (cityName) => {
 
 const getNormalizedStateName = (stateName) => {
   if (!stateName) return "";
-  const cleaned = stateName.trim();
+  const cleaned = String(stateName).trim();
   const lower = cleaned.toLowerCase();
   if (canonicalStates[lower]) return canonicalStates[lower];
   return toTitleCase(cleaned);
@@ -278,7 +278,7 @@ const getNormalizedStateName = (stateName) => {
 
 const getNormalizedDistrictName = (districtName) => {
   if (!districtName) return "";
-  const cleaned = districtName.trim();
+  const cleaned = String(districtName).trim();
   const lower = cleaned.toLowerCase();
   if (canonicalDistricts[lower]) return canonicalDistricts[lower];
   return toTitleCase(cleaned);
@@ -312,11 +312,35 @@ const normalizeAllPartyFields = (data) => {
   if (data.designation) data.designation = toTitleCase(data.designation);
   if (data.department) data.department = toTitleCase(data.department);
 
-  // Trim and lowercase email
-  if (data.email) data.email = data.email.trim().toLowerCase();
+  // Normalize type
+  if (data.type) {
+    data.type = String(data.type).trim().toLowerCase();
+  }
 
-  // Normalize status
-  if (data.status) data.status = data.status.trim().toLowerCase();
+  // Ensure firmName fallback
+  if (!data.firmName && data.name) {
+    data.firmName = data.name;
+  }
+  if (!data.name && data.firmName) {
+    data.name = data.firmName;
+  }
+
+  // Trim and lowercase email
+  if (data.email) data.email = String(data.email).trim().toLowerCase();
+
+  // Normalize status - must strictly match schema enum ['active', 'inactive', 'on-hold']
+  if (data.status) {
+    const s = String(data.status).trim().toLowerCase();
+    if (s === 'active' || s === 'inactive' || s === 'on-hold') {
+      data.status = s;
+    } else if (s === 'hold' || s === 'on hold') {
+      data.status = 'on-hold';
+    } else {
+      data.status = 'active';
+    }
+  } else {
+    data.status = 'active';
+  }
 
   // Trim phone fields
   if (data.phone) data.phone = String(data.phone).trim();
@@ -326,6 +350,10 @@ const normalizeAllPartyFields = (data) => {
   // Trim GST / Aadhar
   if (data.gstNumber) data.gstNumber = String(data.gstNumber).trim().toUpperCase();
   if (data.aadharNumber) data.aadharNumber = String(data.aadharNumber).trim();
+
+  // Numbers sanitization
+  if (data.creditDays !== undefined) data.creditDays = parseInt(data.creditDays, 10) || 0;
+  if (data.creditLimit !== undefined) data.creditLimit = parseFloat(data.creditLimit) || 0;
 
   // For market type, firmName IS the city name — canonicalize it
   if (data.type === 'market' && data.firmName) {
@@ -344,6 +372,7 @@ const normalizeAllPartyFields = (data) => {
   // If openingBalance is provided, initialize outstanding fields if they are missing or not provided
   if (data.openingBalance !== undefined && data.openingBalance !== null && data.openingBalance !== '') {
     const opBal = parseFloat(data.openingBalance) || 0;
+    data.openingBalance = opBal;
     if (data.outstandingBalance === undefined || data.outstandingBalance === null || data.outstandingBalance === '') {
       data.outstandingBalance = opBal;
       data.outstanding = opBal;
@@ -1656,22 +1685,25 @@ exports.importParties = async (req, res) => {
       return res.status(400).json({ msg: 'No parties data provided' });
     }
 
-    const companyIds = [...new Set(parties.map(p => p.company).filter(Boolean))];
+    const companyIds = [...new Set(parties.map(p => p.company).filter(Boolean).map(String))];
     if (companyIds.length === 0) {
       return res.status(400).json({ msg: 'No valid company IDs in import data' });
     }
+    const companyObjectIds = companyIds.map(toObjectId).filter(Boolean);
 
     // 1. Pre-fetch existing Routes, Markets, Agents, Transporters for all companies
     const [routes, existingParties] = await Promise.all([
-      Route.find({ company: { $in: companyIds } }),
-      Party.find({ type: { $in: ['market', 'agent', 'transporter'] }, company: { $in: companyIds } })
+      Route.find({ company: { $in: companyObjectIds } }).lean(),
+      Party.find({ type: { $in: ['market', 'agent', 'transporter'] }, company: { $in: companyObjectIds } }).lean()
     ]);
 
     const routesMap = new Map();
     const routeCodesSet = new Set();
     routes.forEach(r => {
-      routesMap.set(`${r.company}:${r.name.toLowerCase()}`, r);
-      routeCodesSet.add(`${r.company}:${r.code.toUpperCase()}`);
+      const compStr = String(r.company || '');
+      const nameKey = String(r.name || '').trim().toLowerCase();
+      if (nameKey) routesMap.set(`${compStr}:${nameKey}`, r);
+      if (r.code) routeCodesSet.add(`${compStr}:${String(r.code).trim().toUpperCase()}`);
     });
 
     const marketsMap = new Map();
@@ -1679,12 +1711,15 @@ exports.importParties = async (req, res) => {
     const transportersMap = new Map();
 
     existingParties.forEach(p => {
+      const compStr = String(p.company || (p.companies && p.companies[0]) || '');
+      const fName = String(p.firmName || p.name || '').trim().toLowerCase();
+      if (!fName) return;
       if (p.type === 'market') {
-        marketsMap.set(`${p.company}:${p.firmName.toLowerCase()}`, p);
+        marketsMap.set(`${compStr}:${fName}`, p);
       } else if (p.type === 'agent') {
-        agentsMap.set(`${p.company}:${p.firmName.toLowerCase()}`, p);
+        agentsMap.set(`${compStr}:${fName}`, p);
       } else if (p.type === 'transporter') {
-        transportersMap.set(`${p.company}:${p.firmName.toLowerCase()}`, p);
+        transportersMap.set(`${compStr}:${fName}`, p);
       }
     });
 
@@ -1696,16 +1731,17 @@ exports.importParties = async (req, res) => {
 
     for (const p of parties) {
       if (!p.company) continue;
-      const companyId = p.company;
+      const companyId = String(p.company);
+      const companyObjId = toObjectId(companyId);
 
       // Always normalize fields for EVERY imported party
       normalizeAllPartyFields(p);
 
       if (p.type === 'customer') {
-        const routeName = p.route;
-        const cityName = p.city;
-        const agentName = p.agentAssigned;
-        const transporterName = p.preferredTransport;
+        const routeName = p.route ? String(p.route).trim() : '';
+        const cityName = p.city ? String(p.city).trim() : '';
+        const agentName = p.agentAssigned ? String(p.agentAssigned).trim() : '';
+        const transporterName = p.preferredTransport ? String(p.preferredTransport).trim() : '';
 
         // Auto-create Route if missing
         if (routeName) {
@@ -1723,7 +1759,7 @@ exports.importParties = async (req, res) => {
             newRoutesToCreateMap.set(routeKey, {
               name: routeName,
               code: routeCode,
-              company: companyId,
+              company: companyObjId,
               status: 'active'
             });
           }
@@ -1747,8 +1783,8 @@ exports.importParties = async (req, res) => {
               pincode: p.pincode || '',
               route: resolvedRouteName,
               agentAssigned: agentName || '',
-              company: companyId,
-              companies: [companyId],
+              company: companyObjId,
+              companies: [companyObjId],
               status: 'active'
             });
           }
@@ -1761,8 +1797,8 @@ exports.importParties = async (req, res) => {
             newAgentsToCreateMap.set(agentKey, {
               type: 'agent',
               firmName: agentName,
-              company: companyId,
-              companies: [companyId],
+              company: companyObjId,
+              companies: [companyObjId],
               status: 'active'
             });
           }
@@ -1775,8 +1811,8 @@ exports.importParties = async (req, res) => {
             newTransportersToCreateMap.set(transporterKey, {
               type: 'transporter',
               firmName: transporterName,
-              company: companyId,
-              companies: [companyId],
+              company: companyObjId,
+              companies: [companyObjId],
               status: 'active'
             });
           }
@@ -1784,7 +1820,7 @@ exports.importParties = async (req, res) => {
       }
 
       if (p.type === 'market') {
-        const routeName = p.route;
+        const routeName = p.route ? String(p.route).trim() : '';
 
         // Auto-create Route if missing
         if (routeName) {
@@ -1802,7 +1838,7 @@ exports.importParties = async (req, res) => {
             newRoutesToCreateMap.set(routeKey, {
               name: routeName,
               code: routeCode,
-              company: companyId,
+              company: companyObjId,
               status: 'active'
             });
           }
@@ -1810,33 +1846,57 @@ exports.importParties = async (req, res) => {
       }
     }
 
-    // Bulk insert new routes, markets, agents, transporters
+    // Bulk insert new routes, markets, agents, transporters safely
     if (newRoutesToCreateMap.size > 0) {
-      const inserted = await Route.insertMany([...newRoutesToCreateMap.values()]);
-      inserted.forEach(r => {
-        routesMap.set(`${r.company}:${r.name.toLowerCase()}`, r);
-      });
+      try {
+        const inserted = await Route.insertMany([...newRoutesToCreateMap.values()], { ordered: false });
+        inserted.forEach(r => {
+          routesMap.set(`${String(r.company)}:${String(r.name).toLowerCase()}`, r);
+        });
+      } catch (rErr) {
+        if (rErr.insertedDocs) {
+          rErr.insertedDocs.forEach(r => routesMap.set(`${String(r.company)}:${String(r.name).toLowerCase()}`, r));
+        }
+      }
     }
 
     if (newMarketsToCreateMap.size > 0) {
-      const inserted = await Party.insertMany([...newMarketsToCreateMap.values()]);
-      inserted.forEach(m => {
-        marketsMap.set(`${m.company}:${m.firmName.toLowerCase()}`, m);
-      });
+      try {
+        const inserted = await Party.insertMany([...newMarketsToCreateMap.values()], { ordered: false });
+        inserted.forEach(m => {
+          marketsMap.set(`${String(m.company)}:${String(m.firmName).toLowerCase()}`, m);
+        });
+      } catch (mErr) {
+        if (mErr.insertedDocs) {
+          mErr.insertedDocs.forEach(m => marketsMap.set(`${String(m.company)}:${String(m.firmName).toLowerCase()}`, m));
+        }
+      }
     }
 
     if (newAgentsToCreateMap.size > 0) {
-      const inserted = await Party.insertMany([...newAgentsToCreateMap.values()]);
-      inserted.forEach(a => {
-        agentsMap.set(`${a.company}:${a.firmName.toLowerCase()}`, a);
-      });
+      try {
+        const inserted = await Party.insertMany([...newAgentsToCreateMap.values()], { ordered: false });
+        inserted.forEach(a => {
+          agentsMap.set(`${String(a.company)}:${String(a.firmName).toLowerCase()}`, a);
+        });
+      } catch (aErr) {
+        if (aErr.insertedDocs) {
+          aErr.insertedDocs.forEach(a => agentsMap.set(`${String(a.company)}:${String(a.firmName).toLowerCase()}`, a));
+        }
+      }
     }
 
     if (newTransportersToCreateMap.size > 0) {
-      const inserted = await Party.insertMany([...newTransportersToCreateMap.values()]);
-      inserted.forEach(t => {
-        transportersMap.set(`${t.company}:${t.firmName.toLowerCase()}`, t);
-      });
+      try {
+        const inserted = await Party.insertMany([...newTransportersToCreateMap.values()], { ordered: false });
+        inserted.forEach(t => {
+          transportersMap.set(`${String(t.company)}:${String(t.firmName).toLowerCase()}`, t);
+        });
+      } catch (tErr) {
+        if (tErr.insertedDocs) {
+          tErr.insertedDocs.forEach(t => transportersMap.set(`${String(t.company)}:${String(t.firmName).toLowerCase()}`, t));
+        }
+      }
     }
 
     // Activity logging for auto-created entities in bulk
@@ -1882,12 +1942,10 @@ exports.importParties = async (req, res) => {
       });
     });
     if (activityLogs.length > 0) {
-      const ActivityLog = require('../models/activityLogModel');
       await ActivityLog.insertMany(activityLogs).catch(err => console.error("Activity logs failed:", err));
     }
 
     // 3. Resolve Customer prefixes and fetch existing sequence counters
-    const Sequence = require('../models/sequenceModel');
     const seqsMap = new Map();
 
     for (const compId of companyIds) {
@@ -1919,22 +1977,26 @@ exports.importParties = async (req, res) => {
     const processedParties = [];
     for (const p of parties) {
       const data = { ...p };
-      if (data.company && (!data.companies || data.companies.length === 0)) {
-        data.companies = [data.company];
+      const companyId = String(data.company || '');
+      const companyObjId = toObjectId(companyId);
+      data.company = companyObjId;
+
+      if (!data.companies || data.companies.length === 0) {
+        data.companies = [companyObjId];
+      } else {
+        data.companies = data.companies.map(toObjectId).filter(Boolean);
       }
 
-      if (data.company) {
-        const companyId = data.company;
-
+      if (companyId) {
         // Apply normalized case names from caches
         if (data.route) {
-          const routeKey = `${companyId}:${data.route.toLowerCase()}`;
+          const routeKey = `${companyId}:${String(data.route).trim().toLowerCase()}`;
           const routeDoc = routesMap.get(routeKey);
           if (routeDoc) data.route = routeDoc.name;
         }
 
         if (data.city) {
-          const marketKey = `${companyId}:${data.city.toLowerCase()}`;
+          const marketKey = `${companyId}:${String(data.city).trim().toLowerCase()}`;
           const marketDoc = marketsMap.get(marketKey);
           if (marketDoc) {
             data.city = marketDoc.firmName;
@@ -1948,14 +2010,14 @@ exports.importParties = async (req, res) => {
         if (data.type === 'customer') {
           // Apply normalized agent name from cache
           if (data.agentAssigned) {
-            const agentKey = `${companyId}:${data.agentAssigned.toLowerCase()}`;
+            const agentKey = `${companyId}:${String(data.agentAssigned).trim().toLowerCase()}`;
             const agentDoc = agentsMap.get(agentKey);
             if (agentDoc) data.agentAssigned = agentDoc.firmName;
           }
 
           // Apply normalized transporter name from cache
           if (data.preferredTransport) {
-            const transporterKey = `${companyId}:${data.preferredTransport.toLowerCase()}`;
+            const transporterKey = `${companyId}:${String(data.preferredTransport).trim().toLowerCase()}`;
             const transporterDoc = transportersMap.get(transporterKey);
             if (transporterDoc) data.preferredTransport = transporterDoc.firmName;
           }
@@ -1983,7 +2045,7 @@ exports.importParties = async (req, res) => {
           upsert: true
         }
       }));
-      await Sequence.bulkWrite(bulkOps);
+      await Sequence.bulkWrite(bulkOps).catch(seqErr => console.error("Sequence bulkWrite failed:", seqErr));
     }
 
     // 6. Separate route/region vs party records
@@ -1993,22 +2055,24 @@ exports.importParties = async (req, res) => {
     const createdRoutes = [];
     if (routeItems.length > 0) {
       for (const r of routeItems) {
-        const baseCode = getRouteCode(r.firmName || r.name || 'ROUTE');
+        const rName = String(r.firmName || r.name || 'ROUTE').trim();
+        const baseCode = getRouteCode(rName);
         let routeCode = r.code || baseCode;
         if (!r.code) {
           let suffix = 1;
-          while (routeCodesSet.has(`${r.company}:${routeCode.toUpperCase()}`)) {
+          const compStr = String(r.company);
+          while (routeCodesSet.has(`${compStr}:${routeCode.toUpperCase()}`)) {
             routeCode = `${baseCode}${suffix}`;
             suffix++;
           }
-          routeCodesSet.add(`${r.company}:${routeCode.toUpperCase()}`);
+          routeCodesSet.add(`${compStr}:${routeCode.toUpperCase()}`);
         }
         try {
           const rDoc = await Route.findOneAndUpdate(
-            { company: toObjectId(r.company), name: (r.firmName || r.name).trim() },
+            { company: toObjectId(r.company), name: rName },
             {
               $setOnInsert: {
-                name: (r.firmName || r.name).trim(),
+                name: rName,
                 code: routeCode,
                 company: toObjectId(r.company),
                 status: r.status || 'active'
@@ -2031,7 +2095,15 @@ exports.importParties = async (req, res) => {
         if (insertErr.insertedDocs && insertErr.insertedDocs.length > 0) {
           created = insertErr.insertedDocs;
         } else {
-          throw insertErr;
+          // Fallback: insert individually so valid items are never lost
+          for (const item of partyItems) {
+            try {
+              const doc = await Party.create(item);
+              created.push(doc);
+            } catch (singleErr) {
+              console.warn("Skipping invalid party during import:", singleErr.message);
+            }
+          }
         }
       }
     }
@@ -2055,7 +2127,7 @@ exports.importParties = async (req, res) => {
     res.status(201).json({ msg: `Successfully imported ${totalCreatedCount} records`, count: totalCreatedCount });
   } catch (err) {
     console.error("importParties error:", err);
-    res.status(500).json({ msg: err.message });
+    res.status(400).json({ msg: err.message || 'Failed to import parties' });
   }
 };
 

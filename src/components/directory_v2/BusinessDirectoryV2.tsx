@@ -1170,17 +1170,47 @@ export const BusinessDirectoryV2: React.FC = () => {
         return;
       }
 
-      const res = await importParties(partiesToImport);
+      let importedCount = 0;
+      let bulkSucceeded = false;
+      try {
+        const res = await importParties(partiesToImport);
+        if (res && res.data) {
+          importedCount = res.data.count || partiesToImport.length;
+          bulkSucceeded = true;
+        }
+      } catch (bulkErr: any) {
+        console.warn('Bulk import endpoint encountered an error, falling back to resilient row-by-row creation:', bulkErr);
+      }
+
+      if (!bulkSucceeded) {
+        for (const p of partiesToImport) {
+          try {
+            if (p.type === 'route') {
+              await createRoute({ name: p.firmName || p.name, company: selectedCompany._id });
+            } else {
+              await createParty(p);
+            }
+            importedCount++;
+          } catch (singleErr: any) {
+            console.warn('Failed to import individual party row:', p.firmName, singleErr?.message);
+          }
+        }
+      }
+
+      if (importedCount === 0) {
+        showToast('Failed to import any records from file. Please check file format.', 'error');
+        setIsImporting(false);
+        return;
+      }
 
       createActivityLog({
         action: 'IMPORT',
         entityType: activeMainTab.toUpperCase(),
-        entityName: `${partiesToImport.length} ${activeMainTab} imported`,
-        details: `Imported ${partiesToImport.length} ${activeMainTab} records directly into database via Excel/CSV import`,
+        entityName: `${importedCount} ${activeMainTab} imported`,
+        details: `Imported ${importedCount} ${activeMainTab} records directly into database via Excel/CSV import`,
         company: selectedCompany._id
       }).catch(() => {});
 
-      const importedCount = res?.data?.count || partiesToImport.length;
       showToast(`Successfully imported ${importedCount} ${activeMainTab} into database!`, 'success');
       await loadDirectoryData();
       await loadAuxiliaryData();
