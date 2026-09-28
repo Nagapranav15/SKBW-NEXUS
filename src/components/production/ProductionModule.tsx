@@ -2861,7 +2861,7 @@ export const ProductionModule: React.FC = () => {
           >
             <div
               className="bg-white rounded-2xl shadow-2xl w-full flex flex-col my-auto border border-gray-150 animate-in zoom-in-95 duration-200 overflow-hidden relative"
-              style={{ maxWidth: 1200, height: '92vh', maxHeight: '92vh' }}
+              style={{ maxWidth: 1260, height: '94vh', maxHeight: '94vh' }}
               onClick={e => e.stopPropagation()}
             >
               <NewProductionOrderWizard

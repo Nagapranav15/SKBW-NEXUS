@@ -1,22 +1,15 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { 
-  ArrowLeft, ArrowRight, Check, AlertCircle, Plus, Trash2, 
-  RotateCcw, ExternalLink, Calendar, CheckCircle2, ChevronRight,
-  Pencil, DollarSign, Search, Loader2, Sparkles, ChevronDown, 
-  Settings, X, Layers, Box, ShoppingBag, Truck, Link2, FileSpreadsheet
+  Calendar, ChevronDown, Plus, Trash2, RotateCcw, 
+  Layers, Box, Receipt, Calculator, MessageSquare, 
+  Check, X, Search, Loader2, Settings, Building2, MapPin
 } from 'lucide-react';
-import { ProductionOrder, ProductionBomItem, PriorityLevel, ItemType } from '../../types/production';
+import { ProductionOrder } from '../../types/production';
 import { getNextProductionOrderNumber, createProductionOrder } from '../../api/productionApi';
-import { getSkusV2, getWarehouseHierarchyV2, SkuV2, WarehouseLocationV2, getMetadataV2 } from '../../api/mfgApiV2';
-import { getSalesOrdersV2, updateSalesOrderV2Status, SalesOrderV2 } from '../../api/salesOrderApiV2';
-import { getPurchaseInvoicesV2, PurchaseInvoiceV2 } from '../inventory_v2/purchases/purchaseService';
-import { showToast } from '../ui/Toast';
-import { PresetField, PresetItem } from './PresetField';
-import { BulkEditBomModal } from './BulkEditBomModal';
+import { getSkusV2, getWarehouseHierarchyV2, SkuV2, WarehouseLocationV2 } from '../../api/mfgApiV2';
 import { LocationSelectPopup } from '../stock_v2/LocationSelectPopup';
 import { Modal } from '../ui/Modal';
-import { fetchStockCostings, resolveComponentCosting, StockCostingData } from '../../utils/inventoryCosting';
+import { showToast } from '../ui/Toast';
 
 interface NewProductionOrderWizardProps {
   onCancel: () => void;
@@ -25,79 +18,62 @@ interface NewProductionOrderWizardProps {
   initialSkus?: SkuV2[];
 }
 
-// Standard classification identical to SkuMasterV2 products / materials / semi
-export const getItemClassification = (sku: SkuV2): 'products' | 'semi' | 'materials' => {
-  const cat = (sku.category || '').toLowerCase().trim();
-  const code = (sku.skuCode || '').toUpperCase().trim();
-  const name = (sku.name || '').toLowerCase().trim();
-
-  // Semi-finished / WIP
-  if (
-    cat.includes('semi') || 
-    cat.includes('wip') || 
-    cat === 'semi finished' || 
-    cat.includes('sub') || 
-    code.startsWith('SM-') || 
-    code.startsWith('SM') || 
-    code.startsWith('SEM') || 
-    code.startsWith('SFG') || 
-    code.startsWith('SF') || 
-    name.includes('ruled cut') || 
-    name.includes('inner signature') || 
-    name.includes('book block')
-  ) {
-    return 'semi';
-  }
-
-  // Raw Materials
-  if (
-    cat.includes('raw') || 
-    cat.includes('material') || 
-    cat === 'raw material' || 
-    cat.includes('reel') || 
-    cat.includes('board') || 
-    code.startsWith('RM-') || 
-    code.startsWith('RM') || 
-    name.includes('reel') || 
-    name.includes('wire') || 
-    name.includes('adhesive') || 
-    name.includes('glue')
-  ) {
-    return 'materials';
-  }
-
-  // Finished Goods (Products)
-  return 'products';
-};
-
-// Production Preset interface supporting assigned locations
-export interface ProductionPreset {
+export interface DepartmentPreset {
   id: string;
   name: string;
-  department: string;
-  locationId?: string;
-  locationName?: string;
+  locationName: string;
   warehouseId?: string;
   floorId?: string;
   zoneId?: string;
+  locationId?: string;
 }
 
-// Default production presets matching sales order preset styling with location bindings
-export const DEFAULT_PRODUCTION_PRESETS: ProductionPreset[] = [
+interface MaterialRow {
+  id: string;
+  component: string;
+  code: string;
+  uom: string;
+  requiredQty: number;
+  sourceLocation: string;
+  locationId?: string;
+  warehouseId?: string;
+  floorId?: string;
+  zoneId?: string;
+  rate: number;
+  amount: number;
+  basePerPiece?: number;
+}
+
+interface ScrapRow {
+  id: string;
+  item: string;
+  uom: string;
+  qty: number;
+  rate: number;
+  amount: number;
+}
+
+interface AdditionalCostRow {
+  id: string;
+  costType: string;
+  basis: 'Total / Batch' | 'Per GBL' | 'Per Piece' | 'Lump Sum';
+  amount: number;
+  appliedAs: 'Total Cost for this production' | 'Per Unit (GBL)' | 'Per Unit (PCS)';
+}
+
+const DEFAULT_DEPARTMENT_PRESETS: DepartmentPreset[] = [
   {
-    id: 'prod-preset-notebook',
+    id: 'dept-notebook',
     name: 'Notebook Manufacturing',
-    department: 'Notebook Manufacturing',
-    locationName: 'SKBW',
+    locationName: 'SKBW - Ground Floor',
     warehouseId: 'fact-skbw',
     floorId: 'floor-ground',
     zoneId: 'zone-a',
     locationId: 'loc-top'
   },
   {
-    id: 'prod-preset-ruling',
+    id: 'dept-ruling',
     name: 'Ruling & Cutting Line',
-    department: 'Ruling Department',
     locationName: 'SKBW - Ground Floor',
     warehouseId: 'fact-skbw',
     floorId: 'floor-ground',
@@ -105,9 +81,8 @@ export const DEFAULT_PRODUCTION_PRESETS: ProductionPreset[] = [
     locationId: 'loc-m-top'
   },
   {
-    id: 'prod-preset-binding',
-    name: 'Binding & Stitching Section',
-    department: 'Binding Department',
+    id: 'dept-binding',
+    name: 'Binding Department',
     locationName: 'SKBW - 1st Floor',
     warehouseId: 'fact-skbw',
     floorId: 'floor-1st',
@@ -115,9 +90,8 @@ export const DEFAULT_PRODUCTION_PRESETS: ProductionPreset[] = [
     locationId: ''
   },
   {
-    id: 'prod-preset-cover',
+    id: 'dept-cover',
     name: 'Index & Cover Prep',
-    department: 'Cover Department',
     locationName: 'LOM Warehouse',
     warehouseId: 'fact-lom',
     floorId: '',
@@ -125,9 +99,8 @@ export const DEFAULT_PRODUCTION_PRESETS: ProductionPreset[] = [
     locationId: ''
   },
   {
-    id: 'prod-preset-printing',
-    name: 'Printing & Folding Unit',
-    department: 'Printing Department',
+    id: 'dept-printing',
+    name: 'Printing Department',
     locationName: 'SKBW - Ground Floor',
     warehouseId: 'fact-skbw',
     floorId: 'floor-ground',
@@ -135,733 +108,643 @@ export const DEFAULT_PRODUCTION_PRESETS: ProductionPreset[] = [
     locationId: 'loc-bottom'
   },
   {
-    id: 'prod-preset-packing',
-    name: 'Final Packing & Dispatch Bay',
-    department: 'Packing Department',
+    id: 'dept-packing',
+    name: 'Packing Department',
     locationName: 'SKBW - Ground Floor',
     warehouseId: 'fact-skbw',
     floorId: 'floor-ground',
     zoneId: 'zone-s',
     locationId: 'loc-s1'
+  },
+  {
+    id: 'dept-dispatch',
+    name: 'Dispatch Department',
+    locationName: 'LOM Warehouse',
+    warehouseId: 'fact-lom',
+    floorId: '',
+    zoneId: '',
+    locationId: ''
   }
 ];
-
-const DEFAULT_DEPARTMENT_PRESETS: PresetItem[] = [
-  { id: 'dept-notebook', name: 'Notebook Manufacturing', locationName: 'SKBW - Ground Floor', warehouseId: 'fact-skbw', floorId: 'floor-ground', locationId: 'loc-top' },
-  { id: 'dept-binding', name: 'Binding Department', locationName: 'SKBW - 1st Floor', warehouseId: 'fact-skbw', floorId: 'floor-1st', locationId: 'floor-1st' },
-  { id: 'dept-printing', name: 'Printing Department', locationName: 'SKBW - Ground Floor', warehouseId: 'fact-skbw', floorId: 'floor-ground', locationId: 'loc-bottom' },
-  { id: 'dept-packing', name: 'Packing Department', locationName: 'SKBW - Ground Floor', warehouseId: 'fact-skbw', floorId: 'floor-ground', locationId: 'loc-s1' },
-  { id: 'dept-dispatch', name: 'Dispatch Department', locationName: 'LOM Warehouse', warehouseId: 'fact-lom', locationId: 'fact-lom' }
-];
-
-// Module-level in-memory cache to prevent redundant fetches across modal opens
-let cachedCompanyId: string | null = null;
-let cachedWarehouseLocations: WarehouseLocationV2[] = [];
-let cachedFactories: string[] = [];
-let cachedStockCostings: StockCostingData | null = null;
-let cachedNextOrderNumber: string = 'PO-001';
 
 export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> = ({
   onCancel,
   onCreated,
   companyId,
-  initialSkus
+  initialSkus = []
 }) => {
-  // Wizard step: 1 (Basic Info & BOM), 3 (Review & Confirm)
-  const [currentStep, setCurrentStep] = useState<number>(1);
-  const [loadingInitial, setLoadingInitial] = useState<boolean>(() => {
-    return !(initialSkus && initialSkus.length > 0);
-  });
   const [submitting, setSubmitting] = useState<boolean>(false);
 
-  // Backend data (Pre-seeded from parent or cache for instant 0ms render)
-  const [backendSkus, setBackendSkus] = useState<SkuV2[]>(() => {
-    if (initialSkus && initialSkus.length > 0) return initialSkus;
-    return [];
-  });
-  const [factories, setFactories] = useState<string[]>(() => {
-    return cachedCompanyId === companyId && cachedFactories.length > 0 ? cachedFactories : [];
-  });
-  const [warehouseLocations, setWarehouseLocations] = useState<WarehouseLocationV2[]>(() => {
-    return cachedCompanyId === companyId ? cachedWarehouseLocations : [];
-  });
-  const [stockCostings, setStockCostings] = useState<StockCostingData | null>(() => {
-    return cachedCompanyId === companyId ? cachedStockCostings : null;
+  // Master Data
+  const [backendSkus, setBackendSkus] = useState<SkuV2[]>(initialSkus);
+  const [warehouseLocations, setWarehouseLocations] = useState<WarehouseLocationV2[]>([]);
+
+  // Department Presets (matching Sales Order presets in localStorage)
+  const [departmentPresets, setDepartmentPresets] = useState<DepartmentPreset[]>(() => {
+    try {
+      const stored = localStorage.getItem('skbw_department_presets_v2');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return DEFAULT_DEPARTMENT_PRESETS;
   });
 
-  // Bulk Edit BOM Modal state (opens exact Item Master recipe editor)
-  const [showBulkEditBomModal, setShowBulkEditBomModal] = useState<boolean>(false);
+  const [showDepartmentDropdown, setShowDepartmentDropdown] = useState<boolean>(false);
+  const [showManageDeptModal, setShowManageDeptModal] = useState<boolean>(false);
+  const [newDeptName, setNewDeptName] = useState<string>('');
+  const [newDeptLocation, setNewDeptLocation] = useState<string>('SKBW - Ground Floor');
+  const [newDeptWhId, setNewDeptWhId] = useState<string>('fact-skbw');
+  const [newDeptFlId, setNewDeptFlId] = useState<string>('floor-ground');
+  const [newDeptZnId, setNewDeptZnId] = useState<string>('zone-a');
+  const [newDeptLocId, setNewDeptLocId] = useState<string>('loc-top');
+  const departmentDropdownRef = useRef<HTMLDivElement>(null);
 
-  // ERP Cross-Module Connections (Sales Orders & Purchase Batches)
-  const [searchParams] = useSearchParams();
-  const [salesOrders, setSalesOrders] = useState<SalesOrderV2[]>([]);
-  const [selectedSalesOrderId, setSelectedSalesOrderId] = useState<string>('');
-  const [selectedSalesOrder, setSelectedSalesOrder] = useState<SalesOrderV2 | null>(null);
-  const [reference, setReference] = useState<string>('Not Selected');
-  const [showSalesOrderDropdown, setShowSalesOrderDropdown] = useState<boolean>(false);
-  const [salesOrderSearchQuery, setSalesOrderSearchQuery] = useState<string>('');
-  const salesOrderDropdownRef = useRef<HTMLDivElement>(null);
-  const [purchaseInvoices, setPurchaseInvoices] = useState<PurchaseInvoiceV2[]>([]);
+  // Output Location Coordinates
+  const [selectedWhId, setSelectedWhId] = useState<string>('fact-skbw');
+  const [selectedFlId, setSelectedFlId] = useState<string>('floor-ground');
+  const [selectedZnId, setSelectedZnId] = useState<string>('zone-a');
+  const [selectedLocId, setSelectedLocId] = useState<string>('loc-top');
 
-  // Form Fields - PO-001 (Accommodates > 1 lakh orders)
-  const [orderNumber, setOrderNumber] = useState<string>(() => {
-    return cachedCompanyId === companyId && cachedNextOrderNumber ? cachedNextOrderNumber : 'PO-001';
-  });
-  const [selectedSkuId, setSelectedSkuId] = useState<string>(''); // Empty by default
-  const [productSearchQuery, setProductSearchQuery] = useState<string>('');
-  const [showProductDropdown, setShowProductDropdown] = useState<boolean>(false);
-  const productDropdownRef = useRef<HTMLDivElement>(null);
-
-  const [productionQty, setProductionQty] = useState<number | ''>(''); // Empty by default
-  const [productionUom, setProductionUom] = useState<string>('PCS');
-  
-  // Location hierarchy selection (empty by default)
-  const [factory, setFactory] = useState<string>(''); // Backward compatible string
-  const [locationId, setLocationId] = useState<string>('');
-  const [warehouseId, setWarehouseId] = useState<string>('');
-  const [floorId, setFloorId] = useState<string>('');
-  const [zoneId, setZoneId] = useState<string>('');
-  const [locationName, setLocationName] = useState<string>('');
-
-  const [department, setDepartment] = useState<string>('');
-  const [plannedStartDate] = useState<string>(() => {
+  // Top Bar fields (Reference number removed per user request)
+  const [orderNumber, setOrderNumber] = useState<string>('');
+  const [orderDate, setOrderDate] = useState<string>(() => {
     const today = new Date();
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = String(today.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   });
-  const [requiredCompletionDate, setRequiredCompletionDate] = useState<string>(''); // Empty by default
-  const [priority, setPriority] = useState<PriorityLevel>('Normal');
-  const [remarks, setRemarks] = useState<string>(''); // Empty by default
+  const [department, setDepartment] = useState<string>('Notebook Manufacturing');
 
-  // Production Presets (Exact same UI as Sales Order)
-  const [productionPresets, setProductionPresets] = useState<ProductionPreset[]>(() => {
-    try {
-      const stored = localStorage.getItem('skbw_production_presets_v2');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+  // Product Selection fields
+  const [selectedSkuId, setSelectedSkuId] = useState<string>('');
+  const [productName, setProductName] = useState<string>('');
+  const [productCode, setProductCode] = useState<string>('');
+  const [showProductDropdown, setShowProductDropdown] = useState<boolean>(false);
+  const [productSearch, setProductSearch] = useState<string>('');
+  const productDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Output Location & Planned Qty
+  const [outputLocation, setOutputLocation] = useState<string>('SKBW - Ground Floor');
+  const [plannedQty, setPlannedQty] = useState<number | string>('');
+  const [uom, setUom] = useState<string>('PCS');
+  const [conversionFactor, setConversionFactor] = useState<number>(300);
+
+  // Remarks
+  const [remarks, setRemarks] = useState<string>('');
+
+  // Materials Table
+  const [materials, setMaterials] = useState<MaterialRow[]>([]);
+  const [activeMaterialDropdownId, setActiveMaterialDropdownId] = useState<string | null>(null);
+
+  // Scrap / By-Products Table
+  const [scrapItems, setScrapItems] = useState<ScrapRow[]>([]);
+
+  // Additional Costs Table
+  const [additionalCosts, setAdditionalCosts] = useState<AdditionalCostRow[]>([]);
+
+  // Load backend sequence number & SKUs
+  useEffect(() => {
+    let isMounted = true;
+    const loadData = async () => {
+      try {
+        if (companyId) {
+          const [nextNum, skusRes, whRes] = await Promise.allSettled([
+            getNextProductionOrderNumber(companyId),
+            getSkusV2(companyId),
+            getWarehouseHierarchyV2(companyId)
+          ]);
+
+          if (!isMounted) return;
+
+          if (nextNum.status === 'fulfilled' && nextNum.value) {
+            setOrderNumber(nextNum.value);
+          }
+          if (skusRes.status === 'fulfilled' && Array.isArray(skusRes.value)) {
+            setBackendSkus(skusRes.value);
+          }
+          if (whRes.status === 'fulfilled' && Array.isArray(whRes.value)) {
+            setWarehouseLocations(whRes.value);
+          }
+        }
+      } catch (err) {
+        console.error('Error loading production order initial data:', err);
       }
-    } catch (e) {}
-    return DEFAULT_PRODUCTION_PRESETS;
-  });
+    };
 
-  const [showQuickPresetMenu, setShowQuickPresetMenu] = useState<boolean>(false);
-  const [showManagePresetsModal, setShowManagePresetsModal] = useState<boolean>(false);
-  const [highlightedPresetIdx, setHighlightedPresetIdx] = useState<number>(0);
-  const quickPresetMenuRef = useRef<HTMLDivElement>(null);
-  const quickPresetListRef = useRef<HTMLDivElement>(null);
-
-  // New preset form in Manage Modal
-  const [newPresetForm, setNewPresetForm] = useState({
-    name: '',
-    department: '',
-    locationId: ''
-  });
-
-  // BOM Configuration
-  const [bomType, setBomType] = useState<'Default BOM' | 'Custom BOM (Production Order Only)'>('Default BOM');
-  const [bomItems, setBomItems] = useState<ProductionBomItem[]>([]); // Empty by default
-
-  // Searchable Add Component Modal/Dropdown (Only raw and semi materials)
-  const [showAddComponentModal, setShowAddComponentModal] = useState<boolean>(false);
-  const [componentSearchQuery, setComponentSearchQuery] = useState<string>('');
-
-  // Keyboard navigation & Tally shortcuts
-  const [highlightedProductIdx, setHighlightedProductIdx] = useState<number>(0);
-  const [highlightedCatalogIdx, setHighlightedCatalogIdx] = useState<number>(0);
-  const wizardContainerRef = useRef<HTMLDivElement>(null);
-  const productSearchInputRef = useRef<HTMLInputElement>(null);
-  const catalogSearchInputRef = useRef<HTMLInputElement>(null);
-
-  // Auto-focus search input when product dropdown or catalog modal opens
-  useEffect(() => {
-    if (showProductDropdown) {
-      setHighlightedProductIdx(0);
-      setTimeout(() => productSearchInputRef.current?.focus(), 50);
-    }
-  }, [showProductDropdown]);
-
-  useEffect(() => {
-    if (showAddComponentModal) {
-      setHighlightedCatalogIdx(0);
-      setTimeout(() => catalogSearchInputRef.current?.focus(), 50);
-    }
-  }, [showAddComponentModal]);
+    loadData();
+    return () => { isMounted = false; };
+  }, [companyId]);
 
   // Close menus on outside click
   useEffect(() => {
-    const handleOutsideClick = (e: MouseEvent) => {
+    const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (productDropdownRef.current && !productDropdownRef.current.contains(target)) {
         setShowProductDropdown(false);
       }
-      if (quickPresetMenuRef.current && !quickPresetMenuRef.current.contains(target)) {
-        setShowQuickPresetMenu(false);
+      if (departmentDropdownRef.current && !departmentDropdownRef.current.contains(target)) {
+        setShowDepartmentDropdown(false);
       }
-      if (salesOrderDropdownRef.current && !salesOrderDropdownRef.current.contains(target)) {
-        setShowSalesOrderDropdown(false);
+      if (!target.closest('.material-dropdown-container')) {
+        setActiveMaterialDropdownId(null);
       }
     };
-    document.addEventListener('mousedown', handleOutsideClick);
-    return () => document.removeEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // 1. Load backend data in background (quietly updates cache without blocking UI)
-  useEffect(() => {
-    let isMounted = true;
-    const loadBackend = async () => {
-      try {
-        if (!companyId) return;
-
-        const [skusRes, warehouseRes, nextNumRes, costingsRes, salesOrdersRes, purchaseInvoicesRes] = await Promise.allSettled([
-          getSkusV2(companyId),
-          getWarehouseHierarchyV2(companyId),
-          getNextProductionOrderNumber(companyId),
-          fetchStockCostings(companyId),
-          getSalesOrdersV2(companyId),
-          getPurchaseInvoicesV2({ companyId, limit: 100 })
-        ]);
-
-        if (!isMounted) return;
-
-        cachedCompanyId = companyId;
-
-        // Dynamic Stock & Inventory Costing
-        if (costingsRes.status === 'fulfilled' && costingsRes.value) {
-          setStockCostings(costingsRes.value);
-          cachedStockCostings = costingsRes.value;
-        }
-
-        // SKUs
-        if (skusRes.status === 'fulfilled' && Array.isArray(skusRes.value)) {
-          setBackendSkus(skusRes.value);
-        }
-
-        // Sales Orders (ERP Upstream Demand)
-        if (salesOrdersRes.status === 'fulfilled' && Array.isArray(salesOrdersRes.value)) {
-          setSalesOrders(salesOrdersRes.value);
-        }
-
-        // Purchase Invoices (ERP Downstream Raw Material Supply)
-        if (purchaseInvoicesRes.status === 'fulfilled' && purchaseInvoicesRes.value?.invoices) {
-          setPurchaseInvoices(purchaseInvoicesRes.value.invoices);
-        }
-
-        // Warehouse Locations & Factories
-        if (warehouseRes.status === 'fulfilled' && Array.isArray(warehouseRes.value)) {
-          setWarehouseLocations(warehouseRes.value);
-          cachedWarehouseLocations = warehouseRes.value;
-          const factoryLocs = warehouseRes.value.filter(l => l.level === 'Factory');
-          const factoryNames = factoryLocs.map(f => f.name.trim()).filter(Boolean);
-          if (factoryNames.length > 0) {
-            setFactories(factoryNames);
-            cachedFactories = factoryNames;
-          } else if (warehouseRes.value.length > 0) {
-            const rootNames = warehouseRes.value.map(f => f.name.trim()).filter(Boolean);
-            setFactories(rootNames);
-            cachedFactories = rootNames;
-          } else {
-            setFactories(['Main Factory']);
-            cachedFactories = ['Main Factory'];
-          }
-        }
-
-        // Order Number sequence starting at PO-001
-        if (nextNumRes.status === 'fulfilled' && nextNumRes.value) {
-          setOrderNumber(nextNumRes.value);
-          cachedNextOrderNumber = nextNumRes.value;
-        }
-      } catch (err) {
-        console.error('Failed to load initial data from backend:', err);
-      } finally {
-        if (isMounted) setLoadingInitial(false);
-      }
-    };
-
-    loadBackend();
-    return () => { isMounted = false; };
-  }, [companyId]);
-
-  // Handle cross-module deep link via URL search parameters (from Sales or Purchases)
-  useEffect(() => {
-    if (!backendSkus.length && !salesOrders.length) return;
-
-    // 1. If Sales Order is referenced in URL
-    const soIdParam = searchParams.get('salesOrderId');
-    const orderNoParam = searchParams.get('orderNumber');
-    if (soIdParam || orderNoParam) {
-      const matchSo = salesOrders.find(o => o._id === soIdParam || o.orderNumber === orderNoParam);
-      if (matchSo) {
-        setSelectedSalesOrderId(matchSo._id || '');
-        setSelectedSalesOrder(matchSo);
-        setReference(`Sales Order #${matchSo.orderNumber}`);
-        if (matchSo.promisedDate) {
-          setRequiredCompletionDate(matchSo.promisedDate);
-        }
-        if (matchSo.customerName) {
-          setRemarks(`Demand for Sales Order #${matchSo.orderNumber} (${matchSo.customerName})`);
-        }
-      } else if (orderNoParam) {
-        setReference(`Sales Order #${orderNoParam}`);
-      }
-    }
-
-    // 2. If SKU is specified in URL
-    const skuCodeParam = searchParams.get('skuCode');
-    const skuIdParam = searchParams.get('skuId');
-    if (skuCodeParam || skuIdParam) {
-      const matchSku = backendSkus.find(s => 
-        (skuIdParam && s._id === skuIdParam) || 
-        (skuCodeParam && s.skuCode?.toUpperCase() === skuCodeParam.toUpperCase())
-      );
-      if (matchSku && !selectedSkuId) {
-        handleSelectProduct(matchSku);
-      }
-    }
-
-    // 3. Planned Qty & UOM from URL
-    const plannedQtyParam = searchParams.get('plannedQty');
-    if (plannedQtyParam && productionQty === '') {
-      const qtyNum = Number(plannedQtyParam);
-      if (!isNaN(qtyNum) && qtyNum > 0) {
-        setProductionQty(qtyNum);
-      }
-    }
-
-    const plannedUomParam = searchParams.get('plannedUom');
-    if (plannedUomParam) {
-      setProductionUom(plannedUomParam);
-    }
-  }, [backendSkus, salesOrders, searchParams]);
-
-  // Keep backendSkus updated if initialSkus arrives
-  useEffect(() => {
-    if (initialSkus && initialSkus.length > 0 && backendSkus.length === 0) {
-      setBackendSkus(initialSkus);
-      setLoadingInitial(false);
-    }
-  }, [initialSkus]);
-
-  // Production Presets Handlers
-  const saveProductionPresets = (list: ProductionPreset[]) => {
-    setProductionPresets(list);
-    try {
-      localStorage.setItem('skbw_production_presets_v2', JSON.stringify(list));
-    } catch (e) {}
-  };
-
-  const handleApplyPreset = (p: ProductionPreset) => {
-    if (p.department) setDepartment(p.department);
-    if (p.locationId) setLocationId(p.locationId);
-    if (p.warehouseId) setWarehouseId(p.warehouseId);
-    if (p.floorId) setFloorId(p.floorId);
-    if (p.zoneId) setZoneId(p.zoneId);
-
-    const locName = p.locationName || (p.locationId ? warehouseLocations.find(l => l._id === p.locationId)?.name : '') || 'SKBW';
-    setLocationName(locName);
-    setFactory(locName);
-
-    setShowQuickPresetMenu(false);
-    showToast(`Applied Preset "${p.name}" (Auto-filled Location: ${locName})`, 'success');
-  };
-
-  // Items to Produce: BOTH Finished Goods and Semi-Finished Goods
-  const producibleItemsList = useMemo(() => {
-    return backendSkus.filter(sku => {
-      const cls = getItemClassification(sku);
-      return cls === 'products' || cls === 'semi';
+  // Producible Finished Goods & Semi-Finished SKUs
+  const producibleSkus = useMemo(() => {
+    return backendSkus.filter(s => {
+      const cat = (s.category || '').toLowerCase();
+      const code = (s.skuCode || '').toUpperCase();
+      return !code.startsWith('RM-') && !cat.includes('raw') && !cat.includes('material');
     });
   }, [backendSkus]);
 
-  // Raw & Semi-Finished Materials list ONLY (for Add Component)
-  const rawAndSemiMaterialsList = useMemo(() => {
-    return backendSkus.filter(sku => {
-      const cls = getItemClassification(sku);
-      return cls === 'materials' || cls === 'semi';
-    });
-  }, [backendSkus]);
+  const filteredProductOptions = useMemo(() => {
+    if (!productSearch.trim()) return producibleSkus;
+    const q = productSearch.toLowerCase();
+    return producibleSkus.filter(s => 
+      s.name.toLowerCase().includes(q) || s.skuCode.toLowerCase().includes(q)
+    );
+  }, [producibleSkus, productSearch]);
 
-  // Selected SKU reference
-  const selectedSku = useMemo(() => {
+  const currentSku = useMemo(() => {
     return backendSkus.find(s => s._id === selectedSkuId);
-  }, [selectedSkuId, backendSkus]);
+  }, [backendSkus, selectedSkuId]);
 
-  // Item type derived from selected SKU (Finished Good or Semi Finished)
-  const itemType = useMemo<'Finished Good' | 'Semi Finished'>(() => {
-    if (!selectedSku) return 'Finished Good';
-    return getItemClassification(selectedSku) === 'semi' ? 'Semi Finished' : 'Finished Good';
-  }, [selectedSku]);
+  // Filter SKUs for Material / Component dropdown
+  const getFilteredMaterialSkus = (searchTerm: string) => {
+    if (!searchTerm || !searchTerm.trim()) return backendSkus;
+    const q = searchTerm.toLowerCase().trim();
+    return backendSkus.filter(s => 
+      s.name.toLowerCase().includes(q) || 
+      (s.skuCode && s.skuCode.toLowerCase().includes(q)) ||
+      (s.category && s.category.toLowerCase().includes(q))
+    );
+  };
 
-  // Conversion rate computation
-  const conversionRate = useMemo(() => {
-    if (!selectedSku) return 1;
-    if (selectedSku.booksGbl && selectedSku.booksGbl > 0) return selectedSku.booksGbl;
-    if (selectedSku.altUnitConversion && selectedSku.altUnitConversion > 0) return selectedSku.altUnitConversion;
-    if (selectedSku.unit === 'GBL' || productionUom === 'GBL') return 140;
-    return 1;
-  }, [selectedSku, productionUom]);
+  // Handle selecting an item from the Material dropdown
+  const handleSelectMaterialSku = (rowId: string, sku: SkuV2) => {
+    const defaultRate = (sku as any).purchasePrice || (sku as any).standardCost || (sku as any).rate || 0;
+    const uomVal = (sku.unit || 'PCS').toUpperCase();
+    setMaterials(prev => prev.map(row => {
+      if (row.id !== rowId) return row;
+      const qty = row.requiredQty > 0 ? row.requiredQty : 1;
+      const rate = defaultRate > 0 ? defaultRate : row.rate;
+      return {
+        ...row,
+        component: sku.name,
+        code: sku.skuCode || row.code,
+        uom: uomVal,
+        rate: rate,
+        amount: Math.round(qty * rate * 100) / 100
+      };
+    }));
+    setActiveMaterialDropdownId(null);
+  };
 
-  // Total PCS calculation according to conversion rate
-  const totalPlannedPcs = useMemo(() => {
-    const qty = Number(productionQty) || 0;
-    if (qty <= 0) return 0;
-    if (productionUom === 'GBL') {
-      return qty * conversionRate;
+  // STRICTLY ASSIGNED UNITS ONLY (No extra/duplicate units like KG, BOX, BDL)
+  const availableUnits = useMemo(() => {
+    if (!currentSku) return ['PCS', 'GBL'];
+    const set = new Set<string>();
+    if (currentSku.unit) set.add(currentSku.unit.toUpperCase().trim());
+    if (currentSku.altUnit) set.add(currentSku.altUnit.toUpperCase().trim());
+    const conv = Number(currentSku.booksGbl || currentSku.altUnitConversion || 0);
+    if (conv > 0) {
+      set.add('PCS');
+      set.add('GBL');
     }
-    return qty;
-  }, [productionQty, productionUom, conversionRate]);
+    if (set.size === 0) set.add('PCS');
+    return Array.from(set);
+  }, [currentSku]);
 
-  // Build BOM dynamically from Item Master assigned bomItems
-  const loadBomFromItemMaster = (sku: SkuV2, pcs: number) => {
-    if (!sku.bomItems || !Array.isArray(sku.bomItems) || sku.bomItems.length === 0) {
-      setBomItems([]);
+  const numPlannedQty = Number(plannedQty) || 0;
+  
+  const plannedPcs = useMemo(() => {
+    if (uom === 'GBL') {
+      return numPlannedQty * (conversionFactor || 300);
+    }
+    return numPlannedQty;
+  }, [numPlannedQty, uom, conversionFactor]);
+
+  const plannedGbl = useMemo(() => {
+    const factor = conversionFactor > 0 ? conversionFactor : 300;
+    if (uom === 'GBL') {
+      return numPlannedQty;
+    }
+    if (numPlannedQty <= 0) return 0;
+    return Math.round((numPlannedQty / factor) * 100) / 100;
+  }, [numPlannedQty, uom, conversionFactor]);
+
+  const availableOutputLocations = useMemo(() => {
+    const list = warehouseLocations.map(w => w.name).filter(Boolean);
+    if (list.length > 0) return list;
+    return [
+      'Finished Goods (FG-001)',
+      'Main Factory - Finished Goods',
+      'SKBW - Ground Floor',
+      'LOM Warehouse'
+    ];
+  }, [warehouseLocations]);
+
+  // Handle department preset selection with automatic location assignment
+  const handleSelectDepartmentPreset = (preset: DepartmentPreset) => {
+    setDepartment(preset.name);
+    setShowDepartmentDropdown(false);
+
+    if (preset.locationName) {
+      setOutputLocation(preset.locationName);
+      if (preset.warehouseId) setSelectedWhId(preset.warehouseId);
+      if (preset.floorId) setSelectedFlId(preset.floorId);
+      if (preset.zoneId) setSelectedZnId(preset.zoneId);
+      if (preset.locationId) setSelectedLocId(preset.locationId);
+      showToast(`Selected "${preset.name}" (Auto-assigned: ${preset.locationName})`, 'success');
+    }
+  };
+
+  // Add new department preset with full location coordinates
+  const handleAddNewDepartmentPreset = () => {
+    if (!newDeptName.trim()) {
+      showToast('Please enter a department name', 'error');
+      return;
+    }
+    const newPreset: DepartmentPreset = {
+      id: `dept-${Date.now()}`,
+      name: newDeptName.trim(),
+      locationName: newDeptLocation || 'Main Factory',
+      warehouseId: newDeptWhId || undefined,
+      floorId: newDeptFlId || undefined,
+      zoneId: newDeptZnId || undefined,
+      locationId: newDeptLocId || undefined
+    };
+    const updated = [newPreset, ...departmentPresets];
+    setDepartmentPresets(updated);
+    try {
+      localStorage.setItem('skbw_department_presets_v2', JSON.stringify(updated));
+    } catch (e) {}
+    setNewDeptName('');
+    showToast(`Added "${newPreset.name}" to department presets`, 'success');
+  };
+
+  const handleDeleteDepartmentPreset = (id: string) => {
+    const updated = departmentPresets.filter(p => p.id !== id);
+    setDepartmentPresets(updated);
+    try {
+      localStorage.setItem('skbw_department_presets_v2', JSON.stringify(updated));
+    } catch (e) {}
+    showToast('Department preset deleted', 'info');
+  };
+
+  // Output location change handler
+  const handleOutputLocationChange = (whId: string, flId: string, znId: string, locId: string) => {
+    setSelectedWhId(whId);
+    setSelectedFlId(flId);
+    setSelectedZnId(znId);
+    setSelectedLocId(locId);
+
+    const locObj = warehouseLocations.find(l => String(l._id) === String(locId));
+    const whObj = warehouseLocations.find(l => String(l._id) === String(whId));
+    const floorObj = warehouseLocations.find(l => String(l._id) === String(flId));
+    const pathStr = [whObj?.name, floorObj?.name, locObj?.name].filter(Boolean).join(' - ') || locObj?.name || 'Selected Location';
+    setOutputLocation(pathStr);
+  };
+
+  // Material source location change handler via Mini Factory modal
+  const handleMaterialLocationChange = (rowId: string, whId: string, flId: string, znId: string, locId: string) => {
+    const locObj = warehouseLocations.find(l => String(l._id) === String(locId));
+    const whObj = warehouseLocations.find(l => String(l._id) === String(whId));
+    const floorObj = warehouseLocations.find(l => String(l._id) === String(flId));
+    const pathStr = [whObj?.name, floorObj?.name, locObj?.name].filter(Boolean).join(' - ') || locObj?.name || 'Selected Location';
+
+    setMaterials(prev => prev.map(m => {
+      if (m.id !== rowId) return m;
+      return {
+        ...m,
+        sourceLocation: pathStr,
+        locationId: locId,
+        warehouseId: whId,
+        floorId: flId,
+        zoneId: znId
+      };
+    }));
+  };
+
+  // Handle product selection & auto BOM load
+  const handleSelectProduct = (sku: SkuV2) => {
+    setSelectedSkuId(sku._id);
+    setProductName(sku.name);
+    setProductCode(sku.skuCode);
+    setShowProductDropdown(false);
+    setProductSearch('');
+
+    // Dynamic unit adjustment strictly matching the product
+    const assignedUnit = (sku.unit || 'PCS').toUpperCase().trim();
+    setUom(assignedUnit);
+
+    const factor = sku.booksGbl && sku.booksGbl > 0 ? sku.booksGbl : (sku.altUnitConversion || 300);
+    setConversionFactor(factor);
+
+    const rawBom = sku.bomItems || (sku as any).bom || [];
+    if (Array.isArray(rawBom) && rawBom.length > 0) {
+      const yieldQty = Number(sku.recipeYieldQty) || Number(sku.batchYieldQty) || 1;
+      const targetPcs = plannedPcs > 0 ? plannedPcs : 1;
+
+      const loadedMaterials: MaterialRow[] = rawBom.map((raw: any, idx: number) => {
+        const rawQty = Number(raw.qty) || Number(raw.qtyPerBatch) || 1;
+        const perPieceBasis = rawQty / yieldQty;
+        const requiredQty = plannedPcs > 0 ? Math.round(perPieceBasis * targetPcs * 100) / 100 : rawQty;
+        const rate = Number(raw.rate) || 0;
+        return {
+          id: `mat-${idx + 1}-${Date.now()}`,
+          component: raw.name || raw.itemName || `Component ${idx + 1}`,
+          code: raw.skuCode || raw.code || `RM-${String(idx + 1).padStart(3, '0')}`,
+          uom: raw.uom || raw.unit || 'PCS',
+          requiredQty,
+          sourceLocation: 'SKBW - Ground Floor',
+          rate,
+          amount: Math.round(requiredQty * rate * 100) / 100,
+          basePerPiece: perPieceBasis
+        };
+      });
+      setMaterials(loadedMaterials);
+    } else {
+      setMaterials([]);
+    }
+  };
+
+  const handleLoadFromBom = () => {
+    if (!currentSku) {
+      showToast('Please select a product first', 'error');
       return;
     }
 
-    const targetPcs = pcs > 0 ? pcs : 1;
-    const yieldBasis = Number(sku.recipeYieldQty) || Number(sku.batchYieldQty) || 1;
+    const rawBom = currentSku.bomItems || (currentSku as any).bom || [];
+    if (Array.isArray(rawBom) && rawBom.length > 0) {
+      handleSelectProduct(currentSku);
+      showToast('BOM loaded and scaled successfully!', 'success');
+      return;
+    }
 
-    const items: ProductionBomItem[] = sku.bomItems.map((raw: any, idx: number) => {
-      const compSku = backendSkus.find(s => 
-        (raw.skuId && (s._id === raw.skuId || s._id === String(raw.skuId))) ||
-        (raw.skuCode && s.skuCode === raw.skuCode) ||
-        (s.name.toLowerCase() === (raw.name || raw.itemName || '').toLowerCase())
-      );
+    if (materials.length > 0) {
+      const targetPcs = plannedPcs > 0 ? plannedPcs : 1;
+      setMaterials(prev => prev.map(m => {
+        const base = m.basePerPiece || (m.requiredQty / (targetPcs || 1));
+        const req = Math.round(base * targetPcs * 100) / 100;
+        return {
+          ...m,
+          requiredQty: req,
+          amount: Math.round(req * m.rate * 100) / 100
+        };
+      }));
+      showToast('Materials re-scaled for current quantity', 'success');
+    } else {
+      showToast('No recipe found for this product. Use "+ Add Material" to add components.', 'info');
+    }
+  };
 
-      const qtyPerBatch = Number(raw.qty) || Number(raw.qtyPerBatch) || 1;
-      const totalReq = (qtyPerBatch / yieldBasis) * targetPcs;
+  const handleQuantityChange = (val: string) => {
+    setPlannedQty(val);
+    const newQty = Number(val) || 0;
+    const newPcs = uom === 'GBL' ? newQty * (conversionFactor || 300) : newQty;
+    
+    if (newPcs > 0) {
+      setMaterials(prev => prev.map(m => {
+        if (m.basePerPiece !== undefined && m.basePerPiece > 0) {
+          const req = Math.round(m.basePerPiece * newPcs * 100) / 100;
+          return {
+            ...m,
+            requiredQty: req,
+            amount: Math.round(req * m.rate * 100) / 100
+          };
+        }
+        return m;
+      }));
+    }
+  };
 
-      // Dynamically resolve costing and available on-hand stock from Stock & Inventory
-      const costing = resolveComponentCosting({
-        skuId: raw.skuId || compSku?._id,
-        skuCode: raw.skuCode || compSku?.skuCode,
-        name: raw.name || raw.itemName || compSku?.name,
-        rate: Number(raw.rate) || 0,
-        availableStock: raw.inStock
-      }, stockCostings);
-
-      const stock = costing.availableStock;
-      const rate = costing.rate;
-      const amount = Math.round(totalReq * rate * 100) / 100;
-
-      let compType: 'Raw' | 'Semi' | 'Finished' = 'Raw';
-      if (compSku) {
-        compType = getItemClassification(compSku) === 'semi' ? 'Semi' : 'Raw';
-      }
-
-      // Match available purchase batches / lots for raw materials
-      let matchedLotNumber = '';
-      let matchedInvoiceNo = '';
-      let matchedSupplier = '';
-
-      if (purchaseInvoices && purchaseInvoices.length > 0) {
-        for (const inv of purchaseInvoices) {
-          if (!inv.items) continue;
-          const matchingItem = inv.items.find((it: any) => {
-            const itSkuId = typeof it.skuId === 'object' && it.skuId !== null ? it.skuId._id : it.skuId;
-            return (compSku?._id && (itSkuId === compSku._id || itSkuId === String(compSku._id))) ||
-                   (raw.skuCode && it.skuCode === raw.skuCode) ||
-                   (compSku?.skuCode && it.skuCode === compSku.skuCode) ||
-                   (it.skuName && compSku?.name && it.skuName.toLowerCase().includes(compSku.name.toLowerCase()));
-          });
-          if (matchingItem) {
-            matchedLotNumber = matchingItem.lotNumber || `${inv.invoiceNumber}-L01`;
-            matchedInvoiceNo = inv.invoiceNumber;
-            matchedSupplier = typeof inv.vendorId === 'object' && inv.vendorId !== null ? (inv.vendorId.firmName || inv.vendorId.ownerName) : 'Supplier';
-            break;
-          }
+  const handleUpdateMaterial = (id: string, field: keyof MaterialRow, val: any) => {
+    setMaterials(prev => prev.map(row => {
+      if (row.id !== id) return row;
+      const updated = { ...row, [field]: val };
+      if (field === 'requiredQty' || field === 'rate') {
+        const qty = Number(field === 'requiredQty' ? val : updated.requiredQty) || 0;
+        const rate = Number(field === 'rate' ? val : updated.rate) || 0;
+        updated.amount = Math.round(qty * rate * 100) / 100;
+        if (field === 'requiredQty' && plannedPcs > 0) {
+          updated.basePerPiece = qty / plannedPcs;
         }
       }
-
-      return {
-        id: `bom-${idx + 1}-${Date.now()}`,
-        component: raw.name || raw.itemName || compSku?.name || `Component ${idx + 1}`,
-        code: raw.skuCode || compSku?.skuCode || '',
-        type: compType,
-        qtyPerBatch,
-        totalRequired: Math.round(totalReq * 100) / 100,
-        uom: raw.uom || compSku?.unit || 'PCS',
-        availableStock: stock,
-        stockStatus: stock >= totalReq ? 'Available' : 'Shortage',
-        rate,
-        amount,
-        issuedQty: 0,
-        issuedStatus: 'Pending',
-        batchNumber: matchedInvoiceNo || undefined,
-        lotNumber: matchedLotNumber || undefined,
-        purchaseInvoiceNo: matchedInvoiceNo || undefined,
-        supplierName: matchedSupplier || undefined
-      };
-    });
-
-    setBomItems(items);
-  };
-
-  // Handle Sales Order selection (Demand-driven manufacturing / MTO)
-  const handleSelectSalesOrder = (so: SalesOrderV2 | null) => {
-    setShowSalesOrderDropdown(false);
-    setSalesOrderSearchQuery('');
-    if (!so) {
-      setSelectedSalesOrderId('');
-      setSelectedSalesOrder(null);
-      setReference('Not Selected');
-      return;
-    }
-
-    setSelectedSalesOrderId(so._id || '');
-    setSelectedSalesOrder(so);
-    setReference(`Sales Order #${so.orderNumber}`);
-    setRemarks(`Demand for Sales Order #${so.orderNumber} (${so.customerName})`);
-    if (so.promisedDate) {
-      setRequiredCompletionDate(so.promisedDate);
-    }
-
-    if (so.items && so.items.length > 0) {
-      const firstItem = so.items[0];
-      const matchSku = backendSkus.find(s => 
-        (firstItem.skuId && (s._id === firstItem.skuId || s._id === (firstItem.skuId as any)?._id)) ||
-        (firstItem.skuCode && s.skuCode?.toUpperCase() === firstItem.skuCode.toUpperCase()) ||
-        s.name.toLowerCase() === firstItem.itemName?.toLowerCase()
-      );
-
-      if (matchSku) {
-        handleSelectProduct(matchSku);
-      }
-      if (firstItem.quantity) {
-        setProductionQty(firstItem.quantity);
-      }
-      if (firstItem.uom) {
-        setProductionUom(firstItem.uom);
-      }
-    }
-    showToast(`Linked to Sales Order #${so.orderNumber} for ${so.customerName}`, 'success');
-  };
-
-  // Synchronize BOM item costs and stock when stockCostings finishes loading
-  useEffect(() => {
-    if (!stockCostings || bomItems.length === 0) return;
-    setBomItems(prev => prev.map(item => {
-      const costing = resolveComponentCosting({
-        code: item.code,
-        component: item.component,
-        rate: item.rate,
-        availableStock: item.availableStock
-      }, stockCostings);
-
-      const newRate = costing.rate > 0 ? costing.rate : item.rate;
-      const newStock = costing.availableStock;
-      return {
-        ...item,
-        rate: newRate,
-        amount: Math.round(item.totalRequired * newRate * 100) / 100,
-        availableStock: newStock,
-        stockStatus: newStock >= item.totalRequired ? 'Available' : 'Shortage'
-      };
+      return updated;
     }));
-  }, [stockCostings]);
-
-  // When a Finished Product is chosen
-  const handleSelectProduct = (sku: SkuV2) => {
-    setSelectedSkuId(sku._id || '');
-    setShowProductDropdown(false);
-    setProductSearchQuery('');
-
-    // Set units
-    const preferredUom = sku.unit || 'PCS';
-    setProductionUom(preferredUom);
-
-    // Load dynamic BOM from Item Master
-    const pcs = totalPlannedPcs > 0 ? totalPlannedPcs : (Number(productionQty) || 1) * (preferredUom === 'GBL' ? (sku.booksGbl || 140) : 1);
-    loadBomFromItemMaster(sku, pcs);
-    setBomType('Default BOM');
   };
 
-  // Recalculate BOM total required when productionQty or conversion rate changes
-  useEffect(() => {
-    if (bomItems.length === 0 || !selectedSku) return;
-    const pcs = totalPlannedPcs > 0 ? totalPlannedPcs : 1;
-    const yieldBasis = Number(selectedSku.recipeYieldQty) || Number(selectedSku.batchYieldQty) || 1;
+  const handleAddMaterial = () => {
+    const newId = `mat-${Date.now()}`;
+    const nextIdx = materials.length + 1;
+    setMaterials(prev => [
+      ...prev,
+      {
+        id: newId,
+        component: '',
+        code: `RM-${String(nextIdx).padStart(3, '0')}`,
+        uom: 'PCS',
+        requiredQty: 1,
+        sourceLocation: outputLocation || 'SKBW - Ground Floor',
+        locationId: selectedLocId || undefined,
+        warehouseId: selectedWhId || undefined,
+        floorId: selectedFlId || undefined,
+        zoneId: selectedZnId || undefined,
+        rate: 0,
+        amount: 0,
+        basePerPiece: 0
+      }
+    ]);
+    setActiveMaterialDropdownId(newId);
+  };
 
-    setBomItems(prev => prev.map(item => {
-      const totalReq = (item.qtyPerBatch / yieldBasis) * pcs;
-      const status = item.availableStock >= totalReq ? 'Available' : 'Shortage';
-      return {
-        ...item,
-        totalRequired: Math.round(totalReq * 100) / 100,
-        stockStatus: status,
-        amount: totalReq * item.rate
-      };
+  const handleDeleteMaterial = (id: string) => {
+    setMaterials(prev => prev.filter(m => m.id !== id));
+  };
+
+  const handleUpdateScrap = (id: string, field: keyof ScrapRow, val: any) => {
+    setScrapItems(prev => prev.map(row => {
+      if (row.id !== id) return row;
+      const updated = { ...row, [field]: val };
+      if (field === 'qty' || field === 'rate') {
+        const qty = Number(field === 'qty' ? val : updated.qty) || 0;
+        const rate = Number(field === 'rate' ? val : updated.rate) || 0;
+        updated.amount = Math.round(qty * rate * 100) / 100;
+      }
+      return updated;
     }));
-  }, [totalPlannedPcs]);
+  };
 
-  // Update BOM item quantity per batch
-  const handleUpdateQtyPerBatch = (index: number, newQty: number) => {
-    setBomItems(prev => {
-      const next = [...prev];
-      const item = { ...next[index] };
-      const pcs = totalPlannedPcs > 0 ? totalPlannedPcs : 1;
-      const yieldBasis = Number(selectedSku?.recipeYieldQty) || 1;
-      item.qtyPerBatch = newQty;
-      item.totalRequired = Math.round(((newQty / yieldBasis) * pcs) * 100) / 100;
-      item.stockStatus = item.availableStock >= item.totalRequired ? 'Available' : 'Shortage';
-      item.amount = item.totalRequired * item.rate;
-      next[index] = item;
-      return next;
+  const handleAddScrap = () => {
+    const newId = `scrap-${Date.now()}`;
+    setScrapItems(prev => [
+      ...prev,
+      {
+        id: newId,
+        item: '',
+        uom: 'KG',
+        qty: 0,
+        rate: 0,
+        amount: 0
+      }
+    ]);
+  };
+
+  const handleDeleteScrap = (id: string) => {
+    setScrapItems(prev => prev.filter(s => s.id !== id));
+  };
+
+  const handleUpdateCost = (id: string, field: keyof AdditionalCostRow, val: any) => {
+    setAdditionalCosts(prev => prev.map(row => {
+      if (row.id !== id) return row;
+      return { ...row, [field]: val };
+    }));
+  };
+
+  const handleAddCost = () => {
+    const newId = `cost-${Date.now()}`;
+    setAdditionalCosts(prev => [
+      ...prev,
+      {
+        id: newId,
+        costType: '',
+        basis: 'Total / Batch',
+        amount: 0,
+        appliedAs: 'Total Cost for this production'
+      }
+    ]);
+  };
+
+  const handleDeleteCost = (id: string) => {
+    setAdditionalCosts(prev => prev.filter(c => c.id !== id));
+  };
+
+  const totalMaterialCost = useMemo(() => {
+    return materials.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  }, [materials]);
+
+  const totalScrapCost = useMemo(() => {
+    return scrapItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  }, [scrapItems]);
+
+  const totalAdditionalCost = useMemo(() => {
+    return additionalCosts.reduce((sum, row) => {
+      const amt = Number(row.amount) || 0;
+      if (row.basis === 'Per GBL') {
+        return sum + (amt * (plannedGbl || 1));
+      }
+      if (row.basis === 'Per Piece') {
+        return sum + (amt * (plannedPcs || 1));
+      }
+      return sum + amt;
+    }, 0);
+  }, [additionalCosts, plannedGbl, plannedPcs]);
+
+  const totalProductionCost = useMemo(() => {
+    return totalMaterialCost + totalAdditionalCost + totalScrapCost;
+  }, [totalMaterialCost, totalAdditionalCost, totalScrapCost]);
+
+  const costPerGbl = useMemo(() => {
+    if (plannedGbl <= 0) return 0;
+    return Math.round((totalProductionCost / plannedGbl) * 100) / 100;
+  }, [totalProductionCost, plannedGbl]);
+
+  const costPerPiece = useMemo(() => {
+    if (plannedPcs <= 0) return 0;
+    return Math.round((totalProductionCost / plannedPcs) * 100) / 100;
+  }, [totalProductionCost, plannedPcs]);
+
+  const formatCurrency = (val: number) => {
+    return (val || 0).toLocaleString('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
     });
-    setBomType('Custom BOM (Production Order Only)');
   };
 
-  // Remove Component from BOM
-  const handleRemoveComponent = (index: number) => {
-    setBomItems(prev => prev.filter((_, i) => i !== index));
-    setBomType('Custom BOM (Production Order Only)');
-  };
-
-  // Add Component from Catalog (Raw and Semi Materials ONLY)
-  const handleSelectCatalogComponent = (compSku: SkuV2) => {
-    const pcs = totalPlannedPcs > 0 ? totalPlannedPcs : 1;
-    const compType = getItemClassification(compSku) === 'semi' ? 'Semi' : 'Raw';
-
-    // Dynamically resolve costing and stock from Stock & Inventory
-    const costing = resolveComponentCosting({
-      skuId: compSku._id,
-      skuCode: compSku.skuCode,
-      name: compSku.name,
-      rate: Number((compSku as any).purchasePrice || (compSku as any).rate || (compSku as any).avgRate || 0),
-      availableStock: compSku.presentStock ?? compSku.openingStock ?? 0
-    }, stockCostings);
-
-    const liveRate = costing.rate;
-    const liveStock = costing.availableStock;
-
-    const newItem: ProductionBomItem = {
-      id: `bom-add-${Date.now()}`,
-      component: compSku.name,
-      code: compSku.skuCode,
-      type: compType,
-      qtyPerBatch: 1,
-      totalRequired: 1 * pcs,
-      uom: compSku.unit || 'PCS',
-      availableStock: liveStock,
-      stockStatus: liveStock >= (1 * pcs) ? 'Available' : 'Shortage',
-      rate: liveRate,
-      amount: Math.round(1 * pcs * liveRate * 100) / 100,
-      issuedQty: 0,
-      issuedStatus: 'Pending'
-    };
-
-    setBomItems(prev => [...prev, newItem]);
-    setBomType('Custom BOM (Production Order Only)');
-    setShowAddComponentModal(false);
-    setComponentSearchQuery('');
-    showToast(`Added "${compSku.name}" (${compType}) to BOM`, 'success');
-  };
-
-  // Step 3 statistics
-  const bomStats = useMemo(() => {
-    const totalComponents = bomItems.length;
-    const availableCount = bomItems.filter(i => i.stockStatus === 'Available').length;
-    const shortageCount = bomItems.filter(i => i.stockStatus === 'Shortage').length;
-    const totalRequiredPcs = bomItems.reduce((acc, curr) => acc + curr.totalRequired, 0);
-    const totalEstimatedCost = bomItems.reduce((acc, curr) => acc + curr.amount, 0);
-
-    return {
-      totalComponents,
-      availableCount,
-      shortageCount,
-      totalRequiredPcs,
-      totalEstimatedCost
-    };
-  }, [bomItems]);
-
-  // Validation before Step 3
-  const handleSaveAndContinue = () => {
-    if (!orderNumber.trim()) {
-      showToast('Order Number is required', 'error');
-      return;
-    }
-    if (!selectedSku) {
-      showToast('Please select an item to produce', 'error');
-      return;
-    }
-    const qty = Number(productionQty);
-    if (!qty || qty <= 0) {
-      showToast('Please enter a valid production quantity (> 0)', 'error');
-      return;
-    }
-    if (!locationName.trim() && !factory.trim()) {
-      showToast('Please select or specify a Location', 'error');
-      return;
-    }
-    if (!department.trim()) {
-      showToast('Please select or enter a Manufacturing Department', 'error');
-      return;
-    }
-    setCurrentStep(3);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  // Create Order in MongoDB
   const handleCreateOrder = async () => {
-    if (!selectedSku || !companyId) return;
+    if (!productName.trim()) {
+      showToast('Please select a product to manufacture', 'error');
+      return;
+    }
+    if (numPlannedQty <= 0) {
+      showToast('Please enter a planned quantity greater than 0', 'error');
+      return;
+    }
 
     try {
       setSubmitting(true);
-      const qty = Number(productionQty) || 1;
-      const materialStatus = bomStats.shortageCount > 0 ? 'Shortage' : 'Ready';
-      const isSemi = getItemClassification(selectedSku) === 'semi';
-      const finalItemType = isSemi ? 'Semi Finished' : 'Finished Good';
 
-      const payload: Partial<ProductionOrder> = {
-        orderNumber: orderNumber.trim(),
-        itemId: selectedSku._id as any,
-        itemName: selectedSku.name,
-        itemCode: selectedSku.skuCode,
-        itemType: finalItemType as any,
-        plannedQty: qty,
-        plannedUom: productionUom,
-        plannedPcs: totalPlannedPcs,
-        conversionFactor: conversionRate,
+      const payload: any = {
+        orderNumber: orderNumber.trim() || 'PO-0001',
+        itemId: currentSku?._id || undefined,
+        itemName: productName.trim(),
+        itemCode: productCode.trim() || 'FG-001',
+        itemType: 'Finished Good',
+        plannedQty: numPlannedQty,
+        plannedUom: uom,
+        plannedPcs: plannedPcs,
+        conversionFactor: conversionFactor,
         producedQty: 0,
         producedPcs: 0,
-        balanceQty: qty,
-        balancePcs: totalPlannedPcs,
-        materialStatus: materialStatus,
+        balanceQty: numPlannedQty,
+        balancePcs: plannedPcs,
+        materialStatus: 'Ready',
         status: 'Planned',
         progress: 0,
-        department: department.trim(),
-        factory: locationName.trim() || factory.trim() || 'Main Factory',
-        locationId: locationId || undefined,
-        locationName: locationName.trim() || undefined,
-        warehouseId: warehouseId || undefined,
-        floorId: floorId || undefined,
-        zoneId: zoneId || undefined,
-        plannedStartDate: plannedStartDate || '',
-        requiredCompletionDate: requiredCompletionDate || '',
-        priority: priority,
-        reference: selectedSalesOrder ? `Sales Order #${selectedSalesOrder.orderNumber}` : (reference || 'Not Selected'),
-        referenceSalesOrderId: selectedSalesOrderId || undefined,
-        remarks: remarks || '-',
-        bomType: bomType,
-        bomItems: bomItems,
+        department: department.trim() || 'Notebook Manufacturing',
+        factory: outputLocation.trim() || 'Main Factory',
+        outputLocation: outputLocation.trim(),
+        locationId: selectedLocId || undefined,
+        warehouseId: selectedWhId || undefined,
+        floorId: selectedFlId || undefined,
+        zoneId: selectedZnId || undefined,
+        orderDate: orderDate,
+        plannedStartDate: orderDate,
+        requiredCompletionDate: orderDate,
+        priority: 'Normal',
+        remarks: remarks.trim(),
+        bomType: 'Custom BOM (Production Order Only)',
+        bomItems: materials.map(m => ({
+          id: m.id,
+          component: m.component,
+          code: m.code,
+          type: 'Raw',
+          qtyPerBatch: m.requiredQty,
+          totalRequired: m.requiredQty,
+          uom: m.uom,
+          availableStock: 999999,
+          stockStatus: 'Available',
+          rate: m.rate,
+          amount: m.amount,
+          sourceLocation: m.sourceLocation,
+          locationId: m.locationId
+        })),
+        byProducts: scrapItems,
+        additionalCosts: additionalCosts,
+        costSummary: {
+          materialCost: totalMaterialCost,
+          scrapCost: totalScrapCost,
+          additionalCost: totalAdditionalCost,
+          totalProductionCost: totalProductionCost,
+          outputQuantity: `${plannedPcs} PCS (${plannedGbl.toFixed(2)} GBL)`,
+          costPerGbl: costPerGbl,
+          costPerPiece: costPerPiece
+        },
         productionEntries: [],
         company: companyId
       };
 
       const created = await createProductionOrder(payload);
-
-      // Automatically update linked Sales Order to 'In Production'
-      if (selectedSalesOrderId) {
-        try {
-          await updateSalesOrderV2Status(selectedSalesOrderId, { fulfillmentStatus: 'In Production' });
-        } catch (soErr) {
-          console.warn('Could not update sales order status to In Production:', soErr);
-        }
-      }
-
-      showToast(`Production Order ${created.orderNumber} created successfully in database!`, 'success');
+      showToast(`Production Order ${created.orderNumber} created successfully!`, 'success');
       onCreated(created);
     } catch (err: any) {
       console.error('Failed to create production order:', err);
@@ -871,1424 +754,1044 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     }
   };
 
-  // Tally Keyboard Navigation: shift focus forward/backward across inputs & selects
-  const shiftFocus = (delta: number) => {
-    if (!wizardContainerRef.current) return;
-    const focusables = Array.from(
-      wizardContainerRef.current.querySelectorAll<HTMLElement>(
-        'input:not([type="hidden"]):not([disabled]):not([data-skip-tab]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]'
-      )
-    ).filter(el => el.offsetWidth > 0 || el.offsetHeight > 0);
-
-    const activeEl = document.activeElement as HTMLElement;
-    const index = focusables.indexOf(activeEl);
-    const nextIdx = index + delta;
-    if (nextIdx >= 0 && nextIdx < focusables.length) {
-      focusables[nextIdx]?.focus();
-      if ('select' in focusables[nextIdx]) {
-        (focusables[nextIdx] as HTMLInputElement).select?.();
-      }
-    }
-  };
-
-  const handleFormKeyDown = (e: React.KeyboardEvent) => {
-    const target = e.target as HTMLElement;
-    if (!target) return;
-
-    if (e.key === 'Enter') {
-      if (showProductDropdown) return; // handled by product search input
-      if (showAddComponentModal) return; // handled by catalog input
-      if (target.tagName === 'TEXTAREA' || target.tagName === 'BUTTON') return;
-      if (target.getAttribute('data-bom-idx') !== null) return; // handled by BOM input
-
-      e.preventDefault();
-      shiftFocus(1);
-    }
-  };
-
-  // Global Tally Keyboard Shortcuts (Esc, Ctrl+A / Ctrl+Enter, Alt+C, Alt+B, Alt+P)
-  useEffect(() => {
-    const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // 1. Esc: close modals, dropdowns or cancel/back
-      if (e.key === 'Escape') {
-        if (showBulkEditBomModal) {
-          e.preventDefault();
-          setShowBulkEditBomModal(false);
-          return;
-        }
-        if (showAddComponentModal) {
-          e.preventDefault();
-          setShowAddComponentModal(false);
-          return;
-        }
-        if (showProductDropdown) {
-          e.preventDefault();
-          setShowProductDropdown(false);
-          return;
-        }
-        if (currentStep === 3) {
-          e.preventDefault();
-          setCurrentStep(1);
-          return;
-        }
-        e.preventDefault();
-        onCancel();
-        return;
-      }
-
-      // 2. Ctrl+A or Ctrl+Enter: Universal Tally Accept
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A' || e.key === 'Enter')) {
-        e.preventDefault();
-        if (currentStep === 1) {
-          handleSaveAndContinue();
-        } else if (currentStep === 3) {
-          handleCreateOrder();
-        }
-        return;
-      }
-
-      // 3. Alt+C or Alt+A: Add Component (Tally Create/Add)
-      if (e.altKey && (e.key === 'c' || e.key === 'C' || e.key === 'a' || e.key === 'A')) {
-        e.preventDefault();
-        setBomType('Custom BOM (Production Order Only)');
-        setShowAddComponentModal(true);
-        setHighlightedCatalogIdx(0);
-        return;
-      }
-
-      // 4. Alt+B: View Item Master BOM
-      if (e.altKey && (e.key === 'b' || e.key === 'B')) {
-        e.preventDefault();
-        setShowBulkEditBomModal(true);
-        return;
-      }
-
-      // 5. Alt+P: Presets toggle
-      if (e.altKey && (e.key === 'p' || e.key === 'P')) {
-        e.preventDefault();
-        setShowQuickPresetMenu(prev => !prev);
-        setHighlightedPresetIdx(0);
-        return;
-      }
-    };
-
-    window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [
-    currentStep,
-    showBulkEditBomModal,
-    showAddComponentModal,
-    showProductDropdown,
-    selectedSku,
-    productionQty,
-    factory,
-    department,
-    orderNumber,
-    onCancel,
-    bomStats,
-    bomType,
-    bomItems
-  ]);
-
-
-
   return (
-    <div className="flex flex-col h-full bg-slate-50/60 overflow-y-auto custom-scrollbar">
-      {/* Top Header */}
-      <div className="bg-white border-b border-gray-150 px-6 py-4 flex items-center justify-between shrink-0 shadow-2xs">
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={currentStep === 3 ? () => setCurrentStep(1) : onCancel}
-            className="w-8 h-8 rounded-lg border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
+    <div className="flex flex-col h-full bg-[#f8fafc] text-gray-800 font-sans select-none overflow-hidden text-xs">
+      {/* ── TOP HEADER / TITLE BAR ── */}
+      <div className="flex items-center justify-between px-6 py-3.5 bg-white border-b border-gray-200 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold shadow-3xs">
+            <Box className="w-4 h-4 text-blue-600" />
+          </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900 tracking-tight leading-tight">New Production Order</h1>
-            <p className="text-xs text-gray-500 font-medium">Create a new production order to manufacture finished products.</p>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-gray-900 leading-tight">Create Production Order</h2>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                New Order
+              </span>
+            </div>
+            <p className="text-[11px] text-gray-500 mt-0.5">Manufacturing execution with bill of materials & cost ledger</p>
+          </div>
+        </div>
+        <button
+          onClick={onCancel}
+          className="p-1.5 bg-white hover:bg-gray-100 border border-gray-200 rounded-lg text-gray-400 hover:text-gray-700 transition-all cursor-pointer"
+          title="Close (Esc)"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* ── SCROLLABLE MASTER WORKSPACE ── */}
+      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+
+        {/* ── ROW 1: TOP CONTROL BAR (Clean 3-column layout without reference number) ── */}
+        <div className="bg-white rounded-xl border border-gray-200/90 p-4 shadow-3xs">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
+            
+            {/* Production Order No */}
+            <div>
+              <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                Production Order No.
+              </label>
+              <div className="relative flex items-center">
+                <input
+                  type="text"
+                  value={orderNumber}
+                  onChange={e => setOrderNumber(e.target.value)}
+                  placeholder="e.g. PO-0001"
+                  className="w-full h-9 pl-3 pr-14 text-xs font-bold text-gray-900 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 focus:outline-none transition-all placeholder:text-gray-400"
+                />
+                <span className="absolute right-2 px-2 py-0.5 text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-200/60 rounded-md pointer-events-none">
+                  Auto
+                </span>
+              </div>
+            </div>
+
+            {/* Order Date */}
+            <div>
+              <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                Order Date
+              </label>
+              <div className="relative flex items-center">
+                <input
+                  type="date"
+                  value={orderDate}
+                  onChange={e => setOrderDate(e.target.value)}
+                  className="w-full h-9 px-3 pr-8 text-xs font-semibold text-gray-800 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 focus:outline-none transition-all"
+                />
+                <Calendar className="w-3.5 h-3.5 text-gray-400 absolute right-2.5 pointer-events-none" />
+              </div>
+            </div>
+
+            {/* Department (Preset Field with Location Assignment & Manage Modal) */}
+            <div className="relative" ref={departmentDropdownRef}>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-[11px] font-bold text-gray-700">
+                  Department
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowManageDeptModal(true)}
+                  className="text-[10px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-0.5 cursor-pointer"
+                  title="Manage Department Presets"
+                >
+                  <Settings className="w-3 h-3" />
+                  <span>Presets</span>
+                </button>
+              </div>
+
+              <div
+                onClick={() => setShowDepartmentDropdown(!showDepartmentDropdown)}
+                className="w-full h-9 px-3 bg-white border border-gray-200 rounded-lg flex items-center justify-between cursor-pointer hover:border-gray-300 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-600 transition-all"
+              >
+                <span className="text-xs font-semibold text-gray-800 truncate">
+                  {department || 'Select Department...'}
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 text-gray-400 shrink-0 ml-1" />
+              </div>
+
+              {/* Department Presets Dropdown */}
+              {showDepartmentDropdown && (
+                <div className="absolute z-50 left-0 right-0 top-full mt-1.5 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-64 overflow-hidden flex flex-col p-1 animate-in fade-in zoom-in-95 duration-100 min-w-[280px]">
+                  {/* Dropdown Header */}
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 bg-gray-50/80 rounded-t-lg">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Department Presets</span>
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-gray-200/80 text-gray-600">ALT+D</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowDepartmentDropdown(false);
+                        setShowManageDeptModal(true);
+                      }}
+                      className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      <Settings className="w-3 h-3" />
+                      <span>Manage</span>
+                    </button>
+                  </div>
+
+                  {/* List of Presets */}
+                  <div className="overflow-y-auto max-h-52 divide-y divide-gray-100 p-1">
+                    {departmentPresets.map(preset => {
+                      const isSelected = department === preset.name;
+                      return (
+                        <div
+                          key={preset.id}
+                          onClick={() => handleSelectDepartmentPreset(preset)}
+                          className={`p-2.5 rounded-lg cursor-pointer flex items-center justify-between text-xs transition-colors ${
+                            isSelected ? 'bg-blue-50/80 text-blue-900 font-bold' : 'hover:bg-gray-50/80 text-gray-800'
+                          }`}
+                        >
+                          <div className="truncate pr-2">
+                            <span className="block font-semibold truncate">{preset.name}</span>
+                          </div>
+                          {preset.locationName && (
+                            <span className="px-2 py-0.5 text-[9.5px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md shrink-0">
+                              {preset.locationName}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
           </div>
         </div>
 
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
-          >
-            Cancel
-          </button>
+        {/* ── ROW 2: PRODUCT & OUTPUT TARGETS ── */}
+        <div className="bg-white rounded-xl border border-gray-200/90 p-4 shadow-3xs">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-end">
+            
+            {/* Product to Manufacture (EXACT 1:1 WITH USER SCREENSHOT) */}
+            <div className="lg:col-span-4 relative" ref={productDropdownRef}>
+              <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                Product to Manufacture <span className="text-red-500">*</span>
+              </label>
+              <div
+                onClick={() => setShowProductDropdown(!showProductDropdown)}
+                className="w-full h-9 px-3 bg-white border border-gray-200 rounded-lg flex items-center justify-between cursor-pointer hover:border-gray-300 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-600 transition-all shadow-3xs"
+              >
+                <div className="flex items-center gap-2 truncate">
+                  <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                  {productName ? (
+                    <>
+                      <span className="text-xs font-bold text-gray-900 truncate">
+                        {productName}
+                      </span>
+                      {productCode && (
+                        <span className="text-[10px] font-mono font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200/60 shrink-0">
+                          {productCode}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-xs text-gray-400">Select product...</span>
+                  )}
+                </div>
+                <ChevronDown className="w-4 h-4 text-gray-400 shrink-0 ml-1" />
+              </div>
 
-          {currentStep === 1 ? (
-            <button
-              onClick={handleSaveAndContinue}
-              className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-sm hover:shadow transition-all cursor-pointer"
-            >
-              <span>Save & Continue</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          ) : (
-            <button
-              onClick={handleCreateOrder}
-              disabled={submitting}
-              className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-semibold px-5 py-2 rounded-lg shadow-sm hover:shadow transition-all cursor-pointer"
-            >
-              {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              <span>Create Production Order</span>
-            </button>
-          )}
+              {/* Product dropdown list matching exact screenshot design */}
+              {showProductDropdown && (
+                <div className="absolute z-50 left-0 right-0 top-full mt-1.5 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-72 overflow-hidden flex flex-col p-1 animate-in fade-in zoom-in-95 duration-100 w-full min-w-[340px]">
+                  <div className="p-2 border-b border-gray-100 flex items-center gap-2 bg-gray-50/80 rounded-t-lg">
+                    <Search className="w-4 h-4 text-gray-400 shrink-0" />
+                    <input
+                      type="text"
+                      value={productSearch}
+                      onChange={e => setProductSearch(e.target.value)}
+                      placeholder="Search product..."
+                      className="w-full text-xs bg-transparent border-none outline-none text-gray-800 placeholder:text-gray-400"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="overflow-y-auto max-h-60 divide-y divide-gray-100 p-1">
+                    {filteredProductOptions.length === 0 ? (
+                      <div className="p-3 text-xs text-gray-400 text-center italic">No products found</div>
+                    ) : (
+                      filteredProductOptions.map(sku => {
+                        const isSelected = selectedSkuId === sku._id;
+                        const conv = Number(sku.booksGbl || sku.altUnitConversion || 0);
+                        return (
+                          <div
+                            key={sku._id}
+                            onClick={() => handleSelectProduct(sku)}
+                            className={`p-2.5 rounded-lg cursor-pointer flex items-center justify-between transition-colors ${
+                              isSelected 
+                                ? 'bg-blue-100/90 font-bold border border-blue-200' 
+                                : 'hover:bg-blue-50/80'
+                            }`}
+                          >
+                            <div className="flex-1 min-w-0 pr-3">
+                              <div className="font-bold text-gray-900 truncate text-xs">{sku.name}</div>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-[10px] text-gray-400 font-mono">{sku.skuCode}</span>
+                                <span className="text-[10px] text-gray-300">•</span>
+                                <span className="text-[10px] text-gray-500 truncate">{sku.brand || sku.category || 'Finished Goods'}</span>
+                                {conv > 0 && (
+                                  <>
+                                    <span className="text-[10px] text-gray-300">•</span>
+                                    <span className="text-[10px] font-semibold text-blue-600">{conv} Pcs/GBL</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className="px-2 py-0.5 text-[9.5px] font-extrabold uppercase rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
+                                {sku.status || 'Active'}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
+            {/* Output Location (Single clean field with Mini Factory modal) */}
+            <div className="lg:col-span-4">
+              <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                Output Location (Finished Goods) <span className="text-red-500">*</span>
+              </label>
+              <LocationSelectPopup
+                locations={warehouseLocations}
+                warehouseId={selectedWhId}
+                floorId={selectedFlId}
+                zoneId={selectedZnId}
+                locationId={selectedLocId}
+                displayValue={outputLocation}
+                onChange={handleOutputLocationChange}
+                variant="compact"
+                hideLabel
+                className="w-full"
+              />
+            </div>
+
+            {/* Planned Quantity to Produce with STRICTLY ASSIGNED UNITS ONLY */}
+            <div className="lg:col-span-4">
+              <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                Planned Quantity to Produce <span className="text-red-500">*</span>
+              </label>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type="number"
+                    min="0"
+                    value={plannedQty}
+                    onChange={e => handleQuantityChange(e.target.value)}
+                    placeholder="0"
+                    className="w-full h-9 px-3 text-xs font-bold text-gray-900 bg-white border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-lg outline-none transition-all placeholder:text-gray-400"
+                  />
+                </div>
+                
+                {/* UOM Selector: strictly ONLY assigned units for that respective item */}
+                <div className="w-20 relative shrink-0">
+                  <select
+                    value={uom}
+                    onChange={e => setUom(e.target.value)}
+                    className="w-full h-9 pl-2.5 pr-6 text-xs font-bold text-gray-800 bg-white border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-lg outline-none transition-all appearance-none cursor-pointer"
+                  >
+                    {availableUnits.map(unitOption => (
+                      <option key={unitOption} value={unitOption}>{unitOption}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-3.5 h-3.5 text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+
+                {/* Conversion Badge */}
+                <div className="h-9 px-3 bg-blue-50/70 border border-blue-200/70 rounded-lg flex flex-col justify-center shrink-0 min-w-[125px]">
+                  <span className="text-xs font-bold text-blue-700 leading-tight">
+                    {numPlannedQty > 0 ? (
+                      uom === 'GBL' ? `= ${plannedPcs} PCS` : `= ${plannedGbl.toFixed(2)} GBL`
+                    ) : (
+                      uom === 'GBL' ? '- PCS' : '- GBL'
+                    )}
+                  </span>
+                  <span className="text-[9px] font-medium text-blue-600/80 leading-tight">
+                    (Auto from conversion)
+                  </span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        {/* ── ROW 3: MATERIALS TO BE CONSUMED (FROM BOM) ── */}
+        <div className="bg-white rounded-xl border border-gray-200/90 shadow-3xs overflow-hidden">
+          {/* Card Header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-white">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shadow-3xs">
+                <Layers className="w-3.5 h-3.5 text-emerald-600" />
+              </div>
+              <h3 className="font-bold text-gray-900 text-xs sm:text-sm">
+                Materials to be Consumed (From BOM)
+              </h3>
+            </div>
+            <button
+              onClick={handleLoadFromBom}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-lg text-xs cursor-pointer transition-all shadow-3xs"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Load from BOM
+            </button>
+          </div>
+
+          {/* Table with Mini Factory modal for Source Location */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50/90 border-b border-gray-200 text-[10.5px] font-bold text-gray-600 uppercase tracking-wider">
+                  <th className="py-2.5 px-3 text-center w-8">#</th>
+                  <th className="py-2.5 px-3">Material / Component</th>
+                  <th className="py-2.5 px-3 w-24 text-center">Item Code</th>
+                  <th className="py-2.5 px-3 w-16 text-center">UOM</th>
+                  <th className="py-2.5 px-3 w-32 text-right">Required Qty<br/><span className="text-[9.5px] font-normal normal-case text-gray-400">({numPlannedQty > 0 ? `for ${plannedQty} ${uom}` : 'qty'})</span></th>
+                  <th className="py-2.5 px-3 min-w-[210px]">Source Location<br/><span className="text-[9.5px] font-normal normal-case text-gray-400">(Collect from)</span></th>
+                  <th className="py-2.5 px-3 w-24 text-right">Rate (₹)</th>
+                  <th className="py-2.5 px-3 w-28 text-right">Material Cost (₹)</th>
+                  <th className="py-2.5 px-3 w-10 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 text-xs">
+                {materials.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="py-6 text-center text-xs text-gray-400 italic">
+                      No materials added yet. Select a product above or click <strong>"+ Add Material"</strong> to add components.
+                    </td>
+                  </tr>
+                ) : (
+                  materials.map((row, idx) => (
+                    <tr key={row.id} className="hover:bg-gray-50/60 transition-colors">
+                      <td className="py-2 px-3 text-center text-gray-400 font-medium">
+                        {idx + 1}
+                      </td>
+
+                      {/* Material / Component: Searchable Dropdown & Visible Input Box */}
+                      <td className="py-2 px-3 relative material-dropdown-container">
+                        <div className="relative">
+                          <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          <input
+                            type="text"
+                            value={row.component}
+                            onChange={e => {
+                              handleUpdateMaterial(row.id, 'component', e.target.value);
+                              setActiveMaterialDropdownId(row.id);
+                            }}
+                            onFocus={() => setActiveMaterialDropdownId(row.id)}
+                            onClick={() => setActiveMaterialDropdownId(row.id)}
+                            placeholder="Select or enter component..."
+                            className="w-full pl-8 pr-7 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all placeholder:text-gray-400 shadow-3xs"
+                          />
+                          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
+                            {row.component ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleUpdateMaterial(row.id, 'component', '');
+                                  setActiveMaterialDropdownId(row.id);
+                                }}
+                                className="p-0.5 text-gray-400 hover:text-gray-600 cursor-pointer"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setActiveMaterialDropdownId(activeMaterialDropdownId === row.id ? null : row.id)}
+                                className="p-0.5 text-gray-400 hover:text-gray-600 cursor-pointer"
+                              >
+                                <ChevronDown className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Searchable Material Dropdown (1:1 with Screenshot & Sales) */}
+                        {activeMaterialDropdownId === row.id && (
+                          <div className="absolute left-3 top-full mt-1.5 w-[380px] sm:w-[460px] bg-white border border-gray-200 rounded-xl shadow-2xl z-[9999] max-h-64 overflow-y-auto divide-y divide-gray-100 p-1 animate-in fade-in zoom-in-95 duration-100">
+                            {getFilteredMaterialSkus(row.component).length === 0 ? (
+                              <div className="p-3 text-center text-xs text-gray-400 italic">No matching items found</div>
+                            ) : (
+                              getFilteredMaterialSkus(row.component).map(sku => {
+                                const isSelected = row.component.toLowerCase() === sku.name.toLowerCase();
+                                const conv = Number(sku.booksGbl || sku.altUnitConversion || 0);
+                                return (
+                                  <div
+                                    key={sku._id}
+                                    onClick={() => handleSelectMaterialSku(row.id, sku)}
+                                    className={`p-2.5 rounded-lg cursor-pointer flex items-center justify-between text-xs transition-colors ${
+                                      isSelected ? 'bg-blue-100/90 font-bold border border-blue-200' : 'hover:bg-blue-50/80'
+                                    }`}
+                                  >
+                                    <div className="flex-1 min-w-0 pr-3">
+                                      <div className="font-bold text-gray-900 truncate">{sku.name}</div>
+                                      <div className="flex items-center gap-1.5 mt-0.5">
+                                        <span className="text-[10px] text-gray-400 font-mono">{sku.skuCode}</span>
+                                        <span className="text-[10px] text-gray-300">•</span>
+                                        <span className="text-[10px] text-gray-500 truncate">{sku.brand || sku.category || 'Raw Material'}</span>
+                                        {sku.unit && (
+                                          <>
+                                            <span className="text-[10px] text-gray-300">•</span>
+                                            <span className="text-[10px] font-semibold text-blue-600">{sku.unit}</span>
+                                          </>
+                                        )}
+                                        {conv > 0 && (
+                                          <>
+                                            <span className="text-[10px] text-gray-300">•</span>
+                                            <span className="text-[10px] font-semibold text-indigo-600">{conv} Pcs/GBL</span>
+                                          </>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <span className="px-2 py-0.5 text-[9.5px] font-extrabold uppercase rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200 shrink-0">
+                                      {sku.status || 'Active'}
+                                    </span>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Item Code */}
+                      <td className="py-2 px-3 text-center">
+                        <input
+                          type="text"
+                          value={row.code}
+                          onChange={e => handleUpdateMaterial(row.id, 'code', e.target.value)}
+                          placeholder="RM-001"
+                          className="w-24 text-center font-mono text-xs text-gray-700 bg-white border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all placeholder:text-gray-400 shadow-3xs"
+                        />
+                      </td>
+
+                      {/* UOM */}
+                      <td className="py-2 px-3 text-center">
+                        <input
+                          type="text"
+                          value={row.uom}
+                          onChange={e => handleUpdateMaterial(row.id, 'uom', e.target.value)}
+                          className="w-16 text-center text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg px-1.5 py-1.5 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all shadow-3xs"
+                        />
+                      </td>
+
+                      {/* Required Qty */}
+                      <td className="py-2 px-3 text-right">
+                        <input
+                          type="number"
+                          step="any"
+                          value={row.requiredQty}
+                          onChange={e => handleUpdateMaterial(row.id, 'requiredQty', e.target.value)}
+                          className="w-full text-right font-bold text-gray-900 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all shadow-3xs"
+                        />
+                      </td>
+                      
+                      {/* Source Location with Mini Factory Warehouse Hierarchy Modal */}
+                      <td className="py-2 px-3">
+                        <LocationSelectPopup
+                          locations={warehouseLocations}
+                          locationId={row.locationId || ''}
+                          displayValue={row.sourceLocation || 'Select Location...'}
+                          onChange={(wh, fl, zn, loc) => handleMaterialLocationChange(row.id, wh, fl, zn, loc)}
+                          variant="compact"
+                          hideLabel
+                          className="w-full min-w-[200px]"
+                        />
+                      </td>
+
+                      {/* Rate */}
+                      <td className="py-2 px-3 text-right">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={row.rate}
+                          onChange={e => handleUpdateMaterial(row.id, 'rate', e.target.value)}
+                          className="w-20 text-right text-xs font-bold text-gray-900 bg-white border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all shadow-3xs"
+                        />
+                      </td>
+
+                      {/* Material Cost */}
+                      <td className="py-2 px-3 text-right">
+                        <div className="w-24 text-right font-bold text-gray-900 text-xs py-1.5 px-2 bg-gray-50 border border-gray-200/80 rounded-lg ml-auto">
+                          {formatCurrency(row.amount)}
+                        </div>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="py-2 px-3 text-center">
+                        <button
+                          onClick={() => handleDeleteMaterial(row.id)}
+                          className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
+                          title="Delete material"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Table Bottom Control */}
+          <div className="flex items-center justify-between px-4 py-2.5 border-t border-gray-200 bg-gray-50/50">
+            <button
+              onClick={handleAddMaterial}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-lg text-xs cursor-pointer transition-all shadow-3xs"
+            >
+              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+              Add Material
+            </button>
+            <div className="flex items-center gap-3 text-xs">
+              <span className="font-bold text-gray-700">Total Material Cost (₹)</span>
+              <span className="font-extrabold text-gray-900 text-sm">
+                {formatCurrency(totalMaterialCost)}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── ROW 4: SPLIT 2-COLUMN (FINISHED GOODS OUTPUT & BY-PRODUCTS/SCRAP) ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          
+          {/* Card 1: Finished Goods Output */}
+          <div className="lg:col-span-7 bg-white rounded-xl border border-gray-200/90 shadow-3xs overflow-hidden flex flex-col">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 bg-white">
+              <div className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shadow-3xs">
+                <Box className="w-3.5 h-3.5 text-emerald-600" />
+              </div>
+              <h3 className="font-bold text-gray-900 text-xs sm:text-sm">
+                Finished Goods Output
+              </h3>
+            </div>
+            <div className="overflow-x-auto flex-1">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50/90 border-b border-gray-200 text-[10.5px] font-bold text-gray-600 uppercase tracking-wider">
+                    <th className="py-2.5 px-2.5 text-center w-7">#</th>
+                    <th className="py-2.5 px-2.5">Product</th>
+                    <th className="py-2.5 px-2.5 text-center">Item Code</th>
+                    <th className="py-2.5 px-2.5 text-center">UOM</th>
+                    <th className="py-2.5 px-2.5 text-right">Qty (PCS)</th>
+                    <th className="py-2.5 px-2.5 text-right">Qty (GBL)</th>
+                    <th className="py-2.5 px-2.5 text-right">Total Cost (₹)</th>
+                    <th className="py-2.5 px-2.5 text-right">Cost/Piece (₹)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 text-xs">
+                  {productName ? (
+                    <tr className="hover:bg-gray-50/60 transition-colors">
+                      <td className="py-2.5 px-2.5 text-center text-gray-400 font-medium">1</td>
+                      <td className="py-2.5 px-2.5 font-bold text-gray-900">{productName}</td>
+                      <td className="py-2.5 px-2.5 text-center font-mono text-gray-500">{productCode || '-'}</td>
+                      <td className="py-2.5 px-2.5 text-center font-bold text-gray-700">{uom}</td>
+                      <td className="py-2.5 px-2.5 text-right font-extrabold text-gray-900">{plannedPcs || 0}</td>
+                      <td className="py-2.5 px-2.5 text-right font-bold text-gray-800">{plannedGbl.toFixed(2)}</td>
+                      <td className="py-2.5 px-2.5 text-right font-extrabold text-gray-900">{formatCurrency(totalProductionCost)}</td>
+                      <td className="py-2.5 px-2.5 text-right font-bold text-blue-700">{formatCurrency(costPerPiece)}</td>
+                    </tr>
+                  ) : (
+                    <tr>
+                      <td colSpan={8} className="py-6 text-center text-xs text-gray-400 italic">
+                        Select a product above to preview finished goods output & costing.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Card 2: By-Products / Scrap (Optional) */}
+          <div className="lg:col-span-5 bg-white rounded-xl border border-gray-200/90 shadow-3xs overflow-hidden flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 bg-white">
+                <div className="w-6 h-6 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center font-bold shadow-3xs">
+                  <Box className="w-3.5 h-3.5 text-purple-600" />
+                </div>
+                <h3 className="font-bold text-gray-900 text-xs sm:text-sm">
+                  By-Products / Scrap (Optional)
+                </h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50/90 border-b border-gray-200 text-[10.5px] font-bold text-gray-600 uppercase tracking-wider">
+                      <th className="py-2 px-2 text-center w-7">#</th>
+                      <th className="py-2 px-2">Item</th>
+                      <th className="py-2 px-2 w-14 text-center">UOM</th>
+                      <th className="py-2 px-2 w-16 text-right">Qty</th>
+                      <th className="py-2 px-2 w-16 text-right">Rate (₹)</th>
+                      <th className="py-2 px-2 w-20 text-right">Amount (₹)</th>
+                      <th className="py-2 px-2 w-8 text-center"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 text-xs">
+                    {scrapItems.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-5 text-center text-xs text-gray-400 italic">
+                          No scrap or by-products specified.
+                        </td>
+                      </tr>
+                    ) : (
+                      scrapItems.map((scrap, idx) => (
+                        <tr key={scrap.id} className="hover:bg-gray-50/60 transition-colors">
+                          <td className="py-2 px-2 text-center text-gray-400 font-medium">{idx + 1}</td>
+                          <td className="py-2 px-2">
+                            <input
+                              type="text"
+                              value={scrap.item}
+                              onChange={e => handleUpdateScrap(scrap.id, 'item', e.target.value)}
+                              placeholder="e.g. Scrap Paper"
+                              className="w-full text-xs font-semibold text-gray-900 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all placeholder:text-gray-400 shadow-3xs"
+                            />
+                          </td>
+                          <td className="py-2 px-2 text-center">
+                            <input
+                              type="text"
+                              value={scrap.uom}
+                              onChange={e => handleUpdateScrap(scrap.id, 'uom', e.target.value)}
+                              className="w-14 text-center text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg py-1.5 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all shadow-3xs"
+                            />
+                          </td>
+                          <td className="py-2 px-2 text-right">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={scrap.qty}
+                              onChange={e => handleUpdateScrap(scrap.id, 'qty', e.target.value)}
+                              className="w-16 text-right text-xs font-bold text-gray-900 bg-white border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all shadow-3xs"
+                            />
+                          </td>
+                          <td className="py-2 px-2 text-right">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={scrap.rate}
+                              onChange={e => handleUpdateScrap(scrap.id, 'rate', e.target.value)}
+                              className="w-16 text-right text-xs font-bold text-gray-900 bg-white border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all shadow-3xs"
+                            />
+                          </td>
+                          <td className="py-2 px-2 text-right">
+                            <div className="w-20 text-right font-bold text-gray-900 text-xs py-1.5 px-2 bg-gray-50 border border-gray-200/80 rounded-lg ml-auto">
+                              {formatCurrency(scrap.amount)}
+                            </div>
+                          </td>
+                          <td className="py-2 px-2 text-center">
+                            <button
+                              onClick={() => handleDeleteScrap(scrap.id)}
+                              className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
+                              title="Delete scrap item"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            {/* Scrap Footer */}
+            <div className="flex items-center justify-between px-4 py-2.5 border-t border-gray-200 bg-gray-50/50">
+              <button
+                onClick={handleAddScrap}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 border border-purple-200 text-purple-700 hover:bg-purple-50 font-bold rounded-lg text-xs cursor-pointer transition-all shadow-3xs"
+              >
+                <Plus className="w-3 h-3 stroke-[2.5]" />
+                Add Scrap
+              </button>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="font-bold text-gray-700">Total Scrap Cost (₹)</span>
+                <span className="font-extrabold text-gray-900">
+                  {formatCurrency(totalScrapCost)}
+                </span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        {/* ── ROW 5: SPLIT 2-COLUMN (ADDITIONAL COSTS & COST SUMMARY) ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          
+          {/* Card 1: Additional Costs (Optional) */}
+          <div className="lg:col-span-7 bg-white rounded-xl border border-gray-200/90 shadow-3xs overflow-hidden flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 bg-white">
+                <div className="w-6 h-6 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center font-bold shadow-3xs">
+                  <Receipt className="w-3.5 h-3.5 text-purple-600" />
+                </div>
+                <h3 className="font-bold text-gray-900 text-xs sm:text-sm">
+                  Additional Costs (Optional)
+                </h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50/90 border-b border-gray-200 text-[10.5px] font-bold text-gray-600 uppercase tracking-wider">
+                      <th className="py-2 px-2 text-center w-7">#</th>
+                      <th className="py-2 px-2">Cost Type</th>
+                      <th className="py-2 px-2 w-28">Basis</th>
+                      <th className="py-2 px-2 w-24 text-right">Amount (₹)</th>
+                      <th className="py-2 px-2 min-w-[170px]">Applied As</th>
+                      <th className="py-2 px-2 w-8 text-center"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 text-xs">
+                    {additionalCosts.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-5 text-center text-xs text-gray-400 italic">
+                          No additional costs added. Click "+ Add Cost" to include labor, electricity, or overheads.
+                        </td>
+                      </tr>
+                    ) : (
+                      additionalCosts.map((cost, idx) => (
+                        <tr key={cost.id} className="hover:bg-gray-50/60 transition-colors">
+                          <td className="py-2 px-2 text-center text-gray-400 font-medium">{idx + 1}</td>
+                          <td className="py-2 px-2">
+                            <input
+                              type="text"
+                              value={cost.costType}
+                              onChange={e => handleUpdateCost(cost.id, 'costType', e.target.value)}
+                              placeholder="e.g. Wages, Electricity"
+                              className="w-full text-xs font-semibold text-gray-900 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all placeholder:text-gray-400 shadow-3xs"
+                            />
+                          </td>
+                          <td className="py-2 px-2">
+                            <div className="relative">
+                              <select
+                                value={cost.basis}
+                                onChange={e => handleUpdateCost(cost.id, 'basis', e.target.value)}
+                                className="w-full text-xs font-semibold text-gray-800 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 pr-6 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none appearance-none cursor-pointer transition-all shadow-3xs"
+                              >
+                                <option value="Total / Batch">Total / Batch</option>
+                                <option value="Per GBL">Per GBL</option>
+                                <option value="Per Piece">Per Piece</option>
+                                <option value="Lump Sum">Lump Sum</option>
+                              </select>
+                              <ChevronDown className="w-3.5 h-3.5 text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            </div>
+                          </td>
+                          <td className="py-2 px-2 text-right">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={cost.amount}
+                              onChange={e => handleUpdateCost(cost.id, 'amount', e.target.value)}
+                              className="w-24 text-right text-xs font-bold text-gray-900 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all shadow-3xs"
+                            />
+                          </td>
+                          <td className="py-2 px-2">
+                            <div className="relative">
+                              <select
+                                value={cost.appliedAs}
+                                onChange={e => handleUpdateCost(cost.id, 'appliedAs', e.target.value)}
+                                className="w-full text-xs font-semibold text-gray-800 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 pr-6 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none appearance-none cursor-pointer transition-all shadow-3xs"
+                              >
+                                <option value="Total Cost for this production">Total Cost for this production</option>
+                                <option value="Per Unit (GBL)">Per Unit (GBL)</option>
+                                <option value="Per Unit (PCS)">Per Unit (PCS)</option>
+                              </select>
+                              <ChevronDown className="w-3.5 h-3.5 text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            </div>
+                          </td>
+                          <td className="py-2 px-2 text-center">
+                            <button
+                              onClick={() => handleDeleteCost(cost.id)}
+                              className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
+                              title="Delete cost"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            {/* Additional Cost Footer */}
+            <div className="px-4 py-2.5 border-t border-gray-200 bg-gray-50/50">
+              <button
+                onClick={handleAddCost}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 border border-purple-200 text-purple-700 hover:bg-purple-50 font-bold rounded-lg text-xs cursor-pointer transition-all shadow-3xs"
+              >
+                <Plus className="w-3 h-3 stroke-[2.5]" />
+                Add Cost
+              </button>
+            </div>
+          </div>
+
+          {/* Card 2: Cost Summary */}
+          <div className="lg:col-span-5 bg-white rounded-xl border border-gray-200/90 shadow-3xs overflow-hidden flex flex-col">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 bg-white">
+              <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold shadow-3xs">
+                <Calculator className="w-3.5 h-3.5 text-blue-600" />
+              </div>
+              <h3 className="font-bold text-gray-900 text-xs sm:text-sm">
+                Cost Summary
+              </h3>
+            </div>
+            <div className="p-4 space-y-2.5 text-xs">
+              <div className="flex items-center justify-between text-gray-600">
+                <span>Material Cost (A)</span>
+                <span className="font-bold text-gray-900">{formatCurrency(totalMaterialCost)}</span>
+              </div>
+              <div className="flex items-center justify-between text-gray-600">
+                <span>Scrap Cost</span>
+                <span className="font-bold text-gray-900">{formatCurrency(totalScrapCost)}</span>
+              </div>
+              <div className="flex items-center justify-between text-gray-600">
+                <span>Additional Cost (B)</span>
+                <span className="font-bold text-gray-900">{formatCurrency(totalAdditionalCost)}</span>
+              </div>
+              
+              {/* Highlighted Total Production Cost Banner */}
+              <div className="bg-blue-50/80 border border-blue-200/70 rounded-xl p-2.5 flex items-center justify-between font-bold text-blue-900 text-xs sm:text-sm">
+                <span>Total Production Cost (A + B)</span>
+                <span>{formatCurrency(totalProductionCost)}</span>
+              </div>
+
+              <div className="pt-1 flex items-center justify-between text-gray-600">
+                <span>Output Quantity</span>
+                <span className="font-bold text-gray-900">
+                  {numPlannedQty > 0 ? (
+                    uom === 'GBL' ? `${plannedQty} GBL (${plannedPcs} PCS)` : `${plannedPcs} PCS (${plannedGbl.toFixed(2)} GBL)`
+                  ) : '-'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-gray-600">
+                <span>Cost per GBL (₹)</span>
+                <span className="font-bold text-gray-900">{formatCurrency(costPerGbl)}</span>
+              </div>
+              <div className="flex items-center justify-between text-gray-600">
+                <span>Cost per Piece (₹)</span>
+                <span className="font-bold text-gray-900">{formatCurrency(costPerPiece)}</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      {/* ── FOOTER CONTROL BAR (Sales Drawer V2 Style) ── */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-6 py-3.5 bg-white border-t border-gray-200 shrink-0">
+        
+        {/* Remarks Input */}
+        <div className="relative w-full sm:max-w-md">
+          <MessageSquare className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={remarks}
+            onChange={e => setRemarks(e.target.value)}
+            placeholder="Remarks (Optional)"
+            className="w-full h-8 pl-9 pr-3 text-xs text-gray-800 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 focus:outline-none transition-all placeholder:text-gray-400"
+          />
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
           <button
             type="button"
             onClick={onCancel}
-            title="Close"
-            className="w-8 h-8 rounded-lg border border-gray-200 hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors cursor-pointer ml-1"
+            disabled={submitting}
+            className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 transition-all cursor-pointer"
           >
-            <X className="w-4 h-4" />
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleCreateOrder}
+            disabled={submitting}
+            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Creating...</span>
+              </>
+            ) : (
+              <span>Create Production Order</span>
+            )}
           </button>
         </div>
+
       </div>
 
-      {/* Stepper Indicator for Step 3 */}
-      {currentStep === 3 && (
-        <div className="bg-white border-b border-gray-200 px-6 py-3 shrink-0 flex items-center justify-center">
-          <div className="flex items-center space-x-6 text-xs font-semibold">
-            <div className="flex items-center space-x-2 text-blue-600">
-              <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[11px]">
-                <Check className="w-3.5 h-3.5 stroke-[3]" />
-              </div>
-              <span>Basic Information</span>
-            </div>
-            <div className="w-12 h-0.5 bg-blue-600"></div>
-
-            <div className="flex items-center space-x-2 text-blue-600">
-              <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[11px]">
-                <Check className="w-3.5 h-3.5 stroke-[3]" />
-              </div>
-              <span>Bill of Materials (BOM)</span>
-            </div>
-            <div className="w-12 h-0.5 bg-blue-600"></div>
-
-            <div className="flex items-center space-x-2 text-blue-600 font-bold">
-              <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[11px]">
-                3
-              </div>
-              <span>Review & Confirm</span>
-            </div>
-            <div className="w-12 h-0.5 bg-gray-200"></div>
-
-            <div className="flex items-center space-x-2 text-gray-400">
-              <div className="w-5 h-5 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center text-[11px]">
-                4
-              </div>
-              <span>Create Order</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Form Content */}
-      <div 
-        ref={wizardContainerRef}
-        onKeyDown={handleFormKeyDown}
-        className="production-wizard-container p-6 max-w-7xl mx-auto w-full space-y-6"
+      {/* ── MANAGE DEPARTMENT PRESETS MODAL ── */}
+      <Modal
+        isOpen={showManageDeptModal}
+        onClose={() => setShowManageDeptModal(false)}
+        title="Manage Department Presets"
+        maxWidth="max-w-xl"
+        zIndex="z-[99999]"
       >
-        {currentStep === 1 ? (
-          <>
-            {/* ERP Upstream Demand Connection (Sales Orders) */}
-            <div className="bg-gradient-to-r from-blue-50/70 via-indigo-50/40 to-white rounded-xl border border-blue-200/80 p-4 shadow-3xs space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center space-x-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-xs">
-                    <ShoppingBag className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Demand Source (Sales Order Reference)</h3>
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
-                        {selectedSalesOrder ? 'Make to Order (MTO)' : 'Make to Stock (Buffer)'}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-gray-500">
-                      Link this manufacturing batch to customer sales demand for end-to-end traceability
-                    </p>
-                  </div>
+        <div className="space-y-4">
+          <p className="text-xs text-gray-500 leading-relaxed">
+            Department presets appear in the department selector dropdown. Selecting a preset automatically assigns its linked factory and storage location.
+          </p>
+
+          {/* List of Presets */}
+          <div className="max-h-60 overflow-y-auto border border-gray-200/90 rounded-xl divide-y divide-gray-100">
+            {departmentPresets.map(preset => (
+              <div key={preset.id} className="p-3 flex items-center justify-between text-xs hover:bg-gray-50/80 transition-colors">
+                <div className="min-w-0 pr-2">
+                  <span className="font-bold text-gray-900 block truncate">{preset.name}</span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold mt-1 bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <MapPin className="w-3 h-3 text-emerald-600 shrink-0" />
+                    <span className="truncate">{preset.locationName || 'Main Factory'}</span>
+                  </span>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  {selectedSalesOrder && (
-                    <button
-                      type="button"
-                      onClick={() => handleSelectSalesOrder(null)}
-                      className="px-2.5 py-1 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg border border-rose-200 transition-colors flex items-center gap-1 cursor-pointer"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                      <span>Unlink Order</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Demand Selector Dropdown / Search */}
-              <div className="relative" ref={salesOrderDropdownRef}>
-                <div
-                  tabIndex={0}
-                  onClick={() => setShowSalesOrderDropdown(!showSalesOrderDropdown)}
-                  className="w-full text-xs bg-white border border-gray-200 rounded-lg px-3 py-2.5 font-medium flex items-center justify-between cursor-pointer hover:border-blue-400 focus:outline-none focus:border-blue-500 transition-colors shadow-2xs"
-                >
-                  {selectedSalesOrder ? (
-                    <div className="flex items-center gap-2 text-gray-900 font-bold">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-600 text-white">
-                        {selectedSalesOrder.orderNumber}
-                      </span>
-                      <span>{selectedSalesOrder.customerName}</span>
-                      <span className="text-gray-400 font-normal">
-                        • {selectedSalesOrder.items?.length || 0} items
-                        {selectedSalesOrder.promisedDate ? ` • Due: ${selectedSalesOrder.promisedDate}` : ''}
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-gray-500 flex items-center gap-2">
-                      <Box className="w-3.5 h-3.5 text-gray-400" />
-                      <span>Make to Stock (Buffer Inventory) — Click to link with a Customer Sales Order</span>
-                    </span>
-                  )}
-                  <ChevronDown className="w-4 h-4 text-gray-400" />
-                </div>
-
-                {showSalesOrderDropdown && (
-                  <div className="absolute left-0 top-full mt-1.5 w-full bg-white border border-gray-200 rounded-xl shadow-xl z-50 max-h-72 flex flex-col animate-modalPop overflow-hidden">
-                    <div className="p-2 border-b border-gray-150 bg-gray-50 flex items-center gap-2">
-                      <Search className="w-3.5 h-3.5 text-gray-400" />
-                      <input
-                        type="text"
-                        value={salesOrderSearchQuery}
-                        onChange={e => setSalesOrderSearchQuery(e.target.value)}
-                        placeholder="Search sales orders by SO number, customer name..."
-                        autoFocus
-                        className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-500"
-                      />
-                    </div>
-
-                    <div className="overflow-y-auto flex-1 divide-y divide-gray-100 custom-scrollbar">
-                      {/* Make to Stock Option */}
-                      <div
-                        onClick={() => handleSelectSalesOrder(null)}
-                        className={`p-2.5 cursor-pointer flex items-center justify-between hover:bg-blue-50/60 transition-colors ${
-                          !selectedSalesOrderId ? 'bg-blue-50/80 font-bold' : ''
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <Box className="w-4 h-4 text-gray-500" />
-                          <div>
-                            <span className="text-xs font-bold text-gray-900 block">Make to Stock (Buffer Inventory)</span>
-                            <span className="text-[11px] text-gray-400">Produce for warehouse stock without direct sales order binding</span>
-                          </div>
-                        </div>
-                        {!selectedSalesOrderId && <Check className="w-4 h-4 text-blue-600" />}
-                      </div>
-
-                      {/* Sales Orders List */}
-                      {salesOrders
-                        .filter(so => {
-                          if (!salesOrderSearchQuery.trim()) return true;
-                          const q = salesOrderSearchQuery.toLowerCase();
-                          return so.orderNumber?.toLowerCase().includes(q) ||
-                                 so.customerName?.toLowerCase().includes(q);
-                        })
-                        .map(so => {
-                          const isSelected = selectedSalesOrderId === so._id;
-                          const firstItem = so.items?.[0];
-                          return (
-                            <div
-                              key={so._id || so.orderNumber}
-                              onClick={() => handleSelectSalesOrder(so)}
-                              className={`p-2.5 cursor-pointer flex items-center justify-between hover:bg-blue-50/60 transition-colors ${
-                                isSelected ? 'bg-blue-50/80 font-bold' : ''
-                              }`}
-                            >
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
-                                    {so.orderNumber}
-                                  </span>
-                                  <span className="text-xs font-bold text-gray-900">{so.customerName}</span>
-                                  <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-gray-100 text-gray-700">
-                                    {so.fulfillmentStatus || 'Pending'}
-                                  </span>
-                                </div>
-                                <div className="text-[11px] text-gray-500 mt-1 flex items-center gap-3">
-                                  {firstItem && (
-                                    <span>Item: <strong>{firstItem.itemName}</strong> ({firstItem.quantity} {firstItem.uom})</span>
-                                  )}
-                                  {so.promisedDate && <span>Due: {so.promisedDate}</span>}
-                                  {so.grandTotal && <span>₹{so.grandTotal.toLocaleString('en-IN')}</span>}
-                                </div>
-                              </div>
-                              {isSelected && <Check className="w-4 h-4 text-blue-600" />}
-                            </div>
-                          );
-                        })}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {selectedSalesOrder && (
-                <div className="bg-blue-50/80 border border-blue-200 rounded-lg p-2.5 flex items-center justify-between text-xs text-blue-900">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
-                    <span>
-                      Linked to Customer Demand: <strong>{selectedSalesOrder.orderNumber}</strong> for <strong>{selectedSalesOrder.customerName}</strong>. 
-                      Creating this order will automatically advance the sales fulfillment lifecycle to <strong>In Production</strong>.
-                    </span>
-                  </div>
-                  <a
-                    href={`/sales/orders?search=${selectedSalesOrder.orderNumber}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 hover:text-blue-900 underline shrink-0 ml-2"
-                  >
-                    <span>View Sales Order</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
-              )}
-            </div>
-
-            {/* 1. Basic Information */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-2xs space-y-5">
-              <h2 className="text-sm font-bold text-gray-900 tracking-wide uppercase">1. Basic Information</h2>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                {/* Order No - Starts with PO-001 (Scales > 100,000 orders) */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Order No.</label>
-                  <input
-                    type="text"
-                    value={orderNumber}
-                    onChange={e => setOrderNumber(e.target.value)}
-                    placeholder="PO-001"
-                    className="w-full text-xs text-gray-900 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 font-mono font-bold focus:bg-white focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                {/* Item to Produce - Finished Products & Semi Finished Goods */}
-                <div className="relative" ref={productDropdownRef}>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                    Item to Produce (Finished & Semi-Finished) <span className="text-rose-500">*</span>
-                  </label>
-                  
-                  <div
-                    tabIndex={0}
-                    onClick={() => setShowProductDropdown(!showProductDropdown)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
-                        e.preventDefault();
-                        setShowProductDropdown(true);
-                      }
-                    }}
-                    className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 font-semibold flex items-center justify-between cursor-pointer hover:border-gray-300 focus:outline-none focus:border-blue-500"
-                  >
-                    <span className={selectedSku ? 'font-bold text-gray-900 flex items-center gap-1.5' : 'text-gray-400 font-normal'}>
-                      {selectedSku ? (
-                        <>
-                          <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                            itemType === 'Semi Finished' ? 'bg-purple-100 text-purple-700' : 'bg-emerald-100 text-emerald-700'
-                          }`}>
-                            {itemType === 'Semi Finished' ? 'Semi' : 'FG'}
-                          </span>
-                          <span>{selectedSku.name} ({selectedSku.skuCode})</span>
-                        </>
-                      ) : (
-                        'Select product or semi-finished good...'
-                      )}
-                    </span>
-                    <div className="flex items-center space-x-1.5 text-gray-400">
-                      <span className="text-[10px] font-mono">[Enter]</span>
-                      <ChevronDown className="w-3.5 h-3.5" />
-                    </div>
-                  </div>
-
-                  {/* Searchable Product Dropdown */}
-                  {showProductDropdown && (
-                    <div className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl z-40 max-h-64 flex flex-col animate-modalPop">
-                      <div className="p-2 border-b border-gray-150 bg-gray-50 flex items-center justify-between gap-2">
-                        <div className="relative flex-1">
-                          <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                          <input
-                            ref={productSearchInputRef}
-                            type="text"
-                            value={productSearchQuery}
-                            onChange={e => {
-                              setProductSearchQuery(e.target.value);
-                              setHighlightedProductIdx(0);
-                            }}
-                            onKeyDown={e => {
-                              const filteredList = producibleItemsList.filter(s => {
-                                if (!productSearchQuery.trim()) return true;
-                                const q = productSearchQuery.toLowerCase();
-                                return s.name.toLowerCase().includes(q) || s.skuCode.toLowerCase().includes(q);
-                              });
-                              if (e.key === 'ArrowDown') {
-                                e.preventDefault();
-                                setHighlightedProductIdx(prev => Math.min(prev + 1, filteredList.length - 1));
-                              } else if (e.key === 'ArrowUp') {
-                                e.preventDefault();
-                                setHighlightedProductIdx(prev => Math.max(prev - 1, 0));
-                              } else if (e.key === 'Enter') {
-                                e.preventDefault();
-                                if (filteredList.length > 0 && highlightedProductIdx >= 0 && highlightedProductIdx < filteredList.length) {
-                                  handleSelectProduct(filteredList[highlightedProductIdx]);
-                                  setTimeout(() => {
-                                    const qtyInput = document.querySelector('input[name="productionQty"]') as HTMLInputElement;
-                                    qtyInput?.focus();
-                                    qtyInput?.select();
-                                  }, 50);
-                                }
-                              } else if (e.key === 'Escape') {
-                                e.preventDefault();
-                                setShowProductDropdown(false);
-                              }
-                            }}
-                            placeholder="Search finished & semi-finished items... [↑/↓ to navigate, Enter to select]"
-                            autoFocus
-                            className="w-full pl-8 pr-3 py-1.5 text-xs text-gray-900 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="overflow-y-auto flex-1 divide-y divide-gray-100 custom-scrollbar">
-                        {producibleItemsList
-                          .filter(s => {
-                            if (!productSearchQuery.trim()) return true;
-                            const q = productSearchQuery.toLowerCase();
-                            return s.name.toLowerCase().includes(q) || s.skuCode.toLowerCase().includes(q);
-                          })
-                          .map((sku, pIdx) => {
-                            const hasBom = Array.isArray(sku.bomItems) && sku.bomItems.length > 0;
-                            const isHighlighted = highlightedProductIdx === pIdx;
-                            const cls = getItemClassification(sku);
-                            const isSemi = cls === 'semi';
-                            return (
-                              <div
-                                key={sku._id}
-                                onClick={() => {
-                                  handleSelectProduct(sku);
-                                  setTimeout(() => {
-                                    const qtyInput = document.querySelector('input[name="productionQty"]') as HTMLInputElement;
-                                    qtyInput?.focus();
-                                    qtyInput?.select();
-                                  }, 50);
-                                }}
-                                onMouseEnter={() => setHighlightedProductIdx(pIdx)}
-                                className={`p-2.5 cursor-pointer flex items-center justify-between transition-colors ${
-                                  isHighlighted 
-                                    ? 'bg-blue-100/90 text-blue-900 font-bold border-l-4 border-blue-600'
-                                    : selectedSkuId === sku._id 
-                                      ? 'bg-blue-50/80 font-bold' 
-                                      : 'hover:bg-blue-50/60'
-                                }`}
-                              >
-                                <div>
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-xs font-bold text-gray-900">{sku.name}</span>
-                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                                      isSemi 
-                                        ? 'bg-purple-100 text-purple-700 border border-purple-200' 
-                                        : 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                                    }`}>
-                                      {isSemi ? 'Semi-Finished' : 'Finished Good'}
-                                    </span>
-                                  </div>
-                                  <div className="text-[11px] text-gray-400 font-mono mt-0.5">
-                                    {sku.skuCode} • {sku.unit} {sku.booksGbl ? `• ${sku.booksGbl} bks/GBL` : ''}
-                                  </div>
-                                </div>
-                                {hasBom ? (
-                                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                    {sku.bomItems?.length} BOM items
-                                  </span>
-                                ) : (
-                                  <span className="text-[10px] text-gray-400">No BOM</span>
-                                )}
-                              </div>
-                            );
-                          })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Item Type - Derived with status badge */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Item Type</label>
-                  <div className="w-full text-xs text-gray-800 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 font-semibold flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${itemType === 'Semi Finished' ? 'bg-purple-600' : 'bg-emerald-600'}`} />
-                    <span>{itemType}</span>
-                  </div>
-                </div>
-
-                {/* Production Quantity with conversion rate */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                    Production Quantity <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="flex space-x-2">
-                    <input
-                      type="number"
-                      min={1}
-                      name="productionQty"
-                      value={productionQty}
-                      onChange={e => setProductionQty(e.target.value === '' ? '' : Number(e.target.value))}
-                      placeholder="Enter quantity"
-                      className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 font-bold focus:outline-none focus:border-blue-500"
-                    />
-                    <select
-                      value={productionUom}
-                      onChange={e => setProductionUom(e.target.value)}
-                      className="w-24 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg px-2.5 py-2 font-semibold focus:outline-none focus:border-blue-500 cursor-pointer"
-                    >
-                      <option value="GBL">GBL</option>
-                      <option value="PCS">PCS</option>
-                      {selectedSku?.unit && selectedSku.unit !== 'GBL' && selectedSku.unit !== 'PCS' && (
-                        <option value={selectedSku.unit}>{selectedSku.unit}</option>
-                      )}
-                    </select>
-                  </div>
-                  {/* Dynamic Conversion rate helper */}
-                  {productionQty !== '' && Number(productionQty) > 0 && (
-                    <p className="text-[11px] text-blue-700 mt-1 font-semibold">
-                      {productionUom === 'GBL' ? (
-                        <span>= <strong>{totalPlannedPcs.toLocaleString()} PCS</strong> (1 GBL = {conversionRate} PCS)</span>
-                      ) : conversionRate > 1 ? (
-                        <span>= <strong>{(Number(productionQty) / conversionRate).toFixed(2)} GBL</strong> (1 GBL = {conversionRate} PCS)</span>
-                      ) : (
-                        <span>= <strong>{Number(productionQty).toLocaleString()} {productionUom}</strong></span>
-                      )}
-                    </p>
-                  )}
-                </div>
-
-                {/* Location - Warehouse Hierarchy Modal (Neat compact input) */}
-                <div>
-                  <LocationSelectPopup
-                    label="Location"
-                    variant="compact"
-                    required
-                    locations={warehouseLocations}
-                    warehouseId={warehouseId}
-                    floorId={floorId}
-                    zoneId={zoneId}
-                    locationId={locationId}
-                    onChange={(wId, fId, zId, lId) => {
-                      setWarehouseId(wId);
-                      setFloorId(fId);
-                      setZoneId(zId);
-                      setLocationId(lId);
-                      const found = warehouseLocations.find(l => String(l._id || l.id) === String(lId));
-                      const name = found ? (found.name || found.code) : '';
-                      setLocationName(name || 'Selected Location');
-                      setFactory(name || 'SKBW');
-                    }}
-                  />
-                </div>
-
-                {/* Manufacturing Department - Reusable PresetField with persistent storage and Location binding */}
-                <PresetField
-                  label="Manufacturing Department"
-                  required
-                  value={department}
-                  onChange={setDepartment}
-                  storageKey="skbw_mfg_department_presets_v4"
-                  defaultPresets={DEFAULT_DEPARTMENT_PRESETS}
-                  placeholder="Select or enter department..."
-                  locations={warehouseLocations}
-                  onSelectLocation={(loc) => {
-                    setLocationId(loc.locationId);
-                    setLocationName(loc.locationName);
-                    setWarehouseId(loc.warehouseId || '');
-                    setFloorId(loc.floorId || '');
-                    setZoneId(loc.zoneId || '');
-                    setFactory(loc.locationName || 'SKBW');
-                  }}
-                />
-
-                {/* Planned Start Date - Today's date (uneditable) */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Planned Start Date</label>
-                  <input
-                    type="date"
-                    value={plannedStartDate}
-                    readOnly
-                    disabled
-                    className="w-full text-xs text-gray-700 bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 font-semibold cursor-not-allowed select-none h-[38px]"
-                  />
-                </div>
-
-                {/* Required Completion Date - Empty by default */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Required Completion Date</label>
-                  <input
-                    type="date"
-                    value={requiredCompletionDate}
-                    onChange={e => setRequiredCompletionDate(e.target.value)}
-                    className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 font-medium focus:outline-none focus:border-blue-500 h-[38px]"
-                  />
-                </div>
-
-                {/* Priority */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Priority</label>
-                  <select
-                    value={priority}
-                    onChange={e => setPriority(e.target.value as PriorityLevel)}
-                    className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 font-medium focus:outline-none focus:border-blue-500 cursor-pointer h-[38px]"
-                  >
-                    <option value="Normal">Normal</option>
-                    <option value="High">High</option>
-                    <option value="Urgent">Urgent</option>
-                    <option value="Low">Low</option>
-                  </select>
-                </div>
-
-                {/* Remarks */}
-                <div className="md:col-span-3">
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Remarks</label>
-                  <input
-                    type="text"
-                    value={remarks}
-                    onChange={e => setRemarks(e.target.value)}
-                    placeholder="Add any notes..."
-                    className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500 h-[38px]"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* 2. Bill of Materials (BOM) */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-2xs space-y-5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
-                <div>
-                  <h2 className="text-sm font-bold text-gray-900 tracking-wide uppercase">2. Bill of Materials (BOM)</h2>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    BOM components are dynamically loaded from Item Master for the selected finished product.
-                  </p>
-                </div>
-
                 <button
                   type="button"
-                  onClick={() => setShowBulkEditBomModal(true)}
-                  className="inline-flex items-center space-x-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline shrink-0 cursor-pointer"
+                  onClick={() => handleDeleteDepartmentPreset(preset.id)}
+                  className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors shrink-0"
+                  title="Delete preset"
                 >
-                  <span>View Item Master BOM</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
+                  <Trash2 className="w-4 h-4" />
                 </button>
               </div>
-
-              {/* Radio Selection */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <label 
-                  className={`p-4 rounded-xl border transition-all cursor-pointer flex items-start space-x-3 ${
-                    bomType === 'Default BOM' 
-                      ? 'border-blue-500 bg-blue-50/30' 
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="bomType"
-                    checked={bomType === 'Default BOM'}
-                    onChange={() => {
-                      setBomType('Default BOM');
-                      if (selectedSku) loadBomFromItemMaster(selectedSku, totalPlannedPcs);
-                    }}
-                    className="mt-0.5 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                  />
-                  <div>
-                    <div className="text-xs font-bold text-gray-900">Use Default BOM (from Item Master)</div>
-                    <div className="text-[11px] text-gray-500 mt-0.5">
-                      Shows the standard recipe assigned to this product in Item Master.
-                    </div>
-                  </div>
-                </label>
-
-                <label 
-                  className={`p-4 rounded-xl border transition-all cursor-pointer flex items-start space-x-3 ${
-                    bomType === 'Custom BOM (Production Order Only)' 
-                      ? 'border-blue-500 bg-blue-50/30' 
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="bomType"
-                    checked={bomType === 'Custom BOM (Production Order Only)'}
-                    onChange={() => setBomType('Custom BOM (Production Order Only)')}
-                    className="mt-0.5 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                  />
-                  <div>
-                    <div className="text-xs font-bold text-gray-900">Customize BOM for this production only</div>
-                    <div className="text-[11px] text-gray-500 mt-0.5">
-                      Change quantities, add or remove components for this order. Changes apply only to this order.
-                    </div>
-                  </div>
-                </label>
-              </div>
-
-              {/* BOM Table */}
-              <div className="border border-gray-200 rounded-xl overflow-hidden">
-                <div className="bg-gray-50/80 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xs font-bold text-gray-900">
-                      {selectedSku ? `BOM – ${selectedSku.name}` : 'BOM Ingredients'}
-                    </span>
-                    {bomType === 'Custom BOM (Production Order Only)' && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
-                        Editing Mode
-                      </span>
-                    )}
-                  </div>
-
-                  {selectedSku && (
-                    <button
-                      onClick={() => {
-                        loadBomFromItemMaster(selectedSku, totalPlannedPcs);
-                        setBomType('Default BOM');
-                      }}
-                      className="inline-flex items-center space-x-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900 cursor-pointer"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Reset to Item Master BOM</span>
-                    </button>
-                  )}
-                </div>
-
-                <div className="overflow-x-auto custom-scrollbar">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-gray-50/50 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                        <th className="py-2.5 px-3 w-8 text-center">#</th>
-                        <th className="py-2.5 px-3">Component</th>
-                        <th className="py-2.5 px-3">Type</th>
-                        <th className="py-2.5 px-3">Qty per Batch</th>
-                        <th className="py-2.5 px-3">Total Required</th>
-                        <th className="py-2.5 px-3">UOM</th>
-                        <th className="py-2.5 px-3">Available Stock</th>
-                        <th className="py-2.5 px-3">Inward Batch / Lot</th>
-                        <th className="py-2.5 px-3">Unit Cost (₹)</th>
-                        <th className="py-2.5 px-3">Total Cost (₹)</th>
-                        <th className="py-2.5 px-3">Stock Status</th>
-                        <th className="py-2.5 px-3 text-center">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {bomItems.length === 0 ? (
-                        <tr>
-                          <td colSpan={12} className="py-8 text-center text-gray-400">
-                            {!selectedSku ? (
-                              'Please select an Item to Produce above to load its BOM.'
-                            ) : (
-                              <div>
-                                <p className="font-semibold text-gray-600">No BOM assigned in Item Master for this product.</p>
-                                <p className="text-xs text-gray-400 mt-1">
-                                  Click below to add raw materials or semi-finished components from your catalog.
-                                </p>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      ) : (
-                        bomItems.map((item, idx) => (
-                          <tr key={item.id} className="hover:bg-gray-50/60 transition-colors">
-                            <td className="py-3 px-3 text-center font-semibold text-gray-500">{idx + 1}</td>
-                            <td className="py-3 px-3 font-semibold text-gray-900">
-                              <div>{item.component}</div>
-                              {item.code && <div className="text-[10px] text-gray-400 font-mono">{item.code}</div>}
-                            </td>
-                            <td className="py-3 px-3">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                                item.type === 'Semi' 
-                                  ? 'bg-sky-50 text-sky-700 border border-sky-200/60'
-                                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
-                              }`}>
-                                {item.type}
-                              </span>
-                            </td>
-                            <td className="py-3 px-3">
-                              <input
-                                type="number"
-                                min={0.01}
-                                step="any"
-                                data-bom-idx={idx}
-                                value={item.qtyPerBatch}
-                                onChange={e => handleUpdateQtyPerBatch(idx, Math.max(0.01, Number(e.target.value) || 0.01))}
-                                onKeyDown={e => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    const next = document.querySelector(`input[data-bom-idx="${idx + 1}"]`) as HTMLInputElement;
-                                    if (next) {
-                                      next.focus();
-                                      next.select();
-                                    } else {
-                                      shiftFocus(1);
-                                    }
-                                  } else if (e.key === 'ArrowDown') {
-                                    e.preventDefault();
-                                    const next = document.querySelector(`input[data-bom-idx="${idx + 1}"]`) as HTMLInputElement;
-                                    next?.focus();
-                                    next?.select();
-                                  } else if (e.key === 'ArrowUp') {
-                                    e.preventDefault();
-                                    const prev = document.querySelector(`input[data-bom-idx="${idx - 1}"]`) as HTMLInputElement;
-                                    prev?.focus();
-                                    prev?.select();
-                                  }
-                                }}
-                                className="w-20 px-2 py-1 text-xs font-semibold bg-white border border-gray-200 rounded text-center focus:border-blue-500 focus:outline-none"
-                              />
-                            </td>
-                            <td className="py-3 px-3 font-bold text-gray-900">
-                              {item.totalRequired.toLocaleString()}
-                            </td>
-                            <td className="py-3 px-3 text-gray-600 font-medium">{item.uom}</td>
-                            <td className="py-3 px-3 font-semibold text-gray-700">
-                              {item.availableStock.toLocaleString()}
-                            </td>
-                            <td className="py-3 px-3">
-                              {item.lotNumber || item.purchaseInvoiceNo ? (
-                                <div className="flex flex-col">
-                                  <span className="font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded text-[10px] w-fit">
-                                    {item.lotNumber || item.purchaseInvoiceNo}
-                                  </span>
-                                  {item.supplierName && (
-                                    <span className="text-[10px] text-gray-500 truncate max-w-[120px] mt-0.5" title={item.supplierName}>
-                                      {item.supplierName}
-                                    </span>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="text-[10px] text-gray-400 font-medium">Auto FIFO Stock</span>
-                              )}
-                            </td>
-                            <td className="py-3 px-3 font-mono font-medium text-gray-800">
-                              {item.rate > 0 ? `₹${item.rate.toFixed(2)}` : '₹0.00'}
-                            </td>
-                            <td className="py-3 px-3 font-mono font-bold text-gray-900">
-                              {item.amount > 0 ? `₹${item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '₹0.00'}
-                            </td>
-                            <td className="py-3 px-3">
-                              {item.stockStatus === 'Available' ? (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                  Available
-                                </span>
-                              ) : (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-                                  Shortage
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-3 px-3 text-center">
-                              {bomType === 'Custom BOM (Production Order Only)' ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveComponent(idx)}
-                                  title="Remove component"
-                                  className="p-1 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              ) : (
-                                <span className="text-[11px] text-gray-300 font-mono select-none">—</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                    {bomItems.length > 0 && (
-                      <tfoot>
-                        <tr className="bg-gray-50/80 border-t border-gray-200 font-bold text-xs">
-                          <td colSpan={8} className="py-2.5 px-3 text-gray-700 uppercase tracking-wider">
-                            Estimated Material Cost (Dynamic from Stock & Inventory)
-                          </td>
-                          <td colSpan={3} className="py-2.5 px-3 text-right font-black text-blue-600 text-sm font-mono">
-                            ₹ {bomStats.totalEstimatedCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    )}
-                  </table>
-                </div>
-
-                {/* Add Component Button (Raw and Semi ONLY) - ONLY SHOWN IN CUSTOM BOM MODE */}
-                {bomType === 'Custom BOM (Production Order Only)' && (
-                  <div className="p-3 bg-gray-50/50 border-t border-gray-200 flex items-center justify-between">
-                    <button
-                      type="button"
-                      onClick={() => setShowAddComponentModal(true)}
-                      className="inline-flex items-center space-x-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 bg-white border border-gray-200 hover:border-blue-300 px-3 py-1.5 rounded-lg shadow-2xs transition-colors cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Add Component from Catalog (Raw & Semi Materials)</span>
-                    </button>
-                    <span className="text-[11px] text-gray-500 font-medium">
-                      Customizing components for this production order
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Bottom Nav */}
-              <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                <button
-                  onClick={onCancel}
-                  className="px-4 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
-                >
-                  Back
-                </button>
-
-                <button
-                  onClick={handleSaveAndContinue}
-                  className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-5 py-2 rounded-lg shadow-sm hover:shadow transition-all cursor-pointer"
-                >
-                  <span>Save & Continue</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </>
-        ) : (
-          /* STEP 3: Review & Confirm */
-          <div className="space-y-6">
-            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-2xs space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-150 pb-4">
-                <div>
-                  <h2 className="text-base font-bold text-gray-900 tracking-tight">Review & Confirm</h2>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Please review the production order details, BOM and material availability before creating the order.
-                  </p>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  <button
-                    onClick={() => setCurrentStep(1)}
-                    className="px-4 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
-                  >
-                    ← Back
-                  </button>
-
-                  <button
-                    onClick={handleCreateOrder}
-                    disabled={submitting}
-                    className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-semibold px-5 py-2 rounded-lg shadow-sm hover:shadow transition-all cursor-pointer"
-                  >
-                    {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                    <span>Create Production Order</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Order Information 2-Column Summary Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-y-4 gap-x-6 text-xs bg-gray-50/70 p-4 rounded-xl border border-gray-200/70">
-                <div>
-                  <span className="text-[11px] font-semibold text-gray-400 block uppercase">Order No.</span>
-                  <span className="font-bold text-gray-900 font-mono mt-0.5 block">{orderNumber}</span>
-                </div>
-
-                <div>
-                  <span className="text-[11px] font-semibold text-gray-400 block uppercase">Item to Produce</span>
-                  <div className="mt-0.5">
-                    <span className="font-bold text-gray-900 block">{selectedSku?.name}</span>
-                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold mt-0.5 border ${
-                      itemType === 'Semi Finished'
-                        ? 'bg-purple-50 text-purple-700 border-purple-200'
-                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    }`}>
-                      {itemType}
-                    </span>
-                  </div>
-                </div>
-
-                <div>
-                  <span className="text-[11px] font-semibold text-gray-400 block uppercase">Location</span>
-                  <span className="font-bold text-gray-900 mt-0.5 block">{locationName || factory || 'Not specified'}</span>
-                </div>
-
-                <div>
-                  <span className="text-[11px] font-semibold text-gray-400 block uppercase">BOM Type</span>
-                  <span className="font-semibold text-gray-900 mt-0.5 block">{bomType}</span>
-                </div>
-
-                <div>
-                  <span className="text-[11px] font-semibold text-gray-400 block uppercase">Production Quantity</span>
-                  <span className="font-bold text-gray-900 mt-0.5 block">
-                    {productionQty} {productionUom} {productionUom === 'GBL' ? `(= ${totalPlannedPcs.toLocaleString()} PCS)` : ''}
-                  </span>
-                </div>
-
-                <div>
-                  <span className="text-[11px] font-semibold text-gray-400 block uppercase">Manufacturing Department</span>
-                  <span className="font-bold text-gray-900 mt-0.5 block">{department}</span>
-                </div>
-
-                <div>
-                  <span className="text-[11px] font-semibold text-gray-400 block uppercase">Priority</span>
-                  <span className="font-semibold text-gray-900 mt-0.5 block">{priority}</span>
-                </div>
-
-                <div>
-                  <span className="text-[11px] font-semibold text-gray-400 block uppercase">Planned Start Date</span>
-                  <span className="font-semibold text-gray-900 mt-0.5 block">{plannedStartDate || '-'}</span>
-                </div>
-
-                <div>
-                  <span className="text-[11px] font-semibold text-gray-400 block uppercase">Required Completion Date</span>
-                  <span className="font-semibold text-gray-900 mt-0.5 block">{requiredCompletionDate || '-'}</span>
-                </div>
-
-                <div>
-                  <span className="text-[11px] font-semibold text-gray-400 block uppercase">Demand Reference</span>
-                  <span className="font-bold text-gray-900 mt-0.5 block">
-                    {selectedSalesOrder ? `Sales Order #${selectedSalesOrder.orderNumber}` : (reference || 'Make to Stock')}
-                  </span>
-                </div>
-
-                <div className="md:col-span-2">
-                  <span className="text-[11px] font-semibold text-gray-400 block uppercase">Remarks</span>
-                  <span className="text-gray-700 mt-0.5 block">{remarks || '-'}</span>
-                </div>
-              </div>
-
-              {/* BOM Section */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <h3 className="text-sm font-bold text-gray-900">Bill of Materials (BOM)</h3>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                      {bomType}
-                    </span>
-                  </div>
-
-                  <button
-                    onClick={() => setCurrentStep(1)}
-                    className="inline-flex items-center space-x-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 cursor-pointer"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                    <span>Edit BOM</span>
-                  </button>
-                </div>
-
-                <div className="border border-gray-200 rounded-xl overflow-hidden">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                        <th className="py-2.5 px-3 w-8 text-center">#</th>
-                        <th className="py-2.5 px-3">Component</th>
-                        <th className="py-2.5 px-3">Type</th>
-                        <th className="py-2.5 px-3">Qty per Batch</th>
-                        <th className="py-2.5 px-3">Total Required</th>
-                        <th className="py-2.5 px-3">UOM</th>
-                        <th className="py-2.5 px-3">Available Stock</th>
-                        <th className="py-2.5 px-3">Inward Batch / Lot</th>
-                        <th className="py-2.5 px-3">Stock Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {bomItems.map((item, idx) => (
-                        <tr key={item.id} className="hover:bg-gray-50/50">
-                          <td className="py-3 px-3 text-center font-semibold text-gray-500">{idx + 1}</td>
-                          <td className="py-3 px-3 font-semibold text-gray-900">{item.component}</td>
-                          <td className="py-3 px-3">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                              item.type === 'Semi' 
-                                ? 'bg-sky-50 text-sky-700 border border-sky-200'
-                                : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            }`}>
-                              {item.type}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3 font-semibold text-gray-800">{item.qtyPerBatch}</td>
-                          <td className="py-3 px-3 font-bold text-gray-900">{item.totalRequired.toLocaleString()}</td>
-                          <td className="py-3 px-3 text-gray-600 font-medium">{item.uom}</td>
-                          <td className="py-3 px-3 font-semibold text-gray-700">{item.availableStock.toLocaleString()}</td>
-                          <td className="py-3 px-3">
-                            {item.lotNumber || item.purchaseInvoiceNo ? (
-                              <div className="flex flex-col">
-                                <span className="font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded text-[10px] w-fit">
-                                  {item.lotNumber || item.purchaseInvoiceNo}
-                                </span>
-                                {item.supplierName && (
-                                  <span className="text-[10px] text-gray-500 truncate max-w-[120px] mt-0.5">
-                                    {item.supplierName}
-                                  </span>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-[10px] text-gray-400 font-medium">Auto FIFO Stock</span>
-                            )}
-                          </td>
-                          <td className="py-3 px-3">
-                            {item.stockStatus === 'Available' ? (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                Available
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-                                Shortage
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Material Availability Summary Cards */}
-              <div>
-                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-2.5">
-                  Material Availability Summary
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs">
-                    <span className="text-2xl font-black text-blue-600">{bomStats.totalComponents}</span>
-                    <p className="text-xs font-medium text-gray-500 mt-1">Total Components</p>
-                  </div>
-
-                  <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs">
-                    <span className="text-2xl font-black text-emerald-600">{bomStats.availableCount}</span>
-                    <p className="text-xs font-medium text-gray-500 mt-1">Components Available</p>
-                  </div>
-
-                  <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs">
-                    <span className="text-2xl font-black text-rose-600">{bomStats.shortageCount}</span>
-                    <p className="text-xs font-medium text-gray-500 mt-1">Components Shortage</p>
-                  </div>
-
-                  <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs">
-                    <span className="text-xl font-black text-gray-900">{bomStats.totalRequiredPcs.toLocaleString()}</span>
-                    <p className="text-xs font-medium text-gray-500 mt-1">Total Units Required</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Estimated Material Cost Table */}
-              {bomStats.totalEstimatedCost > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
-                      Estimated Material Cost
-                    </h3>
-                  </div>
-
-                  <div className="border border-gray-200 rounded-xl overflow-hidden">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="bg-gray-50 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                          <th className="py-2.5 px-3 w-8 text-center">#</th>
-                          <th className="py-2.5 px-3">Component</th>
-                          <th className="py-2.5 px-3">Required Qty</th>
-                          <th className="py-2.5 px-3">UOM</th>
-                          <th className="py-2.5 px-3">Rate (₹)</th>
-                          <th className="py-2.5 px-3 text-right">Amount (₹)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {bomItems.map((item, idx) => (
-                          <tr key={item.id} className="hover:bg-gray-50/50">
-                            <td className="py-3 px-3 text-center font-semibold text-gray-500">{idx + 1}</td>
-                            <td className="py-3 px-3 font-semibold text-gray-900">{item.component}</td>
-                            <td className="py-3 px-3 font-semibold text-gray-800">{item.totalRequired.toLocaleString()}</td>
-                            <td className="py-3 px-3 text-gray-600 font-medium">{item.uom}</td>
-                            <td className="py-3 px-3 font-semibold text-gray-700">{item.rate.toFixed(2)}</td>
-                            <td className="py-3 px-3 font-bold text-gray-900 text-right">{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr className="bg-gray-50/80 border-t border-gray-200 font-bold text-xs">
-                          <td colSpan={5} className="py-3 px-4 text-gray-800 text-left uppercase tracking-wide">
-                            Total Estimated Material Cost
-                          </td>
-                          <td className="py-3 px-4 text-right text-blue-600 text-sm font-black">
-                            ₹ {bomStats.totalEstimatedCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
+            ))}
           </div>
-        )}
-      </div>
 
-      {/* Modal to pick Raw or Semi Materials ONLY */}
-      {showAddComponentModal && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-gray-900/50 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-200 w-full max-w-xl overflow-hidden flex flex-col max-h-[80vh] animate-modalPop">
-            <div className="p-4 border-b border-gray-150 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-gray-900">Add Raw Material or Semi-Finished Component</h3>
-                <p className="text-xs text-gray-500">Only Raw Materials and Semi-Finished goods are shown</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAddComponentModal(false)}
-                className="p-1 text-gray-400 hover:text-gray-600 rounded-lg cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="p-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between gap-2">
-              <div className="relative flex-1">
-                <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          {/* Add new preset form with Mini Factory Location Modal */}
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleAddNewDepartmentPreset();
+            }}
+            className="p-3.5 bg-blue-50/50 rounded-xl border border-blue-100 space-y-2.5"
+          >
+            <span className="text-[11px] font-bold text-blue-900 block uppercase tracking-wide">
+              + Add New Department Preset (Press Enter to Add)
+            </span>
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-2 text-xs items-center">
+              <div className="md:col-span-5">
                 <input
-                  ref={catalogSearchInputRef}
                   type="text"
-                  value={componentSearchQuery}
-                  onChange={e => {
-                    setComponentSearchQuery(e.target.value);
-                    setHighlightedCatalogIdx(0);
-                  }}
-                  onKeyDown={e => {
-                    const filteredCatalog = rawAndSemiMaterialsList.filter(s => {
-                      if (!componentSearchQuery.trim()) return true;
-                      const q = componentSearchQuery.toLowerCase();
-                      return s.name.toLowerCase().includes(q) || s.skuCode.toLowerCase().includes(q) || (s.category && s.category.toLowerCase().includes(q));
-                    }).slice(0, 60);
-
-                    if (e.key === 'ArrowDown') {
-                      e.preventDefault();
-                      setHighlightedCatalogIdx(prev => Math.min(prev + 1, filteredCatalog.length - 1));
-                    } else if (e.key === 'ArrowUp') {
-                      e.preventDefault();
-                      setHighlightedCatalogIdx(prev => Math.max(prev - 1, 0));
-                    } else if (e.key === 'Enter') {
-                      e.preventDefault();
-                      if (filteredCatalog.length > 0 && highlightedCatalogIdx >= 0 && highlightedCatalogIdx < filteredCatalog.length) {
-                        handleSelectCatalogComponent(filteredCatalog[highlightedCatalogIdx]);
-                      }
-                    } else if (e.key === 'Escape') {
-                      e.preventDefault();
-                      setShowAddComponentModal(false);
-                    }
-                  }}
-                  placeholder="Search materials... [↑/↓ to navigate, Enter to add, Esc to close]"
-                  autoFocus
-                  className="w-full pl-9 pr-3 py-1.5 text-xs text-gray-900 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                  placeholder="Department Name (e.g. Ruling Line 2)"
+                  value={newDeptName}
+                  onChange={(e) => setNewDeptName(e.target.value)}
+                  className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all placeholder:text-gray-400 shadow-3xs"
                 />
               </div>
+              <div className="md:col-span-5">
+                <LocationSelectPopup
+                  locations={warehouseLocations}
+                  warehouseId={newDeptWhId}
+                  floorId={newDeptFlId}
+                  zoneId={newDeptZnId}
+                  locationId={newDeptLocId}
+                  displayValue={newDeptLocation}
+                  onChange={(wh, fl, zn, loc) => {
+                    setNewDeptWhId(wh);
+                    setNewDeptFlId(fl);
+                    setNewDeptZnId(zn);
+                    setNewDeptLocId(loc);
+                    const locObj = warehouseLocations.find(l => String(l._id) === String(loc));
+                    const whObj = warehouseLocations.find(l => String(l._id) === String(wh));
+                    const floorObj = warehouseLocations.find(l => String(l._id) === String(fl));
+                    const pathStr = [whObj?.name, floorObj?.name, locObj?.name].filter(Boolean).join(' - ') || locObj?.name || 'Selected Location';
+                    setNewDeptLocation(pathStr);
+                  }}
+                  variant="compact"
+                  hideLabel
+                  className="w-full"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <button
+                  type="submit"
+                  className="w-full px-3 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold rounded-lg text-xs cursor-pointer shadow-3xs transition-all"
+                >
+                  Add
+                </button>
+              </div>
             </div>
+          </form>
 
-            <div className="overflow-y-auto flex-1 p-2 divide-y divide-gray-100 custom-scrollbar">
-              {rawAndSemiMaterialsList
-                .filter(s => {
-                  if (!componentSearchQuery.trim()) return true;
-                  const q = componentSearchQuery.toLowerCase();
-                  return s.name.toLowerCase().includes(q) || s.skuCode.toLowerCase().includes(q) || (s.category && s.category.toLowerCase().includes(q));
-                })
-                .slice(0, 60)
-                .map((compSku, cIdx) => {
-                  const classification = getItemClassification(compSku);
-                  const isHighlighted = highlightedCatalogIdx === cIdx;
-                  return (
-                    <div
-                      key={compSku._id}
-                      onClick={() => handleSelectCatalogComponent(compSku)}
-                      onMouseEnter={() => setHighlightedCatalogIdx(cIdx)}
-                      className={`p-2.5 rounded-lg flex items-center justify-between cursor-pointer transition-colors ${
-                        isHighlighted 
-                          ? 'bg-blue-100/90 text-blue-900 font-bold border-l-4 border-blue-600'
-                          : 'hover:bg-blue-50/60'
-                      }`}
-                    >
-                      <div>
-                        <div className="text-xs font-bold text-gray-900">{compSku.name}</div>
-                        <div className="text-[11px] text-gray-400 font-mono mt-0.5">
-                          {compSku.skuCode} • Stock: {compSku.presentStock ?? compSku.openingStock ?? 0} {compSku.unit}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center space-x-2">
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                          classification === 'semi'
-                            ? 'bg-sky-50 text-sky-700 border border-sky-200'
-                            : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                        }`}>
-                          {classification === 'semi' ? 'Semi Finished' : 'Raw Material'}
-                        </span>
-                        <button className="px-2.5 py-1 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md">
-                          + Add
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
+          {/* Modal Footer */}
+          <div className="flex justify-between items-center pt-2 border-t border-gray-100 text-xs">
+            <button
+              type="button"
+              onClick={() => {
+                setDepartmentPresets(DEFAULT_DEPARTMENT_PRESETS);
+                try {
+                  localStorage.setItem('skbw_department_presets_v2', JSON.stringify(DEFAULT_DEPARTMENT_PRESETS));
+                } catch (e) {}
+                showToast('Reset to default department presets', 'info');
+              }}
+              className="text-[11px] font-bold text-gray-500 hover:text-gray-700 cursor-pointer"
+            >
+              Reset to Defaults
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowManageDeptModal(false)}
+              className="px-4 py-1.5 bg-gray-900 text-white font-bold rounded-xl text-xs cursor-pointer hover:bg-gray-800 transition-colors"
+            >
+              Done
+            </button>
           </div>
         </div>
-      )}
-
-      {/* Bulk Edit BOM Modal (opens exact Build BOMs modal from Item Master) */}
-      {showBulkEditBomModal && companyId && (
-        <BulkEditBomModal
-          isOpen={showBulkEditBomModal}
-          onClose={() => setShowBulkEditBomModal(false)}
-          companyId={companyId}
-          initialSelectedSkuId={selectedSkuId}
-          onSaved={(updatedSku) => {
-            setBackendSkus(prev => prev.map(s => s._id === updatedSku._id ? updatedSku : s));
-            if (selectedSkuId === updatedSku._id) {
-              const pcs = totalPlannedPcs > 0 ? totalPlannedPcs : 1;
-              loadBomFromItemMaster(updatedSku, pcs);
-            }
-          }}
-        />
-      )}
-
-
-
-      {/* Tally Keyboard Shortcut Status Bar */}
-      <div className="bg-slate-900 text-slate-300 px-6 py-2 border-t border-slate-800 text-xs flex flex-wrap items-center justify-between gap-3 shadow-inner select-none shrink-0">
-        <div className="flex items-center space-x-3 text-[11px] overflow-x-auto py-0.5">
-          <span className="flex items-center space-x-1.5">
-            <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] font-mono text-amber-400 font-bold">↵ Enter</kbd>
-            <span className="text-slate-300">Next Field</span>
-          </span>
-          <span className="text-slate-700">•</span>
-          <span className="flex items-center space-x-1.5">
-            <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] font-mono text-amber-400 font-bold">↑ / ↓</kbd>
-            <span className="text-slate-300">Navigate Lists</span>
-          </span>
-          <span className="text-slate-700">•</span>
-          <span className="flex items-center space-x-1.5">
-            <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] font-mono text-emerald-400 font-bold">Ctrl+A / Ctrl+↵</kbd>
-            <span className="text-emerald-400 font-semibold">{currentStep === 1 ? 'Save & Continue' : 'Create Order'}</span>
-          </span>
-          <span className="text-slate-700">•</span>
-          <span className="flex items-center space-x-1.5">
-            <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] font-mono text-amber-400 font-bold">Alt+C</kbd>
-            <span className="text-slate-300">Add Component</span>
-          </span>
-          <span className="text-slate-700">•</span>
-          <span className="flex items-center space-x-1.5">
-            <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] font-mono text-amber-400 font-bold">Alt+B</kbd>
-            <span className="text-slate-300">Item Master BOM</span>
-          </span>
-          <span className="text-slate-700">•</span>
-          <span className="flex items-center space-x-1.5">
-            <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] font-mono text-amber-400 font-bold">Alt+P</kbd>
-            <span className="text-slate-300">Presets</span>
-          </span>
-        </div>
-        <div className="flex items-center space-x-1.5 text-[11px]">
-          <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] font-mono text-amber-400 font-bold">Esc</kbd>
-          <span className="text-slate-300">{currentStep === 3 ? 'Back to Edit' : 'Cancel'}</span>
-        </div>
-      </div>
+      </Modal>
     </div>
   );
 };

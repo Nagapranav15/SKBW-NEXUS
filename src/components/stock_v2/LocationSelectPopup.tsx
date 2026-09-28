@@ -30,6 +30,7 @@ interface LocationSelectPopupProps {
   variant?: 'card' | 'compact';
   hideLabel?: boolean;
   className?: string;
+  displayValue?: string;
 }
 
 const FALLBACK_LOCATIONS: WarehouseLocationV2[] = [
@@ -62,7 +63,8 @@ export const LocationSelectPopup: React.FC<LocationSelectPopupProps> = ({
   locationStockMap = {},
   variant = 'card',
   hideLabel = false,
-  className = ''
+  className = '',
+  displayValue
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -372,7 +374,9 @@ export const LocationSelectPopup: React.FC<LocationSelectPopupProps> = ({
             <div className="flex items-center gap-2 min-w-0 flex-1 truncate">
               <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
               <span className="truncate font-semibold text-gray-800 text-xs">
-                {locationId && currentTarget ? (
+                {displayValue ? (
+                  <span className="font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 truncate">{displayValue}</span>
+                ) : locationId && currentTarget ? (
                   <span className="inline-flex items-center gap-1 truncate">
                     {currentParts.length > 1 ? (
                       <>

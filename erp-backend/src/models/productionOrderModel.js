@@ -45,6 +45,13 @@ const productionOrderSchema = new mongoose.Schema({
   reference: { type: String, default: "Not Selected" },
   referenceSalesOrderId: { type: mongoose.Schema.Types.Mixed, required: false },
   remarks: { type: String, default: "" },
+  referenceNo: { type: String, default: "" },
+  orderDate: { type: String, default: "" },
+  outputLocation: { type: String, default: "" },
+  outputLocationId: { type: mongoose.Schema.Types.ObjectId, ref: "WarehouseLocationV2", required: false },
+  byProducts: { type: [mongoose.Schema.Types.Mixed], default: [] },
+  additionalCosts: { type: [mongoose.Schema.Types.Mixed], default: [] },
+  costSummary: { type: mongoose.Schema.Types.Mixed, default: {} },
   bomType: { 
     type: String, 
     enum: ["Default BOM", "Custom BOM (Production Order Only)"], 

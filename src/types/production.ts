@@ -85,6 +85,35 @@ export interface ProductionOrder {
   priority: PriorityLevel;
   reference?: string; // e.g. 'Sales Order #SO-1029' or 'Not Selected'
   referenceSalesOrderId?: string;
+  referenceNo?: string;
+  orderDate?: string;
+  outputLocation?: string;
+  outputLocationId?: string;
+  byProducts?: Array<{
+    id?: string;
+    item: string;
+    uom: string;
+    qty: number;
+    rate: number;
+    amount: number;
+  }>;
+  additionalCosts?: Array<{
+    id?: string;
+    costType: string;
+    basis: string;
+    amount: number;
+    appliedAs: string;
+    totalAmount?: number;
+  }>;
+  costSummary?: {
+    materialCost?: number;
+    scrapCost?: number;
+    additionalCost?: number;
+    totalProductionCost?: number;
+    outputQuantity?: string;
+    costPerGbl?: number;
+    costPerPiece?: number;
+  };
   remarks?: string;
   bomType: 'Default BOM' | 'Custom BOM (Production Order Only)';
   bomItems: ProductionBomItem[];
