@@ -146,7 +146,7 @@ export interface PredefinedCharge {
   calculationType: 'per_gbl' | 'fixed';
 }
 
-export const DEFAULT_PREDEFINED_CHARGES: PredefinedCharge[] = [
+const DEFAULT_PREDEFINED_CHARGES: PredefinedCharge[] = [
   { id: 'ch-hamali', name: 'Hamali / Loading Charges', defaultRate: 5, calculationType: 'per_gbl' },
   { id: 'ch-unloading', name: 'Unloading Charges', defaultRate: 5, calculationType: 'per_gbl' },
   { id: 'ch-freight', name: 'Freight / Transport Charges', defaultRate: 15, calculationType: 'per_gbl' },

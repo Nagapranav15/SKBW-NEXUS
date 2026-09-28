@@ -24,7 +24,7 @@ export interface AuthContextType {
   setSelectedCompany: (company: any) => void;
 }
 
-export const AuthContext = createContext<AuthContextType>({
+const AuthContext = createContext<AuthContextType>({
   user: null,
   token: null,
   isAuthenticated: false,
