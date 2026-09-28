@@ -8,6 +8,7 @@ const permissions = ["MANAGE_INVENTORY", "VIEW_INVENTORY", "MANAGE_ITEMS", "VIEW
 
 router.get("/", auth, rbac(permissions), productionOrderController.getProductionOrders);
 router.get("/next-number", auth, rbac(permissions), productionOrderController.getNextOrderNumber);
+router.post("/material-rates", auth, rbac(permissions), productionOrderController.getMaterialRates);
 router.get("/:id", auth, rbac(permissions), productionOrderController.getProductionOrderById);
 router.post("/", auth, rbac(permissions), productionOrderController.createProductionOrder);
 router.put("/:id", auth, rbac(permissions), productionOrderController.updateProductionOrder);

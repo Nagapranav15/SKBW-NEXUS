@@ -1,6 +1,173 @@
 const ProductionOrder = require("../models/productionOrderModel");
 const SkuV2 = require("../models/skuV2Model");
+const InventoryLedger = require("../models/inventoryLedgerModelV2");
+const WarehouseLocationV2 = require("../models/warehouseLocationV2Model");
+const PurchaseInvoiceV2 = require("../models/purchaseInvoiceV2Model");
+const Sequence = require("../models/sequenceModel");
 const mongoose = require("mongoose");
+
+// Helper to resolve warehouse location hierarchy (Factory -> Floor -> Zone -> Location)
+const getHierarchy = async (locationId, companyId) => {
+  if (!locationId && !companyId) return {};
+  const companyObjId = mongoose.Types.ObjectId.isValid(companyId) ? new mongoose.Types.ObjectId(companyId) : null;
+
+  let loc = null;
+  if (locationId && mongoose.Types.ObjectId.isValid(locationId)) {
+    loc = await WarehouseLocationV2.findById(locationId).lean();
+  }
+  if (!loc && locationId && companyObjId) {
+    loc = await WarehouseLocationV2.findOne({
+      company: companyObjId,
+      name: { $regex: new RegExp(`^${String(locationId).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") }
+    }).lean();
+  }
+  if (!loc && companyObjId) {
+    loc = await WarehouseLocationV2.findOne({ company: companyObjId, level: "Storage Location" }).lean()
+      || await WarehouseLocationV2.findOne({ company: companyObjId }).lean();
+  }
+  if (!loc) return {};
+
+  const chain = [loc];
+  let curr = loc;
+  while (curr && curr.parentId) {
+    let parent = await WarehouseLocationV2.findById(curr.parentId).lean();
+    if (!parent) break;
+    chain.unshift(parent);
+    curr = parent;
+  }
+
+  const factoryNode = chain.find(n => n.level === "Factory");
+  const floorNode = chain.find(n => n.level === "Floor");
+  const zoneNode = chain.find(n => n.level === "Zone");
+  const storageNode = chain.find(n => n.level === "Storage Location");
+
+  const warehouseId = factoryNode ? factoryNode._id : (chain[0]?._id || loc._id);
+  const floorId = floorNode ? floorNode._id : (chain[1]?._id || warehouseId);
+  const zoneId = zoneNode ? zoneNode._id : (chain[2]?._id || floorId);
+  const resolvedLocId = storageNode ? storageNode._id : loc._id;
+
+  return { warehouseId, floorId, zoneId, locationId: resolvedLocId };
+};
+
+// Directly reflect prepared production order in Item Stock & Inventory (InventoryLedger)
+const postProductionOrderLedger = async (order) => {
+  try {
+    if (!order || !order.company) return;
+    const companyObjId = order.company;
+
+    // Check if ledger entries already exist for this order to avoid duplicate postings
+    const existingCount = await InventoryLedger.countDocuments({
+      referenceType: "ProductionOrder",
+      referenceId: order.orderNumber,
+      company: companyObjId
+    });
+    if (existingCount > 0) return;
+
+    const ledgerDocs = [];
+
+    // 1. Finished Product Receipt (IN)
+    if (order.itemId || order.itemCode || order.itemName) {
+      let sku = null;
+      if (order.itemId && mongoose.Types.ObjectId.isValid(order.itemId)) {
+        sku = await SkuV2.findById(order.itemId).lean();
+      }
+      if (!sku) {
+        sku = await SkuV2.findOne({
+          company: companyObjId,
+          $or: [
+            { skuCode: order.itemCode },
+            { name: order.itemName }
+          ]
+        }).lean();
+      }
+
+      if (sku) {
+        const outputLocId = order.outputLocationId || order.locationId || order.outputLocation || order.factory || order.factoryId || sku.initialLocationId || sku.defaultLocation;
+        const h = await getHierarchy(outputLocId, companyObjId);
+        const transactionNumber = await Sequence.getNextSequence("IL");
+        const qtyIn = Number(order.producedQty) > 0 ? Number(order.producedQty) : Number(order.plannedQty);
+
+        if (qtyIn > 0 && h.locationId) {
+          ledgerDocs.push({
+            transactionNumber,
+            transactionType: "Production Receipt",
+            skuId: sku._id,
+            quantity: qtyIn,
+            unit: order.plannedUom || sku.unit || "Pcs",
+            direction: "IN",
+            referenceType: "ProductionOrder",
+            referenceId: order.orderNumber,
+            batchNumber: order.finishedGoodsBatch?.batchNo || order.orderNumber,
+            warehouseId: h.warehouseId,
+            floorId: h.floorId,
+            zoneId: h.zoneId,
+            locationId: h.locationId,
+            remarks: `Prepared under Production Order ${order.orderNumber} (${order.itemName})`,
+            createdBy: order.createdBy,
+            company: companyObjId,
+            status: "Posted"
+          });
+        }
+      }
+    }
+
+    // 2. BOM Materials Consumption (OUT)
+    if (order.bomItems && Array.isArray(order.bomItems) && order.bomItems.length > 0) {
+      for (const m of order.bomItems) {
+        const reqQty = Number(m.totalRequired) || Number(m.qtyPerBatch) || 0;
+        if (reqQty <= 0) continue;
+
+        let matSku = null;
+        if (m.skuId && mongoose.Types.ObjectId.isValid(m.skuId)) {
+          matSku = await SkuV2.findById(m.skuId).lean();
+        }
+        if (!matSku) {
+          matSku = await SkuV2.findOne({
+            company: companyObjId,
+            $or: [
+              { skuCode: m.code },
+              { name: m.component }
+            ]
+          }).lean();
+        }
+
+        if (matSku) {
+          const matLocId = m.locationId || m.sourceLocation || matSku.initialLocationId || matSku.defaultLocation || order.outputLocationId || order.locationId;
+          const h = await getHierarchy(matLocId, companyObjId);
+          const transactionNumber = await Sequence.getNextSequence("IL");
+
+          if (h.locationId) {
+            ledgerDocs.push({
+              transactionNumber,
+              transactionType: "Production Consumption",
+              skuId: matSku._id,
+              quantity: reqQty,
+              unit: m.uom || matSku.unit || "Pcs",
+              direction: "OUT",
+              referenceType: "ProductionOrder",
+              referenceId: order.orderNumber,
+              batchNumber: m.batchNumber || order.orderNumber,
+              warehouseId: h.warehouseId,
+              floorId: h.floorId,
+              zoneId: h.zoneId,
+              locationId: h.locationId,
+              remarks: `Consumed for Production Order ${order.orderNumber} (${order.itemName})`,
+              createdBy: order.createdBy,
+              company: companyObjId,
+              status: "Posted"
+            });
+          }
+        }
+      }
+    }
+
+    if (ledgerDocs.length > 0) {
+      await InventoryLedger.insertMany(ledgerDocs, { ordered: false });
+    }
+  } catch (err) {
+    console.error("Error posting production order stock updates to InventoryLedger:", err);
+  }
+};
 
 // Helper to generate next Order Number: PO-001, PO-002... up to 100,000+
 const generateNextOrderNumber = async (companyId) => {
@@ -175,7 +342,24 @@ exports.createProductionOrder = async (req, res) => {
       createdBy: req.user?._id || req.user?.id
     });
 
+    if (!newOrder.stockUpdates || newOrder.stockUpdates.length === 0) {
+      newOrder.stockUpdates = [
+        {
+          item: newOrder.itemName,
+          quantityIn: newOrder.plannedQty,
+          uom: newOrder.plannedUom,
+          location: newOrder.outputLocation || `${newOrder.factory || 'Main Factory'}`
+        }
+      ];
+    }
+
     await newOrder.save();
+
+    // Directly reflect prepared production order in Item Stock & Inventory if not draft
+    if (newOrder.status !== "Draft") {
+      await postProductionOrderLedger(newOrder);
+    }
+
     res.status(201).json(newOrder);
   } catch (err) {
     console.error("Error creating production order:", err);
@@ -195,6 +379,11 @@ exports.updateProductionOrder = async (req, res) => {
 
     if (!updated) {
       return res.status(404).json({ msg: "Production order not found" });
+    }
+
+    // Reflect in Item Stock & Inventory if status is not Draft
+    if (updated.status !== "Draft") {
+      await postProductionOrderLedger(updated);
     }
 
     res.json(updated);
@@ -281,6 +470,11 @@ exports.recordProductionEntry = async (req, res) => {
     }
 
     await order.save();
+
+    if (progress >= 100 || newStatus === "Completed") {
+      await postProductionOrderLedger(order);
+    }
+
     res.json(order);
   } catch (err) {
     console.error("Error recording production entry:", err);
@@ -328,12 +522,16 @@ exports.completeProductionOrder = async (req, res) => {
           item: order.itemName,
           quantityIn: order.plannedQty,
           uom: order.plannedUom,
-          location: `${order.factory} Finished Goods - A1`
+          location: order.outputLocation || `${order.factory} Finished Goods - A1`
         }
       ];
     }
 
     await order.save();
+
+    // Directly reflect completed production order in Item Stock & Inventory
+    await postProductionOrderLedger(order);
+
     res.json(order);
   } catch (err) {
     console.error("Error completing production order:", err);
@@ -349,9 +547,164 @@ exports.deleteProductionOrder = async (req, res) => {
     if (!deleted) {
       return res.status(404).json({ msg: "Production order not found" });
     }
+
+    // Clean up corresponding inventory ledger entries
+    await InventoryLedger.deleteMany({
+      referenceType: "ProductionOrder",
+      referenceId: deleted.orderNumber
+    });
+
     res.json({ msg: "Production order deleted successfully", id });
   } catch (err) {
     console.error("Error deleting production order:", err);
     res.status(500).json({ msg: "Failed to delete production order", error: err.message });
+  }
+};
+
+// POST /api/production-orders/material-rates
+// Calculates 3 costing modes: 1. Avg of purchase batch orders, 2. FIFO (earliest active batch), 3. Custom/Standard
+exports.getMaterialRates = async (req, res) => {
+  try {
+    const { companyId, skuIds } = req.body;
+    if (!companyId || !Array.isArray(skuIds) || skuIds.length === 0) {
+      return res.json({ rates: {} });
+    }
+
+    const companyObjId = new mongoose.Types.ObjectId(companyId);
+    const validSkuIds = skuIds
+      .filter(id => mongoose.Types.ObjectId.isValid(id))
+      .map(id => new mongoose.Types.ObjectId(id));
+
+    const skus = await SkuV2.find({
+      _id: { $in: validSkuIds },
+      company: companyObjId
+    }).lean();
+
+    const rates = {};
+
+    for (const sku of skus) {
+      const skuIdStr = String(sku._id);
+
+      // 1. Fetch active batches with onHand stock (sorted chronologically by firstInDate)
+      const batchBalances = await InventoryLedger.aggregate([
+        { $match: { skuId: sku._id, company: companyObjId, status: { $ne: "Cancelled" } } },
+        {
+          $group: {
+            _id: { batchNumber: "$batchNumber", locationId: "$locationId" },
+            qtyIn: { $sum: { $cond: [{ $eq: ["$direction", "IN"] }, "$quantity", 0] } },
+            qtyOut: { $sum: { $cond: [{ $eq: ["$direction", "OUT"] }, "$quantity", 0] } },
+            firstInDate: { $min: { $cond: [{ $eq: ["$direction", "IN"] }, "$createdAt", null] } }
+          }
+        },
+        {
+          $project: {
+            batchNumber: "$_id.batchNumber",
+            locationId: "$_id.locationId",
+            onHand: { $subtract: ["$qtyIn", "$qtyOut"] },
+            firstInDate: 1
+          }
+        },
+        { $match: { onHand: { $gt: 0.0001 } } },
+        { $sort: { firstInDate: 1 } }
+      ]);
+
+      // 2. Fetch purchase invoices for this SKU
+      const invoices = await PurchaseInvoiceV2.find({
+        company: companyObjId,
+        "items.skuId": sku._id,
+        status: { $ne: "Cancelled" }
+      }).select("invoiceNumber invoiceDate partyName items createdAt").sort({ invoiceDate: 1, createdAt: 1 }).lean();
+
+      const batchPriceMap = new Map();
+      const allPurchasedItems = [];
+
+      invoices.forEach(inv => {
+        (inv.items || []).forEach(it => {
+          if (String(it.skuId) === skuIdStr) {
+            const price = Number(it.purchasePrice) || Number(it.ratePerKg) || 0;
+            const qty = Number(it.quantity) || 0;
+            if (it.lotNumber) batchPriceMap.set(it.lotNumber, price);
+            if (it.batchNumber) batchPriceMap.set(it.batchNumber, price);
+            if (inv.invoiceNumber) batchPriceMap.set(inv.invoiceNumber, price);
+            allPurchasedItems.push({
+              price,
+              quantity: qty,
+              date: inv.invoiceDate || inv.createdAt,
+              invoiceNumber: inv.invoiceNumber,
+              vendor: inv.partyName
+            });
+          }
+        });
+      });
+
+      const standardRate = Number(sku.purchasePrice || (sku).costPrice || (sku).rate || 0);
+
+      // FIFO: Pick the unit price of the earliest active batch
+      let fifoRate = 0;
+      let fifoBatchInfo = null;
+
+      if (batchBalances.length > 0) {
+        const earliestBatch = batchBalances[0];
+        const bNum = earliestBatch.batchNumber;
+        const bRate = (bNum && batchPriceMap.has(bNum)) ? batchPriceMap.get(bNum) : 0;
+        fifoRate = bRate > 0 ? bRate : (allPurchasedItems[0]?.price || standardRate);
+        fifoBatchInfo = {
+          batchNumber: bNum || 'LOT-01',
+          date: earliestBatch.firstInDate ? new Date(earliestBatch.firstInDate).toLocaleDateString('en-GB') : undefined,
+          remainingQty: Math.round(earliestBatch.onHand * 100) / 100,
+          rate: fifoRate
+        };
+      } else if (allPurchasedItems.length > 0) {
+        fifoRate = allPurchasedItems[0].price;
+        fifoBatchInfo = {
+          batchNumber: allPurchasedItems[0].invoiceNumber || 'PO-INV',
+          date: allPurchasedItems[0].date ? new Date(allPurchasedItems[0].date).toLocaleDateString('en-GB') : undefined,
+          remainingQty: allPurchasedItems[0].quantity,
+          rate: fifoRate
+        };
+      } else {
+        fifoRate = standardRate;
+      }
+
+      // Average of Purchase Batch Orders (Weighted Average)
+      let avgRate = 0;
+      let totalBatchQty = 0;
+      let totalBatchValue = 0;
+
+      if (batchBalances.length > 0) {
+        batchBalances.forEach(b => {
+          const bRate = (b.batchNumber && batchPriceMap.has(b.batchNumber)) 
+            ? batchPriceMap.get(b.batchNumber) 
+            : (allPurchasedItems.find(it => it.invoiceNumber === b.batchNumber)?.price || standardRate);
+          if (bRate > 0) {
+            totalBatchQty += b.onHand;
+            totalBatchValue += (b.onHand * bRate);
+          }
+        });
+        avgRate = totalBatchQty > 0 ? Math.round((totalBatchValue / totalBatchQty) * 100) / 100 : standardRate;
+      } else if (allPurchasedItems.length > 0) {
+        const sumQty = allPurchasedItems.reduce((s, it) => s + it.quantity, 0);
+        const sumVal = allPurchasedItems.reduce((s, it) => s + (it.quantity * it.price), 0);
+        avgRate = sumQty > 0 ? Math.round((sumVal / sumQty) * 100) / 100 : standardRate;
+      } else {
+        avgRate = standardRate;
+      }
+
+      rates[skuIdStr] = {
+        skuId: skuIdStr,
+        skuCode: sku.skuCode,
+        skuName: sku.name,
+        standardRate,
+        avgRate: avgRate > 0 ? avgRate : standardRate,
+        fifoRate: fifoRate > 0 ? fifoRate : standardRate,
+        fifoBatchInfo,
+        batchCount: batchBalances.length || allPurchasedItems.length
+      };
+    }
+
+    res.json({ rates });
+  } catch (err) {
+    console.error("Error computing material rates:", err);
+    res.status(500).json({ msg: "Failed to compute material rates", error: err.message });
   }
 };

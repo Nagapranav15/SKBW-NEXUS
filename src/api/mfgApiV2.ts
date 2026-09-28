@@ -418,3 +418,30 @@ export const recordStockAdjustmentV2 = async (payload: StockAdjustmentPayload): 
   return response.data;
 };
 
+export interface MaterialRateInfo {
+  skuId: string;
+  skuCode?: string;
+  skuName?: string;
+  standardRate: number;
+  avgRate: number;
+  fifoRate: number;
+  fifoBatchInfo?: {
+    batchNumber: string;
+    date?: string;
+    remainingQty: number;
+    rate: number;
+  };
+  batchCount: number;
+}
+
+export const getProductionMaterialRates = async (
+  companyId: string,
+  skuIds: string[]
+): Promise<{ rates: Record<string, MaterialRateInfo> }> => {
+  const response = await api.post('/production-orders/material-rates', {
+    companyId,
+    skuIds
+  });
+  return response.data;
+};
+

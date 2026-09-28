@@ -3,11 +3,12 @@ import {
   Calendar, ChevronDown, Plus, Trash2, RotateCcw, 
   Layers, Package, Receipt, Calculator, FileText, 
   Check, X, Search, Loader2, Settings, Building2, 
-  MapPin, Copy, Sparkles, Zap, Eye, Save, Box
+  MapPin, Copy, Sparkles, Zap, Eye, Save, Box,
+  BarChart3, Clock, Pencil
 } from 'lucide-react';
 import { ProductionOrder } from '../../types/production';
 import { getNextProductionOrderNumber, createProductionOrder } from '../../api/productionApi';
-import { getSkusV2, getWarehouseHierarchyV2, SkuV2, WarehouseLocationV2 } from '../../api/mfgApiV2';
+import { getSkusV2, getWarehouseHierarchyV2, SkuV2, WarehouseLocationV2, getProductionMaterialRates, MaterialRateInfo } from '../../api/mfgApiV2';
 import { LocationSelectPopup } from '../stock_v2/LocationSelectPopup';
 import Modal from '../ui/Modal';
 import { showToast } from '../ui/Toast';
@@ -37,8 +38,11 @@ export interface PredefinedCost {
   appliedAs: 'Total Cost for this production' | 'Per Unit (GBL)' | 'Per Unit (PCS)';
 }
 
+export type BomRateMode = 'avg_purchase' | 'fifo' | 'custom';
+
 interface MaterialRow {
   id: string;
+  skuId?: string;
   component: string;
   code: string;
   uom: string;
@@ -48,7 +52,17 @@ interface MaterialRow {
   warehouseId?: string;
   floorId?: string;
   zoneId?: string;
+  rateMode: BomRateMode;
   rate: number;
+  computedAvgRate?: number;
+  computedFifoRate?: number;
+  fifoBatchInfo?: {
+    batchNumber: string;
+    date?: string;
+    remainingQty: number;
+    rate: number;
+  };
+  batchCount?: number;
   amount: number;
   basePerPiece?: number;
 }
@@ -145,6 +159,22 @@ const DEFAULT_PREDEFINED_COSTS: PredefinedCost[] = [
   { id: 'cost-handling', name: 'Internal Handling & Shifting', basis: 'Total / Batch', defaultRate: 200, appliedAs: 'Total Cost for this production' }
 ];
 
+export interface ScrapPreset {
+  id: string;
+  item: string;
+  uom: string;
+  defaultRate: number;
+}
+
+const DEFAULT_SCRAP_PRESETS: ScrapPreset[] = [
+  { id: 'scrap-trimmings', item: 'Paper Trimmings & Offcuts', uom: 'KG', defaultRate: 22 },
+  { id: 'scrap-printed', item: 'Printed Waste Paper / Misprints', uom: 'KG', defaultRate: 18 },
+  { id: 'scrap-board', item: 'Duplex & Grey Board Scrap', uom: 'KG', defaultRate: 14 },
+  { id: 'scrap-cores', item: 'Reel Cores & End Caps', uom: 'PCS', defaultRate: 15 },
+  { id: 'scrap-kraft', item: 'Kraft Paper Waste', uom: 'KG', defaultRate: 16 },
+  { id: 'scrap-wire', item: 'Binding Wire & Metal Shavings', uom: 'KG', defaultRate: 35 }
+];
+
 export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> = ({
   onCancel,
   onCreated,
@@ -202,6 +232,27 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   const costPresetMenuRef = useRef<HTMLDivElement>(null);
   const costPresetListRef = useRef<HTMLDivElement>(null);
 
+  // Predefined By-Product / Scrap Presets (persisted in localStorage)
+  const [scrapPresets, setScrapPresets] = useState<ScrapPreset[]>(() => {
+    try {
+      const stored = localStorage.getItem('skbw_scrap_presets_v2');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return DEFAULT_SCRAP_PRESETS;
+  });
+  const [showQuickScrapPresetMenu, setShowQuickScrapPresetMenu] = useState<boolean>(false);
+  const [highlightedScrapPresetIdx, setHighlightedScrapPresetIdx] = useState<number>(0);
+  const [quickScrapOpenUpwards, setQuickScrapOpenUpwards] = useState<boolean>(false);
+  const [showManageScrapModal, setShowManageScrapModal] = useState<boolean>(false);
+  const [newScrapItem, setNewScrapItem] = useState<string>('');
+  const [newScrapUom, setNewScrapUom] = useState<string>('KG');
+  const [newScrapRate, setNewScrapRate] = useState<string>('');
+  const scrapPresetMenuRef = useRef<HTMLDivElement>(null);
+  const scrapPresetListRef = useRef<HTMLDivElement>(null);
+
   // Output Location Coordinates
   const [selectedWhId, setSelectedWhId] = useState<string>('fact-skbw');
   const [selectedFlId, setSelectedFlId] = useState<string>('floor-ground');
@@ -242,6 +293,11 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   const [materials, setMaterials] = useState<MaterialRow[]>([]);
   const [activeMaterialDropdownId, setActiveMaterialDropdownId] = useState<string | null>(null);
   const [componentSearchMap, setComponentSearchMap] = useState<Record<string, string>>({});
+
+  // 3-Mode Material Costing: 1. Avg of purchases, 2. FIFO (earliest active batch), 3. Custom Value
+  const [globalRateMode, setGlobalRateMode] = useState<BomRateMode>('avg_purchase');
+  const [materialRatesCache, setMaterialRatesCache] = useState<Record<string, MaterialRateInfo>>({});
+  const [loadingMaterialRates, setLoadingMaterialRates] = useState<boolean>(false);
 
   // Scrap / By-Products Table
   const [scrapItems, setScrapItems] = useState<ScrapRow[]>([]);
@@ -295,6 +351,9 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       if (costPresetMenuRef.current && !costPresetMenuRef.current.contains(target)) {
         setShowQuickCostPresetMenu(false);
       }
+      if (scrapPresetMenuRef.current && !scrapPresetMenuRef.current.contains(target)) {
+        setShowQuickScrapPresetMenu(false);
+      }
       if (activeMaterialDropdownId && !target.closest('.material-dropdown-container')) {
         setActiveMaterialDropdownId(null);
       }
@@ -313,6 +372,14 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         }
         if (showManageCostModal) {
           setShowManageCostModal(false);
+          return;
+        }
+        if (showManageScrapModal) {
+          setShowManageScrapModal(false);
+          return;
+        }
+        if (showQuickScrapPresetMenu) {
+          setShowQuickScrapPresetMenu(false);
           return;
         }
         if (showDepartmentDropdown) {
@@ -413,6 +480,13 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     }
   }, [highlightedCostPresetIdx, showQuickCostPresetMenu]);
 
+  useEffect(() => {
+    if (showQuickScrapPresetMenu && scrapPresetListRef.current) {
+      const el = scrapPresetListRef.current.children[highlightedScrapPresetIdx] as HTMLElement;
+      el?.scrollIntoView?.({ block: 'nearest' });
+    }
+  }, [highlightedScrapPresetIdx, showQuickScrapPresetMenu]);
+
   // Item Classification: Raw Materials vs Semi-Finished Goods vs Finished Goods
   const getItemClassification = (sku: SkuV2): 'products' | 'materials' | 'semi' => {
     const cat = (sku.category || '').toLowerCase().trim();
@@ -431,7 +505,12 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       cat.includes('sub-assembly') || 
       cat.includes('sub') || 
       cat.includes('ruled cut') || 
+      cat.includes('sheet') || 
       cat.includes('sheets') || 
+      cat.includes('ruling') || 
+      cat.includes('rulling') || 
+      cat.includes('title') || 
+      cat.includes('index') || 
       name.includes('signature') || 
       name.includes('ruled') || 
       name.includes('book block')
@@ -462,9 +541,12 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     return 'products';
   };
 
-  // Only Finished Goods can be manufactured as final products
-  const finishedGoodsSkus = useMemo(() => {
-    return backendSkus.filter(s => getItemClassification(s) === 'products');
+  // Finished Goods and Semi-Finished Goods that can be manufactured
+  const manufacturableSkus = useMemo(() => {
+    return backendSkus.filter(s => {
+      const type = getItemClassification(s);
+      return type === 'products' || type === 'semi';
+    });
   }, [backendSkus]);
 
   // Raw Materials and Semi Goods for BOM/components consumption
@@ -752,22 +834,143 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         const perPieceBasis = rawQty / yieldQty;
         const requiredQty = plannedPcs > 0 ? Math.round(perPieceBasis * targetPcs * 100) / 100 : rawQty;
         const rate = Number(raw.rate) || 0;
+
+        // Resolve matching SKU to get skuId
+        const matchedSku = backendSkus.find(s => 
+          (raw.skuId && s._id === raw.skuId) ||
+          (raw.skuCode && s.skuCode?.toLowerCase().trim() === raw.skuCode.toLowerCase().trim()) ||
+          (raw.code && s.skuCode?.toLowerCase().trim() === raw.code.toLowerCase().trim()) ||
+          (raw.name && s.name?.toLowerCase().trim() === raw.name.toLowerCase().trim())
+        );
+
         return {
           id: `mat-${idx + 1}-${Date.now()}`,
+          skuId: matchedSku?._id || raw.skuId,
           component: raw.name || raw.itemName || `Component ${idx + 1}`,
           code: raw.skuCode || raw.code || `RM-${String(idx + 1).padStart(3, '0')}`,
           uom: raw.uom || raw.unit || 'PCS',
           requiredQty,
           sourceLocation: 'SKBW - Ground Floor',
+          rateMode: globalRateMode,
           rate,
           amount: Math.round(requiredQty * rate * 100) / 100,
           basePerPiece: perPieceBasis
         };
       });
       setMaterials(loadedMaterials);
+      fetchAndApplyMaterialRates(loadedMaterials, globalRateMode);
     } else {
       setMaterials([]);
     }
+  };
+
+  // Helper to fetch live rate options (Avg purchases vs FIFO) and apply to materials
+  const fetchAndApplyMaterialRates = async (mats: MaterialRow[], modeToApply?: BomRateMode) => {
+    if (!companyId || mats.length === 0) return;
+
+    const skuIdsToFetch: string[] = [];
+    mats.forEach(m => {
+      const sId = m.skuId || backendSkus.find(s => 
+        (m.code && s.skuCode?.toLowerCase().trim() === m.code.toLowerCase().trim()) ||
+        (m.component && s.name?.toLowerCase().trim() === m.component.toLowerCase().trim())
+      )?._id;
+      if (sId && !skuIdsToFetch.includes(sId)) {
+        skuIdsToFetch.push(sId);
+      }
+    });
+
+    if (skuIdsToFetch.length === 0) return;
+
+    try {
+      setLoadingMaterialRates(true);
+      const res = await getProductionMaterialRates(companyId, skuIdsToFetch);
+      const ratesMap = res.rates || {};
+
+      setMaterialRatesCache(prev => ({ ...prev, ...ratesMap }));
+
+      setMaterials(prev => prev.map(m => {
+        const sId = m.skuId || backendSkus.find(s => 
+          (m.code && s.skuCode?.toLowerCase().trim() === m.code.toLowerCase().trim()) ||
+          (m.component && s.name?.toLowerCase().trim() === m.component.toLowerCase().trim())
+        )?._id;
+
+        const rateInfo = sId ? ratesMap[sId] : null;
+        if (!rateInfo) return m;
+
+        const mode = modeToApply || m.rateMode || globalRateMode;
+        let finalRate = m.rate;
+        if (mode === 'avg_purchase') {
+          finalRate = rateInfo.avgRate > 0 ? rateInfo.avgRate : (m.rate > 0 ? m.rate : rateInfo.standardRate);
+        } else if (mode === 'fifo') {
+          finalRate = rateInfo.fifoRate > 0 ? rateInfo.fifoRate : (m.rate > 0 ? m.rate : rateInfo.standardRate);
+        } else if (mode === 'custom') {
+          finalRate = m.rate > 0 ? m.rate : (rateInfo.avgRate || rateInfo.standardRate || 0);
+        }
+
+        return {
+          ...m,
+          skuId: sId || m.skuId,
+          rateMode: mode,
+          rate: finalRate,
+          computedAvgRate: rateInfo.avgRate,
+          computedFifoRate: rateInfo.fifoRate,
+          fifoBatchInfo: rateInfo.fifoBatchInfo,
+          batchCount: rateInfo.batchCount,
+          amount: Math.round(m.requiredQty * finalRate * 100) / 100
+        };
+      }));
+    } catch (err) {
+      console.error('Failed to fetch material rates:', err);
+    } finally {
+      setLoadingMaterialRates(false);
+    }
+  };
+
+  // Switch all materials to a specific Rate Mode
+  const applyGlobalRateMode = (mode: BomRateMode) => {
+    setGlobalRateMode(mode);
+    setMaterials(prev => prev.map(m => {
+      let newRate = m.rate;
+      if (mode === 'avg_purchase') {
+        newRate = (m.computedAvgRate !== undefined && m.computedAvgRate > 0) ? m.computedAvgRate : m.rate;
+      } else if (mode === 'fifo') {
+        newRate = (m.computedFifoRate !== undefined && m.computedFifoRate > 0) ? m.computedFifoRate : m.rate;
+      }
+      return {
+        ...m,
+        rateMode: mode,
+        rate: newRate,
+        amount: Math.round(m.requiredQty * newRate * 100) / 100
+      };
+    }));
+    showToast(
+      mode === 'avg_purchase' ? 'Applied Average of Purchase Batch Rates to BOM' :
+      mode === 'fifo' ? 'Applied FIFO Rates (Earliest Active Lots) to BOM' :
+      'Switched BOM to Custom / Manual Rates',
+      'info'
+    );
+  };
+
+  // Switch a single row's Rate Mode
+  const handleSetRowRateMode = (rowId: string, mode: BomRateMode, customRateValue?: number) => {
+    setMaterials(prev => prev.map(m => {
+      if (m.id !== rowId) return m;
+      let newRate = m.rate;
+      if (mode === 'avg_purchase') {
+        newRate = (m.computedAvgRate !== undefined && m.computedAvgRate > 0) ? m.computedAvgRate : m.rate;
+      } else if (mode === 'fifo') {
+        newRate = (m.computedFifoRate !== undefined && m.computedFifoRate > 0) ? m.computedFifoRate : m.rate;
+      } else if (mode === 'custom') {
+        newRate = customRateValue !== undefined ? customRateValue : m.rate;
+      }
+      return {
+        ...m,
+        rateMode: mode,
+        rate: newRate,
+        amount: Math.round(m.requiredQty * newRate * 100) / 100
+      };
+    }));
+    setActiveRateDropdownId(null);
   };
 
   // Material Table Row Handlers
@@ -782,6 +985,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         uom: 'PCS',
         requiredQty: 1,
         sourceLocation: 'SKBW - Ground Floor',
+        rateMode: globalRateMode,
         rate: 0,
         amount: 0
       }
@@ -809,6 +1013,9 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         const qty = field === 'requiredQty' ? Number(value) || 0 : m.requiredQty;
         const rate = field === 'rate' ? Number(value) || 0 : m.rate;
         updated.amount = Math.round(qty * rate * 100) / 100;
+        if (field === 'rate') {
+          updated.rateMode = 'custom';
+        }
       }
       return updated;
     }));
@@ -818,19 +1025,37 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     const defaultRate = Number(sku.purchasePrice || (sku as any).standardCost || (sku as any).costPrice || 0);
     const uomVal = (sku.unit || 'PCS').toUpperCase().trim();
 
-    setMaterials(prev => prev.map(row => {
-      if (row.id !== rowId) return row;
-      const qty = row.requiredQty > 0 ? row.requiredQty : 1;
-      const rate = defaultRate > 0 ? defaultRate : row.rate;
-      return {
-        ...row,
-        component: sku.name,
-        code: sku.skuCode || row.code,
-        uom: uomVal,
-        rate: rate,
-        amount: Math.round(qty * rate * 100) / 100
-      };
-    }));
+    setMaterials(prev => {
+      const updated = prev.map(row => {
+        if (row.id !== rowId) return row;
+        const qty = row.requiredQty > 0 ? row.requiredQty : 1;
+        const cached = materialRatesCache[String(sku._id)];
+
+        let chosenRate = defaultRate > 0 ? defaultRate : row.rate;
+        let mode: BomRateMode = row.rateMode || globalRateMode;
+        if (cached) {
+          if (mode === 'avg_purchase' && cached.avgRate > 0) chosenRate = cached.avgRate;
+          else if (mode === 'fifo' && cached.fifoRate > 0) chosenRate = cached.fifoRate;
+        }
+
+        return {
+          ...row,
+          skuId: sku._id,
+          component: sku.name,
+          code: sku.skuCode || row.code,
+          uom: uomVal,
+          rateMode: mode,
+          rate: chosenRate,
+          computedAvgRate: cached?.avgRate,
+          computedFifoRate: cached?.fifoRate,
+          fifoBatchInfo: cached?.fifoBatchInfo,
+          batchCount: cached?.batchCount,
+          amount: Math.round(qty * chosenRate * 100) / 100
+        };
+      });
+      fetchAndApplyMaterialRates(updated);
+      return updated;
+    });
     setActiveMaterialDropdownId(null);
   };
 
@@ -865,6 +1090,51 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       }
       return updated;
     }));
+  };
+
+  // By-Product / Scrap Preset Handlers
+  const handleAddPresetScrap = (preset: ScrapPreset) => {
+    const newId = `scrap-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const newRow: ScrapRow = {
+      id: newId,
+      item: preset.item,
+      uom: preset.uom || 'KG',
+      qty: 1,
+      rate: preset.defaultRate || 0,
+      amount: Math.round(1 * (preset.defaultRate || 0) * 100) / 100
+    };
+    setScrapItems(prev => [...prev, newRow]);
+    showToast(`Added scrap: "${preset.item}"`, 'success');
+  };
+
+  const handleAddNewScrapPreset = () => {
+    if (!newScrapItem.trim()) {
+      showToast('Please enter scrap item name', 'error');
+      return;
+    }
+    const newPreset: ScrapPreset = {
+      id: `scrap-p-${Date.now()}`,
+      item: newScrapItem.trim(),
+      uom: newScrapUom.trim() || 'KG',
+      defaultRate: Number(newScrapRate) || 0
+    };
+    const updated = [newPreset, ...scrapPresets];
+    setScrapPresets(updated);
+    try {
+      localStorage.setItem('skbw_scrap_presets_v2', JSON.stringify(updated));
+    } catch (e) {}
+    setNewScrapItem('');
+    setNewScrapRate('');
+    showToast(`Added scrap preset "${newPreset.item}"`, 'success');
+  };
+
+  const handleDeleteScrapPreset = (id: string) => {
+    const updated = scrapPresets.filter(p => p.id !== id);
+    setScrapPresets(updated);
+    try {
+      localStorage.setItem('skbw_scrap_presets_v2', JSON.stringify(updated));
+    } catch (e) {}
+    showToast('Removed scrap preset', 'info');
   };
 
   // Additional Costs Handlers
@@ -960,7 +1230,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         itemId: currentSku?._id || undefined,
         itemName: productName.trim(),
         itemCode: productCode.trim() || 'FG-001',
-        itemType: 'Finished Good',
+        itemType: (currentSku && getItemClassification(currentSku) === 'semi') ? 'Semi Finished' : 'Finished Good',
         plannedQty: numPlannedQty,
         plannedUom: uom,
         plannedPcs: plannedPcs,
@@ -975,6 +1245,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         department: department.trim(),
         factory: outputLocation.trim(),
         outputLocation: outputLocation.trim(),
+        outputLocationId: selectedLocId || undefined,
         locationId: selectedLocId || undefined,
         warehouseId: selectedWhId || undefined,
         floorId: selectedFlId || undefined,
@@ -987,6 +1258,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         bomType: 'Custom BOM (Production Order Only)',
         bomItems: materials.map(m => ({
           id: m.id,
+          skuId: m.skuId,
           component: m.component,
           code: m.code,
           type: 'Raw',
@@ -995,6 +1267,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           uom: m.uom,
           availableStock: 999999,
           stockStatus: 'Available',
+          rateMode: m.rateMode || 'avg_purchase',
           rate: m.rate,
           amount: m.amount,
           sourceLocation: m.sourceLocation,
@@ -1026,17 +1299,17 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     }
   };
 
-  // Filter finished goods matching search
+  // Filter finished goods and semi-finished matching search
   const filteredProducts = useMemo(() => {
     const q = productSearch.toLowerCase().trim();
-    if (!q) return finishedGoodsSkus;
-    return finishedGoodsSkus.filter(s => 
+    if (!q) return manufacturableSkus;
+    return manufacturableSkus.filter(s => 
       (s.name || '').toLowerCase().includes(q) ||
       (s.skuCode || '').toLowerCase().includes(q) ||
       (s.brand || '').toLowerCase().includes(q) ||
       (s.category || '').toLowerCase().includes(q)
     );
-  }, [finishedGoodsSkus, productSearch]);
+  }, [manufacturableSkus, productSearch]);
 
   return (
     <div className="flex flex-col h-full bg-slate-50/70 text-gray-800 font-sans select-none overflow-hidden text-xs">
@@ -1296,10 +1569,10 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
               <div className="relative" ref={productDropdownRef}>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-[10.5px] font-bold text-gray-600">
-                    Finished Good <span className="text-red-500">*</span>
+                    Product / Semi Good to Manufacture <span className="text-red-500">*</span>
                   </label>
                   <span className="text-[10px] text-gray-400 font-mono">
-                    {finishedGoodsSkus.length} products available
+                    {manufacturableSkus.length} products & semi goods available
                   </span>
                 </div>
 
@@ -1315,7 +1588,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                     }}
                     onClick={() => setShowProductDropdown(true)}
                     onFocus={() => setShowProductDropdown(true)}
-                    placeholder="Search product to manufacture..."
+                    placeholder="Search finished product or semi good to manufacture..."
                     className="w-full pl-8 pr-10 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
                   />
                   <div className="absolute right-2 top-2 flex items-center gap-1 text-gray-400">
@@ -1371,9 +1644,18 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                               )}
                             </div>
                           </div>
-                          <span className="px-2 py-0.5 text-[9.5px] font-extrabold uppercase rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200 shrink-0">
-                            {p.status || 'Active'}
-                          </span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded-full border ${
+                              getItemClassification(p) === 'semi'
+                                ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                : 'bg-blue-50 text-blue-700 border-blue-200'
+                            }`}>
+                              {getItemClassification(p) === 'semi' ? 'Semi Finished' : 'Finished Good'}
+                            </span>
+                            <span className="px-2 py-0.5 text-[9.5px] font-extrabold uppercase rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
+                              {p.status || 'Active'}
+                            </span>
+                          </div>
                         </div>
                       );
                     })}
@@ -1519,7 +1801,53 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
               <Layers className="w-4 h-4 text-blue-600" />
               <span>Materials to be Consumed (From BOM)</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* 3-Mode Global Rate Selector Pill Switcher */}
+              <div className="flex items-center gap-1 bg-slate-100/90 p-0.5 rounded-xl border border-slate-200/80 text-[11px]">
+                <span className="text-gray-500 pl-2 pr-1 font-bold text-[10px] uppercase tracking-wider select-none">
+                  Rate Mode:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => applyGlobalRateMode('avg_purchase')}
+                  className={`px-2 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer font-bold ${
+                    globalRateMode === 'avg_purchase'
+                      ? 'bg-white text-indigo-700 shadow-2xs border border-indigo-200/60'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+                  }`}
+                  title="Apply weighted average purchase rate across active batches"
+                >
+                  <BarChart3 className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Avg Purchases</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyGlobalRateMode('fifo')}
+                  className={`px-2 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer font-bold ${
+                    globalRateMode === 'fifo'
+                      ? 'bg-white text-emerald-700 shadow-2xs border border-emerald-200/60'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+                  }`}
+                  title="First In, First Out: Unit price of earliest active inward batch"
+                >
+                  <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>FIFO (Earliest Lot)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyGlobalRateMode('custom')}
+                  className={`px-2 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer font-bold ${
+                    globalRateMode === 'custom'
+                      ? 'bg-white text-amber-700 shadow-2xs border border-amber-200/60'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+                  }`}
+                  title="Custom manual rates freely entered per row"
+                >
+                  <Pencil className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Custom Value</span>
+                </button>
+              </div>
+
               <button
                 type="button"
                 onClick={() => {
@@ -1547,15 +1875,15 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
             <table className="w-full text-left border-collapse text-xs">
               <thead className="bg-gray-50/80 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 select-none">
                 <tr>
-                  <th className="py-2.5 px-2 text-center w-8 whitespace-nowrap">#</th>
-                  <th className="py-2.5 px-3 min-w-[240px] whitespace-nowrap">MATERIAL / COMPONENT <span className="text-red-500">*</span></th>
-                  <th className="py-2.5 px-2 text-center w-28 whitespace-nowrap">ITEM CODE</th>
-                  <th className="py-2.5 px-2 text-center w-16 whitespace-nowrap">UOM</th>
-                  <th className="py-2.5 px-3 text-right w-32 whitespace-nowrap">REQUIRED QTY <span className="text-red-500">*</span></th>
-                  <th className="py-2.5 px-3 min-w-[200px] whitespace-nowrap">SOURCE LOCATION</th>
-                  <th className="py-2.5 px-3 text-right w-24 whitespace-nowrap">RATE (₹)</th>
-                  <th className="py-2.5 px-3 text-right w-32 whitespace-nowrap">MATERIAL COST (₹)</th>
-                  <th className="py-2.5 px-2 text-center w-16 whitespace-nowrap">ACTIONS</th>
+                  <th className="py-2 px-2 text-center w-8 whitespace-nowrap text-[10px]">#</th>
+                  <th className="py-2 px-3 min-w-[360px] whitespace-nowrap text-[10px]">MATERIAL / COMPONENT <span className="text-red-500">*</span></th>
+                  <th className="py-2 px-2 text-center w-24 whitespace-nowrap text-[10px]">ITEM CODE</th>
+                  <th className="py-2 px-2 text-center w-14 whitespace-nowrap text-[10px]">UOM</th>
+                  <th className="py-2 px-3 text-right w-28 whitespace-nowrap text-[10px]">REQUIRED QTY <span className="text-red-500">*</span></th>
+                  <th className="py-2 px-3 min-w-[190px] whitespace-nowrap text-[10px]">SOURCE LOCATION</th>
+                  <th className="py-2 px-3 text-right w-36 whitespace-nowrap text-[10px]">RATE (₹)</th>
+                  <th className="py-2 px-3 text-right w-28 whitespace-nowrap text-[10px]">MATERIAL COST (₹)</th>
+                  <th className="py-2 px-2 text-center w-14 whitespace-nowrap text-[10px]">ACTIONS</th>
                 </tr>
               </thead>
 
@@ -1583,14 +1911,14 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                         className={`hover:bg-blue-50/30 transition-colors relative ${isDropdownActive ? 'z-50' : 'z-10'}`}
                       >
                         {/* # */}
-                        <td className="py-2 px-2 text-center font-bold text-gray-400">
+                        <td className="py-1.5 px-2 text-center font-bold text-gray-400 text-[10.5px]">
                           {idx + 1}
                         </td>
 
-                        {/* Material / Component Dropdown */}
-                        <td className="py-2 px-3 relative material-dropdown-container">
-                          <div className="relative">
-                            <Search className="w-3 h-3 absolute left-2.5 top-2.5 text-gray-400" />
+                        {/* Material / Component Dropdown (Expanded, compact height, all title in one line) */}
+                        <td className="py-1.5 px-3 relative material-dropdown-container min-w-[360px]">
+                          <div className="relative w-full">
+                            <Search className="w-3 h-3 absolute left-2.5 top-2 text-gray-400" />
                             <input
                               type="text"
                               value={componentSearchMap[row.id] !== undefined ? componentSearchMap[row.id] : row.component}
@@ -1601,9 +1929,10 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                               }}
                               onClick={() => setActiveMaterialDropdownId(row.id)}
                               placeholder="Select material / semi good..."
-                              className="w-full pl-7 pr-6 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer"
+                              title={row.component || 'Select material / semi good...'}
+                              className="w-full pl-7 pr-6 py-1 bg-white border border-gray-200 rounded-md text-[11px] font-semibold text-gray-800 focus:ring-1 focus:ring-blue-500 focus:outline-none cursor-pointer h-7"
                             />
-                            <div className="absolute right-2 top-2.5 flex items-center">
+                            <div className="absolute right-2 top-2 flex items-center">
                               {(row.component || componentSearchMap[row.id]) ? (
                                 <button
                                   type="button"
@@ -1620,7 +1949,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                                 </button>
                               ) : (
                                 <ChevronDown 
-                                  className="w-3.5 h-3.5 text-gray-400 cursor-pointer" 
+                                  className="w-3 h-3 text-gray-400 cursor-pointer" 
                                   onClick={() => setActiveMaterialDropdownId(isDropdownActive ? null : row.id)}
                                 />
                               )}
@@ -1629,7 +1958,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
                           {/* Popover Dropdown matching Sales Order 1:1 */}
                           {isDropdownActive && (
-                            <div className="absolute left-3 top-full mt-1 w-[460px] bg-white border border-gray-200 rounded-xl shadow-2xl z-[99999] max-h-64 overflow-y-auto divide-y divide-gray-100 p-1">
+                            <div className="absolute left-3 top-full mt-1 w-[500px] bg-white border border-gray-200 rounded-xl shadow-2xl z-[99999] max-h-64 overflow-y-auto divide-y divide-gray-100 p-1">
                               {filteredComponents.map((s) => {
                                 const itemType = getItemClassification(s);
                                 const specBadge = getSkuSpecOrConversion(s);
@@ -1642,39 +1971,39 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                                       handleSelectMaterialSku(row.id, s);
                                       setComponentSearchMap(prev => ({ ...prev, [row.id]: s.name }));
                                     }}
-                                    className={`p-2.5 cursor-pointer rounded-lg text-xs flex justify-between items-center transition-colors ${
+                                    className={`p-2 cursor-pointer rounded-lg text-xs flex justify-between items-center transition-colors ${
                                       isSelected ? 'bg-blue-100/90 font-bold border border-blue-200' : 'hover:bg-blue-50/80'
                                     }`}
                                   >
                                     <div className="flex-1 min-w-0 pr-3">
-                                      <div className="font-bold text-gray-900 truncate">{s.name}</div>
+                                      <div className="font-bold text-gray-900 truncate text-[11.5px]">{s.name}</div>
                                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                        <span className="text-[10px] text-gray-400 font-mono">{s.skuCode}</span>
+                                        <span className="text-[9.5px] text-gray-400 font-mono">{s.skuCode}</span>
                                         {s.category && (
                                           <>
-                                            <span className="text-[10px] text-gray-300">•</span>
-                                            <span className="text-[10px] font-semibold text-gray-600 uppercase">{s.category}</span>
+                                            <span className="text-[9.5px] text-gray-300">•</span>
+                                            <span className="text-[9.5px] font-semibold text-gray-600 uppercase">{s.category}</span>
                                           </>
                                         )}
                                         {s.unit && (
                                           <>
-                                            <span className="text-[10px] text-gray-300">•</span>
-                                            <span className="text-[10px] font-bold text-blue-600">{s.unit}</span>
+                                            <span className="text-[9.5px] text-gray-300">•</span>
+                                            <span className="text-[9.5px] font-bold text-blue-600">{s.unit}</span>
                                           </>
                                         )}
                                         {specBadge && (
                                           <>
-                                            <span className="text-[10px] text-gray-300">•</span>
-                                            <span className="text-[10px] font-semibold text-indigo-600">{specBadge}</span>
+                                            <span className="text-[9.5px] text-gray-300">•</span>
+                                            <span className="text-[9.5px] font-semibold text-indigo-600">{specBadge}</span>
                                           </>
                                         )}
                                       </div>
                                     </div>
                                     <div className="flex items-center gap-1.5 shrink-0">
-                                      <span className="px-2 py-0.5 text-[9.5px] font-extrabold uppercase rounded-full border bg-purple-50 text-purple-700 border-purple-200">
+                                      <span className="px-2 py-0.5 text-[9px] font-extrabold uppercase rounded-full border bg-purple-50 text-purple-700 border-purple-200">
                                         {itemType === 'semi' ? 'Semi Goods' : (s.category || 'Raw Material')}
                                       </span>
-                                      <span className={`px-2 py-0.5 text-[9.5px] font-extrabold uppercase rounded-full border ${
+                                      <span className={`px-2 py-0.5 text-[9px] font-extrabold uppercase rounded-full border ${
                                         (s.status || '').toLowerCase() === 'inactive'
                                           ? 'bg-amber-50 text-amber-700 border-amber-200'
                                           : 'bg-emerald-50 text-emerald-700 border-emerald-200'
@@ -1686,40 +2015,40 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                                 );
                               })}
                               {filteredComponents.length === 0 && (
-                                <div className="p-3 text-center text-gray-400 italic">No materials or semi goods found</div>
+                                <div className="p-3 text-center text-gray-400 italic text-xs">No materials or semi goods found</div>
                               )}
                             </div>
                           )}
                         </td>
 
                         {/* Item Code */}
-                        <td className="py-2 px-2 text-center">
-                          <span className="font-mono text-[11px] font-medium text-gray-600 bg-gray-50 px-2 py-1 rounded border border-gray-200/60 inline-block w-full">
+                        <td className="py-1.5 px-2 text-center">
+                          <span className="font-mono text-[10px] font-medium text-gray-600 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-200/60 inline-block w-full text-center">
                             {row.code || '—'}
                           </span>
                         </td>
 
                         {/* UOM */}
-                        <td className="py-2 px-2 text-center">
-                          <span className="font-bold text-gray-700 bg-gray-50 px-2 py-1 rounded border border-gray-200/60 inline-block w-full text-center">
+                        <td className="py-1.5 px-2 text-center">
+                          <span className="font-bold text-[10px] text-gray-700 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-200/60 inline-block w-full text-center">
                             {row.uom || 'PCS'}
                           </span>
                         </td>
 
                         {/* Required Qty */}
-                        <td className="py-2 px-3 text-right">
+                        <td className="py-1.5 px-3 text-right">
                           <input
                             type="number"
                             step="any"
                             min="0"
                             value={row.requiredQty}
                             onChange={e => handleUpdateMaterial(row.id, 'requiredQty', e.target.value)}
-                            className="w-full text-right font-bold text-gray-900 bg-white border border-gray-200 rounded-lg px-2.5 py-1 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            className="w-full text-right font-bold text-gray-900 bg-white border border-gray-200 rounded-md px-2 py-0.5 text-[11px] h-7 focus:ring-1 focus:ring-blue-500 focus:outline-none"
                           />
                         </td>
 
                         {/* Source Location (Mini Factory Location Modal) */}
-                        <td className="py-2 px-3">
+                        <td className="py-1.5 px-3">
                           <LocationSelectPopup
                             locations={warehouseLocations}
                             locationId={row.locationId || ''}
@@ -1731,30 +2060,73 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                           />
                         </td>
 
-                        {/* Rate */}
-                        <td className="py-2 px-3 text-right">
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={row.rate}
-                            onChange={e => handleUpdateMaterial(row.id, 'rate', e.target.value)}
-                            className="w-full text-right font-semibold text-gray-800 bg-white border border-gray-200 rounded-lg px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono"
-                          />
+                        {/* Rate with 3-Mode Selector (Avg Purchases / FIFO / Custom) */}
+                        <td className="py-1.5 px-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {/* Mode Selector Pill Select */}
+                            <select
+                              value={row.rateMode || 'avg_purchase'}
+                              onChange={(e) => handleSetRowRateMode(row.id, e.target.value as BomRateMode)}
+                              className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border cursor-pointer focus:outline-none transition-all h-7 ${
+                                row.rateMode === 'fifo'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
+                                  : row.rateMode === 'custom'
+                                  ? 'bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100'
+                                  : 'bg-indigo-50 text-indigo-700 border-indigo-300 hover:bg-indigo-100'
+                              }`}
+                              title={
+                                row.rateMode === 'fifo'
+                                  ? `FIFO: ${row.fifoBatchInfo?.batchNumber || 'Earliest Lot'} (₹${(row.computedFifoRate || row.rate || 0).toFixed(2)})`
+                                  : row.rateMode === 'avg_purchase'
+                                  ? `Avg Purchases: ₹${(row.computedAvgRate || row.rate || 0).toFixed(2)}`
+                                  : 'Custom Rate (User Defined)'
+                              }
+                            >
+                              <option value="avg_purchase">AVG ▾</option>
+                              <option value="fifo">FIFO ▾</option>
+                              <option value="custom">CUST ▾</option>
+                            </select>
+
+                            {/* Numeric Rate Input */}
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={row.rate}
+                              onChange={e => {
+                                handleUpdateMaterial(row.id, 'rate', e.target.value);
+                                handleSetRowRateMode(row.id, 'custom', Number(e.target.value) || 0);
+                              }}
+                              className={`w-20 text-right font-semibold bg-white border rounded-md px-2 py-0.5 text-[11px] h-7 focus:ring-1 focus:ring-blue-500 focus:outline-none font-mono ${
+                                row.rateMode === 'fifo'
+                                  ? 'border-emerald-300 text-emerald-900 bg-emerald-50/20'
+                                  : row.rateMode === 'custom'
+                                  ? 'border-amber-300 text-amber-900 bg-amber-50/20'
+                                  : 'border-gray-200 text-gray-800'
+                              }`}
+                              title={
+                                row.rateMode === 'fifo'
+                                  ? `FIFO Rate from earliest batch (${row.fifoBatchInfo?.batchNumber || 'Batch'})`
+                                  : row.rateMode === 'avg_purchase'
+                                  ? 'Weighted average rate of purchase batches'
+                                  : 'Custom manual rate'
+                              }
+                            />
+                          </div>
                         </td>
 
                         {/* Material Cost Amount */}
-                        <td className="py-2 px-3 text-right font-black font-mono text-gray-900">
+                        <td className="py-1.5 px-3 text-right font-bold font-mono text-gray-900 text-[11px]">
                           ₹{formatCurrency(row.amount)}
                         </td>
 
                         {/* Actions */}
-                        <td className="py-2 px-2 text-center">
+                        <td className="py-1.5 px-2 text-center">
                           <div className="flex items-center justify-center gap-1">
                             <button
                               type="button"
                               onClick={() => handleDuplicateMaterial(idx)}
-                              className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer transition-colors"
+                              className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md cursor-pointer transition-colors"
                               title="Duplicate row"
                             >
                               <Copy className="w-3.5 h-3.5" />
@@ -1762,7 +2134,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                             <button
                               type="button"
                               onClick={() => handleDeleteMaterial(row.id)}
-                              className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
+                              className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-md cursor-pointer transition-colors"
                               title="Delete row"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -1811,14 +2183,89 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleAddScrap}
-                  className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-all border border-purple-200 shadow-3xs"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Scrap</span>
-                </button>
+                <div className="flex items-center gap-1.5">
+                  {/* Preset By-Products / Scrap Dropdown Button (1:1 with Add Preset Overhead) */}
+                  <div className="relative" ref={scrapPresetMenuRef}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const spaceBelow = window.innerHeight - rect.bottom;
+                        setQuickScrapOpenUpwards(spaceBelow < 280 && rect.top > 280);
+                        setShowQuickScrapPresetMenu(!showQuickScrapPresetMenu);
+                        setHighlightedScrapPresetIdx(0);
+                      }}
+                      className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100/80 text-purple-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-purple-200 shadow-3xs"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                      <span>Add Preset Scrap</span>
+                      <ChevronDown className="w-3 h-3 text-purple-500" />
+                    </button>
+
+                    {showQuickScrapPresetMenu && (
+                      <div 
+                        className={`absolute right-0 ${quickScrapOpenUpwards ? 'bottom-full mb-1' : 'top-full mt-1'} w-80 max-h-[80vh] bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1 text-xs divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100`}
+                        role="menu"
+                      >
+                        <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <span>Predefined Scrap Items</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowQuickScrapPresetMenu(false);
+                              setShowManageScrapModal(true);
+                            }}
+                            className="text-purple-600 hover:underline flex items-center gap-0.5 cursor-pointer font-bold"
+                          >
+                            <Settings className="w-3 h-3" />
+                            <span>Manage</span>
+                          </button>
+                        </div>
+                        <div className="max-h-56 overflow-y-auto py-1 scroll-smooth" ref={scrapPresetListRef}>
+                          {scrapPresets.map((p, pIdx) => {
+                            const isSelected = pIdx === highlightedScrapPresetIdx;
+                            return (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => {
+                                  handleAddPresetScrap(p);
+                                  setShowQuickScrapPresetMenu(false);
+                                }}
+                                onMouseEnter={() => setHighlightedScrapPresetIdx(pIdx)}
+                                className={`w-full px-3 py-1.5 text-left flex items-center justify-between group transition-colors cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-purple-100/90 text-purple-900 font-bold ring-1 ring-inset ring-purple-400'
+                                    : 'hover:bg-purple-50/70 text-gray-800'
+                                }`}
+                                role="menuitem"
+                              >
+                                <span className="font-semibold truncate">{p.item}</span>
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 ml-2 bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  ₹{p.defaultRate}/{p.uom}
+                                </span>
+                              </button>
+                            );
+                          })}
+                          {scrapPresets.length === 0 && (
+                            <div className="p-3 text-center text-gray-400 italic">No scrap presets defined</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleAddScrap}
+                    className="px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700 font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-all border border-gray-200 shadow-3xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Scrap</span>
+                  </button>
+                </div>
               </div>
 
               <div className="overflow-visible border border-gray-200 rounded-xl">
@@ -2422,6 +2869,120 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                 type="button"
                 onClick={() => setShowManageCostModal(false)}
                 className="px-4 py-1.5 bg-gray-900 text-white font-bold rounded-xl text-xs cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── MANAGE PREDEFINED SCRAP / BY-PRODUCTS MODAL ── */}
+      {showManageScrapModal && (
+        <Modal
+          isOpen={showManageScrapModal}
+          onClose={() => setShowManageScrapModal(false)}
+          title="Manage Predefined Scrap & By-Products"
+          maxWidth="max-w-lg"
+        >
+          <div className="space-y-4 p-2 text-xs">
+            <p className="text-xs text-gray-500">
+              Predefined scrap items appear in the quick scrap selector. Selecting an item automatically loads its name, unit of measurement, and recovery rate.
+            </p>
+
+            {/* List */}
+            <div className="max-h-60 overflow-y-auto border border-gray-100 rounded-xl divide-y divide-gray-100">
+              {scrapPresets.map(p => (
+                <div key={p.id} className="p-2.5 flex items-center justify-between text-xs hover:bg-gray-50/80">
+                  <div>
+                    <span className="font-bold text-gray-800 block">{p.item}</span>
+                    <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-bold mt-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      ₹{p.defaultRate} / {p.uom}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteScrapPreset(p.id)}
+                    className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg cursor-pointer"
+                    title="Delete preset"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+              {scrapPresets.length === 0 && (
+                <div className="p-4 text-center text-gray-400 italic">No scrap presets saved</div>
+              )}
+            </div>
+
+            {/* Add new scrap preset form */}
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleAddNewScrapPreset();
+              }}
+              className="p-3 bg-purple-50/50 rounded-xl border border-purple-100 space-y-2"
+            >
+              <span className="text-[11px] font-bold text-purple-900 block uppercase tracking-wide">
+                + Add New Scrap Preset (Press Enter to Add)
+              </span>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+                <input
+                  type="text"
+                  placeholder="Scrap Name (e.g. Paper Waste)"
+                  value={newScrapItem}
+                  onChange={(e) => setNewScrapItem(e.target.value)}
+                  className="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-purple-500"
+                />
+                <select
+                  value={newScrapUom}
+                  onChange={(e) => setNewScrapUom(e.target.value)}
+                  className="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-purple-500 cursor-pointer"
+                >
+                  <option value="KG">KG</option>
+                  <option value="PCS">PCS</option>
+                  <option value="BDL">BDL (Bundle)</option>
+                  <option value="GBL">GBL</option>
+                  <option value="SHEET">SHEET</option>
+                </select>
+                <div className="flex gap-1">
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="Rate (₹)"
+                    value={newScrapRate}
+                    onChange={(e) => setNewScrapRate(e.target.value)}
+                    className="w-20 px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-mono focus:ring-1 focus:ring-purple-500"
+                  />
+                  <button
+                    type="submit"
+                    className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg text-xs cursor-pointer flex-1"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+            </form>
+
+            {/* Modal Footer */}
+            <div className="flex justify-between items-center pt-2 border-t border-gray-100 text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setScrapPresets(DEFAULT_SCRAP_PRESETS);
+                  try {
+                    localStorage.setItem('skbw_scrap_presets_v2', JSON.stringify(DEFAULT_SCRAP_PRESETS));
+                  } catch (e) {}
+                  showToast('Reset to default scrap presets', 'info');
+                }}
+                className="text-[11px] font-bold text-gray-500 hover:text-gray-700 cursor-pointer"
+              >
+                Reset to Defaults
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowManageScrapModal(false)}
+                className="px-4 py-1.5 bg-gray-900 text-white font-bold rounded-xl text-xs cursor-pointer hover:bg-gray-800 transition-colors"
               >
                 Done
               </button>
