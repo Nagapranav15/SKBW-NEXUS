@@ -75,6 +75,8 @@ const PrintOrderEstimationModal: React.FC<PrintOrderEstimationModalProps> = ({
     rate: number;
     amount: number;
     isCharge: boolean;
+    isMixedBundle?: boolean;
+    components?: any[];
   }> = [
     ...(order.items || []).map(item => ({
       gbl: Number(item.gbl) || 0,
@@ -83,6 +85,8 @@ const PrintOrderEstimationModal: React.FC<PrintOrderEstimationModalProps> = ({
       rate: item.unitPrice || 0,
       amount: item.totalAmount || 0,
       isCharge: false,
+      isMixedBundle: (item as any).isMixedBundle,
+      components: (item as any).components,
     })),
     ...(order.otherCharges || []).map(charge => ({
       gbl: charge.chargeType === 'per_gbl' ? totalGbl : (Number(charge.quantity) || ''),
@@ -348,7 +352,19 @@ ${Array.from({ length: copies }).map(() => content.innerHTML).join('<div style="
                     {tableRows.map((row, idx) => (
                       <tr key={idx}>
                         <td className="num">{row.gbl || ''}</td>
-                        <td>{row.particulars}</td>
+                        <td>
+                          <div style={{ fontWeight: row.isMixedBundle ? 'bold' : 'normal' }}>{row.particulars}</div>
+                          {row.components && row.components.length > 0 && (
+                            <div style={{ fontSize: '9pt', color: '#333', marginTop: '2px', paddingLeft: '8px' }}>
+                              {row.components.map((c: any, ci: number) => (
+                                <div key={ci} style={{ display: 'flex', justifyContent: 'space-between', borderTop: '0.5px dashed #ccc', paddingTop: '1px' }}>
+                                  <span>└ {c.name || 'Component'} ({c.quantity} {c.uom || 'pcs'} @ ₹{Number(c.rate || 0).toFixed(2)})</span>
+                                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>₹{Number(c.amount || 0).toFixed(2)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </td>
                         <td className="num">{row.qty}</td>
                         <td className="right">{row.rate ? row.rate.toFixed(2) : ''}</td>
                         <td className="right">{row.amount ? row.amount.toFixed(2) : ''}</td>
@@ -472,7 +488,17 @@ ${Array.from({ length: copies }).map(() => content.innerHTML).join('<div style="
                         {row.gbl || ''}
                       </td>
                       <td style={{ border: '1.5px solid #000', padding: '4px 6px', fontSize: 11 }}>
-                        {row.particulars}
+                        <div style={{ fontWeight: row.isMixedBundle ? 600 : 'normal' }}>{row.particulars}</div>
+                        {row.components && row.components.length > 0 && (
+                          <div style={{ fontSize: 9.5, color: '#444', marginTop: 2, paddingLeft: 6 }}>
+                            {row.components.map((c: any, ci: number) => (
+                              <div key={ci} style={{ display: 'flex', justifyContent: 'space-between', borderTop: '0.5px dashed #ccc', paddingTop: 1 }}>
+                                <span>└ {c.name || 'Component'} ({c.quantity} {c.uom || 'pcs'} @ ₹{Number(c.rate || 0).toFixed(2)})</span>
+                                <span style={{ fontVariantNumeric: 'tabular-nums' }}>₹{Number(c.amount || 0).toFixed(2)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </td>
                       <td style={{ border: '1.5px solid #000', padding: '4px 6px', textAlign: 'center', fontSize: 11 }}>
                         {row.qty}

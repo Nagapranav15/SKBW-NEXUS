@@ -84,7 +84,22 @@ const salesOrderItemV2Schema = new mongoose.Schema({
   dispatchedQty: {
     type: Number,
     default: 0
-  }
+  },
+  isMixedBundle: {
+    type: Boolean,
+    default: false
+  },
+  components: [{
+    componentId: { type: String, default: "" },
+    skuId: { type: mongoose.Schema.Types.ObjectId, ref: "SkuV2", required: false },
+    skuCode: { type: String, default: "" },
+    name: { type: String, required: true },
+    quantity: { type: Number, required: true, default: 0 },
+    uom: { type: String, default: "Pcs" },
+    rate: { type: Number, required: true, default: 0 },
+    amount: { type: Number, required: true, default: 0 },
+    notes: { type: String, default: "" }
+  }]
 }, { _id: true });
 
 const salesOrderV2Schema = new mongoose.Schema({

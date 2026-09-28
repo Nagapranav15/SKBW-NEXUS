@@ -144,10 +144,6 @@ const SalesOrders: React.FC = () => {
   // Print Order Estimation Modal State (for standalone print from actions menu)
   const [estimationOrder, setEstimationOrder] = useState<SalesOrderV2 | null>(null);
 
-  // WhatsApp Prompt Modal State
-  const [whatsappOrder, setWhatsappOrder] = useState<SalesOrderV2 | null>(null);
-  const [whatsappPhone, setWhatsappPhone] = useState<string>('');
-
   // Success page after order creation
   const [successOrder, setSuccessOrder] = useState<SalesOrderV2 | null>(null);
 
@@ -233,15 +229,24 @@ const SalesOrders: React.FC = () => {
       // Fetch parties to fill any missing phone/city/region
       let partyMap = new Map<string, any>();
       try {
-        const pRes = await getParties({ company: selectedCompany._id, type: 'customer', limit: 1000, light: true });
+        const pRes = await getParties({ company: selectedCompany._id, type: 'customer', limit: 10000, light: true });
         const pList = pRes.data?.parties || pRes.data || [];
         if (Array.isArray(pList)) {
           pList.forEach((p: any) => {
             if (p._id) partyMap.set(String(p._id), p);
-            if (p.firmName) partyMap.set(p.firmName.toLowerCase().trim(), p);
-            if (p.name) partyMap.set(p.name.toLowerCase().trim(), p);
+            if (p.firmName) {
+              partyMap.set(p.firmName.toLowerCase().trim(), p);
+              const baseFirm = p.firmName.replace(/\s*\([^)]*\)/g, '').toLowerCase().trim();
+              if (baseFirm && !partyMap.has(baseFirm)) partyMap.set(baseFirm, p);
+            }
+            if (p.name) {
+              partyMap.set(p.name.toLowerCase().trim(), p);
+              const baseName = p.name.replace(/\s*\([^)]*\)/g, '').toLowerCase().trim();
+              if (baseName && !partyMap.has(baseName)) partyMap.set(baseName, p);
+            }
             if (p.ownerName) partyMap.set(p.ownerName.toLowerCase().trim(), p);
             if (p.contactName) partyMap.set(p.contactName.toLowerCase().trim(), p);
+            if (p.phone) partyMap.set(p.phone.replace(/\D/g, ''), p);
           });
         }
       } catch (pe) {
@@ -250,12 +255,38 @@ const SalesOrders: React.FC = () => {
 
       const enrichOrder = (o: SalesOrderV2): SalesOrderV2 => {
         const custKey = (o.customerName || '').toLowerCase().trim();
+        const baseCustKey = (o.customerName || '').replace(/\s*\([^)]*\)/g, '').toLowerCase().trim();
         const custId = o.customerId ? String(o.customerId) : (o.customer?._id ? String(o.customer._id) : (o.customer && typeof o.customer === 'string' ? o.customer : ''));
-        const custParty = (custId && partyMap.get(custId)) || (custKey && partyMap.get(custKey)) || null;
+        const rawPhoneDigits = (o.customerPhone || '').replace(/\D/g, '');
+        const custParty = 
+          (custId && partyMap.get(custId)) || 
+          (custKey && partyMap.get(custKey)) || 
+          (baseCustKey && partyMap.get(baseCustKey)) ||
+          (rawPhoneDigits && partyMap.get(rawPhoneDigits)) ||
+          null;
+
         const resolvedPhone = o.customerPhone || o.customer?.phone || custParty?.phone || custParty?.mobile || custParty?.altPhone || custParty?.contactPersons?.[0]?.phone || '';
+
+        const rawContact = 
+          (o as any).contactPerson || 
+          (o as any).contactName || 
+          o.customer?.contactName || 
+          o.customer?.ownerName || 
+          custParty?.contactName || 
+          custParty?.ownerName || 
+          '';
+
+        const fallbackName = (o.customerName || '')
+          .replace(/\s*\([^)]*\)/g, '')
+          .replace(/\s+(Marketing|Stationery|Enterprises|Traders|Agency|Agencies|Stores?|Book\s*Stalls?|Paper\s*Mart|Publishers?|Brothers|Bros\.?|Pvt\.?\s*Ltd\.?|Ltd\.?)\b/gi, '')
+          .trim();
+
+        const resolvedContactName = rawContact || (fallbackName && fallbackName !== o.customerName ? fallbackName : '');
+
         return {
           ...o,
           customerPhone: resolvedPhone,
+          contactPerson: resolvedContactName,
           city: o.city || o.customer?.city || custParty?.city || '',
           region: o.region || o.customer?.state || custParty?.state || '',
           agent: o.agent || custParty?.agent || '',
@@ -332,13 +363,12 @@ const SalesOrders: React.FC = () => {
         if (estimationOrder) setEstimationOrder(null);
         if (successOrder) setSuccessOrder(null);
         if (cancellingOrder) setCancellingOrder(null);
-        if (whatsappOrder) setWhatsappOrder(null);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showDrawer, selectedOrderDetail, printEstimationOrder, estimationOrder, successOrder, cancellingOrder, whatsappOrder]);
+  }, [showDrawer, selectedOrderDetail, printEstimationOrder, estimationOrder, successOrder, cancellingOrder]);
 
   // Unique list of regions for dropdown
   const availableRegions = useMemo(() => {
@@ -747,22 +777,12 @@ const SalesOrders: React.FC = () => {
     return digits;
   };
 
-  const openWhatsAppModal = (order: SalesOrderV2) => {
-    setWhatsappOrder(order);
-    const raw = order.customerPhone || '';
-    let digits = raw.replace(/\D/g, '');
-    if (digits.startsWith('00')) digits = digits.slice(2);
-    if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
-    if (digits.length === 12 && digits.startsWith('91')) digits = digits.slice(2);
-    setWhatsappPhone(digits);
-  };
-
-  // WhatsApp Sender
-  const handleTriggerWhatsApp = (order: SalesOrderV2, customPhone?: string) => {
-    const raw = (customPhone || whatsappPhone || order.customerPhone || '').trim();
+  // WhatsApp Sender (Directly navigates to WhatsApp without confirmation popup)
+  const handleTriggerWhatsApp = (order: SalesOrderV2) => {
+    const raw = (order.customerPhone || '').trim();
     const cleanPhone = normalizeWhatsAppPhone(raw);
     if (!cleanPhone || cleanPhone.length < 10) {
-      showToast('Please provide a valid 10-digit mobile number for WhatsApp', 'warning');
+      showToast('No valid WhatsApp mobile number found for this customer', 'warning');
       return;
     }
     const statusDesc = order.status === 'Draft' ? 'saved as Draft' : 'confirmed';
@@ -771,7 +791,6 @@ const SalesOrders: React.FC = () => {
     );
     const waUrl = `https://wa.me/${cleanPhone}?text=${msg}`;
     window.open(waUrl, '_blank');
-    setWhatsappOrder(null);
   };
 
   return (
@@ -1559,8 +1578,14 @@ const SalesOrders: React.FC = () => {
                         <div className="font-bold text-gray-900 group-hover:text-blue-900 transition-colors">
                           {order.customerName}
                         </div>
-                        <div className="text-[11px] font-mono text-gray-500 font-medium mt-0.5">
-                          {order.customerPhone || '9966259732'}
+                        <div className="text-[11px] font-mono text-gray-500 font-medium mt-0.5 flex items-center gap-1.5">
+                          {order.contactPerson && (
+                            <span className="font-sans font-semibold text-gray-700">{order.contactPerson}</span>
+                          )}
+                          {order.contactPerson && (order.customerPhone || '9966259732') && (
+                            <span className="text-gray-400 font-bold">•</span>
+                          )}
+                          <span>{order.customerPhone || '9966259732'}</span>
                         </div>
                       </td>
                     )}
@@ -1688,7 +1713,7 @@ const SalesOrders: React.FC = () => {
                               {/* 4. WhatsApp */}
                               <button
                                 type="button"
-                                onClick={() => openWhatsAppModal(order)}
+                                onClick={() => handleTriggerWhatsApp(order)}
                                 className="p-1.5 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
                                 title="Send on WhatsApp"
                               >
@@ -1761,7 +1786,7 @@ const SalesOrders: React.FC = () => {
 
                                     <button
                                       type="button"
-                                      onClick={() => { openWhatsAppModal(order); setActiveMenuOrderId(null); }}
+                                      onClick={() => { handleTriggerWhatsApp(order); setActiveMenuOrderId(null); }}
                                       className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
                                     >
                                       <WhatsAppIcon className="w-4 h-4 text-emerald-500" />
@@ -1940,69 +1965,7 @@ const SalesOrders: React.FC = () => {
         />
       )}
 
-      {/* ── WHATSAPP MESSAGE PROMPT MODAL ── */}
-      {whatsappOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-fadeIn">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100 space-y-4 text-left">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
-                <WhatsAppIcon className="w-6 h-6 text-emerald-500" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-gray-900">Send on WhatsApp</h3>
-                <p className="text-xs text-gray-500">To: <span className="font-bold text-gray-800">{whatsappOrder.customerName}</span></p>
-              </div>
-            </div>
 
-            {/* Editable Verified WhatsApp Mobile Number Input */}
-            <div>
-              <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-1">
-                Customer WhatsApp Mobile Number
-              </label>
-              <div className="relative">
-                <div className="absolute left-3 top-2.5 text-xs font-bold text-gray-500 font-mono select-none">+91</div>
-                <input
-                  type="tel"
-                  value={whatsappPhone}
-                  onChange={(e) => setWhatsappPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  placeholder="10-digit mobile number"
-                  className="w-full pl-12 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-bold text-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
-                  autoFocus
-                />
-              </div>
-              {(!whatsappPhone || whatsappPhone.length < 10) && (
-                <p className="text-[10.5px] text-amber-600 mt-1 font-medium">
-                  * Please verify or enter the 10-digit WhatsApp mobile number
-                </p>
-              )}
-            </div>
-
-            <div className="p-3 bg-emerald-50/70 border border-emerald-100 rounded-2xl text-xs text-emerald-950 font-medium leading-relaxed">
-              <p className="text-[10.5px] font-bold text-emerald-700 uppercase tracking-wider mb-1">Message Preview:</p>
-              "Namaste <strong>{whatsappOrder.customerName}</strong>, your Sales Order <strong>{whatsappOrder.orderNumber}</strong> for <strong>₹{whatsappOrder.grandTotal?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> is {whatsappOrder.status === 'Draft' ? 'saved as Draft' : 'confirmed'} and scheduled for dispatch by <strong>{whatsappOrder.promisedDate || 'soon'}</strong>. Thank you!"
-            </div>
-
-            <div className="flex items-center justify-end gap-2.5 pt-2">
-              <button
-                type="button"
-                onClick={() => setWhatsappOrder(null)}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={!whatsappPhone || whatsappPhone.length < 10}
-                onClick={() => handleTriggerWhatsApp(whatsappOrder, whatsappPhone)}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                <Send className="w-3.5 h-3.5" />
-                <span>Send WhatsApp Message</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
 
       {/* ── PRINT ORDER ESTIMATION (from success page) ── */}

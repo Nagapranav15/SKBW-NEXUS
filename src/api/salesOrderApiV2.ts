@@ -1,6 +1,18 @@
 import api from './axios';
 import { SkuV2 } from './mfgApiV2';
 
+export interface OrderItemComponent {
+  componentId?: string;
+  skuId?: string;
+  skuCode?: string;
+  name: string;
+  quantity: number;
+  uom: string;
+  rate: number;
+  amount: number;
+  notes?: string;
+}
+
 export interface SalesOrderItemV2 {
   _id?: string;
   skuId?: SkuV2 | string;
@@ -23,6 +35,8 @@ export interface SalesOrderItemV2 {
   igstAmount?: number;
   totalAmount: number;
   dispatchedQty?: number;
+  isMixedBundle?: boolean;
+  components?: OrderItemComponent[];
 }
 
 export interface OtherChargeItem {
@@ -65,6 +79,7 @@ export interface SalesOrderV2 {
   fulfillmentStatus?: 'Not Started' | 'Partial' | 'Fulfilled' | 'Pending' | 'Partially Dispatched' | 'Fully Dispatched' | 'In Production' | string;
   status: 'Draft' | 'Confirmed' | 'In Production' | 'Partially Delivered' | 'Delivered' | 'Invoiced' | 'Cancelled' | string;
   customerPhone?: string;
+  contactPerson?: string;
   city?: string;
   region?: string;
   agent?: string;

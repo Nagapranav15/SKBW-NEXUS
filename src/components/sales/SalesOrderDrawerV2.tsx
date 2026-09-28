@@ -3,7 +3,7 @@ import {
   Save, Plus, Trash2, Search, ChevronDown, Calendar, User, Package, 
   AlertCircle, FileText, Check, Percent, X, MoreVertical, Edit2, 
   Phone, MapPin, Receipt, Truck, Copy, ExternalLink, Eye, Building2,
-  Settings, Zap, Sparkles, RotateCcw
+  Settings, Zap, Sparkles, RotateCcw, Layers, ChevronRight
 } from 'lucide-react';
 import Modal from '../ui/Modal';
 import { getSkusV2, getBalancesV2, SkuV2 } from '../../api/mfgApiV2';
@@ -14,7 +14,8 @@ import {
   getNextSalesOrderNumberV2, 
   SalesOrderV2, 
   SalesOrderItemV2, 
-  OtherChargeItem 
+  OtherChargeItem,
+  OrderItemComponent
 } from '../../api/salesOrderApiV2';
 import { MOCK_SALES_ORDERS_V2 } from './salesOrderSampleData';
 import { saveCustomSalesOrder } from '../../utils/salesOrderStorage';
@@ -46,6 +47,8 @@ interface OrderItemRow {
   discPercent: number | string;
   discAmount: number;
   amount: number;
+  isMixedBundle?: boolean;
+  components?: OrderItemComponent[];
 }
 
 interface AddressDetails {
@@ -348,6 +351,13 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   const [rowSearchTerms, setRowSearchTerms] = useState<{ [key: number]: string }>({});
 
   const [items, setItems] = useState<OrderItemRow[]>([]);
+  
+  // State for Tally-style Component Allocation / Mixed Bundle
+  const [allocModalRowIdx, setAllocModalRowIdx] = useState<number | null>(null);
+  const [allocComponents, setAllocComponents] = useState<OrderItemComponent[]>([]);
+  const [allocExpandedRows, setAllocExpandedRows] = useState<Record<number, boolean>>({});
+  const [activeAllocDropdownIdx, setActiveAllocDropdownIdx] = useState<number | null>(null);
+  const [allocSearchTerms, setAllocSearchTerms] = useState<Record<number, string>>({});
 
   // Other Charges & Summary State (Empty by default when new)
   const [otherCharges, setOtherCharges] = useState<OtherChargeItem[]>([]);
@@ -491,6 +501,9 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       }
       if (!target.closest('.item-product-cell')) {
         setActiveItemDropdownIdx(null);
+      }
+      if (!target.closest('.alloc-product-cell')) {
+        setActiveAllocDropdownIdx(null);
       }
       if (!target.closest('.charge-name-cell') && !target.closest('.charge-preset-menu')) {
         setActiveChargeDropdown(null);
@@ -709,7 +722,9 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
           rate: i.unitPrice || 0,
           discPercent: i.discountPercent || 0,
           discAmount: 0,
-          amount: i.totalAmount || 0
+          amount: i.totalAmount || 0,
+          isMixedBundle: !!i.isMixedBundle,
+          components: i.components || []
         })));
       } else {
         setItems([getEmptyRow()]);
@@ -772,7 +787,9 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       rate: '',
       discPercent: '',
       discAmount: 0,
-      amount: 0
+      amount: 0,
+      isMixedBundle: false,
+      components: []
     };
   }
 
@@ -974,6 +991,77 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       const remaining = prev.filter((_, i) => i !== idx);
       return remaining.length > 0 ? remaining : [getEmptyRow()];
     });
+  };
+
+  // ── TALLY-STYLE ALLOCATION & COMPONENT BREAKDOWN HANDLERS ──
+  const handleOpenAllocationModal = (idx: number) => {
+    const row = items[idx];
+    if (!row) return;
+
+    if (row.components && row.components.length > 0) {
+      setAllocComponents(row.components.map(c => ({ ...c })));
+    } else {
+      const currentRate = Number(row.rate) || 0;
+      setAllocComponents([
+        { componentId: `comp-${Date.now()}-1`, name: '', quantity: 0, uom: 'Pcs', rate: currentRate, amount: 0 }
+      ]);
+    }
+    setActiveAllocDropdownIdx(null);
+    setAllocSearchTerms({});
+    setAllocModalRowIdx(idx);
+  };
+
+  const handleApplyAllocation = () => {
+    if (allocModalRowIdx === null) return;
+    const rowIdx = allocModalRowIdx;
+    const validComps = allocComponents.filter(c => c.name.trim() && (Number(c.quantity) > 0 || Number(c.amount) > 0));
+
+    if (validComps.length === 0) {
+      showToast('Please add at least one component with a name and quantity', 'warning');
+      return;
+    }
+
+    const totalPcs = validComps.reduce((sum, c) => sum + (Number(c.quantity) || 0), 0);
+    const totalAmt = validComps.reduce((sum, c) => sum + (Number(c.amount) || (Number(c.quantity || 0) * Number(c.rate || 0))), 0);
+    const blendedRate = totalPcs > 0 ? +(totalAmt / totalPcs).toFixed(2) : 0;
+
+    setItems(prev => {
+      const copy = [...prev];
+      const r = { ...copy[rowIdx] };
+      r.isMixedBundle = true;
+      r.components = validComps.map(c => ({
+        ...c,
+        amount: +(Number(c.quantity || 0) * Number(c.rate || 0)).toFixed(2)
+      }));
+      r.totalPcs = totalPcs;
+      r.amount = totalAmt;
+      r.rate = blendedRate;
+
+      const pcsPerGblNum = Number(r.pcsPerGbl) || 0;
+      if (pcsPerGblNum > 0) {
+        r.gbl = +(totalPcs / pcsPerGblNum).toFixed(2);
+      }
+
+      copy[rowIdx] = r;
+      return copy;
+    });
+
+    setAllocExpandedRows(prev => ({ ...prev, [rowIdx]: true }));
+    setAllocModalRowIdx(null);
+    showToast(`Breakdown applied: ${validComps.length} mixed items (${totalPcs} pcs total)`, 'success');
+  };
+
+  const handleRemoveBundle = (idx: number) => {
+    setItems(prev => {
+      const copy = [...prev];
+      const r = { ...copy[idx] };
+      r.isMixedBundle = false;
+      r.components = [];
+      copy[idx] = r;
+      return copy;
+    });
+    setAllocExpandedRows(prev => ({ ...prev, [idx]: false }));
+    showToast('Reverted to standard product line', 'info');
   };
 
   // Calculate Total Order GBL across all products
@@ -1224,7 +1312,9 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
         discountPercent: 0,
         taxableAmount: Number(i.amount) || 0,
         gstRate: 18,
-        totalAmount: Number(i.amount) || 0
+        totalAmount: Number(i.amount) || 0,
+        isMixedBundle: !!i.isMixedBundle,
+        components: i.components || []
       }));
 
       const payload: Partial<SalesOrderV2> = {
@@ -2290,8 +2380,9 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                     );
 
                     return (
-                      <tr key={idx} className={`hover:bg-blue-50/30 transition-colors relative ${isDropdownActive ? 'z-50' : ''}`}>
-                        {/* # */}
+                      <React.Fragment key={idx}>
+                        <tr className={`hover:bg-blue-50/30 transition-colors relative ${isDropdownActive ? 'z-50' : ''}`}>
+                          {/* # */}
                         <td className="py-2.5 px-2 text-center font-bold text-gray-500">
                           {idx + 1}
                         </td>
@@ -2403,6 +2494,50 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                               )}
                             </div>
                           )}
+
+                          {/* Tally-Style Mixed Bundle / Component Breakdown Badge & Controls */}
+                          {row.isMixedBundle && row.components && row.components.length > 0 ? (
+                            <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                              <button
+                                type="button"
+                                onClick={() => setAllocExpandedRows(prev => ({ ...prev, [idx]: !prev[idx] }))}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100/80 text-indigo-700 border border-indigo-200/80 rounded-md text-[10.5px] font-bold transition-all cursor-pointer shadow-3xs"
+                                title="Click to view/hide sub-item breakdown"
+                              >
+                                <Layers className="w-3 h-3 text-indigo-600 shrink-0" />
+                                <span>Mixed Pack: {row.components.length} Items ({row.totalPcs} pcs)</span>
+                                <ChevronDown className={`w-3 h-3 transition-transform ${allocExpandedRows[idx] ? 'rotate-180' : ''}`} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenAllocationModal(idx)}
+                                className="px-1.5 py-0.5 text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors cursor-pointer"
+                                title="Edit mixed components"
+                              >
+                                Edit Mix
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveBundle(idx)}
+                                className="px-1 py-0.5 text-[10px] text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                                title="Remove breakdown and revert to standard single item"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="mt-1">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenAllocationModal(idx)}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/60 rounded border border-dashed border-gray-300 hover:border-indigo-300 transition-colors cursor-pointer"
+                                title="Customize this item as a mixed pack with multiple sub-items (Tally style)"
+                              >
+                                <Layers className="w-2.5 h-2.5 text-indigo-500" />
+                                <span>+ Mix / Allocation</span>
+                              </button>
+                            </div>
+                          )}
                         </td>
 
                         {/* Item Description */}
@@ -2496,7 +2631,45 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                           </div>
                         </td>
                       </tr>
-                    );
+
+                      {/* Accordion Sub-row: Tally-Style Mixed Breakdown Tree */}
+                      {row.isMixedBundle && allocExpandedRows[idx] && row.components && row.components.length > 0 && (
+                        <tr className="bg-indigo-50/25 border-b border-indigo-100/70">
+                          <td className="py-2.5 px-2 text-center text-indigo-400 font-bold text-xs select-none">↳</td>
+                          <td colSpan={2} className="py-2.5 px-3">
+                            <div className="text-[11px] font-extrabold text-indigo-950 mb-1.5 flex items-center gap-1.5">
+                              <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                              <span>Sub-Material Breakdown inside {row.itemName || 'Pack'}:</span>
+                            </div>
+                            <div className="space-y-1 pl-3 border-l-2 border-indigo-200">
+                              {row.components.map((comp, cIdx) => (
+                                <div key={comp.componentId || cIdx} className="flex items-center justify-between text-xs text-gray-800 py-0.5">
+                                  <span className="font-semibold flex items-center gap-1.5">
+                                    <span className="text-[11px] text-indigo-600 font-bold">
+                                      {cIdx === 0 ? '①' : cIdx === 1 ? '②' : cIdx === 2 ? '③' : `${cIdx + 1}.`}
+                                    </span>
+                                    <span>{comp.name}</span>
+                                  </span>
+                                  <span className="font-mono text-gray-500 text-[11px]">
+                                    {comp.quantity} {comp.uom || 'Pcs'} × ₹{Number(comp.rate).toFixed(2)} = <strong className="text-gray-900">₹{Number(comp.amount).toFixed(2)}</strong>
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                          <td colSpan={6} className="py-2.5 px-3 text-right align-bottom text-[11px] text-gray-500 font-mono">
+                            <div className="flex items-center justify-end gap-3 flex-wrap">
+                              <span>Sum Total: <strong className="text-gray-900 font-bold">{row.totalPcs} pcs</strong></span>
+                              <span>•</span>
+                              <span>Weighted Avg Rate: <strong className="text-indigo-700 font-bold">₹{Number(row.rate).toFixed(2)} / pc</strong></span>
+                              <span>•</span>
+                              <span>Total Value: <strong className="text-emerald-700 font-black">₹{Number(row.amount).toFixed(2)}</strong></span>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
                   })}
                 </tbody>
               </table>
@@ -3121,6 +3294,341 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                 className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition-all cursor-pointer shadow-2xs"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── TALLY-STYLE COMPONENT ALLOCATION / MIXED BUNDLE MODAL ── */}
+      {allocModalRowIdx !== null && items[allocModalRowIdx] && (
+        <Modal
+          isOpen={allocModalRowIdx !== null}
+          onClose={() => {
+            setAllocModalRowIdx(null);
+            setActiveAllocDropdownIdx(null);
+          }}
+          padding="p-4 sm:p-5"
+          maxWidth="max-w-2xl"
+          title={
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-200/70 flex items-center justify-center text-indigo-600 shadow-2xs shrink-0">
+                <Layers className="w-3.5 h-3.5" />
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-black text-gray-900 leading-none">
+                  Tally Allocation
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60 font-mono">
+                  {items[allocModalRowIdx].itemName || 'Mixed Pack'}
+                </span>
+              </div>
+            </div>
+          }
+        >
+          <div className="space-y-3">
+            {/* Cute Compact Info Banner */}
+            <div className="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-violet-50/70 via-indigo-50/50 to-blue-50/60 rounded-xl border border-indigo-100/70 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="text-xs">✨</span>
+                <span className="text-[11px] font-medium text-slate-600">
+                  Custom sub-item breakdown &amp; blended pricing for this pack
+                </span>
+              </div>
+              <div className="text-[10px] font-bold text-indigo-600 font-mono bg-white/90 px-2 py-0.5 rounded-md border border-indigo-100 shadow-2xs shrink-0">
+                {items[allocModalRowIdx].itemName || 'Parent Item'}
+              </div>
+            </div>
+
+            {/* Components Table */}
+            <div className="border border-slate-200/80 rounded-xl shadow-2xs bg-white overflow-visible">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 font-bold uppercase text-[9.5px] tracking-wider">
+                  <tr>
+                    <th className="py-2 px-2 text-center w-8">#</th>
+                    <th className="py-2 px-2.5">Sub-Product / Material Name</th>
+                    <th className="py-2 px-2 text-center w-24">Qty (Pcs)</th>
+                    <th className="py-2 px-2 text-right w-24">Rate (₹)</th>
+                    <th className="py-2 px-2.5 text-right w-24">Amount (₹)</th>
+                    <th className="py-2 px-1 text-center w-8"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {allocComponents.map((comp, cIdx) => {
+                    const isDropdownOpen = activeAllocDropdownIdx === cIdx;
+                    const searchTerm = (allocSearchTerms[cIdx] !== undefined ? allocSearchTerms[cIdx] : comp.name || '').toLowerCase().trim();
+                    const filteredSkus = availableSkus.filter(s =>
+                      !searchTerm ||
+                      (s.name || '').toLowerCase().includes(searchTerm) ||
+                      (s.skuCode || '').toLowerCase().includes(searchTerm) ||
+                      (s.category || '').toLowerCase().includes(searchTerm)
+                    );
+
+                    return (
+                      <tr key={comp.componentId || cIdx} className="hover:bg-slate-50/50 transition-colors">
+                        {/* Circled Index */}
+                        <td className="py-2 px-1 text-center">
+                          <span className="w-5 h-5 mx-auto rounded-full bg-indigo-50 border border-indigo-200/60 text-indigo-600 font-bold text-[10px] flex items-center justify-center">
+                            {cIdx + 1}
+                          </span>
+                        </td>
+
+                        {/* Searchable Dropdown Product Name */}
+                        <td className="py-2 px-2 relative alloc-product-cell">
+                          <div className="relative">
+                            <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                            <input
+                              type="text"
+                              placeholder="Search or type material name..."
+                              value={allocSearchTerms[cIdx] !== undefined ? allocSearchTerms[cIdx] : comp.name}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setAllocSearchTerms(prev => ({ ...prev, [cIdx]: val }));
+                                setAllocComponents(prev => prev.map((item, idx) => idx === cIdx ? { ...item, name: val } : item));
+                                setActiveAllocDropdownIdx(cIdx);
+                              }}
+                              onFocus={() => setActiveAllocDropdownIdx(cIdx)}
+                              className="w-full pl-7 pr-6 py-1.5 bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 placeholder-slate-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 focus:outline-none transition-all"
+                            />
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
+                              {(comp.name || allocSearchTerms[cIdx]) ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setAllocSearchTerms(prev => ({ ...prev, [cIdx]: '' }));
+                                    setAllocComponents(prev => prev.map((item, idx) => idx === cIdx ? { ...item, name: '', skuId: undefined, skuCode: undefined } : item));
+                                  }}
+                                  className="p-0.5 text-slate-400 hover:text-slate-600 rounded cursor-pointer"
+                                  title="Clear"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              ) : (
+                                <ChevronDown
+                                  className={`w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600 transition-transform ${isDropdownOpen ? 'rotate-180 text-indigo-600' : ''}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveAllocDropdownIdx(isDropdownOpen ? null : cIdx);
+                                  }}
+                                />
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Searchable Dropdown Popup Menu */}
+                          {isDropdownOpen && (
+                            <div className="absolute left-2 top-full mt-1 w-[320px] bg-white border border-slate-200 rounded-xl shadow-xl z-[99999] max-h-48 overflow-y-auto divide-y divide-slate-100 p-1 animate-in fade-in zoom-in-95 duration-100">
+                              <div className="px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-slate-400 flex justify-between items-center bg-slate-50 rounded mb-0.5">
+                                <span>ITEM MASTER</span>
+                                <span>{filteredSkus.length} Items</span>
+                              </div>
+                              {filteredSkus.length === 0 ? (
+                                <div className="p-2 text-center text-[11px] text-slate-500">
+                                  Use "{allocSearchTerms[cIdx] || comp.name}" as custom item
+                                </div>
+                              ) : (
+                                filteredSkus.slice(0, 30).map((s) => {
+                                  const isInactive = (s.status || '').toLowerCase() === 'inactive';
+                                  const pcsPerGblVal = Number(s.booksGbl || s.altUnitConversion || (s as any).pcsPerGbl || 0);
+
+                                  return (
+                                    <div
+                                      key={s._id}
+                                      onClick={() => {
+                                        const chosenPrice = Number(s.price || s.sellingPrice || s.salesPrice || 0);
+                                        setAllocSearchTerms(prev => ({ ...prev, [cIdx]: s.name }));
+                                        setAllocComponents(prev => prev.map((item, idx) => {
+                                          if (idx === cIdx) {
+                                            const newRate = (item.rate && item.rate > 0) ? item.rate : (chosenPrice > 0 ? chosenPrice : (Number(items[allocModalRowIdx!]?.rate) || 0));
+                                            const newAmt = +(Number(item.quantity || 0) * newRate).toFixed(2);
+                                            return {
+                                              ...item,
+                                              skuId: s._id,
+                                              skuCode: s.skuCode,
+                                              name: s.name,
+                                              uom: s.uom || 'Pcs',
+                                              rate: newRate,
+                                              amount: newAmt
+                                            };
+                                          }
+                                          return item;
+                                        }));
+                                        setActiveAllocDropdownIdx(null);
+                                      }}
+                                      className="p-1.5 cursor-pointer rounded-lg text-xs flex justify-between items-center transition-colors hover:bg-indigo-50/70 group"
+                                    >
+                                      <div className="flex-1 min-w-0 pr-1.5">
+                                        <div className="font-bold text-slate-800 group-hover:text-indigo-950 truncate text-[11px]">{s.name}</div>
+                                        <div className="flex items-center gap-1 text-[9.5px]">
+                                          <span className="text-slate-400 font-mono">{s.skuCode}</span>
+                                          <span className="text-slate-300">•</span>
+                                          <span className="text-slate-500">{s.category || 'Goods'}</span>
+                                          {pcsPerGblVal > 0 && (
+                                            <>
+                                              <span className="text-slate-300">•</span>
+                                              <span className="text-indigo-600 font-semibold">{pcsPerGblVal} /GBL</span>
+                                            </>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <span className={`px-1.5 py-0.2 rounded text-[8.5px] font-bold uppercase shrink-0 ${
+                                        isInactive ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'
+                                      }`}>
+                                        {s.status || 'Active'}
+                                      </span>
+                                    </div>
+                                  );
+                                })
+                              )}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Quantity */}
+                        <td className="py-2 px-1 text-center">
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="0"
+                            value={comp.quantity || ''}
+                            onChange={(e) => {
+                              const qty = parseFloat(e.target.value) || 0;
+                              setAllocComponents(prev => prev.map((item, idx) => {
+                                if (idx === cIdx) {
+                                  const amt = +(qty * (item.rate || 0)).toFixed(2);
+                                  return { ...item, quantity: qty, amount: amt };
+                                }
+                                return item;
+                              }));
+                            }}
+                            className="w-full px-2 py-1.5 text-center bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg font-bold font-mono text-slate-800 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none transition-all"
+                          />
+                        </td>
+
+                        {/* Rate */}
+                        <td className="py-2 px-1 text-right">
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={comp.rate || ''}
+                            onChange={(e) => {
+                              const rt = parseFloat(e.target.value) || 0;
+                              setAllocComponents(prev => prev.map((item, idx) => {
+                                if (idx === cIdx) {
+                                  const amt = +((item.quantity || 0) * rt).toFixed(2);
+                                  return { ...item, rate: rt, amount: amt };
+                                }
+                                return item;
+                              }));
+                            }}
+                            className="w-full px-2 py-1.5 text-right bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg font-bold font-mono text-slate-800 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none transition-all"
+                          />
+                        </td>
+
+                        {/* Amount */}
+                        <td className="py-2 px-2.5 text-right font-black font-mono text-slate-800 text-xs">
+                          ₹{(comp.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+
+                        {/* Delete / Clear button */}
+                        <td className="py-2 px-1 text-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (allocComponents.length > 1) {
+                                setAllocComponents(prev => prev.filter((_, idx) => idx !== cIdx));
+                              } else {
+                                setAllocComponents([{ componentId: `comp-${Date.now()}-1`, name: '', quantity: 0, uom: 'Pcs', rate: Number(items[allocModalRowIdx]?.rate) || 0, amount: 0 }]);
+                                setAllocSearchTerms({});
+                              }
+                            }}
+                            className="p-1 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
+                            title={allocComponents.length > 1 ? "Remove item" : "Clear item"}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Add component button */}
+            <div className="flex justify-between items-center pt-0.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setAllocComponents(prev => [
+                    ...prev,
+                    {
+                      componentId: `comp-${Date.now()}-${prev.length + 1}`,
+                      name: '',
+                      quantity: 0,
+                      uom: 'Pcs',
+                      rate: Number(items[allocModalRowIdx]?.rate) || 0,
+                      amount: 0
+                    }
+                  ]);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100/80 text-indigo-600 font-bold rounded-lg text-xs transition-colors cursor-pointer border border-indigo-200/50 shadow-2xs"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Add Sub-Item</span>
+              </button>
+            </div>
+
+            {/* Cute Compact Summary Cards */}
+            {(() => {
+              const totalAllocPcs = allocComponents.reduce((sum, c) => sum + (Number(c.quantity) || 0), 0);
+              const totalAllocAmt = allocComponents.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+              const avgRate = totalAllocPcs > 0 ? (totalAllocAmt / totalAllocPcs).toFixed(2) : '0.00';
+              const pcsPerGblNum = Number(items[allocModalRowIdx]?.pcsPerGbl) || 0;
+              const gblEquiv = pcsPerGblNum > 0 ? (totalAllocPcs / pcsPerGblNum).toFixed(2) : null;
+
+              return (
+                <div className="grid grid-cols-4 gap-2 p-2.5 bg-slate-50/80 rounded-xl border border-slate-200/70">
+                  <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-2xs text-center">
+                    <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider block">Total Pieces</span>
+                    <span className="text-xs sm:text-sm font-black font-mono text-slate-800 mt-0.5 block">{totalAllocPcs.toLocaleString('en-IN')} pcs</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-2xs text-center">
+                    <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider block">Total Amount</span>
+                    <span className="text-xs sm:text-sm font-black font-mono text-indigo-600 mt-0.5 block">₹{totalAllocAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-2xs text-center">
+                    <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider block">Avg Rate</span>
+                    <span className="text-xs sm:text-sm font-black font-mono text-emerald-600 mt-0.5 block">₹{avgRate}<span className="text-[9.5px] font-normal text-slate-400">/pc</span></span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-2xs text-center">
+                    <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider block">GBL Equiv</span>
+                    <span className="text-xs sm:text-sm font-black font-mono text-amber-600 mt-0.5 block">{gblEquiv ? `${gblEquiv} GBL` : '—'}</span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Modal Actions */}
+            <div className="flex justify-end items-center gap-2 pt-2 border-t border-slate-100 text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setAllocModalRowIdx(null);
+                  setActiveAllocDropdownIdx(null);
+                }}
+                className="px-3.5 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold rounded-lg transition-colors cursor-pointer text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleApplyAllocation}
+                className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-xs transition-all cursor-pointer flex items-center gap-1.5 text-xs"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Apply to Item</span>
               </button>
             </div>
           </div>

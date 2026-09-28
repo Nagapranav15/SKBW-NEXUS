@@ -6,7 +6,7 @@ import {
   User, Calendar, Truck, Tag, MapPin, Phone, Package,
   ChevronRight, Plus, Trash2, CheckCircle, Clock,
   AlertCircle, CreditCard, IndianRupee, Play, Send, Check,
-  Factory, ExternalLink
+  Factory, ExternalLink, Layers
 } from 'lucide-react';
 import { SalesOrderV2, updateSalesOrderV2Status } from '../../api/salesOrderApiV2';
 import { saveCustomSalesOrder } from '../../utils/salesOrderStorage';
@@ -1000,118 +1000,6 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
             </div>
           </div>
 
-          {/* ── ORDER PROGRESS ── */}
-          <div className="border border-gray-200 rounded-xl p-4 bg-white shadow-3xs">
-            <div className="flex items-center justify-between gap-2 mb-4">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <CheckCircle className="w-3.5 h-3.5 stroke-[2.2]" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-gray-900 leading-tight">Order Progress</h4>
-                  <p className="text-[10px] text-gray-500 font-medium">Lifecycle tracking across Production, Dispatch, Invoicing & Settlement</p>
-                </div>
-              </div>
-
-              {/* Dynamic Next Stage Quick Action Button */}
-              {nextPendingStep && (
-                <button
-                  type="button"
-                  disabled={Boolean(isProcessingAction)}
-                  onClick={nextPendingStep.onAction}
-                  className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg text-xs font-bold shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
-                  title={`Proceed to next stage: ${nextPendingStep.actionLabel}`}
-                >
-                  {isProcessingAction ? (
-                    <Clock className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <span>⚡</span>
-                  )}
-                  <span>Next: {nextPendingStep.actionLabel}</span>
-                </button>
-              )}
-            </div>
-
-            {/* Stepper Grid - 100% horizontally aligned nodes with centered connection lines */}
-            <div className="grid grid-cols-6 gap-0 relative">
-              {progressSteps.map((step, idx) => {
-                const colors = stepColorMap[step.color] || stepColorMap.gray;
-                const isClickable = Boolean(step.onAction);
-
-                return (
-                  <div key={step.id} className="flex flex-col items-center min-w-0 relative group">
-                    {/* Node Row with mathematical center connecting bar */}
-                    <div className="w-full flex items-center justify-center relative h-9">
-                      {/* Left connecting track */}
-                      {idx > 0 && (
-                        <div 
-                          className={`absolute left-0 right-1/2 top-1/2 -translate-y-1/2 h-[2px] transition-colors ${
-                            step.done ? 'bg-emerald-500' : 'bg-gray-200'
-                          }`} 
-                        />
-                      )}
-                      {/* Right connecting track */}
-                      {idx < progressSteps.length - 1 && (
-                        <div 
-                          className={`absolute left-1/2 right-0 top-1/2 -translate-y-1/2 h-[2px] transition-colors ${
-                            progressSteps[idx + 1].done ? 'bg-emerald-500' : 'bg-gray-200'
-                          }`} 
-                        />
-                      )}
-
-                      {/* Circle Node Icon */}
-                      <button
-                        type="button"
-                        onClick={step.onAction}
-                        disabled={!isClickable || Boolean(isProcessingAction)}
-                        title={isClickable ? `Click to ${step.actionLabel}` : step.status}
-                        className={`relative z-10 w-9 h-9 rounded-full ring-2 flex items-center justify-center transition-all ${
-                          step.done 
-                            ? `${colors.ring} ${colors.bg}` 
-                            : step.active 
-                              ? 'ring-amber-400 bg-amber-50 animate-pulse' 
-                              : 'ring-gray-200 bg-gray-50'
-                        } ${isClickable ? 'cursor-pointer hover:scale-110 shadow-2xs' : 'cursor-default'}`}
-                      >
-                        {step.done ? (
-                          <CheckCircle className={`w-5 h-5 ${colors.text}`} />
-                        ) : step.active ? (
-                          <Clock className="w-4 h-4 text-amber-600 animate-spin" />
-                        ) : (
-                          <Clock className="w-4 h-4 text-gray-400" />
-                        )}
-                      </button>
-                    </div>
-
-                    {/* Step Text Info - Exactly uniform height for perfect alignment */}
-                    <div className="mt-2 text-center w-full px-1 flex flex-col items-center justify-start min-h-[58px]">
-                      <span className={`text-[11px] font-bold leading-tight truncate w-full ${step.done ? 'text-gray-900' : 'text-gray-600'}`}>
-                        {step.label}
-                      </span>
-                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold border mt-1 select-none ${stepStatusBadge(step.status)}`}>
-                        {step.status}
-                      </span>
-                      <span className="text-[10px] text-gray-400 font-mono mt-0.5 min-h-[15px] block truncate">
-                        {step.date || '—'}
-                      </span>
-                    </div>
-
-                    {/* Optional interactive action trigger on hover */}
-                    {isClickable && !step.done && (
-                      <button
-                        type="button"
-                        onClick={step.onAction}
-                        className="mt-1 text-[9.5px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer truncate max-w-[90%]"
-                      >
-                        {step.actionLabel}
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
           {/* ── ORDER ITEMS TABLE ── */}
           <div className="border border-gray-200 rounded-xl bg-white overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
@@ -1172,6 +1060,26 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                         <td className="px-3 py-2.5">
                           <div className="font-bold text-gray-900">{item.itemName}</div>
                           <div className="text-[10px] text-gray-400 font-mono">{item.skuCode}</div>
+                          {item.isMixedBundle && item.components && item.components.length > 0 && (
+                            <div className="mt-1.5 p-2 bg-indigo-50/70 rounded-lg border border-indigo-100 text-[11px] space-y-1">
+                              <span className="font-bold text-indigo-900 flex items-center gap-1 text-[10px] uppercase">
+                                <Layers className="w-3 h-3 text-indigo-600" />
+                                <span>Mixed Pack Breakdown ({item.components.length} items):</span>
+                              </span>
+                              <div className="space-y-0.5 pl-1.5 border-l-2 border-indigo-300">
+                                {item.components.map((comp, cIdx) => (
+                                  <div key={comp.componentId || cIdx} className="flex items-center justify-between text-gray-700">
+                                    <span className="font-medium">
+                                      {cIdx === 0 ? '①' : cIdx === 1 ? '②' : cIdx === 2 ? '③' : `${cIdx + 1}.`} {comp.name}
+                                    </span>
+                                    <span className="font-mono text-gray-500">
+                                      {comp.quantity} pcs × ₹{Number(comp.rate).toFixed(2)} = <strong className="text-gray-900">₹{Number(comp.amount).toFixed(2)}</strong>
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </td>
                         <td className="px-3 py-2.5 text-center">
                           <span className={`font-bold font-mono ${realStockGbl > 0 ? 'text-emerald-600' : 'text-gray-400'}`}>
