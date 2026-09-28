@@ -277,14 +277,89 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     return backendSkus.find(s => s._id === selectedSkuId);
   }, [backendSkus, selectedSkuId]);
 
-  // Filter SKUs for Material / Component dropdown
+  // Item Classification: Raw Materials vs Semi-Finished Goods vs Finished Goods
+  const getItemClassification = (sku: SkuV2): 'products' | 'materials' | 'semi' => {
+    const cat = (sku.category || '').toLowerCase().trim();
+    const code = (sku.skuCode || '').toUpperCase().trim();
+    const name = (sku.name || '').toLowerCase().trim();
+
+    // 1. Semi Finished Goods (Semi Goods)
+    if (
+      code.startsWith('SFG-') || 
+      code.startsWith('SFG') || 
+      code.startsWith('SM-') || 
+      code.startsWith('SM') || 
+      code.startsWith('SEM') ||
+      cat.includes('semi') || 
+      cat.includes('wip') || 
+      cat.includes('sub-assembly') || 
+      cat.includes('sub') || 
+      cat.includes('ruled cut') || 
+      cat.includes('sheets') || 
+      name.includes('signature') || 
+      name.includes('ruled') || 
+      name.includes('book block')
+    ) {
+      return 'semi';
+    }
+
+    // 2. Raw Materials
+    if (
+      cat.includes('raw') || 
+      cat.includes('material') || 
+      cat === 'raw material' || 
+      cat.includes('reel') || 
+      cat.includes('board') || 
+      cat.includes('paper') || 
+      code.startsWith('RM-') || 
+      code.startsWith('RM') || 
+      name.includes('reel') || 
+      name.includes('gsm') || 
+      name.includes('wire') || 
+      name.includes('adhesive') || 
+      name.includes('glue')
+    ) {
+      return 'materials';
+    }
+
+    // 3. Finished Goods
+    return 'products';
+  };
+
+  // Only Raw Materials and Semi Goods can be selected as components in production
+  const rawAndSemiSkus = useMemo(() => {
+    const list = backendSkus.filter(s => {
+      const type = getItemClassification(s);
+      return type === 'materials' || type === 'semi';
+    });
+    if (list.length > 0) return list;
+    return backendSkus.filter(s => {
+      const code = (s.skuCode || '').toUpperCase();
+      return !code.startsWith('FG-') && !code.startsWith('FG');
+    });
+  }, [backendSkus]);
+
+  const [materialTypeFilter, setMaterialTypeFilter] = useState<'all' | 'materials' | 'semi'>('all');
+
+  const rawCount = useMemo(() => rawAndSemiSkus.filter(s => getItemClassification(s) === 'materials').length, [rawAndSemiSkus]);
+  const semiCount = useMemo(() => rawAndSemiSkus.filter(s => getItemClassification(s) === 'semi').length, [rawAndSemiSkus]);
+
+  // Filter SKUs for Material / Component dropdown strictly to Raw Materials & Semi Goods
   const getFilteredMaterialSkus = (searchTerm: string) => {
-    if (!searchTerm || !searchTerm.trim()) return backendSkus;
+    let base = rawAndSemiSkus;
+    if (materialTypeFilter === 'materials') {
+      base = base.filter(s => getItemClassification(s) === 'materials');
+    } else if (materialTypeFilter === 'semi') {
+      base = base.filter(s => getItemClassification(s) === 'semi');
+    }
+
+    if (!searchTerm || !searchTerm.trim()) return base;
     const q = searchTerm.toLowerCase().trim();
-    return backendSkus.filter(s => 
+    return base.filter(s => 
       s.name.toLowerCase().includes(q) || 
       (s.skuCode && s.skuCode.toLowerCase().includes(q)) ||
-      (s.category && s.category.toLowerCase().includes(q))
+      (s.category && s.category.toLowerCase().includes(q)) ||
+      (s.brand && s.brand.toLowerCase().includes(q))
     );
   };
 
@@ -1156,50 +1231,102 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                           </div>
                         </div>
 
-                        {/* Searchable Material Dropdown (1:1 with Screenshot & Sales) */}
+                        {/* Searchable Material Dropdown (Raw Materials & Semi Goods) */}
                         {activeMaterialDropdownId === row.id && (
-                          <div className="absolute left-3 top-full mt-1.5 w-[380px] sm:w-[460px] bg-white border border-gray-200 rounded-xl shadow-2xl z-[9999] max-h-64 overflow-y-auto divide-y divide-gray-100 p-1 animate-in fade-in zoom-in-95 duration-100">
-                            {getFilteredMaterialSkus(row.component).length === 0 ? (
-                              <div className="p-3 text-center text-xs text-gray-400 italic">No matching items found</div>
-                            ) : (
-                              getFilteredMaterialSkus(row.component).map(sku => {
-                                const isSelected = row.component.toLowerCase() === sku.name.toLowerCase();
-                                const conv = Number(sku.booksGbl || sku.altUnitConversion || 0);
-                                return (
-                                  <div
-                                    key={sku._id}
-                                    onClick={() => handleSelectMaterialSku(row.id, sku)}
-                                    className={`p-2.5 rounded-lg cursor-pointer flex items-center justify-between text-xs transition-colors ${
-                                      isSelected ? 'bg-blue-100/90 font-bold border border-blue-200' : 'hover:bg-blue-50/80'
-                                    }`}
-                                  >
-                                    <div className="flex-1 min-w-0 pr-3">
-                                      <div className="font-bold text-gray-900 truncate">{sku.name}</div>
-                                      <div className="flex items-center gap-1.5 mt-0.5">
-                                        <span className="text-[10px] text-gray-400 font-mono">{sku.skuCode}</span>
-                                        <span className="text-[10px] text-gray-300">•</span>
-                                        <span className="text-[10px] text-gray-500 truncate">{sku.brand || sku.category || 'Raw Material'}</span>
-                                        {sku.unit && (
-                                          <>
-                                            <span className="text-[10px] text-gray-300">•</span>
-                                            <span className="text-[10px] font-semibold text-blue-600">{sku.unit}</span>
-                                          </>
+                          <div className="absolute left-3 top-full mt-1.5 w-[420px] sm:w-[500px] bg-white border border-gray-200 rounded-xl shadow-2xl z-[9999] max-h-72 overflow-hidden flex flex-col p-1 animate-in fade-in zoom-in-95 duration-100">
+                            {/* Type filter tabs: All vs Materials vs Semi Goods */}
+                            <div className="flex items-center gap-1 p-1 bg-gray-50/90 rounded-lg border-b border-gray-100 mb-1">
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setMaterialTypeFilter('all'); }}
+                                className={`px-2.5 py-1 text-[10.5px] font-bold rounded-md transition-colors cursor-pointer ${
+                                  materialTypeFilter === 'all' 
+                                    ? 'bg-white text-blue-700 shadow-3xs border border-gray-200/60' 
+                                    : 'text-gray-500 hover:text-gray-800'
+                                }`}
+                              >
+                                All ({rawAndSemiSkus.length})
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setMaterialTypeFilter('materials'); }}
+                                className={`px-2.5 py-1 text-[10.5px] font-bold rounded-md transition-colors cursor-pointer ${
+                                  materialTypeFilter === 'materials' 
+                                    ? 'bg-amber-50 text-amber-700 border border-amber-200 shadow-3xs' 
+                                    : 'text-gray-500 hover:text-amber-700'
+                                }`}
+                              >
+                                Materials ({rawCount})
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setMaterialTypeFilter('semi'); }}
+                                className={`px-2.5 py-1 text-[10.5px] font-bold rounded-md transition-colors cursor-pointer ${
+                                  materialTypeFilter === 'semi' 
+                                    ? 'bg-purple-50 text-purple-700 border border-purple-200 shadow-3xs' 
+                                    : 'text-gray-500 hover:text-purple-700'
+                                }`}
+                              >
+                                Semi Goods ({semiCount})
+                              </button>
+                            </div>
+
+                            {/* Item List */}
+                            <div className="overflow-y-auto max-h-60 divide-y divide-gray-100 p-1">
+                              {getFilteredMaterialSkus(row.component).length === 0 ? (
+                                <div className="p-4 text-center text-xs text-gray-400 italic">No matching materials or semi goods found</div>
+                              ) : (
+                                getFilteredMaterialSkus(row.component).map(sku => {
+                                  const isSelected = row.component.toLowerCase() === sku.name.toLowerCase();
+                                  const conv = Number(sku.booksGbl || sku.altUnitConversion || 0);
+                                  const itemType = getItemClassification(sku);
+                                  return (
+                                    <div
+                                      key={sku._id}
+                                      onClick={() => handleSelectMaterialSku(row.id, sku)}
+                                      className={`p-2.5 rounded-lg cursor-pointer flex items-center justify-between text-xs transition-colors ${
+                                        isSelected ? 'bg-blue-100/90 font-bold border border-blue-200' : 'hover:bg-blue-50/80'
+                                      }`}
+                                    >
+                                      <div className="flex-1 min-w-0 pr-3">
+                                        <div className="font-bold text-gray-900 truncate">{sku.name}</div>
+                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                          <span className="text-[10px] text-gray-400 font-mono">{sku.skuCode}</span>
+                                          <span className="text-[10px] text-gray-300">•</span>
+                                          <span className="text-[10px] text-gray-500 truncate">{sku.brand || sku.category || (itemType === 'semi' ? 'Semi Finished' : 'Raw Material')}</span>
+                                          {sku.unit && (
+                                            <>
+                                              <span className="text-[10px] text-gray-300">•</span>
+                                              <span className="text-[10px] font-semibold text-blue-600">{sku.unit}</span>
+                                            </>
+                                          )}
+                                          {conv > 0 && (
+                                            <>
+                                              <span className="text-[10px] text-gray-300">•</span>
+                                              <span className="text-[10px] font-semibold text-indigo-600">{conv} Pcs/GBL</span>
+                                            </>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        {itemType === 'semi' ? (
+                                          <span className="px-2 py-0.5 text-[9px] font-extrabold uppercase rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+                                            Semi Goods
+                                          </span>
+                                        ) : (
+                                          <span className="px-2 py-0.5 text-[9px] font-extrabold uppercase rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                                            Material
+                                          </span>
                                         )}
-                                        {conv > 0 && (
-                                          <>
-                                            <span className="text-[10px] text-gray-300">•</span>
-                                            <span className="text-[10px] font-semibold text-indigo-600">{conv} Pcs/GBL</span>
-                                          </>
-                                        )}
+                                        <span className="px-2 py-0.5 text-[9.5px] font-extrabold uppercase rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
+                                          {sku.status || 'Active'}
+                                        </span>
                                       </div>
                                     </div>
-                                    <span className="px-2 py-0.5 text-[9.5px] font-extrabold uppercase rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200 shrink-0">
-                                      {sku.status || 'Active'}
-                                    </span>
-                                  </div>
-                                );
-                              })
-                            )}
+                                  );
+                                })
+                              )}
+                            </div>
                           </div>
                         )}
                       </td>
