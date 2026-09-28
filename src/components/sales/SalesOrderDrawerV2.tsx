@@ -272,7 +272,7 @@ export const computeSkuStock = (
   customPcsPerGbl?: number | string
 ): { stockGbl: number; stockPcs: number; pcsPerGbl: number } => {
   const conv = Number(customPcsPerGbl) || 
-               Number(sku?.booksGbl || sku?.altUnitConversion || (sku as any)?.pcsPerGbl || 0) || 
+               Number(sku?.altUnitConversion || sku?.booksGbl || (sku as any)?.pcsPerGbl || 0) || 
                1;
   const unit = (sku?.unit || '').toUpperCase().trim();
   const altUnit = (sku?.altUnit || '').toUpperCase().trim();
@@ -2513,7 +2513,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                             >
                               {filteredProductSkus.map((s, sIdx) => {
                                 const isInactive = (s.status || '').toLowerCase() === 'inactive';
-                                const definedConv = Number(s.booksGbl || s.altUnitConversion || (s as any).pcsPerGbl || 0);
+                                const definedConv = Number(s.altUnitConversion || s.booksGbl || (s as any).pcsPerGbl || 0);
                                 const isHighlighted = (highlightedProductIdxMap[idx] ?? 0) === sIdx;
 
                                 return (
@@ -3491,7 +3491,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                               ) : (
                                 filteredSkus.slice(0, 30).map((s) => {
                                   const isInactive = (s.status || '').toLowerCase() === 'inactive';
-                                  const pcsPerGblVal = Number(s.booksGbl || s.altUnitConversion || (s as any).pcsPerGbl || 0);
+                                  const pcsPerGblVal = Number(s.altUnitConversion || s.booksGbl || (s as any).pcsPerGbl || 0);
 
                                   return (
                                     <div

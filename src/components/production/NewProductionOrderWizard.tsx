@@ -339,6 +339,13 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     return () => { isMounted = false; };
   }, [companyId]);
 
+  // Sync backendSkus if initialSkus prop updates
+  useEffect(() => {
+    if (initialSkus && initialSkus.length > 0) {
+      setBackendSkus(initialSkus);
+    }
+  }, [initialSkus]);
+
   // Close menus on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -559,12 +566,13 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   }, [backendSkus]);
 
   // Returns PCS per GBL directly from Item Master fields.
-  // Same priority used across the whole codebase (SalesOrderDrawer, etc.)
+  // Prioritizes altUnitConversion as it represents the official Conversion Formula
+  // defined in Item Master (Units & Conversion Logic: 1 GBL = N PCS).
   const getSkuPcsPerGbl = (sku?: SkuV2 | null): number => {
     if (!sku) return 0;
     return (
-      Number((sku as any).booksGbl) ||
       Number(sku.altUnitConversion) ||
+      Number((sku as any).booksGbl) ||
       Number((sku as any).pcsPerGbl) ||
       0
     );
@@ -626,6 +634,16 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       (productName && s.name?.toLowerCase().trim() === productName.toLowerCase().trim())
     );
   }, [backendSkus, selectedSkuId, productCode, productName]);
+
+  // Keep conversionFactor in sync with current SKU from Item Master
+  useEffect(() => {
+    if (currentSku) {
+      const factor = getSkuPcsPerGbl(currentSku);
+      if (factor > 0 && factor !== conversionFactor) {
+        setConversionFactor(factor);
+      }
+    }
+  }, [currentSku]);
 
   // STRICTLY ASSIGNED UNITS ONLY
   const availableUnits = useMemo(() => {
@@ -836,7 +854,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       const loadedMaterials: MaterialRow[] = rawBom.map((raw: any, idx: number) => {
         const rawQty = Number(raw.qty) || Number(raw.qtyPerBatch) || 1;
         const perPieceBasis = rawQty / yieldQty;
-        const requiredQty = plannedPcs > 0 ? Math.round(perPieceBasis * targetPcs * 100) / 100 : rawQty;
+        const requiredQty = curPlannedQty > 0 ? Math.round(perPieceBasis * targetPcs * 100) / 100 : rawQty;
         const rate = Number(raw.rate) || 0;
 
         // Resolve matching SKU to get skuId

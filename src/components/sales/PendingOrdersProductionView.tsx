@@ -144,7 +144,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
         const sId = String(s._id || s.id || '');
         const code = (s.skuCode || '').toLowerCase().trim();
         const name = (s.name || '').toLowerCase().trim();
-        const pcsPerGbl = Number(s.booksGbl || s.altUnitConversion || 100) || 100;
+        const pcsPerGbl = Number(s.altUnitConversion || s.booksGbl || 100) || 100;
         const rawOnHand = skuPcsMap.get(sId) ?? (Number(s.presentStock || s.openingStock || 0));
         const unit = (s.unit || '').toUpperCase().trim();
         const altUnit = (s.altUnit || '').toUpperCase().trim();
