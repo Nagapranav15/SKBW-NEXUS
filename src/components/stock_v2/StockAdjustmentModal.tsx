@@ -28,6 +28,7 @@ import {
   getSkuStockDetailsV2 
 } from '../../api/mfgApiV2';
 import { LocationSelectPopup } from './LocationSelectPopup';
+import { convertPrimaryToAlt } from '../../utils/uomConversion';
 
 interface StockAdjustmentModalProps {
   isOpen: boolean;
@@ -146,7 +147,8 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
 
   const unit = selectedSku?.unit || 'GBL';
   const altUnit = selectedSku?.altUnit || 'PCS';
-  const conversionFactor = Number(selectedSku?.altUnitConversion) || 200;
+  // Use actual SKU master altUnitConversion — no arbitrary fallback
+  const conversionFactor = Number(selectedSku?.altUnitConversion) || 0;
 
   // Fetch real-time balance at selected location
   useEffect(() => {

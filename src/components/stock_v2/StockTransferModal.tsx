@@ -29,6 +29,7 @@ import {
   getSkuStockDetailsV2 
 } from '../../api/mfgApiV2';
 import { LocationSelectPopup } from './LocationSelectPopup';
+import { convertPrimaryToAlt } from '../../utils/uomConversion';
 
 interface BatchRow {
   batchNumber: string;
@@ -187,7 +188,8 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
 
   const unit = selectedSku?.unit || 'GBL';
   const altUnit = selectedSku?.altUnit || 'PCS';
-  const conversionFactor = Number(selectedSku?.altUnitConversion) || 200;
+  // Use actual SKU master altUnitConversion — no arbitrary fallback
+  const conversionFactor = Number(selectedSku?.altUnitConversion) || 0;
 
   // Fetch balances & batches for selected SKU & source location
   useEffect(() => {

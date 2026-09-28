@@ -537,7 +537,7 @@ export const ProductionModule: React.FC = () => {
       const itemCode = o.itemCode || `FG-${String(((globalIdx - 1) % 8) + 1).padStart(3, '0')}`;
       const plannedQty = Number(o.plannedQty) || 10;
       const plannedUom = o.plannedUom || 'GBL';
-      const plannedPcs = Number(o.plannedPcs) || (plannedQty * (o.conversionFactor || 300));
+      const plannedPcs = Number(o.plannedPcs) || (plannedQty * (o.conversionFactor || 1));
       const dueDate = o.requiredCompletionDate 
         ? (o.requiredCompletionDate.includes('-') 
             ? o.requiredCompletionDate.split('-').reverse().join('/') 

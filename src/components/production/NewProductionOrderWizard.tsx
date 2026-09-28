@@ -12,6 +12,7 @@ import { getSkusV2, getWarehouseHierarchyV2, SkuV2, WarehouseLocationV2, getProd
 import { LocationSelectPopup } from '../stock_v2/LocationSelectPopup';
 import Modal from '../ui/Modal';
 import { showToast } from '../ui/Toast';
+import { getUomDirection } from '../../utils/uomConversion';
 
 interface NewProductionOrderWizardProps {
   onCancel: () => void;
@@ -557,27 +558,62 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     });
   }, [backendSkus]);
 
-  // Dynamic conversion extraction from Item Master (0 if no conversion defined)
+  // Dynamic conversion extraction from Item Master.
+  // Returns the number of PCS (pieces) per GBL for this SKU.
+  // Returns 0 if the item is not a GBL-tracked finished/semi good.
   const getSkuPcsPerGbl = (sku?: SkuV2 | null): number => {
     if (!sku) return 0;
+
     const cat = (sku.category || '').toLowerCase();
-    if (cat.includes('raw') || cat.includes('index') || cat.includes('ruling') || cat.includes('board') || sku.paperType === 'Sheets' || sku.paperType === 'Reels') {
-      return 0;
-    }
+    const unitNorm = (sku.unit || '').toUpperCase().trim();
+    const altUnitNorm = (sku.altUnit || '').toUpperCase().trim();
+
+    // Only raw materials and pure reel items have no GBL conversion
+    const isRawReel = sku.paperType === 'Reels' && !cat.includes('product') && !cat.includes('finish');
+    if (isRawReel) return 0;
+
+    // 1. Explicit legacy field booksGbl
     const directBooks = Number((sku as any).booksGbl);
     if (directBooks > 0) return directBooks;
-    
-    const altConv = Number((sku as any).altUnitConversion);
-    if (altConv > 0) return altConv;
 
-    const pcsPerGbl = Number((sku as any).pcsPerGbl);
-    if (pcsPerGbl > 0) return pcsPerGbl;
+    // 2. If unit is GBL (primary unit), use altUnitConversion if altUnit is piece-like
+    if (unitNorm === 'GBL') {
+      const altConv = Number(sku.altUnitConversion);
+      if (altConv > 0) return altConv;
+      // Fallback to pages field (sheets/pieces per GBL bundle)
+      const pages = Number(sku.pages);
+      if (pages > 0) return pages;
+    }
 
-    const convFactor = Number((sku as any).conversionFactor);
-    if (convFactor > 0) return convFactor;
+    // 3. If altUnit is GBL, the altUnitConversion tells us pieces-per-GBL
+    if (altUnitNorm === 'GBL') {
+      const altConv = Number(sku.altUnitConversion);
+      if (altConv > 0) {
+        // direction: ALT_TO_PRIMARY means 1 GBL = altConv PCS
+        const dir = getUomDirection(sku.unit, sku.altUnit, sku.altUnitDirection);
+        return dir === 'ALT_TO_PRIMARY' ? altConv : (altConv > 0 ? 1 / altConv : 0);
+      }
+    }
+
+    // 4. Finished goods / products — use pages as PCS per GBL (notebook bundles)
+    const isFinishedGood = cat.includes('product') || cat.includes('finish') || cat.includes('notebook') || cat.includes('book') || cat.includes('register') || cat.includes('diar') || unitNorm === 'GBL';
+    if (isFinishedGood) {
+      const altConv = Number(sku.altUnitConversion);
+      if (altConv > 0) return altConv;
+      const pages = Number(sku.pages);
+      if (pages > 0) return pages;
+      const pcsPerGbl = Number((sku as any).pcsPerGbl);
+      if (pcsPerGbl > 0) return pcsPerGbl;
+    }
+
+    // 5. Generic altUnitConversion fallback for any SKU with explicit GBL/PCS pair
+    if ((unitNorm === 'GBL' || altUnitNorm === 'GBL') && Number(sku.altUnitConversion) > 0) {
+      return Number(sku.altUnitConversion);
+    }
 
     return 0;
   };
+
 
   // Dynamic Item Master specification badge:
   const getSkuSpecOrConversion = (sku?: SkuV2 | null): string => {
@@ -821,13 +857,23 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     const assignedUnit = (sku.unit || 'PCS').toUpperCase().trim();
     setUom(assignedUnit);
 
-    const factor = getSkuPcsPerGbl(sku);
-    setConversionFactor(factor);
+    // Compute factor synchronously (not from stale state) so BOM scales correctly
+    const newFactor = getSkuPcsPerGbl(sku);
+    setConversionFactor(newFactor);
+
+    // Compute actual planned PCS inline using the freshly computed factor
+    const curPlannedQty = Number(plannedQty) || 0;
+    let actualPlannedPcs: number;
+    if (assignedUnit === 'GBL') {
+      actualPlannedPcs = curPlannedQty > 0 ? curPlannedQty * (newFactor > 0 ? newFactor : 1) : (newFactor > 0 ? newFactor : 1);
+    } else {
+      actualPlannedPcs = curPlannedQty > 0 ? curPlannedQty : 1;
+    }
 
     const rawBom = sku.bomItems || (sku as any).bom || [];
     if (Array.isArray(rawBom) && rawBom.length > 0) {
       const yieldQty = Number(sku.recipeYieldQty) || Number(sku.batchYieldQty) || 1;
-      const targetPcs = plannedPcs > 0 ? plannedPcs : 1;
+      const targetPcs = actualPlannedPcs;
 
       const loadedMaterials: MaterialRow[] = rawBom.map((raw: any, idx: number) => {
         const rawQty = Number(raw.qty) || Number(raw.qtyPerBatch) || 1;

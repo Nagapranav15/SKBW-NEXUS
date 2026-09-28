@@ -3685,9 +3685,20 @@ const PurchaseInvoicePage: React.FC = () => {
                 totalKgWeight += item.quantity || 0;
               } else if (isFgItem) {
                 hasFg = true;
-                const conv = resolvedSku?.conversionFactor || fullSku?.conversionFactor || 200;
+                const activeSku = fullSku || resolvedSku;
+                // Use actual SKU master altUnitConversion for GBL<->PCS conversion
                 const gblQty = item.unit === 'GBL' ? (item.quantity || 0) : (item.altUnit === 'GBL' ? (item.altQuantity || 0) : (item.quantity || 0));
-                const pcsQty = item.altUnit === 'PCS' ? (item.altQuantity || 0) : (item.unit === 'PCS' ? (item.quantity || 0) : (gblQty * conv));
+                let pcsQty: number;
+                if (item.altUnit === 'PCS' || item.altUnit === 'PC' || item.altUnit === 'NOS') {
+                  pcsQty = Number(item.altQuantity) || 0;
+                } else if (item.unit === 'PCS' || item.unit === 'PC' || item.unit === 'NOS') {
+                  pcsQty = Number(item.quantity) || 0;
+                } else if (activeSku?.altUnitConversion) {
+                  // Dynamically convert GBL -> PCS using SKU master rate
+                  pcsQty = convertPrimaryToAlt(gblQty, activeSku);
+                } else {
+                  pcsQty = gblQty;
+                }
                 totalFgPcs += pcsQty;
               } else {
                 totalKgWeight += item.quantity || 0;
@@ -3902,11 +3913,22 @@ const PurchaseInvoicePage: React.FC = () => {
                             if (reelsTotalWt > 0) displayQtyKg = reelsTotalWt;
                             itemUnitDisplay = `${item.reels.length} ${item.reels.length === 1 ? 'Reel' : 'Reels'}`;
                           } else if (isFgItem) {
-                            const conv = resolvedSku?.conversionFactor || fullSku?.conversionFactor || 200;
+                            const activeSku = fullSku || resolvedSku;
+                            // Dynamically compute GBL->PCS using actual SKU master altUnitConversion
                             const gblQty = item.unit === 'GBL' ? (item.quantity || 0) : (item.altUnit === 'GBL' ? (item.altQuantity || 0) : (item.quantity || 0));
-                            const pcsQty = item.altUnit === 'PCS' ? (item.altQuantity || 0) : (item.unit === 'PCS' ? (item.quantity || 0) : (gblQty * conv));
+                            let pcsQty: number;
+                            if (item.altUnit === 'PCS' || item.altUnit === 'PC' || item.altUnit === 'NOS') {
+                              pcsQty = Number(item.altQuantity) || 0;
+                            } else if (item.unit === 'PCS' || item.unit === 'PC' || item.unit === 'NOS') {
+                              pcsQty = Number(item.quantity) || 0;
+                            } else if (activeSku?.altUnitConversion) {
+                              pcsQty = convertPrimaryToAlt(gblQty, activeSku);
+                            } else {
+                              pcsQty = gblQty;
+                            }
                             displayQtyKg = pcsQty;
-                            itemUnitDisplay = `${gblQty} GBL`;
+                            const gblLabel = activeSku?.unit || item.unit || 'GBL';
+                            itemUnitDisplay = `${gblQty} ${gblLabel}`;
                           } else {
                             itemUnitDisplay = `1 Reel`;
                           }
