@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ArrowLeft, Printer, Layers, Package, Plus, CheckCircle2, 
-  Clock, IndianRupee, Box, Check, ExternalLink, AlertCircle, FileText, History, RefreshCw, X
+  Clock, IndianRupee, Box, Check, ExternalLink, AlertCircle, FileText, History, RefreshCw, X, ShoppingBag, Truck, Link2
 } from 'lucide-react';
 import { ProductionOrder } from '../../types/production';
 import { formatOrderNo } from './productionUtils';
@@ -478,7 +478,20 @@ export const ProductionOrderDetailView: React.FC<ProductionOrderDetailViewProps>
 
                 <div>
                   <span className="text-[11px] text-gray-400 font-medium block">Reference (Sales Order)</span>
-                  <span className="font-semibold text-gray-700 mt-0.5 block">{order.reference || 'Not Selected'}</span>
+                  {order.reference && order.reference !== 'Not Selected' ? (
+                    <a
+                      href={`/sales/orders?search=${encodeURIComponent(order.reference.replace(/^Sales Order #?/, '').trim())}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 font-bold text-blue-600 hover:text-blue-800 hover:underline mt-0.5"
+                    >
+                      <ShoppingBag className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span>{order.reference}</span>
+                      <ExternalLink className="w-3 h-3 text-blue-500 shrink-0" />
+                    </a>
+                  ) : (
+                    <span className="font-semibold text-gray-500 mt-0.5 block">Make to Stock (Buffer)</span>
+                  )}
                 </div>
 
                 <div className="col-span-2">
@@ -560,6 +573,149 @@ export const ProductionOrderDetailView: React.FC<ProductionOrderDetailViewProps>
             </div>
           </div>
 
+          {/* Card: ERP 360° Traceability Map (Upstream Demand & Downstream Supply Chain) */}
+          <div className="bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 rounded-xl border border-gray-200 shadow-2xs p-5 md:col-span-2 space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-150 pb-3">
+              <div className="flex items-center space-x-2">
+                <Link2 className="w-4 h-4 text-indigo-600" />
+                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+                  ERP Supply Chain Traceability & Document Flow (Tally / SAP Prime)
+                </h3>
+              </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                Connected Voucher Chain
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Step 1: Upstream Demand */}
+              <div className="bg-white rounded-xl border border-gray-200 p-3.5 shadow-3xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider flex items-center gap-1">
+                      <ShoppingBag className="w-3 h-3" /> Upstream Demand
+                    </span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">
+                      {order.reference && order.reference !== 'Not Selected' ? 'Sales Order' : 'Buffer Stock'}
+                    </span>
+                  </div>
+
+                  <div className="mt-2.5">
+                    {order.reference && order.reference !== 'Not Selected' ? (
+                      <>
+                        <h4 className="text-xs font-black text-gray-900">{order.reference}</h4>
+                        <p className="text-[11px] text-gray-500 mt-0.5">
+                          Customer Demand binding for {order.plannedQty} {order.plannedUom}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <h4 className="text-xs font-bold text-gray-700">Make to Stock</h4>
+                        <p className="text-[11px] text-gray-400 mt-0.5">Manufactured for buffer inventory replenishment</p>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-3 pt-2 border-t border-gray-100 flex items-center justify-between text-[11px]">
+                  {order.reference && order.reference !== 'Not Selected' ? (
+                    <a
+                      href={`/sales/orders?search=${encodeURIComponent(order.reference.replace(/^Sales Order #?/, '').trim())}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 hover:underline"
+                    >
+                      <span>Open Sales Order</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  ) : (
+                    <span className="text-gray-400">No Sales Order</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Step 2: Manufacturing Order */}
+              <div className="bg-white rounded-xl border border-blue-200/80 p-3.5 shadow-3xs flex flex-col justify-between ring-1 ring-blue-500/20">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider flex items-center gap-1">
+                      <Layers className="w-3 h-3" /> Production Process
+                    </span>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                      isCompleted ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                    }`}>
+                      {order.status}
+                    </span>
+                  </div>
+
+                  <div className="mt-2.5">
+                    <h4 className="text-xs font-black text-gray-900 font-mono">{formatOrderNo(order.orderNumber)}</h4>
+                    <p className="text-[11px] text-gray-600 mt-0.5 truncate font-medium" title={order.itemName}>
+                      {order.itemName}
+                    </p>
+                    <div className="text-[10px] text-gray-500 mt-1">
+                      Planned: <strong>{order.plannedQty} {order.plannedUom}</strong> • Done: <strong>{order.producedQty} {order.plannedUom}</strong> ({order.progress}%)
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 pt-2 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-500">
+                  <span>Due: {order.requiredCompletionDate || 'Not set'}</span>
+                  <span>Dept: {order.department}</span>
+                </div>
+              </div>
+
+              {/* Step 3: Downstream Supply */}
+              <div className="bg-white rounded-xl border border-gray-200 p-3.5 shadow-3xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-purple-600 uppercase tracking-wider flex items-center gap-1">
+                      <Truck className="w-3 h-3" /> Raw Material Supply
+                    </span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700">
+                      Purchase Batches
+                    </span>
+                  </div>
+
+                  <div className="mt-2.5 space-y-1.5">
+                    {resolvedBomItems.some(i => i.lotNumber || i.purchaseInvoiceNo) ? (
+                      resolvedBomItems
+                        .filter(i => i.lotNumber || i.purchaseInvoiceNo)
+                        .slice(0, 2)
+                        .map((bItem, bIdx) => (
+                          <div key={bIdx} className="text-[11px] flex items-center justify-between">
+                            <span className="font-mono text-purple-700 font-bold">
+                              {bItem.lotNumber || bItem.purchaseInvoiceNo}
+                            </span>
+                            <span className="text-gray-500 truncate max-w-[100px]" title={bItem.supplierName || bItem.component}>
+                              {bItem.supplierName || bItem.component}
+                            </span>
+                          </div>
+                        ))
+                    ) : (
+                      <p className="text-[11px] text-gray-400 mt-0.5">
+                        Materials allocated from stock inventory / FIFO warehouse reserve
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-3 pt-2 border-t border-gray-100 flex items-center justify-between text-[11px]">
+                  <a
+                    href="/inventory-v2/purchases"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-purple-600 hover:text-purple-800 font-semibold flex items-center gap-1 hover:underline"
+                  >
+                    <span>View Purchase Batches</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                  <span className="text-[10px] text-gray-400">{resolvedBomItems.length} BOM components</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Card 3: Material Consumption Summary */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-2xs p-5 flex flex-col justify-between">
             <div className="space-y-4">
@@ -587,6 +743,7 @@ export const ProductionOrderDetailView: React.FC<ProductionOrderDetailViewProps>
                       <th className="py-2 px-2.5">Required Qty</th>
                       <th className="py-2 px-2.5">UOM</th>
                       <th className="py-2 px-2.5">Live Stock</th>
+                      <th className="py-2 px-2.5">Inward Batch / Lot</th>
                       <th className="py-2 px-2.5">Unit Cost (₹)</th>
                       <th className="py-2 px-2.5">Total Cost (₹)</th>
                       <th className="py-2 px-2.5">Status</th>
@@ -603,6 +760,21 @@ export const ProductionOrderDetailView: React.FC<ProductionOrderDetailViewProps>
                         <td className="py-2.5 px-2.5 font-bold text-gray-800">{item.totalRequired.toLocaleString()}</td>
                         <td className="py-2.5 px-2.5 text-gray-600">{item.uom}</td>
                         <td className="py-2.5 px-2.5 font-semibold text-gray-700">{item.dynamicStock.toLocaleString()}</td>
+                        <td className="py-2.5 px-2.5">
+                          {item.lotNumber || item.purchaseInvoiceNo ? (
+                            <a
+                              href={`/inventory-v2/purchases?search=${encodeURIComponent(item.lotNumber || item.purchaseInvoiceNo || '')}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 font-mono text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded hover:bg-indigo-100 transition-colors"
+                            >
+                              <span>{item.lotNumber || item.purchaseInvoiceNo}</span>
+                              <ExternalLink className="w-2.5 h-2.5 text-indigo-500" />
+                            </a>
+                          ) : (
+                            <span className="text-[10px] text-gray-400">Stock FIFO</span>
+                          )}
+                        </td>
                         <td className="py-2.5 px-2.5 font-mono font-medium text-gray-800">
                           {item.dynamicRate > 0 ? `₹${item.dynamicRate.toFixed(2)}` : '₹0.00'}
                         </td>

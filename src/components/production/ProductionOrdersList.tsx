@@ -3,7 +3,7 @@ import {
   Factory, Plus, Search, SlidersHorizontal, ArrowUpDown, Download, 
   RotateCcw, Eye, Pencil, MoreHorizontal, Calendar, Package, 
   FileText, LayoutGrid, History, Check, ChevronLeft, ChevronRight, 
-  Printer, Trash2, ArrowUp, ArrowDown, Filter, Columns, X
+  Printer, Trash2, ArrowUp, ArrowDown, Filter, Columns, X, ShoppingBag
 } from 'lucide-react';
 import { ProductionOrder, ProductionStatus, ItemType } from '../../types/production';
 import * as XLSX from 'xlsx';
@@ -907,10 +907,21 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                         <td className="py-3.5 px-3 font-bold text-gray-900 whitespace-nowrap">
                           <button
                             onClick={() => onViewOrder(order)}
-                            className="hover:text-blue-600 hover:underline transition-colors text-left font-bold cursor-pointer font-mono"
+                            className="hover:text-blue-600 hover:underline transition-colors text-left font-bold cursor-pointer font-mono block"
                           >
                             {formatOrderNo(order.orderNumber)}
                           </button>
+                          {order.reference && order.reference !== 'Not Selected' && (
+                            <a
+                              href={`/sales/orders?search=${encodeURIComponent(order.reference.replace(/^Sales Order #?/, '').trim())}`}
+                              onClick={(e) => e.stopPropagation()}
+                              title={`Demand Source: ${order.reference}`}
+                              className="inline-flex items-center gap-1 text-[10px] font-medium text-blue-600 hover:text-blue-800 hover:underline mt-0.5"
+                            >
+                              <ShoppingBag className="w-2.5 h-2.5 text-blue-500 shrink-0" />
+                              <span className="truncate max-w-[120px]">{order.reference}</span>
+                            </a>
+                          )}
                         </td>
 
                         {/* Item / Product */}

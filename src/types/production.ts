@@ -17,6 +17,10 @@ export interface ProductionBomItem {
   amount: number; // Total amount in INR
   issuedQty?: number;
   issuedStatus?: 'Issued' | 'Pending' | 'Partial';
+  batchNumber?: string;
+  lotNumber?: string;
+  purchaseInvoiceNo?: string;
+  supplierName?: string;
 }
 
 export interface ProductionEntry {
@@ -80,6 +84,7 @@ export interface ProductionOrder {
   completedBy?: string;
   priority: PriorityLevel;
   reference?: string; // e.g. 'Sales Order #SO-1029' or 'Not Selected'
+  referenceSalesOrderId?: string;
   remarks?: string;
   bomType: 'Default BOM' | 'Custom BOM (Production Order Only)';
   bomItems: ProductionBomItem[];

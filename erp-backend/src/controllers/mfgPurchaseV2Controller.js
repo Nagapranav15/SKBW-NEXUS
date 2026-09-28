@@ -150,12 +150,28 @@ exports.createPurchaseInvoice = async (req, res, next) => {
 
     // 3. Generate sequential invoice number if not manually specified or resolve duplicate
     let finalInvoiceNo = invoiceNumber;
+    const generateNextPB = async () => {
+      const regex = /^PB-(?:[A-Z]{3}-)?(\d+)$/i;
+      const existingInvoices = await PurchaseInvoiceV2.find({ company: companyObjId, invoiceNumber: regex }).select('invoiceNumber').lean();
+      let maxNum = 0;
+      existingInvoices.forEach(inv => {
+        const match = inv.invoiceNumber ? inv.invoiceNumber.match(regex) : null;
+        if (match && match[1]) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > maxNum) maxNum = num;
+        }
+      });
+      const nextSeq = maxNum + 1;
+      const padLen = Math.max(3, String(nextSeq).length);
+      return `PB-${String(nextSeq).padStart(padLen, '0')}`;
+    };
+
     if (!finalInvoiceNo) {
-      finalInvoiceNo = await Sequence.getNextSequence("PB");
+      finalInvoiceNo = await generateNextPB();
     } else {
       const exists = await PurchaseInvoiceV2.findOne({ invoiceNumber: finalInvoiceNo, company: companyObjId });
       if (exists) {
-        finalInvoiceNo = await Sequence.getNextSequence("PB");
+        finalInvoiceNo = await generateNextPB();
       }
     }
 
@@ -398,69 +414,60 @@ exports.createPurchaseInvoice = async (req, res, next) => {
 const migratePurchaseBatchNumbers = async (companyObjId) => {
   try {
     const query = companyObjId ? { company: companyObjId } : {};
-    const allInvoices = await PurchaseInvoiceV2.find(query).sort({ createdAt: 1 });
-    if (!allInvoices || allInvoices.length === 0) return;
+    const unmigrated = await PurchaseInvoiceV2.find({
+      ...query,
+      invoiceNumber: { $not: /^PB-\d{3,}$/ }
+    });
+    if (!unmigrated || unmigrated.length === 0) return;
 
-    // Collect all existing invoice numbers in the database
-    const existingInvoiceDocs = await PurchaseInvoiceV2.find({}, { invoiceNumber: 1 });
-    const existingNumbers = new Set(existingInvoiceDocs.map(i => i.invoiceNumber));
-
-    // Track highest sequence index per month prefix (e.g., PB-SEP-001 -> 1)
-    const monthMaxIndexMap = {};
-    for (const no of existingNumbers) {
-      if (!no) continue;
-      const match = /^PB-([A-Z]{3})-(\d+)$/i.exec(no);
-      if (match) {
-        const month = match[1].toUpperCase();
-        const num = parseInt(match[2], 10);
-        if (!monthMaxIndexMap[month] || num > monthMaxIndexMap[month]) {
-          monthMaxIndexMap[month] = num;
-        }
+    // Fetch all invoices for company ordered by createdAt
+    const allInvoices = await PurchaseInvoiceV2.find(query).sort({ createdAt: 1, _id: 1 });
+    
+    // Existing valid PB- numbers
+    const usedNumbers = new Set();
+    allInvoices.forEach(inv => {
+      if (/^PB-\d{3,}$/.test(inv.invoiceNumber)) {
+        usedNumbers.add(inv.invoiceNumber);
       }
-    }
+    });
 
+    let currentSeq = 1;
     for (const inv of allInvoices) {
       const oldNo = inv.invoiceNumber;
-      if (!/^PB-[A-Z]{3}-\d{3}$/i.test(oldNo)) {
-        const monthShort = inv.createdAt ? new Date(inv.createdAt).toLocaleString('en-US', { month: 'short' }).toUpperCase() : 'SEP';
-        
-        let nextIndex = (monthMaxIndexMap[monthShort] || 0) + 1;
-        let newNo = `PB-${monthShort}-${String(nextIndex).padStart(3, '0')}`;
-
-        while (existingNumbers.has(newNo)) {
-          nextIndex++;
-          newNo = `PB-${monthShort}-${String(nextIndex).padStart(3, '0')}`;
+      if (!/^PB-\d{3,}$/.test(oldNo)) {
+        while (usedNumbers.has(`PB-${String(currentSeq).padStart(3, '0')}`)) {
+          currentSeq++;
         }
-
-        monthMaxIndexMap[monthShort] = nextIndex;
-        existingNumbers.add(newNo);
+        const padLen = Math.max(3, String(currentSeq).length);
+        const newNo = `PB-${String(currentSeq).padStart(padLen, '0')}`;
+        usedNumbers.add(newNo);
 
         inv.invoiceNumber = newNo;
         if (Array.isArray(inv.items)) {
           inv.items.forEach(item => {
-            if (!item.lotNumber || !/^PB-[A-Z]{3}-\d{3}$/i.test(item.lotNumber) || item.lotNumber === oldNo) {
+            if (!item.lotNumber || !/^PB-\d{3,}$/.test(item.lotNumber) || item.lotNumber === oldNo) {
               item.lotNumber = newNo;
             }
           });
         }
-        
+
         try {
           await inv.save();
 
           await InventoryLedger.updateMany(
-            { referenceId: oldNo },
+            { company: inv.company, referenceId: oldNo },
             { $set: { referenceId: newNo, batchNumber: newNo } }
           );
           await InventoryLedger.updateMany(
-            { batchNumber: oldNo },
+            { company: inv.company, batchNumber: oldNo },
             { $set: { batchNumber: newNo } }
           );
           await Transaction.updateMany(
-            { source_type: "PURCHASE", description: { $regex: oldNo } },
+            { company: inv.company, source_type: "PURCHASE", reference_id: inv._id },
             { $set: { description: `Inwarded materials under invoice ${newNo}` } }
           );
         } catch (saveErr) {
-          console.error(`Skipping invoice migration for ID ${inv._id} due to save error:`, saveErr.message);
+          console.error(`Skipping invoice migration for ID ${inv._id}:`, saveErr.message);
         }
       }
     }
@@ -477,6 +484,7 @@ exports.getPurchaseInvoices = async (req, res, next) => {
     }
 
     const companyObjId = toObjectId(companyId);
+    await migratePurchaseBatchNumbers(companyObjId);
 
     const query = { company: companyObjId };
     if (vendorId) query.vendorId = toObjectId(vendorId);
@@ -1081,15 +1089,13 @@ exports.getNextInvoiceNumber = async (req, res, next) => {
     }
     const companyObjId = toObjectId(companyId);
 
-    const monthShort = new Date().toLocaleString('en-US', { month: 'short' }).toUpperCase();
-    const prefix = `PB-${monthShort}-`;
-    const regex = new RegExp(`^PB-${monthShort}-(\\d+)$`, 'i');
+    const regex = /^PB-(?:[A-Z]{3}-)?(\d+)$/i;
 
     const existingInvoices = await PurchaseInvoiceV2.find({ company: companyObjId, invoiceNumber: regex }).select('invoiceNumber').lean();
 
     let maxNum = 0;
     existingInvoices.forEach(inv => {
-      const match = inv.invoiceNumber.match(regex);
+      const match = inv.invoiceNumber ? inv.invoiceNumber.match(regex) : null;
       if (match && match[1]) {
         const num = parseInt(match[1], 10);
         if (!isNaN(num) && num > maxNum) maxNum = num;
@@ -1097,7 +1103,8 @@ exports.getNextInvoiceNumber = async (req, res, next) => {
     });
 
     const nextSeq = maxNum + 1;
-    const code = `${prefix}${String(nextSeq).padStart(3, '0')}`;
+    const padLen = Math.max(3, String(nextSeq).length);
+    const code = `PB-${String(nextSeq).padStart(padLen, '0')}`;
 
     res.json({ nextInvoiceNumber: code });
   } catch (err) {

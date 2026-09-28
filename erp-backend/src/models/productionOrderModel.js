@@ -43,7 +43,7 @@ const productionOrderSchema = new mongoose.Schema({
     default: "Normal" 
   },
   reference: { type: String, default: "Not Selected" },
-  referenceSalesOrderId: { type: mongoose.Schema.Types.ObjectId, ref: "SalesOrder", required: false },
+  referenceSalesOrderId: { type: mongoose.Schema.Types.Mixed, required: false },
   remarks: { type: String, default: "" },
   bomType: { 
     type: String, 

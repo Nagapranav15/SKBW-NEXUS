@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   X, Edit, Printer, FileText, MoreHorizontal,
   User, Calendar, Truck, Tag, MapPin, Phone, Package,
   ChevronRight, Plus, Trash2, CheckCircle, Clock,
-  AlertCircle, CreditCard, IndianRupee, Play, Send, Check
+  AlertCircle, CreditCard, IndianRupee, Play, Send, Check,
+  Factory, ExternalLink
 } from 'lucide-react';
 import { SalesOrderV2, updateSalesOrderV2Status } from '../../api/salesOrderApiV2';
 import { saveCustomSalesOrder } from '../../utils/salesOrderStorage';
@@ -39,6 +41,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
   onOrderUpdated,
 }) => {
   const { selectedCompany, user } = useAuth();
+  const navigate = useNavigate();
   const [localOrder, setLocalOrder] = useState<SalesOrderV2 | null>(order);
   const [productionOrders, setProductionOrders] = useState<any[]>([]);
   const [deliveryChallans, setDeliveryChallans] = useState<any[]>([]);
@@ -160,11 +163,17 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
   const linkedProductionOrder = useMemo(() => {
     if (!productionOrders.length || !activeOrder) return null;
     const orderNum = (activeOrder.orderNumber || '').toLowerCase().trim();
+    const orderId = String(activeOrder._id || '');
     return productionOrders.find(po => {
       const pNum = (po.orderNumber || '').toLowerCase();
       const notes = (po.notes || '').toLowerCase();
       const source = (po.source || '').toLowerCase();
-      return pNum.includes(orderNum) || notes.includes(orderNum) || source.includes(orderNum);
+      const ref = (po.reference || '').toLowerCase();
+      const refId = String(po.referenceSalesOrderId || '');
+      return (
+        (refId && (refId === orderId || refId === (activeOrder as any).id)) ||
+        (orderNum && (ref.includes(orderNum) || pNum.includes(orderNum) || notes.includes(orderNum) || source.includes(orderNum)))
+      );
     });
   }, [productionOrders, activeOrder]);
 
@@ -317,13 +326,15 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
       try {
         const newProd = await createProductionOrder({
           companyId: compId,
-          orderNumber: `PROD-${activeOrder.orderNumber}`,
+          orderNumber: `PO-${activeOrder.orderNumber.replace(/^SO-?/i, '')}`,
+          reference: activeOrder.orderNumber,
+          referenceSalesOrderId: activeOrder._id,
           notes: `Sales Order ${activeOrder.orderNumber} for ${activeOrder.customerName}`,
           source: activeOrder.orderNumber,
           itemName: firstItem?.itemName || 'Finished Goods',
           skuId: skuIdVal,
           plannedQty: totalQty,
-          plannedUom: firstItem?.uom || 'Pcs',
+          plannedUom: firstItem?.uom || 'GBL',
           status: 'In Progress',
           startDate: new Date().toISOString().slice(0, 10),
           dueDate: activeOrder.promisedDate || new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
@@ -747,6 +758,68 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
               >
                 <CheckCircle className="w-4 h-4 stroke-[2.5]" />
                 <span>{isConfirming ? 'Confirming...' : 'Confirm Order'}</span>
+              </button>
+            </div>
+          {/* ── ERP CONNECTION: Linked Production Order or Plan Production ── */}
+          {linkedProductionOrder ? (
+            <div className="flex items-center justify-between p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/90 rounded-xl text-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-300 flex items-center justify-center text-amber-800 font-bold shrink-0">
+                  <Factory className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-gray-900">Linked Production Order:</span>
+                    <span className="font-mono font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                      {linkedProductionOrder.orderNumber}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      linkedProductionOrder.status === 'Completed' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-amber-100 text-amber-800 border border-amber-200'
+                    }`}>
+                      {linkedProductionOrder.status}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-gray-600 mt-0.5">
+                    Item: <span className="font-semibold text-gray-800">{linkedProductionOrder.itemName || 'Finished Goods'}</span> • Planned: <span className="font-semibold text-gray-800">{linkedProductionOrder.plannedQty} {linkedProductionOrder.plannedUom}</span>
+                    {linkedProductionOrder.dueDate && ` • Target: ${fmtDate(linkedProductionOrder.dueDate)}`}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  navigate(`/production?orderId=${linkedProductionOrder._id || linkedProductionOrder.orderNumber}`);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white rounded-lg font-bold text-xs shadow-xs transition-all cursor-pointer shrink-0"
+              >
+                <span>Open in Production</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : activeOrder.status === 'Confirmed' && (
+            <div className="flex items-center justify-between p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-xl text-xs">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                  <Factory className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <span className="font-bold text-blue-950">Ready for Production Planning</span>
+                  <p className="text-[11px] text-blue-800/80">Order is confirmed. You can plan material BOM and schedule production for this order.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  const firstItem = activeOrder.items?.[0];
+                  const totalQty = activeOrder.items?.reduce((s, i) => s + (Number(i.quantity) || 0), 0) || 100;
+                  navigate(`/production?view=new&salesOrderId=${activeOrder._id}&orderNumber=${encodeURIComponent(activeOrder.orderNumber)}&skuCode=${encodeURIComponent(firstItem?.skuCode || '')}&plannedQty=${totalQty}&plannedUom=${encodeURIComponent(firstItem?.uom || 'GBL')}`);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-lg font-bold text-xs shadow-xs transition-all cursor-pointer shrink-0"
+              >
+                <span>Plan Production Order</span>
+                <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
           )}

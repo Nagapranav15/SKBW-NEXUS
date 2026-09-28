@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, ArrowRight, Check, AlertCircle, Plus, Trash2, 
   RotateCcw, ExternalLink, Calendar, CheckCircle2, ChevronRight,
   Pencil, DollarSign, Search, Loader2, Sparkles, ChevronDown, 
-  Settings, X, Layers, Box
+  Settings, X, Layers, Box, ShoppingBag, Truck, Link2, FileSpreadsheet
 } from 'lucide-react';
 import { ProductionOrder, ProductionBomItem, PriorityLevel, ItemType } from '../../types/production';
 import { getNextProductionOrderNumber, createProductionOrder } from '../../api/productionApi';
 import { getSkusV2, getWarehouseHierarchyV2, SkuV2, WarehouseLocationV2, getMetadataV2 } from '../../api/mfgApiV2';
+import { getSalesOrdersV2, updateSalesOrderV2Status, SalesOrderV2 } from '../../api/salesOrderApiV2';
+import { getPurchaseInvoicesV2, PurchaseInvoiceV2 } from '../inventory_v2/purchases/purchaseService';
 import { showToast } from '../ui/Toast';
 import { PresetField, PresetItem } from './PresetField';
 import { BulkEditBomModal } from './BulkEditBomModal';
@@ -189,6 +192,17 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   // Bulk Edit BOM Modal state (opens exact Item Master recipe editor)
   const [showBulkEditBomModal, setShowBulkEditBomModal] = useState<boolean>(false);
 
+  // ERP Cross-Module Connections (Sales Orders & Purchase Batches)
+  const [searchParams] = useSearchParams();
+  const [salesOrders, setSalesOrders] = useState<SalesOrderV2[]>([]);
+  const [selectedSalesOrderId, setSelectedSalesOrderId] = useState<string>('');
+  const [selectedSalesOrder, setSelectedSalesOrder] = useState<SalesOrderV2 | null>(null);
+  const [reference, setReference] = useState<string>('Not Selected');
+  const [showSalesOrderDropdown, setShowSalesOrderDropdown] = useState<boolean>(false);
+  const [salesOrderSearchQuery, setSalesOrderSearchQuery] = useState<string>('');
+  const salesOrderDropdownRef = useRef<HTMLDivElement>(null);
+  const [purchaseInvoices, setPurchaseInvoices] = useState<PurchaseInvoiceV2[]>([]);
+
   // Form Fields - PO-001 (Accommodates > 1 lakh orders)
   const [orderNumber, setOrderNumber] = useState<string>(() => {
     return cachedCompanyId === companyId && cachedNextOrderNumber ? cachedNextOrderNumber : 'PO-001';
@@ -286,6 +300,9 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       if (quickPresetMenuRef.current && !quickPresetMenuRef.current.contains(target)) {
         setShowQuickPresetMenu(false);
       }
+      if (salesOrderDropdownRef.current && !salesOrderDropdownRef.current.contains(target)) {
+        setShowSalesOrderDropdown(false);
+      }
     };
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
@@ -298,11 +315,13 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       try {
         if (!companyId) return;
 
-        const [skusRes, warehouseRes, nextNumRes, costingsRes] = await Promise.allSettled([
+        const [skusRes, warehouseRes, nextNumRes, costingsRes, salesOrdersRes, purchaseInvoicesRes] = await Promise.allSettled([
           getSkusV2(companyId),
           getWarehouseHierarchyV2(companyId),
           getNextProductionOrderNumber(companyId),
-          fetchStockCostings(companyId)
+          fetchStockCostings(companyId),
+          getSalesOrdersV2(companyId),
+          getPurchaseInvoicesV2({ companyId, limit: 100 })
         ]);
 
         if (!isMounted) return;
@@ -318,6 +337,16 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         // SKUs
         if (skusRes.status === 'fulfilled' && Array.isArray(skusRes.value)) {
           setBackendSkus(skusRes.value);
+        }
+
+        // Sales Orders (ERP Upstream Demand)
+        if (salesOrdersRes.status === 'fulfilled' && Array.isArray(salesOrdersRes.value)) {
+          setSalesOrders(salesOrdersRes.value);
+        }
+
+        // Purchase Invoices (ERP Downstream Raw Material Supply)
+        if (purchaseInvoicesRes.status === 'fulfilled' && purchaseInvoicesRes.value?.invoices) {
+          setPurchaseInvoices(purchaseInvoicesRes.value.invoices);
         }
 
         // Warehouse Locations & Factories
@@ -354,6 +383,58 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     loadBackend();
     return () => { isMounted = false; };
   }, [companyId]);
+
+  // Handle cross-module deep link via URL search parameters (from Sales or Purchases)
+  useEffect(() => {
+    if (!backendSkus.length && !salesOrders.length) return;
+
+    // 1. If Sales Order is referenced in URL
+    const soIdParam = searchParams.get('salesOrderId');
+    const orderNoParam = searchParams.get('orderNumber');
+    if (soIdParam || orderNoParam) {
+      const matchSo = salesOrders.find(o => o._id === soIdParam || o.orderNumber === orderNoParam);
+      if (matchSo) {
+        setSelectedSalesOrderId(matchSo._id || '');
+        setSelectedSalesOrder(matchSo);
+        setReference(`Sales Order #${matchSo.orderNumber}`);
+        if (matchSo.promisedDate) {
+          setRequiredCompletionDate(matchSo.promisedDate);
+        }
+        if (matchSo.customerName) {
+          setRemarks(`Demand for Sales Order #${matchSo.orderNumber} (${matchSo.customerName})`);
+        }
+      } else if (orderNoParam) {
+        setReference(`Sales Order #${orderNoParam}`);
+      }
+    }
+
+    // 2. If SKU is specified in URL
+    const skuCodeParam = searchParams.get('skuCode');
+    const skuIdParam = searchParams.get('skuId');
+    if (skuCodeParam || skuIdParam) {
+      const matchSku = backendSkus.find(s => 
+        (skuIdParam && s._id === skuIdParam) || 
+        (skuCodeParam && s.skuCode?.toUpperCase() === skuCodeParam.toUpperCase())
+      );
+      if (matchSku && !selectedSkuId) {
+        handleSelectProduct(matchSku);
+      }
+    }
+
+    // 3. Planned Qty & UOM from URL
+    const plannedQtyParam = searchParams.get('plannedQty');
+    if (plannedQtyParam && productionQty === '') {
+      const qtyNum = Number(plannedQtyParam);
+      if (!isNaN(qtyNum) && qtyNum > 0) {
+        setProductionQty(qtyNum);
+      }
+    }
+
+    const plannedUomParam = searchParams.get('plannedUom');
+    if (plannedUomParam) {
+      setProductionUom(plannedUomParam);
+    }
+  }, [backendSkus, salesOrders, searchParams]);
 
   // Keep backendSkus updated if initialSkus arrives
   useEffect(() => {
@@ -470,6 +551,30 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         compType = getItemClassification(compSku) === 'semi' ? 'Semi' : 'Raw';
       }
 
+      // Match available purchase batches / lots for raw materials
+      let matchedLotNumber = '';
+      let matchedInvoiceNo = '';
+      let matchedSupplier = '';
+
+      if (purchaseInvoices && purchaseInvoices.length > 0) {
+        for (const inv of purchaseInvoices) {
+          if (!inv.items) continue;
+          const matchingItem = inv.items.find((it: any) => {
+            const itSkuId = typeof it.skuId === 'object' && it.skuId !== null ? it.skuId._id : it.skuId;
+            return (compSku?._id && (itSkuId === compSku._id || itSkuId === String(compSku._id))) ||
+                   (raw.skuCode && it.skuCode === raw.skuCode) ||
+                   (compSku?.skuCode && it.skuCode === compSku.skuCode) ||
+                   (it.skuName && compSku?.name && it.skuName.toLowerCase().includes(compSku.name.toLowerCase()));
+          });
+          if (matchingItem) {
+            matchedLotNumber = matchingItem.lotNumber || `${inv.invoiceNumber}-L01`;
+            matchedInvoiceNo = inv.invoiceNumber;
+            matchedSupplier = typeof inv.vendorId === 'object' && inv.vendorId !== null ? (inv.vendorId.firmName || inv.vendorId.ownerName) : 'Supplier';
+            break;
+          }
+        }
+      }
+
       return {
         id: `bom-${idx + 1}-${Date.now()}`,
         component: raw.name || raw.itemName || compSku?.name || `Component ${idx + 1}`,
@@ -483,11 +588,55 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         rate,
         amount,
         issuedQty: 0,
-        issuedStatus: 'Pending'
+        issuedStatus: 'Pending',
+        batchNumber: matchedInvoiceNo || undefined,
+        lotNumber: matchedLotNumber || undefined,
+        purchaseInvoiceNo: matchedInvoiceNo || undefined,
+        supplierName: matchedSupplier || undefined
       };
     });
 
     setBomItems(items);
+  };
+
+  // Handle Sales Order selection (Demand-driven manufacturing / MTO)
+  const handleSelectSalesOrder = (so: SalesOrderV2 | null) => {
+    setShowSalesOrderDropdown(false);
+    setSalesOrderSearchQuery('');
+    if (!so) {
+      setSelectedSalesOrderId('');
+      setSelectedSalesOrder(null);
+      setReference('Not Selected');
+      return;
+    }
+
+    setSelectedSalesOrderId(so._id || '');
+    setSelectedSalesOrder(so);
+    setReference(`Sales Order #${so.orderNumber}`);
+    setRemarks(`Demand for Sales Order #${so.orderNumber} (${so.customerName})`);
+    if (so.promisedDate) {
+      setRequiredCompletionDate(so.promisedDate);
+    }
+
+    if (so.items && so.items.length > 0) {
+      const firstItem = so.items[0];
+      const matchSku = backendSkus.find(s => 
+        (firstItem.skuId && (s._id === firstItem.skuId || s._id === (firstItem.skuId as any)?._id)) ||
+        (firstItem.skuCode && s.skuCode?.toUpperCase() === firstItem.skuCode.toUpperCase()) ||
+        s.name.toLowerCase() === firstItem.itemName?.toLowerCase()
+      );
+
+      if (matchSku) {
+        handleSelectProduct(matchSku);
+      }
+      if (firstItem.quantity) {
+        setProductionQty(firstItem.quantity);
+      }
+      if (firstItem.uom) {
+        setProductionUom(firstItem.uom);
+      }
+    }
+    showToast(`Linked to Sales Order #${so.orderNumber} for ${so.customerName}`, 'success');
   };
 
   // Synchronize BOM item costs and stock when stockCostings finishes loading
@@ -692,6 +841,8 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         plannedStartDate: plannedStartDate || '',
         requiredCompletionDate: requiredCompletionDate || '',
         priority: priority,
+        reference: selectedSalesOrder ? `Sales Order #${selectedSalesOrder.orderNumber}` : (reference || 'Not Selected'),
+        referenceSalesOrderId: selectedSalesOrderId || undefined,
         remarks: remarks || '-',
         bomType: bomType,
         bomItems: bomItems,
@@ -700,6 +851,16 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       };
 
       const created = await createProductionOrder(payload);
+
+      // Automatically update linked Sales Order to 'In Production'
+      if (selectedSalesOrderId) {
+        try {
+          await updateSalesOrderV2Status(selectedSalesOrderId, { fulfillmentStatus: 'In Production' });
+        } catch (soErr) {
+          console.warn('Could not update sales order status to In Production:', soErr);
+        }
+      }
+
       showToast(`Production Order ${created.orderNumber} created successfully in database!`, 'success');
       onCreated(created);
     } catch (err: any) {
@@ -932,6 +1093,167 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       >
         {currentStep === 1 ? (
           <>
+            {/* ERP Upstream Demand Connection (Sales Orders) */}
+            <div className="bg-gradient-to-r from-blue-50/70 via-indigo-50/40 to-white rounded-xl border border-blue-200/80 p-4 shadow-3xs space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-xs">
+                    <ShoppingBag className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Demand Source (Sales Order Reference)</h3>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+                        {selectedSalesOrder ? 'Make to Order (MTO)' : 'Make to Stock (Buffer)'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-500">
+                      Link this manufacturing batch to customer sales demand for end-to-end traceability
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {selectedSalesOrder && (
+                    <button
+                      type="button"
+                      onClick={() => handleSelectSalesOrder(null)}
+                      className="px-2.5 py-1 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg border border-rose-200 transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>Unlink Order</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Demand Selector Dropdown / Search */}
+              <div className="relative" ref={salesOrderDropdownRef}>
+                <div
+                  tabIndex={0}
+                  onClick={() => setShowSalesOrderDropdown(!showSalesOrderDropdown)}
+                  className="w-full text-xs bg-white border border-gray-200 rounded-lg px-3 py-2.5 font-medium flex items-center justify-between cursor-pointer hover:border-blue-400 focus:outline-none focus:border-blue-500 transition-colors shadow-2xs"
+                >
+                  {selectedSalesOrder ? (
+                    <div className="flex items-center gap-2 text-gray-900 font-bold">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-600 text-white">
+                        {selectedSalesOrder.orderNumber}
+                      </span>
+                      <span>{selectedSalesOrder.customerName}</span>
+                      <span className="text-gray-400 font-normal">
+                        • {selectedSalesOrder.items?.length || 0} items
+                        {selectedSalesOrder.promisedDate ? ` • Due: ${selectedSalesOrder.promisedDate}` : ''}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-gray-500 flex items-center gap-2">
+                      <Box className="w-3.5 h-3.5 text-gray-400" />
+                      <span>Make to Stock (Buffer Inventory) — Click to link with a Customer Sales Order</span>
+                    </span>
+                  )}
+                  <ChevronDown className="w-4 h-4 text-gray-400" />
+                </div>
+
+                {showSalesOrderDropdown && (
+                  <div className="absolute left-0 top-full mt-1.5 w-full bg-white border border-gray-200 rounded-xl shadow-xl z-50 max-h-72 flex flex-col animate-modalPop overflow-hidden">
+                    <div className="p-2 border-b border-gray-150 bg-gray-50 flex items-center gap-2">
+                      <Search className="w-3.5 h-3.5 text-gray-400" />
+                      <input
+                        type="text"
+                        value={salesOrderSearchQuery}
+                        onChange={e => setSalesOrderSearchQuery(e.target.value)}
+                        placeholder="Search sales orders by SO number, customer name..."
+                        autoFocus
+                        className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div className="overflow-y-auto flex-1 divide-y divide-gray-100 custom-scrollbar">
+                      {/* Make to Stock Option */}
+                      <div
+                        onClick={() => handleSelectSalesOrder(null)}
+                        className={`p-2.5 cursor-pointer flex items-center justify-between hover:bg-blue-50/60 transition-colors ${
+                          !selectedSalesOrderId ? 'bg-blue-50/80 font-bold' : ''
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Box className="w-4 h-4 text-gray-500" />
+                          <div>
+                            <span className="text-xs font-bold text-gray-900 block">Make to Stock (Buffer Inventory)</span>
+                            <span className="text-[11px] text-gray-400">Produce for warehouse stock without direct sales order binding</span>
+                          </div>
+                        </div>
+                        {!selectedSalesOrderId && <Check className="w-4 h-4 text-blue-600" />}
+                      </div>
+
+                      {/* Sales Orders List */}
+                      {salesOrders
+                        .filter(so => {
+                          if (!salesOrderSearchQuery.trim()) return true;
+                          const q = salesOrderSearchQuery.toLowerCase();
+                          return so.orderNumber?.toLowerCase().includes(q) ||
+                                 so.customerName?.toLowerCase().includes(q);
+                        })
+                        .map(so => {
+                          const isSelected = selectedSalesOrderId === so._id;
+                          const firstItem = so.items?.[0];
+                          return (
+                            <div
+                              key={so._id || so.orderNumber}
+                              onClick={() => handleSelectSalesOrder(so)}
+                              className={`p-2.5 cursor-pointer flex items-center justify-between hover:bg-blue-50/60 transition-colors ${
+                                isSelected ? 'bg-blue-50/80 font-bold' : ''
+                              }`}
+                            >
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                                    {so.orderNumber}
+                                  </span>
+                                  <span className="text-xs font-bold text-gray-900">{so.customerName}</span>
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-gray-100 text-gray-700">
+                                    {so.fulfillmentStatus || 'Pending'}
+                                  </span>
+                                </div>
+                                <div className="text-[11px] text-gray-500 mt-1 flex items-center gap-3">
+                                  {firstItem && (
+                                    <span>Item: <strong>{firstItem.itemName}</strong> ({firstItem.quantity} {firstItem.uom})</span>
+                                  )}
+                                  {so.promisedDate && <span>Due: {so.promisedDate}</span>}
+                                  {so.grandTotal && <span>₹{so.grandTotal.toLocaleString('en-IN')}</span>}
+                                </div>
+                              </div>
+                              {isSelected && <Check className="w-4 h-4 text-blue-600" />}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {selectedSalesOrder && (
+                <div className="bg-blue-50/80 border border-blue-200 rounded-lg p-2.5 flex items-center justify-between text-xs text-blue-900">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+                    <span>
+                      Linked to Customer Demand: <strong>{selectedSalesOrder.orderNumber}</strong> for <strong>{selectedSalesOrder.customerName}</strong>. 
+                      Creating this order will automatically advance the sales fulfillment lifecycle to <strong>In Production</strong>.
+                    </span>
+                  </div>
+                  <a
+                    href={`/sales/orders?search=${selectedSalesOrder.orderNumber}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 hover:text-blue-900 underline shrink-0 ml-2"
+                  >
+                    <span>View Sales Order</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              )}
+            </div>
+
             {/* 1. Basic Information */}
             <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-2xs space-y-5">
               <h2 className="text-sm font-bold text-gray-900 tracking-wide uppercase">1. Basic Information</h2>
@@ -1351,6 +1673,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                         <th className="py-2.5 px-3">Total Required</th>
                         <th className="py-2.5 px-3">UOM</th>
                         <th className="py-2.5 px-3">Available Stock</th>
+                        <th className="py-2.5 px-3">Inward Batch / Lot</th>
                         <th className="py-2.5 px-3">Unit Cost (₹)</th>
                         <th className="py-2.5 px-3">Total Cost (₹)</th>
                         <th className="py-2.5 px-3">Stock Status</th>
@@ -1360,7 +1683,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                     <tbody className="divide-y divide-gray-100">
                       {bomItems.length === 0 ? (
                         <tr>
-                          <td colSpan={11} className="py-8 text-center text-gray-400">
+                          <td colSpan={12} className="py-8 text-center text-gray-400">
                             {!selectedSku ? (
                               'Please select an Item to Produce above to load its BOM.'
                             ) : (
@@ -1429,6 +1752,22 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                             <td className="py-3 px-3 text-gray-600 font-medium">{item.uom}</td>
                             <td className="py-3 px-3 font-semibold text-gray-700">
                               {item.availableStock.toLocaleString()}
+                            </td>
+                            <td className="py-3 px-3">
+                              {item.lotNumber || item.purchaseInvoiceNo ? (
+                                <div className="flex flex-col">
+                                  <span className="font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded text-[10px] w-fit">
+                                    {item.lotNumber || item.purchaseInvoiceNo}
+                                  </span>
+                                  {item.supplierName && (
+                                    <span className="text-[10px] text-gray-500 truncate max-w-[120px] mt-0.5" title={item.supplierName}>
+                                      {item.supplierName}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-[10px] text-gray-400 font-medium">Auto FIFO Stock</span>
+                              )}
                             </td>
                             <td className="py-3 px-3 font-mono font-medium text-gray-800">
                               {item.rate > 0 ? `₹${item.rate.toFixed(2)}` : '₹0.00'}
@@ -1606,7 +1945,14 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   <span className="font-semibold text-gray-900 mt-0.5 block">{requiredCompletionDate || '-'}</span>
                 </div>
 
-                <div className="md:col-span-3">
+                <div>
+                  <span className="text-[11px] font-semibold text-gray-400 block uppercase">Demand Reference</span>
+                  <span className="font-bold text-gray-900 mt-0.5 block">
+                    {selectedSalesOrder ? `Sales Order #${selectedSalesOrder.orderNumber}` : (reference || 'Make to Stock')}
+                  </span>
+                </div>
+
+                <div className="md:col-span-2">
                   <span className="text-[11px] font-semibold text-gray-400 block uppercase">Remarks</span>
                   <span className="text-gray-700 mt-0.5 block">{remarks || '-'}</span>
                 </div>
@@ -1642,6 +1988,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                         <th className="py-2.5 px-3">Total Required</th>
                         <th className="py-2.5 px-3">UOM</th>
                         <th className="py-2.5 px-3">Available Stock</th>
+                        <th className="py-2.5 px-3">Inward Batch / Lot</th>
                         <th className="py-2.5 px-3">Stock Status</th>
                       </tr>
                     </thead>
@@ -1663,6 +2010,22 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                           <td className="py-3 px-3 font-bold text-gray-900">{item.totalRequired.toLocaleString()}</td>
                           <td className="py-3 px-3 text-gray-600 font-medium">{item.uom}</td>
                           <td className="py-3 px-3 font-semibold text-gray-700">{item.availableStock.toLocaleString()}</td>
+                          <td className="py-3 px-3">
+                            {item.lotNumber || item.purchaseInvoiceNo ? (
+                              <div className="flex flex-col">
+                                <span className="font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded text-[10px] w-fit">
+                                  {item.lotNumber || item.purchaseInvoiceNo}
+                                </span>
+                                {item.supplierName && (
+                                  <span className="text-[10px] text-gray-500 truncate max-w-[120px] mt-0.5">
+                                    {item.supplierName}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-gray-400 font-medium">Auto FIFO Stock</span>
+                            )}
+                          </td>
                           <td className="py-3 px-3">
                             {item.stockStatus === 'Available' ? (
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">

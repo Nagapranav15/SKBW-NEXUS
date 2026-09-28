@@ -30,8 +30,8 @@ sequenceSchema.statics.getNextSequence = async function(prefix, session) {
       code = `TRX-${monthShort}-${String(seqDoc.sequence).padStart(3, '0')}`;
       exists = await InventoryLedger.exists({ transactionNumber: code });
     } else if (prefix === "PB") {
-      const monthShort = new Date().toLocaleString('en-US', { month: 'short' }).toUpperCase();
-      code = `PB-${monthShort}-${String(seqDoc.sequence).padStart(3, '0')}`;
+      const padLen = Math.max(3, String(seqDoc.sequence).length);
+      code = `PB-${String(seqDoc.sequence).padStart(padLen, '0')}`;
       exists = await PurchaseInvoiceV2.exists({ invoiceNumber: code });
     } else {
       return seqDoc.sequence;
@@ -55,8 +55,7 @@ sequenceSchema.statics.getNextSequence = async function(prefix, session) {
         }
       });
     } else if (prefix === "PB") {
-      const monthShort = new Date().toLocaleString('en-US', { month: 'short' }).toUpperCase();
-      const regex = new RegExp(`^PB-${monthShort}-(\\d+)$`, 'i');
+      const regex = /^PB-(?:[A-Z]{3}-)?(\d+)$/i;
       const docs = await PurchaseInvoiceV2.find({ invoiceNumber: regex }).select('invoiceNumber').lean();
       docs.forEach(doc => {
         const m = doc.invoiceNumber ? doc.invoiceNumber.match(regex) : null;
@@ -75,10 +74,12 @@ sequenceSchema.statics.getNextSequence = async function(prefix, session) {
     attempts++;
   }
 
+  if (prefix === "PB") {
+    const padLen = Math.max(3, String(seqDoc.sequence).length);
+    return `PB-${String(seqDoc.sequence).padStart(padLen, '0')}`;
+  }
   const monthShort = new Date().toLocaleString('en-US', { month: 'short' }).toUpperCase();
-  return prefix === "PB" 
-    ? `PB-${monthShort}-${String(seqDoc.sequence).padStart(3, '0')}` 
-    : `TRX-${monthShort}-${String(seqDoc.sequence).padStart(3, '0')}`;
+  return `TRX-${monthShort}-${String(seqDoc.sequence).padStart(3, '0')}`;
 };
 
 module.exports = mongoose.model("Sequence", sequenceSchema);

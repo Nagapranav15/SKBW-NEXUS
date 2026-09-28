@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Factory, Package, AlertTriangle, CheckCircle2, Clock,
   ChevronDown, ChevronRight, Search, Download, Printer,
@@ -68,6 +68,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
 }) => {
   const { selectedCompany } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   // Persist viewMode in localStorage and searchParams so it survives page reloads
   const [viewMode, setViewModeState] = useState<'item_wise' | 'order_wise'>(() => {
@@ -420,7 +421,8 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
   // Handle Start Production
   const handleStartProduction = (skuCode: string, skuName: string, shortfallGbl: number) => {
     setInProductionSkus(prev => new Set(prev).add(skuCode));
-    showToast(`Production batch scheduled for ${skuName} (${shortfallGbl} GBL)`, 'success');
+    showToast(`Opening Production Order Wizard for ${skuName} (${shortfallGbl} GBL)...`, 'success');
+    navigate(`/production?view=new&skuCode=${encodeURIComponent(skuCode)}&plannedQty=${encodeURIComponent(String(Math.max(1, shortfallGbl)))}&plannedUom=GBL`);
   };
 
   // Helper for report dates (DD-MM-YYYY)
