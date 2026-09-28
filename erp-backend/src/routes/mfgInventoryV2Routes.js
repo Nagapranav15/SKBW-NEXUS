@@ -55,6 +55,7 @@ router.put("/purchases/invoices/:id", auth, rbac(manage), purchaseCtrl.editPurch
 router.delete("/purchases/invoices/:id", auth, rbac(manage), purchaseCtrl.deletePurchaseInvoice);
 router.put("/purchases/invoices/:id/cancel", auth, rbac(manage), purchaseCtrl.cancelPurchaseInvoice);
 router.post("/purchases/payments", auth, rbac(manage), purchaseCtrl.recordPurchasePayment);
+router.post("/purchases/invoices/:id/allocate-locations", auth, rbac(manage), purchaseCtrl.allocateInvoiceLocations);
 
 const salesOrderCtrl = require("../controllers/mfgSalesOrderV2Controller");
 

@@ -354,13 +354,17 @@ exports.createPurchaseInvoice = async (req, res, next) => {
         });
       }
 
-      skuUpdates.push(
-        SkuV2.findByIdAndUpdate(valItem.skuId, {
-          purchasePrice: valItem.purchasePrice,
-          ratePerKg: valItem.ratePerKg || valItem.purchasePrice,
-          rate: valItem.purchasePrice
-        })
-      );
+      const updateFields = {};
+      if (valItem.purchasePrice > 0) {
+        updateFields.purchasePrice = valItem.purchasePrice;
+        updateFields.rate = valItem.purchasePrice;
+      }
+      if (valItem.ratePerKg > 0) {
+        updateFields.ratePerKg = valItem.ratePerKg;
+      }
+      if (Object.keys(updateFields).length > 0) {
+        skuUpdates.push(SkuV2.findByIdAndUpdate(valItem.skuId, updateFields));
+      }
     }
 
     if (ledgerDocs.length > 0) {
@@ -405,7 +409,15 @@ exports.createPurchaseInvoice = async (req, res, next) => {
       company: companyObjId
     }).catch(e => console.error("ActivityLog error:", e));
 
-    res.status(201).json(invoice);
+    const populatedInvoice = await PurchaseInvoiceV2.findById(invoice._id)
+      .populate("vendorId", "firmName ownerName phone contactName email outstanding")
+      .populate("items.skuId", "skuCode name category unit paperType pages reamWeight gsm width length brand ruleType purchasePrice ratePerKg")
+      .populate("items.locationId", "name level code")
+      .populate("items.splits.locationId", "name level code")
+      .populate("items.reels.locationId", "name level code")
+      .populate("createdBy", "fullName");
+
+    res.status(201).json(populatedInvoice || invoice);
   } catch (err) {
     next(err);
   }
@@ -504,7 +516,9 @@ exports.getPurchaseInvoices = async (req, res, next) => {
       PurchaseInvoiceV2.find(query)
         .populate("vendorId", "firmName ownerName phone contactName email outstanding")
         .populate("items.skuId", "skuCode name category unit paperType pages reamWeight gsm width length brand ruleType purchasePrice ratePerKg")
-        .populate("items.locationId", "name level")
+        .populate("items.locationId", "name level code")
+        .populate("items.splits.locationId", "name level code")
+        .populate("items.reels.locationId", "name level code")
         .populate("createdBy", "fullName")
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -897,13 +911,17 @@ exports.editPurchaseInvoice = async (req, res, next) => {
         });
       }
 
-      skuUpdates.push(
-        SkuV2.findByIdAndUpdate(valItem.skuId, {
-          purchasePrice: valItem.purchasePrice,
-          ratePerKg: valItem.ratePerKg || valItem.purchasePrice,
-          rate: valItem.purchasePrice
-        })
-      );
+      const updateFields = {};
+      if (valItem.purchasePrice > 0) {
+        updateFields.purchasePrice = valItem.purchasePrice;
+        updateFields.rate = valItem.purchasePrice;
+      }
+      if (valItem.ratePerKg > 0) {
+        updateFields.ratePerKg = valItem.ratePerKg;
+      }
+      if (Object.keys(updateFields).length > 0) {
+        skuUpdates.push(SkuV2.findByIdAndUpdate(valItem.skuId, updateFields));
+      }
     }
 
     if (ledgerDocs.length > 0) {
@@ -942,7 +960,15 @@ exports.editPurchaseInvoice = async (req, res, next) => {
       company: companyObjId
     }).catch(e => console.error("ActivityLog error:", e));
 
-    res.json(invoice);
+    const populatedInvoice = await PurchaseInvoiceV2.findById(invoice._id)
+      .populate("vendorId", "firmName ownerName phone contactName email outstanding")
+      .populate("items.skuId", "skuCode name category unit paperType pages reamWeight gsm width length brand ruleType purchasePrice ratePerKg")
+      .populate("items.locationId", "name level code")
+      .populate("items.splits.locationId", "name level code")
+      .populate("items.reels.locationId", "name level code")
+      .populate("createdBy", "fullName");
+
+    res.json(populatedInvoice || invoice);
   } catch (err) {
     next(err);
   }
@@ -1108,6 +1134,239 @@ exports.getNextInvoiceNumber = async (req, res, next) => {
 
     res.json({ nextInvoiceNumber: code });
   } catch (err) {
+    next(err);
+  }
+};
+
+exports.allocateInvoiceLocations = async (req, res, next) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const { id } = req.params;
+    const { itemIndex, allocations, companyId } = req.body;
+
+    const companyObjId = toObjectId(companyId || req.body.company);
+    if (!companyObjId) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ msg: "Company ID is required" });
+    }
+
+    let query = mongoose.Types.ObjectId.isValid(id) ? { _id: toObjectId(id) } : { invoiceNumber: id };
+    query.company = companyObjId;
+
+    const invoice = await PurchaseInvoiceV2.findOne(query).session(session);
+
+    if (!invoice) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ msg: "Purchase batch not found" });
+    }
+
+    if (invoice.status === "Cancelled") {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ msg: "Cannot allocate locations for a cancelled batch" });
+    }
+
+    const idx = Number(itemIndex) || 0;
+    if (!invoice.items || !invoice.items[idx]) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ msg: `Invalid item index ${idx}` });
+    }
+
+    const item = invoice.items[idx];
+    const skuId = item.skuId;
+    const skuDoc = await SkuV2.findById(skuId).session(session);
+
+    const validAllocations = (Array.isArray(allocations) ? allocations : [])
+      .filter(a => a && a.toLocationId && Number(a.quantity) > 0);
+
+    if (validAllocations.length === 0) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ msg: "Please select at least one destination Godown and enter a valid quantity" });
+    }
+
+    const fromLocationId = item.locationId;
+
+    // Helper to resolve hierarchy
+    const getHierarchy = async (locId) => {
+      let loc = await WarehouseLocationV2.findOne({ _id: toObjectId(locId), company: companyObjId }).session(session);
+      if (!loc) loc = await WarehouseLocationV2.findById(toObjectId(locId)).session(session);
+      if (!loc) {
+        return { warehouseId: locId, floorId: locId, zoneId: locId, locationId: locId };
+      }
+      const chain = [loc];
+      let curr = loc;
+      while (curr && curr.parentId) {
+        let parent = await WarehouseLocationV2.findOne({ _id: curr.parentId, company: companyObjId }).session(session);
+        if (!parent) parent = await WarehouseLocationV2.findById(curr.parentId).session(session);
+        if (!parent) break;
+        chain.unshift(parent);
+        curr = parent;
+      }
+      const factoryNode = chain.find(n => n.level === "Factory");
+      const floorNode = chain.find(n => n.level === "Floor");
+      const zoneNode = chain.find(n => n.level === "Zone");
+      const storageNode = chain.find(n => n.level === "Storage Location");
+      const warehouseId = factoryNode ? factoryNode._id : (chain[0]?._id || loc._id);
+      const floorId = floorNode ? floorNode._id : (chain[1]?._id || warehouseId);
+      const zoneId = zoneNode ? zoneNode._id : (chain[2]?._id || floorId);
+      const locationId = storageNode ? storageNode._id : loc._id;
+      return { warehouseId, floorId, zoneId, locationId };
+    };
+
+    const fromH = await getHierarchy(fromLocationId);
+
+    // Record stock transfers in InventoryLedger
+    for (const alloc of validAllocations) {
+      const transferQty = Number(alloc.quantity);
+      const toLocObjId = toObjectId(alloc.toLocationId);
+      const toH = await getHierarchy(toLocObjId);
+
+      const toLocDoc = await WarehouseLocationV2.findById(toLocObjId).session(session);
+      const destName = toLocDoc ? toLocDoc.name : "Target Godown";
+
+      const referenceId = `TXF-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+      const transactionNumberOut = await Sequence.getNextSequence("IL", session);
+      const transactionNumberIn = await Sequence.getNextSequence("IL", session);
+
+      // OUT from source
+      const primOut = new InventoryLedger({
+        transactionNumber: transactionNumberOut,
+        transactionType: "Transfer",
+        skuId: toObjectId(skuId),
+        quantity: transferQty,
+        unit: item.unit || skuDoc?.unit || "kg",
+        direction: "OUT",
+        referenceType: "PurchaseInvoiceAllocation",
+        referenceId,
+        batchNumber: invoice.invoiceNumber,
+        warehouseId: fromH.warehouseId,
+        floorId: fromH.floorId,
+        zoneId: fromH.zoneId,
+        locationId: fromH.locationId,
+        reels: alloc.reels || [],
+        remarks: `Location Allocation to ${destName} for ${invoice.invoiceNumber}`,
+        createdBy: toObjectId(req.user?.id) || companyObjId,
+        company: companyObjId,
+        status: "Posted"
+      });
+      await primOut.save({ session });
+
+      // IN to destination
+      const primIn = new InventoryLedger({
+        transactionNumber: transactionNumberIn,
+        transactionType: "Transfer",
+        skuId: toObjectId(skuId),
+        quantity: transferQty,
+        unit: item.unit || skuDoc?.unit || "kg",
+        direction: "IN",
+        referenceType: "PurchaseInvoiceAllocation",
+        referenceId,
+        batchNumber: invoice.invoiceNumber,
+        warehouseId: toH.warehouseId,
+        floorId: toH.floorId,
+        zoneId: toH.zoneId,
+        locationId: toH.locationId,
+        reels: alloc.reels || [],
+        remarks: `Location Allocation from Receiving Bay for ${invoice.invoiceNumber}`,
+        createdBy: toObjectId(req.user?.id) || companyObjId,
+        company: companyObjId,
+        status: "Posted"
+      });
+      await primIn.save({ session });
+    }
+
+    // Now update invoice.items[idx].splits and reels to keep purchase invoice data consistent
+    const newAllocMap = new Map();
+    validAllocations.forEach(a => {
+      const locStr = String(a.toLocationId);
+      newAllocMap.set(locStr, (newAllocMap.get(locStr) || 0) + Number(a.quantity));
+    });
+
+    const existingSplits = (item.splits && item.splits.length > 0)
+      ? item.splits
+      : [{ locationId: fromLocationId, quantity: item.quantity }];
+
+    const totalNewlyAllocated = validAllocations.reduce((s, a) => s + Number(a.quantity), 0);
+    const updatedSplits = [];
+    let sourceSplitHandled = false;
+
+    for (const sp of existingSplits) {
+      const spLocStr = String(typeof sp.locationId === 'object' && sp.locationId !== null ? sp.locationId._id : sp.locationId);
+      if (spLocStr === String(fromLocationId) && !sourceSplitHandled) {
+        sourceSplitHandled = true;
+        const currentSourceQty = Number(sp.quantity) || 0;
+        const remainingSourceQty = Math.max(0, currentSourceQty - totalNewlyAllocated);
+        if (remainingSourceQty > 0) {
+          updatedSplits.push({
+            locationId: toObjectId(fromLocationId),
+            quantity: remainingSourceQty
+          });
+        }
+      } else {
+        const addedQty = newAllocMap.get(spLocStr) || 0;
+        newAllocMap.delete(spLocStr);
+        updatedSplits.push({
+          locationId: toObjectId(sp.locationId),
+          quantity: (Number(sp.quantity) || 0) + addedQty
+        });
+      }
+    }
+
+    for (const [locStr, qty] of newAllocMap.entries()) {
+      if (qty > 0) {
+        updatedSplits.push({
+          locationId: toObjectId(locStr),
+          quantity: qty
+        });
+      }
+    }
+
+    item.splits = updatedSplits;
+    if (updatedSplits.length > 0) {
+      item.locationId = updatedSplits[0].locationId;
+    }
+
+    if (Array.isArray(item.reels) && item.reels.length > 0) {
+      const reelLocMap = new Map();
+      validAllocations.forEach(a => {
+        (a.reels || []).forEach(r => {
+          const rNum = r.reelNumber || r.reelNo;
+          if (rNum) {
+            reelLocMap.set(rNum, toObjectId(a.toLocationId));
+          }
+        });
+      });
+      item.reels.forEach(r => {
+        const rNum = r.reelNumber || r.reelNo;
+        if (reelLocMap.has(rNum)) {
+          r.locationId = reelLocMap.get(rNum);
+        }
+      });
+    }
+
+    // Rate stability: purchasePrice, ratePerKg, totalPrice, subTotal, grandTotal remain untouched!
+    await invoice.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    const populatedInvoice = await PurchaseInvoiceV2.findById(invoice._id)
+      .populate("vendorId", "firmName ownerName phone contactName email outstanding")
+      .populate("items.skuId", "skuCode name category unit paperType pages reamWeight gsm width length brand ruleType purchasePrice ratePerKg")
+      .populate("items.locationId", "name level code")
+      .populate("items.splits.locationId", "name level code")
+      .populate("items.reels.locationId", "name level code")
+      .populate("createdBy", "fullName");
+
+    res.json({ msg: "Stock allocated successfully", invoice: populatedInvoice || invoice });
+  } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
     next(err);
   }
 };

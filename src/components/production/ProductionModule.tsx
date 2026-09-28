@@ -223,9 +223,13 @@ export const ProductionModule: React.FC = () => {
     handleOpenOrderDetail(newOrder);
   };
 
+  // Detail active tab state
+  const [detailActiveTab, setDetailActiveTab] = useState<'overview' | 'materials' | 'entries' | 'orders' | 'costing'>('overview');
+
   // Navigate to Order Details (Screen 4)
-  const handleOpenOrderDetail = (order: ProductionOrder) => {
+  const handleOpenOrderDetail = (order: ProductionOrder, tab: 'overview' | 'materials' | 'entries' | 'orders' | 'costing' = 'overview') => {
     setSelectedOrder(order);
+    setDetailActiveTab(tab);
     setCurrentView('detail');
     setSearchParams(prev => {
       const next = new URLSearchParams(prev);
@@ -562,29 +566,9 @@ export const ProductionModule: React.FC = () => {
         }
       }
 
-      // If still empty (e.g. fresh orders), generate realistic standard notebook materials
-      if (bomItems.length === 0) {
-        const defaultRaw = [
-          { component: 'Ruling Sheets 57×70 (52 GSM)', code: 'RM-001', required: 3000 * plannedQty, available: 2000 * plannedQty, reserved: 500 * plannedQty, uom: 'PCS' },
-          { component: 'Index Sheets', code: 'RM-002', required: 300 * plannedQty, available: 500 * plannedQty, reserved: 300 * plannedQty, uom: 'PCS' },
-          { component: 'Title Board (Printed)', code: 'RM-003', required: 600 * plannedQty, available: 400 * plannedQty, reserved: 200 * plannedQty, uom: 'PCS' },
-          { component: 'Pinning Wire', code: 'RM-004', required: Math.max(1, Math.round(1.2 * plannedQty)), available: Math.max(2, Math.round(2.5 * plannedQty)), reserved: Math.max(1, Math.round(1.2 * plannedQty)), uom: 'KG' },
-          { component: 'Packing Covers', code: 'RM-005', required: 1000 * plannedQty, available: 1500 * plannedQty, reserved: 1000 * plannedQty, uom: 'PCS' },
-        ];
-        bomItems = defaultRaw.map((r, rIdx) => ({
-          id: `${o._id}-def-${rIdx}`,
-          component: r.component,
-          code: r.code,
-          type: 'Raw',
-          qtyPerBatch: Math.round(r.required / plannedQty),
-          totalRequired: r.required,
-          uom: r.uom,
-          availableStock: r.available,
-          stockStatus: r.available >= r.required ? 'Ready' : 'Shortage',
-          rate: 10,
-          amount: 10 * r.required,
-          issuedQty: r.reserved
-        } as any));
+      // Keep true to order data: if no BOM items exist and no SKU recipe exists, remain empty
+      if (!bomItems) {
+        bomItems = [];
       }
 
       // Format detail items for expanded sub-table (dynamically aligned with database)
@@ -2894,11 +2878,12 @@ export const ProductionModule: React.FC = () => {
           >
             <div
               className="bg-white rounded-2xl shadow-2xl w-full flex flex-col my-auto border border-gray-150 animate-in zoom-in-95 duration-200 overflow-hidden relative"
-              style={{ maxWidth: 1240, height: '92vh', maxHeight: '92vh' }}
+              style={{ maxWidth: 1080, height: '85vh', maxHeight: '85vh' }}
               onClick={e => e.stopPropagation()}
             >
               <ProductionOrderDetailView
                 order={selectedOrder}
+                initialTab={detailActiveTab}
                 onBack={handleBackToList}
                 onNewOrder={handleOpenNewOrder}
                 onRecordEntries={handleOpenRecordEntries}
@@ -2929,7 +2914,7 @@ export const ProductionModule: React.FC = () => {
           >
             <div
               className="bg-white rounded-2xl shadow-2xl w-full flex flex-col my-auto border border-gray-150 animate-in zoom-in-95 duration-200 overflow-hidden relative"
-              style={{ maxWidth: 1200, height: '92vh', maxHeight: '92vh' }}
+              style={{ maxWidth: 1080, height: '85vh', maxHeight: '85vh' }}
               onClick={e => e.stopPropagation()}
             >
               <ProductionOrderEntriesView

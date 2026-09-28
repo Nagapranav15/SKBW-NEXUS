@@ -11,6 +11,7 @@ export interface PurchaseInvoiceItemV2 {
   locationId: WarehouseLocationV2 | string;
   reamWeight?: number;
   ratePerKg?: number;
+  splits?: { locationId: WarehouseLocationV2 | string; quantity: number }[];
   reels?: LedgerReelV2[];
   // denormalised by the API for display
   skuName?: string;
@@ -103,5 +104,17 @@ export const cancelPurchaseInvoiceV2 = async (id: string, companyId: string): Pr
   const response = await api.put(`/v2/purchases/invoices/${id}/cancel`, {
     company: companyId
   });
+  return response.data;
+};
+
+export const allocatePurchaseInvoiceLocationsV2 = async (
+  invoiceId: string,
+  payload: {
+    itemIndex: number;
+    allocations: { toLocationId: string; quantity: number; reels?: any[] }[];
+    companyId: string;
+  }
+): Promise<{ msg: string; invoice: PurchaseInvoiceV2 }> => {
+  const response = await api.post(`/v2/purchases/invoices/${invoiceId}/allocate-locations`, payload);
   return response.data;
 };

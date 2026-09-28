@@ -12,6 +12,7 @@ import {
   createPurchaseInvoiceV2, 
   updatePurchaseInvoiceV2,
   cancelPurchaseInvoiceV2,
+  allocatePurchaseInvoiceLocationsV2,
   PurchaseInvoiceV2 
 } from './purchaseService';
 import { showToast } from '../../ui/Toast';
@@ -1203,6 +1204,17 @@ const PurchaseInvoicePage: React.FC = () => {
     const item = { ...updatedItems[itemIdx] };
     const reels = [...(item.reels || [])];
     
+    if (field === 'locationId') {
+      reels[reelIdx] = { ...reels[reelIdx], locationId: value };
+      item.reels = reels;
+      if (reelIdx === 0 && !item.locationId) {
+        item.locationId = value;
+      }
+      updatedItems[itemIdx] = item;
+      setInvoiceForm({ ...invoiceForm, items: updatedItems });
+      return;
+    }
+
     reels[reelIdx] = { ...reels[reelIdx], [field]: field === 'weight' || field === 'width' ? (Number(value) || 0) : value };
     item.reels = reels;
 
@@ -1258,14 +1270,18 @@ const PurchaseInvoicePage: React.FC = () => {
     const firstStorage = locations.find(loc => loc.level === 'Storage Location');
     const defaultLocId = item.locationId || firstStorage?._id || '';
 
-    const currentSplits = (item.splits && item.splits.length > 0)
-      ? item.splits
+    let currentSplits = (item.splits && item.splits.length > 0)
+      ? [...item.splits]
       : [{ locationId: defaultLocId, quantity: item.quantity || '0' }];
     
+    const totalLotQty = Number(item.quantity) || 0;
+    if (currentSplits.length === 1 && (!currentSplits[0].quantity || Number(currentSplits[0].quantity) === 0) && totalLotQty > 0) {
+      currentSplits[0] = { ...currentSplits[0], quantity: String(totalLotQty) };
+    }
+
     const lastLocId = currentSplits[currentSplits.length - 1]?.locationId || defaultLocId;
     
     // Auto-calculate remaining quantity
-    const totalLotQty = Number(item.quantity) || 0;
     const currentAllocated = currentSplits.reduce((sum: number, s: any) => sum + (Number(s.quantity) || 0), 0);
     const remQty = Math.max(0, totalLotQty - currentAllocated);
 
@@ -1291,7 +1307,21 @@ const PurchaseInvoicePage: React.FC = () => {
     if (field === 'locationId') {
       targetSplit.locationId = val;
       if (splitIdx === 0) item.locationId = val;
-    } else if (field === 'reams') {
+      currentSplits[splitIdx] = targetSplit;
+      item.splits = currentSplits;
+
+      // Keep targetSplit quantity synchronized if only 1 split and item.quantity is set
+      if (currentSplits.length === 1 && (!targetSplit.quantity || Number(targetSplit.quantity) === 0) && Number(item.quantity) > 0) {
+        targetSplit.quantity = item.quantity;
+      }
+
+      // Location allocation must NEVER change item.quantity, purchasePrice, or ratePerKg
+      updatedItems[itemIdx] = item;
+      setInvoiceForm({ ...invoiceForm, items: updatedItems });
+      return;
+    }
+
+    if (field === 'reams') {
       const reams = Number(val) || 0;
       targetSplit.quantity = String(reams * stdSheets);
     } else if (field === 'quantity') {
@@ -1301,7 +1331,7 @@ const PurchaseInvoicePage: React.FC = () => {
     currentSplits[splitIdx] = targetSplit;
     item.splits = currentSplits;
 
-    // Synchronize total lot quantity if user updates splits
+    // Synchronize total lot quantity if user updates split quantities
     const totalAllocated = currentSplits.reduce((sum: number, s: any) => sum + (Number(s.quantity) || 0), 0);
     item.quantity = String(totalAllocated);
     if (selectedSku?.altUnit && selectedSku?.altUnitConversion) {
@@ -1320,13 +1350,17 @@ const PurchaseInvoicePage: React.FC = () => {
     const currentSplits = item.splits || [];
     
     if (currentSplits.length <= 1) {
-      item.splits = [{ locationId: defaultLocId, quantity: '0' }];
-      item.quantity = '0';
+      // Retain the existing item.quantity - do not reset to 0
+      item.splits = [{ locationId: defaultLocId, quantity: item.quantity || '0' }];
     } else {
       const newSplits = currentSplits.filter((_, i) => i !== splitIdx);
       item.splits = newSplits;
       const totalAllocated = newSplits.reduce((sum: number, s: any) => sum + (Number(s.quantity) || 0), 0);
       item.quantity = String(totalAllocated);
+      const selectedSku = skus.find(s => s._id === item.skuId);
+      if (selectedSku?.altUnit && selectedSku?.altUnitConversion) {
+        item.altQuantity = totalAllocated === 0 ? '0' : String(convertPrimaryToAlt(totalAllocated, selectedSku));
+      }
     }
     updatedItems[itemIdx] = item;
     setInvoiceForm({ ...invoiceForm, items: updatedItems });
@@ -1578,8 +1612,14 @@ const PurchaseInvoicePage: React.FC = () => {
         const locIdVal = typeof item.locationId === 'object' && item.locationId !== null ? (item.locationId as any)._id : item.locationId;
         const mappedReels = (item.reels || []).map(r => ({
           ...r,
-          locationId: locIdVal
+          locationId: typeof r.locationId === 'object' && r.locationId !== null ? (r.locationId as any)._id : (r.locationId || locIdVal)
         }));
+        const mappedSplits = (item.splits && item.splits.length > 0)
+          ? item.splits.map(s => ({
+              locationId: typeof s.locationId === 'object' && s.locationId !== null ? (s.locationId as any)._id : s.locationId,
+              quantity: String(s.quantity !== undefined && s.quantity !== null ? s.quantity : '0')
+            }))
+          : (locIdVal ? [{ locationId: locIdVal, quantity: String(item.quantity !== undefined && item.quantity !== null ? item.quantity : '0') }] : []);
 
         return {
           skuId: skuIdVal,
@@ -1602,22 +1642,23 @@ const PurchaseInvoicePage: React.FC = () => {
             return l;
           })(),
           reelsCount: String(item.reels?.length || 0),
-          quantity: String(item.quantity),
+          quantity: String(item.quantity !== undefined && item.quantity !== null ? item.quantity : ''),
           altQuantity: selectedSku?.altUnit && selectedSku?.altUnitConversion
             ? String(convertPrimaryToAlt(Number(item.quantity) || 0, selectedSku))
             : '',
-          purchasePrice: String(item.purchasePrice),
+          purchasePrice: item.purchasePrice !== undefined && item.purchasePrice !== null ? String(item.purchasePrice) : '',
           reamWeight: item.reamWeight ? String(item.reamWeight) : ((selectedSku as any)?.reamWeight ? String((selectedSku as any).reamWeight) : ''),
           ratePerKg: item.ratePerKg ? String(item.ratePerKg) : (() => {
             const rw = item.reamWeight || (selectedSku as any)?.reamWeight || 0;
             const stdSheets = selectedSku?.pages || 500;
-            if (rw > 0) {
+            if (rw > 0 && item.purchasePrice) {
               return String((Number(item.purchasePrice) * stdSheets) / rw);
             }
             return '';
           })(),
           lotNumber: item.lotNumber,
           locationId: locIdVal,
+          splits: mappedSplits,
           reels: mappedReels
         };
       })
@@ -1696,10 +1737,7 @@ const PurchaseInvoicePage: React.FC = () => {
     setAllocateError('');
 
     const lotItem = selectedInvoice.items[allocateForm.itemIndex];
-    const skuId = typeof lotItem.skuId === 'object' && lotItem.skuId !== null ? (lotItem.skuId as any)._id : lotItem.skuId;
-    const fromLocationId = typeof lotItem.locationId === 'object' && lotItem.locationId !== null 
-      ? (lotItem.locationId as any)._id 
-      : lotItem.locationId;
+    if (!lotItem) return;
 
     // Build the list of rows to allocate
     const validRows = allocationsList.filter(a => a.toLocationId && Number(a.quantity) > 0);
@@ -1722,19 +1760,12 @@ const PurchaseInvoicePage: React.FC = () => {
 
     setAllocateSubmitting(true);
     try {
-      // Execute all allocations in sequence
-      for (const item of itemsToAllocate) {
-        await recordTransferV2({
-          skuId: skuId as string,
-          fromLocationId: fromLocationId as string,
-          toLocationId: item.toLocationId,
-          quantity: item.quantity,
-          remarks: `Location Allocation: ${selectedInvoice.invoiceNumber}`,
-          company: selectedCompany?._id || '',
-          batchNumber: selectedInvoice.invoiceNumber,
-          reels: item.reels
-        });
-      }
+      const invId = selectedInvoice._id || (selectedInvoice as any).id;
+      const res = await allocatePurchaseInvoiceLocationsV2(invId, {
+        itemIndex: allocateForm.itemIndex,
+        allocations: itemsToAllocate,
+        companyId: selectedCompany?._id || ''
+      });
 
       showToast('Stock allocated successfully!', 'success');
       setShowAllocateModal(false);
@@ -1742,10 +1773,13 @@ const PurchaseInvoicePage: React.FC = () => {
       setSelectedReelsForAllocation([]);
       setAllocationsList([{ toLocationId: '', quantity: '', reels: [] }]);
       setActiveReelPickerRowIdx(null);
-      loadBalances();
+      if (res.invoice) {
+        setSelectedInvoice(res.invoice);
+      }
+      await Promise.all([loadBalances(), loadInvoices()]);
     } catch (err: any) {
       console.error(err);
-      setAllocateError(err.response?.data?.msg || 'Failed to allocate stock to location');
+      setAllocateError(err.response?.data?.msg || err.message || 'Failed to allocate stock to location');
     } finally {
       setAllocateSubmitting(false);
     }
@@ -2833,14 +2867,12 @@ const PurchaseInvoicePage: React.FC = () => {
                                   type="number"
                                   step="any"
                                   placeholder="0"
-                                  value={reamsVal}
+                                  value={reamsVal > 0 ? reamsVal : (item.quantity === '' ? '' : (reamsVal || ''))}
                                   onChange={e => {
                                     const rawVal = e.target.value;
                                     const updatedItems = [...invoiceForm.items];
                                     if (rawVal === '' || rawVal === null || rawVal === undefined) {
-                                      updatedItems[idx].quantity = '0';
-                                      updatedItems[idx].purchasePrice = '';
-                                      updatedItems[idx].splits = [];
+                                      updatedItems[idx].quantity = '';
                                     } else {
                                       const reams = Number(rawVal);
                                       const calcTotalSheets = !isNaN(reams) ? reams * stdSheets : 0;
@@ -2848,7 +2880,9 @@ const PurchaseInvoicePage: React.FC = () => {
                                       
                                       const firstStorage = locations.find(loc => loc.level === 'Storage Location');
                                       const defaultLocId = updatedItems[idx].locationId || firstStorage?._id || '';
-                                      updatedItems[idx].splits = [{ locationId: defaultLocId, quantity: String(calcTotalSheets) }];
+                                      if (!updatedItems[idx].splits || updatedItems[idx].splits.length <= 1) {
+                                        updatedItems[idx].splits = [{ locationId: defaultLocId, quantity: String(calcTotalSheets) }];
+                                      }
                                       
                                       if (reamWeightNum > 0 && ratePerKgNum > 0) {
                                         updatedItems[idx].purchasePrice = String((reamWeightNum * ratePerKgNum) / stdSheets);
@@ -2968,12 +3002,24 @@ const PurchaseInvoicePage: React.FC = () => {
                               </div>
 
                               <div>
-                                <label className="block text-[11px] font-semibold text-gray-500 mb-1">RATE / SHEET (₹)</label>
+                                <label className="block text-[11px] font-semibold text-blue-600 mb-1">RATE / SHEET (₹) *</label>
                                 <input
-                                  type="text"
-                                  value={'₹' + ratePerSheet.toFixed(4)}
-                                  disabled
-                                  className="w-full px-3 py-2 border border-gray-200 bg-gray-100/60 rounded-xl text-xs text-right font-bold text-gray-600 cursor-not-allowed"
+                                  type="number"
+                                  step="any"
+                                  placeholder="0.00"
+                                  value={item.purchasePrice !== undefined && item.purchasePrice !== null && item.purchasePrice !== '' ? item.purchasePrice : (ratePerSheet > 0 ? ratePerSheet.toFixed(4) : '')}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    const updatedItems = [...invoiceForm.items];
+                                    updatedItems[idx].purchasePrice = val;
+                                    const numVal = Number(val) || 0;
+                                    if (reamWeightNum > 0 && numVal > 0) {
+                                      updatedItems[idx].ratePerKg = String(Number(((numVal * stdSheets) / reamWeightNum).toFixed(4)));
+                                    }
+                                    setInvoiceForm({ ...invoiceForm, items: updatedItems });
+                                  }}
+                                  className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-xs text-right font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                                  required
                                 />
                               </div>
                             </div>
@@ -4025,8 +4071,12 @@ const PurchaseInvoicePage: React.FC = () => {
                                 const locCode = masterLoc?.code || (typeof b.location === 'object' ? (b.location as any).code : '') || '';
                                 const qtyVal = Number(b.onHand) || 0;
                                 const availVal = Number(b.available !== undefined ? b.available : b.onHand || 0);
-                                const skuObj = b.sku || (typeof selectedInvoice.items?.[0]?.skuId === 'object' ? selectedInvoice.items[0].skuId : null);
-                                const priceVal = Number(skuObj?.purchasePrice) || Number(selectedInvoice.items?.[0]?.purchasePrice) || 0;
+                                const matchingItem = (selectedInvoice.items || []).find(it => {
+                                  const itSkuId = typeof it.skuId === 'object' && it.skuId !== null ? (it.skuId as any)._id : it.skuId;
+                                  return String(itSkuId) === String(b.sku?._id || b.skuId);
+                                }) || selectedInvoice.items?.[0];
+                                const skuObj = b.sku || (typeof matchingItem?.skuId === 'object' ? matchingItem.skuId : null);
+                                const priceVal = Number(matchingItem?.purchasePrice) || Number(skuObj?.purchasePrice) || 0;
                                 const estValue = qtyVal * priceVal;
 
                                 return (
