@@ -1146,207 +1146,207 @@ export const ProductionModule: React.FC = () => {
         {/* 6. Production Entries Main Table */}
         <div className="bg-white border border-gray-200/90 rounded-2xl overflow-hidden shadow-2xs">
           <div className="overflow-x-auto min-h-[380px]">
-            <table className="w-full text-left divide-y divide-gray-200">
-              <thead className="bg-gray-50/80 text-[11px] font-bold text-gray-600 uppercase tracking-wider select-none border-b border-gray-200">
-                  <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                    <th className="py-3 px-3 w-8 text-center">
-                      <input 
-                        type="checkbox" 
-                        checked={paginatedEntries.length > 0 && paginatedEntries.every(e => selectedEntryIds.has(e.id))}
-                        onChange={handleSelectAllEntries}
-                        className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" 
-                      />
-                    </th>
-                    <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleSort('entryNo')}>
-                      <div className="flex items-center space-x-1">
-                        <span>Entry No.</span>
-                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
-                      </div>
-                    </th>
-                    <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleSort('date')}>
-                      <div className="flex items-center space-x-1">
-                        <span>Date</span>
-                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
-                      </div>
-                    </th>
-                    <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleSort('orderNumber')}>
-                      <div className="flex items-center space-x-1">
-                        <span>Production Order</span>
-                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
-                      </div>
-                    </th>
-                    <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleSort('itemName')}>
-                      <div className="flex items-center space-x-1">
-                        <span>Item / Product</span>
-                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
-                      </div>
-                    </th>
-                    <th className="py-3 px-3 text-right">Produced Qty</th>
-                    <th className="py-3 px-3 text-right font-bold">Good Qty</th>
-                    <th className="py-3 px-3 text-right">Wastage</th>
-                    <th className="py-3 px-3">UOM</th>
-                    <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleSort('locationFloor')}>
-                      <div className="flex items-center space-x-1">
-                        <span>Output Location</span>
-                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
-                      </div>
-                    </th>
-                    <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleSort('department')}>
-                      <div className="flex items-center space-x-1">
-                        <span>Department</span>
-                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
-                      </div>
-                    </th>
-                    <th className="py-3 px-3">Status</th>
-                    <th className="py-3 px-3 text-center">Actions</th>
+            <table className="w-full text-left border-collapse text-xs">
+              <thead className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider select-none">
+                <tr>
+                  <th className="py-3 px-3 w-8 text-center font-bold">
+                    <input 
+                      type="checkbox" 
+                      checked={paginatedEntries.length > 0 && paginatedEntries.every(e => selectedEntryIds.has(e.id))}
+                      onChange={handleSelectAllEntries}
+                      className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" 
+                    />
+                  </th>
+                  <th className="py-3 px-3 font-bold cursor-pointer select-none" onClick={() => handleSort('entryNo')}>
+                    <div className="flex items-center space-x-1">
+                      <span>ENTRY NO.</span>
+                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                    </div>
+                  </th>
+                  <th className="py-3 px-3 font-bold cursor-pointer select-none" onClick={() => handleSort('date')}>
+                    <div className="flex items-center space-x-1">
+                      <span>DATE</span>
+                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                    </div>
+                  </th>
+                  <th className="py-3 px-3 font-bold cursor-pointer select-none" onClick={() => handleSort('orderNumber')}>
+                    <div className="flex items-center space-x-1">
+                      <span>PRODUCTION ORDER</span>
+                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                    </div>
+                  </th>
+                  <th className="py-3 px-3 font-bold cursor-pointer select-none min-w-[180px]" onClick={() => handleSort('itemName')}>
+                    <div className="flex items-center space-x-1">
+                      <span>ITEM / PRODUCT</span>
+                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                    </div>
+                  </th>
+                  <th className="py-3 px-3 text-right font-bold">PRODUCED QTY</th>
+                  <th className="py-3 px-3 text-right font-bold">GOOD QTY</th>
+                  <th className="py-3 px-3 text-right font-bold">WASTAGE</th>
+                  <th className="py-3 px-3 font-bold">UOM</th>
+                  <th className="py-3 px-3 font-bold cursor-pointer select-none" onClick={() => handleSort('locationFloor')}>
+                    <div className="flex items-center space-x-1">
+                      <span>OUTPUT LOCATION</span>
+                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                    </div>
+                  </th>
+                  <th className="py-3 px-3 font-bold cursor-pointer select-none" onClick={() => handleSort('department')}>
+                    <div className="flex items-center space-x-1">
+                      <span>DEPARTMENT</span>
+                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                    </div>
+                  </th>
+                  <th className="py-3 px-3 font-bold">STATUS</th>
+                  <th className="py-3 px-3 text-center font-bold">ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 text-xs">
+                {paginatedEntries.length === 0 ? (
+                  <tr>
+                    <td colSpan={13} className="py-12 text-center text-gray-400 text-xs">
+                      {entriesSearch ? 'No production entries matching your search criteria.' : 'No production entries recorded in backend yet. Click "+ New Production Entry" to record.'}
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {paginatedEntries.length === 0 ? (
-                    <tr>
-                      <td colSpan={13} className="py-12 text-center text-gray-400">
-                        {entriesSearch ? 'No production entries matching your search criteria.' : 'No production entries recorded in backend yet. Click "+ New Production Entry" to record.'}
-                      </td>
-                    </tr>
-                  ) : (
-                    paginatedEntries.map((e) => {
-                      const isSelected = selectedEntryIds.has(e.id);
-                      return (
-                        <tr 
-                          key={e.id} 
-                          className={`hover:bg-blue-50/30 transition-colors ${isSelected ? 'bg-blue-50/50' : ''}`}
-                        >
-                          {/* Checkbox */}
-                          <td className="py-3 px-3 text-center">
-                            <input 
-                              type="checkbox" 
-                              checked={isSelected}
-                              onChange={() => handleToggleEntry(e.id)}
-                              className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" 
-                            />
-                          </td>
+                ) : (
+                  paginatedEntries.map((e) => {
+                    const isSelected = selectedEntryIds.has(e.id);
+                    return (
+                      <tr 
+                        key={e.id} 
+                        className={`hover:bg-blue-50/40 transition-colors group cursor-pointer ${isSelected ? 'bg-blue-50/60' : ''}`}
+                      >
+                        {/* Checkbox */}
+                        <td className="py-3.5 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                          <input 
+                            type="checkbox" 
+                            checked={isSelected}
+                            onChange={() => handleToggleEntry(e.id)}
+                            className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" 
+                          />
+                        </td>
 
-                          {/* Entry No */}
-                          <td className="py-3 px-3 font-bold font-mono text-blue-600 whitespace-nowrap">
-                            {e.entryNo}
-                          </td>
+                        {/* Entry No */}
+                        <td className="py-3.5 px-3 font-bold font-mono text-blue-600 whitespace-nowrap text-xs">
+                          {e.entryNo}
+                        </td>
 
-                          {/* Date */}
-                          <td className="py-3 px-3 text-gray-700 whitespace-nowrap">
-                            {e.date}
-                          </td>
+                        {/* Date */}
+                        <td className="py-3.5 px-3 text-gray-700 whitespace-nowrap text-xs">
+                          {e.date}
+                        </td>
 
-                          {/* Production Order */}
-                          <td className="py-3 px-3 font-bold font-mono text-blue-600 whitespace-nowrap">
-                            <button 
-                              onClick={() => handleOpenRecordEntries(e.parentOrder)} 
-                              className="hover:underline cursor-pointer"
+                        {/* Production Order */}
+                        <td className="py-3.5 px-3 font-bold font-mono text-blue-600 whitespace-nowrap text-xs">
+                          <button 
+                            onClick={() => handleOpenRecordEntries(e.parentOrder)} 
+                            className="hover:underline cursor-pointer"
+                          >
+                            {e.orderNumber}
+                          </button>
+                        </td>
+
+                        {/* Item / Product */}
+                        <td className="py-3.5 px-3 text-xs">
+                          <div className="font-bold text-gray-900 leading-snug text-xs">
+                            {e.itemName}
+                          </div>
+                          <div className="text-[11px] text-gray-400 font-mono font-medium">
+                            {e.itemCode}
+                          </div>
+                        </td>
+
+                        {/* Produced Qty */}
+                        <td className="py-3.5 px-3 text-right font-medium text-gray-800 text-xs whitespace-nowrap">
+                          {e.producedQty.toLocaleString()}
+                        </td>
+
+                        {/* Good Qty */}
+                        <td className="py-3.5 px-3 text-right font-bold text-gray-900 text-xs whitespace-nowrap">
+                          {e.goodQty.toLocaleString()}
+                        </td>
+
+                        {/* Wastage */}
+                        <td className="py-3.5 px-3 text-right font-medium text-gray-600 text-xs whitespace-nowrap">
+                          {e.wastageQty.toLocaleString()}
+                        </td>
+
+                        {/* UOM */}
+                        <td className="py-3.5 px-3 text-gray-600 font-medium text-xs whitespace-nowrap">
+                          {e.producedUom || 'PCS'}
+                        </td>
+
+                        {/* Output Location */}
+                        <td className="py-3.5 px-3 text-xs">
+                          <div className="font-medium text-gray-800 text-xs">
+                            {e.locationFloor}
+                          </div>
+                          <div className="text-[11px] text-gray-400 font-medium">
+                            {e.locationZone}
+                          </div>
+                        </td>
+
+                        {/* Department */}
+                        <td className="py-3.5 px-3 text-gray-700 font-medium whitespace-nowrap text-xs">
+                          {e.department}
+                        </td>
+
+                        {/* Status */}
+                        <td className="py-3.5 px-3 whitespace-nowrap text-xs">
+                          {e.status === 'Posted' ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                              Posted
+                            </span>
+                          ) : e.status === 'Cancelled' ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200/60">
+                              Cancelled
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-700 border border-gray-200/60">
+                              Draft
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Actions (View / Edit / Print / More) */}
+                        <td className="py-3.5 px-3 text-center whitespace-nowrap text-xs">
+                          <div className="flex items-center justify-center space-x-1.5 text-gray-400">
+                            <button
+                              onClick={() => setSelectedVoucherEntry(e)}
+                              title="View Journal Voucher"
+                              className="p-1 hover:text-blue-600 transition-colors cursor-pointer"
                             >
-                              {e.orderNumber}
+                              <Eye className="w-3.5 h-3.5" />
                             </button>
-                          </td>
-
-                          {/* Item / Product */}
-                          <td className="py-3 px-3">
-                            <div className="font-bold text-gray-900 uppercase text-xs">
-                              {e.itemName}
-                            </div>
-                            <div className="text-[11px] text-gray-400 font-mono">
-                              {e.itemCode}
-                            </div>
-                          </td>
-
-                          {/* Produced Qty */}
-                          <td className="py-3 px-3 text-right font-medium text-gray-800">
-                            {e.producedQty.toLocaleString()}
-                          </td>
-
-                          {/* Good Qty */}
-                          <td className="py-3 px-3 text-right font-bold text-gray-900">
-                            {e.goodQty.toLocaleString()}
-                          </td>
-
-                          {/* Wastage */}
-                          <td className="py-3 px-3 text-right font-medium text-gray-600">
-                            {e.wastageQty.toLocaleString()}
-                          </td>
-
-                          {/* UOM */}
-                          <td className="py-3 px-3 text-gray-600 font-medium">
-                            {e.producedUom || 'PCS'}
-                          </td>
-
-                          {/* Output Location */}
-                          <td className="py-3 px-3">
-                            <div className="font-medium text-gray-800">
-                              {e.locationFloor}
-                            </div>
-                            <div className="text-[11px] text-gray-400">
-                              {e.locationZone}
-                            </div>
-                          </td>
-
-                          {/* Department */}
-                          <td className="py-3 px-3 text-gray-700 font-medium whitespace-nowrap">
-                            {e.department}
-                          </td>
-
-                          {/* Status */}
-                          <td className="py-3 px-3 whitespace-nowrap">
-                            {e.status === 'Posted' ? (
-                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                Posted
-                              </span>
-                            ) : e.status === 'Cancelled' ? (
-                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                                Cancelled
-                              </span>
-                            ) : (
-                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-700 border border-gray-200">
-                                Draft
-                              </span>
-                            )}
-                          </td>
-
-                          {/* Actions (View / Edit / Print / More) */}
-                          <td className="py-3 px-3 text-center whitespace-nowrap">
-                            <div className="flex items-center justify-center space-x-1.5 text-gray-400">
-                              <button
-                                onClick={() => setSelectedVoucherEntry(e)}
-                                title="View Journal Voucher"
-                                className="p-1 hover:text-blue-600 transition-colors cursor-pointer"
-                              >
-                                <Eye className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleOpenRecordEntries(e.parentOrder)}
-                                title="Edit / Record Entries"
-                                className="p-1 hover:text-blue-600 transition-colors cursor-pointer"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => setPrintOrder(e.parentOrder)}
-                                title="Print Order"
-                                className="p-1 hover:text-blue-600 transition-colors cursor-pointer"
-                              >
-                                <Printer className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleOpenOrderDetail(e.parentOrder)}
-                                title="View Order Overview"
-                                className="p-1 hover:text-gray-700 transition-colors cursor-pointer"
-                              >
-                                <MoreVertical className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+                            <button
+                              onClick={() => handleOpenRecordEntries(e.parentOrder)}
+                              title="Edit / Record Entries"
+                              className="p-1 hover:text-blue-600 transition-colors cursor-pointer"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setPrintOrder(e.parentOrder)}
+                              title="Print Order"
+                              className="p-1 hover:text-blue-600 transition-colors cursor-pointer"
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleOpenOrderDetail(e.parentOrder)}
+                              title="View Order Overview"
+                              className="p-1 hover:text-gray-700 transition-colors cursor-pointer"
+                            >
+                              <MoreVertical className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
             </div>
 
             {/* Pagination Footer */}
@@ -1873,64 +1873,64 @@ export const ProductionModule: React.FC = () => {
         {/* 6. Main Table: Material Requirements */}
         <div className="bg-white border border-gray-200/90 rounded-2xl overflow-hidden shadow-2xs">
           <div className="overflow-x-auto min-h-[380px]">
-            <table className="w-full text-left divide-y divide-gray-200">
-              <thead className="bg-gray-50/80 text-[11px] font-bold text-gray-600 uppercase tracking-wider select-none border-b border-gray-200">
-                  <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                    <th className="py-3 px-3 w-8 text-center">
-                      <input 
-                        type="checkbox" 
-                        checked={paginatedOrderRequirements.length > 0 && paginatedOrderRequirements.every(r => selectedRequirementIds.has(r.id))}
-                        onChange={handleSelectAllRequirements}
-                        className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" 
-                      />
-                    </th>
-                    <th className="py-3 px-3 w-16 text-center">#</th>
-                    <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleMatSort('orderNumber')}>
-                      <div className="flex items-center space-x-1">
-                        <span>Production Order</span>
-                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
-                      </div>
-                    </th>
-                    <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleMatSort('itemName')}>
-                      <div className="flex items-center space-x-1">
-                        <span>Product</span>
-                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
-                      </div>
-                    </th>
-                    <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleMatSort('plannedQty')}>
-                      <div className="flex items-center space-x-1">
-                        <span>Planned Qty</span>
-                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
-                      </div>
-                    </th>
-                    <th className="py-3 px-3 cursor-pointer select-none text-center" onClick={() => handleMatSort('materialItemsCount')}>
-                      <div className="flex items-center justify-center space-x-1">
-                        <span>Material Items</span>
-                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
-                      </div>
-                    </th>
-                    <th className="py-3 px-3 cursor-pointer select-none text-center" onClick={() => handleMatSort('shortageItemsCount')}>
-                      <div className="flex items-center justify-center space-x-1">
-                        <span>Shortage Items</span>
-                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
-                      </div>
-                    </th>
-                    <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleMatSort('overallStatus')}>
-                      <div className="flex items-center space-x-1">
-                        <span>Overall Status</span>
-                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
-                      </div>
-                    </th>
-                    <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleMatSort('dueDate')}>
-                      <div className="flex items-center space-x-1">
-                        <span>Due Date</span>
-                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
-                      </div>
-                    </th>
-                    <th className="py-3 px-3 text-center">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider select-none">
+                <tr>
+                  <th className="py-3 px-3 w-8 text-center">
+                    <input 
+                      type="checkbox" 
+                      checked={paginatedOrderRequirements.length > 0 && paginatedOrderRequirements.every(r => selectedRequirementIds.has(r.id))}
+                      onChange={handleSelectAllRequirements}
+                      className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" 
+                    />
+                  </th>
+                  <th className="py-3 px-3 w-16 text-center">#</th>
+                  <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleMatSort('orderNumber')}>
+                    <div className="flex items-center space-x-1">
+                      <span>Production Order</span>
+                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                    </div>
+                  </th>
+                  <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleMatSort('itemName')}>
+                    <div className="flex items-center space-x-1">
+                      <span>Product</span>
+                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                    </div>
+                  </th>
+                  <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleMatSort('plannedQty')}>
+                    <div className="flex items-center space-x-1">
+                      <span>Planned Qty</span>
+                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                    </div>
+                  </th>
+                  <th className="py-3 px-3 cursor-pointer select-none text-center" onClick={() => handleMatSort('materialItemsCount')}>
+                    <div className="flex items-center justify-center space-x-1">
+                      <span>Material Items</span>
+                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                    </div>
+                  </th>
+                  <th className="py-3 px-3 cursor-pointer select-none text-center" onClick={() => handleMatSort('shortageItemsCount')}>
+                    <div className="flex items-center justify-center space-x-1">
+                      <span>Shortage Items</span>
+                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                    </div>
+                  </th>
+                  <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleMatSort('overallStatus')}>
+                    <div className="flex items-center space-x-1">
+                      <span>Overall Status</span>
+                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                    </div>
+                  </th>
+                  <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleMatSort('dueDate')}>
+                    <div className="flex items-center space-x-1">
+                      <span>Due Date</span>
+                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                    </div>
+                  </th>
+                  <th className="py-3 px-3 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 text-xs">
                   {paginatedOrderRequirements.length === 0 ? (
                     <tr>
                       <td colSpan={10} className="py-12 text-center text-gray-400">
