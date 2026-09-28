@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import { 
   Users, 
   Building, 
@@ -1042,38 +1043,60 @@ export const BusinessDirectoryV2: React.FC = () => {
     setIsImporting(true);
 
     try {
-      const text = await file.text();
-      const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
-      if (lines.length <= 1) {
-        showToast('CSV file is empty or missing data rows', 'error');
+      let rawRows: any[][] = [];
+      const fileName = file.name.toLowerCase();
+
+      if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        if (!firstSheetName) {
+          showToast('Excel workbook has no sheets', 'error');
+          setIsImporting(false);
+          return;
+        }
+        const sheet = workbook.Sheets[firstSheetName];
+        rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' }) as any[][];
+      } else {
+        // For CSV / text: try XLSX array buffer parsing first, fallback to text parsing
+        try {
+          const buffer = await file.arrayBuffer();
+          const workbook = XLSX.read(buffer, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          if (firstSheetName) {
+            rawRows = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheetName], { header: 1, defval: '' }) as any[][];
+          }
+        } catch {
+          const text = await file.text();
+          const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+          const parseCSVLine = (line: string) => {
+            const values: string[] = [];
+            let current = '';
+            let inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+              const char = line[i];
+              if (char === '"') inQuotes = !inQuotes;
+              else if (char === ',' && !inQuotes) { values.push(current.trim()); current = ''; }
+              else current += char;
+            }
+            values.push(current.trim());
+            return values.map(v => v.replace(/^"|"$/g, '').replace(/""/g, '"'));
+          };
+          rawRows = lines.map(parseCSVLine);
+        }
+      }
+
+      if (!rawRows || rawRows.length <= 1) {
+        showToast('File is empty or missing data rows', 'error');
         setIsImporting(false);
         return;
       }
 
-      const parseCSVLine = (line: string) => {
-        const values: string[] = [];
-        let current = '';
-        let inQuotes = false;
-        for (let i = 0; i < line.length; i++) {
-          const char = line[i];
-          if (char === '"') {
-            inQuotes = !inQuotes;
-          } else if (char === ',' && !inQuotes) {
-            values.push(current.trim());
-            current = '';
-          } else {
-            current += char;
-          }
-        }
-        values.push(current.trim());
-        return values.map(v => v.replace(/^"|"$/g, '').replace(/""/g, '"'));
-      };
-
-      const rawHeaders = parseCSVLine(lines[0]);
+      const rawHeaders = (rawRows[0] || []).map(h => String(h || '').trim());
       const headerMap: Record<string, number> = {};
       rawHeaders.forEach((h, idx) => {
         const cleanH = h.toLowerCase().replace(/[^a-z0-9]/g, '');
-        headerMap[cleanH] = idx;
+        if (cleanH) headerMap[cleanH] = idx;
       });
 
       const partiesToImport: any[] = [];
@@ -1083,17 +1106,23 @@ export const BusinessDirectoryV2: React.FC = () => {
                         activeMainTab === 'regions' ? 'route' :
                         activeMainTab === 'cities' ? 'market' : 'customer';
 
-      for (let i = 1; i < lines.length; i++) {
-        const row = parseCSVLine(lines[i]);
-        if (row.length === 0 || !row.some(Boolean)) continue;
+      for (let i = 1; i < rawRows.length; i++) {
+        const row = rawRows[i];
+        if (!row || row.length === 0 || !row.some(c => String(c || '').trim())) continue;
 
-        const getValue = (keyName: string) => {
-          const cleanK = keyName.toLowerCase().replace(/[^a-z0-9]/g, '');
-          const idx = headerMap[cleanK];
-          return idx !== undefined && row[idx] !== undefined ? row[idx] : '';
+        const getValue = (...keys: string[]) => {
+          for (const key of keys) {
+            const cleanK = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const idx = headerMap[cleanK];
+            if (idx !== undefined && row[idx] !== undefined && row[idx] !== null) {
+              const val = String(row[idx]).trim();
+              if (val) return val;
+            }
+          }
+          return '';
         };
 
-        const firmName = getValue('firmname') || getValue('customerfirm') || getValue('suppliername') || getValue('agentname') || getValue('transportername') || getValue('regionname') || getValue('cityname') || row[0];
+        const firmName = getValue('firmname', 'customerfirm', 'customername', 'partyname', 'businessname', 'companyname', 'suppliername', 'vendorname', 'agentname', 'transportername', 'regionname', 'cityname', 'name', 'firm') || String(row[0] || '').trim();
         if (!firmName) continue;
 
         const recordObj: any = {
@@ -1101,62 +1130,63 @@ export const BusinessDirectoryV2: React.FC = () => {
           type: partyType,
           firmName,
           name: firmName,
-          ownerName: getValue('ownername') || getValue('contactperson') || getValue('contactname'),
-          contactName: getValue('contactname') || getValue('contactperson') || getValue('ownername'),
-          phone: getValue('phone') || getValue('mobile'),
-          altPhone: getValue('altphone'),
-          whatsapp: getValue('whatsapp') || getValue('phone'),
-          email: getValue('email'),
-          gstNumber: getValue('gstnumber') || getValue('gstin'),
-          aadharNumber: getValue('aadharnumber') || getValue('pan'),
-          doorNo: getValue('doorno'),
-          streetName: getValue('streetname'),
-          address1: getValue('addressline') || getValue('address'),
-          area: getValue('area'),
+          ownerName: getValue('ownername', 'contactperson', 'contactname', 'owner', 'person', 'proprietor'),
+          contactName: getValue('contactname', 'contactperson', 'ownername', 'person'),
+          phone: getValue('phone', 'mobile', 'phonenumber', 'mobilenumber', 'contactnumber', 'cell', 'tel'),
+          altPhone: getValue('altphone', 'altmobile', 'alternatemobile', 'alternatephone', 'phone2'),
+          whatsapp: getValue('whatsapp', 'wanumber', 'phone', 'mobile'),
+          email: getValue('email', 'emailid', 'mail'),
+          gstNumber: getValue('gstnumber', 'gstin', 'gst', 'gstno'),
+          aadharNumber: getValue('aadharnumber', 'aadhar', 'pan', 'pannumber'),
+          doorNo: getValue('doorno', 'door'),
+          streetName: getValue('streetname', 'street'),
+          address1: getValue('addressline', 'address', 'address1'),
+          area: getValue('area', 'locality'),
           landmark: getValue('landmark'),
-          city: getValue('city'),
+          city: getValue('city', 'market', 'station', 'town'),
           district: getValue('district'),
           state: getValue('state') || 'Andhra Pradesh',
-          pincode: getValue('pincode'),
-          gpsLocation: getValue('gpslocation'),
-          route: getValue('region') || getValue('route'),
-          agentAssigned: getValue('agentassigned') || getValue('assignedagent'),
-          preferredTransport: getValue('preferredtransport'),
+          pincode: getValue('pincode', 'pin', 'postalcode', 'zip'),
+          gpsLocation: getValue('gpslocation', 'location', 'gps'),
+          route: getValue('region', 'route', 'areaname'),
+          agentAssigned: getValue('agentassigned', 'assignedagent', 'agent'),
+          preferredTransport: getValue('preferredtransport', 'transport', 'transporter'),
           vendorType: getValue('vendortype') || 'BOARD SUPPLIER',
           creditDays: Number(getValue('creditdays')) || 30,
           creditLimit: Number(getValue('creditlimit')) || 100000,
           openingBalance: Number(getValue('openingbalance')) || 0,
-          outstandingBalance: Number(getValue('outstandingbalance')) || Number(getValue('outstanding')) || 0,
+          outstandingBalance: Number(getValue('outstandingbalance', 'outstanding')) || 0,
           status: (getValue('status') || 'active').toLowerCase(),
           tags: getValue('tags') ? getValue('tags').split(',').map((t: string) => t.trim()).filter(Boolean) : [],
-          notes: getValue('remarks') || getValue('notes')
+          notes: getValue('remarks', 'notes', 'description')
         };
 
         partiesToImport.push(recordObj);
       }
 
       if (partiesToImport.length === 0) {
-        showToast('No valid party records parsed from file', 'warning');
+        showToast('No valid party records found in file', 'warning');
         setIsImporting(false);
         return;
       }
 
-      await importParties(partiesToImport);
+      const res = await importParties(partiesToImport);
 
       createActivityLog({
         action: 'IMPORT',
         entityType: activeMainTab.toUpperCase(),
         entityName: `${partiesToImport.length} ${activeMainTab} imported`,
-        details: `Imported ${partiesToImport.length} ${activeMainTab} records directly into database via CSV import`,
+        details: `Imported ${partiesToImport.length} ${activeMainTab} records directly into database via Excel/CSV import`,
         company: selectedCompany._id
       }).catch(() => {});
 
-      showToast(`Successfully imported ${partiesToImport.length} ${activeMainTab} into database!`, 'success');
+      const importedCount = res?.data?.count || partiesToImport.length;
+      showToast(`Successfully imported ${importedCount} ${activeMainTab} into database!`, 'success');
       await loadDirectoryData();
       await loadAuxiliaryData();
     } catch (err: any) {
       console.error('Import failed:', err);
-      showToast(err?.response?.data?.msg || err.message || 'Failed to import CSV file', 'error');
+      showToast(err?.response?.data?.msg || err.message || 'Failed to import Excel/CSV file', 'error');
     } finally {
       setIsImporting(false);
       e.target.value = '';
@@ -1351,25 +1381,13 @@ export const BusinessDirectoryV2: React.FC = () => {
         }
       });
 
-      const csvContent = '\uFEFF' + [
-        headers.join(','),
-        ...rows.map(row => row.map(val => {
-          const clean = String(val).replace(/"/g, '""');
-          return clean.includes(',') || clean.includes('\n') ? `"${clean}"` : clean;
-        }).join(','))
-      ].join('\n');
-
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.setAttribute('href', url);
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, activeMainTab.toUpperCase());
       const scopeLabel = selectedIds.length > 0 ? `selected_${selectedIds.length}` : 'all';
-      link.setAttribute('download', `${activeMainTab}_${scopeLabel}_export_${new Date().toISOString().slice(0, 10)}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      XLSX.writeFile(wb, `${activeMainTab}_${scopeLabel}_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
 
-      showToast(`Successfully exported ${exportItems.length} ${activeMainTab} records!`, 'success');
+      showToast(`Successfully exported ${exportItems.length} ${activeMainTab} records to Excel!`, 'success');
     } catch (err: any) {
       console.error('Export failed:', err);
       showToast(err.message || 'Failed to export records', 'error');

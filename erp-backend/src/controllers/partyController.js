@@ -1,7 +1,17 @@
+const mongoose = require('mongoose');
 const Party = require('../models/partyModel');
 const Route = require('../models/routeModel');
 const ActivityLog = require('../models/activityLogModel');
 const Sequence = require('../models/sequenceModel');
+
+const toObjectId = (id) => {
+  if (!id) return null;
+  if (id instanceof mongoose.Types.ObjectId) return id;
+  if (typeof id === "string" && mongoose.Types.ObjectId.isValid(id)) {
+    return new mongoose.Types.ObjectId(id);
+  }
+  return id;
+};
 
 const stateMap = {
   "andhra pradesh": "AP",
@@ -1976,23 +1986,75 @@ exports.importParties = async (req, res) => {
       await Sequence.bulkWrite(bulkOps);
     }
 
-    // 6. Insert all processed parties in one bulk query
-    const created = await Party.insertMany(processedParties, { ordered: false });
+    // 6. Separate route/region vs party records
+    const routeItems = processedParties.filter(p => p.type === 'route' || p.type === 'region');
+    const partyItems = processedParties.filter(p => p.type !== 'route' && p.type !== 'region');
+
+    const createdRoutes = [];
+    if (routeItems.length > 0) {
+      for (const r of routeItems) {
+        const baseCode = getRouteCode(r.firmName || r.name || 'ROUTE');
+        let routeCode = r.code || baseCode;
+        if (!r.code) {
+          let suffix = 1;
+          while (routeCodesSet.has(`${r.company}:${routeCode.toUpperCase()}`)) {
+            routeCode = `${baseCode}${suffix}`;
+            suffix++;
+          }
+          routeCodesSet.add(`${r.company}:${routeCode.toUpperCase()}`);
+        }
+        try {
+          const rDoc = await Route.findOneAndUpdate(
+            { company: toObjectId(r.company), name: (r.firmName || r.name).trim() },
+            {
+              $setOnInsert: {
+                name: (r.firmName || r.name).trim(),
+                code: routeCode,
+                company: toObjectId(r.company),
+                status: r.status || 'active'
+              }
+            },
+            { upsert: true, new: true }
+          );
+          if (rDoc) createdRoutes.push(rDoc);
+        } catch (rErr) {
+          console.error("Route import error:", rErr.message);
+        }
+      }
+    }
+
+    let created = [];
+    if (partyItems.length > 0) {
+      try {
+        created = await Party.insertMany(partyItems, { ordered: false });
+      } catch (insertErr) {
+        if (insertErr.insertedDocs && insertErr.insertedDocs.length > 0) {
+          created = insertErr.insertedDocs;
+        } else {
+          throw insertErr;
+        }
+      }
+    }
+
+    const totalCreatedCount = created.length + createdRoutes.length;
 
     // Activity log for final bulk import success
-    if (created.length > 0) {
+    if (totalCreatedCount > 0) {
+      const firstItem = created[0] || createdRoutes[0];
+      const entityType = firstItem?.type || 'party';
       await ActivityLog.create({
         action: 'IMPORT',
-        entityType: created[0].type,
-        entityName: `${created.length} ${created[0].type}s`,
-        details: `Imported ${created.length} ${created[0].type}s from Excel file`,
+        entityType,
+        entityName: `${totalCreatedCount} ${entityType}s`,
+        details: `Imported ${totalCreatedCount} ${entityType}s from Excel file`,
         performedBy: req.user ? req.user.fullName : "System",
-        company: created[0].company
+        company: firstItem?.company
       }).catch(err => console.error("Activity log failed:", err));
     }
 
-    res.status(201).json({ msg: `Successfully imported ${created.length} parties`, count: created.length });
+    res.status(201).json({ msg: `Successfully imported ${totalCreatedCount} records`, count: totalCreatedCount });
   } catch (err) {
+    console.error("importParties error:", err);
     res.status(500).json({ msg: err.message });
   }
 };

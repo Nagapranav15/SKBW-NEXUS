@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const partySchema = new mongoose.Schema({
   type: {
     type: String,
-    enum: ["customer", "vendor", "staff", "employee", "agent", "market", "transporter"],
+    enum: ["customer", "vendor", "staff", "employee", "agent", "market", "transporter", "route", "region"],
     required: true
   },
   firmName: {
