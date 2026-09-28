@@ -339,29 +339,19 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     });
   }, [backendSkus]);
 
-  const [materialTypeFilter, setMaterialTypeFilter] = useState<'all' | 'materials' | 'semi'>('all');
-
-  const rawCount = useMemo(() => rawAndSemiSkus.filter(s => getItemClassification(s) === 'materials').length, [rawAndSemiSkus]);
-  const semiCount = useMemo(() => rawAndSemiSkus.filter(s => getItemClassification(s) === 'semi').length, [rawAndSemiSkus]);
+  const [componentSearch, setComponentSearch] = useState<string>('');
 
   // Filter SKUs for Material / Component dropdown strictly to Raw Materials & Semi Goods
-  const getFilteredMaterialSkus = (searchTerm: string) => {
-    let base = rawAndSemiSkus;
-    if (materialTypeFilter === 'materials') {
-      base = base.filter(s => getItemClassification(s) === 'materials');
-    } else if (materialTypeFilter === 'semi') {
-      base = base.filter(s => getItemClassification(s) === 'semi');
-    }
-
-    if (!searchTerm || !searchTerm.trim()) return base;
-    const q = searchTerm.toLowerCase().trim();
-    return base.filter(s => 
+  const filteredMaterialList = useMemo(() => {
+    if (!componentSearch.trim()) return rawAndSemiSkus;
+    const q = componentSearch.toLowerCase().trim();
+    return rawAndSemiSkus.filter(s => 
       s.name.toLowerCase().includes(q) || 
       (s.skuCode && s.skuCode.toLowerCase().includes(q)) ||
       (s.category && s.category.toLowerCase().includes(q)) ||
       (s.brand && s.brand.toLowerCase().includes(q))
     );
-  };
+  }, [rawAndSemiSkus, componentSearch]);
 
   // Handle selecting an item from the Material dropdown
   const handleSelectMaterialSku = (rowId: string, sku: SkuV2) => {
@@ -1141,9 +1131,9 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         </div>
 
         {/* ── ROW 3: MATERIALS TO BE CONSUMED (FROM BOM) ── */}
-        <div className="bg-white rounded-xl border border-gray-200/90 shadow-3xs overflow-hidden">
+        <div className="bg-white rounded-xl border border-gray-200/90 shadow-3xs overflow-visible relative z-30">
           {/* Card Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-white">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-white rounded-t-xl">
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shadow-3xs">
                 <Layers className="w-3.5 h-3.5 text-emerald-600" />
@@ -1162,12 +1152,12 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           </div>
 
           {/* Table with Mini Factory modal for Source Location */}
-          <div className="overflow-x-auto">
+          <div className="overflow-visible min-h-[160px]">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gray-50/90 border-b border-gray-200 text-[10.5px] font-bold text-gray-600 uppercase tracking-wider">
                   <th className="py-2.5 px-3 text-center w-8">#</th>
-                  <th className="py-2.5 px-3">Material / Component</th>
+                  <th className="py-2.5 px-3 min-w-[240px]">Material / Component</th>
                   <th className="py-2.5 px-3 w-24 text-center">Item Code</th>
                   <th className="py-2.5 px-3 w-16 text-center">UOM</th>
                   <th className="py-2.5 px-3 w-32 text-right">Required Qty<br/><span className="text-[9.5px] font-normal normal-case text-gray-400">({numPlannedQty > 0 ? `for ${plannedQty} ${uom}` : 'qty'})</span></th>
@@ -1186,114 +1176,121 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   </tr>
                 ) : (
                   materials.map((row, idx) => (
-                    <tr key={row.id} className="hover:bg-gray-50/60 transition-colors">
+                    <tr 
+                      key={row.id} 
+                      className={`hover:bg-gray-50/60 transition-colors relative ${activeMaterialDropdownId === row.id ? 'z-50' : 'z-10'}`}
+                    >
                       <td className="py-2 px-3 text-center text-gray-400 font-medium">
                         {idx + 1}
                       </td>
 
-                      {/* Material / Component: Searchable Dropdown & Visible Input Box */}
+                      {/* Material / Component: Replicated Dropdown matching Product to Manufacture */}
                       <td className="py-2 px-3 relative material-dropdown-container">
-                        <div className="relative">
-                          <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                          <input
-                            type="text"
-                            value={row.component}
-                            onChange={e => {
-                              handleUpdateMaterial(row.id, 'component', e.target.value);
+                        <div
+                          onClick={() => {
+                            if (activeMaterialDropdownId === row.id) {
+                              setActiveMaterialDropdownId(null);
+                            } else {
                               setActiveMaterialDropdownId(row.id);
-                            }}
-                            onFocus={() => setActiveMaterialDropdownId(row.id)}
-                            onClick={() => setActiveMaterialDropdownId(row.id)}
-                            placeholder="Select or enter component..."
-                            className="w-full pl-8 pr-7 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all placeholder:text-gray-400 shadow-3xs"
-                          />
-                          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
+                              setComponentSearch('');
+                            }
+                          }}
+                          className="w-full min-w-[220px] h-9 px-3 bg-white border border-gray-200 rounded-lg flex items-center justify-between cursor-pointer hover:border-gray-300 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-600 transition-all shadow-3xs"
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                             {row.component ? (
+                              <>
+                                <span className="text-xs font-bold text-gray-900 truncate">
+                                  {row.component}
+                                </span>
+                                {row.code && (
+                                  <span className="text-[10px] font-mono font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200/60 shrink-0">
+                                    {row.code}
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-xs text-gray-400">Select material / semi good...</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0 ml-1">
+                            {row.component && (
                               <button
                                 type="button"
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   handleUpdateMaterial(row.id, 'component', '');
+                                  handleUpdateMaterial(row.id, 'code', '');
                                   setActiveMaterialDropdownId(row.id);
+                                  setComponentSearch('');
                                 }}
-                                className="p-0.5 text-gray-400 hover:text-gray-600 cursor-pointer"
+                                className="p-0.5 text-gray-400 hover:text-gray-600 rounded cursor-pointer"
+                                title="Clear"
                               >
                                 <X className="w-3 h-3" />
                               </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => setActiveMaterialDropdownId(activeMaterialDropdownId === row.id ? null : row.id)}
-                                className="p-0.5 text-gray-400 hover:text-gray-600 cursor-pointer"
-                              >
-                                <ChevronDown className="w-3.5 h-3.5" />
-                              </button>
                             )}
+                            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${activeMaterialDropdownId === row.id ? 'rotate-180' : ''}`} />
                           </div>
                         </div>
 
-                        {/* Searchable Material Dropdown (Raw Materials & Semi Goods) */}
+                        {/* Dropdown Popup matching exact Product dropdown style (strictly Materials & Semi Goods) */}
                         {activeMaterialDropdownId === row.id && (
-                          <div className="absolute left-3 top-full mt-1.5 w-[420px] sm:w-[500px] bg-white border border-gray-200 rounded-xl shadow-2xl z-[9999] max-h-72 overflow-hidden flex flex-col p-1 animate-in fade-in zoom-in-95 duration-100">
-                            {/* Type filter tabs: All vs Materials vs Semi Goods */}
-                            <div className="flex items-center gap-1 p-1 bg-gray-50/90 rounded-lg border-b border-gray-100 mb-1">
-                              <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); setMaterialTypeFilter('all'); }}
-                                className={`px-2.5 py-1 text-[10.5px] font-bold rounded-md transition-colors cursor-pointer ${
-                                  materialTypeFilter === 'all' 
-                                    ? 'bg-white text-blue-700 shadow-3xs border border-gray-200/60' 
-                                    : 'text-gray-500 hover:text-gray-800'
-                                }`}
-                              >
-                                All ({rawAndSemiSkus.length})
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); setMaterialTypeFilter('materials'); }}
-                                className={`px-2.5 py-1 text-[10.5px] font-bold rounded-md transition-colors cursor-pointer ${
-                                  materialTypeFilter === 'materials' 
-                                    ? 'bg-amber-50 text-amber-700 border border-amber-200 shadow-3xs' 
-                                    : 'text-gray-500 hover:text-amber-700'
-                                }`}
-                              >
-                                Materials ({rawCount})
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); setMaterialTypeFilter('semi'); }}
-                                className={`px-2.5 py-1 text-[10.5px] font-bold rounded-md transition-colors cursor-pointer ${
-                                  materialTypeFilter === 'semi' 
-                                    ? 'bg-purple-50 text-purple-700 border border-purple-200 shadow-3xs' 
-                                    : 'text-gray-500 hover:text-purple-700'
-                                }`}
-                              >
-                                Semi Goods ({semiCount})
-                              </button>
+                          <div className="absolute z-50 left-3 top-full mt-1.5 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-72 overflow-hidden flex flex-col p-1 animate-in fade-in zoom-in-95 duration-100 w-[380px] sm:w-[480px]">
+                            {/* Search Header */}
+                            <div className="p-2 border-b border-gray-100 flex items-center gap-2 bg-gray-50/80 rounded-t-lg">
+                              <Search className="w-4 h-4 text-gray-400 shrink-0" />
+                              <input
+                                type="text"
+                                value={componentSearch}
+                                onChange={e => setComponentSearch(e.target.value)}
+                                placeholder="Search material or semi good..."
+                                className="w-full text-xs bg-transparent border-none outline-none text-gray-800 placeholder:text-gray-400"
+                                autoFocus
+                                onClick={e => e.stopPropagation()}
+                              />
+                              {componentSearch && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); setComponentSearch(''); }}
+                                  className="p-1 text-gray-400 hover:text-gray-600 cursor-pointer"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                             </div>
 
-                            {/* Item List */}
+                            {/* SKUs List */}
                             <div className="overflow-y-auto max-h-60 divide-y divide-gray-100 p-1">
-                              {getFilteredMaterialSkus(row.component).length === 0 ? (
-                                <div className="p-4 text-center text-xs text-gray-400 italic">No matching materials or semi goods found</div>
+                              {filteredMaterialList.length === 0 ? (
+                                <div className="p-3 text-xs text-gray-400 text-center italic">No materials or semi goods found</div>
                               ) : (
-                                getFilteredMaterialSkus(row.component).map(sku => {
-                                  const isSelected = row.component.toLowerCase() === sku.name.toLowerCase();
+                                filteredMaterialList.map(sku => {
+                                  const isSelected = row.component && row.component.toLowerCase() === sku.name.toLowerCase();
                                   const conv = Number(sku.booksGbl || sku.altUnitConversion || 0);
                                   const itemType = getItemClassification(sku);
                                   return (
                                     <div
                                       key={sku._id}
-                                      onClick={() => handleSelectMaterialSku(row.id, sku)}
-                                      className={`p-2.5 rounded-lg cursor-pointer flex items-center justify-between text-xs transition-colors ${
-                                        isSelected ? 'bg-blue-100/90 font-bold border border-blue-200' : 'hover:bg-blue-50/80'
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSelectMaterialSku(row.id, sku);
+                                      }}
+                                      className={`p-2.5 rounded-lg cursor-pointer flex items-center justify-between transition-colors ${
+                                        isSelected 
+                                          ? 'bg-blue-100/90 font-bold border border-blue-200' 
+                                          : 'hover:bg-blue-50/80'
                                       }`}
                                     >
                                       <div className="flex-1 min-w-0 pr-3">
-                                        <div className="font-bold text-gray-900 truncate">{sku.name}</div>
-                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                        <div className="font-bold text-gray-900 truncate text-xs">{sku.name}</div>
+                                        <div className="flex items-center gap-2 mt-0.5">
                                           <span className="text-[10px] text-gray-400 font-mono">{sku.skuCode}</span>
                                           <span className="text-[10px] text-gray-300">•</span>
-                                          <span className="text-[10px] text-gray-500 truncate">{sku.brand || sku.category || (itemType === 'semi' ? 'Semi Finished' : 'Raw Material')}</span>
+                                          <span className="text-[10px] text-gray-500 truncate">
+                                            {sku.brand || sku.category || (itemType === 'semi' ? 'Semi Finished' : 'Raw Material')}
+                                          </span>
                                           {sku.unit && (
                                             <>
                                               <span className="text-[10px] text-gray-300">•</span>
