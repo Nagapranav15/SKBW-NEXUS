@@ -190,12 +190,20 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
         const code = (item.skuCode || `SKU-${idx}`).toUpperCase().trim();
         const name = item.itemName || code;
         const key = code || name;
-        const pcsPerGbl = item.pcsPerGbl || 100;
+        const comps = (item as any).components || [];
+        const packPcs = ((item as any).isMixedBundle && comps.length > 0)
+          ? comps.reduce((sum: number, c: any) => sum + (Number(c.quantity) || 0), 0)
+          : 0;
+        const pcsPerGbl = (packPcs > 0 && (!item.pcsPerGbl || item.pcsPerGbl === 1 || item.pcsPerGbl === 100))
+          ? packPcs
+          : (item.pcsPerGbl || packPcs || 100);
         const rawCat = (item as any).category || (item as any).stockCategory || categoryMap.get(code.toLowerCase()) || categoryMap.get(name.toLowerCase()) || '';
         const category = rawCat || (code.includes('112P') || name.toUpperCase().includes('112P') ? 'FINISHED GOODS' : '');
 
         const orderedPcs = Number(item.quantity) || 0;
-        const orderedGbl = item.gbl || Math.ceil(orderedPcs / pcsPerGbl);
+        const orderedGbl = (item.gbl && packPcs > 0 && item.gbl === packPcs && (item.pcsPerGbl === 1 || !item.pcsPerGbl))
+          ? 1
+          : (item.gbl || Math.ceil(orderedPcs / pcsPerGbl));
         const dispatchedPcs = Number(item.dispatchedQty) || 0;
         const dispatchedGbl = Math.floor(dispatchedPcs / pcsPerGbl);
         const pendingPcs = Math.max(0, orderedPcs - dispatchedPcs);

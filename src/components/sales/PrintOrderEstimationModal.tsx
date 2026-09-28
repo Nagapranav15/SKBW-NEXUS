@@ -78,16 +78,26 @@ const PrintOrderEstimationModal: React.FC<PrintOrderEstimationModalProps> = ({
     isMixedBundle?: boolean;
     components?: any[];
   }> = [
-    ...(order.items || []).map(item => ({
-      gbl: Number(item.gbl) || 0,
-      particulars: (item.itemName || '').toUpperCase(),
-      qty: item.quantity || 0,
-      rate: item.unitPrice || 0,
-      amount: item.totalAmount || 0,
-      isCharge: false,
-      isMixedBundle: (item as any).isMixedBundle,
-      components: (item as any).components,
-    })),
+    ...(order.items || []).map(item => {
+      const comps = (item as any).components || [];
+      const packPcs = ((item as any).isMixedBundle && comps.length > 0)
+        ? comps.reduce((sum: number, c: any) => sum + (Number(c.quantity) || 0), 0)
+        : 0;
+      let gbl = Number(item.gbl) || 0;
+      if (packPcs > 0 && gbl === packPcs && (Number(item.pcsPerGbl) === 1 || !item.pcsPerGbl)) {
+        gbl = 1;
+      }
+      return {
+        gbl: gbl || (Number(item.pcsPerGbl) > 0 ? Math.ceil((item.quantity || 0) / Number(item.pcsPerGbl)) : 0),
+        particulars: (item.itemName || '').toUpperCase(),
+        qty: item.quantity || 0,
+        rate: item.unitPrice || 0,
+        amount: item.totalAmount || 0,
+        isCharge: false,
+        isMixedBundle: (item as any).isMixedBundle,
+        components: comps,
+      };
+    }),
     ...(order.otherCharges || []).map(charge => ({
       gbl: charge.chargeType === 'per_gbl' ? totalGbl : (Number(charge.quantity) || ''),
       particulars: (charge.name || '').toUpperCase(),

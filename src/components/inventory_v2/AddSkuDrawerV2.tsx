@@ -2084,7 +2084,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                       altUnit: val,
                                       altUnitConversion: defaultConversion,
                                       altUnitDirection: '',
-                                      booksGbl: (upperVal === 'GBL' || upperUnit === 'GBL') ? '200' : prev.booksGbl
+                                      booksGbl: prev.booksGbl
                                     }));
                                   }
                                 }}
@@ -2374,7 +2374,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                     altUnit: val,
                                     altUnitConversion: defaultConversion,
                                     altUnitDirection: '',
-                                    booksGbl: (upperVal === 'GBL' || upperUnit === 'GBL') ? '200' : form.booksGbl
+                                    booksGbl: form.booksGbl
                                   });
                                 }
                               }}

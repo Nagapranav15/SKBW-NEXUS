@@ -707,25 +707,43 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       });
 
       if (editOrder.items && editOrder.items.length > 0) {
-        setItems(editOrder.items.map(i => ({
-          skuId: typeof i.skuId === 'object' ? (i.skuId as any)?._id : (i.skuId || ''),
-          skuCode: i.skuCode || '',
-          itemName: i.itemName || '',
-          description: (i as any).description || '',
-          category: i.category || 'Finished Goods',
-          uom: i.uom || 'Pcs',
-          stockPcs: 0,
-          stockGbl: null,
-          gbl: i.gbl || '',
-          pcsPerGbl: i.pcsPerGbl || 100,
-          totalPcs: i.quantity || 0,
-          rate: i.unitPrice || 0,
-          discPercent: i.discountPercent || 0,
-          discAmount: 0,
-          amount: i.totalAmount || 0,
-          isMixedBundle: !!i.isMixedBundle,
-          components: i.components || []
-        })));
+        setItems(editOrder.items.map(i => {
+          const comps = i.components || [];
+          const packPcs = (i.isMixedBundle && comps.length > 0)
+            ? comps.reduce((sum, c) => sum + (Number(c.quantity) || 0), 0)
+            : 0;
+
+          let pcsPerGbl = i.pcsPerGbl;
+          let gbl = i.gbl;
+
+          // If previously saved with buggy inverted logic where gbl = packPcs and pcsPerGbl was 1
+          if (packPcs > 0 && (Number(pcsPerGbl) === 1 || !pcsPerGbl) && Number(gbl) === packPcs) {
+            pcsPerGbl = packPcs;
+            gbl = 1;
+          } else if (packPcs > 0 && (!pcsPerGbl || Number(pcsPerGbl) === 1 || Number(pcsPerGbl) === 100)) {
+            pcsPerGbl = packPcs;
+          }
+
+          return {
+            skuId: typeof i.skuId === 'object' ? (i.skuId as any)?._id : (i.skuId || ''),
+            skuCode: i.skuCode || '',
+            itemName: i.itemName || '',
+            description: (i as any).description || '',
+            category: i.category || 'Finished Goods',
+            uom: i.uom || 'Pcs',
+            stockPcs: 0,
+            stockGbl: null,
+            gbl: gbl !== undefined && gbl !== null ? gbl : '',
+            pcsPerGbl: pcsPerGbl || (packPcs > 0 ? packPcs : 100),
+            totalPcs: i.quantity || 0,
+            rate: i.unitPrice || 0,
+            discPercent: i.discountPercent || 0,
+            discAmount: 0,
+            amount: i.totalAmount || 0,
+            isMixedBundle: !!i.isMixedBundle,
+            components: comps
+          };
+        }));
       } else {
         setItems([getEmptyRow()]);
       }
@@ -914,6 +932,29 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       }
       row.amount = Math.round((row.totalPcs || 0) * (Number(row.rate) || 0) * 100) / 100;
 
+      // If product has predefined recipe/BOM items, auto-initialize as a pack
+      if ((s as any).bomItems && Array.isArray((s as any).bomItems) && (s as any).bomItems.length > 0) {
+        const comps: OrderItemComponent[] = (s as any).bomItems.map((b: any, bIdx: number) => ({
+          componentId: b._id || b.id || `comp-${Date.now()}-${bIdx}`,
+          name: b.name || b.itemName || b.skuCode || '',
+          quantity: Number(b.quantity || b.qty || 0),
+          uom: b.uom || b.unit || 'Pcs',
+          rate: Number(b.rate || b.unitPrice || 0),
+          amount: Number(b.amount || (Number(b.quantity || b.qty || 0) * Number(b.rate || b.unitPrice || 0)))
+        }));
+        const packPcs = comps.reduce((sum, c) => sum + (Number(c.quantity) || 0), 0);
+        const packAmt = comps.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+        const blendedRate = packPcs > 0 ? +(packAmt / packPcs).toFixed(2) : 0;
+
+        row.isMixedBundle = true;
+        row.components = comps;
+        row.pcsPerGbl = packPcs > 0 ? packPcs : (pcsPerGbl > 0 ? pcsPerGbl : 1);
+        row.gbl = 1;
+        row.totalPcs = Number(row.gbl) * Number(row.pcsPerGbl);
+        if (blendedRate > 0) row.rate = blendedRate;
+        row.amount = Math.round((row.totalPcs || 0) * (Number(row.rate) || 0) * 100) / 100;
+      }
+
       copy[idx] = row;
       return copy;
     });
@@ -1021,9 +1062,9 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       return;
     }
 
-    const totalPcs = validComps.reduce((sum, c) => sum + (Number(c.quantity) || 0), 0);
-    const totalAmt = validComps.reduce((sum, c) => sum + (Number(c.amount) || (Number(c.quantity || 0) * Number(c.rate || 0))), 0);
-    const blendedRate = totalPcs > 0 ? +(totalAmt / totalPcs).toFixed(2) : 0;
+    const packPcs = validComps.reduce((sum, c) => sum + (Number(c.quantity) || 0), 0);
+    const packAmt = validComps.reduce((sum, c) => sum + (Number(c.amount) || (Number(c.quantity || 0) * Number(c.rate || 0))), 0);
+    const blendedRate = packPcs > 0 ? +(packAmt / packPcs).toFixed(2) : 0;
 
     setItems(prev => {
       const copy = [...prev];
@@ -1033,14 +1074,35 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
         ...c,
         amount: +(Number(c.quantity || 0) * Number(c.rate || 0)).toFixed(2)
       }));
-      r.totalPcs = totalPcs;
-      r.amount = totalAmt;
-      r.rate = blendedRate;
 
-      const pcsPerGblNum = Number(r.pcsPerGbl) || 0;
-      if (pcsPerGblNum > 0) {
-        r.gbl = +(totalPcs / pcsPerGblNum).toFixed(2);
-      }
+      // Reversed logic: pcs/GBL is according to the number of pcs given in pack
+      r.pcsPerGbl = packPcs > 0 ? packPcs : 1;
+
+      // GBL should be 1 (or current user-specified GBL if > 0 and was not previously set equal to packPcs)
+      const currentGbl = Number(r.gbl);
+      const gblVal = (currentGbl > 0 && currentGbl !== packPcs) ? currentGbl : 1;
+      r.gbl = gblVal;
+
+      r.totalPcs = gblVal * (packPcs > 0 ? packPcs : 1);
+      r.rate = blendedRate;
+      r.amount = Math.round(r.totalPcs * blendedRate * 100) / 100;
+
+      // Recalculate stock in GBL based on new pcsPerGbl
+      const matchedSku = availableSkus.find(s =>
+        (r.skuId && s._id === r.skuId) ||
+        (r.skuCode && s.skuCode?.toLowerCase().trim() === r.skuCode.toLowerCase().trim()) ||
+        (r.itemName && s.name?.toLowerCase().trim() === r.itemName.toLowerCase().trim())
+      );
+      const idKey = r.skuId || matchedSku?._id || '';
+      const codeKey = (r.skuCode || matchedSku?.skuCode || '').toLowerCase().trim();
+      const nameKey = (r.itemName || matchedSku?.name || '').toLowerCase().trim();
+      const rawOnHand = (idKey ? stockMap.get(idKey) : undefined) ??
+                        (codeKey ? stockMap.get(codeKey) : undefined) ??
+                        (nameKey ? stockMap.get(nameKey) : undefined) ??
+                        (r.stockPcs ?? 0);
+      const { stockGbl, stockPcs } = computeSkuStock(rawOnHand, matchedSku, r.pcsPerGbl);
+      r.stockGbl = stockGbl;
+      r.stockPcs = stockPcs;
 
       copy[rowIdx] = r;
       return copy;
@@ -1048,7 +1110,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
     setAllocExpandedRows(prev => ({ ...prev, [rowIdx]: true }));
     setAllocModalRowIdx(null);
-    showToast(`Breakdown applied: ${validComps.length} mixed items (${totalPcs} pcs total)`, 'success');
+    showToast(`Breakdown applied: ${validComps.length} mixed items (${packPcs} pcs/GBL)`, 'success');
   };
 
   const handleRemoveBundle = (idx: number) => {
@@ -2505,7 +2567,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                 title="Click to view/hide sub-item breakdown"
                               >
                                 <Layers className="w-3 h-3 text-indigo-600 shrink-0" />
-                                <span>Mixed Pack: {row.components.length} Items ({row.totalPcs} pcs)</span>
+                                <span>Mixed Pack: {row.components.length} Items ({row.pcsPerGbl || row.components.reduce((sum, c) => sum + (Number(c.quantity) || 0), 0)} pcs)</span>
                                 <ChevronDown className={`w-3 h-3 transition-transform ${allocExpandedRows[idx] ? 'rotate-180' : ''}`} />
                               </button>
                               <button
@@ -2659,7 +2721,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                           </td>
                           <td colSpan={6} className="py-2.5 px-3 text-right align-bottom text-[11px] text-gray-500 font-mono">
                             <div className="flex items-center justify-end gap-3 flex-wrap">
-                              <span>Sum Total: <strong className="text-gray-900 font-bold">{row.totalPcs} pcs</strong></span>
+                              <span>Sum Total: <strong className="text-gray-900 font-bold">{row.components.reduce((sum, c) => sum + (Number(c.quantity) || 0), 0)} pcs</strong></span>
                               <span>•</span>
                               <span>Weighted Avg Rate: <strong className="text-indigo-700 font-bold">₹{Number(row.rate).toFixed(2)} / pc</strong></span>
                               <span>•</span>
@@ -3585,17 +3647,15 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
               const totalAllocPcs = allocComponents.reduce((sum, c) => sum + (Number(c.quantity) || 0), 0);
               const totalAllocAmt = allocComponents.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
               const avgRate = totalAllocPcs > 0 ? (totalAllocAmt / totalAllocPcs).toFixed(2) : '0.00';
-              const pcsPerGblNum = Number(items[allocModalRowIdx]?.pcsPerGbl) || 0;
-              const gblEquiv = pcsPerGblNum > 0 ? (totalAllocPcs / pcsPerGblNum).toFixed(2) : null;
 
               return (
                 <div className="grid grid-cols-4 gap-2 p-2.5 bg-slate-50/80 rounded-xl border border-slate-200/70">
                   <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-2xs text-center">
-                    <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider block">Total Pieces</span>
+                    <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider block">Pack Pieces</span>
                     <span className="text-xs sm:text-sm font-black font-mono text-slate-800 mt-0.5 block">{totalAllocPcs.toLocaleString('en-IN')} pcs</span>
                   </div>
                   <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-2xs text-center">
-                    <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider block">Total Amount</span>
+                    <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider block">Pack Amount</span>
                     <span className="text-xs sm:text-sm font-black font-mono text-indigo-600 mt-0.5 block">₹{totalAllocAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
                   <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-2xs text-center">
@@ -3603,8 +3663,8 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                     <span className="text-xs sm:text-sm font-black font-mono text-emerald-600 mt-0.5 block">₹{avgRate}<span className="text-[9.5px] font-normal text-slate-400">/pc</span></span>
                   </div>
                   <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-2xs text-center">
-                    <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider block">GBL Equiv</span>
-                    <span className="text-xs sm:text-sm font-black font-mono text-amber-600 mt-0.5 block">{gblEquiv ? `${gblEquiv} GBL` : '—'}</span>
+                    <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider block">Pcs / GBL</span>
+                    <span className="text-xs sm:text-sm font-black font-mono text-amber-600 mt-0.5 block">{totalAllocPcs} pcs/GBL</span>
                   </div>
                 </div>
               );

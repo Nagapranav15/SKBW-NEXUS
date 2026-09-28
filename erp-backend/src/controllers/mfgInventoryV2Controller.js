@@ -3128,9 +3128,9 @@ exports.getSkuStockDetails = async (req, res, next) => {
         stockValue,
         avgRate: Math.round(avgRate),
         pcsEquivalent,
-        primaryUnit: sku.unit || 'GBL',
-        altUnit: sku.altUnit || 'PCS',
-        altUnitConversion: sku.altUnitConversion || 200
+        primaryUnit: sku.unit || '',
+        altUnit: sku.altUnit || '',
+        altUnitConversion: sku.altUnitConversion || sku.booksGbl || undefined
       },
       locations: populatedLocations,
       hierarchyTree: rootLocations,

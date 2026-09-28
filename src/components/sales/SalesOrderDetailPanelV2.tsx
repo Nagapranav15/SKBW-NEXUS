@@ -1038,8 +1038,16 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                     const dispatched = item.dispatchedQty || 0;
                     const pending = Math.max(0, item.quantity - dispatched);
                     const itemStatus = dispatched === 0 ? 'Pending' : dispatched >= item.quantity ? 'Fulfilled' : 'Partial';
-                    const gbl = item.gbl || (item.pcsPerGbl ? Math.ceil(item.quantity / item.pcsPerGbl) : 0);
-                    const pcsPerGbl = item.pcsPerGbl || 100;
+                    const comps = item.components || [];
+                    const packPcs = (item.isMixedBundle && comps.length > 0)
+                      ? comps.reduce((sum: number, c: any) => sum + (Number(c.quantity) || 0), 0)
+                      : 0;
+                    const pcsPerGbl = (packPcs > 0 && (!item.pcsPerGbl || item.pcsPerGbl === 1 || item.pcsPerGbl === 100))
+                      ? packPcs
+                      : (item.pcsPerGbl || packPcs || 100);
+                    const gbl = (item.gbl && packPcs > 0 && item.gbl === packPcs && (item.pcsPerGbl === 1 || !item.pcsPerGbl))
+                      ? 1
+                      : (item.gbl || (pcsPerGbl ? Math.ceil(item.quantity / pcsPerGbl) : 0));
 
                     // Compute real warehouse stock in GBL
                     const realStockGbl = (() => {
