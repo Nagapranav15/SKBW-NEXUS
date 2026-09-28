@@ -558,35 +558,16 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     });
   }, [backendSkus]);
 
-  // Dynamic conversion extraction from Item Master.
-  // Returns PCS per GBL, matching the "CONVERSION FORMULA" shown in Item Master
-  // (e.g. 1 GBL = 400 PCS comes from altUnitConversion=400).
-  //
-  // Priority:
-  //   1. booksGbl          — legacy explicit "books per GBL" field
-  //   2. altUnitConversion — the Item Master's Conversion Formula (1 GBL = N PCS)
-  //   3. pcsPerGbl         — generic alternate field name
-  //   NOTE: `pages` = Sheets/Ream (paper attribute) — NEVER use as GBL conversion
+  // Returns PCS per GBL directly from Item Master fields.
+  // Same priority used across the whole codebase (SalesOrderDrawer, etc.)
   const getSkuPcsPerGbl = (sku?: SkuV2 | null): number => {
     if (!sku) return 0;
-
-    // Pure reel raw materials are measured in KG/Reels, not GBL bundles
-    if (sku.paperType === 'Reels') return 0;
-
-    // 1. booksGbl — explicit "books per GBL" (set for raw/semi materials in Item Master)
-    const booksGbl = Number((sku as any).booksGbl);
-    if (booksGbl > 0) return booksGbl;
-
-    // 2. altUnitConversion — the Conversion Formula field from the Item Master
-    //    (Units & Conversion Logic section: "1 GBL = N PCS")
-    const altConv = Number(sku.altUnitConversion);
-    if (altConv > 0) return altConv;
-
-    // 3. pcsPerGbl — alternate naming for the same concept
-    const pcsPerGbl = Number((sku as any).pcsPerGbl);
-    if (pcsPerGbl > 0) return pcsPerGbl;
-
-    return 0;
+    return (
+      Number((sku as any).booksGbl) ||
+      Number(sku.altUnitConversion) ||
+      Number((sku as any).pcsPerGbl) ||
+      0
+    );
   };
 
 
