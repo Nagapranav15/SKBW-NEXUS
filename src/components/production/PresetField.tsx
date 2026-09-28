@@ -238,7 +238,7 @@ export const PresetField: React.FC<PresetFieldProps> = ({
               setHighlightedIdx(0);
             }}
             className="text-[11px] font-bold text-blue-600 hover:text-blue-700 flex items-center space-x-1 cursor-pointer transition-colors"
-            title="Press Alt+P to toggle presets"
+            title="Presets"
           >
             <Sparkles className="w-3 h-3 text-blue-500" />
             <span>Presets ({presets.length})</span>

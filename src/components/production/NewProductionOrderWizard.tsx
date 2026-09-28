@@ -19,6 +19,7 @@ interface NewProductionOrderWizardProps {
   onCancel: () => void;
   onCreated: (order: ProductionOrder) => void;
   companyId?: string;
+  initialSkus?: SkuV2[];
 }
 
 // Standard classification identical to SkuMasterV2 products / materials / semi
@@ -150,27 +151,48 @@ const DEFAULT_DEPARTMENT_PRESETS: PresetItem[] = [
   { id: 'dept-dispatch', name: 'Dispatch Department', locationName: 'LOM Warehouse', warehouseId: 'fact-lom', locationId: 'fact-lom' }
 ];
 
+// Module-level in-memory cache to prevent redundant fetches across modal opens
+let cachedCompanyId: string | null = null;
+let cachedWarehouseLocations: WarehouseLocationV2[] = [];
+let cachedFactories: string[] = [];
+let cachedStockCostings: StockCostingData | null = null;
+let cachedNextOrderNumber: string = 'PO-001';
+
 export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> = ({
   onCancel,
   onCreated,
-  companyId
+  companyId,
+  initialSkus
 }) => {
   // Wizard step: 1 (Basic Info & BOM), 3 (Review & Confirm)
   const [currentStep, setCurrentStep] = useState<number>(1);
-  const [loadingInitial, setLoadingInitial] = useState<boolean>(true);
+  const [loadingInitial, setLoadingInitial] = useState<boolean>(() => {
+    return !(initialSkus && initialSkus.length > 0);
+  });
   const [submitting, setSubmitting] = useState<boolean>(false);
 
-  // Backend data
-  const [backendSkus, setBackendSkus] = useState<SkuV2[]>([]);
-  const [factories, setFactories] = useState<string[]>([]);
-  const [warehouseLocations, setWarehouseLocations] = useState<WarehouseLocationV2[]>([]);
-  const [stockCostings, setStockCostings] = useState<StockCostingData | null>(null);
+  // Backend data (Pre-seeded from parent or cache for instant 0ms render)
+  const [backendSkus, setBackendSkus] = useState<SkuV2[]>(() => {
+    if (initialSkus && initialSkus.length > 0) return initialSkus;
+    return [];
+  });
+  const [factories, setFactories] = useState<string[]>(() => {
+    return cachedCompanyId === companyId && cachedFactories.length > 0 ? cachedFactories : [];
+  });
+  const [warehouseLocations, setWarehouseLocations] = useState<WarehouseLocationV2[]>(() => {
+    return cachedCompanyId === companyId ? cachedWarehouseLocations : [];
+  });
+  const [stockCostings, setStockCostings] = useState<StockCostingData | null>(() => {
+    return cachedCompanyId === companyId ? cachedStockCostings : null;
+  });
 
   // Bulk Edit BOM Modal state (opens exact Item Master recipe editor)
   const [showBulkEditBomModal, setShowBulkEditBomModal] = useState<boolean>(false);
 
   // Form Fields - PO-001 (Accommodates > 1 lakh orders)
-  const [orderNumber, setOrderNumber] = useState<string>('PO-001');
+  const [orderNumber, setOrderNumber] = useState<string>(() => {
+    return cachedCompanyId === companyId && cachedNextOrderNumber ? cachedNextOrderNumber : 'PO-001';
+  });
   const [selectedSkuId, setSelectedSkuId] = useState<string>(''); // Empty by default
   const [productSearchQuery, setProductSearchQuery] = useState<string>('');
   const [showProductDropdown, setShowProductDropdown] = useState<boolean>(false);
@@ -269,12 +291,11 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
-  // 1. Load backend data on mount
+  // 1. Load backend data in background (quietly updates cache without blocking UI)
   useEffect(() => {
     let isMounted = true;
     const loadBackend = async () => {
       try {
-        setLoadingInitial(true);
         if (!companyId) return;
 
         const [skusRes, warehouseRes, nextNumRes, costingsRes] = await Promise.allSettled([
@@ -286,9 +307,12 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
         if (!isMounted) return;
 
+        cachedCompanyId = companyId;
+
         // Dynamic Stock & Inventory Costing
         if (costingsRes.status === 'fulfilled' && costingsRes.value) {
           setStockCostings(costingsRes.value);
+          cachedStockCostings = costingsRes.value;
         }
 
         // SKUs
@@ -299,23 +323,26 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         // Warehouse Locations & Factories
         if (warehouseRes.status === 'fulfilled' && Array.isArray(warehouseRes.value)) {
           setWarehouseLocations(warehouseRes.value);
+          cachedWarehouseLocations = warehouseRes.value;
           const factoryLocs = warehouseRes.value.filter(l => l.level === 'Factory');
           const factoryNames = factoryLocs.map(f => f.name.trim()).filter(Boolean);
           if (factoryNames.length > 0) {
             setFactories(factoryNames);
+            cachedFactories = factoryNames;
           } else if (warehouseRes.value.length > 0) {
             const rootNames = warehouseRes.value.map(f => f.name.trim()).filter(Boolean);
             setFactories(rootNames);
+            cachedFactories = rootNames;
           } else {
             setFactories(['Main Factory']);
+            cachedFactories = ['Main Factory'];
           }
         }
 
-        // Order Number sequence starting at PO-001 (Seamless for > 1 lakh orders)
+        // Order Number sequence starting at PO-001
         if (nextNumRes.status === 'fulfilled' && nextNumRes.value) {
           setOrderNumber(nextNumRes.value);
-        } else {
-          setOrderNumber('PO-001');
+          cachedNextOrderNumber = nextNumRes.value;
         }
       } catch (err) {
         console.error('Failed to load initial data from backend:', err);
@@ -327,6 +354,14 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     loadBackend();
     return () => { isMounted = false; };
   }, [companyId]);
+
+  // Keep backendSkus updated if initialSkus arrives
+  useEffect(() => {
+    if (initialSkus && initialSkus.length > 0 && backendSkus.length === 0) {
+      setBackendSkus(initialSkus);
+      setLoadingInitial(false);
+    }
+  }, [initialSkus]);
 
   // Production Presets Handlers
   const saveProductionPresets = (list: ProductionPreset[]) => {
@@ -794,18 +829,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     bomItems
   ]);
 
-  if (loadingInitial) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] w-full">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-          <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">
-            Loading products & BOM from backend...
-          </span>
-        </div>
-      </div>
-    );
-  }
+
 
   return (
     <div className="flex flex-col h-full bg-slate-50/60 overflow-y-auto custom-scrollbar">
@@ -850,6 +874,15 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
               <span>Create Production Order</span>
             </button>
           )}
+
+          <button
+            type="button"
+            onClick={onCancel}
+            title="Close"
+            className="w-8 h-8 rounded-lg border border-gray-200 hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors cursor-pointer ml-1"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
@@ -1730,7 +1763,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
       {/* Modal to pick Raw or Semi Materials ONLY */}
       {showAddComponentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-xs p-4">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-gray-900/50 backdrop-blur-xs p-4">
           <div className="bg-white rounded-2xl shadow-xl border border-gray-200 w-full max-w-xl overflow-hidden flex flex-col max-h-[80vh] animate-modalPop">
             <div className="p-4 border-b border-gray-150 flex items-center justify-between">
               <div>

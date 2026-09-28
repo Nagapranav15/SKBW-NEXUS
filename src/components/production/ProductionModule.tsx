@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import * as XLSX from 'xlsx';
@@ -179,11 +180,32 @@ export const ProductionModule: React.FC = () => {
         setCurrentView('entries');
       }
     } else {
-      if (!tabParam || tabParam === 'orders') {
-        setCurrentView('list');
-      }
+      setCurrentView('list');
+      setSelectedOrder(null);
     }
   }, [searchParams, orders]);
+
+  // Prevent background scrolling while any dialog modal is open
+  useEffect(() => {
+    const isModalOpen = currentView !== 'list' || !!printOrder;
+    if (isModalOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [currentView, printOrder]);
+
+  // Keep selectedOrder in sync when orders list is refreshed from backend
+  useEffect(() => {
+    if (selectedOrder) {
+      const fresh = orders.find(o => o._id === selectedOrder._id);
+      if (fresh && fresh !== selectedOrder) {
+        setSelectedOrder(fresh);
+      }
+    }
+  }, [orders]);
 
   // Navigate to New Order Wizard
   const handleOpenNewOrder = () => {
@@ -855,53 +877,12 @@ export const ProductionModule: React.FC = () => {
     </div>
   );
 
-  // Render Sub-Views
-  if (currentView === 'new') {
-    return (
-      <NewProductionOrderWizard
-        onCancel={handleBackToList}
-        onCreated={handleOrderCreated}
-        companyId={selectedCompany?._id}
-      />
-    );
-  }
-
-  if (currentView === 'detail' && selectedOrder) {
-    return (
-      <>
-        <ProductionOrderDetailView
-          order={selectedOrder}
-          onBack={handleBackToList}
-          onNewOrder={handleOpenNewOrder}
-          onRecordEntries={handleOpenRecordEntries}
-          onPrint={setPrintOrder}
-          onCompleteOrder={() => handleCompleteOrder(selectedOrder._id)}
-        />
-        <ProductionPrintModal order={printOrder} onClose={() => setPrintOrder(null)} />
-      </>
-    );
-  }
-
-  if (currentView === 'entries' && selectedOrder) {
-    return (
-      <>
-        <ProductionOrderEntriesView
-          order={selectedOrder}
-          onBack={handleBackToList}
-          onViewOverview={handleOpenOrderDetail}
-          onAddEntry={handleAddEntry}
-          onCompleteOrder={handleCompleteOrder}
-          onPrint={setPrintOrder}
-        />
-        <ProductionPrintModal order={printOrder} onClose={() => setPrintOrder(null)} />
-      </>
-    );
-  }
-
-  // -------------------------------------------------------------
-  // TAB 2: PRODUCTION ENTRIES (Exact UI Matching Reference Image)
-  // -------------------------------------------------------------
-  if (activeTab === 'entries') {
+  // Render Tab Content
+  const renderActiveTabContent = () => {
+    // -------------------------------------------------------------
+    // TAB 2: PRODUCTION ENTRIES (Exact UI Matching Reference Image)
+    // -------------------------------------------------------------
+    if (activeTab === 'entries') {
     return (
       <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
         {/* 1. Header Banner (Matching Sales Orders Header Banner) */}
@@ -2841,9 +2822,8 @@ export const ProductionModule: React.FC = () => {
     );
   }
 
-  // Default: Screen 1 List View (Production Orders tab)
-  return (
-    <>
+    // Default: Screen 1 List View (Production Orders tab)
+    return (
       <ProductionOrdersList
         orders={orders}
         activeTab={activeTab}
@@ -2856,6 +2836,117 @@ export const ProductionModule: React.FC = () => {
         onRefresh={loadOrders}
         tabCounts={tabCounts}
       />
+    );
+  };
+
+  return (
+    <>
+      {renderActiveTabContent()}
+
+      {/* ── CREATE NEW PRODUCTION ORDER DIALOG BOX ── */}
+      {currentView === 'new' && typeof document !== 'undefined' && (
+        createPortal(
+          <div
+            className="fixed inset-0 z-[9000] flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden animate-in fade-in duration-200"
+            style={{
+              backgroundColor: 'rgba(15, 23, 42, 0.65)',
+              backdropFilter: 'blur(6px)',
+              WebkitBackdropFilter: 'blur(6px)',
+              width: '100vw',
+              height: '100vh',
+              maxWidth: '100vw',
+              maxHeight: '100vh',
+            }}
+            onClick={handleBackToList}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-2xl w-full flex flex-col my-auto border border-gray-150 animate-in zoom-in-95 duration-200 overflow-hidden relative"
+              style={{ maxWidth: 1200, height: '92vh', maxHeight: '92vh' }}
+              onClick={e => e.stopPropagation()}
+            >
+              <NewProductionOrderWizard
+                onCancel={handleBackToList}
+                onCreated={handleOrderCreated}
+                companyId={selectedCompany?._id}
+                initialSkus={backendSkus}
+              />
+            </div>
+          </div>,
+          document.body
+        )
+      )}
+
+      {/* ── VIEW PRODUCTION ORDER DETAIL DIALOG BOX ── */}
+      {currentView === 'detail' && selectedOrder && typeof document !== 'undefined' && (
+        createPortal(
+          <div
+            className="fixed inset-0 z-[9000] flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden animate-in fade-in duration-200"
+            style={{
+              backgroundColor: 'rgba(15, 23, 42, 0.65)',
+              backdropFilter: 'blur(6px)',
+              WebkitBackdropFilter: 'blur(6px)',
+              width: '100vw',
+              height: '100vh',
+              maxWidth: '100vw',
+              maxHeight: '100vh',
+            }}
+            onClick={handleBackToList}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-2xl w-full flex flex-col my-auto border border-gray-150 animate-in zoom-in-95 duration-200 overflow-hidden relative"
+              style={{ maxWidth: 1240, height: '92vh', maxHeight: '92vh' }}
+              onClick={e => e.stopPropagation()}
+            >
+              <ProductionOrderDetailView
+                order={selectedOrder}
+                onBack={handleBackToList}
+                onNewOrder={handleOpenNewOrder}
+                onRecordEntries={handleOpenRecordEntries}
+                onPrint={setPrintOrder}
+                onCompleteOrder={() => handleCompleteOrder(selectedOrder._id)}
+              />
+            </div>
+          </div>,
+          document.body
+        )
+      )}
+
+      {/* ── RECORD PRODUCTION ENTRIES DIALOG BOX ── */}
+      {currentView === 'entries' && selectedOrder && typeof document !== 'undefined' && (
+        createPortal(
+          <div
+            className="fixed inset-0 z-[9000] flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden animate-in fade-in duration-200"
+            style={{
+              backgroundColor: 'rgba(15, 23, 42, 0.65)',
+              backdropFilter: 'blur(6px)',
+              WebkitBackdropFilter: 'blur(6px)',
+              width: '100vw',
+              height: '100vh',
+              maxWidth: '100vw',
+              maxHeight: '100vh',
+            }}
+            onClick={handleBackToList}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-2xl w-full flex flex-col my-auto border border-gray-150 animate-in zoom-in-95 duration-200 overflow-hidden relative"
+              style={{ maxWidth: 1200, height: '92vh', maxHeight: '92vh' }}
+              onClick={e => e.stopPropagation()}
+            >
+              <ProductionOrderEntriesView
+                order={selectedOrder}
+                onBack={handleBackToList}
+                onViewOverview={handleOpenOrderDetail}
+                onAddEntry={handleAddEntry}
+                onCompleteOrder={handleCompleteOrder}
+                onPrint={setPrintOrder}
+              />
+            </div>
+          </div>,
+          document.body
+        )
+      )}
+
+      {/* ── PRODUCTION PRINT MODAL ── */}
       <ProductionPrintModal order={printOrder} onClose={() => setPrintOrder(null)} />
     </>
   );

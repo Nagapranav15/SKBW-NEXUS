@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   ArrowLeft, Printer, Pencil, Layers, Check, Calendar, 
-  Trash2, Plus, Clock, AlertCircle, RotateCcw
+  Trash2, Plus, Clock, AlertCircle, RotateCcw, X
 } from 'lucide-react';
 import { ProductionOrder, ProductionEntry } from '../../types/production';
 import { showToast } from '../ui/Toast';
@@ -191,6 +191,14 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
                 <span>→</span>
               </button>
             )}
+
+            <button
+              onClick={onBack}
+              title="Close"
+              className="w-8 h-8 rounded-lg border border-gray-200 hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors cursor-pointer ml-1"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </div>
@@ -392,7 +400,6 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
               >
                 <Plus className="w-4 h-4" />
                 <span>Add Production Entry</span>
-                <kbd className="px-1.5 py-0.5 bg-blue-700/80 rounded text-[10px] font-mono text-blue-100 hidden sm:inline">Ctrl+↵</kbd>
               </button>
             </div>
           </form>

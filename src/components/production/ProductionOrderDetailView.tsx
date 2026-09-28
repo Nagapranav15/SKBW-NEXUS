@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ArrowLeft, Printer, Layers, Package, Plus, CheckCircle2, 
-  Clock, IndianRupee, Box, Check, ExternalLink, AlertCircle, FileText, History, RefreshCw
+  Clock, IndianRupee, Box, Check, ExternalLink, AlertCircle, FileText, History, RefreshCw, X
 } from 'lucide-react';
 import { ProductionOrder } from '../../types/production';
 import { showToast } from '../ui/Toast';
@@ -147,7 +147,6 @@ export const ProductionOrderDetailView: React.FC<ProductionOrderDetailViewProps>
             >
               <Printer className="w-3.5 h-3.5 text-gray-500" />
               <span>Print</span>
-              <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-[9.5px] font-mono text-gray-500 hidden sm:inline">Alt+P</kbd>
             </button>
 
             <button
@@ -156,7 +155,6 @@ export const ProductionOrderDetailView: React.FC<ProductionOrderDetailViewProps>
             >
               <Layers className="w-3.5 h-3.5 text-gray-500" />
               <span>View BOM</span>
-              <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-[9.5px] font-mono text-gray-500 hidden sm:inline">Alt+B</kbd>
             </button>
 
             <button
@@ -165,7 +163,6 @@ export const ProductionOrderDetailView: React.FC<ProductionOrderDetailViewProps>
             >
               <Package className="w-3.5 h-3.5 text-gray-500" />
               <span>Record Entries</span>
-              <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-[9.5px] font-mono text-gray-500 hidden sm:inline">Alt+E</kbd>
             </button>
 
             {!isCompleted && onCompleteOrder && (
@@ -184,7 +181,14 @@ export const ProductionOrderDetailView: React.FC<ProductionOrderDetailViewProps>
             >
               <Plus className="w-3.5 h-3.5" />
               <span>New Order</span>
-              <kbd className="px-1.5 py-0.5 bg-blue-700/80 rounded text-[10px] font-mono text-blue-100 hidden sm:inline">Alt+C</kbd>
+            </button>
+
+            <button
+              onClick={onBack}
+              title="Close"
+              className="w-8 h-8 rounded-lg border border-gray-200 hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors cursor-pointer ml-1"
+            >
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
