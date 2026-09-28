@@ -559,55 +559,36 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   }, [backendSkus]);
 
   // Dynamic conversion extraction from Item Master.
-  // Returns the number of PCS (pieces/sheets) per GBL for this SKU.
-  // Priority order matches how the Item Master form saves fields per category:
-  //   Raw Materials  → booksGbl > altUnitConversion
-  //   Semi Finished  → pages (sheets/ream = PCS/GBL) > altUnitConversion
-  //   Finished Goods → booksGbl > altUnitConversion > pages
+  // Returns PCS per GBL, matching the "CONVERSION FORMULA" shown in Item Master
+  // (e.g. 1 GBL = 400 PCS comes from altUnitConversion=400).
+  //
+  // Priority:
+  //   1. booksGbl          — legacy explicit "books per GBL" field
+  //   2. altUnitConversion — the Item Master's Conversion Formula (1 GBL = N PCS)
+  //   3. pcsPerGbl         — generic alternate field name
+  //   NOTE: `pages` = Sheets/Ream (paper attribute) — NEVER use as GBL conversion
   const getSkuPcsPerGbl = (sku?: SkuV2 | null): number => {
     if (!sku) return 0;
 
-    const cat = (sku.category || '').toLowerCase();
-    const unitNorm = (sku.unit || '').toUpperCase().trim();
-
-    // Skip pure reel raw materials (they are measured in KG/Reels, not GBL)
+    // Pure reel raw materials are measured in KG/Reels, not GBL bundles
     if (sku.paperType === 'Reels') return 0;
 
-    // 1. booksGbl is the explicit "books per GBL" field set in the Item Master
+    // 1. booksGbl — explicit "books per GBL" (set for raw/semi materials in Item Master)
     const booksGbl = Number((sku as any).booksGbl);
     if (booksGbl > 0) return booksGbl;
 
-    // 2. For sheet-based paper categories (Ruling, Index, Board, Semi Finished) with
-    //    paperType='Sheets', the `pages` field stores "sheets per ream" = PCS per GBL
-    const isSheetCategory =
-      sku.paperType === 'Sheets' ||
-      cat.includes('ruling') ||
-      cat.includes('index') ||
-      cat.includes('board') ||
-      cat.includes('semi');
-
-    if (isSheetCategory) {
-      const pages = Number(sku.pages ?? (sku as any).sheetsPerReam ?? (sku as any).standardSheets);
-      if (pages > 0) return pages;
-    }
-
-    // 3. For all items: altUnitConversion is the generic UOM conversion factor
+    // 2. altUnitConversion — the Conversion Formula field from the Item Master
+    //    (Units & Conversion Logic section: "1 GBL = N PCS")
     const altConv = Number(sku.altUnitConversion);
     if (altConv > 0) return altConv;
 
-    // 4. For finished goods: pages is the number of pages per book (not PCS/GBL)
-    //    Only use as last resort if no other conversion is available
+    // 3. pcsPerGbl — alternate naming for the same concept
     const pcsPerGbl = Number((sku as any).pcsPerGbl);
     if (pcsPerGbl > 0) return pcsPerGbl;
 
-    // 5. For finished goods with no other data, pages could mean PCS/GBL in some cases
-    if (unitNorm === 'GBL') {
-      const pages = Number(sku.pages ?? (sku as any).sheetsPerReam);
-      if (pages > 0) return pages;
-    }
-
     return 0;
   };
+
 
 
 
@@ -1726,9 +1707,15 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                     {currentSku?.brand && (
                       <span className="text-gray-600 font-medium">Brand: <strong className="text-gray-900">{currentSku.brand}</strong></span>
                     )}
-                    {currentSku?.pages && (
-                      <span className="text-gray-600 font-medium">{currentSku.pages} Pages</span>
-                    )}
+                    {currentSku?.pages && (() => {
+                      const cat = (currentSku.category || '').toLowerCase();
+                      const isSheetBased = currentSku.paperType === 'Sheets' || cat.includes('ruling') || cat.includes('index') || cat.includes('board') || cat.includes('semi');
+                      return (
+                        <span className="text-gray-600 font-medium">
+                          {currentSku.pages} {isSheetBased ? 'Sheets/Ream' : 'Pages'}
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
 
