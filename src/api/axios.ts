@@ -21,10 +21,26 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor - handle 401
+// Response interceptor - handle network glitch retry and 401
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const config = error.config;
+    const isNetworkError =
+      !error.response &&
+      (error.message === 'Network Error' ||
+        error.code === 'ERR_NETWORK' ||
+        error.code === 'ECONNABORTED' ||
+        error.code === 'ERR_INTERNET_DISCONNECTED' ||
+        error.code === 'ERR_NETWORK_CHANGED');
+
+    // Auto-retry idempotent GET requests once after 1.2s if network was momentarily interrupted
+    if (isNetworkError && config && config.method?.toLowerCase() === 'get' && !config._networkRetry) {
+      config._networkRetry = true;
+      await new Promise((res) => setTimeout(res, 1200));
+      return api(config);
+    }
+
     if (error.response?.status === 401) {
       if (localStorage.getItem('token') && window.location.pathname !== '/login') {
         localStorage.removeItem('token');

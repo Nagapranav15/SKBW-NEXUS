@@ -1,34 +1,36 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ToastContainer } from './components/ui/Toast';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { Analytics } from '@vercel/analytics/react';
+import { lazyWithRetry } from './utils/lazyWithRetry';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
-// Lazy loaded page components
-const Login = lazy(() => import('./components/Login'));
-const CompanySelection = lazy(() => import('./components/CompanySelection'));
-const Dashboard = lazy(() => import('./components/Dashboard'));
-const BusinessDirectoryV2 = lazy(() => import('./components/directory_v2/BusinessDirectoryV2'));
-const StockInventoryV2 = lazy(() => import('./components/stock_v2/StockInventoryV2'));
-const SalesQuotes = lazy(() => import('./components/sales/SalesQuotes'));
-const SalesOrders = lazy(() => import('./components/sales/SalesOrders'));
-const PendingOrders = lazy(() => import('./components/sales/PendingOrders'));
-const DeliveryChallan = lazy(() => import('./components/sales/DeliveryChallan'));
-const SalesReports = lazy(() => import('./components/sales/SalesReports'));
-const TransactionTools = lazy(() => import('./components/TransactionTools'));
-const AnalyzerDashboard = lazy(() => import('./components/AnalyzerDashboard'));
-const ProductionModule = lazy(() => import('./components/production/ProductionModule'));
+// Lazy loaded page components with automatic chunk-retry and deployment auto-refresh
+const Login = lazyWithRetry(() => import('./components/Login'));
+const CompanySelection = lazyWithRetry(() => import('./components/CompanySelection'));
+const Dashboard = lazyWithRetry(() => import('./components/Dashboard'));
+const BusinessDirectoryV2 = lazyWithRetry(() => import('./components/directory_v2/BusinessDirectoryV2'));
+const StockInventoryV2 = lazyWithRetry(() => import('./components/stock_v2/StockInventoryV2'));
+const SalesQuotes = lazyWithRetry(() => import('./components/sales/SalesQuotes'));
+const SalesOrders = lazyWithRetry(() => import('./components/sales/SalesOrders'));
+const PendingOrders = lazyWithRetry(() => import('./components/sales/PendingOrders'));
+const DeliveryChallan = lazyWithRetry(() => import('./components/sales/DeliveryChallan'));
+const SalesReports = lazyWithRetry(() => import('./components/sales/SalesReports'));
+const TransactionTools = lazyWithRetry(() => import('./components/TransactionTools'));
+const AnalyzerDashboard = lazyWithRetry(() => import('./components/AnalyzerDashboard'));
+const ProductionModule = lazyWithRetry(() => import('./components/production/ProductionModule'));
 
 // Inventory V2 (Beta) sub-pages
-const DashboardV2 = lazy(() => import('./components/inventory_v2/DashboardV2'));
-const SkuMasterV2 = lazy(() => import('./components/inventory_v2/SkuMasterV2'));
-const WarehouseStructureV2 = lazy(() => import('./components/inventory_v2/WarehouseStructureV2'));
-const TestingTransactionsV2 = lazy(() => import('./components/inventory_v2/TestingTransactionsV2'));
-const PurchaseInvoicePage = lazy(() => import('./components/inventory_v2/purchases/PurchaseInvoicePage'));
-const InventoryBalanceV2 = lazy(() => import('./components/inventory_v2/InventoryBalanceV2'));
-const SettingsPage = lazy(() => import('./components/inventory_v2/SettingsPage'));
+const DashboardV2 = lazyWithRetry(() => import('./components/inventory_v2/DashboardV2'));
+const SkuMasterV2 = lazyWithRetry(() => import('./components/inventory_v2/SkuMasterV2'));
+const WarehouseStructureV2 = lazyWithRetry(() => import('./components/inventory_v2/WarehouseStructureV2'));
+const TestingTransactionsV2 = lazyWithRetry(() => import('./components/inventory_v2/TestingTransactionsV2'));
+const PurchaseInvoicePage = lazyWithRetry(() => import('./components/inventory_v2/purchases/PurchaseInvoicePage'));
+const InventoryBalanceV2 = lazyWithRetry(() => import('./components/inventory_v2/InventoryBalanceV2'));
+const SettingsPage = lazyWithRetry(() => import('./components/inventory_v2/SettingsPage'));
 
 // Premium Micro-Loading Indicator
 const LoadingFallback = () => (
@@ -59,8 +61,9 @@ function App() {
         <div className="min-h-screen bg-white">
           <ToastContainer />
           <Analytics />
-          <Suspense fallback={<LoadingFallback />}>
-            <Routes>
+          <ErrorBoundary>
+            <Suspense fallback={<LoadingFallback />}>
+              <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/company-selection" element={
                 <ProtectedRoute>
@@ -113,6 +116,7 @@ function App() {
               <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
           </Suspense>
+        </ErrorBoundary>
         </div>
       </Router>
     </AuthProvider>
