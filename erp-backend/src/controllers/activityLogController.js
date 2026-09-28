@@ -9,14 +9,7 @@ exports.getActivityLogs = async (req, res) => {
     if (companyParam) {
       const compIdStr = String(companyParam).trim();
       if (mongoose.Types.ObjectId.isValid(compIdStr)) {
-        conditions.push({
-          $or: [
-            { company: new mongoose.Types.ObjectId(compIdStr) },
-            { company: compIdStr }
-          ]
-        });
-      } else {
-        conditions.push({ company: compIdStr });
+        conditions.push({ company: new mongoose.Types.ObjectId(compIdStr) });
       }
     }
     
@@ -41,6 +34,20 @@ exports.getActivityLogs = async (req, res) => {
           $or: [
             { entityType: { $in: ['WarehouseLocationV2', 'Warehouse', 'warehouse', 'Location', 'Zone', 'Floor', 'Factory'] } },
             { entityType: { $regex: /warehouse|location|zone|floor|factory/i } }
+          ]
+        });
+      } else if (/^(Production|Mfg|Manufacturing)/i.test(et)) {
+        conditions.push({
+          $or: [
+            { entityType: { $in: ['ProductionOrder', 'Production', 'production', 'ProductionEntry', 'Manufacturing', 'MFG'] } },
+            { entityType: { $regex: /production|manufacturing/i } }
+          ]
+        });
+      } else if (/^(Sales|Order)/i.test(et)) {
+        conditions.push({
+          $or: [
+            { entityType: { $in: ['SalesOrderV2', 'SalesOrder', 'Sales', 'sales', 'SO'] } },
+            { entityType: { $regex: /sales/i } }
           ]
         });
       } else {

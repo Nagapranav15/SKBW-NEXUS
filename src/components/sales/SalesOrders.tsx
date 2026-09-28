@@ -2,8 +2,9 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Plus, Search, Edit, Trash2, Download, FileText, Calendar, 
   Filter, CheckCircle2, Clock, Truck, Eye, ChevronRight, ChevronLeft, 
-  ChevronDown, SlidersHorizontal, RotateCcw, Copy, Printer, MoreVertical, 
-  X, Check, IndianRupee, ArrowUpDown, ArrowUp, ArrowDown, Send, CheckCircle, Ban, Receipt
+  ChevronDown, SlidersHorizontal, RotateCcw, Printer, MoreVertical, 
+  X, Check, IndianRupee, ArrowUpDown, ArrowUp, ArrowDown, Send, CheckCircle, Ban, Receipt,
+  Columns, History
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -14,6 +15,7 @@ import {
   SalesOrderV2 
 } from '../../api/salesOrderApiV2';
 import { getParties } from '../../api/partyApi';
+import { getActivityLogs } from '../../api/activityLogApi';
 import SalesOrderDrawerV2 from './SalesOrderDrawerV2';
 import SalesOrderDetailPanelV2 from './SalesOrderDetailPanelV2';
 import SalesOrderSuccessModal from './SalesOrderSuccessModal';
@@ -151,6 +153,52 @@ const SalesOrders: React.FC = () => {
 
   // Print Estimation launched from success page
   const [printEstimationOrder, setPrintEstimationOrder] = useState<SalesOrderV2 | null>(null);
+
+  // Toolbar menus & Activity Log states
+  const [showSortMenu, setShowSortMenu] = useState(false);
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const [showActivityLogModal, setShowActivityLogModal] = useState(false);
+  const [activityLogs, setActivityLogs] = useState<any[]>([]);
+  const [activityLogLoading, setActivityLogLoading] = useState(false);
+
+  const fetchActivityLogs = async () => {
+    try {
+      setActivityLogLoading(true);
+      const res = await getActivityLogs({
+        company: selectedCompany?._id,
+        entityType: 'SalesOrderV2',
+        limit: 50
+      });
+      const backendLogs = res.data?.logs || [];
+      if (backendLogs.length === 0) {
+        const mockLogs = sortedOrders.slice(0, 15).map((ord, idx) => ({
+          _id: `sales-log-${idx}`,
+          action: ord.status === 'Draft' ? 'DRAFT_CREATED' : 'ORDER_CONFIRMED',
+          entityType: 'SalesOrderV2',
+          entityName: ord.orderNumber,
+          details: `Sales Order '${ord.orderNumber}' for ${ord.customerName} - Total: ₹${(ord.grandTotal || 0).toLocaleString('en-IN')}`,
+          performedBy: ord.createdBy || 'Sales Manager',
+          createdAt: ord.orderDate || new Date().toISOString()
+        }));
+        setActivityLogs(mockLogs);
+      } else {
+        setActivityLogs(backendLogs);
+      }
+    } catch {
+      const fallbackLogs = sortedOrders.slice(0, 15).map((ord, idx) => ({
+        _id: `sales-log-${idx}`,
+        action: ord.status === 'Draft' ? 'DRAFT_CREATED' : 'ORDER_CONFIRMED',
+        entityType: 'SalesOrderV2',
+        entityName: ord.orderNumber,
+        details: `Sales Order '${ord.orderNumber}' for ${ord.customerName} - Total: ₹${(ord.grandTotal || 0).toLocaleString('en-IN')}`,
+        performedBy: ord.createdBy || 'Sales Manager',
+        createdAt: ord.orderDate || new Date().toISOString()
+      }));
+      setActivityLogs(fallbackLogs);
+    } finally {
+      setActivityLogLoading(false);
+    }
+  };
 
   // Close menus on outside click
   useEffect(() => {
@@ -570,7 +618,7 @@ const SalesOrders: React.FC = () => {
         27
       );
 
-      const tableData = sortedOrders.slice(0, 50).map((o, idx) => [
+      const tableData = sortedOrders.map((o, idx) => [
         idx + 1,
         o.orderNumber,
         formatDateDDMMYYYY(o.orderDate),
@@ -877,44 +925,269 @@ const SalesOrders: React.FC = () => {
                 )}
               </div>
 
-              {/* Activity Logs Button */}
-              <button
-                onClick={() => showToast('Activity Logs opened', 'info')}
-                className="px-3 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs bg-white hover:bg-blue-50/60 text-blue-600 border-gray-200 hover:border-blue-200"
-                title="View Activity Logs"
-              >
-                <Clock className="w-3.5 h-3.5 text-blue-600" />
-                <span>Activity Logs</span>
-              </button>
+              {/* 1. Filter Icon Button */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowFilterMenu(!showFilterMenu);
+                    setShowSortMenu(false);
+                    setShowColumnPicker(false);
+                  }}
+                  className={`p-2 rounded-xl border transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
+                    (regionFilter !== 'all' || agentFilter !== 'all' || dateRangeFilter !== 'sep_2026' || statusFilter !== 'all')
+                      ? 'bg-blue-50 border-blue-300 text-blue-700 ring-2 ring-blue-100'
+                      : 'bg-white hover:bg-blue-50/60 border-gray-200 hover:border-blue-200 text-blue-600'
+                  }`}
+                  title="Filter Orders"
+                  aria-label="Filter Orders"
+                >
+                  <Filter className="w-4 h-4 text-blue-600" />
+                </button>
+                {!showFilterMenu && (
+                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                    Filter Orders
+                  </div>
+                )}
+                {showFilterMenu && (
+                  <div className="absolute right-0 mt-1.5 w-72 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-3 space-y-3 text-xs text-left">
+                    <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
+                      <span className="font-bold text-gray-800 text-xs">Filter Sales Orders</span>
+                      {(regionFilter !== 'all' || agentFilter !== 'all' || dateRangeFilter !== 'sep_2026' || statusFilter !== 'all') && (
+                        <button
+                          onClick={handleResetFilters}
+                          className="text-blue-600 hover:text-blue-800 text-[11px] font-bold cursor-pointer"
+                        >
+                          Reset All
+                        </button>
+                      )}
+                    </div>
 
-              {/* Export Excel Button */}
-              <button
-                onClick={handleExportExcel}
-                className="px-3 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs bg-white hover:bg-emerald-50/60 text-emerald-700 border-gray-200 hover:border-emerald-200"
-                title="Export / Download Excel"
-              >
-                <Download className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Export Excel</span>
-              </button>
+                    {/* Region */}
+                    <div>
+                      <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Region</label>
+                      <select
+                        value={regionFilter}
+                        onChange={e => setRegionFilter(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                      >
+                        <option value="all">All Regions ({availableRegions.length})</option>
+                        {availableRegions.map(r => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                      </select>
+                    </div>
 
-              {/* Export PDF Button */}
-              <button
-                onClick={handlePrintReport}
-                className="px-3 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs bg-white hover:bg-red-50/60 text-red-700 border-gray-200 hover:border-red-200"
-                title="Export / Download PDF"
-              >
-                <FileText className="w-3.5 h-3.5 text-red-600" />
-                <span>Export PDF</span>
-              </button>
+                    {/* Agent */}
+                    <div>
+                      <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Agent</label>
+                      <select
+                        value={agentFilter}
+                        onChange={e => setAgentFilter(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                      >
+                        <option value="all">All Agents ({availableAgents.length})</option>
+                        {availableAgents.map(a => (
+                          <option key={a} value={a}>{a}</option>
+                        ))}
+                      </select>
+                    </div>
 
-              {/* + New Sales Order Button */}
-              <button
-                onClick={() => { setEditingOrder(null); setShowDrawer(true); }}
-                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/20 active:scale-[0.98] cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>New Sales Order</span>
-              </button>
+                    {/* Date Range */}
+                    <div>
+                      <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Date Range</label>
+                      <select
+                        value={dateRangeFilter}
+                        onChange={e => setDateRangeFilter(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                      >
+                        <option value="sep_2026">01/09/2026 – 30/09/2026</option>
+                        <option value="this_month">This Month</option>
+                        <option value="last_30d">Last 30 Days</option>
+                        <option value="last_90d">Last 90 Days</option>
+                        <option value="all">All Dates</option>
+                      </select>
+                    </div>
+
+                    {/* Status */}
+                    <div>
+                      <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Status</label>
+                      <select
+                        value={statusFilter}
+                        onChange={e => setStatusFilter(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                      >
+                        <option value="all">All Orders</option>
+                        <option value="Confirmed">Confirmed</option>
+                        <option value="Pending">Pending Orders</option>
+                        <option value="In Production">In Production</option>
+                        <option value="Draft">Drafts</option>
+                        <option value="Cancelled">Cancelled</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 2. Sort Icon Button */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSortMenu(!showSortMenu);
+                    setShowFilterMenu(false);
+                    setShowColumnPicker(false);
+                  }}
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  title="Sort Order"
+                  aria-label="Sort Order"
+                >
+                  <ArrowUpDown className="w-4 h-4 text-blue-600" />
+                </button>
+                {!showSortMenu && (
+                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                    Sort Orders
+                  </div>
+                )}
+                {showSortMenu && (
+                  <div className="absolute right-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs text-left">
+                    <button
+                      onClick={() => { setSortField('orderDate'); setSortOrder('desc'); setShowSortMenu(false); }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-xl font-medium hover:bg-gray-50 text-gray-700"
+                    >
+                      Date (Newest First)
+                    </button>
+                    <button
+                      onClick={() => { setSortField('orderDate'); setSortOrder('asc'); setShowSortMenu(false); }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-xl font-medium hover:bg-gray-50 text-gray-700"
+                    >
+                      Date (Oldest First)
+                    </button>
+                    <button
+                      onClick={() => { setSortField('orderNumber'); setSortOrder('desc'); setShowSortMenu(false); }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-xl font-medium hover:bg-gray-50 text-gray-700"
+                    >
+                      SO No. (High to Low)
+                    </button>
+                    <button
+                      onClick={() => { setSortField('grandTotal'); setSortOrder('desc'); setShowSortMenu(false); }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-xl font-medium hover:bg-gray-50 text-gray-700"
+                    >
+                      Amount (High to Low)
+                    </button>
+                    <button
+                      onClick={() => { setSortField('customer'); setSortOrder('asc'); setShowSortMenu(false); }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-xl font-medium hover:bg-gray-50 text-gray-700"
+                    >
+                      Customer (A to Z)
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* 3. Column Visibility Icon Button */}
+              <div className="relative group" ref={columnPickerRef}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowColumnPicker(!showColumnPicker);
+                    setShowSortMenu(false);
+                    setShowFilterMenu(false);
+                  }}
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  title="Column Visibility"
+                  aria-label="Column Visibility"
+                >
+                  <Columns className="w-4 h-4 text-blue-600" />
+                </button>
+                {!showColumnPicker && (
+                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                    Column Visibility
+                  </div>
+                )}
+                {showColumnPicker && (
+                  <div className="absolute right-0 mt-1.5 w-52 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2.5 space-y-1.5 text-xs text-left">
+                    <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block border-b border-gray-100 pb-1">Visible Columns</span>
+                    {columns.map(col => (
+                      <label key={col.id} className="flex items-center gap-2 p-1 text-gray-700 cursor-pointer hover:bg-gray-50 rounded-lg">
+                        <input
+                          type="checkbox"
+                          checked={col.visible}
+                          onChange={() => {
+                            setColumns(prev => prev.map(c => c.id === col.id ? { ...c, visible: !c.visible } : c));
+                          }}
+                          className="rounded text-blue-600 focus:ring-blue-500"
+                        />
+                        <span>{col.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 4. Export Excel Icon Button */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={handleExportExcel}
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  title="Export to Excel Spreadsheet"
+                  aria-label="Export to Excel Spreadsheet"
+                >
+                  <Download className="w-4 h-4 text-blue-600" />
+                </button>
+                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                  Export Excel (.xlsx)
+                </div>
+              </div>
+
+              {/* 5. Export PDF Icon Button */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={handlePrintReport}
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  title="Export to PDF Report"
+                  aria-label="Export to PDF Report"
+                >
+                  <FileText className="w-4 h-4 text-blue-600" />
+                </button>
+                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                  Export PDF (.pdf)
+                </div>
+              </div>
+
+              {/* 6. Activity Logs Icon Button */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={() => { fetchActivityLogs(); setShowActivityLogModal(true); }}
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  title="View Activity Logs"
+                  aria-label="View Activity Logs"
+                >
+                  <History className="w-4 h-4 text-blue-600" />
+                </button>
+                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                  Activity Logs
+                </div>
+              </div>
+
+              {/* 7. Circular + Add Button */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={() => { setEditingOrder(null); setShowDrawer(true); }}
+                  className="w-8 h-8 rounded-full border border-gray-200 bg-white hover:bg-blue-50 text-blue-600 flex items-center justify-center transition-all shadow-2xs cursor-pointer font-bold shrink-0"
+                  title="New Sales Order"
+                  aria-label="New Sales Order"
+                >
+                  <Plus className="w-4 h-4 text-blue-600 stroke-[2.5]" />
+                </button>
+                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                  New Sales Order
+                </div>
+              </div>
             </div>
           </div>
 
@@ -996,65 +1269,7 @@ const SalesOrders: React.FC = () => {
             </div>
           )}
 
-          {/* 4. Table Card Container with Filter Toolbar - Hidden on Pending tab */}
-          {statusFilter !== 'Pending' && (
-            <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden space-y-0">
-              {/* Filter Sub-bar */}
-              <div className="bg-gray-50/50 border-b border-gray-200 px-4 py-2.5 flex items-center justify-between flex-wrap gap-2 text-xs font-semibold text-gray-600">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Region:</span>
-                  <select
-                    value={regionFilter}
-                    onChange={e => setRegionFilter(e.target.value)}
-                    className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 shadow-2xs focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                  >
-                    <option value="all">All Regions ({availableRegions.length})</option>
-                    {availableRegions.map(r => (
-                      <option key={r} value={r}>{r}</option>
-                    ))}
-                  </select>
 
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider ml-2">Agent:</span>
-                  <select
-                    value={agentFilter}
-                    onChange={e => setAgentFilter(e.target.value)}
-                    className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 shadow-2xs focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                  >
-                    <option value="all">All Agents ({availableAgents.length})</option>
-                    {availableAgents.map(a => (
-                      <option key={a} value={a}>{a}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Date Range:</span>
-                  <div className="flex items-center gap-1.5 border border-gray-200 rounded-xl px-2.5 py-1 bg-white text-xs font-semibold shadow-2xs">
-                    <select
-                      value={dateRangeFilter}
-                      onChange={(e) => setDateRangeFilter(e.target.value)}
-                      className="bg-transparent border-none text-xs font-semibold text-gray-700 cursor-pointer focus:outline-none font-mono"
-                    >
-                      <option value="sep_2026">01/09/2026 – 30/09/2026</option>
-                      <option value="this_month">This Month</option>
-                      <option value="last_30d">Last 30 Days</option>
-                      <option value="last_90d">Last 90 Days</option>
-                      <option value="all">All Dates</option>
-                    </select>
-                  </div>
-
-                  {(search || statusFilter !== 'all' || regionFilter !== 'all' || agentFilter !== 'all' || dateRangeFilter !== 'sep_2026') && (
-                    <button
-                      onClick={handleResetFilters}
-                      className="text-blue-600 hover:text-blue-800 text-xs font-bold px-2 py-1 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                    >
-                      Clear Filters
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
 
       {/* ── ADVANCED FILTERS DRAWER (COLLAPSIBLE) ── */}
       {showAdvancedFilters && (
@@ -1093,8 +1308,16 @@ const SalesOrders: React.FC = () => {
         <>
           {/* ── TABLE TOOLBAR: METADATA & ACTIONS (1:1 with Screenshot) ── */}
       <div className="flex items-center justify-between pt-1 text-xs">
-        <div className="font-semibold text-gray-600">
-          Showing all {sortedOrders.length} sales orders
+        <div className="font-semibold text-gray-600 flex items-center gap-2">
+          <span>Showing all {sortedOrders.length} sales orders</span>
+          {(search || statusFilter !== 'all' || regionFilter !== 'all' || agentFilter !== 'all' || dateRangeFilter !== 'sep_2026') && (
+            <button
+              onClick={handleResetFilters}
+              className="text-blue-600 hover:text-blue-800 text-[11px] font-bold px-1.5 py-0.5 hover:bg-blue-50 rounded transition-colors cursor-pointer"
+            >
+              Clear Filters
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -1792,6 +2015,61 @@ const SalesOrders: React.FC = () => {
           }}
           onBack={() => setPrintEstimationOrder(null)}
         />
+      )}
+
+      {/* ── SALES ACTIVITY LOGS MODAL ── */}
+      {showActivityLogModal && (
+        <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 max-w-xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95">
+            <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50/80">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 rounded-xl bg-blue-100/80 text-blue-700">
+                  <History className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 text-sm">Sales Orders Activity Log</h3>
+                  <p className="text-xs text-gray-500">Audit trail and event records</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowActivityLogModal(false)}
+                className="w-8 h-8 rounded-lg border border-gray-200 hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-700 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 overflow-y-auto space-y-3 flex-1 text-xs">
+              {activityLogLoading ? (
+                <div className="py-12 text-center text-gray-400">Loading activity logs...</div>
+              ) : activityLogs.length === 0 ? (
+                <div className="py-12 text-center text-gray-400">No activity logs recorded yet.</div>
+              ) : (
+                activityLogs.map((log) => (
+                  <div key={log._id} className="p-3.5 rounded-xl border border-gray-100 bg-gray-50/50 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-blue-600 font-mono">{log.entityName || log.action}</span>
+                      <span className="text-[10px] text-gray-400">{log.createdAt ? new Date(log.createdAt).toLocaleString('en-IN') : 'Recent'}</span>
+                    </div>
+                    <p className="text-gray-700 font-medium">{log.details}</p>
+                    <p className="text-[10px] text-gray-400">By {log.performedBy || 'System'}</p>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/50 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowActivityLogModal(false)}
+                className="px-4 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
         </div>

@@ -4,8 +4,7 @@ import {
   Clock, IndianRupee, Box, Check, ExternalLink, AlertCircle, FileText, History, RefreshCw, X
 } from 'lucide-react';
 import { ProductionOrder } from '../../types/production';
-import { showToast } from '../ui/Toast';
-import { formatOrderNo } from './ProductionOrdersList';
+import { formatOrderNo } from './productionUtils';
 import { fetchStockCostings, resolveComponentCosting, StockCostingData } from '../../utils/inventoryCosting';
 
 interface ProductionOrderDetailViewProps {

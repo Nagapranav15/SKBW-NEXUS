@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, X, FileText, Trash2, Download, HelpCircle, Check, Eye, Edit, ArrowRight, Layers, Clock, AlertTriangle, CheckCircle, Lock, Settings, User, MapPin as MapPinIcon, Ban, Save, Package, Receipt, AlertCircle, Building2, RotateCcw, Filter } from 'lucide-react';
+import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, X, FileText, Trash2, Download, HelpCircle, Check, Eye, Edit, ArrowRight, Layers, Clock, AlertTriangle, CheckCircle, Lock, Settings, User, MapPin as MapPinIcon, Ban, Save, Package, Receipt, AlertCircle, Building2, RotateCcw, Filter, ArrowUpDown, Columns, FileSpreadsheet, History } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { getActivityLogs, createActivityLog } from '../../../api/activityLogApi';
@@ -259,6 +259,10 @@ const PurchaseInvoicePage: React.FC = () => {
   const [showActivityLog, setShowActivityLog] = useState(false);
   const [showDuplicates, setShowDuplicates] = useState(false);
   const [showRecycleBin, setShowRecycleBin] = useState(false);
+  const [showSortMenu, setShowSortMenu] = useState(false);
+  const [showColumnPicker, setShowColumnPicker] = useState(false);
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const [sortConfig, setSortConfig] = useState<{ field: string; direction: 'asc' | 'desc' }>({ field: 'createdAt', direction: 'desc' });
 
   // Tools action data
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
@@ -1935,10 +1939,10 @@ const PurchaseInvoicePage: React.FC = () => {
               </button>
             </div>
 
-            {/* Right Action Bar (Search + Icon-Only Action Tools + Reorder + Add Button) */}
-            <div className="py-2 flex items-center gap-2 flex-wrap shrink-0 relative z-40">
+            {/* Right Action Bar (Search + 9 Icons: Filter, Sort, Columns, Export Excel, Export PDF, Import, Activity Logs, Duplicates, + New) */}
+            <div className="py-2 flex items-center gap-1.5 flex-wrap shrink-0 relative z-40">
               
-              {/* 1. Global Search Box */}
+              {/* Global Search Box */}
               <div className="relative">
                 <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
                 <input
@@ -1946,7 +1950,7 @@ const PurchaseInvoicePage: React.FC = () => {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search batches, suppliers..."
-                  className="pl-8 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl w-40 md:w-52 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+                  className="pl-8 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl w-36 md:w-44 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
                 />
                 {search && (
                   <button 
@@ -1958,44 +1962,259 @@ const PurchaseInvoicePage: React.FC = () => {
                 )}
               </div>
 
-              {/* 2. Activity Logs Button */}
-              <button
-                onClick={() => { fetchActivityLogs(); setShowActivityLog(true); }}
-                className="px-3 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs bg-white hover:bg-blue-50/60 text-blue-600 border-gray-200 hover:border-blue-200"
-                title="View Activity Logs"
-              >
-                <Clock className="w-3.5 h-3.5 text-blue-600" />
-                <span>Activity Logs</span>
-              </button>
+              {/* 1. Filter Icon Button */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowFilterMenu(!showFilterMenu);
+                    setShowSortMenu(false);
+                    setShowColumnPicker(false);
+                  }}
+                  className={`p-2 rounded-xl border transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
+                    (vendorFilter || statusFilter || startDate !== '2024-06-01' || endDate !== '2024-06-30')
+                      ? 'bg-blue-50 border-blue-300 text-blue-700 ring-2 ring-blue-100'
+                      : 'bg-white hover:bg-blue-50/60 border-gray-200 hover:border-blue-200 text-blue-600'
+                  }`}
+                  title="Filter Batches"
+                  aria-label="Filter Batches"
+                >
+                  <Filter className="w-4 h-4 text-blue-600" />
+                </button>
+                {!showFilterMenu && (
+                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                    Filter Batches
+                  </div>
+                )}
+                {showFilterMenu && (
+                  <div className="absolute right-0 mt-1.5 w-72 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-3 space-y-3 text-xs text-left">
+                    <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
+                      <span className="font-bold text-gray-800 text-xs">Filter Purchases</span>
+                      {(vendorFilter || statusFilter || startDate !== '2024-06-01' || endDate !== '2024-06-30') && (
+                        <button
+                          onClick={() => {
+                            setVendorFilter('');
+                            setStatusFilter('');
+                            setStartDate('2024-06-01');
+                            setEndDate('2024-06-30');
+                            setPage(1);
+                          }}
+                          className="text-blue-600 hover:text-blue-800 text-[11px] font-bold cursor-pointer"
+                        >
+                          Reset All
+                        </button>
+                      )}
+                    </div>
 
-              {/* 3. Export Excel Button */}
-              <button
-                onClick={handleExportExcel}
-                className="px-3 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs bg-white hover:bg-emerald-50/60 text-emerald-700 border-gray-200 hover:border-emerald-200"
-                title="Export / Download Excel"
-              >
-                <Download className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Export Excel</span>
-              </button>
+                    {/* Supplier */}
+                    <div>
+                      <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Supplier</label>
+                      <select
+                        value={vendorFilter}
+                        onChange={e => { setVendorFilter(e.target.value); setPage(1); }}
+                        className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                      >
+                        <option value="">All Suppliers ({vendors.length})</option>
+                        {vendors.map(v => (
+                          <option key={v._id} value={v._id}>{v.firmName || v.ownerName}</option>
+                        ))}
+                      </select>
+                    </div>
 
-              {/* 4. Export PDF Button */}
-              <button
-                onClick={handleExportPDF}
-                className="px-3 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs bg-white hover:bg-red-50/60 text-red-700 border-gray-200 hover:border-red-200"
-                title="Export / Download PDF"
-              >
-                <FileText className="w-3.5 h-3.5 text-red-600" />
-                <span>Export PDF</span>
-              </button>
+                    {/* Date Range */}
+                    <div>
+                      <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Date Range</label>
+                      <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-xl p-1.5">
+                        <input
+                          type="date"
+                          value={startDate}
+                          onChange={e => { setStartDate(e.target.value); setPage(1); }}
+                          className="text-xs border-0 bg-transparent focus:ring-0 p-0 text-gray-700 font-mono font-bold w-full"
+                        />
+                        <span className="text-gray-400 font-bold text-xs">–</span>
+                        <input
+                          type="date"
+                          value={endDate}
+                          onChange={e => { setEndDate(e.target.value); setPage(1); }}
+                          className="text-xs border-0 bg-transparent focus:ring-0 p-0 text-gray-700 font-mono font-bold w-full"
+                        />
+                      </div>
+                    </div>
 
-              {/* 5. + New Purchase Batch Button */}
-              <button
-                onClick={handleNewPurchaseClick}
-                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/20 active:scale-[0.98] cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>New Purchase</span>
-              </button>
+                    {/* Status */}
+                    <div>
+                      <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Status</label>
+                      <select
+                        value={statusFilter}
+                        onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
+                        className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                      >
+                        <option value="">All Batches</option>
+                        <option value="Posted">Received / Posted</option>
+                        <option value="Draft">Draft / Pending</option>
+                        <option value="Cancelled">Cancelled</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 2. Sort Icon Button */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSortMenu(!showSortMenu);
+                    setShowFilterMenu(false);
+                    setShowColumnPicker(false);
+                  }}
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  title="Sort Order"
+                  aria-label="Sort Order"
+                >
+                  <ArrowUpDown className="w-4 h-4 text-blue-600" />
+                </button>
+                {!showSortMenu && (
+                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                    Sort Batches
+                  </div>
+                )}
+                {showSortMenu && (
+                  <div className="absolute right-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs text-left">
+                    <button
+                      onClick={() => { setSortConfig({ field: 'createdAt', direction: 'desc' }); setShowSortMenu(false); }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-xl font-medium hover:bg-gray-50 text-gray-700"
+                    >
+                      Date (Newest First)
+                    </button>
+                    <button
+                      onClick={() => { setSortConfig({ field: 'createdAt', direction: 'asc' }); setShowSortMenu(false); }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-xl font-medium hover:bg-gray-50 text-gray-700"
+                    >
+                      Date (Oldest First)
+                    </button>
+                    <button
+                      onClick={() => { setSortConfig({ field: 'invoiceNumber', direction: 'asc' }); setShowSortMenu(false); }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-xl font-medium hover:bg-gray-50 text-gray-700"
+                    >
+                      Batch No. (Ascending)
+                    </button>
+                    <button
+                      onClick={() => { setSortConfig({ field: 'grandTotal', direction: 'desc' }); setShowSortMenu(false); }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-xl font-medium hover:bg-gray-50 text-gray-700"
+                    >
+                      Value (High to Low)
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* 3. Column Visibility Icon Button */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowColumnPicker(!showColumnPicker);
+                    setShowSortMenu(false);
+                    setShowFilterMenu(false);
+                  }}
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  title="Column Visibility"
+                  aria-label="Column Visibility"
+                >
+                  <Columns className="w-4 h-4 text-blue-600" />
+                </button>
+                {!showColumnPicker && (
+                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                    Column Visibility
+                  </div>
+                )}
+                {showColumnPicker && (
+                  <div className="absolute right-0 mt-1.5 w-52 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2.5 space-y-1.5 text-xs text-left">
+                    <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block border-b border-gray-100 pb-1">Visible Columns</span>
+                    <label className="flex items-center gap-2 p-1 text-gray-700 cursor-pointer hover:bg-gray-50 rounded-lg">
+                      <input type="checkbox" defaultChecked className="rounded text-blue-600" />
+                      <span>Batch Details</span>
+                    </label>
+                    <label className="flex items-center gap-2 p-1 text-gray-700 cursor-pointer hover:bg-gray-50 rounded-lg">
+                      <input type="checkbox" defaultChecked className="rounded text-blue-600" />
+                      <span>Supplier & Vendor</span>
+                    </label>
+                    <label className="flex items-center gap-2 p-1 text-gray-700 cursor-pointer hover:bg-gray-50 rounded-lg">
+                      <input type="checkbox" defaultChecked className="rounded text-blue-600" />
+                      <span>Material Lots & Weight</span>
+                    </label>
+                    <label className="flex items-center gap-2 p-1 text-gray-700 cursor-pointer hover:bg-gray-50 rounded-lg">
+                      <input type="checkbox" defaultChecked className="rounded text-blue-600" />
+                      <span>Financials & Landed Rate</span>
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              {/* 4. Export Excel Icon Button */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={handleExportExcel}
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  title="Export to Excel Spreadsheet"
+                  aria-label="Export to Excel Spreadsheet"
+                >
+                  <Download className="w-4 h-4 text-blue-600" />
+                </button>
+                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                  Export Excel (.xlsx)
+                </div>
+              </div>
+
+              {/* 5. Export PDF Icon Button */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={handleExportPDF}
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  title="Export to PDF Report"
+                  aria-label="Export to PDF Report"
+                >
+                  <FileText className="w-4 h-4 text-blue-600" />
+                </button>
+                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                  Export PDF (.pdf)
+                </div>
+              </div>
+
+              {/* 6. Activity Logs Icon Button */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={() => { fetchActivityLogs(); setShowActivityLog(true); }}
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  title="View Activity Logs"
+                  aria-label="View Activity Logs"
+                >
+                  <History className="w-4 h-4 text-blue-600" />
+                </button>
+                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                  Activity Logs
+                </div>
+              </div>
+
+              {/* 7. Circular + Add Button */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={handleNewPurchaseClick}
+                  className="w-8 h-8 rounded-full border border-gray-200 bg-white hover:bg-blue-50 text-blue-600 flex items-center justify-center transition-all shadow-2xs cursor-pointer font-bold shrink-0"
+                  title="New Purchase Batch"
+                  aria-label="New Purchase Batch"
+                >
+                  <Plus className="w-4 h-4 text-blue-600 stroke-[2.5]" />
+                </button>
+                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+                  New Purchase Batch
+                </div>
+              </div>
             </div>
           </div>
 
@@ -2102,42 +2321,12 @@ const PurchaseInvoicePage: React.FC = () => {
             );
           })()}
 
-          {/* 4. Table Card Container with Supplier/Date Filters */}
+          {/* 4. Table Card Container */}
           <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden space-y-0">
-            {/* Filter Sub-bar */}
-            <div className="bg-gray-50/50 border-b border-gray-200 px-4 py-2.5 flex items-center justify-between flex-wrap gap-2 text-xs font-semibold text-gray-600">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Supplier:</span>
-                <select
-                  value={vendorFilter}
-                  onChange={e => { setVendorFilter(e.target.value); setPage(1); }}
-                  className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 shadow-2xs focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                >
-                  <option value="">All Suppliers ({vendors.length})</option>
-                  {vendors.map(v => (
-                    <option key={v._id} value={v._id}>{v.firmName || v.ownerName}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Date Range:</span>
-                <div className="flex items-center gap-1.5 border border-gray-200 rounded-xl px-2.5 py-1 bg-white text-xs font-semibold shadow-2xs">
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={e => setStartDate(e.target.value)}
-                    className="text-xs border-0 bg-transparent focus:ring-0 p-0 text-gray-700 font-mono font-bold"
-                  />
-                  <span className="text-gray-400 font-bold text-xs">–</span>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={e => setEndDate(e.target.value)}
-                    className="text-xs border-0 bg-transparent focus:ring-0 p-0 text-gray-700 font-mono font-bold"
-                  />
-                </div>
-
+            {/* Table Sub-bar: Metadata */}
+            <div className="bg-gray-50/50 border-b border-gray-200 px-4 py-2 flex items-center justify-between flex-wrap gap-2 text-xs font-semibold text-gray-600">
+              <div className="flex items-center gap-2">
+                <span>Showing {invoices.length} purchase batches</span>
                 {(vendorFilter || search || statusFilter || startDate !== '2024-06-01' || endDate !== '2024-06-30') && (
                   <button
                     onClick={() => {
@@ -2148,7 +2337,7 @@ const PurchaseInvoicePage: React.FC = () => {
                       setEndDate('2024-06-30');
                       setPage(1);
                     }}
-                    className="text-blue-600 hover:text-blue-800 text-xs font-bold px-2 py-1 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                    className="text-blue-600 hover:text-blue-800 text-[11px] font-bold px-1.5 py-0.5 hover:bg-blue-50 rounded transition-colors cursor-pointer"
                   >
                     Clear Filters
                   </button>
@@ -2158,7 +2347,29 @@ const PurchaseInvoicePage: React.FC = () => {
 
             {/* Invoices Table */}
             <InvoiceTable
-              invoices={invoices}
+              invoices={(() => {
+                let list = [...invoices];
+                if (sortConfig.field === 'createdAt') {
+                  list.sort((a, b) => {
+                    const da = new Date(a.createdAt || 0).getTime();
+                    const db = new Date(b.createdAt || 0).getTime();
+                    return sortConfig.direction === 'asc' ? da - db : db - da;
+                  });
+                } else if (sortConfig.field === 'invoiceNumber') {
+                  list.sort((a, b) => {
+                    const na = a.invoiceNumber || '';
+                    const nb = b.invoiceNumber || '';
+                    return sortConfig.direction === 'asc' ? na.localeCompare(nb) : nb.localeCompare(na);
+                  });
+                } else if (sortConfig.field === 'grandTotal') {
+                  list.sort((a, b) => {
+                    const va = a.grandTotal || a.subTotal || 0;
+                    const vb = b.grandTotal || b.subTotal || 0;
+                    return sortConfig.direction === 'asc' ? va - vb : vb - va;
+                  });
+                }
+                return list;
+              })()}
               loading={loading}
               skus={skus}
               onViewDetails={(inv) => {
