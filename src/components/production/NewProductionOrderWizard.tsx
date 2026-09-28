@@ -1904,14 +1904,14 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
               <thead className="bg-gray-50/80 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 select-none">
                 <tr>
                   <th className="py-2 px-2 text-center w-8 whitespace-nowrap text-[10px]">#</th>
-                  <th className="py-2 px-3 min-w-[360px] whitespace-nowrap text-[10px]">MATERIAL / COMPONENT <span className="text-red-500">*</span></th>
-                  <th className="py-2 px-2 text-center w-24 whitespace-nowrap text-[10px]">ITEM CODE</th>
+                  <th className="py-2 px-3 min-w-[200px] whitespace-nowrap text-[10px]">MATERIAL / COMPONENT <span className="text-red-500">*</span></th>
+                  <th className="py-2 px-2 text-center w-20 whitespace-nowrap text-[10px]">ITEM CODE</th>
                   <th className="py-2 px-2 text-center w-14 whitespace-nowrap text-[10px]">UOM</th>
-                  <th className="py-2 px-3 text-right w-28 whitespace-nowrap text-[10px]">REQUIRED QTY <span className="text-red-500">*</span></th>
-                  <th className="py-2 px-3 min-w-[190px] whitespace-nowrap text-[10px]">SOURCE LOCATION</th>
-                  <th className="py-2 px-3 text-right w-36 whitespace-nowrap text-[10px]">RATE (₹)</th>
-                  <th className="py-2 px-3 text-right w-28 whitespace-nowrap text-[10px]">MATERIAL COST (₹)</th>
-                  <th className="py-2 px-2 text-center w-14 whitespace-nowrap text-[10px]">ACTIONS</th>
+                  <th className="py-2 px-2.5 text-right w-24 whitespace-nowrap text-[10px]">REQUIRED QTY <span className="text-red-500">*</span></th>
+                  <th className="py-2 px-2.5 min-w-[160px] whitespace-nowrap text-[10px]">SOURCE LOCATION</th>
+                  <th className="py-2 px-2.5 text-right w-32 whitespace-nowrap text-[10px]">RATE (₹)</th>
+                  <th className="py-2 px-2.5 text-right w-28 whitespace-nowrap text-[10px]">MATERIAL COST (₹)</th>
+                  <th className="py-2 px-2 text-center w-20 whitespace-nowrap text-[10px]">ACTIONS</th>
                 </tr>
               </thead>
 
@@ -1944,7 +1944,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                         </td>
 
                         {/* Material / Component Dropdown (Expanded, compact height, all title in one line) */}
-                        <td className="py-1.5 px-3 relative material-dropdown-container min-w-[360px]">
+                        <td className="py-1.5 px-3 relative material-dropdown-container min-w-[200px]">
                           <div className="relative w-full">
                             <Search className="w-3 h-3 absolute left-2.5 top-2 text-gray-400" />
                             <input
@@ -2064,7 +2064,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                         </td>
 
                         {/* Required Qty */}
-                        <td className="py-1.5 px-3 text-right">
+                        <td className="py-1.5 px-2.5 text-right w-24">
                           <input
                             type="number"
                             step="any"
@@ -2076,7 +2076,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                         </td>
 
                         {/* Source Location (Mini Factory Location Modal) */}
-                        <td className="py-1.5 px-3">
+                        <td className="py-1.5 px-2.5 min-w-[160px]">
                           <LocationSelectPopup
                             locations={warehouseLocations}
                             locationId={row.locationId || ''}
@@ -2084,12 +2084,12 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                             onChange={(wh, fl, zn, loc) => handleMaterialLocationChange(row.id, wh, fl, zn, loc)}
                             variant="compact"
                             hideLabel
-                            className="w-full min-w-[190px]"
+                            className="w-full min-w-[160px]"
                           />
                         </td>
 
                         {/* Rate with 3-Mode Selector (Avg Purchases / FIFO / Custom) */}
-                        <td className="py-1.5 px-3 text-right">
+                        <td className="py-1.5 px-2.5 text-right w-32">
                           <div className="flex items-center justify-end gap-1.5">
                             {/* Mode Selector Pill Select */}
                             <select
@@ -2125,7 +2125,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                                 handleUpdateMaterial(row.id, 'rate', e.target.value);
                                 handleSetRowRateMode(row.id, 'custom', Number(e.target.value) || 0);
                               }}
-                              className={`w-20 text-right font-semibold bg-white border rounded-md px-2 py-0.5 text-[11px] h-7 focus:ring-1 focus:ring-blue-500 focus:outline-none font-mono ${
+                              className={`w-18 text-right font-semibold bg-white border rounded-md px-1.5 py-0.5 text-[11px] h-7 focus:ring-1 focus:ring-blue-500 focus:outline-none font-mono ${
                                 row.rateMode === 'fifo'
                                   ? 'border-emerald-300 text-emerald-900 bg-emerald-50/20'
                                   : row.rateMode === 'custom'
@@ -2144,12 +2144,12 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                         </td>
 
                         {/* Material Cost Amount */}
-                        <td className="py-1.5 px-3 text-right font-bold font-mono text-gray-900 text-[11px]">
+                        <td className="py-1.5 px-2.5 text-right font-bold font-mono text-gray-900 text-[11px] w-28">
                           ₹{formatCurrency(row.amount)}
                         </td>
 
                         {/* Actions */}
-                        <td className="py-1.5 px-2 text-center">
+                        <td className="py-1.5 px-2 text-center w-20">
                           <div className="flex items-center justify-center gap-1">
                             <button
                               type="button"
@@ -2306,7 +2306,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                       <th className="py-2 px-3 text-right w-24">QTY</th>
                       <th className="py-2 px-3 text-right w-24">RATE (₹)</th>
                       <th className="py-2 px-3 text-right w-28">AMOUNT (₹)</th>
-                      <th className="py-2 px-3 text-center w-14">ACTIONS</th>
+                      <th className="py-2 px-3 text-center w-20">ACTIONS</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 bg-white">
@@ -2491,7 +2491,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                       <th className="py-2 px-3 text-center w-32">CALC BASIS</th>
                       <th className="py-2 px-3 text-right w-24">AMOUNT (₹)</th>
                       <th className="py-2 px-3 w-48">APPLIED AS</th>
-                      <th className="py-2 px-3 text-center w-14">ACTIONS</th>
+                      <th className="py-2 px-3 text-center w-20">ACTIONS</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 bg-white">
