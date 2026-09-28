@@ -12,7 +12,7 @@ import { getSkusV2, getWarehouseHierarchyV2, SkuV2, WarehouseLocationV2, getProd
 import { LocationSelectPopup } from '../stock_v2/LocationSelectPopup';
 import Modal from '../ui/Modal';
 import { showToast } from '../ui/Toast';
-import { getUomDirection } from '../../utils/uomConversion';
+
 
 interface NewProductionOrderWizardProps {
   onCancel: () => void;
@@ -559,60 +559,56 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   }, [backendSkus]);
 
   // Dynamic conversion extraction from Item Master.
-  // Returns the number of PCS (pieces) per GBL for this SKU.
-  // Returns 0 if the item is not a GBL-tracked finished/semi good.
+  // Returns the number of PCS (pieces/sheets) per GBL for this SKU.
+  // Priority order matches how the Item Master form saves fields per category:
+  //   Raw Materials  → booksGbl > altUnitConversion
+  //   Semi Finished  → pages (sheets/ream = PCS/GBL) > altUnitConversion
+  //   Finished Goods → booksGbl > altUnitConversion > pages
   const getSkuPcsPerGbl = (sku?: SkuV2 | null): number => {
     if (!sku) return 0;
 
     const cat = (sku.category || '').toLowerCase();
     const unitNorm = (sku.unit || '').toUpperCase().trim();
-    const altUnitNorm = (sku.altUnit || '').toUpperCase().trim();
 
-    // Only raw materials and pure reel items have no GBL conversion
-    const isRawReel = sku.paperType === 'Reels' && !cat.includes('product') && !cat.includes('finish');
-    if (isRawReel) return 0;
+    // Skip pure reel raw materials (they are measured in KG/Reels, not GBL)
+    if (sku.paperType === 'Reels') return 0;
 
-    // 1. Explicit legacy field booksGbl
-    const directBooks = Number((sku as any).booksGbl);
-    if (directBooks > 0) return directBooks;
+    // 1. booksGbl is the explicit "books per GBL" field set in the Item Master
+    const booksGbl = Number((sku as any).booksGbl);
+    if (booksGbl > 0) return booksGbl;
 
-    // 2. If unit is GBL (primary unit), use altUnitConversion if altUnit is piece-like
+    // 2. For sheet-based paper categories (Ruling, Index, Board, Semi Finished) with
+    //    paperType='Sheets', the `pages` field stores "sheets per ream" = PCS per GBL
+    const isSheetCategory =
+      sku.paperType === 'Sheets' ||
+      cat.includes('ruling') ||
+      cat.includes('index') ||
+      cat.includes('board') ||
+      cat.includes('semi');
+
+    if (isSheetCategory) {
+      const pages = Number(sku.pages ?? (sku as any).sheetsPerReam ?? (sku as any).standardSheets);
+      if (pages > 0) return pages;
+    }
+
+    // 3. For all items: altUnitConversion is the generic UOM conversion factor
+    const altConv = Number(sku.altUnitConversion);
+    if (altConv > 0) return altConv;
+
+    // 4. For finished goods: pages is the number of pages per book (not PCS/GBL)
+    //    Only use as last resort if no other conversion is available
+    const pcsPerGbl = Number((sku as any).pcsPerGbl);
+    if (pcsPerGbl > 0) return pcsPerGbl;
+
+    // 5. For finished goods with no other data, pages could mean PCS/GBL in some cases
     if (unitNorm === 'GBL') {
-      const altConv = Number(sku.altUnitConversion);
-      if (altConv > 0) return altConv;
-      // Fallback to pages field (sheets/pieces per GBL bundle)
-      const pages = Number(sku.pages);
+      const pages = Number(sku.pages ?? (sku as any).sheetsPerReam);
       if (pages > 0) return pages;
-    }
-
-    // 3. If altUnit is GBL, the altUnitConversion tells us pieces-per-GBL
-    if (altUnitNorm === 'GBL') {
-      const altConv = Number(sku.altUnitConversion);
-      if (altConv > 0) {
-        // direction: ALT_TO_PRIMARY means 1 GBL = altConv PCS
-        const dir = getUomDirection(sku.unit, sku.altUnit, sku.altUnitDirection);
-        return dir === 'ALT_TO_PRIMARY' ? altConv : (altConv > 0 ? 1 / altConv : 0);
-      }
-    }
-
-    // 4. Finished goods / products — use pages as PCS per GBL (notebook bundles)
-    const isFinishedGood = cat.includes('product') || cat.includes('finish') || cat.includes('notebook') || cat.includes('book') || cat.includes('register') || cat.includes('diar') || unitNorm === 'GBL';
-    if (isFinishedGood) {
-      const altConv = Number(sku.altUnitConversion);
-      if (altConv > 0) return altConv;
-      const pages = Number(sku.pages);
-      if (pages > 0) return pages;
-      const pcsPerGbl = Number((sku as any).pcsPerGbl);
-      if (pcsPerGbl > 0) return pcsPerGbl;
-    }
-
-    // 5. Generic altUnitConversion fallback for any SKU with explicit GBL/PCS pair
-    if ((unitNorm === 'GBL' || altUnitNorm === 'GBL') && Number(sku.altUnitConversion) > 0) {
-      return Number(sku.altUnitConversion);
     }
 
     return 0;
   };
+
 
 
   // Dynamic Item Master specification badge:
