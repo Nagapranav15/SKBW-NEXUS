@@ -760,6 +760,8 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                 <span>{isConfirming ? 'Confirming...' : 'Confirm Order'}</span>
               </button>
             </div>
+          )}
+
           {/* ── ERP CONNECTION: Linked Production Order or Plan Production ── */}
           {linkedProductionOrder ? (
             <div className="flex items-center justify-between p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/90 rounded-xl text-xs">
