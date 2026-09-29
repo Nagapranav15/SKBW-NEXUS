@@ -640,7 +640,7 @@ const SkuMasterV2: React.FC = () => {
   }>>([]);
   const [bomProfitPricing, setBomProfitPricing] = useState<{
     pricingMethod: string; markupPercentage: string | number;
-  }>({ pricingMethod: 'Markup %', markupPercentage: '' });
+  }>({ pricingMethod: 'Margin %', markupPercentage: '' });
 
   const handleSaveBomRecipe = async () => {
     if (!selectedSkuDetails?._id) {
@@ -1413,11 +1413,11 @@ const SkuMasterV2: React.FC = () => {
       // Load Profit & Pricing from saved SKU
       if ((selectedSkuDetails as any).profitPricing && typeof (selectedSkuDetails as any).profitPricing === 'object') {
         setBomProfitPricing({
-          pricingMethod: (selectedSkuDetails as any).profitPricing.pricingMethod || 'Markup %',
+          pricingMethod: 'Margin %',
           markupPercentage: (selectedSkuDetails as any).profitPricing.markupPercentage ?? ''
         });
       } else {
-        setBomProfitPricing({ pricingMethod: 'Markup %', markupPercentage: '' });
+        setBomProfitPricing({ pricingMethod: 'Margin %', markupPercentage: '' });
       }
     }
   }, [selectedSkuDetails]);
@@ -6384,25 +6384,21 @@ const SkuMasterV2: React.FC = () => {
                         <div className="bg-emerald-50/20 border border-emerald-100 rounded-xl p-3 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
                           <div>
                             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Pricing Method</label>
-                            <select
-                              value={bomProfitPricing.pricingMethod}
-                              onChange={e => setBomProfitPricing(prev => ({ ...prev, pricingMethod: e.target.value }))}
-                              className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                            >
-                              <option value="Markup %">Markup %</option>
-                              <option value="Margin %">Margin %</option>
-                            </select>
+                            <div className="w-full px-2.5 py-1.5 bg-white border border-emerald-200 rounded-lg text-xs font-bold text-emerald-800 flex items-center justify-between shadow-3xs">
+                              <span>Margin %</span>
+                              <span className="text-[9px] px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded font-semibold border border-emerald-200">Profit Margin</span>
+                            </div>
                           </div>
                           <div>
                             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
-                              {bomProfitPricing.pricingMethod === 'Margin %' ? 'Margin Percentage' : 'Markup Percentage'}
+                              Margin Percentage
                             </label>
                             <div className="relative">
                               <input
                                 type="number"
                                 step="any"
                                 value={bomProfitPricing.markupPercentage}
-                                onChange={e => setBomProfitPricing(prev => ({ ...prev, markupPercentage: e.target.value }))}
+                                onChange={e => setBomProfitPricing(prev => ({ ...prev, pricingMethod: 'Margin %', markupPercentage: e.target.value }))}
                                 placeholder="0"
                                 className="w-full pl-3 pr-7 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold font-mono text-gray-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                               />

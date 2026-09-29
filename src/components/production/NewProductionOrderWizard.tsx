@@ -334,7 +334,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
   // Profit & Pricing (Optional)
   const [profitPricing, setProfitPricing] = useState<ProfitPricingState>({
-    pricingMethod: 'Markup %',
+    pricingMethod: 'Margin %',
     markupPercentage: ''
   });
 
@@ -1013,14 +1013,14 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     // Dynamic Profit & Pricing from SKU BOM (blank by default)
     if ((sku as any).profitPricing && typeof (sku as any).profitPricing === 'object') {
       setProfitPricing({
-        pricingMethod: (sku as any).profitPricing.pricingMethod || 'Markup %',
+        pricingMethod: 'Margin %',
         markupPercentage: (sku as any).profitPricing.markupPercentage ?? '',
         suggestedPricePcs: (sku as any).profitPricing.suggestedPricePcs,
         suggestedPriceGbl: (sku as any).profitPricing.suggestedPriceGbl
       });
     } else {
       setProfitPricing({
-        pricingMethod: 'Markup %',
+        pricingMethod: 'Margin %',
         markupPercentage: ''
       });
     }
@@ -2288,7 +2288,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                     }
                     if (copied.profitPricing) {
                       setProfitPricing({
-                        pricingMethod: copied.profitPricing.pricingMethod || 'Markup %',
+                        pricingMethod: 'Margin %',
                         markupPercentage: copied.profitPricing.markupPercentage ?? ''
                       });
                     }
@@ -2328,7 +2328,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                     }
                     if (copied.profitPricing && (!profitPricing.markupPercentage || profitPricing.markupPercentage === '')) {
                       setProfitPricing({
-                        pricingMethod: copied.profitPricing.pricingMethod || 'Markup %',
+                        pricingMethod: 'Margin %',
                         markupPercentage: copied.profitPricing.markupPercentage ?? ''
                       });
                     }
@@ -2904,26 +2904,22 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
                     Pricing Method
                   </label>
-                  <select
-                    value={profitPricing.pricingMethod}
-                    onChange={e => setProfitPricing(prev => ({ ...prev, pricingMethod: e.target.value as any }))}
-                    className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  >
-                    <option value="Markup %">Markup %</option>
-                    <option value="Margin %">Margin %</option>
-                  </select>
+                  <div className="w-full px-2.5 py-1.5 bg-white border border-emerald-200 rounded-lg text-xs font-bold text-emerald-800 flex items-center justify-between shadow-3xs">
+                    <span>Margin %</span>
+                    <span className="text-[9px] px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded font-semibold border border-emerald-200">Profit Margin</span>
+                  </div>
                 </div>
 
                 <div>
                   <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
-                    {profitPricing.pricingMethod === 'Margin %' ? 'Margin Percentage' : 'Markup Percentage'}
+                    Margin Percentage
                   </label>
                   <div className="relative">
                     <input
                       type="number"
                       step="any"
                       value={profitPricing.markupPercentage}
-                      onChange={e => setProfitPricing(prev => ({ ...prev, markupPercentage: e.target.value }))}
+                      onChange={e => setProfitPricing(prev => ({ ...prev, pricingMethod: 'Margin %', markupPercentage: e.target.value }))}
                       placeholder="0"
                       className="w-full pl-3 pr-7 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold font-mono text-gray-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     />

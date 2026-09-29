@@ -49,7 +49,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
   const [activeRecipeItems, setActiveRecipeItems] = useState<BomRecipeItem[]>([]);
   const [activeAdditionalCosts, setActiveAdditionalCosts] = useState<AdditionalCostRow[]>([]);
   const [activeProfitPricing, setActiveProfitPricing] = useState<ProfitPricingState>({
-    pricingMethod: 'Markup %',
+    pricingMethod: 'Margin %',
     markupPercentage: ''
   });
   const [buildBatchYieldQty, setBuildBatchYieldQty] = useState<string>('1');
@@ -282,14 +282,14 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
 
     if ((prod as any).profitPricing && typeof (prod as any).profitPricing === 'object') {
       setActiveProfitPricing({
-        pricingMethod: (prod as any).profitPricing.pricingMethod || 'Markup %',
+        pricingMethod: 'Margin %',
         markupPercentage: (prod as any).profitPricing.markupPercentage ?? '',
         suggestedPricePcs: (prod as any).profitPricing.suggestedPricePcs,
         suggestedPriceGbl: (prod as any).profitPricing.suggestedPriceGbl
       });
     } else {
       setActiveProfitPricing({
-        pricingMethod: 'Markup %',
+        pricingMethod: 'Margin %',
         markupPercentage: ''
       });
     }
@@ -837,7 +837,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                           }
                           if (copied.profitPricing) {
                             setActiveProfitPricing({
-                              pricingMethod: copied.profitPricing.pricingMethod || 'Markup %',
+                              pricingMethod: 'Margin %',
                               markupPercentage: copied.profitPricing.markupPercentage ?? ''
                             });
                           }
@@ -878,7 +878,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                           }
                           if (copied.profitPricing && (!activeProfitPricing.markupPercentage || activeProfitPricing.markupPercentage === '')) {
                             setActiveProfitPricing({
-                              pricingMethod: copied.profitPricing.pricingMethod || 'Markup %',
+                              pricingMethod: 'Margin %',
                               markupPercentage: copied.profitPricing.markupPercentage ?? ''
                             });
                           }
@@ -1313,26 +1313,22 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                         <label className="text-[9.5px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
                           Pricing Method
                         </label>
-                        <select
-                          value={activeProfitPricing.pricingMethod}
-                          onChange={e => setActiveProfitPricing(prev => ({ ...prev, pricingMethod: e.target.value }))}
-                          className="w-full h-7 px-2 py-0.5 bg-white border border-gray-200 rounded-md text-xs font-semibold text-gray-800 cursor-pointer focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                        >
-                          <option value="Markup %">Markup %</option>
-                          <option value="Margin %">Margin %</option>
-                        </select>
+                        <div className="w-full h-7 px-2 py-0.5 bg-white border border-emerald-200 rounded-md text-xs font-bold text-emerald-800 flex items-center justify-between">
+                          <span>Margin %</span>
+                          <span className="text-[9px] px-1 py-0.2 bg-emerald-50 text-emerald-700 rounded font-semibold">Margin</span>
+                        </div>
                       </div>
 
                       <div>
                         <label className="text-[9.5px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
-                          {activeProfitPricing.pricingMethod === 'Margin %' ? 'Margin Percentage' : 'Markup Percentage'}
+                          Margin Percentage
                         </label>
                         <div className="relative">
                           <input
                             type="number"
                             step="any"
                             value={activeProfitPricing.markupPercentage}
-                            onChange={e => setActiveProfitPricing(prev => ({ ...prev, markupPercentage: e.target.value }))}
+                            onChange={e => setActiveProfitPricing(prev => ({ ...prev, pricingMethod: 'Margin %', markupPercentage: e.target.value }))}
                             placeholder="0"
                             className="w-full h-7 pl-2.5 pr-6 py-0.5 bg-white border border-gray-200 rounded-md text-xs font-bold font-mono text-gray-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                           />
