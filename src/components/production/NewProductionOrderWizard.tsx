@@ -1862,42 +1862,21 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   </button>
                 </div>
 
-                {/* Category Dropdown Selector */}
-                <div className="flex items-center gap-1 shrink-0">
-                  <div className="relative">
-                    <select
-                      value={productCategoryFilter}
-                      onChange={(e) => setProductCategoryFilter(e.target.value)}
-                      className={`text-[10px] font-bold pl-2 pr-6 py-0.5 rounded-lg border appearance-none cursor-pointer focus:outline-none transition-all ${
-                        productCategoryFilter !== 'ALL'
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-3xs'
-                          : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <option value="ALL" className="bg-white text-gray-900 font-semibold">
-                        📂 All Categories ({categoryBreakdown.categories.length})
-                      </option>
-                      {categoryBreakdown.categories.map(([cat, count]) => (
-                        <option key={cat} value={cat} className="bg-white text-gray-900 font-semibold">
-                          {cat} ({count})
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className={`w-3 h-3 absolute right-1.5 top-1.5 pointer-events-none ${
-                      productCategoryFilter !== 'ALL' ? 'text-white' : 'text-gray-400'
-                    }`} />
-                  </div>
-                  {productCategoryFilter !== 'ALL' && (
+                {/* Active Category Badge (if selected in popover) */}
+                {productCategoryFilter !== 'ALL' && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-gray-500 font-medium">Category:</span>
                     <button
                       type="button"
                       onClick={() => setProductCategoryFilter('ALL')}
-                      className="p-1 text-gray-400 hover:text-rose-600 rounded cursor-pointer"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-bold hover:bg-blue-100 cursor-pointer transition-colors"
                       title="Clear category filter"
                     >
-                      <X className="w-3 h-3" />
+                      <span>{productCategoryFilter}</span>
+                      <X className="w-3 h-3 text-blue-600" />
                     </button>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
 
               {/* Searchable Product Input */}
