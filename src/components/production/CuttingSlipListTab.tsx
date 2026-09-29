@@ -233,6 +233,11 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
                         <span className="text-[10px] text-slate-500 block">
                           {slip.actualReams?.toFixed(2)} Reams
                         </span>
+                        {slip.cutsCount ? (
+                          <span className="text-[9.5px] text-indigo-600 font-bold block">
+                            {slip.cutsCount.toLocaleString()} cuts @ {slip.reelsOnStand || 1}R
+                          </span>
+                        ) : null}
                       </td>
                       <td className="py-3 px-3 text-center">
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold inline-flex items-center gap-1 ${
@@ -330,6 +335,9 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
                 <span className="font-bold text-emerald-800 block mb-1">CONVERTED SHEETS</span>
                 <div>SKU: <span className="font-bold">{selectedSlipForPrint.targetSku?.name}</span></div>
                 <div>Yield: <span className="font-bold font-mono text-emerald-900">{selectedSlipForPrint.actualSheets} Sheets ({selectedSlipForPrint.actualReams} Reams)</span></div>
+                {selectedSlipForPrint.cutsCount ? (
+                  <div>Meter: <span className="font-bold font-mono text-indigo-700">{selectedSlipForPrint.cutsCount} Cuts ({selectedSlipForPrint.reelsOnStand || 1} reels on stand)</span></div>
+                ) : null}
                 <div>Loss: <span className="font-bold text-rose-700">-{selectedSlipForPrint.wastePercentage}%</span></div>
               </div>
             </div>

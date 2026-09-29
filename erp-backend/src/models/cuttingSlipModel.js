@@ -27,6 +27,13 @@ const cuttingSlipSchema = new mongoose.Schema({
   sheetGsm: { type: Number, required: true },    // e.g. 52
   sheetsPerReam: { type: Number, default: 500 },
 
+  // Machine Sheeter Meter & Cut Strokes
+  startMeterReading: { type: Number, default: 0 },
+  endMeterReading: { type: Number, default: 0 },
+  cutsCount: { type: Number, default: 0 }, // Machine stroke count
+  reelsOnStand: { type: Number, default: 1 }, // Webs cut simultaneously
+  slitsCount: { type: Number, default: 1 }, // Streams across reel width
+
   // Yield & Reconciliation
   theoreticalSheets: { type: Number, required: true },
   theoreticalReams: { type: Number, default: 0 },

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   X, Scissors, Printer, CheckCircle2, AlertTriangle, 
-  ArrowRight, Layers, Box, Scale, RefreshCw, FileText
+  ArrowRight, Layers, Box, Scale, RefreshCw, FileText,
+  Activity, RotateCcw, Calculator
 } from 'lucide-react';
 import Modal from '../ui/Modal';
 import { 
@@ -50,6 +51,14 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
   const [sheetLength, setSheetLength] = useState<string>('70');
   const [sheetGsm, setSheetGsm] = useState<string>('52');
   const [sheetsPerReam, setSheetsPerReam] = useState<number>(500);
+
+  // Machine Sheeter Meter & Knife Strokes
+  const [cutsCountInput, setCutsCountInput] = useState<string>('');
+  const [startMeterReading, setStartMeterReading] = useState<string>('');
+  const [endMeterReading, setEndMeterReading] = useState<string>('');
+  const [reelsOnStand, setReelsOnStand] = useState<number>(1);
+  const [slitsCount, setSlitsCount] = useState<number>(1);
+  const [meterMode, setMeterMode] = useState<'cuts' | 'odometer'>('cuts');
 
   // Simultaneous Dual Units (Sheets <-> Reams)
   const [actualSheetsInput, setActualSheetsInput] = useState<string>('');
@@ -171,6 +180,13 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
     return availableReels.filter(r => selectedReelIds.has(r.id));
   }, [availableReels, selectedReelIds]);
 
+  // Sync reels on stand with selected reels count
+  useEffect(() => {
+    if (selectedReels.length > 0) {
+      setReelsOnStand(selectedReels.length);
+    }
+  }, [selectedReels.length]);
+
   // Source consumption metrics
   const totalInputWeight = useMemo(() => {
     return selectedReels.reduce((sum, r) => sum + (Number(r.weight) || 0), 0);
@@ -208,14 +224,92 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
     return Math.round((theoreticalSheets / spr) * 100) / 100;
   }, [theoreticalSheets, sheetsPerReam]);
 
+  // Machine Sheeter Output Formulas:
+  // 1 Cut Stroke cuts across all reels mounted on stand and slits across width
+  // Sheets per Cut = Reels on Stand * Slits across Width
+  const sheetsPerCut = useMemo(() => {
+    return Math.max(1, reelsOnStand) * Math.max(1, slitsCount);
+  }, [reelsOnStand, slitsCount]);
+
+  const theoreticalCuts = useMemo(() => {
+    if (theoreticalSheets <= 0 || sheetsPerCut <= 0) return 0;
+    return Math.ceil(theoreticalSheets / sheetsPerCut);
+  }, [theoreticalSheets, sheetsPerCut]);
+
+  const numCutsCount = parseFloat(cutsCountInput) || 0;
+  const machineDerivedSheets = useMemo(() => {
+    return Math.round(numCutsCount * sheetsPerCut);
+  }, [numCutsCount, sheetsPerCut]);
+
+  const machineDerivedReams = useMemo(() => {
+    const spr = sheetsPerReam || 500;
+    return Math.round((machineDerivedSheets / spr) * 100) / 100;
+  }, [machineDerivedSheets, sheetsPerReam]);
+
   // Synchronize actual sheets and reams when theoretical is computed
   useEffect(() => {
     if (theoreticalSheets > 0 && !actualSheetsInput && !actualReamsInput) {
+      if (theoreticalCuts > 0 && !cutsCountInput) {
+        setCutsCountInput(String(theoreticalCuts));
+      }
       setActualSheetsInput(String(theoreticalSheets));
       const spr = sheetsPerReam || 500;
       setActualReamsInput(String(Math.round((theoreticalSheets / spr) * 100) / 100));
     }
-  }, [theoreticalSheets]);
+  }, [theoreticalSheets, theoreticalCuts]);
+
+  // Machine Meter Handlers
+  const handleCutsChange = (val: string) => {
+    setCutsCountInput(val);
+    const cuts = parseFloat(val);
+    if (!isNaN(cuts) && cuts >= 0) {
+      const totalGenSheets = Math.round(cuts * sheetsPerCut);
+      setActualSheetsInput(String(totalGenSheets));
+      const spr = sheetsPerReam || 500;
+      setActualReamsInput(String(Math.round((totalGenSheets / spr) * 100) / 100));
+    }
+  };
+
+  const handleMeterReadingChange = (startVal: string, endVal: string) => {
+    setStartMeterReading(startVal);
+    setEndMeterReading(endVal);
+    const s = parseFloat(startVal);
+    const e = parseFloat(endVal);
+    if (!isNaN(s) && !isNaN(e) && e >= s) {
+      const diff = Math.round(e - s);
+      setCutsCountInput(String(diff));
+      const totalGenSheets = Math.round(diff * sheetsPerCut);
+      setActualSheetsInput(String(totalGenSheets));
+      const spr = sheetsPerReam || 500;
+      setActualReamsInput(String(Math.round((totalGenSheets / spr) * 100) / 100));
+    }
+  };
+
+  const handleReelsOnStandChange = (val: number) => {
+    const r = Math.max(1, val);
+    setReelsOnStand(r);
+    const cuts = parseFloat(cutsCountInput);
+    if (!isNaN(cuts) && cuts > 0) {
+      const perCut = r * Math.max(1, slitsCount);
+      const totalGenSheets = Math.round(cuts * perCut);
+      setActualSheetsInput(String(totalGenSheets));
+      const spr = sheetsPerReam || 500;
+      setActualReamsInput(String(Math.round((totalGenSheets / spr) * 100) / 100));
+    }
+  };
+
+  const handleSlitsCountChange = (val: number) => {
+    const s = Math.max(1, val);
+    setSlitsCount(s);
+    const cuts = parseFloat(cutsCountInput);
+    if (!isNaN(cuts) && cuts > 0) {
+      const perCut = Math.max(1, reelsOnStand) * s;
+      const totalGenSheets = Math.round(cuts * perCut);
+      setActualSheetsInput(String(totalGenSheets));
+      const spr = sheetsPerReam || 500;
+      setActualReamsInput(String(Math.round((totalGenSheets / spr) * 100) / 100));
+    }
+  };
 
   // Dual Unit Handlers (Simultaneous Bi-directional Sync)
   const handleSheetsChange = (val: string) => {
@@ -224,6 +318,9 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
     if (!isNaN(numSheets)) {
       const spr = sheetsPerReam || 500;
       setActualReamsInput(String(Math.round((numSheets / spr) * 100) / 100));
+      if (sheetsPerCut > 0) {
+        setCutsCountInput(String(Math.round(numSheets / sheetsPerCut)));
+      }
     } else {
       setActualReamsInput('');
     }
@@ -234,9 +331,19 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
     const numReams = parseFloat(val);
     if (!isNaN(numReams)) {
       const spr = sheetsPerReam || 500;
-      setActualSheetsInput(String(Math.round(numReams * spr)));
+      const computedSheets = Math.round(numReams * spr);
+      setActualSheetsInput(String(computedSheets));
+      if (sheetsPerCut > 0) {
+        setCutsCountInput(String(Math.round(computedSheets / sheetsPerCut)));
+      }
     } else {
       setActualSheetsInput('');
+    }
+  };
+
+  const handleUseTheoreticalCuts = () => {
+    if (theoreticalCuts > 0) {
+      handleCutsChange(String(theoreticalCuts));
     }
   };
 
@@ -323,6 +430,11 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
         sheetLength: parseFloat(sheetLength) || 70,
         sheetGsm: parseFloat(sheetGsm) || 52,
         sheetsPerReam: sheetsPerReam || 500,
+        startMeterReading: parseFloat(startMeterReading) || 0,
+        endMeterReading: parseFloat(endMeterReading) || 0,
+        cutsCount: numCutsCount,
+        reelsOnStand: reelsOnStand || 1,
+        slitsCount: slitsCount || 1,
         theoreticalSheets,
         theoreticalReams,
         actualSheets: numActualSheets,
@@ -444,6 +556,10 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                   <span className="font-bold text-slate-700 block mb-1">OUTPUT (SHEETS REQUIRED)</span>
                   <div>Target SKU: <span className="font-bold">{skus.find(s => s._id === targetSkuId)?.name || 'Sheets'}</span></div>
                   <div>Cut Size: <span className="font-bold">{sheetWidth} x {sheetLength} cm ({sheetGsm} GSM)</span></div>
+                  <div>Machine Meter: <span className="font-bold font-mono">{cutsCountInput || '0'} Cuts ({reelsOnStand} Reels on Stand × {slitsCount} Slits)</span></div>
+                  {(startMeterReading || endMeterReading) ? (
+                    <div>Odometer: <span className="font-bold font-mono">{startMeterReading || '0'} → {endMeterReading || '0'}</span></div>
+                  ) : null}
                   <div>Theoretical: <span className="font-bold font-mono">{theoreticalSheets} Sheets ({theoreticalReams} Reams)</span></div>
                   <div>Actual Good: <span className="font-bold font-mono text-emerald-700">{numActualSheets} Sheets ({numActualReams} Reams)</span></div>
                 </div>
@@ -721,6 +837,178 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                     </div>
                   </div>
 
+                  {/* Machine Sheeter Cut Meter & Blade Strokes Panel */}
+                  <div className="bg-gradient-to-br from-indigo-50/70 via-blue-50/50 to-slate-50 border border-indigo-200/90 rounded-2xl p-3 space-y-2.5 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Activity className="w-4 h-4 text-indigo-700" />
+                        <div>
+                          <span className="text-xs font-bold text-indigo-950 uppercase tracking-wide block">
+                            Machine Cutting Meter (Knife Strokes)
+                          </span>
+                          <span className="text-[10px] text-slate-500 block">
+                            Derived Sheets = Knife Cuts × Reels on Stand × Slits Across
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-indigo-200/80 text-[10.5px]">
+                        <button
+                          type="button"
+                          onClick={() => setMeterMode('cuts')}
+                          className={`px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
+                            meterMode === 'cuts' ? 'bg-indigo-600 text-white shadow-3xs' : 'text-slate-600 hover:text-indigo-700'
+                          }`}
+                        >
+                          Direct Cuts
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMeterMode('odometer')}
+                          className={`px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
+                            meterMode === 'odometer' ? 'bg-indigo-600 text-white shadow-3xs' : 'text-slate-600 hover:text-indigo-700'
+                          }`}
+                        >
+                          Meter Odometer
+                        </button>
+                      </div>
+                    </div>
+
+                    {meterMode === 'cuts' ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div className="sm:col-span-1">
+                          <label className="text-[10px] font-bold text-indigo-900 uppercase block mb-1">
+                            Knife Cuts (Strokes) *
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              step="1"
+                              value={cutsCountInput}
+                              onChange={e => handleCutsChange(e.target.value)}
+                              placeholder="0"
+                              className="w-full pl-3 pr-12 py-1.5 bg-white border border-indigo-300 rounded-xl text-sm font-black font-mono text-indigo-950 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-3xs"
+                            />
+                            <span className="absolute right-2.5 top-2 text-[10px] font-bold text-indigo-600">
+                              CUTS
+                            </span>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">
+                            Reels on Stand
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={reelsOnStand}
+                            onChange={e => handleReelsOnStandChange(parseInt(e.target.value) || 1)}
+                            className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold font-mono text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">
+                            Slits Across
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={slitsCount}
+                            onChange={e => handleSlitsCountChange(parseInt(e.target.value) || 1)}
+                            className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold font-mono text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          <div>
+                            <label className="text-[10px] font-bold text-indigo-900 uppercase block mb-1">
+                              Start Meter
+                            </label>
+                            <input
+                              type="number"
+                              step="any"
+                              value={startMeterReading}
+                              onChange={e => handleMeterReadingChange(e.target.value, endMeterReading)}
+                              placeholder="0"
+                              className="w-full px-2.5 py-1.5 bg-white border border-indigo-200 rounded-xl text-xs font-bold font-mono text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] font-bold text-indigo-900 uppercase block mb-1">
+                              End Meter
+                            </label>
+                            <input
+                              type="number"
+                              step="any"
+                              value={endMeterReading}
+                              onChange={e => handleMeterReadingChange(startMeterReading, e.target.value)}
+                              placeholder="0"
+                              className="w-full px-2.5 py-1.5 bg-white border border-indigo-200 rounded-xl text-xs font-bold font-mono text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">
+                              Reels on Stand
+                            </label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={reelsOnStand}
+                              onChange={e => handleReelsOnStandChange(parseInt(e.target.value) || 1)}
+                              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold font-mono text-slate-800"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">
+                              Slits Across
+                            </label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={slitsCount}
+                              onChange={e => handleSlitsCountChange(parseInt(e.target.value) || 1)}
+                              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold font-mono text-slate-800"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[11px] bg-indigo-100/50 px-2.5 py-1 rounded-lg text-indigo-900 font-mono">
+                          <span>Meter Stroke Difference: <strong>{cutsCountInput || 0} cuts</strong></span>
+                          <span>1 stroke = {sheetsPerCut} sheets</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Live Cut Calculation Display */}
+                    <div className="flex items-center justify-between flex-wrap gap-2 pt-1 border-t border-indigo-100 text-[11px]">
+                      <div className="flex items-center gap-2 text-indigo-900">
+                        <span className="font-semibold text-slate-600">Machine Output:</span>
+                        <span className="font-mono bg-white px-2 py-0.5 rounded border border-indigo-200/80 font-bold">
+                          {numCutsCount} cuts × {sheetsPerCut} sh/cut = <span className="text-indigo-700">{machineDerivedSheets.toLocaleString()} Sheets</span> ({machineDerivedReams} Reams)
+                        </span>
+                      </div>
+
+                      {theoreticalCuts > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleUseTheoreticalCuts}
+                          className="text-[10.5px] text-indigo-700 hover:text-indigo-950 font-bold underline flex items-center gap-1 cursor-pointer"
+                          title="Auto-fill machine cuts using theoretical formula"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          <span>Use Theo Cuts: {theoreticalCuts.toLocaleString()}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Simultaneous Dual-Unit Actual Production Inputs */}
                   <div className="bg-emerald-50/40 border border-emerald-200/80 rounded-2xl p-3 space-y-2">
                     <div className="flex items-center justify-between">
@@ -784,7 +1072,14 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                     </div>
 
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-slate-500">Actual Live Yield:</span>
+                      <span className="font-semibold text-slate-500">Machine Meter Output:</span>
+                      <span className="font-mono font-bold text-indigo-700">
+                        {machineDerivedSheets.toLocaleString()} Sheets ({numCutsCount} cuts @ {reelsOnStand}R)
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-500">Actual Good Stock In:</span>
                       <span className="font-mono font-bold text-emerald-700">
                         {numActualSheets.toLocaleString()} Sheets ({numActualReams} Reams)
                       </span>

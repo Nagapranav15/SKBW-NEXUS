@@ -502,6 +502,11 @@ export interface CuttingSlipV2 {
   sheetLength: number;
   sheetGsm: number;
   sheetsPerReam: number;
+  startMeterReading?: number;
+  endMeterReading?: number;
+  cutsCount?: number;
+  reelsOnStand?: number;
+  slitsCount?: number;
   theoreticalSheets: number;
   theoreticalReams: number;
   actualSheets: number;
