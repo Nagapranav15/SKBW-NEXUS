@@ -443,11 +443,13 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      size="max-w-[1360px]"
-      maxWidth="max-w-[1360px]"
+      size="max-w-[98vw] 2xl:max-w-[1780px]"
+      maxWidth="max-w-[98vw] 2xl:max-w-[1780px]"
+      className="max-h-[96vh] h-[95vh] w-full"
+      padding="p-0"
       hideCloseButton={true}
     >
-      <div className="p-5 space-y-4 max-h-[92vh] flex flex-col">
+      <div className="p-4 sm:p-5 space-y-3.5 h-full max-h-[95vh] flex flex-col">
         {/* Modal Header */}
         <div className="flex items-center justify-between pb-3 border-b border-gray-100 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
@@ -485,9 +487,9 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
         </div>
 
         {/* 3-Column Body Layout */}
-        <div className="grid grid-cols-12 gap-4 flex-1 overflow-hidden min-h-[540px]">
-          {/* Column 1: Products Selector List (3 cols) */}
-          <div className="col-span-3 border border-gray-200 rounded-2xl p-3 flex flex-col gap-2.5 bg-gray-50/40 overflow-hidden">
+        <div className="flex gap-3.5 flex-1 overflow-hidden min-h-[560px]">
+          {/* Column 1: Products Selector List */}
+          <div className="w-[360px] xl:w-[410px] 2xl:w-[450px] shrink-0 border border-gray-200 rounded-2xl p-3 flex flex-col gap-2.5 bg-gray-50/40 overflow-hidden">
             {/* Domain Switcher: Finished Goods vs Semi-Finished Materials */}
             <div className="flex items-center p-1 bg-gray-200/70 rounded-xl gap-1 shrink-0 select-none">
               <button
@@ -694,16 +696,18 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <div className="font-bold text-xs text-gray-900 truncate">{prod.name}</div>
+                        <div className="font-bold text-xs text-gray-900 leading-snug line-clamp-2" title={prod.name}>
+                          {prod.name}
+                        </div>
                         <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
                           <span className="text-[10px] text-gray-400 font-mono">{prod.skuCode}</span>
                           {(prod.title || prod.brand) && (
-                            <span className="text-[9.5px] text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded font-medium border border-emerald-200/60 truncate max-w-[100px]" title={prod.title || prod.brand}>
+                            <span className="text-[9.5px] text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded font-medium border border-emerald-200/60 truncate max-w-[140px]" title={prod.title || prod.brand}>
                               {prod.title || prod.brand}
                             </span>
                           )}
                           {prod.ruleType && (
-                            <span className="text-[9.5px] text-blue-800 bg-blue-50 px-1.5 py-0.5 rounded font-medium border border-blue-200/60 truncate max-w-[100px]" title={prod.ruleType}>
+                            <span className="text-[9.5px] text-blue-800 bg-blue-50 px-1.5 py-0.5 rounded font-medium border border-blue-200/60 truncate max-w-[140px]" title={prod.ruleType}>
                               {prod.ruleType}
                             </span>
                           )}
@@ -763,8 +767,8 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
             </div>
           </div>
 
-          {/* Column 2: Active Product Recipe & Costing Builder (6 cols) */}
-          <div className="col-span-6 border border-slate-200/90 rounded-2xl p-3 flex flex-col gap-2.5 bg-white overflow-hidden shadow-2xs">
+          {/* Column 2: Active Product Recipe & Costing Builder */}
+          <div className="flex-1 min-w-[540px] border border-slate-200/90 rounded-2xl p-3 flex flex-col gap-2.5 bg-white overflow-hidden shadow-2xs">
             {activeBomProduct ? (
               <>
                 {/* Active Product Header Bar */}
@@ -1398,8 +1402,8 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
             )}
           </div>
 
-          {/* Column 3: Materials Catalog & Cost Summary Panel (3 cols) */}
-          <div className="col-span-3 border border-gray-200 rounded-2xl p-3 flex flex-col gap-3 bg-gray-50/40 overflow-hidden">
+          {/* Column 3: Materials Catalog & Cost Summary Panel */}
+          <div className="w-[340px] xl:w-[390px] 2xl:w-[430px] shrink-0 border border-gray-200 rounded-2xl p-3 flex flex-col gap-3 bg-gray-50/40 overflow-hidden">
             <div className="relative shrink-0">
               <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
               <input
@@ -1451,11 +1455,11 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                           : 'bg-white border-gray-200 hover:border-blue-300 text-gray-800 shadow-2xs'
                       }`}
                     >
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className={isAdded ? 'text-emerald-600 font-bold' : 'text-blue-600 font-bold'}>
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1 pr-1">
+                        <span className={isAdded ? 'text-emerald-600 font-bold shrink-0' : 'text-blue-600 font-bold shrink-0'}>
                           {isAdded ? '✓' : '+'}
                         </span>
-                        <span className="truncate text-[11px]">{mat.name}</span>
+                        <span className="text-[11.5px] leading-snug line-clamp-2" title={mat.name}>{mat.name}</span>
                       </div>
                       <span className="text-[10px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">
                         {Number((mat as any).presentStock || 0)}
@@ -1504,11 +1508,11 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                           : 'bg-white border-gray-200 hover:border-blue-300 text-gray-800 shadow-2xs'
                       }`}
                     >
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className={isAdded ? 'text-emerald-600 font-bold' : 'text-blue-600 font-bold'}>
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1 pr-1">
+                        <span className={isAdded ? 'text-emerald-600 font-bold shrink-0' : 'text-blue-600 font-bold shrink-0'}>
                           {isAdded ? '✓' : '+'}
                         </span>
-                        <span className="truncate text-[11px]">{semi.name}</span>
+                        <span className="text-[11.5px] leading-snug line-clamp-2" title={semi.name}>{semi.name}</span>
                       </div>
                       <span className="text-[10px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">
                         {Number((semi as any).presentStock || 0)}

@@ -65,8 +65,8 @@ export const Modal: React.FC<ModalProps> = ({
       />
 
       {/* Modal Dialog Content Container */}
-      <div className="fixed inset-0 overflow-y-auto flex items-center justify-center p-3 sm:p-6 pointer-events-none">
-        <div className={`relative bg-white rounded-2xl shadow-2xl shadow-slate-950/20 border border-slate-200 flex flex-col w-full ${modalSize} max-h-[90vh] overflow-hidden animate-modalPop pointer-events-auto ${className}`}>
+      <div className="fixed inset-0 overflow-y-auto flex items-center justify-center p-2 sm:p-4 lg:p-6 pointer-events-none">
+        <div className={`relative bg-white rounded-2xl shadow-2xl shadow-slate-950/20 border border-slate-200 flex flex-col w-full ${modalSize} ${className.includes('max-h-') ? '' : 'max-h-[90vh]'} overflow-hidden animate-modalPop pointer-events-auto ${className}`}>
           {title && (
             <div className="px-6 py-4 border-b border-slate-100 bg-white flex justify-between items-center shrink-0">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
