@@ -704,7 +704,70 @@ exports.getMaterialRates = async (req, res) => {
         });
       });
 
-      const standardRate = Number(sku.purchasePrice || (sku).costPrice || (sku).rate || 0);
+      // Check if this SKU was produced by any Production Order (for Semi-Finished or Finished Goods)
+      let productionRate = 0;
+      try {
+        const prodOrders = await ProductionOrder.find({
+          company: companyObjId,
+          $or: [
+            { itemId: sku._id },
+            { itemCode: sku.skuCode },
+            { itemName: sku.name }
+          ],
+          status: { $ne: "Cancelled" }
+        }).sort({ createdAt: -1 }).lean();
+
+        for (const po of prodOrders) {
+          const cs = po.costSummary || {};
+          const isGbl = (sku.unit || '').toUpperCase() === 'GBL' || (po.plannedUom || '').toUpperCase() === 'GBL';
+          let unitRate = 0;
+          if (isGbl && cs.costPerGbl && Number(cs.costPerGbl) > 0) {
+            unitRate = Number(cs.costPerGbl);
+          } else if (!isGbl && cs.costPerPiece && Number(cs.costPerPiece) > 0) {
+            unitRate = Number(cs.costPerPiece);
+          } else if (cs.totalProductionCost && Number(cs.totalProductionCost) > 0) {
+            const divisor = isGbl ? (po.plannedQty || 1) : (po.plannedPcs || po.plannedQty || 1);
+            unitRate = Number(cs.totalProductionCost) / divisor;
+          }
+          if (unitRate > 0) {
+            productionRate = Math.round(unitRate * 100) / 100;
+            break;
+          }
+        }
+      } catch (e) {
+        // Non-critical
+      }
+
+      // Also check if any active batches in batchBalances were generated from production orders
+      for (const b of batchBalances) {
+        if (b.batchNumber && !batchPriceMap.has(b.batchNumber)) {
+          const po = await ProductionOrder.findOne({
+            company: companyObjId,
+            $or: [
+              { orderNumber: b.batchNumber },
+              { "finishedGoodsBatch.batchNo": b.batchNumber }
+            ]
+          }).lean();
+          if (po) {
+            const cs = po.costSummary || {};
+            const isGbl = (sku.unit || '').toUpperCase() === 'GBL' || (po.plannedUom || '').toUpperCase() === 'GBL';
+            let prodRate = 0;
+            if (isGbl && cs.costPerGbl && Number(cs.costPerGbl) > 0) {
+              prodRate = Number(cs.costPerGbl);
+            } else if (!isGbl && cs.costPerPiece && Number(cs.costPerPiece) > 0) {
+              prodRate = Number(cs.costPerPiece);
+            } else if (cs.totalProductionCost && Number(cs.totalProductionCost) > 0) {
+              const divisor = isGbl ? (po.plannedQty || 1) : (po.plannedPcs || po.plannedQty || 1);
+              prodRate = Number(cs.totalProductionCost) / divisor;
+            }
+            if (prodRate > 0) {
+              batchPriceMap.set(b.batchNumber, Math.round(prodRate * 100) / 100);
+            }
+          }
+        }
+      }
+
+      const standardRate = Number(sku.purchasePrice || (sku).costPrice || (sku).rate || productionRate || 0);
 
       // FIFO: Pick the unit price of the earliest active batch
       let fifoRate = 0;
@@ -714,7 +777,7 @@ exports.getMaterialRates = async (req, res) => {
         const earliestBatch = batchBalances[0];
         const bNum = earliestBatch.batchNumber;
         const bRate = (bNum && batchPriceMap.has(bNum)) ? batchPriceMap.get(bNum) : 0;
-        fifoRate = bRate > 0 ? bRate : (allPurchasedItems[0]?.price || standardRate);
+        fifoRate = bRate > 0 ? bRate : (allPurchasedItems[0]?.price || standardRate || productionRate);
         fifoBatchInfo = {
           batchNumber: bNum || 'LOT-01',
           date: earliestBatch.firstInDate ? new Date(earliestBatch.firstInDate).toLocaleDateString('en-GB') : undefined,
@@ -730,7 +793,7 @@ exports.getMaterialRates = async (req, res) => {
           rate: fifoRate
         };
       } else {
-        fifoRate = standardRate;
+        fifoRate = standardRate || productionRate;
       }
 
       // Average of Purchase Batch Orders (Weighted Average)
@@ -742,19 +805,19 @@ exports.getMaterialRates = async (req, res) => {
         batchBalances.forEach(b => {
           const bRate = (b.batchNumber && batchPriceMap.has(b.batchNumber)) 
             ? batchPriceMap.get(b.batchNumber) 
-            : (allPurchasedItems.find(it => it.invoiceNumber === b.batchNumber)?.price || standardRate);
+            : (allPurchasedItems.find(it => it.invoiceNumber === b.batchNumber)?.price || standardRate || productionRate);
           if (bRate > 0) {
             totalBatchQty += b.onHand;
             totalBatchValue += (b.onHand * bRate);
           }
         });
-        avgRate = totalBatchQty > 0 ? Math.round((totalBatchValue / totalBatchQty) * 100) / 100 : standardRate;
+        avgRate = totalBatchQty > 0 ? Math.round((totalBatchValue / totalBatchQty) * 100) / 100 : (standardRate || productionRate);
       } else if (allPurchasedItems.length > 0) {
         const sumQty = allPurchasedItems.reduce((s, it) => s + it.quantity, 0);
         const sumVal = allPurchasedItems.reduce((s, it) => s + (it.quantity * it.price), 0);
-        avgRate = sumQty > 0 ? Math.round((sumVal / sumQty) * 100) / 100 : standardRate;
+        avgRate = sumQty > 0 ? Math.round((sumVal / sumQty) * 100) / 100 : (standardRate || productionRate);
       } else {
-        avgRate = standardRate;
+        avgRate = standardRate || productionRate;
       }
 
       // 3. Fetch last-used rate from most recent production order that used this SKU as a material
@@ -778,13 +841,16 @@ exports.getMaterialRates = async (req, res) => {
         // Non-critical: silently ignore, fallback to 0
       }
 
+      const effectiveRate = avgRate > 0 ? avgRate : (productionRate > 0 ? productionRate : (lastProductionRate > 0 ? lastProductionRate : standardRate));
+
       rates[skuIdStr] = {
         skuId: skuIdStr,
         skuCode: sku.skuCode,
         skuName: sku.name,
-        standardRate,
-        avgRate: avgRate > 0 ? avgRate : standardRate,
-        fifoRate: fifoRate > 0 ? fifoRate : standardRate,
+        standardRate: standardRate || productionRate,
+        productionRate: productionRate > 0 ? productionRate : 0,
+        avgRate: effectiveRate,
+        fifoRate: fifoRate > 0 ? fifoRate : effectiveRate,
         fifoBatchInfo,
         batchCount: batchBalances.length || allPurchasedItems.length,
         lastProductionRate: lastProductionRate > 0 ? lastProductionRate : 0

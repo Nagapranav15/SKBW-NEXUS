@@ -315,6 +315,7 @@ exports.createPurchaseInvoice = async (req, res, next) => {
             reels: reelsGroup,
             createdBy: toObjectId(req.user?.id) || companyObjId,
             company: companyObjId,
+            createdAt: invoice.createdAt || invoice.invoiceDate || new Date(),
             status: "Posted"
           });
         }
@@ -343,6 +344,7 @@ exports.createPurchaseInvoice = async (req, res, next) => {
             reels: [],
             createdBy: toObjectId(req.user?.id) || companyObjId,
             company: companyObjId,
+            createdAt: invoice.createdAt || invoice.invoiceDate || new Date(),
             status: "Posted"
           });
         }
@@ -368,6 +370,7 @@ exports.createPurchaseInvoice = async (req, res, next) => {
           reels: [],
           createdBy: toObjectId(req.user?.id) || companyObjId,
           company: companyObjId,
+          createdAt: invoice.createdAt || invoice.invoiceDate || new Date(),
           status: "Posted"
         });
       }
@@ -908,6 +911,7 @@ exports.editPurchaseInvoice = async (req, res, next) => {
             reels: reelsGroup,
             createdBy: toObjectId(req.user?.id) || companyObjId,
             company: companyObjId,
+            createdAt: invoice.createdAt || (invoice.invoiceDate ? new Date(invoice.invoiceDate) : new Date()),
             status: "Posted"
           });
         }
@@ -936,6 +940,7 @@ exports.editPurchaseInvoice = async (req, res, next) => {
             reels: [],
             createdBy: toObjectId(req.user?.id) || companyObjId,
             company: companyObjId,
+            createdAt: invoice.createdAt || (invoice.invoiceDate ? new Date(invoice.invoiceDate) : new Date()),
             status: "Posted"
           });
         }
@@ -961,6 +966,7 @@ exports.editPurchaseInvoice = async (req, res, next) => {
           reels: [],
           createdBy: toObjectId(req.user?.id) || companyObjId,
           company: companyObjId,
+          createdAt: invoice.createdAt || (invoice.invoiceDate ? new Date(invoice.invoiceDate) : new Date()),
           status: "Posted"
         });
       }

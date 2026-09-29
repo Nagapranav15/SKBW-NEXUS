@@ -441,6 +441,8 @@ export interface MaterialRateInfo {
   batchCount: number;
   /** Rate used in the most recent production order that included this SKU */
   lastProductionRate?: number;
+  /** Production cost calculated from finished/semi-finished goods production orders */
+  productionRate?: number;
 }
 
 export const getProductionMaterialRates = async (

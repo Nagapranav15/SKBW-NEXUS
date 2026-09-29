@@ -704,7 +704,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
       'Batch No': m.batchNumber || '',
       [`Qty (${unit})`]: m.quantity,
       [`Qty (${altUnit})`]: m.quantity * conversionFactor,
-      [`Balance (${unit})`]: m.runningBalance || 0,
+      [`Balance (${unit})`]: m.runningBalance !== undefined && m.runningBalance !== null ? m.runningBalance : (totalStock || 0),
       'User': m.userName || '',
       'Remarks': m.remarks || ''
     }));
@@ -1883,7 +1883,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                                 </>
                               );
                             })()}
-                            <td className="p-3 text-right font-mono font-black text-gray-900">{m.runningBalance || totalStock}</td>
+                            <td className="p-3 text-right font-mono font-black text-gray-900">{m.runningBalance !== undefined && m.runningBalance !== null ? m.runningBalance : totalStock}</td>
                             <td className="p-3 text-gray-700">{m.userName || 'System'}</td>
                             <td className="p-3 text-gray-500 italic max-w-[150px] truncate" title={m.remarks}>
                               {m.remarks || '-'}

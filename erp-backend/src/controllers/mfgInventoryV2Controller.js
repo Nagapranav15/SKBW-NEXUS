@@ -1898,7 +1898,7 @@ exports.getBalances = async (req, res, next) => {
           }
         }
       },
-      { $match: { onHand: { $gt: 0.0001 } } },
+      { $match: { $expr: { $gt: [{ $abs: "$onHand" }, 0.0001] } } },
       {
         $lookup: {
           localField: "skuId",
@@ -2783,7 +2783,7 @@ exports.getSkuStockDetails = async (req, res, next) => {
           onHand: { $subtract: ["$qtyIn", "$qtyOut"] }
         }
       },
-      { $match: { onHand: { $gt: 0.0001 } } },
+      { $match: { $expr: { $gt: [{ $abs: "$onHand" }, 0.0001] } } },
       {
         $lookup: {
           from: WarehouseLocationV2.collection.name,
@@ -3083,10 +3083,16 @@ exports.getSkuStockDetails = async (req, res, next) => {
       const rawType = m.transactionType || 'Stock Transfer';
       let normalizedType = rawType;
       let prefix = 'TRF';
-      if (rawType.includes('Transfer')) {
+      if (rawType.includes('Transfer') || m.referenceType === 'Transfer') {
         normalizedType = 'Stock Transfer';
         prefix = 'TRF';
-      } else if (rawType.includes('Production') || rawType.includes('Purchase') || rawType.includes('Receipt')) {
+      } else if (rawType.includes('Purchase') || m.referenceType === 'PurchaseInvoice') {
+        normalizedType = 'Purchase Inward';
+        prefix = 'PB';
+      } else if (m.direction === 'OUT' && (rawType.includes('Production') || rawType.includes('Consumption') || m.referenceType === 'ProductionOrder')) {
+        normalizedType = 'Production Consumption';
+        prefix = 'PO';
+      } else if (m.direction === 'IN' && (rawType.includes('Production') || rawType.includes('Receipt') || m.referenceType === 'ProductionOrder')) {
         normalizedType = 'Production Receipt';
         prefix = 'PR';
       } else if (rawType.includes('Dispatch') || rawType.includes('Sales')) {
@@ -3130,7 +3136,7 @@ exports.getSkuStockDetails = async (req, res, next) => {
         qtyIn: isIncoming ? m.quantity : 0,
         qtyOut: !isIncoming ? m.quantity : 0,
         quantity: delta,
-        runningBalance: Math.max(0, runningBalance),
+        runningBalance: Math.round(runningBalance * 1000) / 1000,
         remarks: m.remarks || '',
         userName: m.createdBy?.name || 'System'
       };
@@ -3237,8 +3243,21 @@ exports.getSkuStockDetails = async (req, res, next) => {
       }
     });
 
-    // 6. Overall Totals & Valuation
-    const onHandTotal = populatedLocations.reduce((sum, l) => sum + (l.onHand || 0), 0);
+    // 6. Overall Totals & Valuation: Calculated directly from the net sum of ledger transactions
+    // so onHand always tallies 100% with the movements ledger and stock overview.
+    const totalLedgerBalance = await InventoryLedger.aggregate([
+      { $match: ledgerMatchFilter },
+      {
+        $group: {
+          _id: null,
+          qtyIn: { $sum: { $cond: [{ $eq: ["$direction", "IN"] }, "$quantity", 0] } },
+          qtyOut: { $sum: { $cond: [{ $eq: ["$direction", "OUT"] }, "$quantity", 0] } }
+        }
+      }
+    ]);
+    const onHandTotal = totalLedgerBalance.length > 0
+      ? Math.round((totalLedgerBalance[0].qtyIn - totalLedgerBalance[0].qtyOut) * 1000) / 1000
+      : populatedLocations.reduce((sum, l) => sum + (l.onHand || 0), 0);
     const availableTotal = Math.max(0, onHandTotal - totalReserved);
     const totalBatchesVal = batchesWithCosting.reduce((sum, b) => sum + (b.value || 0), 0);
     const unitPrice = Number(sku.costPrice || sku.rate || (batchesWithCosting.length > 0 ? totalBatchesVal / onHandTotal : 0) || 0);

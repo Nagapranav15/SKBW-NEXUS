@@ -63,6 +63,8 @@ interface MaterialRow {
   computedFifoRate?: number;
   /** Rate used in the most recently created production order for this material */
   lastProductionRate?: number;
+  /** Production cost calculated from finished/semi-finished goods production orders */
+  productionRate?: number;
   fifoBatchInfo?: {
     batchNumber: string;
     date?: string;
@@ -1017,28 +1019,23 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         const rateInfo = sId ? ratesMap[sId] : null;
         if (!rateInfo) return m;
 
-        // lastProductionRate: the rate this material was used at in the most recent
-        // production order — serves as the carry-forward default.
+        const prodRate = Number(rateInfo.productionRate) || 0;
         const lastProdRate = Number(rateInfo.lastProductionRate) || 0;
 
         const mode = modeToApply || m.rateMode || globalRateMode;
         let finalRate = m.rate;
         if (mode === 'avg_purchase') {
-          // Prefer live avg from active purchase batches; if not available, carry
-          // forward from last production; then fall back to standard rate.
           finalRate = rateInfo.avgRate > 0
             ? rateInfo.avgRate
-            : (lastProdRate > 0 ? lastProdRate : (m.rate > 0 ? m.rate : rateInfo.standardRate));
+            : (prodRate > 0 ? prodRate : (lastProdRate > 0 ? lastProdRate : (m.rate > 0 ? m.rate : rateInfo.standardRate)));
         } else if (mode === 'fifo') {
           finalRate = rateInfo.fifoRate > 0
             ? rateInfo.fifoRate
-            : (lastProdRate > 0 ? lastProdRate : (m.rate > 0 ? m.rate : rateInfo.standardRate));
+            : (prodRate > 0 ? prodRate : (lastProdRate > 0 ? lastProdRate : (m.rate > 0 ? m.rate : rateInfo.standardRate)));
         } else if (mode === 'custom') {
-          // Custom mode: use existing row rate if already set; otherwise seed with
-          // last production rate so users don't start from zero.
           finalRate = m.rate > 0
             ? m.rate
-            : (lastProdRate > 0 ? lastProdRate : (rateInfo.avgRate || rateInfo.standardRate || 0));
+            : (prodRate > 0 ? prodRate : (lastProdRate > 0 ? lastProdRate : (rateInfo.avgRate || rateInfo.standardRate || 0)));
         }
 
         return {
@@ -1049,6 +1046,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           computedAvgRate: rateInfo.avgRate,
           computedFifoRate: rateInfo.fifoRate,
           lastProductionRate: lastProdRate,
+          productionRate: prodRate,
           fifoBatchInfo: rateInfo.fifoBatchInfo,
           batchCount: rateInfo.batchCount,
           amount: Math.round(m.requiredQty * finalRate * 100) / 100
@@ -2337,13 +2335,22 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                                 }
                               />
                             </div>
-                            {/* Carry-forward badge: shown when avg/fifo mode fell back to last production rate */}
+                            {/* Cost origin badges: shown to clarify where the rate came from */}
+                            {row.productionRate != null && row.productionRate > 0 && (
+                              <span
+                                className="text-[9px] text-blue-600 font-semibold leading-none"
+                                title={`Dynamic production costing from Stock & Inventory: ₹${row.productionRate.toFixed(2)}/${row.uom || 'Unit'}`}
+                              >
+                                🏭 prod. cost
+                              </span>
+                            )}
                             {row.lastProductionRate != null && row.lastProductionRate > 0 &&
+                              (!row.productionRate || row.productionRate === 0) &&
                               row.rateMode !== 'custom' &&
                               row.computedAvgRate === 0 && row.computedFifoRate === 0 && (
                               <span
                                 className="text-[9px] text-purple-600 font-semibold leading-none"
-                                title={`No active purchase batches found. Rate carried forward from last production order (₹${row.lastProductionRate.toFixed(2)}).`}
+                                title={`Rate carried forward from last production order (₹${row.lastProductionRate.toFixed(2)}).`}
                               >
                                 ↩ last prod.
                               </span>
