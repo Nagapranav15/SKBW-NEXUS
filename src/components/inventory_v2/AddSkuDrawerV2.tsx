@@ -760,7 +760,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   };
 
   // BOM Recipe Materials State (Empty by default)
-  const [bomItems, setBomItems] = useState<{ id: string; name: string; qty: string; uom: string; inStock: number; notes: string }[]>([]);
+  const [bomItems, setBomItems] = useState<{ id: string; skuId?: string; skuCode?: string; name: string; qty: string; uom: string; auom?: string; altUnit?: string; inStock: number; notes: string }[]>([]);
 
   // Production Process Steps State
   const [processSteps, setProcessSteps] = useState<{ id: string; stepName: string; machine: string }[]>([]);
@@ -768,7 +768,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
   const handleAddBomItem = () => {
     setBomItems(prev => [
       ...prev,
-      { id: 'bom_' + Date.now(), name: '', qty: '', uom: form.unit || 'Kg', inStock: 0, notes: '' }
+      { id: 'bom_' + Date.now(), name: '', qty: '', uom: form.unit || 'Kg', auom: '', altUnit: '', inStock: 0, notes: '' }
     ]);
   };
 
@@ -1245,6 +1245,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
             name: currentName,
             qty: String(b.qty ?? b.quantity ?? ''),
             uom: matchedSku?.unit || b.uom || b.unit || 'Kg',
+            auom: b.auom || b.altUnit || matchedSku?.altUnit || '',
+            altUnit: b.auom || b.altUnit || matchedSku?.altUnit || '',
             inStock: Number((matchedSku as any)?.openingStock ?? b.inStock ?? 0),
             notes: b.notes || ''
           };
@@ -2633,9 +2635,13 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                 basisUnit: form.unit || 'Pcs',
                                 lines: bomItems.map(item => ({
                                   id: item.id,
+                                  skuId: item.skuId,
+                                  skuCode: item.skuCode,
                                   name: item.name,
                                   qty: item.qty,
                                   uom: item.uom,
+                                  auom: item.auom || item.altUnit || '',
+                                  altUnit: item.auom || item.altUnit || '',
                                   inStock: item.inStock,
                                   notes: item.notes
                                 })),
@@ -2644,14 +2650,21 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                             }}
                             onPaste={(copied, mode) => {
                               if (mode === 'replace') {
-                                setBomItems(copied.lines.map((l, i) => ({
-                                  id: `b-paste-${Date.now()}-${i}`,
-                                  name: l.name,
-                                  qty: String(l.qty || ''),
-                                  uom: l.uom || form.unit || 'Kg',
-                                  inStock: l.inStock ?? 0,
-                                  notes: l.notes || ''
-                                })));
+                                setBomItems(copied.lines.map((l, i) => {
+                                  const matched = (allSkusList || []).find(s => (l.skuId && String(s._id) === String(l.skuId)) || (l.skuCode && s.skuCode === l.skuCode) || (l.name && s.name === l.name));
+                                  return {
+                                    id: `b-paste-${Date.now()}-${i}`,
+                                    skuId: l.skuId || matched?._id,
+                                    skuCode: l.skuCode || matched?.skuCode,
+                                    name: l.name,
+                                    qty: String(l.qty || ''),
+                                    uom: l.uom || matched?.unit || form.unit || 'Kg',
+                                    auom: l.auom || (l as any).altUnit || matched?.altUnit || '',
+                                    altUnit: l.auom || (l as any).altUnit || matched?.altUnit || '',
+                                    inStock: l.inStock ?? 0,
+                                    notes: l.notes || ''
+                                  };
+                                }));
                                 if (copied.basis) {
                                   setForm(prev => ({ ...prev, recipeYieldQty: String(copied.basis) }));
                                 }
@@ -2659,14 +2672,21 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                 const existingNames = new Set(bomItems.map(i => (i.name || '').toLowerCase().trim()));
                                 const toAdd = copied.lines
                                   .filter(l => !existingNames.has((l.name || '').toLowerCase().trim()))
-                                  .map((l, i) => ({
-                                    id: `b-merge-${Date.now()}-${i}`,
-                                    name: l.name,
-                                    qty: String(l.qty || ''),
-                                    uom: l.uom || form.unit || 'Kg',
-                                    inStock: l.inStock ?? 0,
-                                    notes: l.notes || ''
-                                  }));
+                                  .map((l, i) => {
+                                    const matched = (allSkusList || []).find(s => (l.skuId && String(s._id) === String(l.skuId)) || (l.skuCode && s.skuCode === l.skuCode) || (l.name && s.name === l.name));
+                                    return {
+                                      id: `b-merge-${Date.now()}-${i}`,
+                                      skuId: l.skuId || matched?._id,
+                                      skuCode: l.skuCode || matched?.skuCode,
+                                      name: l.name,
+                                      qty: String(l.qty || ''),
+                                      uom: l.uom || matched?.unit || form.unit || 'Kg',
+                                      auom: l.auom || (l as any).altUnit || matched?.altUnit || '',
+                                      altUnit: l.auom || (l as any).altUnit || matched?.altUnit || '',
+                                      inStock: l.inStock ?? 0,
+                                      notes: l.notes || ''
+                                    };
+                                  });
                                 if (bomItems.length === 0 && copied.basis) {
                                   setForm(prev => ({ ...prev, recipeYieldQty: String(copied.basis) }));
                                 }
@@ -2730,6 +2750,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                 <th className="py-2 px-2">ITEM</th>
                                 <th className="py-2 px-2 w-24 text-center">QTY</th>
                                 <th className="py-2 px-2 w-20 text-center">UOM</th>
+                                <th className="py-2 px-2 w-20 text-center">AUOM</th>
                                 <th className="py-2 px-2 w-20 text-center">IN STOCK</th>
                                 <th className="py-2 px-1 w-8 text-center"></th>
                               </tr>
@@ -2747,6 +2768,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                           updateBomItem(item.id, 'skuId', matchedSku._id);
                                           updateBomItem(item.id, 'skuCode', matchedSku.skuCode);
                                           updateBomItem(item.id, 'uom', matchedSku.unit || 'Kg');
+                                          updateBomItem(item.id, 'auom', matchedSku.altUnit || '');
+                                          updateBomItem(item.id, 'altUnit', matchedSku.altUnit || '');
                                           updateBomItem(item.id, 'inStock', (matchedSku as any).openingStock ?? 0);
                                         }
                                       }}
@@ -2769,6 +2792,19 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                       onChange={(e) => updateBomItem(item.id, 'uom', e.target.value)}
                                       className="w-full px-1.5 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 bg-white text-center uppercase"
                                       placeholder="UOM"
+                                    />
+                                  </td>
+                                  <td className="py-2 px-2 text-center">
+                                    <input
+                                      type="text"
+                                      value={item.auom || item.altUnit || ''}
+                                      onChange={(e) => {
+                                        updateBomItem(item.id, 'auom', e.target.value);
+                                        updateBomItem(item.id, 'altUnit', e.target.value);
+                                      }}
+                                      className="w-full px-1.5 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 bg-white text-center uppercase"
+                                      placeholder="AUOM"
+                                      title="Alternate Unit of Measurement"
                                     />
                                   </td>
                                   <td className="py-2 px-2 text-center text-gray-500 font-mono">{item.inStock}</td>

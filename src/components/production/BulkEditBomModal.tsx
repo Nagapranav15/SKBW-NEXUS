@@ -19,6 +19,8 @@ export interface BomRecipeItem {
   name: string;
   qty: number;
   uom: string;
+  auom?: string;
+  altUnit?: string;
   inStock: number;
   notes?: string;
 }
@@ -28,6 +30,7 @@ export interface BulkEditBomModalProps {
   onClose: () => void;
   companyId: string;
   initialSelectedSkuId?: string;
+  initialTab?: 'products' | 'semi';
   onSaved?: (updatedSku: SkuV2) => void;
 }
 
@@ -36,10 +39,12 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
   onClose,
   companyId,
   initialSelectedSkuId,
+  initialTab,
   onSaved
 }) => {
   const [skus, setSkus] = useState<SkuV2[]>([]);
   const [loading, setLoading] = useState(false);
+  const [activeDomainTab, setActiveDomainTab] = useState<'products' | 'semi'>(initialTab || 'products');
   const [activeBomProduct, setActiveBomProduct] = useState<SkuV2 | null>(null);
   const [activeRecipeItems, setActiveRecipeItems] = useState<BomRecipeItem[]>([]);
   const [activeAdditionalCosts, setActiveAdditionalCosts] = useState<AdditionalCostRow[]>([]);
@@ -78,6 +83,12 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
         if (initialSelectedSkuId) {
           const match = list.find(s => s._id === initialSelectedSkuId);
           if (match) {
+            const classif = getItemClassification(match);
+            if (classif === 'semi') {
+              setActiveDomainTab('semi');
+            } else if (classif === 'products') {
+              setActiveDomainTab('products');
+            }
             handleSelectBomProduct(match, list);
           }
         }
@@ -138,27 +149,32 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
   const semiList = useMemo(() => skus.filter(s => getItemClassification(s) === 'semi'), [skus]);
   const rawAndSemiMaterials = useMemo(() => [...materialsList, ...semiList], [materialsList, semiList]);
 
-  // Filter & Sort Products
+  // Currently active domain list (Finished Goods vs Semi-Finished)
+  const activeList = useMemo(() => {
+    return activeDomainTab === 'semi' ? semiList : productsList;
+  }, [activeDomainTab, semiList, productsList]);
+
+  // Filter & Sort Items in active list
   const buildBomsAvailableTitles = useMemo(() => {
     const set = new Set<string>();
-    productsList.forEach(p => {
-      const val = (p.title || p.brand || '').trim();
+    activeList.forEach(p => {
+      const val = (p.title || p.brand || p.category || '').trim();
       if (val) set.add(val);
     });
     return Array.from(set).sort();
-  }, [productsList]);
+  }, [activeList]);
 
   const buildBomsAvailableRulings = useMemo(() => {
     const set = new Set<string>();
-    productsList.forEach(p => {
+    activeList.forEach(p => {
       const val = (p.ruleType || '').trim();
       if (val) set.add(val);
     });
     return Array.from(set).sort();
-  }, [productsList]);
+  }, [activeList]);
 
   const filteredBuildProducts = useMemo(() => {
-    let filtered = productsList;
+    let filtered = activeList;
 
     if (buildBomsSearch.trim()) {
       const q = buildBomsSearch.toLowerCase().trim();
@@ -166,7 +182,8 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
         (p.name && p.name.toLowerCase().includes(q)) ||
         (p.skuCode && p.skuCode.toLowerCase().includes(q)) ||
         (p.brand && p.brand.toLowerCase().includes(q)) ||
-        (p.title && p.title.toLowerCase().includes(q))
+        (p.title && p.title.toLowerCase().includes(q)) ||
+        (p.category && p.category.toLowerCase().includes(q))
       );
     }
 
@@ -175,7 +192,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
     }
 
     if (buildBomsTitleFilter) {
-      filtered = filtered.filter(p => (p.title || p.brand || '').trim() === buildBomsTitleFilter.trim());
+      filtered = filtered.filter(p => (p.title || p.brand || p.category || '').trim() === buildBomsTitleFilter.trim());
     }
 
     if (buildBomsRulingFilter) {
@@ -197,7 +214,19 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
     }
 
     return filtered;
-  }, [productsList, buildBomsSearch, onlyNoRecipeFilter, buildBomsTitleFilter, buildBomsRulingFilter, buildBomsSortBy]);
+  }, [activeList, buildBomsSearch, onlyNoRecipeFilter, buildBomsTitleFilter, buildBomsRulingFilter, buildBomsSortBy]);
+
+  // Auto-switch selection when tab changes if current item not in active list
+  useEffect(() => {
+    if (filteredBuildProducts.length > 0) {
+      if (!activeBomProduct || !filteredBuildProducts.some(p => p._id === activeBomProduct._id)) {
+        handleSelectBomProduct(filteredBuildProducts[0]);
+      }
+    } else {
+      setActiveBomProduct(null);
+      setActiveRecipeItems([]);
+    }
+  }, [activeDomainTab]);
 
   const filteredRawCatalog = useMemo(() => {
     return materialsList.filter(m => (m.name || '').toLowerCase().includes(catalogSearch.toLowerCase()));
@@ -229,6 +258,8 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
           name: currentName,
           qty: Number(item.qty) || 1,
           uom: item.uom || matchedSku?.unit || 'Kg',
+          auom: item.auom || (item as any).altUnit || matchedSku?.altUnit || '',
+          altUnit: item.auom || (item as any).altUnit || matchedSku?.altUnit || '',
           inStock: Number((matchedSku as any)?.openingStock ?? item.inStock ?? 0),
           notes: item.notes || ''
         };
@@ -355,10 +386,13 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
   const handleExportCSV = () => {
     try {
       const rows: any[] = [];
-      productsList.forEach(prod => {
+      const allToExport = [...productsList, ...semiList];
+      allToExport.forEach(prod => {
+        const itemType = getItemClassification(prod) === 'semi' ? 'Semi-Finished' : 'Finished Goods';
         const items = (prod as any).bomItems || [];
         if (items.length === 0) {
           rows.push({
+            'Item Type': itemType,
             'Product Code': prod.skuCode,
             'Product Name': prod.name,
             'Brand': prod.brand || prod.title || '',
@@ -367,11 +401,13 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
             'Ingredient Code': '',
             'Ingredient Name': '',
             'Qty': '',
-            'UOM': ''
+            'UOM': '',
+            'AUOM': ''
           });
         } else {
           items.forEach((item: any) => {
             rows.push({
+              'Item Type': itemType,
               'Product Code': prod.skuCode,
               'Product Name': prod.name,
               'Brand': prod.brand || prod.title || '',
@@ -380,7 +416,8 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
               'Ingredient Code': item.skuCode || '',
               'Ingredient Name': item.name || '',
               'Qty': item.qty || '',
-              'UOM': item.uom || ''
+              'UOM': item.uom || '',
+              'AUOM': item.auom || item.altUnit || ''
             });
           });
         }
@@ -396,9 +433,9 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
     }
   };
 
-  const productsWithRecipeCount = useMemo(() => {
-    return productsList.filter(p => (p as any).bomItems && (p as any).bomItems.length > 0).length;
-  }, [productsList]);
+  const activeWithRecipeCount = useMemo(() => {
+    return activeList.filter(p => (p as any).bomItems && (p as any).bomItems.length > 0).length;
+  }, [activeList]);
 
   if (!isOpen) return null;
 
@@ -422,7 +459,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                 <span>Build BOMs</span>
               </h3>
               <p className="text-xs text-gray-400 font-medium truncate">
-                Define recipes product by product — a faster alternative to the Excel import.
+                Define recipes item by item for Finished Goods & Semi-Finished materials.
               </p>
             </div>
           </div>
@@ -435,7 +472,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
               <Download className="w-3.5 h-3.5 text-gray-500" /> Export all (Excel)
             </button>
             <div className="text-xs font-semibold text-gray-500 bg-gray-100 px-3 py-1.5 rounded-xl">
-              {productsWithRecipeCount} of {productsList.length} items have a recipe
+              {activeWithRecipeCount} of {activeList.length} {activeDomainTab === 'semi' ? 'semi-finished' : 'finished'} items have a recipe
             </div>
             <button
               onClick={onClose}
@@ -451,6 +488,53 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
         <div className="grid grid-cols-12 gap-4 flex-1 overflow-hidden min-h-[540px]">
           {/* Column 1: Products Selector List (3 cols) */}
           <div className="col-span-3 border border-gray-200 rounded-2xl p-3 flex flex-col gap-2.5 bg-gray-50/40 overflow-hidden">
+            {/* Domain Switcher: Finished Goods vs Semi-Finished Materials */}
+            <div className="flex items-center p-1 bg-gray-200/70 rounded-xl gap-1 shrink-0 select-none">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveDomainTab('products');
+                  setBuildBomsTitleFilter('');
+                  setBuildBomsRulingFilter('');
+                }}
+                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  activeDomainTab === 'products'
+                    ? 'bg-white text-gray-900 shadow-2xs'
+                    : 'text-gray-500 hover:text-gray-800'
+                }`}
+              >
+                <Boxes className="w-3.5 h-3.5 text-blue-600" />
+                <span>Finished Goods</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                  activeDomainTab === 'products' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {productsList.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveDomainTab('semi');
+                  setBuildBomsTitleFilter('');
+                  setBuildBomsRulingFilter('');
+                }}
+                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  activeDomainTab === 'semi'
+                    ? 'bg-white text-gray-900 shadow-2xs'
+                    : 'text-gray-500 hover:text-gray-800'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5 text-amber-600" />
+                <span>Semi Finished</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                  activeDomainTab === 'semi' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {semiList.length}
+                </span>
+              </button>
+            </div>
+
             <div className="space-y-2">
               <div className="relative">
                 <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
@@ -458,7 +542,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                   type="text"
                   value={buildBomsSearch}
                   onChange={(e) => setBuildBomsSearch(e.target.value)}
-                  placeholder="Search products..."
+                  placeholder={activeDomainTab === 'semi' ? "Search semi-finished materials..." : "Search products..."}
                   className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 shadow-2xs font-medium"
                 />
               </div>
@@ -553,15 +637,23 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        setActiveRecipeItems(copiedBom.lines.map((l, i) => ({
-                          id: `b-build-paste-${Date.now()}-${i}`,
-                          name: l.name,
-                          qty: Number(l.qty) || 1,
-                          uom: l.uom,
-                          inStock: l.inStock ?? 500,
-                          notes: l.notes || ''
-                        })));
+                        setActiveRecipeItems(copiedBom.lines.map((l, i) => {
+                          const matched = skus.find(s => (l.skuId && String(s._id) === String(l.skuId)) || (l.skuCode && s.skuCode === l.skuCode) || (l.name && s.name === l.name));
+                          return {
+                            id: `b-build-paste-${Date.now()}-${i}`,
+                            skuId: l.skuId || matched?._id,
+                            skuCode: l.skuCode || matched?.skuCode,
+                            name: l.name,
+                            qty: Number(l.qty) || 1,
+                            uom: l.uom || matched?.unit || 'Kg',
+                            auom: l.auom || (l as any).altUnit || matched?.altUnit || '',
+                            altUnit: l.auom || (l as any).altUnit || matched?.altUnit || '',
+                            inStock: l.inStock ?? (matched as any)?.openingStock ?? 500,
+                            notes: l.notes || ''
+                          };
+                        }));
                         if (copiedBom.basis) setBuildBatchYieldQty(String(copiedBom.basis));
+                        if (copiedBom.basisUnit) setBuildBatchYieldUnit(copiedBom.basisUnit);
                       }}
                       className="px-2.5 py-1 bg-[#064E3B] hover:bg-[#0B6B63] text-white rounded-md text-[11px] font-medium shrink-0 cursor-pointer shadow-2xs transition-all"
                     >
@@ -626,13 +718,27 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
+                            const lines = ((prod as any).bomItems || []).map((b: any) => {
+                              const matched = skus.find(s => (b.skuId && String(s._id) === String(b.skuId)) || (b.skuCode && s.skuCode === b.skuCode) || (b.name && s.name === b.name));
+                              return {
+                                skuId: b.skuId || matched?._id,
+                                skuCode: b.skuCode || matched?.skuCode,
+                                name: b.name,
+                                qty: b.qty,
+                                uom: b.uom || matched?.unit || 'Kg',
+                                auom: b.auom || b.altUnit || matched?.altUnit || '',
+                                altUnit: b.auom || b.altUnit || matched?.altUnit || '',
+                                inStock: b.inStock,
+                                notes: b.notes
+                              };
+                            });
                             copyBom({
                               sourceSkuId: prod._id,
                               sourceSkuCode: prod.skuCode,
                               sourceName: prod.name || prod.skuCode,
                               basis: (prod as any).recipeYieldQty || (prod as any).batchYieldQty || 1,
                               basisUnit: (prod as any).recipeYieldUnit || (prod as any).batchYieldUnit || prod.unit || 'Pcs',
-                              lines: (prod as any).bomItems || [],
+                              lines,
                               additionalCosts: (prod as any).additionalCosts || [],
                               profitPricing: (prod as any).profitPricing || { pricingMethod: 'Markup %', markupPercentage: '' }
                             });
@@ -682,28 +788,42 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                           sourceName: activeBomProduct?.name || activeBomProduct?.skuCode || 'Product',
                           basis: buildBatchYieldQty,
                           basisUnit: buildBatchYieldUnit || (activeBomProduct as any)?.recipeYieldUnit || activeBomProduct?.unit || 'Pcs',
-                          lines: activeRecipeItems.map(item => ({
-                            id: item.id,
-                            name: item.name,
-                            qty: item.qty,
-                            uom: item.uom,
-                            inStock: item.inStock,
-                            notes: item.notes
-                          })),
+                          lines: activeRecipeItems.map(item => {
+                            const matched = skus.find(s => (item.skuId && String(s._id) === String(item.skuId)) || (item.skuCode && s.skuCode === item.skuCode) || (item.name && s.name === item.name));
+                            return {
+                              id: item.id,
+                              skuId: item.skuId || matched?._id,
+                              skuCode: item.skuCode || matched?.skuCode,
+                              name: item.name,
+                              qty: item.qty,
+                              uom: item.uom || matched?.unit || 'Kg',
+                              auom: item.auom || (item as any).altUnit || matched?.altUnit || '',
+                              altUnit: item.auom || (item as any).altUnit || matched?.altUnit || '',
+                              inStock: item.inStock,
+                              notes: item.notes
+                            };
+                          }),
                           additionalCosts: activeAdditionalCosts,
                           profitPricing: activeProfitPricing
                         };
                       }}
                       onPaste={(copied, mode) => {
                         if (mode === 'replace') {
-                          setActiveRecipeItems(copied.lines.map((l, i) => ({
-                            id: `b-build-paste-${Date.now()}-${i}`,
-                            name: l.name,
-                            qty: Number(l.qty) || 1,
-                            uom: l.uom,
-                            inStock: l.inStock ?? 500,
-                            notes: l.notes || ''
-                          })));
+                          setActiveRecipeItems(copied.lines.map((l, i) => {
+                            const matched = skus.find(s => (l.skuId && String(s._id) === String(l.skuId)) || (l.skuCode && s.skuCode === l.skuCode) || (l.name && s.name === l.name));
+                            return {
+                              id: `b-build-paste-${Date.now()}-${i}`,
+                              skuId: l.skuId || matched?._id,
+                              skuCode: l.skuCode || matched?.skuCode,
+                              name: l.name,
+                              qty: Number(l.qty) || 1,
+                              uom: l.uom || matched?.unit || 'Kg',
+                              auom: l.auom || (l as any).altUnit || matched?.altUnit || '',
+                              altUnit: l.auom || (l as any).altUnit || matched?.altUnit || '',
+                              inStock: l.inStock ?? (matched as any)?.openingStock ?? 500,
+                              notes: l.notes || ''
+                            };
+                          }));
                           if (copied.basis) setBuildBatchYieldQty(String(copied.basis));
                           if (copied.basisUnit) setBuildBatchYieldUnit(copied.basisUnit);
                           if (Array.isArray(copied.additionalCosts)) {
@@ -725,14 +845,21 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                           const existingNames = new Set(activeRecipeItems.map(i => (i.name || '').toLowerCase().trim()));
                           const toAdd = copied.lines
                             .filter(l => !existingNames.has((l.name || '').toLowerCase().trim()))
-                            .map((l, i) => ({
-                              id: `b-build-merge-${Date.now()}-${i}`,
-                              name: l.name,
-                              qty: Number(l.qty) || 1,
-                              uom: l.uom,
-                              inStock: l.inStock ?? 500,
-                              notes: l.notes || ''
-                            }));
+                            .map((l, i) => {
+                              const matched = skus.find(s => (l.skuId && String(s._id) === String(l.skuId)) || (l.skuCode && s.skuCode === l.skuCode) || (l.name && s.name === l.name));
+                              return {
+                                id: `b-build-merge-${Date.now()}-${i}`,
+                                skuId: l.skuId || matched?._id,
+                                skuCode: l.skuCode || matched?.skuCode,
+                                name: l.name,
+                                qty: Number(l.qty) || 1,
+                                uom: l.uom || matched?.unit || 'Kg',
+                                auom: l.auom || (l as any).altUnit || matched?.altUnit || '',
+                                altUnit: l.auom || (l as any).altUnit || matched?.altUnit || '',
+                                inStock: l.inStock ?? (matched as any)?.openingStock ?? 500,
+                                notes: l.notes || ''
+                              };
+                            });
                           if (copied.basis) setBuildBatchYieldQty(String(copied.basis));
                           if (copied.basisUnit) setBuildBatchYieldUnit(copied.basisUnit);
                           setActiveRecipeItems(prev => [...prev, ...toAdd]);
@@ -862,6 +989,8 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                               name: '',
                               qty: 1,
                               uom: 'KG',
+                              auom: '',
+                              altUnit: '',
                               inStock: 0,
                               notes: ''
                             }
@@ -882,6 +1011,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                             <th className="py-1.5 px-2 min-w-[170px]">MATERIAL</th>
                             <th className="py-1.5 px-1.5 text-center w-16">QTY</th>
                             <th className="py-1.5 px-1.5 text-center w-14">UOM</th>
+                            <th className="py-1.5 px-1.5 text-center w-14">AUOM</th>
                             <th className="py-1.5 px-1.5 text-center w-16">IN STOCK</th>
                             <th className="py-1.5 px-1.5 text-center w-10"></th>
                           </tr>
@@ -908,6 +1038,8 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                                         skuId: matchedSku?._id || item.skuId,
                                         skuCode: matchedSku?.skuCode || item.skuCode,
                                         uom: matchedSku?.unit || item.uom || 'KG',
+                                        auom: matchedSku?.altUnit || item.auom || '',
+                                        altUnit: matchedSku?.altUnit || item.auom || '',
                                         inStock: (matchedSku as any)?.openingStock ?? (matchedSku as any)?.currentStock ?? item.inStock ?? 0
                                       };
                                     }));
@@ -945,6 +1077,19 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                                 />
                               </td>
                               <td className="py-1.5 px-1.5 text-center">
+                                <input
+                                  type="text"
+                                  value={b.auom || (b as any).altUnit || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setActiveRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, auom: val, altUnit: val } : item));
+                                  }}
+                                  className="w-14 h-7 border border-slate-200 focus:border-blue-400 rounded-md px-1 py-0.5 text-[10.5px] font-bold text-center uppercase bg-white shadow-3xs focus:outline-none mx-auto block"
+                                  placeholder="AUOM"
+                                  title="Alternate Unit of Measurement"
+                                />
+                              </td>
+                              <td className="py-1.5 px-1.5 text-center">
                                 <span className="font-mono text-[10px] font-semibold text-slate-500 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded">
                                   {b.inStock ?? 0}
                                 </span>
@@ -963,7 +1108,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                           ))}
                           {activeRecipeItems.length === 0 && (
                             <tr>
-                              <td colSpan={6} className="py-3.5 text-center text-[11px] text-slate-400 italic bg-slate-50/20">
+                              <td colSpan={7} className="py-3.5 text-center text-[11px] text-slate-400 italic bg-slate-50/20">
                                 No materials added yet. Click "+ Add Material" above or choose from the catalog on the right.
                               </td>
                             </tr>
@@ -1273,6 +1418,8 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                               name: mat.name,
                               qty: 1,
                               uom: mat.unit || 'Kg',
+                              auom: mat.altUnit || '',
+                              altUnit: mat.altUnit || '',
                               inStock: Number((mat as any).presentStock || 0),
                               notes: ''
                             }
@@ -1324,6 +1471,8 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                               name: semi.name,
                               qty: 1,
                               uom: semi.unit || 'Pcs',
+                              auom: semi.altUnit || '',
+                              altUnit: semi.altUnit || '',
                               inStock: Number((semi as any).presentStock || 0),
                               notes: ''
                             }

@@ -176,9 +176,13 @@ const DEFAULT_CATEGORIES: CategoryCardData[] = [
 // BOM Recipe Item interface
 interface BomRecipeItem {
   id: string;
+  skuId?: string;
+  skuCode?: string;
   name: string;
   qty: number;
   uom: string;
+  auom?: string;
+  altUnit?: string;
   inStock: number;
   notes?: string;
 }
@@ -697,24 +701,38 @@ const SkuMasterV2: React.FC = () => {
       const existingNames = new Set(existingItems.map((i: any) => (i.name || '').toLowerCase().trim()));
       const newItems = copiedBom.lines
         .filter(l => !existingNames.has((l.name || '').toLowerCase().trim()))
-        .map((l, i) => ({
-          id: `b-paste-${Date.now()}-${i}`,
-          name: l.name,
-          qty: l.qty,
-          uom: l.uom,
-          inStock: l.inStock ?? 0,
-          notes: l.notes || ''
-        }));
-      
-      const updatedBomItems = existingItems.length === 0 
-        ? copiedBom.lines.map((l, i) => ({
+        .map((l, i) => {
+          const matched = (skus || []).find(s => (l.skuId && String(s._id) === String(l.skuId)) || (l.skuCode && s.skuCode === l.skuCode) || (l.name && s.name === l.name));
+          return {
             id: `b-paste-${Date.now()}-${i}`,
+            skuId: l.skuId || matched?._id,
+            skuCode: l.skuCode || matched?.skuCode,
             name: l.name,
             qty: l.qty,
-            uom: l.uom,
-            inStock: l.inStock ?? 0,
+            uom: l.uom || matched?.unit || 'Kg',
+            auom: l.auom || (l as any).altUnit || matched?.altUnit || '',
+            altUnit: l.auom || (l as any).altUnit || matched?.altUnit || '',
+            inStock: l.inStock ?? (matched as any)?.openingStock ?? 0,
             notes: l.notes || ''
-          }))
+          };
+        });
+      
+      const updatedBomItems = existingItems.length === 0 
+        ? copiedBom.lines.map((l, i) => {
+            const matched = (skus || []).find(s => (l.skuId && String(s._id) === String(l.skuId)) || (l.skuCode && s.skuCode === l.skuCode) || (l.name && s.name === l.name));
+            return {
+              id: `b-paste-${Date.now()}-${i}`,
+              skuId: l.skuId || matched?._id,
+              skuCode: l.skuCode || matched?.skuCode,
+              name: l.name,
+              qty: l.qty,
+              uom: l.uom || matched?.unit || 'Kg',
+              auom: l.auom || (l as any).altUnit || matched?.altUnit || '',
+              altUnit: l.auom || (l as any).altUnit || matched?.altUnit || '',
+              inStock: l.inStock ?? (matched as any)?.openingStock ?? 0,
+              notes: l.notes || ''
+            };
+          })
         : [...existingItems, ...newItems];
 
       const yieldQty = copiedBom.basis !== undefined && copiedBom.basis !== null && String(copiedBom.basis).trim() !== '' 
@@ -1367,6 +1385,8 @@ const SkuMasterV2: React.FC = () => {
             name: currentName,
             qty: item.qty ?? '',
             uom: matchedSku?.unit || item.uom || 'Pcs',
+            auom: item.auom || (item as any).altUnit || matchedSku?.altUnit || '',
+            altUnit: item.auom || (item as any).altUnit || matchedSku?.altUnit || '',
             inStock: Number(item.inStock) || 0,
             notes: item.notes || ''
           };
@@ -1765,6 +1785,8 @@ const SkuMasterV2: React.FC = () => {
       name: '',
       qty: '' as any,
       uom: 'Kg',
+      auom: '',
+      altUnit: '',
       inStock: 0,
       notes: ''
     };
@@ -5856,9 +5878,13 @@ const SkuMasterV2: React.FC = () => {
                               basisUnit: recipeYieldUnit || (selectedSkuDetails as any).recipeYieldUnit || (selectedSkuDetails as any).batchYieldUnit || selectedSkuDetails?.unit || 'Pcs',
                               lines: bomRecipeItems.map(item => ({
                                 id: item.id,
+                                skuId: item.skuId,
+                                skuCode: item.skuCode,
                                 name: item.name,
                                 qty: item.qty,
                                 uom: item.uom,
+                                auom: item.auom || item.altUnit || '',
+                                altUnit: item.auom || item.altUnit || '',
                                 inStock: item.inStock,
                                 notes: item.notes
                               }))
@@ -5867,28 +5893,42 @@ const SkuMasterV2: React.FC = () => {
                           onPaste={(copied, mode) => {
                             setIsEditingItemBom(true);
                             if (mode === 'replace') {
-                              setBomRecipeItems(copied.lines.map((l, i) => ({
-                                id: `b-paste-${Date.now()}-${i}`,
-                                name: l.name,
-                                qty: Number(l.qty) || 1,
-                                uom: l.uom,
-                                inStock: l.inStock ?? 0,
-                                notes: l.notes || ''
-                              })));
+                              setBomRecipeItems(copied.lines.map((l, i) => {
+                                const matched = (skus || []).find(s => (l.skuId && String(s._id) === String(l.skuId)) || (l.skuCode && s.skuCode === l.skuCode) || (l.name && s.name === l.name));
+                                return {
+                                  id: `b-paste-${Date.now()}-${i}`,
+                                  skuId: l.skuId || matched?._id,
+                                  skuCode: l.skuCode || matched?.skuCode,
+                                  name: l.name,
+                                  qty: Number(l.qty) || 1,
+                                  uom: l.uom || matched?.unit || 'Kg',
+                                  auom: l.auom || (l as any).altUnit || matched?.altUnit || '',
+                                  altUnit: l.auom || (l as any).altUnit || matched?.altUnit || '',
+                                  inStock: l.inStock ?? (matched as any)?.openingStock ?? 0,
+                                  notes: l.notes || ''
+                                };
+                              }));
                               if (copied.basis) setRecipeYieldQty(String(copied.basis));
                               if (copied.basisUnit) setRecipeYieldUnit(copied.basisUnit);
                             } else {
                               const existingNames = new Set(bomRecipeItems.map(i => (i.name || '').toLowerCase().trim()));
                               const toAdd = copied.lines
                                 .filter(l => !existingNames.has((l.name || '').toLowerCase().trim()))
-                                .map((l, i) => ({
-                                  id: `b-merge-${Date.now()}-${i}`,
-                                  name: l.name,
-                                  qty: Number(l.qty) || 1,
-                                  uom: l.uom,
-                                  inStock: l.inStock ?? 0,
-                                  notes: l.notes || ''
-                                }));
+                                .map((l, i) => {
+                                  const matched = (skus || []).find(s => (l.skuId && String(s._id) === String(l.skuId)) || (l.skuCode && s.skuCode === l.skuCode) || (l.name && s.name === l.name));
+                                  return {
+                                    id: `b-merge-${Date.now()}-${i}`,
+                                    skuId: l.skuId || matched?._id,
+                                    skuCode: l.skuCode || matched?.skuCode,
+                                    name: l.name,
+                                    qty: Number(l.qty) || 1,
+                                    uom: l.uom || matched?.unit || 'Kg',
+                                    auom: l.auom || (l as any).altUnit || matched?.altUnit || '',
+                                    altUnit: l.auom || (l as any).altUnit || matched?.altUnit || '',
+                                    inStock: l.inStock ?? (matched as any)?.openingStock ?? 0,
+                                    notes: l.notes || ''
+                                  };
+                                });
                               if (copied.basis) {
                                 setRecipeYieldQty(String(copied.basis));
                               }
@@ -5992,6 +6032,7 @@ const SkuMasterV2: React.FC = () => {
                               <th className="py-2.5 px-3">Item</th>
                               <th className="py-2.5 px-3 text-center w-24">Qty</th>
                               <th className="py-2.5 px-3 text-center w-20">UOM</th>
+                              <th className="py-2.5 px-3 text-center w-20">AUOM</th>
                               <th className="py-2.5 px-3 text-center w-20">In Stock</th>
                               <th className="py-2.5 px-3 text-center w-20 font-bold">Runs</th>
                               {isEditingItemBom && <th className="py-2.5 px-3 text-right w-10"></th>}
@@ -6017,7 +6058,11 @@ const SkuMasterV2: React.FC = () => {
                                                 return {
                                                   ...item,
                                                   name: selectedName,
+                                                  skuId: matchedSku?._id || item.skuId,
+                                                  skuCode: matchedSku?.skuCode || item.skuCode,
                                                   uom: matchedSku?.unit || item.uom || 'Kg',
+                                                  auom: matchedSku?.altUnit || item.auom || '',
+                                                  altUnit: matchedSku?.altUnit || item.auom || '',
                                                   inStock: (matchedSku as any)?.openingStock ?? item.inStock ?? 0
                                                 };
                                               }
@@ -6063,6 +6108,23 @@ const SkuMasterV2: React.FC = () => {
                                       />
                                     ) : (
                                       <span className="text-gray-600 font-semibold whitespace-nowrap">{b.uom}</span>
+                                    )}
+                                  </td>
+                                  <td className="py-2 px-3 text-center w-20">
+                                    {isEditingItemBom ? (
+                                      <input
+                                        type="text"
+                                        value={b.auom || (b as any).altUnit || ''}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          setBomRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, auom: val, altUnit: val } : item));
+                                        }}
+                                        className="w-full border border-gray-200 rounded-lg px-1.5 py-1.5 text-xs font-semibold text-center uppercase focus:outline-none focus:border-blue-500 bg-white"
+                                        placeholder="AUOM"
+                                        title="Alternate Unit of Measurement"
+                                      />
+                                    ) : (
+                                      <span className="text-gray-600 font-semibold whitespace-nowrap">{b.auom || (b as any).altUnit || '—'}</span>
                                     )}
                                   </td>
                                   <td className="py-2 px-3 text-center text-gray-600 font-mono whitespace-nowrap w-20">{b.inStock ?? 0}</td>
@@ -7585,6 +7647,7 @@ const SkuMasterV2: React.FC = () => {
             loadSkus(false);
           }}
           companyId={selectedCompany?._id || ""}
+          initialTab={activeMainTab === 'semi' ? 'semi' : 'products'}
           initialSelectedSkuId={activeBomProduct?._id || selectedSkuDetails?._id}
           onSaved={(updatedSku) => {
             setSkus(prev => prev.map(s => s._id === updatedSku._id ? updatedSku : s));

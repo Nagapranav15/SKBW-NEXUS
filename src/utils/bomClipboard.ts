@@ -6,9 +6,13 @@ import { useSyncExternalStore } from 'react';
 export interface CopiedBomMaterialLine {
   id?: string;
   materialId?: string;
+  skuId?: string;
+  skuCode?: string;
   name: string;
   qty: number | string;
   uom: string;
+  auom?: string;
+  altUnit?: string;
   inStock?: number;
   notes?: string;
 }
