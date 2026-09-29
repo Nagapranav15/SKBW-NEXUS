@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -284,6 +284,13 @@ const PurchaseInvoicePage: React.FC = () => {
   const [invoices, setInvoices] = useState<PurchaseInvoiceV2[]>([]);
   const [vendors, setVendors] = useState<any[]>([]);
   const [skus, setSkus] = useState<SkuV2[]>([]);
+  const skuMap = useMemo(() => {
+    const map = new Map<string, SkuV2>();
+    skus.forEach(s => {
+      if (s._id) map.set(s._id, s);
+    });
+    return map;
+  }, [skus]);
   const [refreshingSkus, setRefreshingSkus] = useState(false);
   const [categoriesData, setCategoriesData] = useState<{ id?: string; name: string; type?: 'products' | 'materials' | 'semi' }[]>([]);
   const [locations, setLocations] = useState<WarehouseLocationV2[]>([]);
@@ -1670,13 +1677,16 @@ const PurchaseInvoicePage: React.FC = () => {
     setActiveSubPage('new');
   };
 
-  const handleNewPurchaseClick = async (preselectedSkuId?: string) => {
+  const handleNewPurchaseClick = (preselectedSkuId?: string | unknown) => {
     setIsEditing(false);
     setEditingInvoiceId(null);
-    refreshItemMasterSkus(true);
+
+    const actualSkuId = typeof preselectedSkuId === 'string' && preselectedSkuId.trim() !== '' 
+      ? preselectedSkuId.trim() 
+      : undefined;
 
     let initialItem: PurchaseInvoiceFormItem = { 
-      skuId: preselectedSkuId || '', 
+      skuId: actualSkuId || '', 
       brand: '', 
       gsm: '', 
       width: '', 
@@ -1687,19 +1697,13 @@ const PurchaseInvoicePage: React.FC = () => {
       reamWeight: '', 
       ratePerKg: '', 
       lotNumber: '', 
-      locationId: locations.find(l => l.level === 'Storage Location')?._id || '', 
+      locationId: '', 
       splits: [], 
       reels: [] 
     };
 
-    if (preselectedSkuId) {
-      let targetSku = skus.find(s => s._id === preselectedSkuId);
-      if (!targetSku && selectedCompany?._id) {
-        try {
-          const fresh = await getSkusV2(selectedCompany._id);
-          targetSku = (fresh || []).find(s => s._id === preselectedSkuId);
-        } catch (_) {}
-      }
+    if (actualSkuId) {
+      const targetSku = skuMap.get(actualSkuId) || skus.find(s => s._id === actualSkuId);
       if (targetSku) {
         initialItem = {
           skuId: targetSku._id,
@@ -1713,7 +1717,7 @@ const PurchaseInvoicePage: React.FC = () => {
           reamWeight: (targetSku as any).reamWeight ? String((targetSku as any).reamWeight) : '',
           ratePerKg: (targetSku as any).ratePerKg ? String((targetSku as any).ratePerKg) : '',
           lotNumber: '',
-          locationId: locations.find(l => l.level === 'Storage Location')?._id || '',
+          locationId: '',
           splits: [],
           reels: []
         };
@@ -1735,14 +1739,20 @@ const PurchaseInvoicePage: React.FC = () => {
     setAddError('');
     setActiveSubPage('new');
 
-    try {
-      const nextNo = await getNextInvoiceNumberV2(selectedCompany?._id || '');
-      setInvoiceForm(prev => ({
-        ...prev,
-        invoiceNumber: nextNo
-      }));
-    } catch (e) {
-      console.error("Failed to load next purchase invoice number:", e);
+    // Fetch next invoice number in background without blocking modal opening
+    if (selectedCompany?._id) {
+      getNextInvoiceNumberV2(selectedCompany._id)
+        .then(nextNo => {
+          if (nextNo) {
+            setInvoiceForm(prev => ({
+              ...prev,
+              invoiceNumber: prev.invoiceNumber || nextNo
+            }));
+          }
+        })
+        .catch(e => {
+          console.error("Failed to load next purchase invoice number:", e);
+        });
     }
   };
 
@@ -1942,15 +1952,61 @@ const PurchaseInvoicePage: React.FC = () => {
   const formMatTotal = invoiceForm.items.reduce((sum, item) => sum + getItemSubtotal(item), 0);
   const formOtherCharges = (Number(invoiceForm.freight) || 0) + (Number(invoiceForm.craneCharges) || 0) + (Number(invoiceForm.loadingUnloading) || 0) + (Number(invoiceForm.otherCharges) || 0);
 
-  // Dashboard Stats (mocked or loaded)
+  // Dashboard Stats (memoized with skuMap for instantaneous rendering)
   const dashboardTotalBatches = total;
-  const dashboardTotalValue = invoices
-    .filter(inv => inv.status !== 'Cancelled')
-    .reduce((sum, inv) => {
-      const finalVal = inv.grandTotal || ((inv.subTotal || 0) + (inv.freight || 0) + (inv.craneCharges || 0) + (inv.otherCharges || 0) + (inv.taxAmount || 0));
-      return sum + finalVal;
-    }, 0);
-  const dashboardPendingReceipts = invoices.filter(inv => inv.status === 'Draft').length;
+  const dashboardStats = useMemo(() => {
+    let dashboardTotalReels = 0;
+    let dashboardTotalReams = 0;
+    let dashboardTotalSheets = 0;
+    let hasAnyReels = false;
+    let hasAnySheets = false;
+    let dashboardReceivedBatches = 0;
+    let dashboardTotalValue = 0;
+    let dashboardPendingReceipts = 0;
+
+    invoices.forEach(inv => {
+      if (inv.status === 'Posted') {
+        dashboardReceivedBatches++;
+      } else if (inv.status === 'Draft') {
+        dashboardPendingReceipts++;
+      }
+      if (inv.status !== 'Cancelled') {
+        const finalVal = inv.grandTotal || ((inv.subTotal || 0) + (inv.freight || 0) + (inv.craneCharges || 0) + (inv.otherCharges || 0) + (inv.taxAmount || 0));
+        dashboardTotalValue += finalVal;
+
+        inv.items?.forEach(item => {
+          const resolvedSku = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null;
+          const skuIdStr = resolvedSku?._id || (typeof item.skuId === 'string' ? item.skuId : '');
+          const fullSku = (skuIdStr ? skuMap.get(skuIdStr) : null) || resolvedSku;
+          const paperType = resolvedSku?.paperType || fullSku?.paperType;
+          if (paperType === 'Sheets') {
+            hasAnySheets = true;
+            const stdSheets = resolvedSku?.pages || fullSku?.pages || 500;
+            const itemReams = (item.quantity || 0) / stdSheets;
+            dashboardTotalReams += itemReams;
+            dashboardTotalSheets += item.quantity || 0;
+          } else if (item.reels && item.reels.length > 0) {
+            hasAnyReels = true;
+            dashboardTotalReels += item.reels.length;
+          } else if (paperType === 'Reels') {
+            hasAnyReels = true;
+            dashboardTotalReels += Number(item.reelsCount) || 1;
+          }
+        });
+      }
+    });
+
+    return {
+      dashboardReceivedBatches,
+      dashboardTotalReels,
+      dashboardTotalReams,
+      dashboardTotalSheets,
+      hasAnyReels,
+      hasAnySheets,
+      dashboardTotalValue,
+      dashboardPendingReceipts
+    };
+  }, [invoices, skuMap]);
 
   return (
     <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
@@ -2310,7 +2366,7 @@ const PurchaseInvoicePage: React.FC = () => {
               <div className="relative group">
                 <button
                   type="button"
-                  onClick={handleNewPurchaseClick}
+                  onClick={() => handleNewPurchaseClick()}
                   className="w-8 h-8 rounded-full border border-gray-200 bg-white hover:bg-blue-50 text-blue-600 flex items-center justify-center transition-all shadow-2xs cursor-pointer font-bold shrink-0"
                   title="New Purchase Batch"
                   aria-label="New Purchase Batch"
@@ -2325,107 +2381,75 @@ const PurchaseInvoicePage: React.FC = () => {
           </div>
 
           {/* 3. Statistics Cards (Matching SkuMasterV2 card styling) */}
-          {(() => {
-            const dashboardReceivedBatches = invoices.filter(inv => inv.status === 'Posted').length;
-            let dashboardTotalReels = 0;
-            let dashboardTotalReams = 0;
-            let dashboardTotalSheets = 0;
-            let hasAnyReels = false;
-            let hasAnySheets = false;
-
-            invoices.filter(inv => inv.status !== 'Cancelled').forEach(inv => {
-              inv.items?.forEach(item => {
-                const resolvedSku = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null;
-                const fullSku = skus.find(s => s._id === (resolvedSku?._id || item.skuId)) || resolvedSku;
-                const paperType = resolvedSku?.paperType || fullSku?.paperType;
-                if (paperType === 'Sheets') {
-                  hasAnySheets = true;
-                  const stdSheets = resolvedSku?.pages || fullSku?.pages || 500;
-                  const itemReams = (item.quantity || 0) / stdSheets;
-                  dashboardTotalReams += itemReams;
-                  dashboardTotalSheets += item.quantity || 0;
-                } else if (item.reels && item.reels.length > 0) {
-                  hasAnyReels = true;
-                  dashboardTotalReels += item.reels.length;
-                } else if (paperType === 'Reels') {
-                  hasAnyReels = true;
-                  dashboardTotalReels += Number(item.reelsCount) || 1;
-                }
-              });
-            });
-
-            return (
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <button
-                  onClick={() => { setStatusFilter(''); setPage(1); }}
-                  className={`w-full text-left rounded-2xl shadow-2xs border p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
-                    statusFilter === '' 
-                      ? 'bg-blue-50/40 border-blue-400 ring-2 ring-blue-100' 
-                      : 'bg-white border-gray-200/80 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Total Batches</span>
-                    <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                  </div>
-                  <p className="text-2xl font-black text-gray-900 mt-1 font-mono">{dashboardTotalBatches}</p>
-                </button>
-
-                <button
-                  onClick={() => { setStatusFilter('Posted'); setPage(1); }}
-                  className={`w-full text-left rounded-2xl shadow-2xs border p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
-                    statusFilter === 'Posted' 
-                      ? 'bg-emerald-50/40 border-emerald-400 ring-2 ring-emerald-100' 
-                      : 'bg-white border-gray-200/80 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Received Batches</span>
-                    <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
-                  </div>
-                  <p className="text-2xl font-black text-emerald-600 mt-1 font-mono">{dashboardReceivedBatches}</p>
-                </button>
-
-                {/* Dynamic Reels / Sheets Info Card */}
-                <div className="w-full text-left rounded-2xl shadow-2xs border p-4 bg-white border-gray-200/80">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                      {hasAnyReels && hasAnySheets 
-                        ? 'Total Reels & Reams' 
-                        : hasAnySheets 
-                          ? 'Total Reams' 
-                          : 'Total Reels'}
-                    </span>
-                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                  </div>
-                  <div className="mt-1 flex items-baseline gap-2 flex-wrap">
-                    {hasAnyReels && (
-                      <span className="text-2xl font-black text-amber-600 font-mono">
-                        {dashboardTotalReels} <span className="text-xs font-bold text-gray-500 font-sans">Reels</span>
-                      </span>
-                    )}
-                    {hasAnyReels && hasAnySheets && <span className="text-gray-300 font-bold">•</span>}
-                    {hasAnySheets && (
-                      <span className="text-2xl font-black text-teal-600 font-mono" title={`${dashboardTotalSheets.toLocaleString('en-IN')} Sheets`}>
-                        {dashboardTotalReams.toLocaleString('en-IN', { maximumFractionDigits: 1 })} <span className="text-xs font-bold text-gray-500 font-sans">Reams</span>
-                      </span>
-                    )}
-                    {!hasAnyReels && !hasAnySheets && (
-                      <span className="text-2xl font-black text-gray-400 font-mono">0</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="w-full text-left rounded-2xl shadow-2xs border p-4 bg-white border-gray-200/80">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Total Value</span>
-                    <span className="w-2 h-2 rounded-full bg-purple-600"></span>
-                  </div>
-                  <p className="text-2xl font-black text-purple-700 mt-1 font-mono">₹{dashboardTotalValue.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
-                </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <button
+              onClick={() => { setStatusFilter(''); setPage(1); }}
+              className={`w-full text-left rounded-2xl shadow-2xs border p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
+                statusFilter === '' 
+                  ? 'bg-blue-50/40 border-blue-400 ring-2 ring-blue-100' 
+                  : 'bg-white border-gray-200/80 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Total Batches</span>
+                <span className="w-2 h-2 rounded-full bg-blue-600"></span>
               </div>
-            );
-          })()}
+              <p className="text-2xl font-black text-gray-900 mt-1 font-mono">{dashboardTotalBatches}</p>
+            </button>
+
+            <button
+              onClick={() => { setStatusFilter('Posted'); setPage(1); }}
+              className={`w-full text-left rounded-2xl shadow-2xs border p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
+                statusFilter === 'Posted' 
+                  ? 'bg-emerald-50/40 border-emerald-400 ring-2 ring-emerald-100' 
+                  : 'bg-white border-gray-200/80 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Received Batches</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+              </div>
+              <p className="text-2xl font-black text-emerald-600 mt-1 font-mono">{dashboardStats.dashboardReceivedBatches}</p>
+            </button>
+
+            {/* Dynamic Reels / Sheets Info Card */}
+            <div className="w-full text-left rounded-2xl shadow-2xs border p-4 bg-white border-gray-200/80">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                  {dashboardStats.hasAnyReels && dashboardStats.hasAnySheets 
+                    ? 'Total Reels & Reams' 
+                    : dashboardStats.hasAnySheets 
+                      ? 'Total Reams' 
+                      : 'Total Reels'}
+                </span>
+                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+              </div>
+              <div className="mt-1 flex items-baseline gap-2 flex-wrap">
+                {dashboardStats.hasAnyReels && (
+                  <span className="text-2xl font-black text-amber-600 font-mono">
+                    {dashboardStats.dashboardTotalReels} <span className="text-xs font-bold text-gray-500 font-sans">Reels</span>
+                  </span>
+                )}
+                {dashboardStats.hasAnyReels && dashboardStats.hasAnySheets && <span className="text-gray-300 font-bold">•</span>}
+                {dashboardStats.hasAnySheets && (
+                  <span className="text-2xl font-black text-teal-600 font-mono" title={`${dashboardStats.dashboardTotalSheets.toLocaleString('en-IN')} Sheets`}>
+                    {dashboardStats.dashboardTotalReams.toLocaleString('en-IN', { maximumFractionDigits: 1 })} <span className="text-xs font-bold text-gray-500 font-sans">Reams</span>
+                  </span>
+                )}
+                {!dashboardStats.hasAnyReels && !dashboardStats.hasAnySheets && (
+                  <span className="text-2xl font-black text-gray-400 font-mono">0</span>
+                )}
+              </div>
+            </div>
+
+            <div className="w-full text-left rounded-2xl shadow-2xs border p-4 bg-white border-gray-200/80">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Total Value</span>
+                <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+              </div>
+              <p className="text-2xl font-black text-purple-700 mt-1 font-mono">₹{dashboardStats.dashboardTotalValue.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
+            </div>
+          </div>
 
           {/* 4. Table Card Container */}
           <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden space-y-0">
