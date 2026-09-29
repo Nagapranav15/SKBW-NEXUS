@@ -5,7 +5,7 @@ import {
   Layers, Package, Receipt, Calculator, FileText, 
   Check, X, Search, Loader2, Settings, Building2, 
   MapPin, Copy, Sparkles, Zap, Eye, Save, Box,
-  BarChart3, Clock, Pencil, Tag, TrendingUp
+  BarChart3, Clock, Pencil, Tag, TrendingUp, Scissors
 } from 'lucide-react';
 import { ProductionOrder } from '../../types/production';
 import { getNextProductionOrderNumber, createProductionOrder } from '../../api/productionApi';
@@ -14,6 +14,7 @@ import { LocationSelectPopup } from '../stock_v2/LocationSelectPopup';
 import { BomCopyPasteControls } from '../inventory_v2/BomCopyPasteControls';
 import { copyBom, useCopiedBom } from '../../utils/bomClipboard';
 import { ProfitPricingState } from '../../utils/costingUtils';
+import { CuttingSlipModal } from './CuttingSlipModal';
 import Modal from '../ui/Modal';
 import { showToast } from '../ui/Toast';
 
@@ -337,6 +338,9 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     pricingMethod: 'Margin %',
     markupPercentage: ''
   });
+
+  // Paper Cutting Slip Voucher (Reel -> Sheet Conversion)
+  const [showCuttingSlipModal, setShowCuttingSlipModal] = useState(false);
 
   // Load backend sequence number & SKUs
   useEffect(() => {
@@ -2227,6 +2231,16 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                 <span>Load from BOM</span>
               </button>
 
+              <button
+                type="button"
+                onClick={() => setShowCuttingSlipModal(true)}
+                className="px-3 py-1.5 border border-teal-200 text-teal-700 bg-teal-50/70 hover:bg-teal-100 font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-3xs"
+                title="Convert raw reels into sheets via Cutting Slip voucher"
+              >
+                <Scissors className="w-3.5 h-3.5 text-teal-600" />
+                <span>Cut Reels to Sheets</span>
+              </button>
+
               <BomCopyPasteControls
                 getCopyPayload={() => {
                   const hasItems = materials && materials.length > 0;
@@ -3447,6 +3461,20 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Cutting Slip Voucher (Reel -> Sheet conversion) */}
+      {showCuttingSlipModal && (
+        <CuttingSlipModal
+          isOpen={showCuttingSlipModal}
+          onClose={() => setShowCuttingSlipModal(false)}
+          companyId={companyId || ''}
+          skus={backendSkus}
+          locations={warehouseLocations}
+          onSaved={() => {
+            showToast('Reels converted to sheets successfully! New sheets added to stock.', 'success');
+          }}
+        />
       )}
 
     </div>

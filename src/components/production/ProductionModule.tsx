@@ -18,9 +18,12 @@ import { ProductionOrderDetailView } from './ProductionOrderDetailView';
 import { ProductionOrderEntriesView } from './ProductionOrderEntriesView';
 import { ProductionPrintModal } from './ProductionPrintModal';
 import { BulkEditBomModal } from './BulkEditBomModal';
+import { CuttingSlipModal } from './CuttingSlipModal';
+import { CuttingSlipListTab } from './CuttingSlipListTab';
+import { getWarehouseHierarchyV2, getCuttingSlipsV2, WarehouseLocationV2 } from '../../api/mfgApiV2';
 import { showToast } from '../ui/Toast';
 import { 
-  Calendar, Package, FileText, LayoutGrid, History, 
+  Calendar, Package, FileText, LayoutGrid, History, Scissors,
   ArrowLeft, Search, Plus, CheckCircle, AlertTriangle, Layers, Loader2, X, Edit3, ExternalLink,
   ChevronDown, ChevronRight, ChevronLeft, Calculator, Eye, Filter, Check, Clock, TrendingUp, Info,
   Boxes, ArrowUpDown, Download, Printer, Pencil, MoreVertical, RotateCcw, Activity, MessageCircle
@@ -68,6 +71,11 @@ export const ProductionModule: React.FC = () => {
 
   // Printing Modal Order
   const [printOrder, setPrintOrder] = useState<ProductionOrder | null>(null);
+
+  // Cutting Slip Voucher State (Reel -> Sheet Journal)
+  const [showCuttingSlipModal, setShowCuttingSlipModal] = useState(false);
+  const [cuttingSlipsCount, setCuttingSlipsCount] = useState(0);
+  const [warehouseLocations, setWarehouseLocations] = useState<WarehouseLocationV2[]>([]);
 
   // Tab 2: Production Entries UI States matching Reference
   const [entriesSearch, setEntriesSearch] = useState('');
@@ -120,9 +128,11 @@ export const ProductionModule: React.FC = () => {
     if (!selectedCompany?._id) return;
     try {
       setLoading(true);
-      const [listRes, skusRes] = await Promise.allSettled([
+      const [listRes, skusRes, locsRes, slipsRes] = await Promise.allSettled([
         getProductionOrders({ companyId: selectedCompany._id }),
-        getSkusV2(selectedCompany._id)
+        getSkusV2(selectedCompany._id),
+        getWarehouseHierarchyV2(selectedCompany._id),
+        getCuttingSlipsV2(selectedCompany._id, { limit: 1 })
       ]);
 
       let loadedOrders: ProductionOrder[] = [];
@@ -131,6 +141,22 @@ export const ProductionModule: React.FC = () => {
         setOrders(loadedOrders);
       } else {
         setOrders([]);
+      }
+
+      if (locsRes.status === 'fulfilled' && Array.isArray(locsRes.value)) {
+        const flatten = (nodes: any[]): any[] => {
+          let list: any[] = [];
+          for (const n of nodes) {
+            list.push(n);
+            if (n.children && n.children.length > 0) list = list.concat(flatten(n.children));
+          }
+          return list;
+        };
+        setWarehouseLocations(flatten(locsRes.value));
+      }
+
+      if (slipsRes.status === 'fulfilled' && slipsRes.value?.pagination) {
+        setCuttingSlipsCount(slipsRes.value.pagination.total || 0);
       }
 
       if (skusRes.status === 'fulfilled' && Array.isArray(skusRes.value)) {
@@ -825,6 +851,7 @@ export const ProductionModule: React.FC = () => {
   // Tab Header Bar Definition & Counts
   const TAB_ITEMS = [
     { id: 'orders', label: 'Production Orders', icon: Calendar },
+    { id: 'cutting', label: 'Paper Cutting (Reel → Sheet)', icon: Scissors },
     { id: 'entries', label: 'Production Entries', icon: Package },
     { id: 'materials', label: 'Material Requirements', icon: FileText },
     { id: 'bom', label: 'BOM', icon: LayoutGrid },
@@ -833,6 +860,7 @@ export const ProductionModule: React.FC = () => {
 
   const tabCounts: Record<string, number> = {
     orders: orders.length,
+    cutting: cuttingSlipsCount,
     entries: allEntries.length,
     materials: orderRequirementsList.length,
     bom: skusWithBom.length,
@@ -2596,6 +2624,61 @@ export const ProductionModule: React.FC = () => {
   }
 
   // -------------------------------------------------------------
+  // TAB 2.5: PAPER CUTTING & SHEETING (Reel -> Sheet Stock Journal)
+  // -------------------------------------------------------------
+  if (activeTab === 'cutting') {
+    return (
+      <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
+        {/* 1. Header Banner */}
+        <div className="flex flex-row items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs relative">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-teal-100/80 text-teal-700 rounded-2xl shadow-2xs">
+              <Scissors className="w-5 h-5 stroke-[2.2]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-bold text-gray-900 tracking-tight">Paper Cutting & Sheeting (Reel → Sheet)</h1>
+                <span className="text-[11px] font-bold bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full border border-teal-200">
+                  Stock Journal Voucher
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 font-medium">
+                Tally-style Reel-to-Sheet conversion vouchers with live scrap tracking, dual-unit (Sheets ↔ Reams), & zero-discrepancy inventory reconciliation.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowCuttingSlipModal(true)}
+              className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5 text-teal-400" />
+              <span>New Cutting Slip (Alt + C)</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('orders')}
+              className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer text-xs"
+            >
+              ← Back to Orders
+            </button>
+          </div>
+        </div>
+
+        {/* 2. Tab Navigation */}
+        {renderTabNavigation()}
+
+        {/* 3. List Tab Content */}
+        <CuttingSlipListTab
+          companyId={selectedCompany?._id || ''}
+          onOpenNewSlip={() => setShowCuttingSlipModal(true)}
+          onToast={(msg, type) => showToast(msg, type)}
+        />
+      </div>
+    );
+  }
+
+  // -------------------------------------------------------------
   // TAB 5: HISTORY / AUDIT LOG (Tally Production Activity Log)
   // -------------------------------------------------------------
   if (activeTab === 'history') {
@@ -2944,6 +3027,21 @@ export const ProductionModule: React.FC = () => {
 
       {/* ── PRODUCTION PRINT MODAL ── */}
       <ProductionPrintModal order={printOrder} onClose={() => setPrintOrder(null)} />
+
+      {/* ── CUTTING SLIP / REEL-TO-SHEET VOUCHER MODAL ── */}
+      {showCuttingSlipModal && (
+        <CuttingSlipModal
+          isOpen={showCuttingSlipModal}
+          onClose={() => setShowCuttingSlipModal(false)}
+          companyId={selectedCompany?._id || ''}
+          skus={backendSkus}
+          locations={warehouseLocations}
+          onSaved={() => {
+            loadOrders();
+            showToast('Cutting slip posted to inventory successfully!', 'success');
+          }}
+        />
+      )}
     </>
   );
 };

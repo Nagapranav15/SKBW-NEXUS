@@ -58,6 +58,14 @@ router.post("/purchases/payments", auth, rbac(manage), purchaseCtrl.recordPurcha
 router.post("/purchases/invoices/:id/allocate-locations", auth, rbac(manage), purchaseCtrl.allocateInvoiceLocations);
 
 const salesOrderCtrl = require("../controllers/mfgSalesOrderV2Controller");
+const cuttingSlipCtrl = require("../controllers/cuttingSlipController");
+
+// Cutting Slips / Paper Conversion Voucher Routes (Reel -> Sheet Journal)
+router.get("/cutting-slips/next-number", auth, rbac(view), cuttingSlipCtrl.getNextSlipNumber);
+router.get("/cutting-slips/available-reels", auth, rbac(view), cuttingSlipCtrl.getAvailableReels);
+router.get("/cutting-slips", auth, rbac(view), cuttingSlipCtrl.getCuttingSlips);
+router.post("/cutting-slips", auth, rbac(manage), cuttingSlipCtrl.createCuttingSlip);
+router.put("/cutting-slips/:id/cancel", auth, rbac(manage), cuttingSlipCtrl.cancelCuttingSlip);
 
 // Sales Orders V2 Routes (Makoro Replicated Engine)
 router.get("/sales-orders/next-number", auth, rbac(view), salesOrderCtrl.getNextSalesOrderNumber);

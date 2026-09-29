@@ -458,3 +458,98 @@ export const getProductionMaterialRates = async (
   return response.data;
 };
 
+// ==========================================
+// Cutting Slip / Reel-to-Sheet Voucher API
+// ==========================================
+export interface CuttingSlipReelItem {
+  reelNumber: string;
+  weight: number;
+  width?: number;
+  gsm?: number;
+  locationId?: string;
+  locationName?: string;
+}
+
+export interface AvailableReelV2 {
+  id: string;
+  reelNumber: string;
+  weight: number;
+  width?: number;
+  gsm?: number;
+  skuId: string;
+  skuName: string;
+  skuCode: string;
+  locationId: string;
+  locationName: string;
+  purchaseBatch: string;
+  ratePerKg: number;
+}
+
+export interface CuttingSlipV2 {
+  _id?: string;
+  slipNumber: string;
+  company?: string;
+  date: string;
+  sourceSku: any;
+  purchaseBatch?: string;
+  sourceLocationId?: any;
+  selectedReels: CuttingSlipReelItem[];
+  totalInputWeight: number;
+  inputRatePerKg: number;
+  totalInputCost: number;
+  targetSku: any;
+  sheetWidth: number;
+  sheetLength: number;
+  sheetGsm: number;
+  sheetsPerReam: number;
+  theoreticalSheets: number;
+  theoreticalReams: number;
+  actualSheets: number;
+  actualReams: number;
+  varianceSheets: number;
+  wastePercentage: number;
+  scrapWeightKg: number;
+  scrapRatePerKg: number;
+  coreCount: number;
+  coreRatePerPc: number;
+  totalScrapCredit: number;
+  netProductionCost: number;
+  effectiveCostPerSheet: number;
+  effectiveCostPerReam: number;
+  destinationLocationId: any;
+  machineName?: string;
+  operatorName?: string;
+  notes?: string;
+  status?: 'Posted' | 'Cancelled';
+  createdAt?: string;
+}
+
+export const getNextCuttingSlipNumberV2 = async (companyId: string): Promise<{ slipNumber: string }> => {
+  const response = await api.get('/v2/cutting-slips/next-number', { params: { companyId } });
+  return response.data;
+};
+
+export const getAvailableReelsV2 = async (companyId: string): Promise<{ availableReels: AvailableReelV2[] }> => {
+  const response = await api.get('/v2/cutting-slips/available-reels', { params: { companyId } });
+  return response.data;
+};
+
+export const getCuttingSlipsV2 = async (
+  companyId: string,
+  params?: { page?: number; limit?: number; search?: string }
+): Promise<{ cuttingSlips: CuttingSlipV2[]; pagination: { total: number; page: number; pages: number } }> => {
+  const response = await api.get('/v2/cutting-slips', { params: { companyId, ...params } });
+  return response.data;
+};
+
+export const createCuttingSlipV2 = async (data: Partial<CuttingSlipV2> & { companyId: string }): Promise<{ msg: string; cuttingSlip: CuttingSlipV2 }> => {
+  const response = await api.post('/v2/cutting-slips', data);
+  return response.data;
+};
+
+export const cancelCuttingSlipV2 = async (id: string, companyId: string): Promise<{ msg: string }> => {
+  const response = await api.put(`/v2/cutting-slips/${id}/cancel`, { companyId });
+  return response.data;
+};
+
+
