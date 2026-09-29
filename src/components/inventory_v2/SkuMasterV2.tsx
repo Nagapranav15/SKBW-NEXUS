@@ -6031,8 +6031,7 @@ const SkuMasterV2: React.FC = () => {
                             <tr>
                               <th className="py-2.5 px-3">Item</th>
                               <th className="py-2.5 px-3 text-center w-24">Qty</th>
-                              <th className="py-2.5 px-3 text-center w-20">UOM</th>
-                              <th className="py-2.5 px-3 text-center w-20">AUOM</th>
+                              <th className="py-2.5 px-3 text-center min-w-[110px]">UOM / AUOM</th>
                               <th className="py-2.5 px-3 text-center w-20">In Stock</th>
                               <th className="py-2.5 px-3 text-center w-20 font-bold">Runs</th>
                               {isEditingItemBom && <th className="py-2.5 px-3 text-right w-10"></th>}
@@ -6094,37 +6093,59 @@ const SkuMasterV2: React.FC = () => {
                                       <span className="font-mono font-bold text-gray-900">{b.qty !== undefined && b.qty !== '' ? b.qty : '—'}</span>
                                     )}
                                   </td>
-                                  <td className="py-2 px-3 text-center w-20">
+                                  <td className="py-2 px-3 text-center">
                                     {isEditingItemBom ? (
-                                      <input
-                                        type="text"
-                                        value={b.uom || ''}
-                                        onChange={(e) => {
-                                          const val = e.target.value;
-                                          setBomRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, uom: val } : item));
-                                        }}
-                                        className="w-full border border-gray-200 rounded-lg px-1.5 py-1.5 text-xs font-semibold text-center uppercase focus:outline-none focus:border-blue-500 bg-white"
-                                        placeholder="UOM"
-                                      />
+                                      (() => {
+                                        const matchedSku = (skus || []).find(s => 
+                                          (b.skuId && String(s._id) === String(b.skuId)) ||
+                                          (b.skuCode && s.skuCode === b.skuCode) ||
+                                          (b.name && s.name === b.name)
+                                        );
+                                        const primaryUom = matchedSku?.unit || b.uom || 'Kg';
+                                        const altUom = matchedSku?.altUnit || b.auom || (b as any).altUnit || '';
+                                        const hasAlt = !!(altUom && altUom.trim() && altUom.trim().toLowerCase() !== primaryUom.trim().toLowerCase());
+
+                                        const options: { value: string; label: string }[] = [];
+                                        options.push({ value: primaryUom, label: `${primaryUom} (UOM)` });
+                                        if (hasAlt) {
+                                          options.push({ value: altUom.trim(), label: `${altUom.trim()} (AUOM)` });
+                                        }
+                                        if (b.uom && !options.some(o => o.value.toLowerCase() === b.uom.toLowerCase())) {
+                                          options.push({ value: b.uom, label: b.uom });
+                                        }
+
+                                        const selectedValue = options.some(o => o.value.toLowerCase() === (b.uom || '').toLowerCase())
+                                          ? options.find(o => o.value.toLowerCase() === (b.uom || '').toLowerCase())!.value
+                                          : primaryUom;
+
+                                        return (
+                                          <select
+                                            value={selectedValue}
+                                            onChange={(e) => {
+                                              const val = e.target.value;
+                                              const isAlt = hasAlt && val.toLowerCase() === altUom.trim().toLowerCase();
+                                              setBomRecipeItems(prev => prev.map(item => item.id === b.id ? { 
+                                                ...item, 
+                                                uom: val,
+                                                auom: isAlt ? val : (altUom || ''),
+                                                altUnit: isAlt ? val : (altUom || '')
+                                              } : item));
+                                            }}
+                                            className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold text-center focus:outline-none focus:border-blue-500 bg-white cursor-pointer"
+                                            title="Unit of Measurement (UOM / AUOM)"
+                                          >
+                                            {options.map(opt => (
+                                              <option key={opt.value} value={opt.value}>
+                                                {opt.label}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        );
+                                      })()
                                     ) : (
-                                      <span className="text-gray-600 font-semibold whitespace-nowrap">{b.uom}</span>
-                                    )}
-                                  </td>
-                                  <td className="py-2 px-3 text-center w-20">
-                                    {isEditingItemBom ? (
-                                      <input
-                                        type="text"
-                                        value={b.auom || (b as any).altUnit || ''}
-                                        onChange={(e) => {
-                                          const val = e.target.value;
-                                          setBomRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, auom: val, altUnit: val } : item));
-                                        }}
-                                        className="w-full border border-gray-200 rounded-lg px-1.5 py-1.5 text-xs font-semibold text-center uppercase focus:outline-none focus:border-blue-500 bg-white"
-                                        placeholder="AUOM"
-                                        title="Alternate Unit of Measurement"
-                                      />
-                                    ) : (
-                                      <span className="text-gray-600 font-semibold whitespace-nowrap">{b.auom || (b as any).altUnit || '—'}</span>
+                                      <span className="text-gray-700 font-semibold whitespace-nowrap text-xs bg-gray-50 border border-gray-100 px-2 py-0.5 rounded-md">
+                                        {b.uom || 'Pcs'}
+                                      </span>
                                     )}
                                   </td>
                                   <td className="py-2 px-3 text-center text-gray-600 font-mono whitespace-nowrap w-20">{b.inStock ?? 0}</td>

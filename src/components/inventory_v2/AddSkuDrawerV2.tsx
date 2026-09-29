@@ -2749,8 +2749,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                               <tr className="border-b border-gray-100 text-[10px] font-bold text-gray-400 uppercase">
                                 <th className="py-2 px-2">ITEM</th>
                                 <th className="py-2 px-2 w-24 text-center">QTY</th>
-                                <th className="py-2 px-2 w-20 text-center">UOM</th>
-                                <th className="py-2 px-2 w-20 text-center">AUOM</th>
+                                <th className="py-2 px-2 min-w-[110px] text-center">UOM / AUOM</th>
                                 <th className="py-2 px-2 w-20 text-center">IN STOCK</th>
                                 <th className="py-2 px-1 w-8 text-center"></th>
                               </tr>
@@ -2786,26 +2785,50 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                     />
                                   </td>
                                   <td className="py-2 px-2 text-center">
-                                    <input
-                                      type="text"
-                                      value={item.uom || ''}
-                                      onChange={(e) => updateBomItem(item.id, 'uom', e.target.value)}
-                                      className="w-full px-1.5 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 bg-white text-center uppercase"
-                                      placeholder="UOM"
-                                    />
-                                  </td>
-                                  <td className="py-2 px-2 text-center">
-                                    <input
-                                      type="text"
-                                      value={item.auom || item.altUnit || ''}
-                                      onChange={(e) => {
-                                        updateBomItem(item.id, 'auom', e.target.value);
-                                        updateBomItem(item.id, 'altUnit', e.target.value);
-                                      }}
-                                      className="w-full px-1.5 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 bg-white text-center uppercase"
-                                      placeholder="AUOM"
-                                      title="Alternate Unit of Measurement"
-                                    />
+                                    {(() => {
+                                      const matchedSku = (allSkusList || []).find(s => 
+                                        (item.skuId && String(s._id) === String(item.skuId)) ||
+                                        (item.skuCode && s.skuCode === item.skuCode) ||
+                                        (item.name && s.name === item.name)
+                                      );
+                                      const primaryUom = matchedSku?.unit || item.uom || 'Kg';
+                                      const altUom = matchedSku?.altUnit || item.auom || (item as any).altUnit || '';
+                                      const hasAlt = !!(altUom && altUom.trim() && altUom.trim().toLowerCase() !== primaryUom.trim().toLowerCase());
+
+                                      const options: { value: string; label: string }[] = [];
+                                      options.push({ value: primaryUom, label: `${primaryUom} (UOM)` });
+                                      if (hasAlt) {
+                                        options.push({ value: altUom.trim(), label: `${altUom.trim()} (AUOM)` });
+                                      }
+                                      if (item.uom && !options.some(o => o.value.toLowerCase() === item.uom.toLowerCase())) {
+                                        options.push({ value: item.uom, label: item.uom });
+                                      }
+
+                                      const selectedValue = options.some(o => o.value.toLowerCase() === (item.uom || '').toLowerCase())
+                                        ? options.find(o => o.value.toLowerCase() === (item.uom || '').toLowerCase())!.value
+                                        : primaryUom;
+
+                                      return (
+                                        <select
+                                          value={selectedValue}
+                                          onChange={(e) => {
+                                            const val = e.target.value;
+                                            const isAlt = hasAlt && val.toLowerCase() === altUom.trim().toLowerCase();
+                                            updateBomItem(item.id, 'uom', val);
+                                            updateBomItem(item.id, 'auom', isAlt ? val : (altUom || ''));
+                                            updateBomItem(item.id, 'altUnit', isAlt ? val : (altUom || ''));
+                                          }}
+                                          className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 bg-white text-center cursor-pointer focus:outline-none focus:border-blue-500"
+                                          title="Unit of Measurement (UOM / AUOM)"
+                                        >
+                                          {options.map(opt => (
+                                            <option key={opt.value} value={opt.value}>
+                                              {opt.label}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      );
+                                    })()}
                                   </td>
                                   <td className="py-2 px-2 text-center text-gray-500 font-mono">{item.inStock}</td>
                                   <td className="py-2 px-1 text-center">

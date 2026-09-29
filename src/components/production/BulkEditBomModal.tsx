@@ -1010,8 +1010,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                             <th className="py-1.5 px-2 w-7 text-center">#</th>
                             <th className="py-1.5 px-2 min-w-[170px]">MATERIAL</th>
                             <th className="py-1.5 px-1.5 text-center w-16">QTY</th>
-                            <th className="py-1.5 px-1.5 text-center w-14">UOM</th>
-                            <th className="py-1.5 px-1.5 text-center w-14">AUOM</th>
+                            <th className="py-1.5 px-1.5 text-center min-w-[120px]">UOM / AUOM</th>
                             <th className="py-1.5 px-1.5 text-center w-16">IN STOCK</th>
                             <th className="py-1.5 px-1.5 text-center w-10"></th>
                           </tr>
@@ -1065,29 +1064,53 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                                 />
                               </td>
                               <td className="py-1.5 px-1.5 text-center">
-                                <input
-                                  type="text"
-                                  value={b.uom || ''}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setActiveRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, uom: val } : item));
-                                  }}
-                                  className="w-12 h-7 border border-slate-200 focus:border-blue-400 rounded-md px-1 py-0.5 text-[10.5px] font-bold text-center uppercase bg-white shadow-3xs focus:outline-none mx-auto block"
-                                  placeholder="UOM"
-                                />
-                              </td>
-                              <td className="py-1.5 px-1.5 text-center">
-                                <input
-                                  type="text"
-                                  value={b.auom || (b as any).altUnit || ''}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setActiveRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, auom: val, altUnit: val } : item));
-                                  }}
-                                  className="w-14 h-7 border border-slate-200 focus:border-blue-400 rounded-md px-1 py-0.5 text-[10.5px] font-bold text-center uppercase bg-white shadow-3xs focus:outline-none mx-auto block"
-                                  placeholder="AUOM"
-                                  title="Alternate Unit of Measurement"
-                                />
+                                {(() => {
+                                  const matchedSku = skus.find(s => 
+                                    (b.skuId && String(s._id) === String(b.skuId)) ||
+                                    (b.skuCode && s.skuCode === b.skuCode) ||
+                                    (b.name && s.name === b.name)
+                                  );
+                                  const primaryUom = matchedSku?.unit || b.uom || 'KG';
+                                  const altUom = matchedSku?.altUnit || b.auom || (b as any).altUnit || '';
+                                  const hasAlt = !!(altUom && altUom.trim() && altUom.trim().toLowerCase() !== primaryUom.trim().toLowerCase());
+
+                                  const options: { value: string; label: string }[] = [];
+                                  options.push({ value: primaryUom, label: `${primaryUom} (UOM)` });
+                                  if (hasAlt) {
+                                    options.push({ value: altUom.trim(), label: `${altUom.trim()} (AUOM)` });
+                                  }
+                                  if (b.uom && !options.some(o => o.value.toLowerCase() === b.uom.toLowerCase())) {
+                                    options.push({ value: b.uom, label: b.uom });
+                                  }
+
+                                  const selectedValue = options.some(o => o.value.toLowerCase() === (b.uom || '').toLowerCase())
+                                    ? options.find(o => o.value.toLowerCase() === (b.uom || '').toLowerCase())!.value
+                                    : primaryUom;
+
+                                  return (
+                                    <select
+                                      value={selectedValue}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        const isAlt = hasAlt && val.toLowerCase() === altUom.trim().toLowerCase();
+                                        setActiveRecipeItems(prev => prev.map(item => item.id === b.id ? { 
+                                          ...item, 
+                                          uom: val,
+                                          auom: isAlt ? val : (altUom || ''),
+                                          altUnit: isAlt ? val : (altUom || '')
+                                        } : item));
+                                      }}
+                                      className="h-7 px-2 border border-slate-200 focus:border-blue-400 rounded-md text-[10.5px] font-bold text-slate-800 bg-white shadow-3xs focus:outline-none cursor-pointer mx-auto block max-w-[125px] truncate"
+                                      title="Unit of Measurement (UOM / AUOM)"
+                                    >
+                                      {options.map(opt => (
+                                        <option key={opt.value} value={opt.value}>
+                                          {opt.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  );
+                                })()}
                               </td>
                               <td className="py-1.5 px-1.5 text-center">
                                 <span className="font-mono text-[10px] font-semibold text-slate-500 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded">
@@ -1108,7 +1131,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                           ))}
                           {activeRecipeItems.length === 0 && (
                             <tr>
-                              <td colSpan={7} className="py-3.5 text-center text-[11px] text-slate-400 italic bg-slate-50/20">
+                              <td colSpan={6} className="py-3.5 text-center text-[11px] text-slate-400 italic bg-slate-50/20">
                                 No materials added yet. Click "+ Add Material" above or choose from the catalog on the right.
                               </td>
                             </tr>
