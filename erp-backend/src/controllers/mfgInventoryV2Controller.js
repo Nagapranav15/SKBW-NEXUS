@@ -2581,7 +2581,7 @@ exports.getMetadata = async (req, res, next) => {
 
 exports.updateMetadata = async (req, res, next) => {
   try {
-    const { companyId, units, categories, ruleTypes, groups, brands, categoryFields, categoryCards, standardizedSheets } = req.body;
+    const { companyId, units, categories, ruleTypes, groups, brands, categoryFields, categoryCards, standardizedSheets, departmentPresets } = req.body;
     if (!companyId) {
       return res.status(400).json({ msg: "companyId is required" });
     }
@@ -2598,6 +2598,7 @@ exports.updateMetadata = async (req, res, next) => {
     if (categoryFields !== undefined) updateObj.categoryFields = categoryFields;
     if (categoryCards !== undefined) updateObj.categoryCards = categoryCards;
     if (standardizedSheets !== undefined) updateObj.standardizedSheets = standardizedSheets;
+    if (departmentPresets !== undefined) updateObj.departmentPresets = departmentPresets;
 
     const doc = await Metadata.findOneAndUpdate(
       { company: companyObjId },

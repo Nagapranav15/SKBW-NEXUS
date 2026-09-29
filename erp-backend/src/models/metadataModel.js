@@ -9,6 +9,7 @@ const metadataSchema = new mongoose.Schema({
   brands: { type: [String], default: [] },
   categoryCards: { type: Array, default: [] },
   standardizedSheets: { type: Array, default: [] },
+  departmentPresets: { type: Array, default: [] },
   categoryFields: {
     type: Map,
     of: [String],

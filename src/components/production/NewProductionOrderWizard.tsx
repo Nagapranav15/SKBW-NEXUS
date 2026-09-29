@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { ProductionOrder } from '../../types/production';
 import { getNextProductionOrderNumber, createProductionOrder } from '../../api/productionApi';
-import { getSkusV2, getWarehouseHierarchyV2, SkuV2, WarehouseLocationV2, getProductionMaterialRates, MaterialRateInfo } from '../../api/mfgApiV2';
+import { getSkusV2, getWarehouseHierarchyV2, SkuV2, WarehouseLocationV2, getProductionMaterialRates, MaterialRateInfo, getMetadataV2, updateMetadataV2 } from '../../api/mfgApiV2';
 import { LocationSelectPopup } from '../stock_v2/LocationSelectPopup';
 import { BomCopyPasteControls } from '../inventory_v2/BomCopyPasteControls';
 import { copyBom, useCopiedBom } from '../../utils/bomClipboard';
@@ -94,71 +94,71 @@ interface AdditionalCostRow {
   appliedAs: 'Total Cost for this production' | 'Per Unit (GBL)' | 'Per Unit (PCS)';
 }
 
-const DEFAULT_DEPARTMENT_PRESETS: DepartmentPreset[] = [
-  {
-    id: 'dept-notebook',
-    name: 'Notebook Manufacturing',
-    locationName: 'SKBW - Ground Floor',
-    warehouseId: 'fact-skbw',
-    floorId: 'floor-ground',
-    zoneId: 'zone-a',
-    locationId: 'loc-top'
-  },
-  {
-    id: 'dept-ruling',
-    name: 'Ruling & Cutting Line',
-    locationName: 'SKBW - Ground Floor',
-    warehouseId: 'fact-skbw',
-    floorId: 'floor-ground',
-    zoneId: 'zone-m',
-    locationId: 'loc-m-top'
-  },
-  {
-    id: 'dept-binding',
-    name: 'Binding Department',
-    locationName: 'SKBW - 1st Floor',
-    warehouseId: 'fact-skbw',
-    floorId: 'floor-1st',
-    zoneId: '',
-    locationId: ''
-  },
-  {
-    id: 'dept-cover',
-    name: 'Index & Cover Prep',
-    locationName: 'LOM Warehouse',
-    warehouseId: 'fact-lom',
-    floorId: '',
-    zoneId: '',
-    locationId: ''
-  },
-  {
-    id: 'dept-printing',
-    name: 'Printing Department',
-    locationName: 'SKBW - Ground Floor',
-    warehouseId: 'fact-skbw',
-    floorId: 'floor-ground',
-    zoneId: 'zone-a',
-    locationId: 'loc-bottom'
-  },
-  {
-    id: 'dept-packing',
-    name: 'Packing Department',
-    locationName: 'SKBW - Ground Floor',
-    warehouseId: 'fact-skbw',
-    floorId: 'floor-ground',
-    zoneId: 'zone-s',
-    locationId: 'loc-s1'
-  },
-  {
-    id: 'dept-dispatch',
-    name: 'Dispatch Department',
-    locationName: 'LOM Warehouse',
-    warehouseId: 'fact-lom',
-    floorId: '',
-    zoneId: '',
-    locationId: ''
+export const buildCleanDepartmentPresets = (locs: WarehouseLocationV2[]): DepartmentPreset[] => {
+  if (!Array.isArray(locs) || locs.length === 0) {
+    return [
+      { id: 'dept-notebook', name: 'Notebook Manufacturing', locationName: 'Main Factory' },
+      { id: 'dept-ruling', name: 'Ruling & Cutting Line', locationName: 'Main Factory' },
+      { id: 'dept-printing', name: 'Printing Department', locationName: 'Main Factory' },
+      { id: 'dept-binding', name: 'Binding Department', locationName: 'Main Factory' },
+      { id: 'dept-packing', name: 'Packing Department', locationName: 'Main Factory' },
+      { id: 'dept-cover', name: 'Index & Cover Prep', locationName: 'Main Factory' },
+      { id: 'dept-dispatch', name: 'Dispatch Department', locationName: 'Main Factory' }
+    ];
   }
-];
+
+  function findLoc(names: string[]) {
+    for (const name of names) {
+      const found = locs.find(l => (l.name || '').toLowerCase() === name.toLowerCase());
+      if (found) return found;
+    }
+    return locs[0] || null;
+  }
+
+  function getHierarchy(leaf: WarehouseLocationV2 | null) {
+    if (!leaf) return { locationName: 'Main Factory', warehouseId: '', floorId: '', zoneId: '', locationId: '' };
+    const chain = [leaf];
+    let curr: WarehouseLocationV2 | null = leaf;
+    while (curr && curr.parentId) {
+      const p = locs.find(l => String(l._id) === String(curr!.parentId));
+      if (p) { chain.unshift(p); curr = p; } else break;
+    }
+    const wh = chain[0] || leaf;
+    const fl = chain.length > 1 ? chain[1] : null;
+    const zn = chain.length > 2 ? chain[2] : null;
+    const loc = chain.length > 3 ? chain[3] : (zn || fl || wh);
+    const locPath = chain.map(c => c.name).join(' > ');
+    return {
+      locationName: locPath,
+      warehouseId: String(wh._id),
+      floorId: fl ? String(fl._id) : '',
+      zoneId: zn ? String(zn._id) : '',
+      locationId: String(loc._id)
+    };
+  }
+
+  const deptConfigs = [
+    { id: 'dept-notebook', name: 'Notebook Manufacturing', targets: ['A', 'GND', 'SKBW'] },
+    { id: 'dept-ruling', name: 'Ruling & Cutting Line', targets: ['B', 'GND', 'SKBW'] },
+    { id: 'dept-printing', name: 'Printing Department', targets: ['C', 'GND', 'SKBW'] },
+    { id: 'dept-binding', name: 'Binding Department', targets: ['A1', '1ST', 'SKBW'] },
+    { id: 'dept-packing', name: 'Packing Department', targets: ['B1', '1ST', 'SKBW'] },
+    { id: 'dept-cover', name: 'Index & Cover Prep', targets: ['OPEN', 'GND', 'LOM'] },
+    { id: 'dept-dispatch', name: 'Dispatch Department', targets: ['MARUTI', 'OPEN', 'LOM'] }
+  ];
+
+  return deptConfigs.map(cfg => {
+    const locDoc = findLoc(cfg.targets);
+    const h = getHierarchy(locDoc);
+    return {
+      id: cfg.id,
+      name: cfg.name,
+      ...h
+    };
+  });
+};
+
+const DEFAULT_DEPARTMENT_PRESETS: DepartmentPreset[] = buildCleanDepartmentPresets([]);
 
 const DEFAULT_PREDEFINED_COSTS: PredefinedCost[] = [
   { id: 'cost-elec', name: 'Electricity / Power Charges', basis: 'Per GBL', defaultRate: 25, appliedAs: 'Per Unit (GBL)' },
@@ -197,7 +197,11 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   const [backendSkus, setBackendSkus] = useState<SkuV2[]>(initialSkus);
   const [warehouseLocations, setWarehouseLocations] = useState<WarehouseLocationV2[]>([]);
 
-  // Department Presets (matching Sales Order presets in localStorage)
+  // Category & Type Shifting in Product to Manufacture
+  const [productCategoryFilter, setProductCategoryFilter] = useState<string>('ALL');
+  const [productTypeFilter, setProductTypeFilter] = useState<'ALL' | 'products' | 'semi'>('ALL');
+
+  // Department Presets (synchronized across all systems via company metadata)
   const [departmentPresets, setDepartmentPresets] = useState<DepartmentPreset[]>(() => {
     try {
       const stored = localStorage.getItem('skbw_department_presets_v2');
@@ -340,22 +344,40 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     const loadData = async () => {
       try {
         if (companyId) {
-          const [nextNum, skusRes, whRes] = await Promise.allSettled([
+          const [nextNum, skusRes, whRes, metaRes] = await Promise.allSettled([
             getNextProductionOrderNumber(companyId),
             getSkusV2(companyId),
-            getWarehouseHierarchyV2(companyId)
+            getWarehouseHierarchyV2(companyId),
+            getMetadataV2(companyId)
           ]);
 
           if (!isMounted) return;
 
+          let loadedWhLocs: WarehouseLocationV2[] = [];
+          if (whRes.status === 'fulfilled' && Array.isArray(whRes.value)) {
+            loadedWhLocs = whRes.value;
+            setWarehouseLocations(whRes.value);
+          }
           if (nextNum.status === 'fulfilled' && nextNum.value) {
             setOrderNumber(nextNum.value);
           }
           if (skusRes.status === 'fulfilled' && Array.isArray(skusRes.value)) {
             setBackendSkus(skusRes.value);
           }
-          if (whRes.status === 'fulfilled' && Array.isArray(whRes.value)) {
-            setWarehouseLocations(whRes.value);
+
+          // Sync Department Presets from database so all systems have identical presets
+          if (metaRes.status === 'fulfilled' && metaRes.value) {
+            const serverPresets = metaRes.value.departmentPresets;
+            if (Array.isArray(serverPresets) && serverPresets.length > 0) {
+              setDepartmentPresets(serverPresets);
+              try {
+                localStorage.setItem('skbw_department_presets_v2', JSON.stringify(serverPresets));
+              } catch (e) {}
+            } else {
+              const freshDefaults = buildCleanDepartmentPresets(loadedWhLocs);
+              setDepartmentPresets(freshDefaults);
+              updateMetadataV2({ companyId, departmentPresets: freshDefaults }).catch(() => {});
+            }
           }
         }
       } catch (err) {
@@ -773,7 +795,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     }
   };
 
-  const handleAddNewDepartmentPreset = () => {
+  const handleAddNewDepartmentPreset = async () => {
     if (!newDeptName.trim()) {
       showToast('Please enter a department name', 'error');
       return;
@@ -792,17 +814,35 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     try {
       localStorage.setItem('skbw_department_presets_v2', JSON.stringify(updated));
     } catch (e) {}
+    if (companyId) {
+      await updateMetadataV2({ companyId, departmentPresets: updated }).catch(e => console.error(e));
+    }
     setNewDeptName('');
-    showToast(`Added "${newPreset.name}" to department presets`, 'success');
+    showToast(`Added "${newPreset.name}" to department presets (synced across all systems)`, 'success');
   };
 
-  const handleDeleteDepartmentPreset = (id: string) => {
+  const handleDeleteDepartmentPreset = async (id: string) => {
     const updated = departmentPresets.filter(p => p.id !== id);
     setDepartmentPresets(updated);
     try {
       localStorage.setItem('skbw_department_presets_v2', JSON.stringify(updated));
     } catch (e) {}
-    showToast('Department preset deleted', 'info');
+    if (companyId) {
+      await updateMetadataV2({ companyId, departmentPresets: updated }).catch(e => console.error(e));
+    }
+    showToast('Department preset deleted (synced across all systems)', 'info');
+  };
+
+  const handleResetDepartmentPresets = async () => {
+    const defaults = buildCleanDepartmentPresets(warehouseLocations);
+    setDepartmentPresets(defaults);
+    try {
+      localStorage.setItem('skbw_department_presets_v2', JSON.stringify(defaults));
+    } catch (e) {}
+    if (companyId) {
+      await updateMetadataV2({ companyId, departmentPresets: defaults }).catch(e => console.error(e));
+    }
+    showToast('Reset department presets to system defaults', 'info');
   };
 
   // Predefined Overheads Presets Handlers
@@ -1469,17 +1509,61 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     }
   };
 
-  // Filter finished goods and semi-finished matching search
+  // Filter finished goods and semi-finished matching search, category, and type
+  const categoryBreakdown = useMemo(() => {
+    const catMap = new Map<string, number>();
+    let finishedCount = 0;
+    let semiCount = 0;
+
+    manufacturableSkus.forEach(s => {
+      const type = getItemClassification(s);
+      if (type === 'products') finishedCount++;
+      if (type === 'semi') semiCount++;
+
+      const cat = (s.category || '').trim();
+      if (cat) {
+        catMap.set(cat, (catMap.get(cat) || 0) + 1);
+      }
+    });
+
+    const sortedCategories = Array.from(catMap.entries())
+      .sort((a, b) => b[1] - a[1]);
+
+    return {
+      total: manufacturableSkus.length,
+      finishedCount,
+      semiCount,
+      categories: sortedCategories
+    };
+  }, [manufacturableSkus]);
+
   const filteredProducts = useMemo(() => {
     const q = productSearch.toLowerCase().trim();
-    if (!q) return manufacturableSkus;
-    return manufacturableSkus.filter(s => 
-      (s.name || '').toLowerCase().includes(q) ||
-      (s.skuCode || '').toLowerCase().includes(q) ||
-      (s.brand || '').toLowerCase().includes(q) ||
-      (s.category || '').toLowerCase().includes(q)
-    );
-  }, [manufacturableSkus, productSearch]);
+    return manufacturableSkus.filter(s => {
+      // 1. Classification type filter
+      if (productTypeFilter !== 'ALL') {
+        const type = getItemClassification(s);
+        if (type !== productTypeFilter) return false;
+      }
+
+      // 2. Category filter
+      if (productCategoryFilter !== 'ALL') {
+        const cat = (s.category || '').trim().toLowerCase();
+        if (cat !== productCategoryFilter.toLowerCase()) return false;
+      }
+
+      // 3. Search query
+      if (q) {
+        const matchName = (s.name || '').toLowerCase().includes(q);
+        const matchCode = (s.skuCode || '').toLowerCase().includes(q);
+        const matchBrand = (s.brand || '').toLowerCase().includes(q);
+        const matchCat = (s.category || '').toLowerCase().includes(q);
+        if (!matchName && !matchCode && !matchBrand && !matchCat) return false;
+      }
+
+      return true;
+    });
+  }, [manufacturableSkus, productSearch, productTypeFilter, productCategoryFilter]);
 
   return (
     <div className="flex flex-col h-full bg-slate-50/70 text-gray-800 font-sans select-none overflow-hidden text-xs">
@@ -1546,7 +1630,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
 
           {/* CARD 1: Order Information (Fixed Height) */}
-          <div className="lg:col-span-3 bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs h-[270px] min-h-[270px] max-h-[270px] flex flex-col justify-between">
+          <div className="lg:col-span-3 bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs h-[305px] min-h-[305px] max-h-[305px] flex flex-col justify-between">
             <div className="flex items-center gap-2 text-xs font-bold text-gray-900 pb-1 border-b border-gray-100">
               <Calendar className="w-4 h-4 text-blue-600" />
               <span>Order Information</span>
@@ -1719,33 +1803,105 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
             </div>
           </div>
 
-          {/* CARD 2: Product to Manufacture (Expanded Width for Full Item Titles) */}
-          <div className="lg:col-span-6 bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs h-[270px] min-h-[270px] max-h-[270px] flex flex-col justify-between">
+          {/* CARD 2: Product to Manufacture (Expanded Width with Category Shifting) */}
+          <div className="lg:col-span-6 bg-white rounded-2xl border border-gray-200/80 p-3.5 shadow-3xs h-[305px] min-h-[305px] max-h-[305px] flex flex-col justify-between">
             <div>
-              <div className="flex items-center justify-between pb-1.5">
-                <div className="flex items-center gap-2 text-xs font-bold text-gray-900">
+              <div className="flex items-center justify-between pb-1">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-gray-900">
                   <Package className="w-4 h-4 text-blue-600" />
                   <span>Product to Manufacture</span>
                 </div>
-                {productName && (
+                {productName ? (
                   <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
                     <Check className="w-3 h-3 stroke-[3]" />
                     <span>Selected</span>
                   </span>
+                ) : (
+                  <span className="text-[10px] text-gray-400 font-mono">
+                    {filteredProducts.length} of {categoryBreakdown.total} available
+                  </span>
                 )}
+              </div>
+
+              {/* Category & Type Shift Bar */}
+              <div className="mb-2 bg-slate-50 border border-slate-200/70 rounded-xl p-1 flex items-center justify-between gap-1.5 flex-wrap">
+                {/* Type Filter Pills: All / Finished / Semi */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setProductTypeFilter('ALL')}
+                    className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                      productTypeFilter === 'ALL'
+                        ? 'bg-white text-blue-700 shadow-3xs border border-blue-200'
+                        : 'text-gray-500 hover:text-gray-800 hover:bg-white/60'
+                    }`}
+                  >
+                    All ({categoryBreakdown.total})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setProductTypeFilter('products')}
+                    className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                      productTypeFilter === 'products'
+                        ? 'bg-white text-blue-700 shadow-3xs border border-blue-200'
+                        : 'text-gray-500 hover:text-gray-800 hover:bg-white/60'
+                    }`}
+                  >
+                    Finished ({categoryBreakdown.finishedCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setProductTypeFilter('semi')}
+                    className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                      productTypeFilter === 'semi'
+                        ? 'bg-white text-purple-700 shadow-3xs border border-purple-200'
+                        : 'text-gray-500 hover:text-gray-800 hover:bg-white/60'
+                    }`}
+                  >
+                    Semi Goods ({categoryBreakdown.semiCount})
+                  </button>
+                </div>
+
+                {/* Category Dropdown Selector */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <div className="relative">
+                    <select
+                      value={productCategoryFilter}
+                      onChange={(e) => setProductCategoryFilter(e.target.value)}
+                      className={`text-[10px] font-bold pl-2 pr-6 py-0.5 rounded-lg border appearance-none cursor-pointer focus:outline-none transition-all ${
+                        productCategoryFilter !== 'ALL'
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-3xs'
+                          : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <option value="ALL" className="bg-white text-gray-900 font-semibold">
+                        📂 All Categories ({categoryBreakdown.categories.length})
+                      </option>
+                      {categoryBreakdown.categories.map(([cat, count]) => (
+                        <option key={cat} value={cat} className="bg-white text-gray-900 font-semibold">
+                          {cat} ({count})
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className={`w-3 h-3 absolute right-1.5 top-1.5 pointer-events-none ${
+                      productCategoryFilter !== 'ALL' ? 'text-white' : 'text-gray-400'
+                    }`} />
+                  </div>
+                  {productCategoryFilter !== 'ALL' && (
+                    <button
+                      type="button"
+                      onClick={() => setProductCategoryFilter('ALL')}
+                      className="p-1 text-gray-400 hover:text-rose-600 rounded cursor-pointer"
+                      title="Clear category filter"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Searchable Product Input */}
               <div className="relative" ref={productDropdownRef}>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[10.5px] font-bold text-gray-600">
-                    Product / Semi Good to Manufacture <span className="text-red-500">*</span>
-                  </label>
-                  <span className="text-[10px] text-gray-400 font-mono">
-                    {manufacturableSkus.length} products & semi goods available
-                  </span>
-                </div>
-
                 <div className="relative">
                   <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
                   <input
@@ -1758,7 +1914,15 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                     }}
                     onClick={() => setShowProductDropdown(true)}
                     onFocus={() => setShowProductDropdown(true)}
-                    placeholder="Search finished product or semi good to manufacture..."
+                    placeholder={
+                      productCategoryFilter !== 'ALL'
+                        ? `Search in ${productCategoryFilter} (${filteredProducts.length} items)...`
+                        : productTypeFilter === 'semi'
+                        ? `Search semi-finished goods (${filteredProducts.length} items)...`
+                        : productTypeFilter === 'products'
+                        ? `Search finished products (${filteredProducts.length} items)...`
+                        : "Search finished product or semi good to manufacture..."
+                    }
                     title={productSearch || productName}
                     className="w-full pl-8 pr-10 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
                   />
@@ -1787,16 +1951,57 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   </div>
                 </div>
 
-                {/* Product Dropdown Popover */}
+                {/* Product Dropdown Popover with Category Shift Filter Header */}
                 {showProductDropdown && (
-                  <div className="absolute left-0 top-full mt-1 w-full min-w-[360px] sm:min-w-[480px] bg-white border border-gray-200 rounded-xl shadow-2xl z-[999] max-h-72 overflow-y-auto divide-y divide-gray-50 p-1">
+                  <div className="absolute left-0 top-full mt-1 w-full min-w-[360px] sm:min-w-[500px] bg-white border border-gray-200 rounded-xl shadow-2xl z-[999] max-h-80 overflow-y-auto divide-y divide-gray-100 p-1">
+                    {/* Popover Category Chips Header */}
+                    <div className="sticky top-0 bg-white/95 backdrop-blur-xs p-2 border-b border-gray-100 z-10 space-y-1.5 shadow-3xs">
+                      <div className="flex items-center justify-between text-[10px] font-bold text-gray-500">
+                        <span className="flex items-center gap-1">
+                          <Tag className="w-3 h-3 text-blue-600" />
+                          <span>Shift Category:</span>
+                        </span>
+                        <span>Showing {filteredProducts.length} of {categoryBreakdown.total}</span>
+                      </div>
+                      <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-thin">
+                        <button
+                          type="button"
+                          onClick={() => setProductCategoryFilter('ALL')}
+                          className={`px-2 py-0.5 rounded-full text-[9.5px] font-bold shrink-0 transition-all cursor-pointer ${
+                            productCategoryFilter === 'ALL'
+                              ? 'bg-blue-600 text-white shadow-3xs'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                        >
+                          All ({categoryBreakdown.total})
+                        </button>
+                        {categoryBreakdown.categories.slice(0, 10).map(([cat, count]) => (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => setProductCategoryFilter(cat)}
+                            className={`px-2 py-0.5 rounded-full text-[9.5px] font-bold shrink-0 transition-all cursor-pointer ${
+                              productCategoryFilter === cat
+                                ? 'bg-blue-600 text-white shadow-3xs'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          >
+                            {cat} ({count})
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     {filteredProducts.map((p) => {
                       const isSelected = p._id === selectedSkuId || p.name === productName;
                       const specBadge = getSkuSpecOrConversion(p);
                       return (
                         <div
                           key={p._id}
-                          onClick={() => handleSelectProduct(p)}
+                          onClick={() => {
+                            handleSelectProduct(p);
+                            setShowProductDropdown(false);
+                          }}
                           className={`p-2.5 cursor-pointer rounded-lg transition-colors flex items-center justify-between text-xs ${
                             isSelected ? 'bg-blue-100/90 font-bold border border-blue-200' : 'hover:bg-blue-50/80'
                           }`}
@@ -1806,7 +2011,9 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                             <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                               <span className="text-[10px] text-gray-400 font-mono">{p.skuCode}</span>
                               <span className="text-[10px] text-gray-300">•</span>
-                              <span className="text-[10px] text-gray-500">{p.category || 'Finished Goods'}</span>
+                              <span className="text-[10px] font-semibold text-gray-700 bg-gray-100 px-1.5 py-0.2 rounded border border-gray-200/60">
+                                {p.category || 'General'}
+                              </span>
                               {specBadge && (
                                 <>
                                   <span className="text-[10px] text-gray-300">•</span>
@@ -1831,7 +2038,9 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                       );
                     })}
                     {filteredProducts.length === 0 && (
-                      <div className="p-3 text-center text-gray-400 italic">No products found</div>
+                      <div className="p-4 text-center text-gray-400 italic">
+                        No products found matching &ldquo;{productSearch}&rdquo; in {productCategoryFilter !== 'ALL' ? productCategoryFilter : 'this selection'}.
+                      </div>
                     )}
                   </div>
                 )}
@@ -1887,14 +2096,14 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                 <Package className="w-7 h-7 text-gray-300 mb-1 stroke-[1.5]" />
                 <p className="text-xs font-semibold text-gray-500">No Product Selected</p>
                 <p className="text-[10px] text-gray-400 mt-0.5">
-                  Search and select a product above to load BOM and begin batch planning.
+                  Search or shift categories above to load BOM and begin batch planning.
                 </p>
               </div>
             )}
           </div>
 
           {/* CARD 3: Output Location & Targets (Decreased Size: lg:col-span-3) */}
-          <div className="lg:col-span-3 bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs h-[270px] min-h-[270px] max-h-[270px] flex flex-col justify-between">
+          <div className="lg:col-span-3 bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs h-[305px] min-h-[305px] max-h-[305px] flex flex-col justify-between">
             <div className="flex items-center gap-2 text-xs font-bold text-gray-900 pb-1 border-b border-gray-100">
               <MapPin className="w-4 h-4 text-blue-600" />
               <span>Output Location & Targets</span>
@@ -3023,13 +3232,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
             <div className="flex justify-between items-center pt-2 border-t border-gray-100 text-xs">
               <button
                 type="button"
-                onClick={() => {
-                  setDepartmentPresets(DEFAULT_DEPARTMENT_PRESETS);
-                  try {
-                    localStorage.setItem('skbw_department_presets_v2', JSON.stringify(DEFAULT_DEPARTMENT_PRESETS));
-                  } catch (e) {}
-                  showToast('Reset to default department presets', 'info');
-                }}
+                onClick={handleResetDepartmentPresets}
                 className="text-[11px] font-bold text-gray-500 hover:text-gray-700 cursor-pointer"
               >
                 Reset to Defaults
