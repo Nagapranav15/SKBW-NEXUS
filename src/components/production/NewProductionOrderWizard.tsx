@@ -61,6 +61,8 @@ interface MaterialRow {
   rate: number;
   computedAvgRate?: number;
   computedFifoRate?: number;
+  /** Rate used in the most recently created production order for this material */
+  lastProductionRate?: number;
   fifoBatchInfo?: {
     batchNumber: string;
     date?: string;
@@ -1015,14 +1017,28 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         const rateInfo = sId ? ratesMap[sId] : null;
         if (!rateInfo) return m;
 
+        // lastProductionRate: the rate this material was used at in the most recent
+        // production order — serves as the carry-forward default.
+        const lastProdRate = Number(rateInfo.lastProductionRate) || 0;
+
         const mode = modeToApply || m.rateMode || globalRateMode;
         let finalRate = m.rate;
         if (mode === 'avg_purchase') {
-          finalRate = rateInfo.avgRate > 0 ? rateInfo.avgRate : (m.rate > 0 ? m.rate : rateInfo.standardRate);
+          // Prefer live avg from active purchase batches; if not available, carry
+          // forward from last production; then fall back to standard rate.
+          finalRate = rateInfo.avgRate > 0
+            ? rateInfo.avgRate
+            : (lastProdRate > 0 ? lastProdRate : (m.rate > 0 ? m.rate : rateInfo.standardRate));
         } else if (mode === 'fifo') {
-          finalRate = rateInfo.fifoRate > 0 ? rateInfo.fifoRate : (m.rate > 0 ? m.rate : rateInfo.standardRate);
+          finalRate = rateInfo.fifoRate > 0
+            ? rateInfo.fifoRate
+            : (lastProdRate > 0 ? lastProdRate : (m.rate > 0 ? m.rate : rateInfo.standardRate));
         } else if (mode === 'custom') {
-          finalRate = m.rate > 0 ? m.rate : (rateInfo.avgRate || rateInfo.standardRate || 0);
+          // Custom mode: use existing row rate if already set; otherwise seed with
+          // last production rate so users don't start from zero.
+          finalRate = m.rate > 0
+            ? m.rate
+            : (lastProdRate > 0 ? lastProdRate : (rateInfo.avgRate || rateInfo.standardRate || 0));
         }
 
         return {
@@ -1032,6 +1048,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           rate: finalRate,
           computedAvgRate: rateInfo.avgRate,
           computedFifoRate: rateInfo.fifoRate,
+          lastProductionRate: lastProdRate,
           fifoBatchInfo: rateInfo.fifoBatchInfo,
           batchCount: rateInfo.batchCount,
           amount: Math.round(m.requiredQty * finalRate * 100) / 100
@@ -2276,50 +2293,64 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
                         {/* Rate with 3-Mode Selector (Avg Purchases / FIFO / Custom) */}
                         <td className="py-1.5 px-2.5 text-right w-32">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {/* Mode Selector Pill Select */}
-                            <select
-                              value={row.rateMode || 'avg_purchase'}
-                              onChange={(e) => handleSetRowRateMode(row.id, e.target.value as BomRateMode)}
-                              className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border cursor-pointer focus:outline-none transition-all h-7 ${
-                                row.rateMode === 'fifo'
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
-                                  : row.rateMode === 'custom'
-                                  ? 'bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100'
-                                  : 'bg-indigo-50 text-indigo-700 border-indigo-300 hover:bg-indigo-100'
-                              }`}
-                              title="Select valuation method for this material"
-                            >
-                              <option value="avg_purchase">AVG</option>
-                              <option value="fifo">FIFO</option>
-                              <option value="custom">CUSTOM</option>
-                            </select>
+                          <div className="flex flex-col items-end gap-0.5">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {/* Mode Selector Pill Select */}
+                              <select
+                                value={row.rateMode || 'avg_purchase'}
+                                onChange={(e) => handleSetRowRateMode(row.id, e.target.value as BomRateMode)}
+                                className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border cursor-pointer focus:outline-none transition-all h-7 ${
+                                  row.rateMode === 'fifo'
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
+                                    : row.rateMode === 'custom'
+                                    ? 'bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100'
+                                    : 'bg-indigo-50 text-indigo-700 border-indigo-300 hover:bg-indigo-100'
+                                }`}
+                                title="Select valuation method for this material"
+                              >
+                                <option value="avg_purchase">AVG</option>
+                                <option value="fifo">FIFO</option>
+                                <option value="custom">CUSTOM</option>
+                              </select>
 
-                            {/* Rate Input Field */}
-                            <input
-                              type="number"
-                              step="any"
-                              min="0"
-                              disabled={row.rateMode !== 'custom'}
-                              value={row.rate}
-                              onChange={e => handleUpdateMaterial(row.id, 'rate', e.target.value)}
-                              className={`w-20 text-right font-bold bg-white border rounded-md px-2 py-0.5 text-[11px] h-7 focus:ring-1 focus:ring-blue-500 focus:outline-none ${
-                                row.rateMode === 'fifo'
-                                  ? 'border-emerald-300 text-emerald-900 bg-emerald-50/20'
-                                  : row.rateMode === 'custom'
-                                  ? 'border-amber-300 text-amber-900 bg-amber-50/20'
-                                  : 'border-gray-200 text-gray-800'
-                              }`}
-                              title={
-                                row.rateMode === 'fifo'
-                                  ? `FIFO Rate from earliest batch (${row.fifoBatchInfo?.batchNumber || 'Batch'})`
-                                  : row.rateMode === 'avg_purchase'
-                                  ? 'Weighted average rate of purchase batches'
-                                  : 'Custom manual rate'
-                              }
-                            />
+                              {/* Rate Input Field */}
+                              <input
+                                type="number"
+                                step="any"
+                                min="0"
+                                disabled={row.rateMode !== 'custom'}
+                                value={row.rate}
+                                onChange={e => handleUpdateMaterial(row.id, 'rate', e.target.value)}
+                                className={`w-20 text-right font-bold bg-white border rounded-md px-2 py-0.5 text-[11px] h-7 focus:ring-1 focus:ring-blue-500 focus:outline-none ${
+                                  row.rateMode === 'fifo'
+                                    ? 'border-emerald-300 text-emerald-900 bg-emerald-50/20'
+                                    : row.rateMode === 'custom'
+                                    ? 'border-amber-300 text-amber-900 bg-amber-50/20'
+                                    : 'border-gray-200 text-gray-800'
+                                }`}
+                                title={
+                                  row.rateMode === 'fifo'
+                                    ? `FIFO Rate from earliest batch (${row.fifoBatchInfo?.batchNumber || 'Batch'})`
+                                    : row.rateMode === 'avg_purchase'
+                                    ? 'Weighted average rate of purchase batches'
+                                    : 'Custom manual rate'
+                                }
+                              />
+                            </div>
+                            {/* Carry-forward badge: shown when avg/fifo mode fell back to last production rate */}
+                            {row.lastProductionRate != null && row.lastProductionRate > 0 &&
+                              row.rateMode !== 'custom' &&
+                              row.computedAvgRate === 0 && row.computedFifoRate === 0 && (
+                              <span
+                                className="text-[9px] text-purple-600 font-semibold leading-none"
+                                title={`No active purchase batches found. Rate carried forward from last production order (₹${row.lastProductionRate.toFixed(2)}).`}
+                              >
+                                ↩ last prod.
+                              </span>
+                            )}
                           </div>
                         </td>
+
 
                         {/* Material Cost Amount */}
                         <td className="py-1.5 px-2.5 text-right font-bold font-mono text-gray-900 text-[11px] w-28">

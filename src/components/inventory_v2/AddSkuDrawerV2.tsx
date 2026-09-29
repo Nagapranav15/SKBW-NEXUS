@@ -561,7 +561,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
       category: newCategory,
       unit: newUom,
       paperType: newType === 'materials' ? (prev.paperType || 'Reels') : (newType === 'semi' ? 'Sheets' : ''),
-      pages: (newType === 'materials' && prev.paperType !== 'Sheets') ? '' : (newType === 'semi' ? (prev.pages || '500') : prev.pages),
+      pages: (newType === 'materials' && prev.paperType !== 'Sheets') ? '' : prev.pages,
       ruleType: newType === 'materials' ? '' : prev.ruleType
     }));
 
@@ -1284,7 +1284,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         title: '',
         group: '',
         ruleType: '',
-        pages: sectionForNew === 'semi' ? '500' : '',
+        pages: '',
         reamWeight: '',
         booksGbl: '',
         defaultLocation: 'SKBW',

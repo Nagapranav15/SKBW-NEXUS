@@ -1824,9 +1824,11 @@ exports.getBalances = async (req, res, next) => {
       : { skuId: "$skuId", locationId: "$locationId" };
 
     const matchObj = { 
-      status: { $ne: "Cancelled" },
-      referenceType: { $ne: "OpeningStock" },
-      transactionType: { $nin: ["Opening Stock", "Opening Balance", "OPENING_BALANCE"] }
+      status: { $ne: "Cancelled" }
+      // NOTE: Opening stock entries are intentionally included here so that
+      // onHand (IN − OUT) always matches the running balance shown in the
+      // movements ledger.  Do NOT add referenceType or transactionType
+      // exclusions or the two views will diverge.
     };
     if (companyId) {
       const cId = toObjectId(companyId);
@@ -2760,10 +2762,9 @@ exports.getSkuStockDetails = async (req, res, next) => {
     const ledgerMatchFilter = {
       skuId: skuObjId,
       company: companyObjId,
-      status: { $ne: "Cancelled" },
-      // Exclude opening-stock entries (same exclusion used by getBalances)
-      referenceType: { $ne: "OpeningStock" },
-      transactionType: { $nin: ["Opening Stock", "Opening Balance", "OPENING_BALANCE"] }
+      status: { $ne: "Cancelled" }
+      // Opening stock entries are included so that onHand always equals the
+      // net sum of movements shown in the ledger movements tab.
     };
 
     // 1. Location Balances with full hierarchy

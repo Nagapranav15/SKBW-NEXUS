@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { CheckCircle, XCircle, AlertTriangle, Info, X } from 'lucide-react';
 
 interface ToastProps {
@@ -22,11 +23,11 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', duration = 3000, 
   }[type];
 
   return (
-    <div className={`flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg ${config.bg} animate-slide-in`}>
+    <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border shadow-2xl ${config.bg} animate-slide-in backdrop-blur-md`}>
       <config.Icon className={`w-5 h-5 ${config.iconColor} flex-shrink-0`} />
-      <span className={`text-sm font-medium ${config.text} flex-1`}>{message}</span>
-      <button onClick={onClose} className="p-0.5 hover:bg-white/50 rounded">
-        <X className="w-4 h-4 text-gray-400" />
+      <span className={`text-sm font-semibold ${config.text} flex-1 leading-snug`}>{message}</span>
+      <button onClick={onClose} className="p-1 hover:bg-black/5 rounded-lg transition-colors cursor-pointer">
+        <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
       </button>
     </div>
   );
@@ -59,12 +60,18 @@ export const ToastContainer: React.FC = () => {
 
   const remove = (id: number) => setToasts(prev => prev.filter(t => t.id !== id));
 
-  return (
-    <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 max-w-sm">
+  if (toasts.length === 0) return null;
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div className="fixed top-5 right-5 z-[9999999] flex flex-col gap-2.5 max-w-sm w-full pointer-events-none">
       {toasts.map(t => (
-        <Toast key={t.id} message={t.message} type={t.type} onClose={() => remove(t.id)} />
+        <div key={t.id} className="pointer-events-auto">
+          <Toast message={t.message} type={t.type} onClose={() => remove(t.id)} />
+        </div>
       ))}
-    </div>
+    </div>,
+    document.body
   );
 };
 

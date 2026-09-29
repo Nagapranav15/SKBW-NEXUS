@@ -26,8 +26,9 @@ import {
   Columns3 as Columns, Download, FileText, History, Plus, HelpCircle,
   ChevronLeft, ChevronRight, RefreshCw, Save, Eye, Pencil as Edit,
   MapPin as MapPinIcon, AlertCircle, AlertTriangle, ExternalLink, 
-  Factory, Layers, Lock, ArrowRight, Building2, Trash2, X
+  Factory, Layers, Lock, ArrowRight, Building2, Trash2, X, Printer
 } from 'lucide-react';
+import { PurchaseBatchPrintModal } from './PurchaseBatchPrintModal';
 
 interface PurchaseInvoiceFormItem {
   skuId: string;
@@ -54,6 +55,7 @@ interface InvoiceTableProps {
   onViewDetails: (invoice: PurchaseInvoiceV2) => void;
   onEditInvoice: (invoice: PurchaseInvoiceV2) => void;
   onCancelInvoice: (invoice: PurchaseInvoiceV2) => void;
+  onPrintInvoice?: (invoice: PurchaseInvoiceV2) => void;
 }
 
 const getFallbackReamWeight = (sku: any): number => {
@@ -84,7 +86,8 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
   skus,
   onViewDetails,
   onEditInvoice,
-  onCancelInvoice
+  onCancelInvoice,
+  onPrintInvoice
 }) => {
   if (loading) {
     return (
@@ -217,6 +220,15 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
                       >
                         <Eye className="w-4 h-4" />
                       </button>
+                      {onPrintInvoice && (
+                        <button
+                          onClick={() => onPrintInvoice(inv)}
+                          className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer"
+                          title="Print Purchase Batch"
+                        >
+                          <Printer className="w-4 h-4" />
+                        </button>
+                      )}
                       {!isCancelled && onEditInvoice && (
                         <button
                           onClick={() => onEditInvoice(inv)}
@@ -418,6 +430,7 @@ const PurchaseInvoicePage: React.FC = () => {
   // Navigation states
   const [activeSubPage, setActiveSubPage] = useState<'list' | 'new' | 'details'>('list');
   const [selectedInvoice, setSelectedInvoice] = useState<PurchaseInvoiceV2 | null>(null);
+  const [printInvoiceTarget, setPrintInvoiceTarget] = useState<PurchaseInvoiceV2 | null>(null);
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
   useEffect(() => {
@@ -1138,9 +1151,10 @@ const PurchaseInvoicePage: React.FC = () => {
         }
         item.width = w;
         item.length = l;
-        const rw = (selectedSku as any).reamWeight || getFallbackReamWeight(selectedSku);
-        item.reamWeight = rw ? String(Number(rw.toFixed(4))) : '';
-        item.sheetsPerReam = selectedSku.pages || 500;
+        const rw = (selectedSku as any).reamWeight;
+        item.reamWeight = rw !== undefined && rw !== null && rw !== '' ? String(rw) : '';
+        const sp = (selectedSku as any).pages ?? (selectedSku as any).sheetsPerReam ?? (selectedSku as any).standardSheets;
+        item.sheetsPerReam = sp !== undefined && sp !== null && sp !== '' ? String(sp) : '';
 
         // Keep rate and quantity user-definable (do not auto-populate default rates)
         item.ratePerKg = '';
@@ -1598,6 +1612,10 @@ const PurchaseInvoicePage: React.FC = () => {
   };
 
   const handleEditInvoice = (invoice: PurchaseInvoiceV2) => {
+    if (invoice.status === 'Cancelled') {
+      showToast('Cancelled purchase batches cannot be edited.', 'warning');
+      return;
+    }
     setIsEditing(true);
     setEditingInvoiceId(invoice._id || null);
     
@@ -2507,6 +2525,7 @@ const PurchaseInvoicePage: React.FC = () => {
                 setDetailsTab('lots');
                 setActiveSubPage('details');
               }}
+              onPrintInvoice={(inv) => setPrintInvoiceTarget(inv)}
               onEditInvoice={handleEditInvoice}
               onCancelInvoice={handleCancelInvoice}
             />
@@ -2928,11 +2947,11 @@ const PurchaseInvoicePage: React.FC = () => {
                       )}
 
                       {paperType === 'Sheets' && (() => {
-                        const stdSheets = Number(item.sheetsPerReam) || (selectedSku as any)?.pages || (selectedSku as any)?.sheetsPerReam || (selectedSku as any)?.standardSheets || 500;
+                        const stdSheets = Number(item.sheetsPerReam) || (selectedSku as any)?.pages || (selectedSku as any)?.sheetsPerReam || (selectedSku as any)?.standardSheets || 0;
                         
-                        const defaultRw = (selectedSku as any)?.reamWeight !== undefined && (selectedSku as any)?.reamWeight !== null
+                        const defaultRw = (selectedSku as any)?.reamWeight !== undefined && (selectedSku as any)?.reamWeight !== null && (selectedSku as any)?.reamWeight !== ''
                           ? String((selectedSku as any).reamWeight)
-                          : (getFallbackReamWeight(selectedSku) ? String(Number(getFallbackReamWeight(selectedSku)!.toFixed(4))) : '0');
+                          : '';
                         
                         const reamWeightStr = item.reamWeight !== undefined && item.reamWeight !== null
                           ? item.reamWeight
@@ -3731,11 +3750,20 @@ const PurchaseInvoicePage: React.FC = () => {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => handleEditInvoice(selectedInvoice)}
-                  className="px-3 py-1.5 border border-gray-200 text-gray-700 hover:bg-gray-100 bg-white rounded-lg text-xs font-bold shadow-3xs flex items-center gap-1.5 transition-all cursor-pointer"
+                  onClick={() => setPrintInvoiceTarget(selectedInvoice)}
+                  className="px-3 py-1.5 border border-indigo-200 text-indigo-700 hover:bg-indigo-50 bg-white rounded-lg text-xs font-bold shadow-3xs flex items-center gap-1.5 transition-all cursor-pointer"
+                  title="Print Purchase Batch Receipt"
                 >
-                  <Edit className="w-3.5 h-3.5 text-amber-500" /> Edit Batch
+                  <Printer className="w-3.5 h-3.5 text-indigo-600" /> Print Batch
                 </button>
+                {selectedInvoice.status !== 'Cancelled' && (
+                  <button
+                    onClick={() => handleEditInvoice(selectedInvoice)}
+                    className="px-3 py-1.5 border border-gray-200 text-gray-700 hover:bg-gray-100 bg-white rounded-lg text-xs font-bold shadow-3xs flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <Edit className="w-3.5 h-3.5 text-amber-500" /> Edit Batch
+                  </button>
+                )}
                 <button
                   onClick={() => setActiveSubPage('list')}
                   className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-200 rounded-lg transition-colors cursor-pointer"
@@ -4523,12 +4551,20 @@ const PurchaseInvoicePage: React.FC = () => {
                   <Ban className="w-3.5 h-3.5" /> Batch Cancelled
                 </span>
               )}
-              <button
-                onClick={() => setActiveSubPage('list')}
-                className="px-5 py-2 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 text-gray-700 font-bold text-xs shadow-3xs cursor-pointer"
-              >
-                Close Window
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPrintInvoiceTarget(selectedInvoice)}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs shadow-3xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" /> Print Batch Slip
+                </button>
+                <button
+                  onClick={() => setActiveSubPage('list')}
+                  className="px-5 py-2 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 text-gray-700 font-bold text-xs shadow-3xs cursor-pointer"
+                >
+                  Close Window
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -5504,6 +5540,17 @@ const PurchaseInvoicePage: React.FC = () => {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Purchase Batch Print Modal */}
+      {printInvoiceTarget && (
+        <PurchaseBatchPrintModal
+          invoice={printInvoiceTarget}
+          companyName={selectedCompany?.name || 'SKBW ERP'}
+          skus={skus}
+          locations={locations}
+          onClose={() => setPrintInvoiceTarget(null)}
+        />
       )}
     </div>
   );

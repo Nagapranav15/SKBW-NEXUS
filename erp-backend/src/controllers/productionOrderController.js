@@ -757,6 +757,27 @@ exports.getMaterialRates = async (req, res) => {
         avgRate = standardRate;
       }
 
+      // 3. Fetch last-used rate from most recent production order that used this SKU as a material
+      let lastProductionRate = 0;
+      try {
+        const lastPO = await ProductionOrder.findOne({
+          company: companyObjId,
+          "bomItems.skuId": sku._id.toString(),
+          status: { $ne: "Cancelled" }
+        }).sort({ createdAt: -1 }).select("bomItems orderNumber createdAt").lean();
+
+        if (lastPO && Array.isArray(lastPO.bomItems)) {
+          const matchedBomItem = lastPO.bomItems.find(b =>
+            b.skuId && String(b.skuId) === skuIdStr
+          );
+          if (matchedBomItem) {
+            lastProductionRate = Number(matchedBomItem.rate) || 0;
+          }
+        }
+      } catch (e) {
+        // Non-critical: silently ignore, fallback to 0
+      }
+
       rates[skuIdStr] = {
         skuId: skuIdStr,
         skuCode: sku.skuCode,
@@ -765,7 +786,8 @@ exports.getMaterialRates = async (req, res) => {
         avgRate: avgRate > 0 ? avgRate : standardRate,
         fifoRate: fifoRate > 0 ? fifoRate : standardRate,
         fifoBatchInfo,
-        batchCount: batchBalances.length || allPurchasedItems.length
+        batchCount: batchBalances.length || allPurchasedItems.length,
+        lastProductionRate: lastProductionRate > 0 ? lastProductionRate : 0
       };
     }
 

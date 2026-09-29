@@ -964,6 +964,7 @@ const SkuMasterV2: React.FC = () => {
     { id: 'gsm', label: 'GSM', visible: true },
     { id: 'size', label: 'SIZE', visible: true },
     { id: 'pages', label: 'SHEETS PER REAM', visible: true },
+    { id: 'reamWeight', label: 'REAM WEIGHT', visible: true },
     { id: 'preferredVendor', label: 'PREFERRED VENDOR', visible: true },
     { id: 'openingStock', label: 'STOCK', visible: false },
     { id: 'workOrders', label: 'WORK ORDERS', visible: false },
@@ -981,6 +982,7 @@ const SkuMasterV2: React.FC = () => {
     { id: 'gsm', label: 'GSM', visible: true },
     { id: 'size', label: 'SIZE', visible: true },
     { id: 'pages', label: 'SHEETS PER REAM', visible: true },
+    { id: 'reamWeight', label: 'REAM WEIGHT', visible: true },
     { id: 'preferredVendor', label: 'PREFERRED VENDOR', visible: true },
     { id: 'bom', label: 'BOM RECIPE', visible: true },
     { id: 'openingStock', label: 'STOCK', visible: false },
@@ -988,7 +990,7 @@ const SkuMasterV2: React.FC = () => {
     { id: 'dispatchOrders', label: 'DISPATCH ORDERS', visible: false }
   ];
 
-  const STORAGE_KEY = 'skbw_sku_master_tab_columns_v18';
+  const STORAGE_KEY = 'skbw_sku_master_tab_columns_v19';
 
   // Helper to sanitize column list against current valid defaults
   const sanitizeColumns = (savedList: any[], defaultList: typeof DEFAULT_PRODUCTS_COLUMNS) => {
@@ -4567,7 +4569,7 @@ const SkuMasterV2: React.FC = () => {
                             case 'gsm':
                               return (
                                 <td key="gsm" className="py-3 px-3 text-gray-600 font-medium whitespace-nowrap">
-                                  {sku.gsm ? `${sku.gsm} GSM` : '52 GSM'}
+                                  {sku.gsm ? `${sku.gsm} GSM` : '—'}
                                 </td>
                               );
                             case 'size':
@@ -4585,19 +4587,21 @@ const SkuMasterV2: React.FC = () => {
                                   </td>
                                 );
                               }
-                              const pageMatch = sku.name.match(/(\d+)P/i);
                               const isSheetItemCol = sku.paperType === 'Sheets' || activeMainTab === 'semi' || getItemType(sku) === 'semi' || (sku.name || '').toLowerCase().includes('sheet');
                               const pagesVal = (sku as any).pages ?? (sku as any).sheetsPerReam ?? (sku as any).standardSheets;
                               const pagesStr = (pagesVal !== undefined && pagesVal !== null && pagesVal !== '')
                                 ? `${pagesVal} ${isSheetItemCol ? 'Sheets/Ream' : 'P'}`
-                                : isSheetItemCol
-                                  ? '500 Sheets/Ream'
-                                  : pageMatch
-                                    ? `${pageMatch[1]} P`
-                                    : (activeMainTab === 'products' ? '132 P' : '—');
+                                : '—';
                               return (
                                 <td key="pages" className="py-3 px-3 text-gray-600 font-medium whitespace-nowrap">
                                   {pagesStr}
+                                </td>
+                              );
+                            case 'reamWeight':
+                              const rwVal = sku.reamWeight;
+                              return (
+                                <td key="reamWeight" className="py-3 px-3 text-gray-600 font-medium whitespace-nowrap">
+                                  {rwVal !== undefined && rwVal !== null && rwVal !== '' ? `${rwVal} KG` : '—'}
                                 </td>
                               );
                             case 'bom':
@@ -5567,7 +5571,7 @@ const SkuMasterV2: React.FC = () => {
                               {(() => {
                                 const detailPages = (selectedSkuDetails as any).pages ?? (selectedSkuDetails as any).sheetsPerReam ?? (selectedSkuDetails as any).standardSheets;
                                 const hasVal = detailPages !== undefined && detailPages !== null && detailPages !== '';
-                                return isReel ? '—' : isSheet ? (hasVal ? `${detailPages} Sheets/Ream` : '500 Sheets/Ream') : (hasVal ? `${detailPages} Pages` : '—');
+                                return isReel ? '—' : isSheet ? (hasVal ? `${detailPages} Sheets/Ream` : '—') : (hasVal ? `${detailPages} Pages` : '—');
                               })()}
                             </span>
                           </div>

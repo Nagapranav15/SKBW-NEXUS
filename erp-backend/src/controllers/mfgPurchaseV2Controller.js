@@ -663,6 +663,10 @@ exports.editPurchaseInvoice = async (req, res, next) => {
       return res.status(404).json({ msg: "Purchase Invoice not found" });
     }
 
+    if (invoice.status === "Cancelled") {
+      return res.status(400).json({ msg: "Cancelled purchase batches cannot be edited" });
+    }
+
     const companyObjId = invoice.company;
 
     let vendor = await Party.findById(invoice.vendorId);
