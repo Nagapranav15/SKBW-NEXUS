@@ -1,8 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, X, FileText, Trash2, Download, HelpCircle, Check, Eye, Edit, ArrowRight, Layers, Clock, AlertTriangle, CheckCircle, Lock, Settings, User, MapPin as MapPinIcon, Ban, Save, Package, Receipt, AlertCircle, Building2, RotateCcw, Filter, ArrowUpDown, Columns, FileSpreadsheet, History, Factory, ExternalLink } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getActivityLogs, createActivityLog } from '../../../api/activityLogApi';
 import { getParties } from '../../../api/partyApi';
 import { getSkusV2, getWarehouseHierarchyV2, recordTransferV2, SkuV2, WarehouseLocationV2, getBalancesV2, getNextInvoiceNumberV2, getMetadataV2 } from '../../../api/mfgApiV2';
@@ -22,6 +21,13 @@ import autoTable from 'jspdf-autotable';
 import Modal from '../../ui/Modal';
 import { LocationSelectPopup } from '../../stock_v2/LocationSelectPopup';
 import { convertAltToPrimary, convertPrimaryToAlt, formatUomFormula } from '../../../utils/uomConversion';
+import { 
+  Receipt, CheckCircle, Clock, Ban, Search, Filter, ArrowUpDown, 
+  Columns3 as Columns, Download, FileText, History, Plus, HelpCircle,
+  ChevronLeft, ChevronRight, RefreshCw, Save, Eye, Pencil as Edit,
+  MapPin as MapPinIcon, AlertCircle, AlertTriangle, ExternalLink, 
+  Factory, Layers, Lock, ArrowRight, Building2, Trash2
+} from 'lucide-react';
 
 interface PurchaseInvoiceFormItem {
   skuId: string;
@@ -254,6 +260,7 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
 const PurchaseInvoicePage: React.FC = () => {
   const { selectedCompany } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   
   // Data lists
   // Tools states
@@ -489,8 +496,8 @@ const PurchaseInvoicePage: React.FC = () => {
   const [, setActiveReelModalIdx] = useState<number | null>(null);
 
   // Date range filters
-  const [startDate, setStartDate] = useState('2024-06-01');
-  const [endDate, setEndDate] = useState('2024-06-30');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -1134,15 +1141,14 @@ const PurchaseInvoicePage: React.FC = () => {
         item.quantity = '';
         item.altQuantity = '';
 
-        // Auto-assign storage location
-        const firstStorage = locations.find(loc => loc.level === 'Storage Location');
-        const defaultLocId = selectedSku.initialLocationId || (selectedSku as any).locationId || firstStorage?._id || '';
+        // Auto-assign storage location if configured on SKU
+        const defaultLocId = selectedSku.initialLocationId || (selectedSku as any).locationId || '';
         if (defaultLocId && !item.locationId) {
           item.locationId = String(defaultLocId);
         }
 
         // Initialize default multi-godown split
-        item.splits = [{ locationId: item.locationId || defaultLocId, quantity: item.quantity || '0' }];
+        item.splits = [{ locationId: item.locationId || defaultLocId || '', quantity: item.quantity || '0' }];
 
         // Auto-select preferred vendor if specified on the SKU and batch vendor is not set
         const prefVen = (selectedSku as any).preferredVendor;
@@ -1234,11 +1240,10 @@ const PurchaseInvoicePage: React.FC = () => {
 
     const splitWeight = totalQty > 0 ? Number((totalQty / count).toFixed(2)) : 0;
     const currentReels = item.reels || [];
-    const firstStorage = locations.find(loc => loc.level === 'Storage Location');
     const newReels = Array.from({ length: count }).map((_, rIdx) => ({
       weight: splitWeight,
       width: Number(item.width) || Number(currentReels[rIdx]?.width) || 0,
-      locationId: currentReels[rIdx]?.locationId || item.locationId || firstStorage?._id || ''
+      locationId: currentReels[rIdx]?.locationId || item.locationId || ''
     }));
 
     item.reels = newReels;
@@ -1267,8 +1272,7 @@ const PurchaseInvoicePage: React.FC = () => {
   const handleAddSplitRow = (itemIdx: number) => {
     const updatedItems = [...invoiceForm.items];
     const item = { ...updatedItems[itemIdx] };
-    const firstStorage = locations.find(loc => loc.level === 'Storage Location');
-    const defaultLocId = item.locationId || firstStorage?._id || '';
+    const defaultLocId = item.locationId || '';
 
     let currentSplits = (item.splits && item.splits.length > 0)
       ? [...item.splits]
@@ -1295,8 +1299,7 @@ const PurchaseInvoicePage: React.FC = () => {
     const item = { ...updatedItems[itemIdx] };
     const selectedSku = skus.find(s => s._id === item.skuId);
     const stdSheets = selectedSku?.pages || 500;
-    const firstStorage = locations.find(loc => loc.level === 'Storage Location');
-    const defaultLocId = item.locationId || firstStorage?._id || '';
+    const defaultLocId = item.locationId || '';
 
     const currentSplits = (item.splits && item.splits.length > 0)
       ? [...item.splits]
@@ -1667,10 +1670,56 @@ const PurchaseInvoicePage: React.FC = () => {
     setActiveSubPage('new');
   };
 
-  const handleNewPurchaseClick = async () => {
+  const handleNewPurchaseClick = async (preselectedSkuId?: string) => {
     setIsEditing(false);
     setEditingInvoiceId(null);
     refreshItemMasterSkus(true);
+
+    let initialItem: PurchaseInvoiceFormItem = { 
+      skuId: preselectedSkuId || '', 
+      brand: '', 
+      gsm: '', 
+      width: '', 
+      length: '', 
+      reelsCount: '', 
+      quantity: '', 
+      purchasePrice: '', 
+      reamWeight: '', 
+      ratePerKg: '', 
+      lotNumber: '', 
+      locationId: locations.find(l => l.level === 'Storage Location')?._id || '', 
+      splits: [], 
+      reels: [] 
+    };
+
+    if (preselectedSkuId) {
+      let targetSku = skus.find(s => s._id === preselectedSkuId);
+      if (!targetSku && selectedCompany?._id) {
+        try {
+          const fresh = await getSkusV2(selectedCompany._id);
+          targetSku = (fresh || []).find(s => s._id === preselectedSkuId);
+        } catch (_) {}
+      }
+      if (targetSku) {
+        initialItem = {
+          skuId: targetSku._id,
+          brand: targetSku.brand || '',
+          gsm: String(targetSku.gsm || ''),
+          width: targetSku.width ? String(targetSku.width) : '',
+          length: targetSku.length ? String(targetSku.length) : '',
+          reelsCount: '',
+          quantity: '',
+          purchasePrice: String((targetSku as any).purchasePrice || (targetSku as any).ratePerKg || (targetSku as any).cost || ''),
+          reamWeight: (targetSku as any).reamWeight ? String((targetSku as any).reamWeight) : '',
+          ratePerKg: (targetSku as any).ratePerKg ? String((targetSku as any).ratePerKg) : '',
+          lotNumber: '',
+          locationId: locations.find(l => l.level === 'Storage Location')?._id || '',
+          splits: [],
+          reels: []
+        };
+      }
+    }
+
     setInvoiceForm({
       purchaseType: 'Raw Material',
       invoiceNumber: '',
@@ -1681,7 +1730,7 @@ const PurchaseInvoicePage: React.FC = () => {
       loadingUnloading: '0',
       otherCharges: '0',
       dueDate: new Date().toISOString().split('T')[0],
-      items: [{ skuId: '', brand: '', gsm: '', width: '', length: '', reelsCount: '', quantity: '', purchasePrice: '', reamWeight: '', ratePerKg: '', lotNumber: '', locationId: '', splits: [], reels: [] }]
+      items: [initialItem]
     });
     setAddError('');
     setActiveSubPage('new');
@@ -1696,6 +1745,24 @@ const PurchaseInvoicePage: React.FC = () => {
       console.error("Failed to load next purchase invoice number:", e);
     }
   };
+
+  // Auto-open Add Purchase Batch modal if opened with ?create=true or ?new=true
+  const autoOpenedRef = useRef(false);
+  useEffect(() => {
+    const isCreate = searchParams.get('create') === 'true' || searchParams.get('new') === 'true';
+    if (isCreate && !autoOpenedRef.current && selectedCompany?._id) {
+      autoOpenedRef.current = true;
+      const skuIdParam = searchParams.get('skuId') || undefined;
+      handleNewPurchaseClick(skuIdParam);
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev);
+        next.delete('create');
+        next.delete('new');
+        next.delete('skuId');
+        return next;
+      }, { replace: true });
+    }
+  }, [searchParams, selectedCompany?._id]);
 
   const [cancelConfirmInvoice, setCancelConfirmInvoice] = useState<PurchaseInvoiceV2 | null>(null);
 
@@ -2011,7 +2078,7 @@ const PurchaseInvoicePage: React.FC = () => {
                     setShowColumnPicker(false);
                   }}
                   className={`p-2 rounded-xl border transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
-                    (vendorFilter || statusFilter || startDate !== '2024-06-01' || endDate !== '2024-06-30')
+                    (vendorFilter || statusFilter || startDate || endDate)
                       ? 'bg-blue-50 border-blue-300 text-blue-700 ring-2 ring-blue-100'
                       : 'bg-white hover:bg-blue-50/60 border-gray-200 hover:border-blue-200 text-blue-600'
                   }`}
@@ -2029,13 +2096,13 @@ const PurchaseInvoicePage: React.FC = () => {
                   <div className="absolute right-0 mt-1.5 w-72 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-3 space-y-3 text-xs text-left">
                     <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
                       <span className="font-bold text-gray-800 text-xs">Filter Purchases</span>
-                      {(vendorFilter || statusFilter || startDate !== '2024-06-01' || endDate !== '2024-06-30') && (
+                      {(vendorFilter || statusFilter || startDate || endDate) && (
                         <button
                           onClick={() => {
                             setVendorFilter('');
                             setStatusFilter('');
-                            setStartDate('2024-06-01');
-                            setEndDate('2024-06-30');
+                            setStartDate('');
+                            setEndDate('');
                             setPage(1);
                           }}
                           className="text-blue-600 hover:text-blue-800 text-[11px] font-bold cursor-pointer"
@@ -2366,14 +2433,14 @@ const PurchaseInvoicePage: React.FC = () => {
             <div className="bg-gray-50/50 border-b border-gray-200 px-4 py-2 flex items-center justify-between flex-wrap gap-2 text-xs font-semibold text-gray-600">
               <div className="flex items-center gap-2">
                 <span>Showing {invoices.length} purchase batches</span>
-                {(vendorFilter || search || statusFilter || startDate !== '2024-06-01' || endDate !== '2024-06-30') && (
+                {(vendorFilter || search || statusFilter || startDate || endDate) && (
                   <button
                     onClick={() => {
                       setSearch('');
                       setVendorFilter('');
                       setStatusFilter('');
-                      setStartDate('2024-06-01');
-                      setEndDate('2024-06-30');
+                      setStartDate('');
+                      setEndDate('');
                       setPage(1);
                     }}
                     className="text-blue-600 hover:text-blue-800 text-[11px] font-bold px-1.5 py-0.5 hover:bg-blue-50 rounded transition-colors cursor-pointer"
@@ -3196,8 +3263,7 @@ const PurchaseInvoicePage: React.FC = () => {
 
                     {/* Non-reels Godown / Location Allocation Matrix (Default Always Active) */}
                     {!reelsCount && (() => {
-                      const firstStorage = locations.find(loc => loc.level === 'Storage Location');
-                      const defaultLocId = item.locationId || firstStorage?._id || '';
+                      const defaultLocId = item.locationId || '';
                       const splits = (item.splits && item.splits.length > 0)
                         ? item.splits
                         : [{ locationId: defaultLocId, quantity: item.quantity || '0' }];
@@ -3282,6 +3348,8 @@ const PurchaseInvoicePage: React.FC = () => {
                                           onChange={(_w, _f, _z, locId) => handleSplitRowChange(idx, sIdx, 'locationId', locId)}
                                           variant="compact"
                                           hideLabel
+                                          unit={unitLabel}
+                                          skuId={item.skuId}
                                         />
                                       </td>
                                       {isSheets && (
@@ -3430,6 +3498,8 @@ const PurchaseInvoicePage: React.FC = () => {
                                         onChange={(_w, _f, _z, locId) => handleReelChange(idx, rIdx, 'locationId', locId)}
                                         variant="compact"
                                         hideLabel
+                                        unit="KG"
+                                        skuId={item.skuId}
                                       />
                                     </td>
                                   </tr>
@@ -4477,6 +4547,8 @@ const PurchaseInvoicePage: React.FC = () => {
                     onChange={(_w, _f, _z, locId) => setSplitDraftLocId(locId)}
                     variant="compact"
                     hideLabel
+                    unit={unitLabel}
+                    skuId={activeSku?._id || ''}
                   />
                 </div>
 
@@ -4873,6 +4945,8 @@ const PurchaseInvoicePage: React.FC = () => {
                                   variant="compact"
                                   hideLabel
                                   disabled={allocateSubmitting}
+                                  skuId={selectedSku?._id}
+                                  unit={unitLabel}
                                 />
                               </td>
 

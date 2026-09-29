@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Calendar, ChevronDown, Plus, Trash2, RotateCcw, 
   Layers, Package, Receipt, Calculator, FileText, 
@@ -297,7 +298,20 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   // Materials Table
   const [materials, setMaterials] = useState<MaterialRow[]>([]);
   const [activeMaterialDropdownId, setActiveMaterialDropdownId] = useState<string | null>(null);
+  const [materialDropdownPosition, setMaterialDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
   const [componentSearchMap, setComponentSearchMap] = useState<Record<string, string>>({});
+
+  const handleOpenMaterialDropdown = (rowId: string, el: HTMLElement) => {
+    const rect = el.getBoundingClientRect();
+    const popoverWidth = Math.max(540, rect.width);
+    const left = Math.min(Math.max(10, rect.left), window.innerWidth - popoverWidth - 20);
+    setMaterialDropdownPosition({
+      top: rect.bottom + 4,
+      left,
+      width: popoverWidth
+    });
+    setActiveMaterialDropdownId(rowId);
+  };
 
   // 3-Mode Material Costing: 1. Avg of purchases, 2. FIFO (earliest active batch), 3. Custom Value
   const [globalRateMode, setGlobalRateMode] = useState<BomRateMode>('avg_purchase');
@@ -378,6 +392,21 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [activeMaterialDropdownId]);
+
+  useEffect(() => {
+    if (!activeMaterialDropdownId) return;
+    const handleScroll = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target && target.closest && target.closest('.material-dropdown-container')) return;
+      setActiveMaterialDropdownId(null);
+    };
+    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', handleScroll);
+    };
   }, [activeMaterialDropdownId]);
 
   // Global Keyboard Shortcuts (Alt+D for Department Presets, Alt+P/C for Cost Presets)
@@ -1502,7 +1531,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
 
           {/* CARD 1: Order Information (Fixed Height) */}
-          <div className="lg:col-span-4 bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs h-[270px] min-h-[270px] max-h-[270px] flex flex-col justify-between">
+          <div className="lg:col-span-3 bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs h-[270px] min-h-[270px] max-h-[270px] flex flex-col justify-between">
             <div className="flex items-center gap-2 text-xs font-bold text-gray-900 pb-1 border-b border-gray-100">
               <Calendar className="w-4 h-4 text-blue-600" />
               <span>Order Information</span>
@@ -1675,8 +1704,8 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
             </div>
           </div>
 
-          {/* CARD 2: Product to Manufacture (Fixed Height) */}
-          <div className="lg:col-span-4 bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs h-[270px] min-h-[270px] max-h-[270px] flex flex-col justify-between">
+          {/* CARD 2: Product to Manufacture (Expanded Width for Full Item Titles) */}
+          <div className="lg:col-span-6 bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs h-[270px] min-h-[270px] max-h-[270px] flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between pb-1.5">
                 <div className="flex items-center gap-2 text-xs font-bold text-gray-900">
@@ -1715,6 +1744,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                     onClick={() => setShowProductDropdown(true)}
                     onFocus={() => setShowProductDropdown(true)}
                     placeholder="Search finished product or semi good to manufacture..."
+                    title={productSearch || productName}
                     className="w-full pl-8 pr-10 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
                   />
                   <div className="absolute right-2 top-2 flex items-center gap-1 text-gray-400">
@@ -1744,7 +1774,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
                 {/* Product Dropdown Popover */}
                 {showProductDropdown && (
-                  <div className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-2xl z-[999] max-h-64 overflow-y-auto divide-y divide-gray-50 p-1">
+                  <div className="absolute left-0 top-full mt-1 w-full min-w-[360px] sm:min-w-[480px] bg-white border border-gray-200 rounded-xl shadow-2xl z-[999] max-h-72 overflow-y-auto divide-y divide-gray-50 p-1">
                     {filteredProducts.map((p) => {
                       const isSelected = p._id === selectedSkuId || p.name === productName;
                       const specBadge = getSkuSpecOrConversion(p);
@@ -1757,7 +1787,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                           }`}
                         >
                           <div className="flex-1 min-w-0 pr-3">
-                            <div className="font-bold text-gray-900 truncate">{p.name}</div>
+                            <div className="font-bold text-gray-900 break-words leading-snug text-xs sm:text-[13px]">{p.name}</div>
                             <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                               <span className="text-[10px] text-gray-400 font-mono">{p.skuCode}</span>
                               <span className="text-[10px] text-gray-300">•</span>
@@ -1797,8 +1827,8 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
             {productName ? (
               <div className="h-[142px] p-3 bg-blue-50/30 rounded-xl border border-blue-100/80 flex flex-col justify-between text-[11px] text-gray-600">
                 <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-gray-900 text-xs truncate">{productName}</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-bold text-gray-900 text-xs leading-snug break-words line-clamp-2" title={productName}>{productName}</span>
                     <span className="px-2 py-0.5 text-[9.5px] font-extrabold uppercase rounded-full border bg-purple-50 text-purple-700 border-purple-200 shrink-0">
                       Finished Good
                     </span>
@@ -1848,8 +1878,8 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
             )}
           </div>
 
-          {/* CARD 3: Output Location & Targets (Fixed Height) */}
-          <div className="lg:col-span-4 bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs h-[270px] min-h-[270px] max-h-[270px] flex flex-col justify-between">
+          {/* CARD 3: Output Location & Targets (Decreased Size: lg:col-span-3) */}
+          <div className="lg:col-span-3 bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs h-[270px] min-h-[270px] max-h-[270px] flex flex-col justify-between">
             <div className="flex items-center gap-2 text-xs font-bold text-gray-900 pb-1 border-b border-gray-100">
               <MapPin className="w-4 h-4 text-blue-600" />
               <span>Output Location & Targets</span>
@@ -1871,6 +1901,8 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                 variant="compact"
                 hideLabel
                 className="w-full"
+                skuId={currentSku?._id || selectedSkuId || ''}
+                unit={uom || currentSku?.unit || 'PCS'}
               />
             </div>
 
@@ -2114,13 +2146,13 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
             </div>
           </div>
 
-          {/* Table matching Order Items in Sales Drawer */}
-          <div className="overflow-visible border border-gray-200 rounded-xl">
-            <table className="w-full text-left border-collapse text-xs">
+          {/* Table matching Order Items in Sales Drawer with horizontal scrolling and no overflow */}
+          <div className="overflow-x-auto border border-gray-200 rounded-xl custom-scrollbar">
+            <table className="w-full text-left border-collapse text-xs min-w-[920px]">
               <thead className="bg-gray-50/80 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 select-none">
                 <tr>
                   <th className="py-2 px-2 text-center w-8 whitespace-nowrap text-[10px]">#</th>
-                  <th className="py-2 px-3 min-w-[200px] whitespace-nowrap text-[10px]">MATERIAL / COMPONENT <span className="text-red-500">*</span></th>
+                  <th className="py-2 px-3 min-w-[290px] whitespace-nowrap text-[10px]">MATERIAL / COMPONENT <span className="text-red-500">*</span></th>
                   <th className="py-2 px-2 text-center w-20 whitespace-nowrap text-[10px]">ITEM CODE</th>
                   <th className="py-2 px-2 text-center w-14 whitespace-nowrap text-[10px]">UOM</th>
                   <th className="py-2 px-2.5 text-right w-24 whitespace-nowrap text-[10px]">REQUIRED QTY <span className="text-red-500">*</span></th>
@@ -2141,18 +2173,11 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                 ) : (
                   materials.map((row, idx) => {
                     const isDropdownActive = activeMaterialDropdownId === row.id;
-                    const searchTerm = (componentSearchMap[row.id] ?? '').toLowerCase().trim();
-                    const filteredComponents = rawAndSemiSkus.filter(s =>
-                      !searchTerm ||
-                      (s.name || '').toLowerCase().includes(searchTerm) ||
-                      (s.skuCode || '').toLowerCase().includes(searchTerm) ||
-                      (s.category || '').toLowerCase().includes(searchTerm)
-                    );
 
                     return (
                       <tr 
                         key={row.id} 
-                        className={`hover:bg-blue-50/30 transition-colors relative ${isDropdownActive ? 'z-50' : 'z-10'}`}
+                        className="hover:bg-blue-50/30 transition-colors"
                       >
                         {/* # */}
                         <td className="py-1.5 px-2 text-center font-bold text-gray-400 text-[10.5px]">
@@ -2160,21 +2185,21 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                         </td>
 
                         {/* Material / Component Dropdown (Expanded, compact height, all title in one line) */}
-                        <td className="py-1.5 px-3 relative material-dropdown-container min-w-[200px]">
+                        <td className="py-1.5 px-3 relative material-dropdown-container min-w-[290px]">
                           <div className="relative w-full">
-                            <Search className="w-3 h-3 absolute left-2.5 top-2 text-gray-400" />
                             <input
                               type="text"
                               value={componentSearchMap[row.id] !== undefined ? componentSearchMap[row.id] : row.component}
                               onChange={(e) => {
                                 setComponentSearchMap(prev => ({ ...prev, [row.id]: e.target.value }));
                                 handleUpdateMaterial(row.id, 'component', e.target.value);
-                                setActiveMaterialDropdownId(row.id);
+                                handleOpenMaterialDropdown(row.id, e.currentTarget);
                               }}
-                              onClick={() => setActiveMaterialDropdownId(row.id)}
+                              onClick={(e) => handleOpenMaterialDropdown(row.id, e.currentTarget)}
+                              onFocus={(e) => handleOpenMaterialDropdown(row.id, e.currentTarget)}
                               placeholder="Select material / semi good..."
                               title={row.component || 'Select material / semi good...'}
-                              className="w-full pl-7 pr-6 py-1 bg-white border border-gray-200 rounded-md text-[11px] font-semibold text-gray-800 focus:ring-1 focus:ring-blue-500 focus:outline-none cursor-pointer h-7"
+                              className="w-full pl-2.5 pr-6 py-1 bg-white border border-gray-200 rounded-md text-[11px] font-semibold text-gray-800 focus:ring-1 focus:ring-blue-500 focus:outline-none cursor-pointer h-7"
                             />
                             <div className="absolute right-2 top-2 flex items-center">
                               {(row.component || componentSearchMap[row.id]) ? (
@@ -2184,7 +2209,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                                     handleUpdateMaterial(row.id, 'component', '');
                                     handleUpdateMaterial(row.id, 'code', '');
                                     setComponentSearchMap(prev => ({ ...prev, [row.id]: '' }));
-                                    setActiveMaterialDropdownId(row.id);
+                                    setActiveMaterialDropdownId(null);
                                   }}
                                   className="text-gray-400 hover:text-gray-600 cursor-pointer"
                                   title="Clear"
@@ -2194,75 +2219,18 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                               ) : (
                                 <ChevronDown 
                                   className="w-3 h-3 text-gray-400 cursor-pointer" 
-                                  onClick={() => setActiveMaterialDropdownId(isDropdownActive ? null : row.id)}
+                                  onClick={(e) => {
+                                    if (isDropdownActive) {
+                                      setActiveMaterialDropdownId(null);
+                                    } else {
+                                      const inputEl = (e.currentTarget.closest('.material-dropdown-container') as HTMLElement)?.querySelector('input');
+                                      if (inputEl) handleOpenMaterialDropdown(row.id, inputEl);
+                                    }
+                                  }}
                                 />
                               )}
                             </div>
                           </div>
-
-                          {/* Popover Dropdown matching Sales Order 1:1 */}
-                          {isDropdownActive && (
-                            <div className="absolute left-3 top-full mt-1 w-[500px] bg-white border border-gray-200 rounded-xl shadow-2xl z-[99999] max-h-64 overflow-y-auto divide-y divide-gray-100 p-1">
-                              {filteredComponents.map((s) => {
-                                const itemType = getItemClassification(s);
-                                const specBadge = getSkuSpecOrConversion(s);
-                                const isSelected = row.component && row.component.toLowerCase() === s.name.toLowerCase();
-
-                                return (
-                                  <div
-                                    key={s._id}
-                                    onClick={() => {
-                                      handleSelectMaterialSku(row.id, s);
-                                      setComponentSearchMap(prev => ({ ...prev, [row.id]: s.name }));
-                                    }}
-                                    className={`p-2 cursor-pointer rounded-lg text-xs flex justify-between items-center transition-colors ${
-                                      isSelected ? 'bg-blue-100/90 font-bold border border-blue-200' : 'hover:bg-blue-50/80'
-                                    }`}
-                                  >
-                                    <div className="flex-1 min-w-0 pr-3">
-                                      <div className="font-bold text-gray-900 truncate text-[11.5px]">{s.name}</div>
-                                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                        <span className="text-[9.5px] text-gray-400 font-mono">{s.skuCode}</span>
-                                        {s.category && (
-                                          <>
-                                            <span className="text-[9.5px] text-gray-300">•</span>
-                                            <span className="text-[9.5px] font-semibold text-gray-600 uppercase">{s.category}</span>
-                                          </>
-                                        )}
-                                        {s.unit && (
-                                          <>
-                                            <span className="text-[9.5px] text-gray-300">•</span>
-                                            <span className="text-[9.5px] font-bold text-blue-600">{s.unit}</span>
-                                          </>
-                                        )}
-                                        {specBadge && (
-                                          <>
-                                            <span className="text-[9.5px] text-gray-300">•</span>
-                                            <span className="text-[9.5px] font-semibold text-indigo-600">{specBadge}</span>
-                                          </>
-                                        )}
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center gap-1.5 shrink-0">
-                                      <span className="px-2 py-0.5 text-[9px] font-extrabold uppercase rounded-full border bg-purple-50 text-purple-700 border-purple-200">
-                                        {itemType === 'semi' ? 'Semi Goods' : (s.category || 'Raw Material')}
-                                      </span>
-                                      <span className={`px-2 py-0.5 text-[9px] font-extrabold uppercase rounded-full border ${
-                                        (s.status || '').toLowerCase() === 'inactive'
-                                          ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                      }`}>
-                                        {s.status || 'Active'}
-                                      </span>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                              {filteredComponents.length === 0 && (
-                                <div className="p-3 text-center text-gray-400 italic text-xs">No materials or semi goods found</div>
-                              )}
-                            </div>
-                          )}
                         </td>
 
                         {/* Item Code */}
@@ -2301,6 +2269,8 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                             variant="compact"
                             hideLabel
                             className="w-full min-w-[160px]"
+                            skuId={row.skuId}
+                            unit={row.uom || ''}
                           />
                         </td>
 
@@ -2318,30 +2288,22 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                                   ? 'bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100'
                                   : 'bg-indigo-50 text-indigo-700 border-indigo-300 hover:bg-indigo-100'
                               }`}
-                              title={
-                                row.rateMode === 'fifo'
-                                  ? `FIFO: ${row.fifoBatchInfo?.batchNumber || 'Earliest Lot'} (₹${(row.computedFifoRate || row.rate || 0).toFixed(2)})`
-                                  : row.rateMode === 'avg_purchase'
-                                  ? `Avg Purchases: ₹${(row.computedAvgRate || row.rate || 0).toFixed(2)}`
-                                  : 'Custom Rate (User Defined)'
-                              }
+                              title="Select valuation method for this material"
                             >
-                              <option value="avg_purchase">AVG ▾</option>
-                              <option value="fifo">FIFO ▾</option>
-                              <option value="custom">CUST ▾</option>
+                              <option value="avg_purchase">AVG</option>
+                              <option value="fifo">FIFO</option>
+                              <option value="custom">CUSTOM</option>
                             </select>
 
-                            {/* Numeric Rate Input */}
+                            {/* Rate Input Field */}
                             <input
                               type="number"
-                              step="0.01"
+                              step="any"
                               min="0"
+                              disabled={row.rateMode !== 'custom'}
                               value={row.rate}
-                              onChange={e => {
-                                handleUpdateMaterial(row.id, 'rate', e.target.value);
-                                handleSetRowRateMode(row.id, 'custom', Number(e.target.value) || 0);
-                              }}
-                              className={`w-18 text-right font-semibold bg-white border rounded-md px-1.5 py-0.5 text-[11px] h-7 focus:ring-1 focus:ring-blue-500 focus:outline-none font-mono ${
+                              onChange={e => handleUpdateMaterial(row.id, 'rate', e.target.value)}
+                              className={`w-20 text-right font-bold bg-white border rounded-md px-2 py-0.5 text-[11px] h-7 focus:ring-1 focus:ring-blue-500 focus:outline-none ${
                                 row.rateMode === 'fifo'
                                   ? 'border-emerald-300 text-emerald-900 bg-emerald-50/20'
                                   : row.rateMode === 'custom'
@@ -2392,6 +2354,93 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
               </tbody>
             </table>
           </div>
+
+          {/* Material Dropdown Popover (Portaled to document.body so it floats cleanly above table and scroll boundaries) */}
+          {activeMaterialDropdownId && materialDropdownPosition && typeof document !== 'undefined' && (() => {
+            const activeRow = materials.find(m => m.id === activeMaterialDropdownId);
+            const activeSearchTerm = (componentSearchMap[activeMaterialDropdownId] ?? '').toLowerCase().trim();
+            const filteredComponents = rawAndSemiSkus.filter(s =>
+              !activeSearchTerm ||
+              (s.name || '').toLowerCase().includes(activeSearchTerm) ||
+              (s.skuCode || '').toLowerCase().includes(activeSearchTerm) ||
+              (s.category || '').toLowerCase().includes(activeSearchTerm)
+            );
+
+            return createPortal(
+              <div 
+                style={{
+                  position: 'fixed',
+                  top: `${materialDropdownPosition.top}px`,
+                  left: `${materialDropdownPosition.left}px`,
+                  width: `${materialDropdownPosition.width}px`,
+                  maxHeight: '280px',
+                  zIndex: 999999
+                }}
+                className="bg-white border border-gray-200 rounded-xl shadow-2xl overflow-y-auto divide-y divide-gray-100 p-1 material-dropdown-container animate-in fade-in zoom-in-95 duration-100"
+              >
+                {filteredComponents.map((s) => {
+                  const itemType = getItemClassification(s);
+                  const specBadge = getSkuSpecOrConversion(s);
+                  const isSelected = activeRow?.component && activeRow.component.toLowerCase() === s.name.toLowerCase();
+
+                  return (
+                    <div
+                      key={s._id}
+                      onClick={() => {
+                        handleSelectMaterialSku(activeMaterialDropdownId, s);
+                        setComponentSearchMap(prev => ({ ...prev, [activeMaterialDropdownId]: s.name }));
+                        setActiveMaterialDropdownId(null);
+                      }}
+                      className={`p-2 cursor-pointer rounded-lg text-xs flex justify-between items-center transition-colors ${
+                        isSelected ? 'bg-blue-100/90 font-bold border border-blue-200' : 'hover:bg-blue-50/80'
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0 pr-3">
+                        <div className="font-bold text-gray-900 break-words leading-snug text-xs sm:text-[12.5px]">{s.name}</div>
+                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                          <span className="text-[9.5px] text-gray-400 font-mono">{s.skuCode}</span>
+                          {s.category && (
+                            <>
+                              <span className="text-[9.5px] text-gray-300">•</span>
+                              <span className="text-[9.5px] font-semibold text-gray-600 uppercase">{s.category}</span>
+                            </>
+                          )}
+                          {s.unit && (
+                            <>
+                              <span className="text-[9.5px] text-gray-300">•</span>
+                              <span className="text-[9.5px] font-bold text-blue-600">{s.unit}</span>
+                            </>
+                          )}
+                          {specBadge && (
+                            <>
+                              <span className="text-[9.5px] text-gray-300">•</span>
+                              <span className="text-[9.5px] font-semibold text-indigo-600">{specBadge}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="px-2 py-0.5 text-[9px] font-extrabold uppercase rounded-full border bg-purple-50 text-purple-700 border-purple-200">
+                          {itemType === 'semi' ? 'Semi Goods' : (s.category || 'Raw Material')}
+                        </span>
+                        <span className={`px-2 py-0.5 text-[9px] font-extrabold uppercase rounded-full border ${
+                          (s.status || '').toLowerCase() === 'inactive'
+                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                            : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        }`}>
+                          {s.status || 'Active'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+                {filteredComponents.length === 0 && (
+                  <div className="p-3 text-center text-gray-400 italic text-xs">No materials or semi goods found</div>
+                )}
+              </div>,
+              document.body
+            );
+          })()}
 
           {/* Right-aligned Materials Total */}
           <div className="flex justify-end pt-1">
@@ -2518,8 +2567,8 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                 </div>
               </div>
 
-              <div className="overflow-visible border border-gray-200 rounded-xl">
-                <table className="w-full text-left border-collapse text-xs">
+              <div className="overflow-x-auto border border-gray-200 rounded-xl custom-scrollbar">
+                <table className="w-full text-left border-collapse text-xs min-w-[640px]">
                   <thead className="bg-gray-50/80 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 select-none">
                     <tr>
                       <th className="py-2 px-3 w-8 text-center">#</th>

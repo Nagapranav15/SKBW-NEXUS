@@ -43,7 +43,10 @@ export const SearchableMaterialDropdown: React.FC<{
   value: string;
   materials: SkuV2[];
   onChange: (selectedName: string, matchedSku?: SkuV2) => void;
-}> = ({ value, materials, onChange }) => {
+  className?: string;
+  placeholder?: string;
+  compact?: boolean;
+}> = ({ value, materials, onChange, className, placeholder, compact }) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -127,12 +130,12 @@ export const SearchableMaterialDropdown: React.FC<{
           if (!open) updatePosition();
           setOpen(!open);
         }}
-        className="w-full px-3 py-2 bg-white border border-gray-200 hover:border-blue-300 rounded-xl text-xs font-semibold text-gray-800 flex items-center justify-between shadow-2xs transition-all cursor-pointer"
+        className={className || "w-full px-3 py-2 bg-white border border-gray-200 hover:border-blue-300 rounded-xl text-xs font-semibold text-gray-800 flex items-center justify-between shadow-2xs transition-all cursor-pointer"}
       >
         <span className="truncate">
-          {value || <span className="text-gray-400 font-normal">-- Select Raw Material --</span>}
+          {value || <span className="text-gray-400 font-normal">{placeholder || '-- Select Raw Material --'}</span>}
         </span>
-        <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`${compact ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && createPortal(
@@ -3219,6 +3222,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         onClose={() => setShowLocationModal(false)}
         rawHierarchy={rawHierarchy}
         selectedLocationId={form.initialLocationId}
+        companyId={companyId}
+        skuId={editSku?._id}
+        unit={form.unit}
         onSelectLocation={(locId, locPath) => {
           setForm(prev => ({ ...prev, initialLocationId: locId, defaultLocation: locPath }));
           setDynamicLocationText(locPath);

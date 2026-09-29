@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   Building2, 
@@ -10,9 +10,11 @@ import {
   Check, 
   X,
   Search,
-  Sparkles
+  Sparkles,
+  RefreshCw
 } from 'lucide-react';
-import { WarehouseLocationV2 } from '../../api/mfgApiV2';
+import { WarehouseLocationV2, getBalancesV2 } from '../../api/mfgApiV2';
+import { useAuth } from '../../context/AuthContext';
 
 interface LocationSelectPopupProps {
   label?: string;
@@ -31,23 +33,9 @@ interface LocationSelectPopupProps {
   hideLabel?: boolean;
   className?: string;
   displayValue?: string;
+  companyId?: string;
+  skuId?: string;
 }
-
-const FALLBACK_LOCATIONS: WarehouseLocationV2[] = [
-  { _id: 'fact-skbw', name: 'SKBW', level: 'Factory', parentId: null, status: 'Active' },
-  { _id: 'floor-ground', name: 'Ground', level: 'Floor', parentId: 'fact-skbw', status: 'Active' },
-  { _id: 'zone-a', name: 'A', level: 'Zone', parentId: 'floor-ground', status: 'Active' },
-  { _id: 'loc-top', name: 'Top', level: 'Storage Location', parentId: 'zone-a', status: 'Active' },
-  { _id: 'loc-bottom', name: 'Bottom', level: 'Storage Location', parentId: 'zone-a', status: 'Active' },
-  { _id: 'zone-m', name: 'M', level: 'Zone', parentId: 'floor-ground', status: 'Active' },
-  { _id: 'loc-m-top', name: 'Top', level: 'Storage Location', parentId: 'zone-m', status: 'Active' },
-  { _id: 'zone-s', name: 'S', level: 'Zone', parentId: 'floor-ground', status: 'Active' },
-  { _id: 'loc-s1', name: 'Bin 1', level: 'Storage Location', parentId: 'zone-s', status: 'Active' },
-  { _id: 'floor-1st', name: '1st', level: 'Floor', parentId: 'fact-skbw', status: 'Active' },
-  { _id: 'floor-2nd', name: '2nd', level: 'Floor', parentId: 'fact-skbw', status: 'Active' },
-  { _id: 'fact-lom', name: 'LOM', level: 'Factory', parentId: null, status: 'Active' },
-  { _id: 'fact-maruti', name: 'Maruti', level: 'Factory', parentId: null, status: 'Active' }
-];
 
 export const LocationSelectPopup: React.FC<LocationSelectPopupProps> = ({
   label,
@@ -59,16 +47,24 @@ export const LocationSelectPopup: React.FC<LocationSelectPopupProps> = ({
   onChange,
   disabled = false,
   required = true,
-  unit = 'GBL',
-  locationStockMap = {},
+  unit: unitProp,
+  locationStockMap: externalStockMap,
   variant = 'card',
   hideLabel = false,
   className = '',
-  displayValue
+  displayValue,
+  companyId: propCompanyId,
+  skuId
 }) => {
+  const { selectedCompany } = useAuth();
+  const effectiveCompanyId = propCompanyId || selectedCompany?._id || '';
+
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
+  const [liveStockMap, setLiveStockMap] = useState<Record<string, { qty: number; batches: number }>>({});
+  const [liveUnit, setLiveUnit] = useState<string>('');
+  const [stockLoading, setStockLoading] = useState(false);
 
   // Draft selection state inside popup
   const [selectedWhId, setSelectedWhId] = useState<string>(warehouseId);
@@ -76,9 +72,9 @@ export const LocationSelectPopup: React.FC<LocationSelectPopupProps> = ({
   const [selectedZId, setSelectedZId] = useState<string>(zoneId);
   const [selectedLId, setSelectedLId] = useState<string>(locationId);
 
-  // Normalized location list
+  // Normalized location list - no fake demo data
   const allLocs = useMemo(() => {
-    return Array.isArray(locations) && locations.length > 0 ? locations : FALLBACK_LOCATIONS;
+    return Array.isArray(locations) ? locations : [];
   }, [locations]);
 
   // Lookup map
@@ -90,11 +86,81 @@ export const LocationSelectPopup: React.FC<LocationSelectPopupProps> = ({
     return map;
   }, [allLocs]);
 
-  // Helper to get live stock & batch counts for any node (matches Image 2)
-  const getLocationStock = (nodeId: string, level: string) => {
+  // Effective stock map: external prop > live-fetched > empty
+  const activeStockMap = useMemo(() => {
+    if (externalStockMap && Object.keys(externalStockMap).length > 0) return externalStockMap;
+    if (Object.keys(liveStockMap).length > 0) return liveStockMap;
+    return {};
+  }, [externalStockMap, liveStockMap]);
+
+  // Effective unit: explicit prop > detected from balances > empty string
+  const unit = unitProp || liveUnit || '';
+
+  // Fetch live stock data when popup opens, filtered by skuId if specified
+  const fetchLiveStock = useCallback(async () => {
+    if (!effectiveCompanyId) return;
+
+    // If skuId is explicitly provided as empty string (e.g. product expected but not yet selected)
+    if (skuId === '') {
+      setLiveStockMap({});
+      setLiveUnit('');
+      return;
+    }
+
+    setStockLoading(true);
+    try {
+      const balances = await getBalancesV2(effectiveCompanyId, undefined, true, skuId);
+      if (!Array.isArray(balances) || balances.length === 0) {
+        setLiveStockMap({});
+        return;
+      }
+
+      const stockByLoc: Record<string, { qty: number; batches: Set<string> }> = {};
+      let detectedUnit = '';
+
+      balances.forEach((b: any) => {
+        // Double-check skuId match
+        if (skuId) {
+          const bSkuId = String(b.skuId?._id || b.skuId || b.sku?._id || b.sku || '');
+          if (bSkuId && bSkuId !== String(skuId)) return;
+        }
+
+        const locId = b.locationId ? String(b.locationId._id || b.locationId) : '';
+        if (!locId) return;
+
+        const qty = Number(b.onHand ?? b.quantity ?? b.qty) || 0;
+        if (qty <= 0) return;
+
+        const batchKey = b.batchNumber || b.batch || 'default';
+        const itemUnit = b.sku?.unit || b.skuId?.unit || b.unit || '';
+        if (itemUnit && !detectedUnit) detectedUnit = itemUnit;
+
+        if (!stockByLoc[locId]) {
+          stockByLoc[locId] = { qty: 0, batches: new Set() };
+        }
+        stockByLoc[locId].qty += qty;
+        stockByLoc[locId].batches.add(batchKey);
+      });
+
+      const finalMap: Record<string, { qty: number; batches: number }> = {};
+      for (const [locId, data] of Object.entries(stockByLoc)) {
+        finalMap[locId] = { qty: Math.round(data.qty * 100) / 100, batches: data.batches.size };
+      }
+
+      setLiveStockMap(finalMap);
+      if (detectedUnit) setLiveUnit(detectedUnit);
+    } catch (err) {
+      console.error('LocationSelectPopup: Failed to fetch live stock', err);
+    } finally {
+      setStockLoading(false);
+    }
+  }, [effectiveCompanyId, skuId]);
+
+  // Helper to get real stock & batch counts for any node
+  const getLocationStock = (nodeId: string, _level: string) => {
     const id = String(nodeId);
-    if (locationStockMap && locationStockMap[id]) {
-      return locationStockMap[id];
+    if (activeStockMap && activeStockMap[id]) {
+      return activeStockMap[id];
     }
 
     // Sum stock from children for parents (Warehouse, Floor, Zone)
@@ -104,9 +170,9 @@ export const LocationSelectPopup: React.FC<LocationSelectPopupProps> = ({
       const children = allLocs.filter(l => l && String(l.parentId) === String(pId));
       children.forEach(c => {
         const cId = String(c._id);
-        if (locationStockMap && locationStockMap[cId]) {
-          totalQty += Number(locationStockMap[cId].qty || 0);
-          totalBatches += Number(locationStockMap[cId].batches || 0);
+        if (activeStockMap && activeStockMap[cId]) {
+          totalQty += Number(activeStockMap[cId].qty || 0);
+          totalBatches += Number(activeStockMap[cId].batches || 0);
         }
         sumChildren(cId);
       });
@@ -114,23 +180,7 @@ export const LocationSelectPopup: React.FC<LocationSelectPopupProps> = ({
     sumChildren(id);
 
     if (totalQty > 0) {
-      return { qty: totalQty, batches: totalBatches || 1 };
-    }
-
-    // Realistic fallback for demo consistency with screenshots (Top in SKBW has 20 GBL / 1 batch)
-    const nodeObj = locMap.get(id);
-    const nodeName = nodeObj?.name?.trim().toLowerCase();
-    if (nodeName === 'top' || id === 'loc-top' || id === 'loc-m-top') {
-      return { qty: 20, batches: 1 };
-    }
-    if (level === 'Zone' && (nodeName === 'm' || nodeName === 'a')) {
-      return { qty: 20, batches: 1 };
-    }
-    if (level === 'Floor' && nodeName === 'ground') {
-      return { qty: 20, batches: 1 };
-    }
-    if (level === 'Factory' && nodeName === 'skbw') {
-      return { qty: 20, batches: 1 };
+      return { qty: Math.round(totalQty * 100) / 100, batches: totalBatches };
     }
 
     return { qty: 0, batches: 0 };
@@ -212,8 +262,11 @@ export const LocationSelectPopup: React.FC<LocationSelectPopupProps> = ({
       setSearchQuery('');
       // Everything closed by default
       setExpandedNodes({});
+      if (effectiveCompanyId && (!externalStockMap || Object.keys(externalStockMap).length === 0)) {
+        fetchLiveStock();
+      }
     }
-  }, [isOpen, warehouseId, floorId, zoneId, locationId, locMap]);
+  }, [isOpen, warehouseId, floorId, zoneId, locationId, locMap, effectiveCompanyId, externalStockMap, fetchLiveStock]);
 
   const toggleExpand = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -548,9 +601,12 @@ export const LocationSelectPopup: React.FC<LocationSelectPopupProps> = ({
 
             {/* Informational Micro Table Header (Matching Image 2) */}
             <div className="grid grid-cols-12 px-3 py-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 bg-slate-50/40">
-              <div className="col-span-7">Location</div>
+              <div className="col-span-7 flex items-center gap-1.5">
+                <span>Location</span>
+                {stockLoading && <RefreshCw className="w-2.5 h-2.5 animate-spin text-blue-500" />}
+              </div>
               <div className="col-span-2 text-center">Batches</div>
-              <div className="col-span-3 text-right">Qty ({unit})</div>
+              <div className="col-span-3 text-right">Qty {unit ? `(${unit})` : ''}</div>
             </div>
 
             {/* Tree Content: Clean, Borderless, Exactly like Image 2 */}

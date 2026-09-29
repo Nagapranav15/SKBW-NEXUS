@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { 
   Building2,
   Layers, 
@@ -9,9 +9,10 @@ import {
   X, 
   Search, 
   AlertCircle,
-  Sparkles
+  Sparkles,
+  RefreshCw
 } from 'lucide-react';
-import { WarehouseLocationV2 } from '../../api/mfgApiV2';
+import { WarehouseLocationV2, getBalancesV2 } from '../../api/mfgApiV2';
 
 interface LocationSelectModalProps {
   isOpen: boolean;
@@ -22,23 +23,9 @@ interface LocationSelectModalProps {
   title?: string;
   unit?: string;
   locationStockMap?: Record<string, { qty: number; batches?: number }>;
+  companyId?: string;
+  skuId?: string;
 }
-
-const DEFAULT_DEMO_HIERARCHY: WarehouseLocationV2[] = [
-  { _id: 'fact-skbw', name: 'SKBW', level: 'Factory', parentId: null, status: 'Active' },
-  { _id: 'floor-ground', name: 'Ground', level: 'Floor', parentId: 'fact-skbw', status: 'Active' },
-  { _id: 'zone-a', name: 'A', level: 'Zone', parentId: 'floor-ground', status: 'Active' },
-  { _id: 'loc-top', name: 'Top', level: 'Storage Location', parentId: 'zone-a', status: 'Active' },
-  { _id: 'loc-bottom', name: 'Bottom', level: 'Storage Location', parentId: 'zone-a', status: 'Active' },
-  { _id: 'zone-m', name: 'M', level: 'Zone', parentId: 'floor-ground', status: 'Active' },
-  { _id: 'loc-m-top', name: 'Top', level: 'Storage Location', parentId: 'zone-m', status: 'Active' },
-  { _id: 'zone-s', name: 'S', level: 'Zone', parentId: 'floor-ground', status: 'Active' },
-  { _id: 'loc-s1', name: 'Bin 1', level: 'Storage Location', parentId: 'zone-s', status: 'Active' },
-  { _id: 'floor-1st', name: '1st', level: 'Floor', parentId: 'fact-skbw', status: 'Active' },
-  { _id: 'floor-2nd', name: '2nd', level: 'Floor', parentId: 'fact-skbw', status: 'Active' },
-  { _id: 'fact-lom', name: 'LOM', level: 'Factory', parentId: null, status: 'Active' },
-  { _id: 'fact-maruti', name: 'Maruti', level: 'Factory', parentId: null, status: 'Active' }
-];
 
 export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
   isOpen,
@@ -47,17 +34,32 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
   selectedLocationId = '',
   onSelectLocation,
   title = 'Warehouse Hierarchy',
-  unit = 'GBL',
-  locationStockMap = {}
+  unit: unitProp,
+  locationStockMap: externalStockMap,
+  companyId,
+  skuId
 }) => {
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
   const [tempSelectedId, setTempSelectedId] = useState<string>(selectedLocationId);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [warningMsg, setWarningMsg] = useState<string | null>(null);
+  const [liveStockMap, setLiveStockMap] = useState<Record<string, { qty: number; batches: number }>>({});
+  const [liveUnit, setLiveUnit] = useState<string>('');
+  const [stockLoading, setStockLoading] = useState(false);
 
   const hierarchyToUse = useMemo(() => {
-    return Array.isArray(rawHierarchy) && rawHierarchy.length > 0 ? rawHierarchy : DEFAULT_DEMO_HIERARCHY;
+    return Array.isArray(rawHierarchy) && rawHierarchy.length > 0 ? rawHierarchy : [];
   }, [rawHierarchy]);
+
+  // Determine which stock map to use: external prop > live-fetched > empty
+  const locationStockMap = useMemo(() => {
+    if (externalStockMap && Object.keys(externalStockMap).length > 0) return externalStockMap;
+    if (Object.keys(liveStockMap).length > 0) return liveStockMap;
+    return {};
+  }, [externalStockMap, liveStockMap]);
+
+  // Determine unit: explicit prop > detected from balances > fallback
+  const unit = unitProp || liveUnit || '';
 
   // Build Location Map & Paths
   const locMap = useMemo(() => {
@@ -68,12 +70,74 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
     return map;
   }, [hierarchyToUse]);
 
-  const getLocationStock = (nodeId: string, level: string) => {
+  // Fetch live stock data when modal opens, filtered by skuId if specified
+  const fetchLiveStock = useCallback(async () => {
+    if (!companyId) return;
+
+    if (skuId === '') {
+      setLiveStockMap({});
+      setLiveUnit('');
+      return;
+    }
+
+    setStockLoading(true);
+    try {
+      const balances = await getBalancesV2(companyId, undefined, true, skuId);
+      if (!Array.isArray(balances) || balances.length === 0) {
+        setLiveStockMap({});
+        setStockLoading(false);
+        return;
+      }
+
+      const stockByLoc: Record<string, { qty: number; batches: Set<string> }> = {};
+      let detectedUnit = '';
+
+      balances.forEach((b: any) => {
+        if (skuId) {
+          const bSkuId = String(b.skuId?._id || b.skuId || b.sku?._id || b.sku || '');
+          if (bSkuId && bSkuId !== String(skuId)) return;
+        }
+
+        const locId = b.locationId ? String(b.locationId._id || b.locationId) : '';
+        if (!locId) return;
+
+        const qty = Number(b.onHand ?? b.quantity ?? b.qty) || 0;
+        if (qty <= 0) return;
+
+        const batchKey = b.batchNumber || b.batch || 'default';
+        const skuUnit = b.sku?.unit || b.skuId?.unit || b.unit || '';
+        if (skuUnit && !detectedUnit) detectedUnit = skuUnit;
+
+        if (!stockByLoc[locId]) {
+          stockByLoc[locId] = { qty: 0, batches: new Set() };
+        }
+        stockByLoc[locId].qty += qty;
+        stockByLoc[locId].batches.add(batchKey);
+      });
+
+      // Convert Sets to counts
+      const finalMap: Record<string, { qty: number; batches: number }> = {};
+      for (const [locId, data] of Object.entries(stockByLoc)) {
+        finalMap[locId] = { qty: Math.round(data.qty * 100) / 100, batches: data.batches.size };
+      }
+
+      setLiveStockMap(finalMap);
+      if (detectedUnit) setLiveUnit(detectedUnit);
+    } catch (err) {
+      console.error('LocationSelectModal: Failed to fetch live stock', err);
+    } finally {
+      setStockLoading(false);
+    }
+  }, [companyId, skuId]);
+
+  const getLocationStock = (nodeId: string, _level: string) => {
     const id = String(nodeId);
+    // Direct match in stock map
     if (locationStockMap && locationStockMap[id]) {
       return locationStockMap[id];
     }
 
+    // Sum children recursively
     let totalQty = 0;
     let totalBatches = 0;
     const sumChildren = (pId: string) => {
@@ -90,22 +154,7 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
     sumChildren(id);
 
     if (totalQty > 0) {
-      return { qty: totalQty, batches: totalBatches || 1 };
-    }
-
-    const nodeObj = locMap.get(id);
-    const nodeName = nodeObj?.name?.trim().toLowerCase();
-    if (nodeName === 'top' || id === 'loc-top' || id === 'loc-m-top') {
-      return { qty: 20, batches: 1 };
-    }
-    if (level === 'Zone' && (nodeName === 'm' || nodeName === 'a')) {
-      return { qty: 20, batches: 1 };
-    }
-    if (level === 'Floor' && nodeName === 'ground') {
-      return { qty: 20, batches: 1 };
-    }
-    if (level === 'Factory' && nodeName === 'skbw') {
-      return { qty: 20, batches: 1 };
+      return { qty: Math.round(totalQty * 100) / 100, batches: totalBatches };
     }
 
     return { qty: 0, batches: 0 };
@@ -137,10 +186,13 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
       setTempSelectedId(selectedLocationId);
       setSearchQuery('');
       setWarningMsg(null);
-      // Everything closed by default
       setExpandedNodes({});
+      // Fetch live stock data when modal opens
+      if (companyId) {
+        fetchLiveStock();
+      }
     }
-  }, [isOpen, selectedLocationId]);
+  }, [isOpen, selectedLocationId, companyId, fetchLiveStock]);
 
   if (!isOpen) return null;
 
@@ -340,17 +392,28 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
 
         {/* Informational Micro Table Header */}
         <div className="grid grid-cols-12 px-3 py-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 bg-slate-50/40">
-          <div className="col-span-7">Location</div>
+          <div className="col-span-7 flex items-center gap-1">
+            Location
+            {stockLoading && (
+              <RefreshCw className="w-2.5 h-2.5 animate-spin text-blue-500" />
+            )}
+          </div>
           <div className="col-span-2 text-center">Batches</div>
-          <div className="col-span-3 text-right">Qty ({unit})</div>
+          <div className="col-span-3 text-right">Qty{unit ? ` (${unit})` : ''}</div>
         </div>
 
-        {/* Tree Content: Clean, Borderless, Exactly like Image 2 */}
+        {/* Tree Content */}
         <div className="px-2 py-1.5 overflow-y-auto flex-1 max-h-[350px] custom-scrollbar divide-y divide-slate-50">
-          {rootFactories.filter(matchesSearch).length === 0 ? (
+          {hierarchyToUse.length === 0 ? (
             <div className="py-10 text-center text-slate-400">
               <Layers className="w-6 h-6 mx-auto mb-1.5 text-slate-300" />
-              <p className="text-xs font-semibold">No locations found</p>
+              <p className="text-xs font-semibold">No warehouse hierarchy loaded</p>
+              <p className="text-[10px] text-slate-400 mt-0.5">Pass rawHierarchy data to display locations</p>
+            </div>
+          ) : rootFactories.filter(matchesSearch).length === 0 ? (
+            <div className="py-10 text-center text-slate-400">
+              <Search className="w-6 h-6 mx-auto mb-1.5 text-slate-300" />
+              <p className="text-xs font-semibold">No matching locations</p>
             </div>
           ) : (
             rootFactories.filter(matchesSearch).map(factory => {

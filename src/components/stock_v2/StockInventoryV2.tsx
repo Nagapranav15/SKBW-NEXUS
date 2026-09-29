@@ -43,7 +43,7 @@ import {
   ClipboardList
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Modal from '../ui/Modal';
 import { showToast } from '../ui/Toast';
@@ -213,6 +213,7 @@ const getSkuCategoryGroup = (item: SkuV2): 'products' | 'materials' | 'semi' => 
 
 export const StockInventoryV2: React.FC = () => {
   const { selectedCompany } = useAuth();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const VALID_STOCK_TABS: StockTabType[] = ['overview', 'products', 'materials', 'semi', 'batches', 'transfers', 'adjustments', 'warehouse'];
@@ -498,41 +499,8 @@ export const StockInventoryV2: React.FC = () => {
     }
   ]);
 
-  const handleOpenBatchModal = () => {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const defaultLoc = allLocations[0]?._id || '';
-    const defaultLocName = allLocations[0]?.name || '';
-    const defaultSup = allSuppliers[0]?._id || '';
-    const defaultSupName = allSuppliers[0]?.firmName || allSuppliers[0]?.name || allSuppliers[0]?.partyName || '';
-
-    setBatchForm({
-      batchNumber: `PB-${Date.now().toString().slice(-5)}`,
-      purchaseDate: todayStr,
-      supplierId: defaultSup,
-      supplierName: defaultSupName,
-      purchaseType: 'Materials',
-      freightCharges: 0,
-      craneCharges: 0,
-      loadingCharges: 0,
-      otherCharges: 0,
-      remarks: ''
-    });
-    setLots([
-      {
-        id: `lot-${Date.now()}-1`,
-        skuId: '',
-        skuCode: '',
-        skuName: '',
-        brand: '',
-        gsm: '',
-        unit: 'Kg',
-        totalKg: 0,
-        ratePerKg: 0,
-        locationId: defaultLoc,
-        locationName: defaultLocName
-      }
-    ]);
-    setShowBatchModal(true);
+  const handleOpenBatchModal = (sku?: SkuV2) => {
+    navigate(`/inventory-v2/purchases?create=true${sku?._id ? `&skuId=${sku._id}` : ''}`);
   };
 
   const handleAddLotRow = () => {
