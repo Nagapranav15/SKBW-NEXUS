@@ -49,4 +49,8 @@ const inventoryLedgerSchema = new mongoose.Schema({
   company: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true, index: true }
 }, { timestamps: true });
 
+inventoryLedgerSchema.index({ company: 1, status: 1 });
+inventoryLedgerSchema.index({ company: 1, skuId: 1, locationId: 1 });
+inventoryLedgerSchema.index({ company: 1, referenceType: 1, referenceId: 1 });
+
 module.exports = mongoose.model("InventoryLedger", inventoryLedgerSchema);

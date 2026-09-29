@@ -49,23 +49,67 @@ const getHierarchy = async (locationId, companyId) => {
   return { warehouseId, floorId, zoneId, locationId: resolvedLocId };
 };
 
-// Directly reflect prepared production order in Item Stock & Inventory (InventoryLedger)
-const postProductionOrderLedger = async (order) => {
+const cleanedCompanies = new Set();
+
+// Cleanup ghost ledger entries for uncompleted production orders where 0 was produced
+const cleanupGhostProductionLedgers = async (companyId) => {
+  try {
+    if (cleanedCompanies.has(String(companyId))) return;
+    const filter = {
+      status: { $nin: ["Completed"] },
+      $or: [{ producedQty: 0 }, { producedQty: { $exists: false } }]
+    };
+    if (companyId) filter.company = companyId;
+
+    const unproducedOrders = await ProductionOrder.find(filter).select("orderNumber company").lean();
+    if (unproducedOrders.length > 0) {
+      const orderNumbers = unproducedOrders.map(o => o.orderNumber);
+      const exists = await InventoryLedger.exists({
+        referenceType: "ProductionOrder",
+        referenceId: { $in: orderNumbers }
+      });
+      if (exists) {
+        await InventoryLedger.deleteMany({
+          referenceType: "ProductionOrder",
+          referenceId: { $in: orderNumbers }
+        });
+      }
+    }
+    cleanedCompanies.add(String(companyId));
+  } catch (e) {
+    console.error("Error cleaning ghost production ledgers:", e);
+  }
+};
+
+// Dynamically synchronize prepared production order stock in Item Stock & Inventory (InventoryLedger).
+// Only actual PREPARED (produced) stock is recorded into on-hand inventory!
+// While planned or in-production with 0 produced, it only reserves the place (does not record directly).
+const syncProductionOrderLedger = async (order) => {
   try {
     if (!order || !order.company) return;
     const companyObjId = order.company;
 
-    // Check if ledger entries already exist for this order to avoid duplicate postings
-    const existingCount = await InventoryLedger.countDocuments({
+    // Clean up previous ledger entries for this production order to avoid stale or duplicate postings
+    await InventoryLedger.deleteMany({
       referenceType: "ProductionOrder",
       referenceId: order.orderNumber,
       company: companyObjId
     });
-    if (existingCount > 0) return;
+
+    const isCompleted = order.status === "Completed";
+    const producedQty = Number(order.producedQty) || 0;
+    // Dynamic prepared stock: only actual produced quantity, or full planned quantity if order is Completed
+    const qtyIn = isCompleted ? (producedQty > 0 ? producedQty : Number(order.plannedQty)) : producedQty;
+
+    // If 0 stock has been prepared, DO NOT record on-hand stock directly into the ledger!
+    // It remains in "In Production" / reserved place.
+    if (qtyIn <= 0) {
+      return;
+    }
 
     const ledgerDocs = [];
 
-    // 1. Finished Product Receipt (IN)
+    // 1. Finished Product Receipt (IN) - ONLY for actual prepared stock
     if (order.itemId || order.itemCode || order.itemName) {
       let sku = null;
       if (order.itemId && mongoose.Types.ObjectId.isValid(order.itemId)) {
@@ -85,9 +129,8 @@ const postProductionOrderLedger = async (order) => {
         const outputLocId = order.outputLocationId || order.locationId || order.outputLocation || order.factory || order.factoryId || sku.initialLocationId || sku.defaultLocation;
         const h = await getHierarchy(outputLocId, companyObjId);
         const transactionNumber = await Sequence.getNextSequence("IL");
-        const qtyIn = Number(order.producedQty) > 0 ? Number(order.producedQty) : Number(order.plannedQty);
 
-        if (qtyIn > 0 && h.locationId) {
+        if (h.locationId) {
           ledgerDocs.push({
             transactionNumber,
             transactionType: "Production Receipt",
@@ -102,7 +145,7 @@ const postProductionOrderLedger = async (order) => {
             floorId: h.floorId,
             zoneId: h.zoneId,
             locationId: h.locationId,
-            remarks: `Prepared under Production Order ${order.orderNumber} (${order.itemName})`,
+            remarks: `Prepared under Production Order ${order.orderNumber} (${order.itemName}) [${isCompleted ? 'Completed' : 'Partial'}]`,
             createdBy: order.createdBy,
             company: companyObjId,
             status: "Posted"
@@ -111,11 +154,14 @@ const postProductionOrderLedger = async (order) => {
       }
     }
 
-    // 2. BOM Materials Consumption (OUT)
+    // 2. BOM Materials Consumption (OUT) - Proportional to actual prepared stock
     if (order.bomItems && Array.isArray(order.bomItems) && order.bomItems.length > 0) {
+      const progressRatio = isCompleted ? 1 : Math.min(1, qtyIn / (Number(order.plannedQty) || 1));
+
       for (const m of order.bomItems) {
-        const reqQty = Number(m.totalRequired) || Number(m.qtyPerBatch) || 0;
-        if (reqQty <= 0) continue;
+        const fullReq = Number(m.totalRequired) || Number(m.qtyPerBatch) || 0;
+        const consumedQty = Math.round(fullReq * progressRatio * 1000) / 1000;
+        if (consumedQty <= 0) continue;
 
         let matSku = null;
         if (m.skuId && mongoose.Types.ObjectId.isValid(m.skuId)) {
@@ -141,7 +187,7 @@ const postProductionOrderLedger = async (order) => {
               transactionNumber,
               transactionType: "Production Consumption",
               skuId: matSku._id,
-              quantity: reqQty,
+              quantity: consumedQty,
               unit: m.uom || matSku.unit || "Pcs",
               direction: "OUT",
               referenceType: "ProductionOrder",
@@ -165,7 +211,7 @@ const postProductionOrderLedger = async (order) => {
       await InventoryLedger.insertMany(ledgerDocs, { ordered: false });
     }
   } catch (err) {
-    console.error("Error posting production order stock updates to InventoryLedger:", err);
+    console.error("Error syncing production order stock updates to InventoryLedger:", err);
   }
 };
 
@@ -207,6 +253,9 @@ exports.getProductionOrders = async (req, res) => {
       return res.status(400).json({ msg: "Company ID is required" });
     }
 
+    // Auto-heal ghost ledger entries for uncompleted orders with 0 produced
+    await cleanupGhostProductionLedgers(companyId);
+
     const filter = { company: companyId };
 
     if (req.query.status && req.query.status !== "All") {
@@ -231,9 +280,12 @@ exports.getProductionOrders = async (req, res) => {
       ];
     }
 
-    const orders = await ProductionOrder.find(filter)
-      .sort({ createdAt: -1, orderNumber: -1 })
-      .lean();
+    let queryExec = ProductionOrder.find(filter).sort({ createdAt: -1, orderNumber: -1 });
+    if (req.query.light === "true" || req.query.light === true) {
+      queryExec = queryExec.select("orderNumber itemId itemName itemCode plannedQty plannedUom plannedPcs producedQty producedPcs status progress costSummary bomItems outputLocation factory");
+    }
+
+    const orders = await queryExec.lean();
 
     // Ensure all order numbers display standard PO- format
     const normalized = orders.map(o => {
@@ -326,17 +378,37 @@ exports.createProductionOrder = async (req, res) => {
     const balanceQty = plannedQty;
     const balancePcs = plannedPcs;
 
+    // Calculate dynamic costSummary if not fully provided
+    let costSummary = req.body.costSummary || {};
+    const bomItems = req.body.bomItems || [];
+    const matCost = bomItems.reduce((acc, it) => acc + (Number(it.amount) || ((Number(it.totalRequired || it.qtyPerBatch || 0)) * (Number(it.rate) || 0))), 0);
+    const addCosts = req.body.additionalCosts || [];
+    const addCost = addCosts.reduce((acc, it) => acc + (Number(it.amount || it.totalAmount) || 0), 0);
+    const totalCost = Number(costSummary.totalProductionCost) > 0 ? Number(costSummary.totalProductionCost) : (matCost + addCost);
+    const costPerGbl = plannedQty > 0 ? (totalCost / plannedQty) : 0;
+    const costPerPiece = plannedPcs > 0 ? (totalCost / plannedPcs) : 0;
+
+    costSummary = {
+      materialCost: Number(costSummary.materialCost) || matCost,
+      additionalCost: Number(costSummary.additionalCost) || addCost,
+      totalProductionCost: totalCost,
+      costPerGbl: Number(costSummary.costPerGbl) || Math.round(costPerGbl * 100) / 100,
+      costPerPiece: Number(costSummary.costPerPiece) || Math.round(costPerPiece * 100) / 100,
+      ...costSummary
+    };
+
     const newOrder = new ProductionOrder({
       ...req.body,
+      costSummary,
       orderNumber,
       plannedQty,
       conversionFactor,
       plannedPcs,
-      producedQty: 0,
-      producedPcs: 0,
+      producedQty: Number(req.body.producedQty) || 0,
+      producedPcs: Number(req.body.producedPcs) || 0,
       balanceQty,
       balancePcs,
-      progress: 0,
+      progress: req.body.progress || 0,
       status: req.body.status || "Planned",
       company: companyId,
       createdBy: req.user?._id || req.user?.id
@@ -355,10 +427,8 @@ exports.createProductionOrder = async (req, res) => {
 
     await newOrder.save();
 
-    // Directly reflect prepared production order in Item Stock & Inventory if not draft
-    if (newOrder.status !== "Draft") {
-      await postProductionOrderLedger(newOrder);
-    }
+    // Dynamically sync prepared stock in Item Stock & Inventory (only records if actually prepared/completed)
+    await syncProductionOrderLedger(newOrder);
 
     res.status(201).json(newOrder);
   } catch (err) {
@@ -381,10 +451,8 @@ exports.updateProductionOrder = async (req, res) => {
       return res.status(404).json({ msg: "Production order not found" });
     }
 
-    // Reflect in Item Stock & Inventory if status is not Draft
-    if (updated.status !== "Draft") {
-      await postProductionOrderLedger(updated);
-    }
+    // Dynamically sync prepared stock in Item Stock & Inventory
+    await syncProductionOrderLedger(updated);
 
     res.json(updated);
   } catch (err) {
@@ -471,9 +539,8 @@ exports.recordProductionEntry = async (req, res) => {
 
     await order.save();
 
-    if (progress >= 100 || newStatus === "Completed") {
-      await postProductionOrderLedger(order);
-    }
+    // Dynamically sync prepared stock in Item Stock & Inventory according to production
+    await syncProductionOrderLedger(order);
 
     res.json(order);
   } catch (err) {
@@ -530,7 +597,7 @@ exports.completeProductionOrder = async (req, res) => {
     await order.save();
 
     // Directly reflect completed production order in Item Stock & Inventory
-    await postProductionOrderLedger(order);
+    await syncProductionOrderLedger(order);
 
     res.json(order);
   } catch (err) {

@@ -9,6 +9,7 @@ const ActivityLog = require("../models/activityLogModel");
 const User = require("../models/userModel");
 const SalesOrderV2 = require("../models/salesOrderV2Model");
 const PurchaseInvoiceV2 = require("../models/purchaseInvoiceV2Model");
+const ProductionOrder = require("../models/productionOrderModel");
 const { validateUomConversion } = require("../utils/uomConversion");
 
 const toObjectId = (id) => {
@@ -84,7 +85,7 @@ exports.getSkus = async (req, res, next) => {
       }
     }
 
-    const skus = await SkuV2.find(query).sort({ skuCode: 1, createdAt: 1 });
+    const skus = await SkuV2.find(query).sort({ skuCode: 1, createdAt: 1 }).lean();
     res.json(skus);
   } catch (err) {
     next(err);
@@ -1244,8 +1245,11 @@ exports.getWarehouseHierarchy = async (req, res, next) => {
     }
 
     const companyObjId = toObjectId(companyId);
-    await ensureDefaultWarehouseLocations(companyObjId);
-    const locations = await WarehouseLocationV2.find({ company: companyObjId }).lean();
+    let locations = await WarehouseLocationV2.find({ company: companyObjId }).lean();
+    if (!locations || locations.length === 0) {
+      await ensureDefaultWarehouseLocations(companyObjId);
+      locations = await WarehouseLocationV2.find({ company: companyObjId }).lean();
+    }
     res.json(locations);
   } catch (err) {
     next(err);
@@ -2905,9 +2909,36 @@ exports.getSkuStockDetails = async (req, res, next) => {
         let receivedQty = b.onHand;
         let reference = b.referenceId || `LOT-${idx + 1}`;
 
-        if (b.batchNumber && b.batchNumber !== 'UNKNOWN') {
-          // The batchNumber on ledger entries is the invoiceNumber (e.g. "PB-011")
-          // Look up the purchase invoice directly by invoiceNumber for an exact match.
+        let isFromProduction = b.referenceType === 'ProductionOrder' || b.referenceType === 'Production' || (b.referenceId && /^(?:PO|PR)-/i.test(b.referenceId));
+
+        if (isFromProduction) {
+          const po = await ProductionOrder.findOne({
+            company: companyObjId,
+            orderNumber: b.referenceId
+          }).lean();
+
+          if (po) {
+            supplier = `Production (${po.orderNumber})`;
+            reference = po.orderNumber;
+            purchaseDate = po.actualCompletionDate || po.updatedAt || po.createdAt || purchaseDate;
+
+            const cs = po.costSummary || {};
+            const isGbl = (sku.unit || '').toUpperCase() === 'GBL' || (po.plannedUom || '').toUpperCase() === 'GBL';
+            let prodRate = 0;
+            if (isGbl && cs.costPerGbl && Number(cs.costPerGbl) > 0) {
+              prodRate = Number(cs.costPerGbl);
+            } else if (!isGbl && cs.costPerPiece && Number(cs.costPerPiece) > 0) {
+              prodRate = Number(cs.costPerPiece);
+            } else if (cs.totalProductionCost && Number(cs.totalProductionCost) > 0) {
+              const divisor = isGbl ? (po.plannedQty || 1) : (po.plannedPcs || po.plannedQty || 1);
+              prodRate = Number(cs.totalProductionCost) / divisor;
+            }
+            if (prodRate > 0) {
+              rate = Math.round(prodRate * 100) / 100;
+            }
+          }
+        } else if (b.batchNumber && b.batchNumber !== 'UNKNOWN') {
+          // Check Purchase Invoice directly by invoiceNumber
           const inv = await PurchaseInvoiceV2.findOne({
             company: companyObjId,
             invoiceNumber: b.batchNumber
@@ -2918,17 +2949,44 @@ exports.getSkuStockDetails = async (req, res, next) => {
             purchaseDate = inv.invoiceDate || purchaseDate;
             reference = inv.invoiceNumber || reference;
 
-            // Strictly match the item by skuId — never fall back via a loose OR that
-            // returns another batch's rate.
             const matchedItem = inv.items?.find(it => String(it.skuId) === String(sku._id));
             if (matchedItem) {
-              // purchasePrice is the per-batch declared rate; it is not overwritten globally.
               const itemRate = Number(matchedItem.purchasePrice || matchedItem.ratePerKg || 0);
               if (itemRate > 0) rate = itemRate;
             }
+          } else {
+            // Also check if batchNumber matches a Production Order
+            const po = await ProductionOrder.findOne({
+              company: companyObjId,
+              $or: [
+                { orderNumber: b.batchNumber },
+                { "finishedGoodsBatch.batchNo": b.batchNumber }
+              ]
+            }).lean();
+
+            if (po) {
+              isFromProduction = true;
+              supplier = `Production (${po.orderNumber})`;
+              reference = po.orderNumber;
+              purchaseDate = po.actualCompletionDate || po.updatedAt || po.createdAt || purchaseDate;
+
+              const cs = po.costSummary || {};
+              const isGbl = (sku.unit || '').toUpperCase() === 'GBL' || (po.plannedUom || '').toUpperCase() === 'GBL';
+              let prodRate = 0;
+              if (isGbl && cs.costPerGbl && Number(cs.costPerGbl) > 0) {
+                prodRate = Number(cs.costPerGbl);
+              } else if (!isGbl && cs.costPerPiece && Number(cs.costPerPiece) > 0) {
+                prodRate = Number(cs.costPerPiece);
+              } else if (cs.totalProductionCost && Number(cs.totalProductionCost) > 0) {
+                const divisor = isGbl ? (po.plannedQty || 1) : (po.plannedPcs || po.plannedQty || 1);
+                prodRate = Number(cs.totalProductionCost) / divisor;
+              }
+              if (prodRate > 0) {
+                rate = Math.round(prodRate * 100) / 100;
+              }
+            }
           }
         }
-
 
         // Build short hierarchy path for location
         let locDoc = b.location;
@@ -2956,7 +3014,7 @@ exports.getSkuStockDetails = async (req, res, next) => {
           rate: rate > 0 ? rate : Number(sku.costPrice || sku.rate || 250),
           value: b.onHand * (rate > 0 ? rate : Number(sku.costPrice || sku.rate || 250)),
           supplier: supplier,
-          source: b.referenceType === 'Production' ? `Production ${b.referenceId}` : supplier,
+          source: (isFromProduction || supplier.startsWith('Production')) ? (supplier || `Production ${b.referenceId}`) : supplier,
           date: purchaseDate,
           status: 'Active'
         };
@@ -3127,6 +3185,57 @@ exports.getSkuStockDetails = async (req, res, next) => {
       });
     });
 
+    // 5b. Active Production Orders: BOM Raw Material Reservations & In-Process Finished Goods
+    const activeProdOrders = await ProductionOrder.find({
+      company: companyObjId,
+      status: { $in: ["Planned", "In Production", "Not Started"] }
+    }).lean();
+
+    // Check if this SKU is reserved as a BOM raw material in active production orders
+    activeProdOrders.forEach((po, poIdx) => {
+      (po.bomItems || []).forEach((m) => {
+        const matchSku = (m.skuId && String(m.skuId) === String(skuObjId)) ||
+                         (m.code && m.code === sku.skuCode) ||
+                         (m.component && m.component.trim().toLowerCase() === sku.name.trim().toLowerCase());
+        if (matchSku) {
+          const totalReq = Number(m.totalRequired) || Number(m.qtyPerBatch) || 0;
+          const prog = (po.progress || 0) / 100;
+          const consumed = totalReq * prog;
+          const remainingReq = Math.max(0, totalReq - consumed);
+          if (remainingReq > 0) {
+            totalReserved += remainingReq;
+            reservations.push({
+              id: `res-po-${po._id}-${m.skuId || m.code || poIdx}`,
+              orderId: po._id,
+              orderNumber: po.orderNumber,
+              orderDate: po.orderDate || po.createdAt,
+              requiredDate: po.requiredCompletionDate || po.plannedStartDate || new Date(),
+              daysLeftText: `In Production (${po.status})`,
+              isOverdue: false,
+              customerName: `Production PO: ${po.orderNumber} (${po.itemName})`,
+              orderedQty: totalReq,
+              reservedQty: remainingReq,
+              pendingQty: 0,
+              dispatchedQty: consumed,
+              status: 'Reserved for Production'
+            });
+          }
+        }
+      });
+    });
+
+    // Check if this SKU is the item being produced (In-Process stock)
+    let inProcessTotal = 0;
+    activeProdOrders.forEach(po => {
+      const matchItem = (po.itemId && String(po.itemId) === String(skuObjId)) ||
+                        (po.itemCode && po.itemCode === sku.skuCode) ||
+                        (po.itemName && po.itemName.trim().toLowerCase() === sku.name.trim().toLowerCase());
+      if (matchItem) {
+        const remainingProduce = Math.max(0, (po.plannedQty || 0) - (po.producedQty || 0));
+        inProcessTotal += remainingProduce;
+      }
+    });
+
     // 6. Overall Totals & Valuation
     const onHandTotal = populatedLocations.reduce((sum, l) => sum + (l.onHand || 0), 0);
     const availableTotal = Math.max(0, onHandTotal - totalReserved);
@@ -3146,7 +3255,7 @@ exports.getSkuStockDetails = async (req, res, next) => {
         onHand: onHandTotal,
         reserved: totalReserved,
         available: availableTotal,
-        inProcess: 0,
+        inProcess: inProcessTotal,
         stockValue,
         avgRate: Math.round(avgRate),
         pcsEquivalent,

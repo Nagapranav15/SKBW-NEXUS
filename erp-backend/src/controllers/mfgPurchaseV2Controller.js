@@ -506,15 +506,20 @@ const migratePurchaseBatchNumbers = async (companyObjId) => {
   }
 };
 
+const migratedCompanies = new Set();
+
 exports.getPurchaseInvoices = async (req, res, next) => {
   try {
-    const { companyId, vendorId, paymentStatus, status, search, page = 1, limit = 20 } = req.query;
+    const { companyId, vendorId, paymentStatus, status, search, page = 1, limit = 20, light } = req.query;
     if (!companyId) {
       return res.status(400).json({ msg: "companyId query parameter is required" });
     }
 
     const companyObjId = toObjectId(companyId);
-    await migratePurchaseBatchNumbers(companyObjId);
+    if (!migratedCompanies.has(String(companyObjId))) {
+      await migratePurchaseBatchNumbers(companyObjId);
+      migratedCompanies.add(String(companyObjId));
+    }
 
     const query = { company: companyObjId };
     if (vendorId) query.vendorId = toObjectId(vendorId);
@@ -529,6 +534,17 @@ exports.getPurchaseInvoices = async (req, res, next) => {
     }
 
     const skip = (Number(page) - 1) * Number(limit);
+
+    // Fast light query for inventory costing and overview without heavy nested populates
+    if (light === "true" || light === true) {
+      const invoices = await PurchaseInvoiceV2.find(query)
+        .select("invoiceNumber invoiceDate partyName status items.skuId items.quantity items.purchasePrice items.price items.ratePerKg items.locationId")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean();
+      return res.json({ invoices, total: invoices.length, page: Number(page), limit: Number(limit) });
+    }
 
     const [invoices, total] = await Promise.all([
       PurchaseInvoiceV2.find(query)

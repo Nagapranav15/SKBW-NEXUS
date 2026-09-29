@@ -7,6 +7,7 @@ export interface ProductionOrderFilters {
   itemType?: string;
   department?: string;
   search?: string;
+  light?: boolean;
 }
 
 export const getProductionOrders = async (params: ProductionOrderFilters): Promise<ProductionOrder[]> => {

@@ -62,6 +62,7 @@ import {
   WarehouseLocationV2 
 } from '../../api/mfgApiV2';
 import { getParties } from '../../api/partyApi';
+import { getProductionOrders } from '../../api/productionApi';
 import { createPurchaseInvoiceV2, updatePurchaseInvoiceV2, getPurchaseInvoicesV2, cancelPurchaseInvoiceV2 } from '../inventory_v2/purchases/purchaseService';
 import WarehouseStructureV2 from '../inventory_v2/WarehouseStructureV2';
 import ItemStockDetailsDrawer, { ItemDrawerTab } from './ItemStockDetailsDrawer';
@@ -571,22 +572,24 @@ export const StockInventoryV2: React.FC = () => {
   // Load auxiliary lists from backend
   const loadAuxiliaryData = useCallback(async (showSpinner = false) => {
     if (!selectedCompany?._id) return;
-    if (showSpinner) setLoading(true);
+    if (showSpinner && allSkus.length === 0) setLoading(true);
     try {
-      const [supRes, skusRes, locsRes, balancesRes, ledgerRes, purchasesRes] = await Promise.all([
-        getParties({ company: selectedCompany._id, type: 'vendor', limit: 1000, light: true }).catch(() => ({ data: [] })),
+      // Fire non-blocking background fetch for vendors (only needed for modal)
+      getParties({ company: selectedCompany._id, type: 'vendor', limit: 200, light: true })
+        .then(supRes => setAllSuppliers(supRes.data?.parties || supRes.data || []))
+        .catch(() => {});
+
+      // Parallel core data fetch with light payloads
+      const [skusRes, locsRes, balancesRes, purchasesRes, prodOrdersRes] = await Promise.all([
         getSkusV2(selectedCompany._id).catch(() => []),
         getWarehouseHierarchyV2(selectedCompany._id).catch(() => []),
         getBalancesV2(selectedCompany._id).catch(() => []),
-        getLedgerV2({ companyId: selectedCompany._id, limit: 1000 }).catch(() => []),
-        getPurchaseInvoicesV2({ companyId: selectedCompany._id, limit: 1000 }).catch(() => ({ invoices: [] }))
+        getPurchaseInvoicesV2({ companyId: selectedCompany._id, limit: 100, light: true }).catch(() => ({ invoices: [] })),
+        getProductionOrders({ companyId: selectedCompany._id, light: true }).catch(() => [])
       ]);
 
-      const vendors = supRes.data?.parties || supRes.data || [];
-      setAllSuppliers(vendors);
       setAllLocations(locsRes || []);
       setBalancesList(balancesRes || []);
-      setLedgerEntries(ledgerRes || []);
 
       // 1. Calculate live ledger on-hand stock and full multi-location breakdown
       const balanceMap = new Map<string, number>();
@@ -641,13 +644,105 @@ export const StockInventoryV2: React.FC = () => {
         });
       });
 
+      // 3. Dynamic Costing & Place Reservation from Production Orders
+      const prodCostMap = new Map<string, { totalSpend: number; totalQty: number; avgRate: number; inProduction: number }>();
+      const rmReservedMap = new Map<string, number>();
+      const prodOrders = Array.isArray(prodOrdersRes) ? prodOrdersRes : [];
+
+      prodOrders.forEach((po: any) => {
+        if (po.status === 'Cancelled') return;
+
+        const rawItemId = po.itemId?._id || po.itemId;
+        const sId = rawItemId ? String(rawItemId) : '';
+        const sCode = (po.itemCode || '').trim().toLowerCase();
+        const sName = (po.itemName || '').trim().toLowerCase();
+
+        const plannedQty = Number(po.plannedQty) || 0;
+        const plannedPcs = Number(po.plannedPcs) || 0;
+        const producedQty = Number(po.producedQty) || 0;
+        const isGbl = (po.plannedUom || '').toUpperCase() === 'GBL';
+
+        // Extract unit cost from production order's costSummary
+        const cs = po.costSummary || {};
+        let unitRate = 0;
+        if (isGbl && cs.costPerGbl && Number(cs.costPerGbl) > 0) {
+          unitRate = Number(cs.costPerGbl);
+        } else if (!isGbl && cs.costPerPiece && Number(cs.costPerPiece) > 0) {
+          unitRate = Number(cs.costPerPiece);
+        } else if (cs.totalProductionCost && Number(cs.totalProductionCost) > 0) {
+          const divisor = isGbl ? (plannedQty || 1) : (plannedPcs || plannedQty || 1);
+          unitRate = Number(cs.totalProductionCost) / divisor;
+        }
+
+        const targetKeys = [sId, sCode, sName].filter(Boolean);
+
+        if (unitRate > 0) {
+          const qtyWeight = producedQty > 0 ? producedQty : plannedQty;
+          targetKeys.forEach(k => {
+            const cur = prodCostMap.get(k) || { totalSpend: 0, totalQty: 0, avgRate: 0, inProduction: 0 };
+            const newSpend = cur.totalSpend + (qtyWeight * unitRate);
+            const newQty = cur.totalQty + qtyWeight;
+            prodCostMap.set(k, {
+              totalSpend: newSpend,
+              totalQty: newQty,
+              avgRate: newQty > 0 ? (newSpend / newQty) : unitRate,
+              inProduction: cur.inProduction
+            });
+          });
+        }
+
+        // Place reservation: while in production/planned, output is inProduction (not on-hand directly)
+        if (po.status !== 'Completed') {
+          const remainingProduce = Math.max(0, plannedQty - producedQty);
+          if (remainingProduce > 0) {
+            targetKeys.forEach(k => {
+              const cur = prodCostMap.get(k) || { totalSpend: 0, totalQty: 0, avgRate: 0, inProduction: 0 };
+              cur.inProduction += remainingProduce;
+              prodCostMap.set(k, cur);
+            });
+          }
+
+          // Place reservation for BOM raw materials
+          (po.bomItems || []).forEach((m: any) => {
+            const matId = m.skuId?._id || m.skuId;
+            const mKey = matId ? String(matId) : (m.code || m.component || '').trim().toLowerCase();
+            const totalReq = Number(m.totalRequired) || Number(m.qtyPerBatch) || 0;
+            const prog = (Number(po.progress) || 0) / 100;
+            const remainingReq = Math.max(0, totalReq * (1 - prog));
+            if (mKey && remainingReq > 0) {
+              rmReservedMap.set(mKey, (rmReservedMap.get(mKey) || 0) + remainingReq);
+            }
+          });
+        }
+      });
+
       const formattedSkus: SkuV2[] = (skusRes || []).map((s: SkuV2) => {
         const sId = String(s._id);
-        const ledgerStock = balanceMap.get(sId) || 0;
+        const sCode = (s.skuCode || '').trim().toLowerCase();
+        const sName = (s.name || '').trim().toLowerCase();
+
+        const liveOnHand = balanceMap.get(sId) || 0;
         const avgStats = avgPriceMap.get(sId);
-        const calculatedAvg = avgStats && avgStats.avgPrice > 0 
-          ? avgStats.avgPrice 
-          : Number((s as any).purchasePrice || (s as any).ratePerKg || (s as any).rate || (s as any).avgRate || 0);
+        const prodStats = prodCostMap.get(sId) || prodCostMap.get(sCode) || prodCostMap.get(sName);
+
+        // Production costing is prioritized for manufactured items (finished & semi goods)
+        let calculatedAvg = 0;
+        let costSource: 'production' | 'purchase' | 'master' = 'master';
+
+        if (prodStats && prodStats.avgRate > 0) {
+          calculatedAvg = Math.round(prodStats.avgRate * 100) / 100;
+          costSource = 'production';
+        } else if (avgStats && avgStats.avgPrice > 0) {
+          calculatedAvg = Math.round(avgStats.avgPrice * 100) / 100;
+          costSource = 'purchase';
+        } else {
+          calculatedAvg = Number((s as any).purchasePrice || (s as any).ratePerKg || (s as any).rate || (s as any).avgRate || 0);
+          costSource = 'master';
+        }
+
+        const inProduction = prodStats?.inProduction || 0;
+        const reserved = rmReservedMap.get(sId) || rmReservedMap.get(sCode) || rmReservedMap.get(sName) || 0;
+        const availableStock = Math.max(0, liveOnHand - reserved);
 
         const locBreakdown = (skuLocationsMap.get(sId) || []).filter(l => (l.onHand || 0) > 0);
         let primaryLocationInfo: SkuLocationInfo;
@@ -663,8 +758,14 @@ export const StockInventoryV2: React.FC = () => {
         return {
           ...s,
           openingStock: 0,
-          presentStock: ledgerStock,
+          onHand: liveOnHand,
+          preparedStock: liveOnHand,
+          inProduction,
+          reserved,
+          availableStock,
+          presentStock: availableStock,
           avgRate: calculatedAvg,
+          costSource,
           resolvedLocation: primaryLocationInfo.leafName,
           primaryLocationInfo,
           locationBreakdown: locBreakdown
@@ -685,6 +786,15 @@ export const StockInventoryV2: React.FC = () => {
       loadAuxiliaryData(true);
     }
   }, [selectedCompany?._id, loadAuxiliaryData]);
+
+  // Lazy-load ledger entries on-demand when transfers or adjustments tab is clicked
+  useEffect(() => {
+    if ((activeTab === 'transfers' || activeTab === 'adjustments') && ledgerEntries.length === 0 && selectedCompany?._id) {
+      getLedgerV2({ companyId: selectedCompany._id, limit: 250 })
+        .then(res => setLedgerEntries(res || []))
+        .catch(err => console.error('Failed to load ledger entries:', err));
+    }
+  }, [activeTab, selectedCompany?._id, ledgerEntries.length]);
 
   // Main KPI Aggregations across all SKUs
   const kpiStats = useMemo(() => {
@@ -2010,8 +2120,27 @@ export const StockInventoryV2: React.FC = () => {
                             )}
                             {/* 6. Available Stock */}
                             {columnsConfig.find(c => c.id === 'presentStock')?.visible !== false && (
-                              <td className="px-4 py-3 text-right font-mono font-bold text-gray-900 text-sm whitespace-nowrap">
-                                {onHand.toLocaleString('en-IN')}
+                              <td className="px-4 py-3 text-right whitespace-nowrap">
+                                <div className="font-mono font-bold text-gray-900 text-sm">
+                                  {Number((sku as any).availableStock ?? onHand ?? 0).toLocaleString('en-IN')}
+                                </div>
+                                <div className="flex items-center justify-end gap-1 mt-0.5">
+                                  {Number((sku as any).inProduction || 0) > 0 && (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200" title="In Production (Reserved Place)">
+                                      +{Number((sku as any).inProduction).toLocaleString('en-IN')} in prod
+                                    </span>
+                                  )}
+                                  {Number((sku as any).reserved || 0) > 0 && (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200" title="Reserved for Production or Orders">
+                                      {Number((sku as any).reserved).toLocaleString('en-IN')} reserved
+                                    </span>
+                                  )}
+                                  {Number((sku as any).preparedStock || 0) > 0 && Number((sku as any).preparedStock) !== Number((sku as any).availableStock ?? onHand) && (
+                                    <span className="text-[10px] text-gray-400 font-mono" title="Prepared On-Hand Stock">
+                                      ({Number((sku as any).preparedStock).toLocaleString('en-IN')} on-hand)
+                                    </span>
+                                  )}
+                                </div>
                               </td>
                             )}
                             {/* 7. UOM */}
@@ -2058,8 +2187,13 @@ export const StockInventoryV2: React.FC = () => {
                                 <div className="font-mono font-bold text-blue-700 text-xs">
                                   {formatCurrency(totalVal)}
                                 </div>
-                                <div className="text-[10px] font-mono text-gray-400" title={`Average purchase cost across batch entries: ₹${avgPrice.toFixed(2)}/${sku.unit || 'Unit'}`}>
-                                  Avg ₹{avgPrice.toLocaleString('en-IN', { maximumFractionDigits: 2 })}/{sku.unit || 'Unit'}
+                                <div 
+                                  className="text-[10px] font-mono text-gray-400" 
+                                  title={(sku as any).costSource === 'production' 
+                                    ? `Dynamic unit costing from Production Orders: ₹${avgPrice.toFixed(2)}/${sku.unit || 'Unit'}`
+                                    : `Average purchase cost across batch entries: ₹${avgPrice.toFixed(2)}/${sku.unit || 'Unit'}`}
+                                >
+                                  {(sku as any).costSource === 'production' ? 'Prod ' : 'Avg '}₹{avgPrice.toLocaleString('en-IN', { maximumFractionDigits: 2 })}/{sku.unit || 'Unit'}
                                 </div>
                               </td>
                             )}

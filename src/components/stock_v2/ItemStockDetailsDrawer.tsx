@@ -453,12 +453,12 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
   // Use actual SKU master altUnitConversion — no hardcoded fallback
   const conversionFactor = Number(sku?.altUnitConversion) || 0;
 
-  const totalStock = summary ? summary.onHand : (Number((sku as any)?.presentStock) || 0);
-  const reservedStock = summary ? summary.reserved : 0;
+  const totalStock = summary ? summary.onHand : (Number((sku as any)?.preparedStock ?? (sku as any)?.onHand ?? (sku as any)?.presentStock) || 0);
+  const reservedStock = (summary && summary.reserved !== undefined && summary.reserved > 0) ? summary.reserved : (Number((sku as any)?.reserved) || 0);
   const availableStock = summary ? summary.available : Math.max(0, totalStock - reservedStock);
-  const inProcessStock = summary ? summary.inProcess : 0;
-  const stockValue = summary ? summary.stockValue : 0;
-  const avgRate = summary?.avgRate || (totalStock > 0 ? Math.round(stockValue / totalStock) : 0);
+  const inProcessStock = (summary && summary.inProcess !== undefined && summary.inProcess > 0) ? summary.inProcess : (Number((sku as any)?.inProduction) || 0);
+  const stockValue = summary ? summary.stockValue : (totalStock * (Number((sku as any)?.avgRate) || 0));
+  const avgRate = (summary && summary.avgRate > 0) ? summary.avgRate : (Number((sku as any)?.avgRate) || (totalStock > 0 ? Math.round(stockValue / totalStock) : 0));
 
   // Direction-aware conversion: use convertPrimaryToAlt if sku has altUnitConversion
   const availablePcs = sku && sku.altUnitConversion ? convertPrimaryToAlt(availableStock, sku) : availableStock * conversionFactor;

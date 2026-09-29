@@ -65,6 +65,7 @@ export const getPurchaseInvoicesV2 = async (params: {
   search?: string;
   page?: number;
   limit?: number;
+  light?: boolean;
 }): Promise<FetchInvoicesResponse> => {
   const response = await api.get('/v2/purchases/invoices', { params });
   return response.data;

@@ -1,15 +1,16 @@
 import { getSkusV2, getBalancesV2, getPurchaseInvoicesV2, SkuV2 } from '../api/mfgApiV2';
+import { getProductionOrders } from '../api/productionApi';
 
 export interface ComponentCostingResult {
   rate: number;
   availableStock: number;
-  source: 'purchase_invoice' | 'valuation_rate' | 'sku_master' | 'manual';
+  source: 'purchase_invoice' | 'valuation_rate' | 'sku_master' | 'production' | 'manual';
   rateLabel: string;
   sku?: SkuV2;
 }
 
 export interface StockCostingData {
-  ratesMap: Map<string, { rate: number; source: 'purchase_invoice' | 'valuation_rate' | 'sku_master' }>;
+  ratesMap: Map<string, { rate: number; source: 'purchase_invoice' | 'valuation_rate' | 'sku_master' | 'production' }>;
   stockMap: Map<string, number>;
   skuMap: Map<string, SkuV2>;
   skus: SkuV2[];
@@ -31,10 +32,11 @@ export const fetchStockCostings = async (companyId: string): Promise<StockCostin
   }
 
   try {
-    const [skusRes, balancesRes, purchasesRes] = await Promise.allSettled([
+    const [skusRes, balancesRes, purchasesRes, prodOrdersRes] = await Promise.allSettled([
       getSkusV2(companyId),
       getBalancesV2(companyId, undefined, true),
-      getPurchaseInvoicesV2({ companyId, limit: 100 })
+      getPurchaseInvoicesV2({ companyId, limit: 100 }),
+      getProductionOrders({ companyId })
     ]);
 
     // 1. Process SKUs
@@ -136,6 +138,38 @@ export const fetchStockCostings = async (companyId: string): Promise<StockCostin
       });
     }
 
+    // 4. Process Production Orders (Dynamic manufactured unit cost)
+    if (prodOrdersRes.status === 'fulfilled' && Array.isArray(prodOrdersRes.value)) {
+      const prodOrders = prodOrdersRes.value;
+      prodOrders.forEach((po: any) => {
+        if (po.status === 'Cancelled') return;
+        const rawId = po.itemId?._id || po.itemId;
+        const sId = rawId ? String(rawId) : '';
+        const sCode = (po.itemCode || '').trim().toLowerCase();
+        const sName = (po.itemName || '').trim().toLowerCase();
+
+        const cs = po.costSummary || {};
+        const isGbl = (po.plannedUom || '').toUpperCase() === 'GBL';
+        let unitRate = 0;
+        if (isGbl && cs.costPerGbl && Number(cs.costPerGbl) > 0) {
+          unitRate = Number(cs.costPerGbl);
+        } else if (!isGbl && cs.costPerPiece && Number(cs.costPerPiece) > 0) {
+          unitRate = Number(cs.costPerPiece);
+        } else if (cs.totalProductionCost && Number(cs.totalProductionCost) > 0) {
+          const divisor = isGbl ? (po.plannedQty || 1) : (po.plannedPcs || po.plannedQty || 1);
+          unitRate = Number(cs.totalProductionCost) / divisor;
+        }
+
+        if (unitRate > 0) {
+          const effectiveRate = Math.round(unitRate * 100) / 100;
+          const entry = { rate: effectiveRate, source: 'production' as const };
+          if (sId) ratesMap.set(sId, entry);
+          if (sCode) ratesMap.set(sCode, entry);
+          if (sName) ratesMap.set(sName, entry);
+        }
+      });
+    }
+
     return { ratesMap, stockMap, skuMap, skus };
   } catch (err) {
     console.error('Failed to fetch stock costings from backend:', err);
@@ -226,7 +260,7 @@ export const resolveComponentCosting = (
   }
 
   const rateLabel = resolvedRate > 0 
-    ? `₹${resolvedRate.toFixed(2)}${source === 'purchase_invoice' ? ' (Procurement)' : source === 'sku_master' ? ' (Inventory)' : ''}`
+    ? `₹${resolvedRate.toFixed(2)}${source === 'production' ? ' (Production)' : source === 'purchase_invoice' ? ' (Procurement)' : source === 'sku_master' ? ' (Inventory)' : ''}`
     : 'Rate Not Set';
 
   return {

@@ -55,5 +55,6 @@ const skuV2Schema = new mongoose.Schema({
 skuV2Schema.index({ skuCode: 1, company: 1 }, { unique: true, partialFilterExpression: { isDeleted: false } });
 skuV2Schema.index({ company: 1, category: 1 });
 skuV2Schema.index({ company: 1, status: 1 });
+skuV2Schema.index({ company: 1, isDeleted: 1, skuCode: 1 });
 
 module.exports = mongoose.model("SkuV2", skuV2Schema);
