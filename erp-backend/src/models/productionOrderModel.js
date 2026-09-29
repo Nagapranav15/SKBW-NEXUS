@@ -55,6 +55,7 @@ const productionOrderSchema = new mongoose.Schema({
   zoneId: { type: mongoose.Schema.Types.ObjectId, ref: "WarehouseLocationV2", required: false },
   byProducts: { type: [mongoose.Schema.Types.Mixed], default: [] },
   additionalCosts: { type: [mongoose.Schema.Types.Mixed], default: [] },
+  profitPricing: { type: mongoose.Schema.Types.Mixed, default: {} },
   costSummary: { type: mongoose.Schema.Types.Mixed, default: {} },
   bomType: { 
     type: String, 

@@ -25,6 +25,13 @@ export interface SkuV2 {
   altUnitDirection?: 'PRIMARY_TO_ALT' | 'ALT_TO_PRIMARY';
   status: 'Active' | 'Inactive';
   bomItems?: any[];
+  additionalCosts?: any[];
+  profitPricing?: {
+    pricingMethod?: string;
+    markupPercentage?: number | string;
+    suggestedPricePcs?: number;
+    suggestedPriceGbl?: number;
+  };
   recipeYieldQty?: number;
   recipeYieldUnit?: string;
   batchYieldQty?: number;

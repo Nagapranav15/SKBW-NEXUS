@@ -89,6 +89,7 @@ import Modal from '../ui/Modal';
 import { formatSkuName } from '../../utils/skuUtils';
 import { BomCopyPasteControls, MakoroPasteIcon } from './BomCopyPasteControls';
 import { copyBom, useCopiedBom } from '../../utils/bomClipboard';
+import { BulkEditBomModal } from '../production/BulkEditBomModal';
 import { getActivityLogs, createActivityLog } from '../../api/activityLogApi';
 
 // Helper to render neat domain icon for items
@@ -629,6 +630,13 @@ const SkuMasterV2: React.FC = () => {
   const [buildBatchYieldUnit, setBuildBatchYieldUnit] = useState<string>('');
   const [isSavingBom, setIsSavingBom] = useState(false);
   const [isEditingItemBom, setIsEditingItemBom] = useState(false);
+  // Additional Costs & Profit Pricing (persisted on the SKU BOM)
+  const [bomAdditionalCosts, setBomAdditionalCosts] = useState<Array<{
+    id: string; costType: string; basis: string; amount: number | string; appliedAs: string;
+  }>>([]);
+  const [bomProfitPricing, setBomProfitPricing] = useState<{
+    pricingMethod: string; markupPercentage: string | number;
+  }>({ pricingMethod: 'Markup %', markupPercentage: '' });
 
   const handleSaveBomRecipe = async () => {
     if (!selectedSkuDetails?._id) {
@@ -639,23 +647,38 @@ const SkuMasterV2: React.FC = () => {
     try {
       const yieldQty = Number(recipeYieldQty) || 1;
       const yieldUnit = recipeYieldUnit || (selectedSkuDetails as any).recipeYieldUnit || (selectedSkuDetails as any).batchYieldUnit || selectedSkuDetails.unit || 'Pcs';
+      const costsPayload = bomAdditionalCosts.map(c => ({
+        id: c.id, costType: c.costType, calcBasis: c.basis, basis: c.basis,
+        amount: Number(c.amount) || 0, appliedAs: c.appliedAs
+      }));
       await updateSkuV2(selectedSkuDetails._id, {
         bomItems: bomRecipeItems,
+        additionalCosts: costsPayload,
+        profitPricing: bomProfitPricing,
         recipeYieldQty: yieldQty,
         recipeYieldUnit: yieldUnit,
         batchYieldQty: yieldQty,
         batchYieldUnit: yieldUnit,
         company: selectedCompany?._id
       });
-      setSelectedSkuDetails(prev => prev ? ({ ...prev, bomItems: bomRecipeItems, recipeYieldQty: yieldQty, recipeYieldUnit: yieldUnit, batchYieldQty: yieldQty, batchYieldUnit: yieldUnit }) : null);
-      setSkus(prev => prev.map(s => s._id === selectedSkuDetails._id ? { ...s, bomItems: bomRecipeItems, recipeYieldQty: yieldQty, recipeYieldUnit: yieldUnit, batchYieldQty: yieldQty, batchYieldUnit: yieldUnit } : s));
+      const patch = {
+        bomItems: bomRecipeItems,
+        additionalCosts: costsPayload,
+        profitPricing: bomProfitPricing,
+        recipeYieldQty: yieldQty,
+        recipeYieldUnit: yieldUnit,
+        batchYieldQty: yieldQty,
+        batchYieldUnit: yieldUnit
+      };
+      setSelectedSkuDetails(prev => prev ? ({ ...prev, ...patch }) : null);
+      setSkus(prev => prev.map(s => s._id === selectedSkuDetails._id ? { ...s, ...patch } : s));
       if (activeBomProduct?._id === selectedSkuDetails._id) {
-        setActiveBomProduct(prev => prev ? ({ ...prev, bomItems: bomRecipeItems, recipeYieldQty: yieldQty, recipeYieldUnit: yieldUnit, batchYieldQty: yieldQty, batchYieldUnit: yieldUnit }) : null);
+        setActiveBomProduct(prev => prev ? ({ ...prev, ...patch }) : null);
         setActiveRecipeItems(bomRecipeItems);
         setBuildBatchYieldQty(String(yieldQty));
         setBuildBatchYieldUnit(yieldUnit);
       }
-      showToast('BOM Recipe saved successfully to database!', 'success');
+      showToast('BOM Recipe & Costing saved!', 'success');
       setIsEditingItemBom(false);
       loadSkus(false);
     } catch (err: any) {
@@ -1350,6 +1373,29 @@ const SkuMasterV2: React.FC = () => {
         }));
       } else {
         setBomRecipeItems([]);
+      }
+
+      // Load Additional Costs from saved SKU
+      if (Array.isArray((selectedSkuDetails as any).additionalCosts)) {
+        setBomAdditionalCosts((selectedSkuDetails as any).additionalCosts.map((c: any, i: number) => ({
+          id: c.id || `cost-${Date.now()}-${i}`,
+          costType: c.costType || '',
+          basis: c.calcBasis || c.basis || 'Per Piece',
+          amount: c.amount ?? 0,
+          appliedAs: c.appliedAs || 'Per Unit (PCS)'
+        })));
+      } else {
+        setBomAdditionalCosts([]);
+      }
+
+      // Load Profit & Pricing from saved SKU
+      if ((selectedSkuDetails as any).profitPricing && typeof (selectedSkuDetails as any).profitPricing === 'object') {
+        setBomProfitPricing({
+          pricingMethod: (selectedSkuDetails as any).profitPricing.pricingMethod || 'Markup %',
+          markupPercentage: (selectedSkuDetails as any).profitPricing.markupPercentage ?? ''
+        });
+      } else {
+        setBomProfitPricing({ pricingMethod: 'Markup %', markupPercentage: '' });
       }
     }
   }, [selectedSkuDetails]);
@@ -6107,6 +6153,210 @@ const SkuMasterV2: React.FC = () => {
                 );
               })()}
 
+                {/* 3b. Additional Costs / Overheads */}
+                {(() => {
+                  const isRawMaterial =
+                    activeMainTab === 'materials' ||
+                    getItemType(selectedSkuDetails) === 'materials' ||
+                    (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('RM') ||
+                    (selectedSkuDetails.category || '').toLowerCase().includes('raw') ||
+                    (selectedSkuDetails.category || '').toLowerCase().includes('material');
+                  if (isRawMaterial) return null;
+                  return (
+                    <div className="space-y-3 border-t border-gray-100 pt-4">
+                      {/* Card: Additional Costs */}
+                      <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center">
+                              <Settings className="w-4 h-4 text-orange-500" />
+                            </div>
+                            <div>
+                              <span className="text-xs font-bold text-gray-900 uppercase tracking-wide">
+                                Additional Costs / Overheads ({bomAdditionalCosts.length})
+                              </span>
+                              <p className="text-[10px] text-gray-500 font-medium">
+                                Direct labour, electricity, packaging, or machine charges.
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBomAdditionalCosts(prev => [...prev, {
+                                id: `cost-${Date.now()}`,
+                                costType: '',
+                                basis: 'Per Piece',
+                                amount: 0,
+                                appliedAs: 'Per Unit (PCS)'
+                              }]);
+                            }}
+                            className="px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700 font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-all border border-gray-200 shadow-3xs"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Add Cost</span>
+                          </button>
+                        </div>
+
+                        <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead className="bg-gray-50/80 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                              <tr>
+                                <th className="py-2 px-3 w-8 text-center">#</th>
+                                <th className="py-2 px-3">COST TYPE</th>
+                                <th className="py-2 px-3 text-center w-32">CALC BASIS</th>
+                                <th className="py-2 px-3 text-right w-24">AMOUNT (₹)</th>
+                                <th className="py-2 px-3 w-44">APPLIED AS</th>
+                                <th className="py-2 px-3 text-center w-16">ACTIONS</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 bg-white">
+                              {bomAdditionalCosts.map((cost, cIdx) => (
+                                <tr key={cost.id} className="hover:bg-gray-50/60">
+                                  <td className="py-2 px-3 text-center font-bold text-gray-400">{cIdx + 1}</td>
+                                  <td className="py-2 px-3">
+                                    <input
+                                      type="text"
+                                      value={cost.costType}
+                                      onChange={e => setBomAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, costType: e.target.value } : c))}
+                                      placeholder="e.g. Labour, Electricity"
+                                      className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                                    />
+                                  </td>
+                                  <td className="py-2 px-3 text-center">
+                                    <select
+                                      value={cost.basis}
+                                      onChange={e => setBomAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, basis: e.target.value } : c))}
+                                      className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer"
+                                    >
+                                      <option value="Total / Batch">Total / Batch</option>
+                                      <option value="Per GBL">Per GBL</option>
+                                      <option value="Per Piece">Per Piece</option>
+                                      <option value="Lump Sum">Lump Sum</option>
+                                    </select>
+                                  </td>
+                                  <td className="py-2 px-3 text-right">
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={cost.amount}
+                                      onChange={e => setBomAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, amount: e.target.value } : c))}
+                                      className="w-20 px-1.5 py-1 text-right bg-white border border-gray-200 rounded-lg font-mono text-gray-800 text-xs font-bold"
+                                    />
+                                  </td>
+                                  <td className="py-2 px-3">
+                                    <select
+                                      value={cost.appliedAs}
+                                      onChange={e => setBomAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, appliedAs: e.target.value } : c))}
+                                      className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer"
+                                    >
+                                      <option value="Total Cost for this production">Total Cost for this production</option>
+                                      <option value="Per Unit (GBL)">Per Unit (GBL)</option>
+                                      <option value="Per Unit (PCS)">Per Unit (PCS)</option>
+                                    </select>
+                                  </td>
+                                  <td className="py-2 px-3 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => setBomAdditionalCosts(prev => prev.filter(c => c.id !== cost.id))}
+                                      className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                              {bomAdditionalCosts.length === 0 && (
+                                <tr>
+                                  <td colSpan={6} className="py-4 text-center text-xs text-gray-400 italic bg-gray-50/30">
+                                    No additional costs added. Click <strong className="text-orange-600 cursor-pointer" onClick={() => setBomAdditionalCosts(prev => [...prev, { id: `cost-${Date.now()}`, costType: '', basis: 'Per Piece', amount: 0, appliedAs: 'Per Unit (PCS)' }])}>"+ Add Cost"</strong> above to record direct labour, machine charges, or printing.
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* Card: Profit & Pricing */}
+                      <div className="bg-white rounded-2xl border border-emerald-200/80 p-4 shadow-3xs space-y-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
+                            <Tag className="w-4 h-4 text-emerald-600" />
+                          </div>
+                          <div>
+                            <span className="text-xs font-bold text-gray-900 uppercase tracking-wide">
+                              Profit &amp; Pricing (Optional)
+                            </span>
+                            <p className="text-[10px] text-gray-500 font-medium">
+                              Calculate suggested selling price based on manufacturing cost.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="bg-emerald-50/20 border border-emerald-100 rounded-xl p-3 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                          <div>
+                            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Pricing Method</label>
+                            <select
+                              value={bomProfitPricing.pricingMethod}
+                              onChange={e => setBomProfitPricing(prev => ({ ...prev, pricingMethod: e.target.value }))}
+                              className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            >
+                              <option value="Markup %">Markup %</option>
+                              <option value="Margin %">Margin %</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                              {bomProfitPricing.pricingMethod === 'Margin %' ? 'Margin Percentage' : 'Markup Percentage'}
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                step="any"
+                                value={bomProfitPricing.markupPercentage}
+                                onChange={e => setBomProfitPricing(prev => ({ ...prev, markupPercentage: e.target.value }))}
+                                placeholder="0"
+                                className="w-full pl-3 pr-7 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold font-mono text-gray-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                              />
+                              <span className="absolute right-2.5 top-1.5 text-xs font-bold text-gray-400 select-none">%</span>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block mb-1">Suggested Price / PCS</label>
+                            <div className="px-3 py-1.5 bg-white border border-emerald-300 text-emerald-900 rounded-lg font-mono font-black text-sm text-center shadow-3xs">
+                              ₹0.00
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block mb-1">Suggested Price / GBL</label>
+                            <div className="px-3 py-1.5 bg-white border border-emerald-300 text-emerald-900 rounded-lg font-mono font-black text-sm text-center shadow-3xs">
+                              ₹0.00
+                            </div>
+                          </div>
+                        </div>
+
+                        <p className="text-[10px] text-gray-400 text-center">
+                          Live pricing calculations are shown in the <strong>Production Order Wizard</strong> when this SKU is selected.
+                        </p>
+                      </div>
+
+                      {/* Save Button for Costing */}
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={handleSaveBomRecipe}
+                          disabled={isSavingBom}
+                          className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all disabled:opacity-50"
+                        >
+                          {isSavingBom ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                          <span>Save BOM &amp; Costing</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* 4. Process Steps (Only for Finished Goods & Semi-Finished Items) */}
                 {(() => {
                   const isRawMaterial = 
@@ -7328,707 +7578,23 @@ const SkuMasterV2: React.FC = () => {
 
       {/* ── BUILD BOMS / BULK EDIT BOM MODAL ── */}
       {showBuildBomsModal && (
-        <Modal
+        <BulkEditBomModal
           isOpen={showBuildBomsModal}
-          onClose={() => setShowBuildBomsModal(false)}
-          size="max-w-[1300px]"
-          maxWidth="max-w-[1300px]"
-          hideCloseButton={true}
-        >
-          <div className="p-5 space-y-4 max-h-[90vh] flex flex-col">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100 shrink-0">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="p-2.5 bg-emerald-100/70 text-emerald-800 rounded-2xl shrink-0">
-                  <ClipboardList className="w-5 h-5 stroke-[2.5]" />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2 truncate">
-                    <span>Build BOMs</span>
-                  </h3>
-                  <p className="text-xs text-gray-400 font-medium truncate">
-                    Define recipes product by product — a faster alternative to the Excel import.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 shrink-0">
-                <button
-                  onClick={() => handleExportCSV()}
-                  className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-semibold rounded-xl text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5 text-gray-500" /> Export all (CSV)
-                </button>
-                <div className="text-xs font-semibold text-gray-500 bg-gray-100 px-3 py-1.5 rounded-xl">
-                  {productsWithRecipeCount} of {bomProductSkus.length} items have a recipe
-                </div>
-                <button
-                  onClick={() => setShowBuildBomsModal(false)}
-                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all cursor-pointer"
-                  title="Close Build BOMs"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* 3-Column Body Layout */}
-            <div className="grid grid-cols-12 gap-4 flex-1 overflow-hidden min-h-[540px]">
-              
-              {/* Column 1: Products Selector List (3 cols) */}
-              <div className="col-span-3 border border-gray-200 rounded-2xl p-3 flex flex-col gap-2.5 bg-gray-50/40 overflow-hidden">
-                <div className="space-y-2">
-                  <div className="relative">
-                    <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
-                    <input
-                      type="text"
-                      value={buildBomsSearch}
-                      onChange={(e) => setBuildBomsSearch(e.target.value)}
-                      placeholder="Search products..."
-                      className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 shadow-2xs font-medium"
-                    />
-                  </div>
-
-                  {/* Title / Brand & Ruling Spec Filter Row */}
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <div>
-                      <select
-                        value={buildBomsTitleFilter}
-                        onChange={(e) => setBuildBomsTitleFilter(e.target.value)}
-                        className="w-full px-2 py-1 text-[11px] font-semibold bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs truncate"
-                        title="Filter by Brand"
-                      >
-                        <option value="">All Brands ({buildBomsAvailableTitles.length})</option>
-                        {buildBomsAvailableTitles.map(t => (
-                          <option key={t} value={t}>{t}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <select
-                        value={buildBomsRulingFilter}
-                        onChange={(e) => setBuildBomsRulingFilter(e.target.value)}
-                        className="w-full px-2 py-1 text-[11px] font-semibold bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs truncate"
-                        title="Filter by Ruling"
-                      >
-                        <option value="">All Rulings ({buildBomsAvailableRulings.length})</option>
-                        {buildBomsAvailableRulings.map(r => (
-                          <option key={r} value={r}>{r}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Sort Controls Row */}
-                  <div className="flex items-center gap-1.5">
-                    <select
-                      value={buildBomsSortBy}
-                      onChange={(e) => setBuildBomsSortBy(e.target.value as any)}
-                      className="w-full px-2 py-1 text-[11px] font-bold bg-blue-50/80 border border-blue-200 rounded-lg text-blue-900 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs"
-                      title="Sort products list"
-                    >
-                      <option value="default">Sort: Default Code</option>
-                      <option value="title-asc">Sort: Title (A → Z)</option>
-                      <option value="title-desc">Sort: Title (Z → A)</option>
-                      <option value="ruling-asc">Sort: Ruling (A → Z)</option>
-                      <option value="ruling-desc">Sort: Ruling (Z → A)</option>
-                      <option value="name-asc">Sort: Product Name (A → Z)</option>
-                    </select>
-
-                    {(buildBomsTitleFilter || buildBomsRulingFilter || buildBomsSortBy !== 'default' || onlyNoRecipeFilter || buildBomsSearch) && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setBuildBomsSearch('');
-                          setBuildBomsTitleFilter('');
-                          setBuildBomsRulingFilter('');
-                          setBuildBomsSortBy('default');
-                          setOnlyNoRecipeFilter(false);
-                        }}
-                        className="px-2 py-1 text-[10px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg shrink-0 cursor-pointer transition-all"
-                        title="Reset all filters"
-                      >
-                        Reset
-                      </button>
-                    )}
-                  </div>
-
-                  <label className="flex items-center gap-2 text-[11px] font-semibold text-gray-600 cursor-pointer select-none px-1">
-                    <input
-                      type="checkbox"
-                      checked={onlyNoRecipeFilter}
-                      onChange={(e) => setOnlyNoRecipeFilter(e.target.checked)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span>Only products without a recipe</span>
-                  </label>
-                </div>
-
-                {/* Product List with Quick Copy/Paste on Hover & Clipboard Banner */}
-                {copiedBom && (
-                  <div className="p-2.5 bg-emerald-50/90 border border-emerald-200 rounded-xl flex flex-col gap-2 text-xs shrink-0 shadow-2xs">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">BOM in Clipboard</span>
-                        <span className="text-xs font-bold text-gray-800 truncate block" title={copiedBom.sourceName}>
-                          {copiedBom.sourceName} ({copiedBom.lines.length} items)
-                        </span>
-                      </div>
-                      {activeBomProduct && (
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            await handleDirectPasteBomToSku(activeBomProduct);
-                            setActiveRecipeItems(copiedBom.lines.map((l, i) => ({
-                              id: `b-build-paste-${Date.now()}-${i}`,
-                              name: l.name,
-                              qty: Number(l.qty) || 1,
-                              uom: l.uom,
-                              inStock: l.inStock ?? 500,
-                              notes: l.notes || ''
-                            })));
-                            if (copiedBom.basis) setBuildBatchYieldQty(String(copiedBom.basis));
-                          }}
-                          className="px-2.5 py-1 bg-[#064E3B] hover:bg-[#0B6B63] text-white rounded-md text-[11px] font-medium shrink-0 cursor-pointer shadow-2xs transition-all"
-                        >
-                          Paste to Active
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Bulk Action: Paste to all products without a recipe! */}
-                    {(() => {
-                      const noRecipeProducts = filteredBuildProducts.filter(p => !(p as any).bomItems || (p as any).bomItems.length === 0);
-                      if (noRecipeProducts.length === 0) return null;
-                      return (
-                        <button
-                          type="button"
-                          onClick={() => handleBatchPasteToAllWithoutRecipe(noRecipeProducts)}
-                          className="w-full py-1.5 px-2 bg-white hover:bg-emerald-100/70 border border-emerald-300 text-emerald-900 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-all"
-                        >
-                          <MakoroPasteIcon className="w-3.5 h-3.5 text-[#064E3B]" />
-                          <span>Paste to all {noRecipeProducts.length} without recipe</span>
-                        </button>
-                      );
-                    })()}
-                  </div>
-                )}
-
-                <div className="flex-1 overflow-y-auto space-y-1 pr-1">
-                  {filteredBuildProducts.map((prod) => {
-                    const hasRecipe = (prod as any).bomItems && (prod as any).bomItems.length > 0;
-                    const isSelected = activeBomProduct?._id === prod._id;
-
-                    return (
-                      <div
-                        key={prod._id}
-                        onClick={() => handleSelectBomProduct(prod)}
-                        className={`p-2.5 rounded-xl cursor-pointer transition-all flex items-center justify-between border group/item ${
-                          isSelected
-                            ? 'bg-emerald-50/80 border-emerald-300 shadow-2xs'
-                            : 'bg-white border-transparent hover:bg-gray-100/80 hover:border-gray-200'
-                        }`}
-                      >
-                        <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                          <div className="mt-0.5 shrink-0">
-                            {hasRecipe ? (
-                              <div className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-[10px]">
-                                ✓
-                              </div>
-                            ) : (
-                              <div className="w-4 h-4 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-[10px]">
-                                !
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="min-w-0 flex-1">
-                            <div className="font-bold text-xs text-gray-900 truncate">{prod.name}</div>
-                            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                              <span className="text-[10px] text-gray-400 font-mono">{prod.skuCode}</span>
-                              {(prod.title || prod.brand) && (
-                                <span className="text-[9.5px] text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded font-medium border border-emerald-200/60 truncate max-w-[100px]" title={prod.title || prod.brand}>
-                                  {prod.title || prod.brand}
-                                </span>
-                              )}
-                              {prod.ruleType && (
-                                <span className="text-[9.5px] text-blue-800 bg-blue-50 px-1.5 py-0.5 rounded font-medium border border-blue-200/60 truncate max-w-[100px]" title={prod.ruleType}>
-                                  {prod.ruleType}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Quick Copy / Paste Icons for this product in the list matching Makoro style */}
-                        <div className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
-                          {hasRecipe && (
-                            <div className="relative group/copy">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  copyBom({
-                                    sourceSkuId: prod._id,
-                                    sourceSkuCode: prod.skuCode,
-                                    sourceName: prod.name || prod.skuCode,
-                                    basis: (prod as any).recipeYieldQty || (prod as any).batchYieldQty || 1,
-                                    basisUnit: (prod as any).recipeYieldUnit || (prod as any).batchYieldUnit || prod.unit || 'Pcs',
-                                    lines: (prod as any).bomItems || []
-                                  });
-                                  showToast(`BOM copied from "${prod.name || prod.skuCode}"! Ready to paste.`, 'success');
-                                }}
-                                className="h-6 w-6 rounded border border-gray-200 bg-white text-[#0B6B63] hover:border-[#0B6B63] flex items-center justify-center shadow-2xs transition-all cursor-pointer"
-                                aria-label="Copy BOM"
-                              >
-                                <Copy className="w-3 h-3 text-[#0B6B63]" />
-                              </button>
-                              <div className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1 hidden group-hover/copy:block z-50 whitespace-nowrap">
-                                <div className="bg-[#323842] text-white text-[11px] font-normal px-2.5 py-1 rounded-md shadow-xl">
-                                  Copy this BOM
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                          {copiedBom && (
-                            <div className="relative group/paste">
-                              <button
-                                type="button"
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  await handleDirectPasteBomToSku(prod);
-                                  if (activeBomProduct?._id === prod._id) {
-                                    setActiveRecipeItems(copiedBom.lines.map((l, i) => ({
-                                      id: `b-build-paste-${Date.now()}-${i}`,
-                                      name: l.name,
-                                      qty: Number(l.qty) || 1,
-                                      uom: l.uom,
-                                      inStock: l.inStock ?? 500,
-                                      notes: l.notes || ''
-                                    })));
-                                    if (copiedBom.basis) setBuildBatchYieldQty(String(copiedBom.basis));
-                                  }
-                                }}
-                                className="h-6 w-6 rounded border border-gray-200 bg-white text-[#0B6B63] hover:border-[#0B6B63] flex items-center justify-center shadow-2xs transition-all cursor-pointer"
-                                aria-label="Paste BOM"
-                              >
-                                <MakoroPasteIcon className="w-3 h-3 text-[#0B6B63]" />
-                              </button>
-                              <div className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1 hidden group-hover/paste:block z-50 whitespace-nowrap">
-                                <div className="bg-[#323842] text-white text-[11px] font-normal px-2.5 py-1 rounded-md shadow-xl">
-                                  Paste BOM into this product
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {filteredBuildProducts.length === 0 && (
-                    <div className="p-4 text-center text-xs text-gray-400 italic">
-                      No products match search
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Column 2: Active Product Recipe Builder (6 cols) */}
-              <div className="col-span-6 border border-gray-200 rounded-2xl p-4 flex flex-col gap-3 bg-white overflow-hidden shadow-2xs">
-                {activeBomProduct ? (
-                  <>
-                    {/* Active Product Header Bar */}
-                    <div className="flex items-center justify-between gap-3 border-b border-gray-100 pb-3">
-                      <div className="min-w-0 pr-2">
-                        <h4 className="font-bold text-gray-900 text-sm truncate" title={activeBomProduct.name}>{activeBomProduct.name}</h4>
-                        <p className="text-xs text-gray-400 font-mono truncate">{activeBomProduct.skuCode}</p>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        <BomCopyPasteControls
-                          getCopyPayload={() => {
-                            if (!activeRecipeItems || activeRecipeItems.length === 0) return null;
-                            return {
-                              sourceSkuId: activeBomProduct?._id,
-                              sourceSkuCode: activeBomProduct?.skuCode,
-                              sourceName: activeBomProduct?.name || activeBomProduct?.skuCode || 'Product',
-                              basis: buildBatchYieldQty,
-                              basisUnit: buildBatchYieldUnit || (activeBomProduct as any)?.recipeYieldUnit || activeBomProduct?.unit || 'Pcs',
-                              lines: activeRecipeItems.map(item => ({
-                                id: item.id,
-                                name: item.name,
-                                qty: item.qty,
-                                uom: item.uom,
-                                inStock: item.inStock,
-                                notes: item.notes
-                              }))
-                            };
-                          }}
-                          onPaste={(copied, mode) => {
-                            if (mode === 'replace') {
-                              setActiveRecipeItems(copied.lines.map((l, i) => ({
-                                id: `b-build-paste-${Date.now()}-${i}`,
-                                name: l.name,
-                                qty: Number(l.qty) || 1,
-                                uom: l.uom,
-                                inStock: l.inStock ?? 500,
-                                notes: l.notes || ''
-                              })));
-                              if (copied.basis) setBuildBatchYieldQty(String(copied.basis));
-                              if (copied.basisUnit) setBuildBatchYieldUnit(copied.basisUnit);
-                            } else {
-                              const existingNames = new Set(activeRecipeItems.map(i => (i.name || '').toLowerCase().trim()));
-                              const toAdd = copied.lines
-                                .filter(l => !existingNames.has((l.name || '').toLowerCase().trim()))
-                                .map((l, i) => ({
-                                  id: `b-build-merge-${Date.now()}-${i}`,
-                                  name: l.name,
-                                  qty: Number(l.qty) || 1,
-                                  uom: l.uom,
-                                  inStock: l.inStock ?? 500,
-                                  notes: l.notes || ''
-                                }));
-                              if (copied.basis) {
-                                setBuildBatchYieldQty(String(copied.basis));
-                              }
-                              if (copied.basisUnit) {
-                                setBuildBatchYieldUnit(copied.basisUnit);
-                              }
-                              setActiveRecipeItems(prev => [...prev, ...toAdd]);
-                            }
-                          }}
-                          existingCount={activeRecipeItems.length}
-                          sourceLabel={activeBomProduct?.name}
-                          onToast={showToast}
-                        />
-                        <button
-                          onClick={handleSaveBuildBomRecipe}
-                          disabled={isSavingBuildBom}
-                          className="px-3.5 py-1.5 bg-[#064E3B] hover:bg-[#0B6B63] text-white font-medium rounded-md text-xs shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                        >
-                          {isSavingBuildBom ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                          <span>Save recipe</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Sub-header details bar with UOM & AUOM support */}
-                    {(() => {
-                      const uom = activeBomProduct?.unit || 'Pcs';
-                      const auom = activeBomProduct?.altUnit;
-                      const hasAuom = !!(auom && auom.trim() && auom.trim().toLowerCase() !== uom.trim().toLowerCase());
-                      const currentUnit = buildBatchYieldUnit || (activeBomProduct as any)?.recipeYieldUnit || uom;
-
-                      const options: { value: string; label: string }[] = [];
-                      options.push({ value: uom, label: hasAuom ? `${uom} (UOM)` : uom });
-                      if (hasAuom) {
-                        options.push({ value: auom!.trim(), label: `${auom!.trim()} (AUOM)` });
-                      }
-
-                      return (
-                        <div className="flex items-center gap-3 text-xs font-semibold text-gray-500 bg-gray-50 p-2.5 rounded-xl border border-gray-100 flex-wrap">
-                          <span>ITEMS <strong>{activeRecipeItems.length}</strong></span>
-                          <span>·</span>
-                          <div className="flex items-center gap-1.5">
-                            <span>BATCH SIZE:</span>
-                            <input
-                              type="number"
-                              min="1"
-                              placeholder="1"
-                              value={buildBatchYieldQty}
-                              onChange={(e) => setBuildBatchYieldQty(e.target.value)}
-                              className="w-16 px-2 py-1 border border-blue-300 rounded-lg text-xs font-bold text-blue-700 text-center bg-white shadow-2xs focus:ring-2 focus:ring-blue-400 focus:outline-none"
-                              title="Batch Yield Quantity (Number of pieces)"
-                            />
-                            {options.length > 1 ? (
-                              <select
-                                value={currentUnit}
-                                onChange={(e) => setBuildBatchYieldUnit(e.target.value)}
-                                className="px-2.5 py-1 border border-blue-300 rounded-lg text-xs font-bold text-blue-900 bg-blue-50/90 cursor-pointer shadow-2xs focus:ring-2 focus:ring-blue-400 focus:outline-none"
-                                title="Yield Unit (UOM / AUOM)"
-                              >
-                                {options.map(opt => (
-                                  <option key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : (
-                              <strong className="text-gray-800 bg-white border border-gray-200 px-2.5 py-1 rounded-lg text-xs font-bold font-mono shadow-2xs">
-                                {uom}
-                              </strong>
-                            )}
-                          </div>
-                          <span>·</span>
-                          <span className="text-[11px] font-normal text-gray-400">Quantities configured per batch produced</span>
-                        </div>
-                      );
-                    })()}
-
-                    {/* Top Search Dropdown input to quickly add material */}
-                    <div className="relative z-30">
-                      <SearchableMaterialDropdown
-                        value=""
-                        materials={rawAndSemiMaterials}
-                        onChange={(selectedName, matchedSku) => {
-                          if (!selectedName) return;
-                          setActiveRecipeItems(prev => [
-                            ...prev,
-                            {
-                              id: `b-${Date.now()}`,
-                              skuId: matchedSku?._id,
-                              skuCode: matchedSku?.skuCode,
-                              name: selectedName,
-                              qty: '' as any,
-                              uom: matchedSku?.unit || 'Kg',
-                              inStock: (matchedSku as any)?.openingStock ?? 0,
-                              notes: ''
-                            }
-                          ]);
-                        }}
-                      />
-                    </div>
-
-                    {/* Draggable Recipe Items List with Runs calculation */}
-                    <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 border border-gray-100 rounded-xl p-2 bg-gray-50/20">
-                      {activeRecipeItems.length > 0 && (
-                        <div className="flex items-center gap-2 px-2 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                          <span className="w-4"></span>
-                          <span className="flex-1">Material</span>
-                          <span className="w-20 text-center">Qty</span>
-                          <span className="w-16 text-center">UOM</span>
-                          <span className="w-16 text-center">In Stock</span>
-                          <span className="w-16 text-center">Runs</span>
-                          <span className="w-6"></span>
-                        </div>
-                      )}
-
-                      {activeRecipeItems.map((b) => {
-                        const qtyNum = Number(b.qty);
-                        const inStockNum = Number(b.inStock) || 0;
-                        const runs = (qtyNum > 0) ? Math.floor(inStockNum / qtyNum) : null;
-
-                        return (
-                          <div
-                            key={b.id}
-                            className="p-2.5 bg-white border border-gray-200 rounded-xl shadow-2xs flex items-center gap-2.5 text-xs hover:border-gray-300 transition-colors"
-                          >
-                            <span className="text-gray-400 font-bold select-none cursor-grab text-[11px] w-4">⋮⋮</span>
-
-                            <div className="flex-1 font-bold text-gray-900 text-xs min-w-0 pr-2 leading-relaxed" title={b.name}>
-                              {b.name}
-                            </div>
-
-                            <div className="w-20">
-                              <input
-                                type="number"
-                                step="any"
-                                value={b.qty}
-                                onChange={(e) => {
-                                  const val = Number(e.target.value);
-                                  setActiveRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, qty: val } : item));
-                                }}
-                                className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs font-bold font-mono text-center focus:outline-none focus:border-[#064E3B] bg-white"
-                                placeholder="Qty"
-                              />
-                            </div>
-
-                            <div className="w-16">
-                              <input
-                                type="text"
-                                value={b.uom || ''}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setActiveRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, uom: val } : item));
-                                }}
-                                className="w-full border border-gray-200 rounded-lg px-1.5 py-1 text-xs font-semibold text-center uppercase focus:outline-none focus:border-[#064E3B] bg-white"
-                                placeholder="UOM"
-                              />
-                            </div>
-
-                            <span className="text-gray-400 font-mono text-[11px] w-16 text-center">{b.inStock}</span>
-
-                            <span className="text-gray-900 font-bold text-[11px] w-16 text-center">
-                              {runs !== null ? runs.toLocaleString() : '—'}
-                            </span>
-
-                            <button
-                              onClick={() => setActiveRecipeItems(prev => prev.filter(item => item.id !== b.id))}
-                              className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-md transition-all cursor-pointer w-6 flex items-center justify-center"
-                              title="Remove material"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        );
-                      })}
-
-                      {activeRecipeItems.length === 0 && (
-                        <div className="p-8 text-center text-xs text-gray-400 italic">
-                          No material ingredients added to recipe yet. Paste a BOM or select from the right catalog!
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Bottom Summary Bar matching Makoro style */}
-                    <div className="p-2.5 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between shadow-2xs shrink-0">
-                      <div className="flex items-center gap-8 text-xs">
-                        <div>
-                          <div className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">Items</div>
-                          <div className="text-xs font-bold text-gray-900">{activeRecipeItems.length} items</div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">Can make</div>
-                          <div className="text-xs font-bold text-gray-900">
-                            {(() => {
-                              const validRuns = activeRecipeItems
-                                .map(b => (b.qty && Number(b.qty) > 0) ? Math.floor((Number(b.inStock) || 0) / Number(b.qty)) : null)
-                                .filter((v): v is number => v !== null);
-                              if (validRuns.length === 0) return '—';
-                              return `${Math.min(...validRuns).toLocaleString()} units`;
-                            })()}
-                          </div>
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={handleSaveBuildBomRecipe}
-                        disabled={isSavingBuildBom}
-                        className="px-3.5 py-1.5 bg-[#064E3B] hover:bg-[#0B6B63] text-white font-medium rounded-md text-xs shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                      >
-                        {isSavingBuildBom ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                        <span>Save recipe</span>
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-gray-400">
-                    <ClipboardList className="w-10 h-10 text-gray-300 mb-2" />
-                    <p className="font-semibold text-gray-600">Select a product from the left list</p>
-                    <p className="text-xs">Choose any product to view or edit its BOM recipe ingredients</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Column 3: Materials Catalog Panel (3 cols) */}
-              <div className="col-span-3 border border-gray-200 rounded-2xl p-3 flex flex-col gap-3 bg-gray-50/40 overflow-hidden">
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
-                  <input
-                    type="text"
-                    value={catalogSearch}
-                    onChange={(e) => setCatalogSearch(e.target.value)}
-                    placeholder="Filter catalog..."
-                    className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 shadow-2xs"
-                  />
-                </div>
-
-                <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-                  {/* Section 1: Raw Materials */}
-                  <div className="space-y-1.5">
-                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-1">
-                      MATERIALS ({filteredRawCatalog.length})
-                    </div>
-                    {filteredRawCatalog.map((mat) => {
-                      const isAdded = activeRecipeItems.some(b => b.name === mat.name);
-                      return (
-                        <div
-                          key={mat._id || mat.skuCode || mat.name}
-                          onClick={() => {
-                            if (!activeBomProduct) {
-                              showToast('Please select a product on the left first', 'warning');
-                              return;
-                            }
-                            if (!isAdded) {
-                              setActiveRecipeItems(prev => [
-                                ...prev,
-                                {
-                                  id: `b-${Date.now()}`,
-                                  name: mat.name,
-                                  qty: 1,
-                                  uom: mat.unit || 'Kg',
-                                  inStock: Number((mat as any).presentStock || 0),
-                                  notes: ''
-                                }
-                              ]);
-                            }
-                          }}
-                          className={`p-2 rounded-xl text-xs font-semibold flex items-center justify-between cursor-pointer transition-all border ${
-                            isAdded
-                              ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800'
-                              : 'bg-white border-gray-200 hover:border-blue-300 text-gray-800 shadow-2xs'
-                          }`}
-                        >
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span className={isAdded ? 'text-emerald-600 font-bold' : 'text-blue-600 font-bold'}>
-                              {isAdded ? '✓' : '+'}
-                            </span>
-                            <span className="truncate text-[11px]">{mat.name}</span>
-                          </div>
-                          <span className="text-[10px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">
-                            {Number((mat as any).presentStock || 0)}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Section 2: Semi-Finished Goods */}
-                  <div className="space-y-1.5">
-                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-1">
-                      SUB-ASSEMBLIES ({filteredSemiCatalog.length})
-                    </div>
-                    {filteredSemiCatalog.map((semi) => {
-                      const isAdded = activeRecipeItems.some(b => b.name === semi.name);
-                      return (
-                        <div
-                          key={semi._id || semi.skuCode || semi.name}
-                          onClick={() => {
-                            if (!activeBomProduct) {
-                              showToast('Please select a product on the left first', 'warning');
-                              return;
-                            }
-                            if (!isAdded) {
-                              setActiveRecipeItems(prev => [
-                                ...prev,
-                                {
-                                  id: `b-${Date.now()}`,
-                                  name: semi.name,
-                                  qty: 1,
-                                  uom: semi.unit || 'Pcs',
-                                  inStock: Number((semi as any).presentStock || 0),
-                                  notes: ''
-                                }
-                              ]);
-                            }
-                          }}
-                          className={`p-2 rounded-xl text-xs font-semibold flex items-center justify-between cursor-pointer transition-all border ${
-                            isAdded
-                              ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800'
-                              : 'bg-white border-gray-200 hover:border-blue-300 text-gray-800 shadow-2xs'
-                          }`}
-                        >
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span className={isAdded ? 'text-emerald-600 font-bold' : 'text-blue-600 font-bold'}>
-                              {isAdded ? '✓' : '+'}
-                            </span>
-                            <span className="truncate text-[11px]">{semi.name}</span>
-                          </div>
-                          <span className="text-[10px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">
-                            {Number((semi as any).presentStock || 0)}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div>
-        </Modal>
+          onClose={() => {
+            setShowBuildBomsModal(false);
+            loadSkus(false);
+          }}
+          companyId={selectedCompany?._id || ""}
+          initialSelectedSkuId={activeBomProduct?._id || selectedSkuDetails?._id}
+          onSaved={(updatedSku) => {
+            setSkus(prev => prev.map(s => s._id === updatedSku._id ? updatedSku : s));
+            if (selectedSkuDetails?._id === updatedSku._id) {
+              setSelectedSkuDetails(updatedSku);
+              setBomRecipeItems(updatedSku.bomItems || []);
+            }
+            loadSkus(false);
+          }}
+        />
       )}
 
       {/* ── BULK EDIT SKUS MODAL (Cream / Beige Theme) ── */}

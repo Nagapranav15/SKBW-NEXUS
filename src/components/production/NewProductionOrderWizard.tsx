@@ -4,12 +4,15 @@ import {
   Layers, Package, Receipt, Calculator, FileText, 
   Check, X, Search, Loader2, Settings, Building2, 
   MapPin, Copy, Sparkles, Zap, Eye, Save, Box,
-  BarChart3, Clock, Pencil
+  BarChart3, Clock, Pencil, Tag, TrendingUp
 } from 'lucide-react';
 import { ProductionOrder } from '../../types/production';
 import { getNextProductionOrderNumber, createProductionOrder } from '../../api/productionApi';
 import { getSkusV2, getWarehouseHierarchyV2, SkuV2, WarehouseLocationV2, getProductionMaterialRates, MaterialRateInfo } from '../../api/mfgApiV2';
 import { LocationSelectPopup } from '../stock_v2/LocationSelectPopup';
+import { BomCopyPasteControls } from '../inventory_v2/BomCopyPasteControls';
+import { copyBom, useCopiedBom } from '../../utils/bomClipboard';
+import { ProfitPricingState } from '../../utils/costingUtils';
 import Modal from '../ui/Modal';
 import { showToast } from '../ui/Toast';
 
@@ -306,6 +309,12 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
   // Additional Costs Table
   const [additionalCosts, setAdditionalCosts] = useState<AdditionalCostRow[]>([]);
+
+  // Profit & Pricing (Optional)
+  const [profitPricing, setProfitPricing] = useState<ProfitPricingState>({
+    pricingMethod: 'Markup %',
+    markupPercentage: ''
+  });
 
   // Load backend sequence number & SKUs
   useEffect(() => {
@@ -913,6 +922,35 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     } else {
       setMaterials([]);
     }
+
+    // Dynamic Overheads / Additional Costs from SKU BOM (blank by default)
+    if (Array.isArray((sku as any).additionalCosts) && (sku as any).additionalCosts.length > 0) {
+      setAdditionalCosts((sku as any).additionalCosts.map((c: any, i: number) => ({
+        id: c.id || `cost-${Date.now()}-${i}`,
+        costType: c.costType || '',
+        basis: (c.calcBasis || c.basis || 'Per Piece') as any,
+        amount: Number(c.amount) || 0,
+        appliedAs: (c.appliedAs || 'Per Unit (PCS)') as any,
+        totalAmount: 0
+      })));
+    } else {
+      setAdditionalCosts([]);
+    }
+
+    // Dynamic Profit & Pricing from SKU BOM (blank by default)
+    if ((sku as any).profitPricing && typeof (sku as any).profitPricing === 'object') {
+      setProfitPricing({
+        pricingMethod: (sku as any).profitPricing.pricingMethod || 'Markup %',
+        markupPercentage: (sku as any).profitPricing.markupPercentage ?? '',
+        suggestedPricePcs: (sku as any).profitPricing.suggestedPricePcs,
+        suggestedPriceGbl: (sku as any).profitPricing.suggestedPriceGbl
+      });
+    } else {
+      setProfitPricing({
+        pricingMethod: 'Markup %',
+        markupPercentage: ''
+      });
+    }
   };
 
   // Helper to fetch live rate options (Avg purchases vs FIFO) and apply to materials
@@ -1229,22 +1267,20 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   const totalAdditionalCost = useMemo(() => {
     return additionalCosts.reduce((sum, row) => {
       const amt = Number(row.amount) || 0;
-      if (row.basis === 'Per GBL') {
+      if (row.basis === 'Per GBL' || row.appliedAs === 'Per Unit (GBL)') {
         return sum + (amt * (plannedGbl || 1));
       }
-      if (row.basis === 'Per Piece') {
+      if (row.basis === 'Per Piece' || row.appliedAs === 'Per Unit (PCS)') {
         return sum + (amt * (plannedPcs || 1));
       }
       return sum + amt;
     }, 0);
   }, [additionalCosts, plannedGbl, plannedPcs]);
 
-  // Production Cost Ledger: Material Cost + Overheads - Scrap Recovery
+  // Production Cost Ledger: Material Cost + Overheads
   const totalProductionCost = useMemo(() => {
-    const gross = totalMaterialCost + totalAdditionalCost;
-    const net = gross - totalScrapCost;
-    return net > 0 ? net : gross;
-  }, [totalMaterialCost, totalAdditionalCost, totalScrapCost]);
+    return totalMaterialCost + totalAdditionalCost;
+  }, [totalMaterialCost, totalAdditionalCost]);
 
   const costPerGbl = useMemo(() => {
     if (plannedGbl <= 0) return 0;
@@ -1255,6 +1291,33 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     if (plannedPcs <= 0) return 0;
     return Math.round((totalProductionCost / plannedPcs) * 100) / 100;
   }, [totalProductionCost, plannedPcs]);
+
+  // Dynamic Profit & Selling Price calculations
+  const profitCostingSummary = useMemo(() => {
+    const markupPct = Number(profitPricing.markupPercentage) || 0;
+    let suggestedPricePcs = 0;
+    if (markupPct > 0) {
+      if (profitPricing.pricingMethod === 'Margin %') {
+        suggestedPricePcs = markupPct < 100 ? costPerPiece / (1 - markupPct / 100) : costPerPiece;
+      } else {
+        // Markup %
+        suggestedPricePcs = costPerPiece * (1 + markupPct / 100);
+      }
+    } else {
+      suggestedPricePcs = costPerPiece;
+    }
+    const factor = conversionFactor > 0 ? conversionFactor : 400;
+    const suggestedPriceGbl = suggestedPricePcs * factor;
+    const totalRevenue = suggestedPricePcs * plannedPcs;
+    const projectedProfit = totalRevenue - totalProductionCost;
+
+    return {
+      suggestedPricePcs: Math.round(suggestedPricePcs * 100) / 100,
+      suggestedPriceGbl: Math.round(suggestedPriceGbl * 100) / 100,
+      totalRevenue: Math.round(totalRevenue * 100) / 100,
+      projectedProfit: Math.round(projectedProfit * 100) / 100
+    };
+  }, [profitPricing, costPerPiece, conversionFactor, plannedPcs, totalProductionCost]);
 
   const formatCurrency = (val: number) => {
     return (val || 0).toLocaleString('en-IN', {
@@ -1329,14 +1392,23 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         })),
         byProducts: scrapItems,
         additionalCosts: additionalCosts,
+        profitPricing: {
+          pricingMethod: profitPricing.pricingMethod,
+          markupPercentage: profitPricing.markupPercentage,
+          suggestedPricePcs: profitCostingSummary.suggestedPricePcs,
+          suggestedPriceGbl: profitCostingSummary.suggestedPriceGbl,
+          totalRevenue: profitCostingSummary.totalRevenue,
+          projectedProfit: profitCostingSummary.projectedProfit
+        },
         costSummary: {
           materialCost: totalMaterialCost,
-          scrapCost: totalScrapCost,
           additionalCost: totalAdditionalCost,
           totalProductionCost: totalProductionCost,
           outputQuantity: `${plannedPcs} PCS (${plannedGbl.toFixed(2)} GBL)`,
           costPerGbl: costPerGbl,
-          costPerPiece: costPerPiece
+          costPerPiece: costPerPiece,
+          suggestedPricePcs: profitCostingSummary.suggestedPricePcs,
+          suggestedPriceGbl: profitCostingSummary.suggestedPriceGbl
         },
         productionEntries: [],
         company: companyId
@@ -1919,6 +1991,118 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                 <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
                 <span>Load from BOM</span>
               </button>
+
+              <BomCopyPasteControls
+                getCopyPayload={() => {
+                  const hasItems = materials && materials.length > 0;
+                  const hasCosts = additionalCosts && additionalCosts.length > 0;
+                  if (!hasItems && !hasCosts) return null;
+                  return {
+                    sourceSkuId: currentSku?._id,
+                    sourceSkuCode: currentSku?.skuCode || productCode,
+                    sourceName: currentSku?.name || productName || 'Production Order',
+                    basis: numPlannedQty,
+                    basisUnit: uom,
+                    lines: materials.map(m => ({
+                      id: m.id,
+                      skuId: m.skuId,
+                      name: m.component,
+                      qty: m.requiredQty,
+                      uom: m.uom,
+                      inStock: m.availableStock ?? 0,
+                      rate: m.rate,
+                      amount: m.amount,
+                      notes: m.code || ''
+                    })),
+                    additionalCosts: additionalCosts.map(c => ({
+                      id: c.id,
+                      costType: c.costType,
+                      calcBasis: c.basis,
+                      amount: c.amount,
+                      appliedAs: c.appliedAs
+                    })),
+                    profitPricing: profitPricing
+                  };
+                }}
+                onPaste={(copied, mode) => {
+                  if (mode === 'replace') {
+                    setMaterials(copied.lines.map((l, i) => ({
+                      id: `mat-paste-${Date.now()}-${i}`,
+                      skuId: l.skuId,
+                      component: l.name,
+                      code: l.notes || '',
+                      type: 'Raw',
+                      uom: l.uom || 'Kg',
+                      requiredQty: Number(l.qty) || 1,
+                      availableStock: l.inStock ?? 999999,
+                      stockStatus: 'Available',
+                      rateMode: 'custom',
+                      rate: Number(l.rate) || 0,
+                      amount: Math.round((Number(l.qty) || 1) * (Number(l.rate) || 0) * 100) / 100,
+                      sourceLocation: 'Raw Material Store'
+                    })));
+                    if (Array.isArray(copied.additionalCosts)) {
+                      setAdditionalCosts(copied.additionalCosts.map((c, i) => ({
+                        id: `cost-paste-${Date.now()}-${i}`,
+                        costType: c.costType || '',
+                        basis: (c.calcBasis || 'Per Piece') as any,
+                        amount: Number(c.amount) || 0,
+                        appliedAs: (c.appliedAs || 'Per Unit (PCS)') as any,
+                        totalAmount: 0
+                      })));
+                    }
+                    if (copied.profitPricing) {
+                      setProfitPricing({
+                        pricingMethod: copied.profitPricing.pricingMethod || 'Markup %',
+                        markupPercentage: copied.profitPricing.markupPercentage ?? ''
+                      });
+                    }
+                  } else {
+                    const existingNames = new Set(materials.map(m => (m.component || '').toLowerCase().trim()));
+                    const toAdd = copied.lines
+                      .filter(l => !existingNames.has((l.name || '').toLowerCase().trim()))
+                      .map((l, i) => ({
+                        id: `mat-merge-${Date.now()}-${i}`,
+                        skuId: l.skuId,
+                        component: l.name,
+                        code: l.notes || '',
+                        type: 'Raw' as const,
+                        uom: l.uom || 'Kg',
+                        requiredQty: Number(l.qty) || 1,
+                        availableStock: l.inStock ?? 999999,
+                        stockStatus: 'Available' as const,
+                        rateMode: 'custom' as const,
+                        rate: Number(l.rate) || 0,
+                        amount: Math.round((Number(l.qty) || 1) * (Number(l.rate) || 0) * 100) / 100,
+                        sourceLocation: 'Raw Material Store'
+                      }));
+                    setMaterials(prev => [...prev, ...toAdd]);
+                    if (Array.isArray(copied.additionalCosts) && copied.additionalCosts.length > 0) {
+                      const existingTypes = new Set(additionalCosts.map(c => (c.costType || '').toLowerCase().trim()));
+                      const costsToAdd = copied.additionalCosts
+                        .filter(c => !existingTypes.has((c.costType || '').toLowerCase().trim()))
+                        .map((c, i) => ({
+                          id: `cost-merge-${Date.now()}-${i}`,
+                          costType: c.costType,
+                          basis: (c.calcBasis || 'Per Piece') as any,
+                          amount: Number(c.amount) || 0,
+                          appliedAs: (c.appliedAs || 'Per Unit (PCS)') as any,
+                          totalAmount: 0
+                        }));
+                      setAdditionalCosts(prev => [...prev, ...costsToAdd]);
+                    }
+                    if (copied.profitPricing && (!profitPricing.markupPercentage || profitPricing.markupPercentage === '')) {
+                      setProfitPricing({
+                        pricingMethod: copied.profitPricing.pricingMethod || 'Markup %',
+                        markupPercentage: copied.profitPricing.markupPercentage ?? ''
+                      });
+                    }
+                  }
+                }}
+                existingCount={materials.length}
+                onToast={(msg, type) => showToast(msg, type)}
+              />
+
               <button
                 type="button"
                 onClick={handleAddMaterial}
@@ -2226,187 +2410,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           {/* LEFT 8 COLUMNS: Scrap, Overheads & Notes */}
           <div className="lg:col-span-8 space-y-4">
 
-            {/* CARD 1: By-Products / Scrap (Optional) */}
-            <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
-                    <Sparkles className="w-4 h-4 text-purple-600" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-bold text-gray-900 uppercase tracking-wide">
-                      By-Products / Scrap (Optional)
-                    </span>
-                    <p className="text-[10px] text-gray-500 font-medium">
-                      Recoverable scrap value is deducted from total production cost
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  {/* Preset By-Products / Scrap Dropdown Button (1:1 with Add Preset Overhead) */}
-                  <div className="relative" ref={scrapPresetMenuRef}>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        const spaceBelow = window.innerHeight - rect.bottom;
-                        setQuickScrapOpenUpwards(spaceBelow < 280 && rect.top > 280);
-                        setShowQuickScrapPresetMenu(!showQuickScrapPresetMenu);
-                        setHighlightedScrapPresetIdx(0);
-                      }}
-                      className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100/80 text-purple-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-purple-200 shadow-3xs"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-                      <span>Add Preset Scrap</span>
-                      <ChevronDown className="w-3 h-3 text-purple-500" />
-                    </button>
-
-                    {showQuickScrapPresetMenu && (
-                      <div 
-                        className={`absolute right-0 ${quickScrapOpenUpwards ? 'bottom-full mb-1' : 'top-full mt-1'} w-80 max-h-[80vh] bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1 text-xs divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100`}
-                        role="menu"
-                      >
-                        <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
-                          <span className="flex items-center gap-1.5">
-                            <span>Predefined Scrap Items</span>
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowQuickScrapPresetMenu(false);
-                              setShowManageScrapModal(true);
-                            }}
-                            className="text-purple-600 hover:underline flex items-center gap-0.5 cursor-pointer font-bold"
-                          >
-                            <Settings className="w-3 h-3" />
-                            <span>Manage</span>
-                          </button>
-                        </div>
-                        <div className="max-h-56 overflow-y-auto py-1 scroll-smooth" ref={scrapPresetListRef}>
-                          {scrapPresets.map((p, pIdx) => {
-                            const isSelected = pIdx === highlightedScrapPresetIdx;
-                            return (
-                              <button
-                                key={p.id}
-                                type="button"
-                                onClick={() => {
-                                  handleAddPresetScrap(p);
-                                  setShowQuickScrapPresetMenu(false);
-                                }}
-                                onMouseEnter={() => setHighlightedScrapPresetIdx(pIdx)}
-                                className={`w-full px-3 py-1.5 text-left flex items-center justify-between group transition-colors cursor-pointer ${
-                                  isSelected
-                                    ? 'bg-purple-100/90 text-purple-900 font-bold ring-1 ring-inset ring-purple-400'
-                                    : 'hover:bg-purple-50/70 text-gray-800'
-                                }`}
-                                role="menuitem"
-                              >
-                                <span className="font-semibold truncate">{p.item}</span>
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 ml-2 bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                  ₹{p.defaultRate}/{p.uom}
-                                </span>
-                              </button>
-                            );
-                          })}
-                          {scrapPresets.length === 0 && (
-                            <div className="p-3 text-center text-gray-400 italic">No scrap presets defined</div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleAddScrap}
-                    className="px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700 font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-all border border-gray-200 shadow-3xs"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add Scrap</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="overflow-visible border border-gray-200 rounded-xl">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead className="bg-gray-50/80 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 select-none">
-                    <tr>
-                      <th className="py-2 px-3 w-8 text-center">#</th>
-                      <th className="py-2 px-3">ITEM NAME</th>
-                      <th className="py-2 px-3 text-center w-20">UOM</th>
-                      <th className="py-2 px-3 text-right w-24">QTY</th>
-                      <th className="py-2 px-3 text-right w-24">RATE (₹)</th>
-                      <th className="py-2 px-3 text-right w-28">AMOUNT (₹)</th>
-                      <th className="py-2 px-3 text-center w-20">ACTIONS</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 bg-white">
-                    {scrapItems.map((scrap, sIdx) => (
-                      <tr key={scrap.id} className="hover:bg-gray-50/60">
-                        <td className="py-2 px-3 text-center font-bold text-gray-400">{sIdx + 1}</td>
-                        <td className="py-2 px-3">
-                          <input
-                            type="text"
-                            value={scrap.item}
-                            onChange={e => handleUpdateScrap(scrap.id, 'item', e.target.value)}
-                            placeholder="e.g. Paper Trimmings"
-                            className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                          />
-                        </td>
-                        <td className="py-2 px-3 text-center">
-                          <input
-                            type="text"
-                            value={scrap.uom}
-                            onChange={e => handleUpdateScrap(scrap.id, 'uom', e.target.value)}
-                            className="w-16 px-1.5 py-1 text-center bg-white border border-gray-200 rounded-lg font-bold text-gray-800 text-xs"
-                          />
-                        </td>
-                        <td className="py-2 px-3 text-right">
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={scrap.qty}
-                            onChange={e => handleUpdateScrap(scrap.id, 'qty', e.target.value)}
-                            className="w-20 px-1.5 py-1 text-right bg-white border border-gray-200 rounded-lg font-mono text-gray-800 text-xs font-bold"
-                          />
-                        </td>
-                        <td className="py-2 px-3 text-right">
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={scrap.rate}
-                            onChange={e => handleUpdateScrap(scrap.id, 'rate', e.target.value)}
-                            className="w-20 px-1.5 py-1 text-right bg-white border border-gray-200 rounded-lg font-mono text-gray-800 text-xs font-bold"
-                          />
-                        </td>
-                        <td className="py-2 px-3 text-right font-black font-mono text-emerald-700">
-                          - ₹{formatCurrency(scrap.amount)}
-                        </td>
-                        <td className="py-2 px-3 text-center">
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteScrap(scrap.id)}
-                            className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                    {scrapItems.length === 0 && (
-                      <tr>
-                        <td colSpan={7} className="py-4 text-center text-xs text-gray-400 italic bg-gray-50/30">
-                          No scrap or by-products specified. Click <strong className="text-purple-600 font-semibold cursor-pointer" onClick={handleAddScrap}>"+ Add Scrap"</strong> above to record recovered scrap.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* CARD 2: Additional Costs / Overheads (Optional) with Presets matching Sales Order 1:1 */}
+            {/* CARD 1: Additional Costs / Overheads (Optional) with Presets matching Sales Order 1:1 */}
             <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -2594,6 +2598,115 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
               </div>
             </div>
 
+            {/* CARD 2: Profit & Costing (Dynamic) */}
+            <div className="bg-white rounded-2xl border border-emerald-200/80 p-4 shadow-3xs space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                    <TrendingUp className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-gray-900 uppercase tracking-wide">
+                      Profit & Costing (Dynamic)
+                    </span>
+                    <p className="text-[10px] text-gray-500 font-medium">
+                      Calculate dynamic suggested selling prices and projected profit based on live manufacturing cost
+                    </p>
+                  </div>
+                </div>
+
+                {numPlannedQty > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md text-[11px] font-mono font-bold">
+                      Batch Cost: ₹{formatCurrency(totalProductionCost)}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-emerald-50/20 border border-emerald-100 rounded-xl p-3 grid grid-cols-1 sm:grid-cols-4 gap-3 items-center">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                    Pricing Method
+                  </label>
+                  <select
+                    value={profitPricing.pricingMethod}
+                    onChange={e => setProfitPricing(prev => ({ ...prev, pricingMethod: e.target.value as any }))}
+                    className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  >
+                    <option value="Markup %">Markup %</option>
+                    <option value="Margin %">Margin %</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                    {profitPricing.pricingMethod === 'Margin %' ? 'Margin Percentage' : 'Markup Percentage'}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="any"
+                      value={profitPricing.markupPercentage}
+                      onChange={e => setProfitPricing(prev => ({ ...prev, markupPercentage: e.target.value }))}
+                      placeholder="0"
+                      className="w-full pl-3 pr-7 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold font-mono text-gray-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                    <span className="absolute right-2.5 top-1.5 text-xs font-bold text-gray-400 select-none">%</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block mb-1">
+                    Suggested Price / PCS
+                  </label>
+                  <div className="px-3 py-1.5 bg-white border border-emerald-300 text-emerald-900 rounded-lg font-mono font-black text-sm text-center shadow-3xs">
+                    ₹{formatCurrency(profitCostingSummary.suggestedPricePcs)}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block mb-1">
+                    Suggested Price / GBL
+                  </label>
+                  <div className="px-3 py-1.5 bg-white border border-emerald-300 text-emerald-900 rounded-lg font-mono font-black text-sm text-center shadow-3xs">
+                    ₹{formatCurrency(profitCostingSummary.suggestedPriceGbl)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic Live Profit & Revenue Insights */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
+                <div className="p-2 bg-gray-50 rounded-lg border border-gray-100 flex flex-col justify-center">
+                  <span className="text-[10px] font-medium text-gray-400">Mfg Cost / Piece</span>
+                  <span className="font-mono font-bold text-gray-800 text-xs">
+                    ₹{formatCurrency(costPerPiece)}
+                  </span>
+                </div>
+
+                <div className="p-2 bg-gray-50 rounded-lg border border-gray-100 flex flex-col justify-center">
+                  <span className="text-[10px] font-medium text-gray-400">Margin / Piece</span>
+                  <span className="font-mono font-bold text-emerald-700 text-xs">
+                    + ₹{formatCurrency(Math.max(0, profitCostingSummary.suggestedPricePcs - costPerPiece))}
+                  </span>
+                </div>
+
+                <div className="p-2 bg-gray-50 rounded-lg border border-gray-100 flex flex-col justify-center">
+                  <span className="text-[10px] font-medium text-gray-400">Est. Total Revenue</span>
+                  <span className="font-mono font-bold text-gray-900 text-xs">
+                    ₹{formatCurrency(profitCostingSummary.totalRevenue)}
+                  </span>
+                </div>
+
+                <div className="p-2 bg-emerald-50/60 rounded-lg border border-emerald-200 flex flex-col justify-center">
+                  <span className="text-[10px] font-bold text-emerald-800">Est. Batch Profit</span>
+                  <span className="font-mono font-black text-emerald-800 text-xs">
+                    {profitCostingSummary.projectedProfit >= 0 ? '+' : ''}₹{formatCurrency(profitCostingSummary.projectedProfit)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
             {/* CARD 3: Notes / Instructions (Optional) */}
             <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs space-y-2">
               <div className="flex items-center gap-2 text-xs font-bold text-gray-900">
@@ -2640,18 +2753,9 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   </span>
                 </div>
 
-                {totalScrapCost > 0 && (
-                  <div className="flex justify-between text-emerald-700 font-medium">
-                    <span>Scrap Recovery Deduction (-)</span>
-                    <span className="font-mono font-bold text-emerald-700">
-                      - ₹{formatCurrency(totalScrapCost)}
-                    </span>
-                  </div>
-                )}
-
                 <div className="pt-2 border-t border-gray-200">
                   <div className="flex justify-between items-center text-sm font-black text-gray-900">
-                    <span>Total Production Cost</span>
+                    <span>Total Production Cost (A + B)</span>
                     <span className="font-mono text-base text-blue-700">
                       ₹{formatCurrency(totalProductionCost)}
                     </span>
@@ -2683,6 +2787,35 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                       <span className="font-mono font-bold text-gray-900">
                         ₹{formatCurrency(costPerGbl)}
                       </span>
+                    </div>
+                  )}
+
+                  {Number(profitPricing.markupPercentage) > 0 && (
+                    <div className="pt-2.5 border-t border-dashed border-gray-200 space-y-2">
+                      <div className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider flex items-center justify-between">
+                        <span>Suggested Selling Price</span>
+                        <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                          {profitPricing.pricingMethod} {profitPricing.markupPercentage}%
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center bg-emerald-50/80 p-2 rounded-xl border border-emerald-200">
+                        <span className="font-bold text-emerald-950 text-xs">Suggested / Piece</span>
+                        <span className="font-mono font-black text-emerald-900 text-sm">
+                          ₹{formatCurrency(profitCostingSummary.suggestedPricePcs)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-gray-600 font-medium px-1 text-xs">
+                        <span>Suggested / GBL</span>
+                        <span className="font-mono font-bold text-gray-900">
+                          ₹{formatCurrency(profitCostingSummary.suggestedPriceGbl)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-gray-600 font-medium px-1 text-xs">
+                        <span>Est. Batch Profit</span>
+                        <span className="font-mono font-black text-emerald-700">
+                          + ₹{formatCurrency(profitCostingSummary.projectedProfit)}
+                        </span>
+                      </div>
                     </div>
                   )}
                 </div>

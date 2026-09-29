@@ -114,6 +114,13 @@ export interface ProductionOrder {
     costPerGbl?: number;
     costPerPiece?: number;
   };
+  profitPricing?: {
+    pricingMethod?: string;
+    markupPercentage?: number | string;
+    suggestedPricePcs?: number;
+    suggestedPriceGbl?: number;
+    totalProfit?: number;
+  };
   remarks?: string;
   bomType: 'Default BOM' | 'Custom BOM (Production Order Only)';
   bomItems: ProductionBomItem[];

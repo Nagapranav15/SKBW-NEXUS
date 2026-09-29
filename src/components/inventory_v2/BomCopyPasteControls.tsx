@@ -65,9 +65,11 @@ export const BomCopyPasteControls: React.FC<BomCopyPasteControlsProps> = ({
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
     const payload = getCopyPayload();
-    if (!payload || !payload.lines || payload.lines.length === 0) {
+    const hasLines = !!(payload?.lines && payload.lines.length > 0);
+    const hasCosts = !!(payload?.additionalCosts && payload.additionalCosts.length > 0);
+    if (!payload || (!hasLines && !hasCosts)) {
       if (onToast) {
-        onToast('No BOM materials defined to copy', 'error');
+        onToast('No BOM materials or costs defined to copy', 'error');
       }
       return;
     }
@@ -77,14 +79,23 @@ export const BomCopyPasteControls: React.FC<BomCopyPasteControlsProps> = ({
     setTimeout(() => setCopiedRecently(false), 2000);
 
     const displayName = payload.sourceName || sourceLabel || 'Product';
+    const linesCount = payload.lines?.length || 0;
+    const costsCount = payload.additionalCosts?.length || 0;
+    const summaryParts: string[] = [];
+    if (linesCount > 0) summaryParts.push(`${linesCount} items`);
+    if (costsCount > 0) summaryParts.push(`${costsCount} overheads`);
+    const summaryStr = summaryParts.length > 0 ? ` (${summaryParts.join(', ')})` : '';
+
     if (onToast) {
-      onToast(`BOM copied from "${displayName}" (${payload.lines.length} items). Ready to paste on another product!`, 'success');
+      onToast(`BOM copied from "${displayName}"${summaryStr}! Ready to paste on another product.`, 'success');
     }
   };
 
   const handlePasteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!copiedBom || copiedBom.lines.length === 0) return;
+    const hasLines = !!(copiedBom?.lines && copiedBom.lines.length > 0);
+    const hasCosts = !!(copiedBom?.additionalCosts && copiedBom.additionalCosts.length > 0);
+    if (!copiedBom || (!hasLines && !hasCosts)) return;
 
     // If destination already has materials, offer choices (Merge or Replace)
     if (existingCount > 0) {

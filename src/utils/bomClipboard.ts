@@ -13,6 +13,21 @@ export interface CopiedBomMaterialLine {
   notes?: string;
 }
 
+export interface AdditionalCostItem {
+  id?: string;
+  costType: string;
+  calcBasis?: string;
+  amount: number | string;
+  appliedAs?: string;
+}
+
+export interface ProfitPricingConfig {
+  pricingMethod?: string;
+  markupPercentage?: number | string;
+  suggestedPricePcs?: number;
+  suggestedPriceGbl?: number;
+}
+
 export interface CopiedBomPayload {
   sourceSkuId?: string;
   sourceSkuCode?: string;
@@ -20,6 +35,8 @@ export interface CopiedBomPayload {
   basis?: number | string; // batch yield qty / recipe makes (e.g. 1, 100)
   basisUnit?: string;
   lines: CopiedBomMaterialLine[];
+  additionalCosts?: AdditionalCostItem[];
+  profitPricing?: ProfitPricingConfig;
   copiedAt?: number;
 }
 
@@ -67,7 +84,7 @@ if (typeof window !== 'undefined') {
  * Copy a BOM payload to the global clipboard
  */
 export function copyBom(payload: CopiedBomPayload): void {
-  if (!payload || !payload.lines || payload.lines.length === 0) {
+  if (!payload || ((!payload.lines || payload.lines.length === 0) && (!payload.additionalCosts || payload.additionalCosts.length === 0))) {
     return;
   }
   currentClipboard = {

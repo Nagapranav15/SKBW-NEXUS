@@ -38,6 +38,8 @@ const skuV2Schema = new mongoose.Schema({
   defaultLocation: { type: String, required: false },
   status: { type: String, required: true, enum: ["Active", "Inactive"], default: "Active" },
   bomItems: { type: [mongoose.Schema.Types.Mixed], default: [] },
+  additionalCosts: { type: [mongoose.Schema.Types.Mixed], default: [] },
+  profitPricing: { type: mongoose.Schema.Types.Mixed, default: {} },
   recipeYieldQty: { type: Number, default: 1 },
   recipeYieldUnit: { type: String, default: "" },
   batchYieldQty: { type: Number, default: 1 },

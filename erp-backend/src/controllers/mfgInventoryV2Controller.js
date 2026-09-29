@@ -487,6 +487,14 @@ exports.updateSku = async (req, res, next) => {
       sku.bomItems = Array.isArray(req.body.bomItems) ? req.body.bomItems : [];
       sku.markModified('bomItems');
     }
+    if (req.body.additionalCosts !== undefined) {
+      sku.additionalCosts = Array.isArray(req.body.additionalCosts) ? req.body.additionalCosts : [];
+      sku.markModified('additionalCosts');
+    }
+    if (req.body.profitPricing !== undefined) {
+      sku.profitPricing = (req.body.profitPricing && typeof req.body.profitPricing === 'object') ? req.body.profitPricing : {};
+      sku.markModified('profitPricing');
+    }
     if (req.body.recipeYieldQty !== undefined || req.body.batchYieldQty !== undefined) {
       const parsedQty = req.body.recipeYieldQty !== undefined ? Number(req.body.recipeYieldQty) : Number(req.body.batchYieldQty);
       sku.recipeYieldQty = !isNaN(parsedQty) && parsedQty > 0 ? parsedQty : 1;

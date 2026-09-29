@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  ClipboardList, Search, Download, X, Copy, Save, RefreshCw, Layers, Boxes, Package, Trash2
+  ClipboardList, Search, Download, X, Copy, Save, RefreshCw, Layers, Boxes, Package, Trash2,
+  Settings, Plus, Tag, Receipt, Info
 } from 'lucide-react';
 import { SkuV2, getSkusV2, updateSkuV2 } from '../../api/mfgApiV2';
 import Modal from '../ui/Modal';
 import { SearchableMaterialDropdown } from '../inventory_v2/AddSkuDrawerV2';
 import { BomCopyPasteControls, MakoroPasteIcon } from '../inventory_v2/BomCopyPasteControls';
 import { copyBom, useCopiedBom } from '../../utils/bomClipboard';
+import { AdditionalCostRow, ProfitPricingState, calculateCosting, formatInr } from '../../utils/costingUtils';
 import { showToast } from '../ui/Toast';
 import * as XLSX from 'xlsx';
 
@@ -40,6 +42,11 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [activeBomProduct, setActiveBomProduct] = useState<SkuV2 | null>(null);
   const [activeRecipeItems, setActiveRecipeItems] = useState<BomRecipeItem[]>([]);
+  const [activeAdditionalCosts, setActiveAdditionalCosts] = useState<AdditionalCostRow[]>([]);
+  const [activeProfitPricing, setActiveProfitPricing] = useState<ProfitPricingState>({
+    pricingMethod: 'Markup %',
+    markupPercentage: ''
+  });
   const [buildBatchYieldQty, setBuildBatchYieldQty] = useState<string>('1');
   const [buildBatchYieldUnit, setBuildBatchYieldUnit] = useState<string>('Pcs');
   const [isSavingBuildBom, setIsSavingBuildBom] = useState(false);
@@ -229,7 +236,67 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
     } else {
       setActiveRecipeItems([]);
     }
+
+    if (Array.isArray((prod as any).additionalCosts)) {
+      setActiveAdditionalCosts((prod as any).additionalCosts.map((c: any, i: number) => ({
+        id: c.id || `cost-${Date.now()}-${i}`,
+        costType: c.costType || '',
+        calcBasis: c.calcBasis || c.basis || 'Per Piece',
+        amount: c.amount ?? '',
+        appliedAs: c.appliedAs || 'Per Unit (PCS)'
+      })));
+    } else {
+      setActiveAdditionalCosts([]);
+    }
+
+    if ((prod as any).profitPricing && typeof (prod as any).profitPricing === 'object') {
+      setActiveProfitPricing({
+        pricingMethod: (prod as any).profitPricing.pricingMethod || 'Markup %',
+        markupPercentage: (prod as any).profitPricing.markupPercentage ?? '',
+        suggestedPricePcs: (prod as any).profitPricing.suggestedPricePcs,
+        suggestedPriceGbl: (prod as any).profitPricing.suggestedPriceGbl
+      });
+    } else {
+      setActiveProfitPricing({
+        pricingMethod: 'Markup %',
+        markupPercentage: ''
+      });
+    }
   };
+
+  // Financial Costing Summary (Material Cost + Additional Costs + Profit & Pricing)
+  const totalMaterialCost = useMemo(() => {
+    return activeRecipeItems.reduce((sum, item) => {
+      const matchedSku = skus.find(s => 
+        (item.skuId && String(s._id) === String(item.skuId)) ||
+        (item.skuCode && s.skuCode === item.skuCode) ||
+        (item.name && s.name === item.name)
+      );
+      const rate = Number(
+        (matchedSku as any)?.purchasePrice ||
+        (matchedSku as any)?.ratePerKg ||
+        (matchedSku as any)?.rate ||
+        (matchedSku as any)?.avgRate ||
+        (matchedSku as any)?.cost ||
+        (matchedSku as any)?.unitPrice ||
+        (item as any)?.rate ||
+        0
+      );
+      return sum + ((Number(item.qty) || 0) * rate);
+    }, 0);
+  }, [activeRecipeItems, skus]);
+
+  const costingSummary = useMemo(() => {
+    const factor = Number(activeBomProduct?.booksGbl || activeBomProduct?.altUnitConversion || 400) || 400;
+    return calculateCosting({
+      materialCost: totalMaterialCost,
+      additionalCosts: activeAdditionalCosts,
+      batchQty: Number(buildBatchYieldQty) || 1,
+      batchUnit: buildBatchYieldUnit,
+      conversionFactor: factor,
+      pricing: activeProfitPricing
+    });
+  }, [totalMaterialCost, activeAdditionalCosts, buildBatchYieldQty, buildBatchYieldUnit, activeBomProduct, activeProfitPricing]);
 
   // If no active product yet, auto-select first available product
   useEffect(() => {
@@ -248,6 +315,12 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
 
       const updatedPayload: any = {
         bomItems: activeRecipeItems,
+        additionalCosts: activeAdditionalCosts,
+        profitPricing: {
+          ...activeProfitPricing,
+          suggestedPricePcs: costingSummary.suggestedPricePcs,
+          suggestedPriceGbl: costingSummary.suggestedPriceGbl
+        },
         recipeYieldQty: yieldQty,
         recipeYieldUnit: yieldUnit,
         batchYieldQty: yieldQty,
@@ -266,7 +339,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
       setSkus(prev => prev.map(s => s._id === activeBomProduct._id ? updated : s));
       setActiveBomProduct(updated);
 
-      showToast(`BOM Recipe saved for ${activeBomProduct.name}!`, 'success');
+      showToast(`BOM Recipe & Costing saved for ${activeBomProduct.name}!`, 'success');
       if (onSaved) {
         onSaved(updated);
       }
@@ -333,11 +406,11 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      size="max-w-[1300px]"
-      maxWidth="max-w-[1300px]"
+      size="max-w-[1360px]"
+      maxWidth="max-w-[1360px]"
       hideCloseButton={true}
     >
-      <div className="p-5 space-y-4 max-h-[90vh] flex flex-col">
+      <div className="p-5 space-y-4 max-h-[92vh] flex flex-col">
         {/* Modal Header */}
         <div className="flex items-center justify-between pb-3 border-b border-gray-100 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
@@ -346,10 +419,10 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
             </div>
             <div className="min-w-0">
               <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2 truncate">
-                <span>Build BOMs / Bulk Edit BOM</span>
+                <span>Build BOMs</span>
               </h3>
               <p className="text-xs text-gray-400 font-medium truncate">
-                Define and update recipes product by product in Item Master.
+                Define recipes product by product — a faster alternative to the Excel import.
               </p>
             </div>
           </div>
@@ -546,7 +619,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                       </div>
                     </div>
 
-                    {/* Quick Copy / Paste Icons */}
+            {/* Quick Copy / Paste Icons */}
                     <div className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
                       {hasRecipe && (
                         <button
@@ -559,12 +632,14 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                               sourceName: prod.name || prod.skuCode,
                               basis: (prod as any).recipeYieldQty || (prod as any).batchYieldQty || 1,
                               basisUnit: (prod as any).recipeYieldUnit || (prod as any).batchYieldUnit || prod.unit || 'Pcs',
-                              lines: (prod as any).bomItems || []
+                              lines: (prod as any).bomItems || [],
+                              additionalCosts: (prod as any).additionalCosts || [],
+                              profitPricing: (prod as any).profitPricing || { pricingMethod: 'Markup %', markupPercentage: '' }
                             });
                             showToast(`BOM copied from "${prod.name || prod.skuCode}"! Ready to paste.`, 'success');
                           }}
                           className="h-6 w-6 rounded border border-gray-200 bg-white text-[#0B6B63] hover:border-[#0B6B63] flex items-center justify-center shadow-2xs transition-all cursor-pointer"
-                          title="Copy this BOM"
+                          title="Copy this BOM & Costing"
                         >
                           <Copy className="w-3 h-3 text-[#0B6B63]" />
                         </button>
@@ -582,7 +657,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
             </div>
           </div>
 
-          {/* Column 2: Active Product Recipe Builder (6 cols) */}
+          {/* Column 2: Active Product Recipe & Costing Builder (6 cols) */}
           <div className="col-span-6 border border-gray-200 rounded-2xl p-4 flex flex-col gap-3 bg-white overflow-hidden shadow-2xs">
             {activeBomProduct ? (
               <>
@@ -596,7 +671,9 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                   <div className="flex items-center gap-2 shrink-0">
                     <BomCopyPasteControls
                       getCopyPayload={() => {
-                        if (!activeRecipeItems || activeRecipeItems.length === 0) return null;
+                        const hasItems = activeRecipeItems && activeRecipeItems.length > 0;
+                        const hasCosts = activeAdditionalCosts && activeAdditionalCosts.length > 0;
+                        if (!hasItems && !hasCosts) return null;
                         return {
                           sourceSkuId: activeBomProduct?._id,
                           sourceSkuCode: activeBomProduct?.skuCode,
@@ -610,7 +687,9 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                             uom: item.uom,
                             inStock: item.inStock,
                             notes: item.notes
-                          }))
+                          })),
+                          additionalCosts: activeAdditionalCosts,
+                          profitPricing: activeProfitPricing
                         };
                       }}
                       onPaste={(copied, mode) => {
@@ -625,6 +704,21 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                           })));
                           if (copied.basis) setBuildBatchYieldQty(String(copied.basis));
                           if (copied.basisUnit) setBuildBatchYieldUnit(copied.basisUnit);
+                          if (Array.isArray(copied.additionalCosts)) {
+                            setActiveAdditionalCosts(copied.additionalCosts.map((c, i) => ({
+                              id: `cost-paste-${Date.now()}-${i}`,
+                              costType: c.costType || '',
+                              calcBasis: c.calcBasis || 'Per Piece',
+                              amount: c.amount ?? '',
+                              appliedAs: c.appliedAs || 'Per Unit (PCS)'
+                            })));
+                          }
+                          if (copied.profitPricing) {
+                            setActiveProfitPricing({
+                              pricingMethod: copied.profitPricing.pricingMethod || 'Markup %',
+                              markupPercentage: copied.profitPricing.markupPercentage ?? ''
+                            });
+                          }
                         } else {
                           const existingNames = new Set(activeRecipeItems.map(i => (i.name || '').toLowerCase().trim()));
                           const toAdd = copied.lines
@@ -640,6 +734,25 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                           if (copied.basis) setBuildBatchYieldQty(String(copied.basis));
                           if (copied.basisUnit) setBuildBatchYieldUnit(copied.basisUnit);
                           setActiveRecipeItems(prev => [...prev, ...toAdd]);
+                          if (Array.isArray(copied.additionalCosts) && copied.additionalCosts.length > 0) {
+                            const existingCostTypes = new Set(activeAdditionalCosts.map(c => (c.costType || '').toLowerCase().trim()));
+                            const costsToAdd = copied.additionalCosts
+                              .filter(c => !existingCostTypes.has((c.costType || '').toLowerCase().trim()))
+                              .map((c, i) => ({
+                                id: `cost-merge-${Date.now()}-${i}`,
+                                costType: c.costType,
+                                calcBasis: c.calcBasis || 'Per Piece',
+                                amount: c.amount,
+                                appliedAs: c.appliedAs || 'Per Unit (PCS)'
+                              }));
+                            setActiveAdditionalCosts(prev => [...prev, ...costsToAdd]);
+                          }
+                          if (copied.profitPricing && (!activeProfitPricing.markupPercentage || activeProfitPricing.markupPercentage === '')) {
+                            setActiveProfitPricing({
+                              pricingMethod: copied.profitPricing.pricingMethod || 'Markup %',
+                              markupPercentage: copied.profitPricing.markupPercentage ?? ''
+                            });
+                          }
                         }
                       }}
                       existingCount={activeRecipeItems.length}
@@ -658,30 +771,60 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                   </div>
                 </div>
 
-                {/* Sub-header details bar */}
-                <div className="flex items-center gap-3 text-xs font-semibold text-gray-500 bg-gray-50 p-2.5 rounded-xl border border-gray-100 flex-wrap">
-                  <span>ITEMS <strong>{activeRecipeItems.length}</strong></span>
-                  <span>·</span>
-                  <div className="flex items-center gap-1.5">
-                    <span>BATCH SIZE:</span>
-                    <input
-                      type="number"
-                      min="1"
-                      placeholder="1"
-                      value={buildBatchYieldQty}
-                      onChange={(e) => setBuildBatchYieldQty(e.target.value)}
-                      className="w-16 px-2 py-1 border border-blue-300 rounded-lg text-xs font-bold text-blue-700 text-center bg-white shadow-2xs focus:ring-2 focus:ring-blue-400 focus:outline-none"
-                    />
-                    <strong className="text-gray-800 bg-white border border-gray-200 px-2.5 py-1 rounded-lg text-xs font-bold font-mono shadow-2xs">
-                      {buildBatchYieldUnit || activeBomProduct.unit || 'Pcs'}
-                    </strong>
-                  </div>
-                  <span>·</span>
-                  <span className="text-[11px] font-normal text-gray-400">Quantities configured per batch produced</span>
-                </div>
+                {/* Sub-header details bar with UOM / AUOM selector */}
+                {(() => {
+                  const uom = activeBomProduct?.unit || 'Pcs';
+                  const auom = activeBomProduct?.altUnit;
+                  const hasAuom = !!(auom && auom.trim() && auom.trim().toLowerCase() !== uom.trim().toLowerCase());
+                  const currentUnit = buildBatchYieldUnit || (activeBomProduct as any)?.recipeYieldUnit || uom;
+
+                  const options: { value: string; label: string }[] = [];
+                  options.push({ value: uom, label: hasAuom ? `${uom} (UOM)` : uom });
+                  if (hasAuom) {
+                    options.push({ value: auom!.trim(), label: `${auom!.trim()} (AUOM)` });
+                  }
+
+                  return (
+                    <div className="flex items-center gap-3 text-xs font-semibold text-gray-500 bg-gray-50 p-2.5 rounded-xl border border-gray-100 flex-wrap shrink-0">
+                      <span>ITEMS <strong>{activeRecipeItems.length}</strong></span>
+                      <span>·</span>
+                      <div className="flex items-center gap-1.5">
+                        <span>BATCH SIZE:</span>
+                        <input
+                          type="number"
+                          min="1"
+                          placeholder="1"
+                          value={buildBatchYieldQty}
+                          onChange={(e) => setBuildBatchYieldQty(e.target.value)}
+                          className="w-16 px-2 py-1 border border-blue-300 rounded-lg text-xs font-bold text-blue-700 text-center bg-white shadow-2xs focus:ring-2 focus:ring-blue-400 focus:outline-none"
+                        />
+                        {options.length > 1 ? (
+                          <select
+                            value={currentUnit}
+                            onChange={(e) => setBuildBatchYieldUnit(e.target.value)}
+                            className="px-2.5 py-1 border border-blue-300 rounded-lg text-xs font-bold text-blue-900 bg-blue-50/90 cursor-pointer shadow-2xs focus:ring-2 focus:ring-blue-400 focus:outline-none"
+                            title="Yield Unit (UOM / AUOM)"
+                          >
+                            {options.map(opt => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <strong className="text-gray-800 bg-white border border-gray-200 px-2.5 py-1 rounded-lg text-xs font-bold font-mono shadow-2xs">
+                            {uom}
+                          </strong>
+                        )}
+                      </div>
+                      <span>·</span>
+                      <span className="text-[11px] font-normal text-gray-400">Quantities configured per batch produced</span>
+                    </div>
+                  );
+                })()}
 
                 {/* Searchable input to quickly add material */}
-                <div className="relative z-30">
+                <div className="relative z-30 shrink-0">
                   <SearchableMaterialDropdown
                     value=""
                     materials={rawAndSemiMaterials}
@@ -704,100 +847,348 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                   />
                 </div>
 
-                {/* Recipe Items List */}
-                <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 border border-gray-100 rounded-xl p-2 bg-gray-50/20 custom-scrollbar">
-                  {activeRecipeItems.length > 0 && (
-                    <div className="flex items-center gap-2 px-2 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      <span className="flex-1">Material</span>
-                      <span className="w-20 text-center">Qty</span>
-                      <span className="w-16 text-center">UOM</span>
-                      <span className="w-16 text-center">In Stock</span>
-                      <span className="w-16 text-center">Runs</span>
-                      <span className="w-6"></span>
-                    </div>
-                  )}
+                {/* Middle Scrollable Section: Materials + Additional Costs + Profit & Pricing */}
+                <div className="flex-1 overflow-y-auto space-y-4 pr-1 custom-scrollbar">
 
-                  {activeRecipeItems.map((b) => {
-                    const qtyNum = Number(b.qty);
-                    const inStockNum = Number(b.inStock) || 0;
-                    const runs = (qtyNum > 0) ? Math.floor(inStockNum / qtyNum) : null;
-
-                    return (
-                      <div
-                        key={b.id}
-                        className="p-2.5 bg-white border border-gray-200 rounded-xl shadow-2xs flex items-center gap-2.5 text-xs hover:border-gray-300 transition-colors"
-                      >
-                        <div className="flex-1 font-bold text-gray-900 text-xs min-w-0 pr-2 leading-relaxed" title={b.name}>
-                          {b.name}
+                  {/* SECTION 1: MATERIALS */}
+                  <div className="border border-gray-200/90 rounded-2xl p-3.5 bg-white shadow-2xs space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+                          <Boxes className="w-4 h-4 text-blue-600" />
                         </div>
+                        <div>
+                          <h5 className="text-xs font-bold text-gray-900 uppercase tracking-wide">
+                            MATERIALS ({activeRecipeItems.length})
+                          </h5>
+                          <p className="text-[10.5px] text-gray-400 font-medium">
+                            Raw materials consumed to produce this item.
+                          </p>
+                        </div>
+                      </div>
 
-                        <div className="w-20">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveRecipeItems(prev => [
+                            ...prev,
+                            {
+                              id: `b-${Date.now()}`,
+                              name: '',
+                              qty: 1,
+                              uom: 'Kg',
+                              inStock: 0,
+                              notes: ''
+                            }
+                          ]);
+                        }}
+                        className="px-2.5 py-1 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-all shadow-3xs"
+                      >
+                        <Plus className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Add Material</span>
+                      </button>
+                    </div>
+
+                    <div className="overflow-visible border border-gray-200 rounded-xl">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead className="bg-gray-50/80 text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 select-none">
+                          <tr>
+                            <th className="py-2 px-3 w-8 text-center">#</th>
+                            <th className="py-2 px-3">MATERIAL</th>
+                            <th className="py-2 px-3 text-center w-24">QTY</th>
+                            <th className="py-2 px-3 text-center w-20">UOM</th>
+                            <th className="py-2 px-3 text-center w-20">IN STOCK</th>
+                            <th className="py-2 px-3 text-center w-16">ACTIONS</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 bg-white">
+                          {activeRecipeItems.map((b, idx) => (
+                            <tr key={b.id} className="hover:bg-gray-50/60">
+                              <td className="py-2 px-3 text-center text-gray-400 font-bold text-xs select-none">
+                                <span className="text-gray-400 font-mono text-[11px] mr-1">::</span>{idx + 1}
+                              </td>
+                              <td className="py-2 px-3">
+                                <span className="font-bold text-gray-900 text-xs block leading-snug">{b.name}</span>
+                                {b.skuCode && <span className="text-[10px] text-gray-400 font-mono">{b.skuCode}</span>}
+                              </td>
+                              <td className="py-2 px-3 text-center">
+                                <input
+                                  type="number"
+                                  step="any"
+                                  value={b.qty}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value);
+                                    setActiveRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, qty: val } : item));
+                                  }}
+                                  className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-xs font-bold font-mono text-center focus:outline-none focus:border-[#064E3B] bg-white mx-auto block"
+                                  placeholder="Qty"
+                                />
+                              </td>
+                              <td className="py-2 px-3 text-center">
+                                <input
+                                  type="text"
+                                  value={b.uom || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setActiveRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, uom: val } : item));
+                                  }}
+                                  className="w-16 border border-gray-200 rounded-lg px-1.5 py-1 text-xs font-semibold text-center uppercase focus:outline-none focus:border-[#064E3B] bg-white mx-auto block"
+                                  placeholder="UOM"
+                                />
+                              </td>
+                              <td className="py-2 px-3 text-center font-mono text-gray-500 text-xs">
+                                {b.inStock ?? '0'}
+                              </td>
+                              <td className="py-2 px-3 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveRecipeItems(prev => prev.filter(item => item.id !== b.id))}
+                                  className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                  title="Remove material"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                          {activeRecipeItems.length === 0 && (
+                            <tr>
+                              <td colSpan={6} className="py-4 text-center text-xs text-gray-400 italic bg-gray-50/30">
+                                No materials added yet. Select from the dropdown above or click on items in the right catalog.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* SECTION 2: ADDITIONAL COSTS / OVERHEADS */}
+                  <div className="border border-gray-200/90 rounded-2xl p-3.5 bg-white shadow-2xs space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
+                          <Settings className="w-4 h-4 text-amber-600" />
+                        </div>
+                        <div>
+                          <h5 className="text-xs font-bold text-gray-900 uppercase tracking-wide">
+                            ADDITIONAL COSTS / OVERHEADS ({activeAdditionalCosts.length})
+                          </h5>
+                          <p className="text-[10.5px] text-gray-400 font-medium">
+                            Direct labour, electricity, packaging, or machine charges.
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveAdditionalCosts(prev => [
+                            ...prev,
+                            {
+                              id: `cost-${Date.now()}-${prev.length}`,
+                              costType: '',
+                              calcBasis: 'Per Piece',
+                              amount: '',
+                              appliedAs: 'Per Unit (PCS)'
+                            }
+                          ]);
+                        }}
+                        className="px-2.5 py-1 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-all shadow-3xs"
+                      >
+                        <Plus className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Add Cost</span>
+                      </button>
+                    </div>
+
+                    <div className="overflow-visible border border-gray-200 rounded-xl">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead className="bg-gray-50/80 text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 select-none">
+                          <tr>
+                            <th className="py-2 px-3 w-8 text-center">#</th>
+                            <th className="py-2 px-3">COST TYPE</th>
+                            <th className="py-2 px-3 text-center w-28">CALC BASIS</th>
+                            <th className="py-2 px-3 text-right w-24">AMOUNT (₹)</th>
+                            <th className="py-2 px-3 text-center w-36">APPLIED AS</th>
+                            <th className="py-2 px-3 text-center w-16">ACTIONS</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 bg-white">
+                          {activeAdditionalCosts.map((cost, cIdx) => (
+                            <tr key={cost.id} className="hover:bg-gray-50/60">
+                              <td className="py-2 px-3 text-center text-gray-400 font-bold text-xs select-none">
+                                {cIdx + 1}
+                              </td>
+                              <td className="py-2 px-3">
+                                <input
+                                  type="text"
+                                  value={cost.costType}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setActiveAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, costType: val } : c));
+                                  }}
+                                  placeholder="e.g. Index Printing, Rulling, Labour"
+                                  className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                                />
+                              </td>
+                              <td className="py-2 px-3 text-center">
+                                <select
+                                  value={cost.calcBasis}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setActiveAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, calcBasis: val } : c));
+                                  }}
+                                  className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer"
+                                >
+                                  <option value="Per Piece">Per Piece</option>
+                                  <option value="Per Batch">Per Batch</option>
+                                  <option value="Per GBL">Per GBL</option>
+                                  <option value="Fixed">Fixed</option>
+                                </select>
+                              </td>
+                              <td className="py-2 px-3 text-right">
+                                <input
+                                  type="number"
+                                  step="any"
+                                  value={cost.amount}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setActiveAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, amount: val } : c));
+                                  }}
+                                  placeholder="0.00"
+                                  className="w-20 px-1.5 py-1 text-right bg-white border border-gray-200 rounded-lg font-mono text-gray-800 text-xs font-bold focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                                />
+                              </td>
+                              <td className="py-2 px-3 text-center">
+                                <select
+                                  value={cost.appliedAs}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setActiveAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, appliedAs: val } : c));
+                                  }}
+                                  className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer"
+                                >
+                                  <option value="Per Unit (PCS)">Per Unit (PCS)</option>
+                                  <option value="Per Unit (GBL)">Per Unit (GBL)</option>
+                                  <option value="Per Batch">Per Batch</option>
+                                  <option value="Total Cost">Total Cost</option>
+                                </select>
+                              </td>
+                              <td className="py-2 px-3 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveAdditionalCosts(prev => prev.filter(c => c.id !== cost.id))}
+                                  className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                  title="Delete overhead"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                          {activeAdditionalCosts.length === 0 && (
+                            <tr>
+                              <td colSpan={6} className="py-4 text-center text-xs text-gray-400 italic bg-gray-50/30">
+                                No additional costs added. Click <strong className="text-amber-700 font-semibold cursor-pointer" onClick={() => {
+                                  setActiveAdditionalCosts(prev => [
+                                    ...prev,
+                                    {
+                                      id: `cost-${Date.now()}`,
+                                      costType: '',
+                                      calcBasis: 'Per Piece',
+                                      amount: '',
+                                      appliedAs: 'Per Unit (PCS)'
+                                    }
+                                  ]);
+                                }}>"+ Add Cost"</strong> above to record direct labour, machine charges, or printing.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* SECTION 3: PROFIT & PRICING (OPTIONAL) */}
+                  <div className="border border-emerald-200/90 rounded-2xl p-3.5 bg-emerald-50/20 shadow-2xs space-y-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-700 shrink-0">
+                        <Tag className="w-4 h-4 text-emerald-700" />
+                      </div>
+                      <div>
+                        <h5 className="text-xs font-bold text-gray-900 uppercase tracking-wide">
+                          PROFIT & PRICING (Optional)
+                        </h5>
+                        <p className="text-[10.5px] text-gray-500 font-medium">
+                          Calculate suggested selling price based on manufacturing cost.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="bg-white border border-emerald-200/80 rounded-xl p-3 grid grid-cols-1 sm:grid-cols-4 gap-3 items-center">
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                          Pricing Method
+                        </label>
+                        <select
+                          value={activeProfitPricing.pricingMethod}
+                          onChange={e => setActiveProfitPricing(prev => ({ ...prev, pricingMethod: e.target.value }))}
+                          className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                        >
+                          <option value="Markup %">Markup %</option>
+                          <option value="Margin %">Margin %</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                          {activeProfitPricing.pricingMethod === 'Margin %' ? 'Margin Percentage' : 'Markup Percentage'}
+                        </label>
+                        <div className="relative">
                           <input
                             type="number"
                             step="any"
-                            value={b.qty}
-                            onChange={(e) => {
-                              const val = Number(e.target.value);
-                              setActiveRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, qty: val } : item));
-                            }}
-                            className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs font-bold font-mono text-center focus:outline-none focus:border-[#064E3B] bg-white"
-                            placeholder="Qty"
+                            value={activeProfitPricing.markupPercentage}
+                            onChange={e => setActiveProfitPricing(prev => ({ ...prev, markupPercentage: e.target.value }))}
+                            placeholder="0"
+                            className="w-full pl-3 pr-7 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold font-mono text-gray-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                           />
+                          <span className="absolute right-2.5 top-1.5 text-xs font-bold text-gray-400 select-none">%</span>
                         </div>
-
-                        <div className="w-16">
-                          <input
-                            type="text"
-                            value={b.uom || ''}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setActiveRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, uom: val } : item));
-                            }}
-                            className="w-full border border-gray-200 rounded-lg px-1.5 py-1 text-xs font-semibold text-center uppercase focus:outline-none focus:border-[#064E3B] bg-white"
-                            placeholder="UOM"
-                          />
-                        </div>
-
-                        <div className="w-16 text-center text-[11px] font-mono text-gray-400">
-                          {b.inStock ?? '—'}
-                        </div>
-
-                        <div className="w-16 text-center">
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                            runs === null ? 'text-gray-300' :
-                            runs === 0 ? 'bg-rose-50 text-rose-600 border border-rose-200' :
-                            runs < 5 ? 'bg-amber-50 text-amber-700 border border-amber-200' :
-                            'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          }`}>
-                            {runs !== null ? `${runs} runs` : '—'}
-                          </span>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => setActiveRecipeItems(prev => prev.filter(item => item.id !== b.id))}
-                          className="w-6 h-6 flex items-center justify-center text-gray-300 hover:text-rose-600 rounded transition-colors cursor-pointer"
-                          title="Remove item"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
                       </div>
-                    );
-                  })}
 
-                  {activeRecipeItems.length === 0 && (
-                    <div className="p-8 text-center text-xs text-gray-400">
-                      No components in recipe. Add from catalog on right or use the search above.
+                      <div>
+                        <label className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block mb-1">
+                          Suggested Price / PCS
+                        </label>
+                        <div className="px-3 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-lg font-mono font-black text-sm text-center">
+                          ₹{formatInr(costingSummary.suggestedPricePcs)}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block mb-1">
+                          Suggested Price / GBL
+                        </label>
+                        <div className="px-3 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-lg font-mono font-black text-sm text-center">
+                          ₹{formatInr(costingSummary.suggestedPriceGbl)}
+                        </div>
+                      </div>
                     </div>
-                  )}
+                  </div>
+
                 </div>
 
                 {/* Footer summary bar */}
-                <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                <div className="flex items-center justify-between pt-2 border-t border-gray-100 shrink-0">
                   <div className="flex items-center gap-4">
                     <div>
                       <div className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">Total Ingredients</div>
                       <div className="text-xs font-bold text-gray-900">{activeRecipeItems.length} items</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">Overheads</div>
+                      <div className="text-xs font-bold text-gray-900">{activeAdditionalCosts.length} items</div>
                     </div>
                     <div>
                       <div className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">Can make</div>
@@ -807,7 +1198,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                             .map(b => (b.qty && Number(b.qty) > 0) ? Math.floor((Number(b.inStock) || 0) / Number(b.qty)) : null)
                             .filter((v): v is number => v !== null);
                           if (validRuns.length === 0) return '—';
-                          return `${Math.min(...validRuns).toLocaleString()} units`;
+                          return `${Math.min(...validRuns).toLocaleString()} batches`;
                         })()}
                       </div>
                     </div>
@@ -827,14 +1218,14 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
               <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-gray-400">
                 <ClipboardList className="w-10 h-10 text-gray-300 mb-2" />
                 <p className="font-semibold text-gray-600">Select a product from the left list</p>
-                <p className="text-xs">Choose any product to view or edit its BOM recipe ingredients</p>
+                <p className="text-xs">Choose any product to view or edit its BOM recipe ingredients & costing</p>
               </div>
             )}
           </div>
 
-          {/* Column 3: Materials Catalog Panel (3 cols) */}
+          {/* Column 3: Materials Catalog & Cost Summary Panel (3 cols) */}
           <div className="col-span-3 border border-gray-200 rounded-2xl p-3 flex flex-col gap-3 bg-gray-50/40 overflow-hidden">
-            <div className="relative">
+            <div className="relative shrink-0">
               <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
               <input
                 type="text"
@@ -845,7 +1236,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
               />
             </div>
 
-            <div className="flex-1 overflow-y-auto space-y-4 pr-1 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1 custom-scrollbar min-h-0">
               {/* Section 1: Raw Materials */}
               <div className="space-y-1.5">
                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-1">
@@ -946,6 +1337,68 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                     </div>
                   );
                 })}
+              </div>
+            </div>
+
+            {/* Bottom: Cost Summary (Per Batch) Card matching user mock */}
+            {activeBomProduct && (
+              <div className="bg-white border border-gray-200 rounded-2xl p-3.5 shadow-2xs space-y-2.5 shrink-0">
+                <div className="flex items-center gap-2 text-xs font-bold text-gray-900 pb-1 border-b border-gray-100">
+                  <Receipt className="w-4 h-4 text-blue-600" />
+                  <span>COST SUMMARY (Per Batch)</span>
+                </div>
+
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex justify-between text-gray-600 font-medium">
+                    <span>Material Cost (A)</span>
+                    <span className="font-mono font-bold text-gray-900">
+                      ₹{formatInr(costingSummary.materialCost)}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between text-gray-600 font-medium">
+                    <span>Additional Costs (B)</span>
+                    <span className="font-mono font-bold text-gray-900">
+                      ₹{formatInr(costingSummary.additionalCostsTotal)}
+                    </span>
+                  </div>
+
+                  <div className="pt-2 border-t border-gray-100 flex justify-between items-center">
+                    <span className="font-bold text-gray-900 text-xs">Total Production Cost (A + B)</span>
+                    <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-md font-mono font-black text-xs">
+                      ₹{formatInr(costingSummary.totalProductionCost)}
+                    </span>
+                  </div>
+
+                  <div className="pt-2 border-t border-gray-100 space-y-1">
+                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                      COST PER UNIT
+                    </div>
+
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-gray-600 font-medium">Cost / PCS</span>
+                      <span className="font-mono font-bold text-blue-900">
+                        ₹{formatInr(costingSummary.costPerPcs)}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-gray-600 font-medium">Cost / GBL ({costingSummary.conversionFactor} PCS)</span>
+                      <span className="font-mono font-bold text-gray-900">
+                        ₹{formatInr(costingSummary.costPerGbl)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Bottom Manufacturing Pill */}
+            <div className="p-2.5 bg-blue-50/50 border border-blue-100 rounded-xl flex items-center gap-2 text-xs shrink-0">
+              <Info className="w-4 h-4 text-blue-600 shrink-0" />
+              <div className="text-[11px] leading-tight">
+                <span className="font-semibold text-gray-800 block">Manufacturing Execution Engine</span>
+                <span className="text-gray-500 text-[10px]">Ready to dispatch to factory floor</span>
               </div>
             </div>
           </div>
