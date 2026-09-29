@@ -2751,9 +2751,20 @@ exports.getSkuStockDetails = async (req, res, next) => {
       return res.status(404).json({ msg: "SKU not found for this company" });
     }
 
+    // Shared match filter — used by all ledger aggregations in this endpoint
+    // to ensure onHand, available, and batch totals are always consistent.
+    const ledgerMatchFilter = {
+      skuId: skuObjId,
+      company: companyObjId,
+      status: { $ne: "Cancelled" },
+      // Exclude opening-stock entries (same exclusion used by getBalances)
+      referenceType: { $ne: "OpeningStock" },
+      transactionType: { $nin: ["Opening Stock", "Opening Balance", "OPENING_BALANCE"] }
+    };
+
     // 1. Location Balances with full hierarchy
     const locationBalances = await InventoryLedger.aggregate([
-      { $match: { skuId: skuObjId, company: companyObjId, status: { $ne: "Cancelled" } } },
+      { $match: ledgerMatchFilter },
       {
         $group: {
           _id: "$locationId",
@@ -2853,7 +2864,7 @@ exports.getSkuStockDetails = async (req, res, next) => {
 
     // 2. Batch Balances & Cost Layers
     const batchBalances = await InventoryLedger.aggregate([
-      { $match: { skuId: skuObjId, company: companyObjId, status: { $ne: "Cancelled" } } },
+      { $match: ledgerMatchFilter },
       {
         $group: {
           _id: { batchNumber: "$batchNumber", locationId: "$locationId" },
@@ -2995,11 +3006,7 @@ exports.getSkuStockDetails = async (req, res, next) => {
     rootLocations.forEach(root => rollupNode(root));
 
     // 4. Movements Ledger (chronological with running balances)
-    const rawMovements = await InventoryLedger.find({
-      skuId: skuObjId,
-      company: companyObjId,
-      status: { $ne: "Cancelled" }
-    })
+    const rawMovements = await InventoryLedger.find(ledgerMatchFilter)
       .sort({ createdAt: 1 })
       .populate("locationId", "name code")
       .populate("warehouseId", "name")
