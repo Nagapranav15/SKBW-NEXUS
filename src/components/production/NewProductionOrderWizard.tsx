@@ -66,6 +66,7 @@ interface MaterialRow {
   batchCount?: number;
   amount: number;
   basePerPiece?: number;
+  recipeQty?: number;
 }
 
 interface ScrapRow {
@@ -578,6 +579,26 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     );
   };
 
+  // Converts BOM "recipe makes" quantity into base PCS:
+  // e.g. If recipe makes 5 GBL, and 1 GBL = 400 PCS, then recipeBasePcs = 5 * 400 = 2,000 PCS.
+  // If recipe makes 2000 PCS, recipeBasePcs = 2,000 PCS.
+  const getSkuRecipeBasePcs = (sku: SkuV2, convFactor: number): number => {
+    const rawYieldQty = Number(sku.recipeYieldQty) || Number(sku.batchYieldQty) || 1;
+    const yieldUnit = (
+      (sku as any).recipeYieldUnit || 
+      (sku as any).batchYieldUnit || 
+      sku.unit || 
+      'PCS'
+    ).toUpperCase().trim();
+
+    if (yieldUnit === 'GBL') {
+      const factor = convFactor > 0 ? convFactor : 1;
+      return rawYieldQty * factor;
+    }
+
+    return rawYieldQty > 0 ? rawYieldQty : 1;
+  };
+
 
 
 
@@ -680,10 +701,12 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
   // Recalculate material requirements when target quantity changes
   useEffect(() => {
-    if (materials.length > 0 && plannedPcs > 0) {
+    if (materials.length > 0) {
       setMaterials(prev => prev.map(m => {
         if (m.basePerPiece && m.basePerPiece > 0) {
-          const req = Math.round(m.basePerPiece * plannedPcs * 100) / 100;
+          const req = plannedPcs > 0 
+            ? Math.round(m.basePerPiece * plannedPcs * 1000) / 1000 
+            : (m.recipeQty ?? m.requiredQty);
           return {
             ...m,
             requiredQty: req,
@@ -839,22 +862,27 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
     // Compute actual planned PCS inline using the freshly computed factor
     const curPlannedQty = Number(plannedQty) || 0;
-    let actualPlannedPcs: number;
-    if (assignedUnit === 'GBL') {
-      actualPlannedPcs = curPlannedQty > 0 ? curPlannedQty * (newFactor > 0 ? newFactor : 1) : (newFactor > 0 ? newFactor : 1);
-    } else {
-      actualPlannedPcs = curPlannedQty > 0 ? curPlannedQty : 1;
-    }
+    const actualPlannedPcs = assignedUnit === 'GBL' 
+      ? curPlannedQty * (newFactor > 0 ? newFactor : 1) 
+      : curPlannedQty;
 
     const rawBom = sku.bomItems || (sku as any).bom || [];
     if (Array.isArray(rawBom) && rawBom.length > 0) {
-      const yieldQty = Number(sku.recipeYieldQty) || Number(sku.batchYieldQty) || 1;
-      const targetPcs = actualPlannedPcs;
+      // 1. Convert BOM "recipe makes" quantity into base UOM (PCS)
+      // e.g. 5 GBL * 400 PCS = 2,000 PCS
+      const recipeBasePcs = getSkuRecipeBasePcs(sku, newFactor);
 
       const loadedMaterials: MaterialRow[] = rawBom.map((raw: any, idx: number) => {
         const rawQty = Number(raw.qty) || Number(raw.qtyPerBatch) || 1;
-        const perPieceBasis = rawQty / yieldQty;
-        const requiredQty = curPlannedQty > 0 ? Math.round(perPieceBasis * targetPcs * 100) / 100 : rawQty;
+        // Requirement per 1 base piece (PCS)
+        const perPieceBasis = rawQty / recipeBasePcs;
+        
+        // Scale factor = plannedBaseQty / recipeBaseQty
+        // If curPlannedQty is 0 (not entered yet), display the recipe's standard BOM qty
+        const scaleFactor = curPlannedQty > 0 ? actualPlannedPcs / recipeBasePcs : 1;
+        const requiredQty = curPlannedQty > 0 
+          ? Math.round(rawQty * scaleFactor * 1000) / 1000 
+          : rawQty;
         const rate = Number(raw.rate) || 0;
 
         // Resolve matching SKU to get skuId
@@ -872,6 +900,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           code: raw.skuCode || raw.code || `RM-${String(idx + 1).padStart(3, '0')}`,
           uom: raw.uom || raw.unit || 'PCS',
           requiredQty,
+          recipeQty: rawQty,
           sourceLocation: 'SKBW - Ground Floor',
           rateMode: globalRateMode,
           rate,
@@ -1037,6 +1066,9 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         updated.amount = Math.round(qty * rate * 100) / 100;
         if (field === 'rate') {
           updated.rateMode = 'custom';
+        }
+        if (field === 'requiredQty' && plannedPcs > 0) {
+          updated.basePerPiece = qty / plannedPcs;
         }
       }
       return updated;

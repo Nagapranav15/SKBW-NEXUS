@@ -550,19 +550,30 @@ export const ProductionModule: React.FC = () => {
       if (bomItems.length === 0) {
         const skuMatch = backendSkus.find(s => s.name === o.itemName || s.skuCode === o.itemCode);
         if (skuMatch && skuMatch.bomItems && skuMatch.bomItems.length > 0) {
-          bomItems = skuMatch.bomItems.map((b: any, bIdx: number) => ({
-            id: b.id || `${o._id}-b-${bIdx}`,
-            component: b.component || b.materialName || 'Material',
-            code: b.code || `RM-${String(bIdx + 1).padStart(3, '0')}`,
-            type: b.type || 'Raw',
-            qtyPerBatch: Number(b.qtyPerBatch) || 1,
-            totalRequired: (Number(b.qtyPerBatch) || 1) * plannedQty,
-            uom: b.uom || 'PCS',
-            availableStock: Number(b.availableStock) || 0,
-            stockStatus: (Number(b.availableStock) || 0) >= (Number(b.qtyPerBatch) || 1) * plannedQty ? 'Ready' : 'Shortage',
-            rate: Number(b.rate) || 0,
-            amount: Number(b.amount) || 0
-          }));
+          const convFactor = Number(skuMatch.altUnitConversion || (skuMatch as any).booksGbl || 1);
+          const yieldUnit = ((skuMatch as any).recipeYieldUnit || (skuMatch as any).batchYieldUnit || skuMatch.unit || 'PCS').toUpperCase().trim();
+          const rawYield = Number(skuMatch.recipeYieldQty || (skuMatch as any).batchYieldQty || 1);
+          const recipeBasePcs = yieldUnit === 'GBL' ? rawYield * convFactor : rawYield;
+          const plannedBasePcs = (o.plannedUom || '').toUpperCase().trim() === 'GBL' ? plannedQty * convFactor : plannedQty;
+          const scale = recipeBasePcs > 0 ? plannedBasePcs / recipeBasePcs : 1;
+
+          bomItems = skuMatch.bomItems.map((b: any, bIdx: number) => {
+            const rawQty = Number(b.qty ?? b.qtyPerBatch) || 1;
+            const req = Math.round(rawQty * scale * 1000) / 1000;
+            return {
+              id: b.id || `${o._id}-b-${bIdx}`,
+              component: b.component || b.materialName || b.name || 'Material',
+              code: b.code || b.skuCode || `RM-${String(bIdx + 1).padStart(3, '0')}`,
+              type: b.type || 'Raw',
+              qtyPerBatch: rawQty,
+              totalRequired: req,
+              uom: b.uom || b.unit || 'PCS',
+              availableStock: Number(b.availableStock) || 0,
+              stockStatus: (Number(b.availableStock) || 0) >= req ? 'Ready' : 'Shortage',
+              rate: Number(b.rate) || 0,
+              amount: Math.round(req * (Number(b.rate) || 0) * 100) / 100
+            };
+          });
         }
       }
 
