@@ -26,7 +26,7 @@ import {
   Columns3 as Columns, Download, FileText, History, Plus, HelpCircle,
   ChevronLeft, ChevronRight, RefreshCw, Save, Eye, Pencil as Edit,
   MapPin as MapPinIcon, AlertCircle, AlertTriangle, ExternalLink, 
-  Factory, Layers, Lock, ArrowRight, Building2, Trash2
+  Factory, Layers, Lock, ArrowRight, Building2, Trash2, X
 } from 'lucide-react';
 
 interface PurchaseInvoiceFormItem {
