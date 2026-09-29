@@ -2895,22 +2895,29 @@ exports.getSkuStockDetails = async (req, res, next) => {
         let reference = b.referenceId || `LOT-${idx + 1}`;
 
         if (b.batchNumber && b.batchNumber !== 'UNKNOWN') {
+          // The batchNumber on ledger entries is the invoiceNumber (e.g. "PB-011")
+          // Look up the purchase invoice directly by invoiceNumber for an exact match.
           const inv = await PurchaseInvoiceV2.findOne({
             company: companyObjId,
-            "items.batchNumber": b.batchNumber
-          }).select("invoiceNumber invoiceDate partyName items").lean();
+            invoiceNumber: b.batchNumber
+          }).select("invoiceNumber invoiceDate partyName vendorId items").lean();
 
           if (inv) {
             supplier = inv.partyName || supplier;
             purchaseDate = inv.invoiceDate || purchaseDate;
             reference = inv.invoiceNumber || reference;
-            const matchedItem = inv.items?.find(it => it.batchNumber === b.batchNumber || String(it.skuId) === String(sku._id));
+
+            // Strictly match the item by skuId — never fall back via a loose OR that
+            // returns another batch's rate.
+            const matchedItem = inv.items?.find(it => String(it.skuId) === String(sku._id));
             if (matchedItem) {
-              rate = matchedItem.rate || rate;
-              receivedQty = matchedItem.quantity || receivedQty;
+              // purchasePrice is the per-batch declared rate; it is not overwritten globally.
+              const itemRate = Number(matchedItem.purchasePrice || matchedItem.ratePerKg || 0);
+              if (itemRate > 0) rate = itemRate;
             }
           }
         }
+
 
         // Build short hierarchy path for location
         let locDoc = b.location;

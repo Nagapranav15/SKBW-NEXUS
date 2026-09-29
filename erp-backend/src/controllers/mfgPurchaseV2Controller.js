@@ -272,10 +272,28 @@ exports.createPurchaseInvoice = async (req, res, next) => {
           reelsByLoc[lId].push(r);
         });
 
-        for (const locIdStr of Object.keys(reelsByLoc)) {
+        const locIds = Object.keys(reelsByLoc);
+        const totalReelWeight = valItem.reels.reduce((s, r) => s + (Number(r.weight) || 0), 0);
+
+        for (const locIdStr of locIds) {
           const reelsGroup = reelsByLoc[locIdStr];
           let groupWeight = reelsGroup.reduce((s, r) => s + (Number(r.weight) || 0), 0);
-          if (groupWeight <= 0) groupWeight = valItem.quantity;
+
+          // If reels are all in one location and their weight sum doesn't match the declared
+          // lot quantity, use the declared quantity to avoid silent stock loss.
+          if (locIds.length === 1) {
+            // Single-location reel batch: trust the declared lot quantity over reel weights.
+            if (groupWeight <= 0 || Math.abs(groupWeight - valItem.quantity) > 0.001) {
+              groupWeight = valItem.quantity;
+            }
+          } else {
+            // Multi-location: each group contributes proportionally; fall back to lot qty if zero
+            if (groupWeight <= 0) {
+              const ratio = totalReelWeight > 0 ? (reelsGroup.length / valItem.reels.length) : (1 / locIds.length);
+              groupWeight = valItem.quantity * ratio;
+            }
+          }
+
           const h = await getHierarchy(locIdStr);
           const transactionNumber = await Sequence.getNextSequence("IL");
 
@@ -829,10 +847,26 @@ exports.editPurchaseInvoice = async (req, res, next) => {
           reelsByLoc[lId].push(r);
         });
 
-        for (const locIdStr of Object.keys(reelsByLoc)) {
+        const locIds = Object.keys(reelsByLoc);
+        const totalReelWeight = valItem.reels.reduce((s, r) => s + (Number(r.weight) || 0), 0);
+
+        for (const locIdStr of locIds) {
           const reelsGroup = reelsByLoc[locIdStr];
           let groupWeight = reelsGroup.reduce((s, r) => s + (Number(r.weight) || 0), 0);
-          if (groupWeight <= 0) groupWeight = valItem.quantity;
+
+          // Single-location: trust the declared lot quantity over reel weights
+          if (locIds.length === 1) {
+            if (groupWeight <= 0 || Math.abs(groupWeight - valItem.quantity) > 0.001) {
+              groupWeight = valItem.quantity;
+            }
+          } else {
+            // Multi-location: each group contributes proportionally; fall back to lot qty if zero
+            if (groupWeight <= 0) {
+              const ratio = totalReelWeight > 0 ? (reelsGroup.length / valItem.reels.length) : (1 / locIds.length);
+              groupWeight = valItem.quantity * ratio;
+            }
+          }
+
           const h = await getHierarchy(locIdStr);
           const transactionNumber = await Sequence.getNextSequence("IL");
 
