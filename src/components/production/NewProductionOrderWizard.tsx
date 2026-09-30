@@ -2697,20 +2697,16 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                               const { stockQty, uom, isAvailable } = getLiveStockForMaterial(row);
                               const isZero = stockQty <= 0;
                               return (
-                                <div className="flex items-center gap-1.5 mt-0.5 px-0.5 text-[9.5px]">
-                                  <span className="text-gray-400 font-medium">Stock:</span>
+                                <div className="flex items-center gap-1 mt-0.5 px-0.5 text-[9.5px]">
+                                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                    isAvailable && !isZero ? 'bg-emerald-500' : !isZero ? 'bg-amber-500' : 'bg-rose-500'
+                                  }`} />
+                                  <span className="text-gray-400">Stock:</span>
                                   <span className={`font-mono font-bold ${
-                                    isAvailable && !isZero ? 'text-emerald-600' : !isZero ? 'text-amber-600' : 'text-rose-600'
+                                    isAvailable && !isZero ? 'text-emerald-700' : !isZero ? 'text-amber-700' : 'text-rose-700'
                                   }`}>
                                     {formatStockQty(stockQty)} {uom}
                                   </span>
-                                  {isAvailable && !isZero ? (
-                                    <span className="text-[8.5px] text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded font-semibold border border-emerald-200/60">Available</span>
-                                  ) : !isZero ? (
-                                    <span className="text-[8.5px] text-amber-700 bg-amber-50 px-1 py-0.2 rounded font-semibold border border-amber-200/60">Short</span>
-                                  ) : (
-                                    <span className="text-[8.5px] text-rose-700 bg-rose-50 px-1 py-0.2 rounded font-semibold border border-rose-200/60">0 On-Hand</span>
-                                  )}
                                 </div>
                               );
                             })()}
@@ -2994,120 +2990,70 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
             );
           })()}
 
-          {/* ── BOM FOOTER: LIVE STOCK OF RESPECTIVE BOM ITEMS (LEFT) & MATERIALS TOTAL (RIGHT) ── */}
-          <div className="pt-3 border-t border-gray-100 flex flex-col xl:flex-row xl:items-start justify-between gap-3">
-            {/* Left / Center: Live Material Stock Availability */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-5 h-5 rounded-md bg-indigo-50 border border-indigo-200/70 flex items-center justify-center text-indigo-600">
-                  <Package className="w-3 h-3 text-indigo-600" />
-                </div>
-                <span className="text-[11px] font-bold text-gray-800 uppercase tracking-wider">
-                  Live Stock of Respective BOM Items
-                </span>
-                <span className="text-[10px] text-gray-400 font-medium hidden sm:inline">
-                  • Real-time warehouse & ledger on-hand stock
-                </span>
+          {/* ── BOM FOOTER: CUTE COMPACT STOCK PILLS (LEFT) & CLEAN MATERIALS TOTAL (RIGHT) ── */}
+          <div className="pt-2 flex flex-wrap items-center justify-between gap-2.5">
+            {/* Left: Cute, Compact Live Stock Pills */}
+            <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1 mr-0.5 select-none">
+                <Package className="w-3 h-3 text-indigo-500" />
+                <span>Stock:</span>
+              </span>
+
+              {materials.length === 0 ? (
+                <span className="text-[10.5px] text-gray-400 italic">No materials</span>
+              ) : (
+                materials.map((m, idx) => {
+                  const { stockQty, uom, isAvailable } = getLiveStockForMaterial(m);
+                  const isZero = stockQty <= 0;
+                  const displayName = m.component || m.code || `Item ${idx + 1}`;
+
+                  return (
+                    <div
+                      key={m.id || idx}
+                      title={`${displayName} (${m.code || '—'}) • Live Stock: ${formatStockQty(stockQty)} ${uom}`}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] border transition-all select-none ${
+                        isAvailable && !isZero
+                          ? 'bg-emerald-50 text-emerald-900 border-emerald-200 hover:bg-emerald-100/60'
+                          : !isZero
+                          ? 'bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100/60'
+                          : 'bg-rose-50 text-rose-900 border-rose-200 hover:bg-rose-100/60'
+                      }`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                        isAvailable && !isZero ? 'bg-emerald-500' : !isZero ? 'bg-amber-500' : 'bg-rose-500'
+                      }`} />
+                      <span className="font-semibold truncate max-w-[130px] sm:max-w-[170px] text-gray-800">
+                        {displayName}
+                      </span>
+                      <span className={`font-mono font-bold shrink-0 ${
+                        isAvailable && !isZero ? 'text-emerald-700' : !isZero ? 'text-amber-700' : 'text-rose-700'
+                      }`}>
+                        {formatStockQty(stockQty)} {uom}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+
+              {companyId && (
                 <button
                   type="button"
                   onClick={handleRefreshStock}
                   disabled={isStockLoading}
-                  className="p-1 text-gray-400 hover:text-blue-600 rounded transition-colors ml-1 cursor-pointer"
-                  title="Refresh live stock balances"
+                  className="p-1 text-gray-400 hover:text-indigo-600 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+                  title="Refresh live stock"
                 >
-                  <RotateCcw className={`w-3 h-3 ${isStockLoading ? 'animate-spin text-blue-600' : ''}`} />
+                  <RotateCcw className={`w-3 h-3 ${isStockLoading ? 'animate-spin text-indigo-600' : ''}`} />
                 </button>
-              </div>
-
-              {materials.length === 0 ? (
-                <div className="text-[11px] text-gray-400 italic bg-gray-50/60 rounded-xl px-3 py-2 border border-dashed border-gray-200">
-                  No materials in BOM yet. Items added above will display their real-time live stock availability here.
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                  {materials.map((m, idx) => {
-                    const { stockQty, uom, reqQty, isAvailable, shortage } = getLiveStockForMaterial(m);
-                    const isZero = stockQty <= 0;
-                    const isShort = !isAvailable && !isZero;
-
-                    return (
-                      <div
-                        key={m.id || idx}
-                        className={`p-2.5 rounded-xl border transition-all text-xs flex flex-col justify-between shadow-3xs ${
-                          isAvailable && !isZero
-                            ? 'bg-emerald-50/50 border-emerald-200/80 hover:border-emerald-300'
-                            : isShort
-                            ? 'bg-amber-50/50 border-amber-200/80 hover:border-amber-300'
-                            : 'bg-rose-50/50 border-rose-200/80 hover:border-rose-300'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-1.5 mb-1.5">
-                          <div className="min-w-0 flex-1">
-                            <div className="font-bold text-gray-900 text-[11px] truncate" title={m.component || m.code}>
-                              {m.component || m.code || `Component ${idx + 1}`}
-                            </div>
-                            {m.code && (
-                              <div className="text-[9.5px] font-mono text-gray-500 truncate">
-                                {m.code}
-                              </div>
-                            )}
-                          </div>
-                          {/* Stock status badge */}
-                          <span className={`shrink-0 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider flex items-center gap-1 border ${
-                            isAvailable && !isZero
-                              ? 'bg-emerald-100/90 text-emerald-800 border-emerald-300'
-                              : isShort
-                              ? 'bg-amber-100/90 text-amber-800 border-amber-300'
-                              : 'bg-rose-100/90 text-rose-800 border-rose-300'
-                          }`}>
-                            {isAvailable && !isZero ? (
-                              <>
-                                <Check className="w-2.5 h-2.5 text-emerald-700" />
-                                <span>In Stock</span>
-                              </>
-                            ) : isShort ? (
-                              <span>Short: {formatStockQty(shortage)} {uom}</span>
-                            ) : (
-                              <span>Out of Stock</span>
-                            )}
-                          </span>
-                        </div>
-
-                        {/* Stock vs Req Qty numbers */}
-                        <div className="flex items-center justify-between pt-1.5 border-t border-black/5 text-[10.5px]">
-                          <div className="text-gray-500">
-                            Required: <span className="font-bold font-mono text-gray-800">{formatStockQty(reqQty)} {m.uom}</span>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-gray-500 mr-1">Live Stock:</span>
-                            <span className={`font-mono font-black ${
-                              isAvailable && !isZero ? 'text-emerald-700' : isShort ? 'text-amber-700' : 'text-rose-700'
-                            }`}>
-                              {formatStockQty(stockQty)} {uom}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
               )}
             </div>
 
-            {/* Right: Materials Total Card */}
-            <div className="shrink-0 flex flex-col justify-center items-end p-3 bg-gradient-to-br from-slate-50 to-gray-50/80 rounded-xl border border-gray-200/80 min-w-[210px] shadow-3xs self-stretch xl:self-auto">
-              <div className="text-right w-full">
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
-                  Materials Total
-                </div>
-                <div className="text-lg font-black font-mono text-gray-900 tracking-tight">
-                  ₹{formatCurrency(totalMaterialCost)}
-                </div>
-              </div>
-              <div className="text-[10px] text-gray-500 font-medium mt-1 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                <span>{materials.length} {materials.length === 1 ? 'material component' : 'material components'} in BOM</span>
-              </div>
+            {/* Right: Clean Materials Total */}
+            <div className="text-right shrink-0">
+              <span className="text-xs text-gray-500 font-semibold mr-2">Materials Total:</span>
+              <span className="text-sm font-black font-mono text-gray-900">
+                ₹{formatCurrency(totalMaterialCost)}
+              </span>
             </div>
           </div>
         </div>
