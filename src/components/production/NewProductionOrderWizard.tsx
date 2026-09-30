@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { ProductionOrder } from '../../types/production';
 import { getNextProductionOrderNumber, createProductionOrder } from '../../api/productionApi';
-import { getSkusV2, getWarehouseHierarchyV2, SkuV2, WarehouseLocationV2, getProductionMaterialRates, MaterialRateInfo, getMetadataV2, updateMetadataV2 } from '../../api/mfgApiV2';
+import { getSkusV2, getWarehouseHierarchyV2, SkuV2, WarehouseLocationV2, getProductionMaterialRates, MaterialRateInfo, getMetadataV2, updateMetadataV2, getBalancesV2 } from '../../api/mfgApiV2';
 import { LocationSelectPopup } from '../stock_v2/LocationSelectPopup';
 import { BomCopyPasteControls } from '../inventory_v2/BomCopyPasteControls';
 import { copyBom, useCopiedBom } from '../../utils/bomClipboard';
@@ -359,17 +359,23 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   // Paper Cutting Slip Voucher (Reel -> Sheet Conversion)
   const [showCuttingSlipModal, setShowCuttingSlipModal] = useState(false);
 
+  // Live Material Stock from Inventory Balances
+  const [liveStockMap, setLiveStockMap] = useState<Map<string, number>>(new Map());
+  const [isStockLoading, setIsStockLoading] = useState<boolean>(false);
+
   // Load backend sequence number & SKUs
   useEffect(() => {
     let isMounted = true;
     const loadData = async () => {
       try {
         if (companyId) {
-          const [nextNum, skusRes, whRes, metaRes] = await Promise.allSettled([
+          setIsStockLoading(true);
+          const [nextNum, skusRes, whRes, metaRes, balancesRes] = await Promise.allSettled([
             getNextProductionOrderNumber(companyId),
             getSkusV2(companyId),
             getWarehouseHierarchyV2(companyId),
-            getMetadataV2(companyId)
+            getMetadataV2(companyId),
+            getBalancesV2(companyId)
           ]);
 
           if (!isMounted) return;
@@ -385,6 +391,34 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           if (skusRes.status === 'fulfilled' && Array.isArray(skusRes.value)) {
             setBackendSkus(skusRes.value);
           }
+
+          // Build live stock map from ledger balances and SKU on-hand values
+          const bMap = new Map<string, number>();
+          if (balancesRes.status === 'fulfilled' && Array.isArray(balancesRes.value)) {
+            balancesRes.value.forEach((b: any) => {
+              const rawId = b.skuId || b.sku?._id;
+              const sId = rawId ? String((rawId as any)._id || rawId) : '';
+              const sCode = (b.sku?.skuCode || b.skuCode || '').toLowerCase().trim();
+              const sName = (b.sku?.name || b.name || '').toLowerCase().trim();
+              const qty = Number(b.onHand) || Number(b.quantity) || 0;
+              if (sId) bMap.set(sId, (bMap.get(sId) || 0) + qty);
+              if (sCode) bMap.set(sCode, (bMap.get(sCode) || 0) + qty);
+              if (sName) bMap.set(sName, (bMap.get(sName) || 0) + qty);
+            });
+          }
+
+          const skusList = skusRes.status === 'fulfilled' && Array.isArray(skusRes.value) ? skusRes.value : [];
+          skusList.forEach(s => {
+            const sId = s._id ? String(s._id) : '';
+            const sCode = (s.skuCode || '').toLowerCase().trim();
+            const sName = (s.name || '').toLowerCase().trim();
+            const fallback = Number(s.presentStock !== undefined ? s.presentStock : (s.openingStock || 0));
+            if (sId && !bMap.has(sId)) bMap.set(sId, fallback);
+            if (sCode && !bMap.has(sCode)) bMap.set(sCode, fallback);
+            if (sName && !bMap.has(sName)) bMap.set(sName, fallback);
+          });
+          setLiveStockMap(bMap);
+          setIsStockLoading(false);
 
           // Sync Department Presets from database so all systems have identical presets
           if (metaRes.status === 'fulfilled' && metaRes.value) {
@@ -403,6 +437,8 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         }
       } catch (err) {
         console.error('Error loading production order initial data:', err);
+      } finally {
+        if (isMounted) setIsStockLoading(false);
       }
     };
 
@@ -414,6 +450,20 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   useEffect(() => {
     if (initialSkus && initialSkus.length > 0) {
       setBackendSkus(initialSkus);
+      setLiveStockMap(prev => {
+        if (prev.size > 0) return prev;
+        const bMap = new Map<string, number>();
+        initialSkus.forEach(s => {
+          const sId = s._id ? String(s._id) : '';
+          const sCode = (s.skuCode || '').toLowerCase().trim();
+          const sName = (s.name || '').toLowerCase().trim();
+          const fallback = Number(s.presentStock !== undefined ? s.presentStock : (s.openingStock || 0));
+          if (sId) bMap.set(sId, fallback);
+          if (sCode) bMap.set(sCode, fallback);
+          if (sName) bMap.set(sName, fallback);
+        });
+        return bMap;
+      });
     }
   }, [initialSkus]);
 
@@ -1053,6 +1103,22 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
       setMaterialRatesCache(prev => ({ ...prev, ...ratesMap }));
 
+      // Augment liveStockMap with purchase batch remaining quantities
+      if (res.rates) {
+        setLiveStockMap(prev => {
+          const next = new Map(prev);
+          Object.entries(res.rates).forEach(([skuId, rInfo]: [string, any]) => {
+            if (rInfo?.batchBalances && Array.isArray(rInfo.batchBalances)) {
+              const totalRemaining = rInfo.batchBalances.reduce((s: number, b: any) => s + (Number(b.remainingQty) || 0), 0);
+              if (totalRemaining > 0 && !next.has(skuId)) {
+                next.set(skuId, totalRemaining);
+              }
+            }
+          });
+          return next;
+        });
+      }
+
       setMaterials(prev => prev.map(m => {
         const sId = m.skuId || backendSkus.find(s => 
           (m.code && s.skuCode?.toLowerCase().trim() === m.code.toLowerCase().trim()) ||
@@ -1485,6 +1551,106 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
+  };
+
+  const formatStockQty = (val: number) => {
+    const num = Number(val) || 0;
+    return num.toLocaleString('en-IN', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 3
+    });
+  };
+
+  // Helper to resolve live available stock for any material component
+  const getLiveStockForMaterial = (m: MaterialRow) => {
+    const matchedSku = backendSkus.find(s => 
+      (m.skuId && String(s._id) === String(m.skuId)) ||
+      (m.code && s.skuCode?.toLowerCase().trim() === m.code.toLowerCase().trim()) ||
+      (m.component && s.name?.toLowerCase().trim() === m.component.toLowerCase().trim())
+    );
+
+    const sId = matchedSku?._id ? String(matchedSku._id) : (m.skuId ? String(m.skuId) : '');
+    const sCode = (matchedSku?.skuCode || m.code || '').toLowerCase().trim();
+    const sName = (matchedSku?.name || m.component || '').toLowerCase().trim();
+
+    let stockQty = 0;
+    let hasEntry = false;
+
+    if (sId && liveStockMap.has(sId)) {
+      stockQty = liveStockMap.get(sId)!;
+      hasEntry = true;
+    } else if (sCode && liveStockMap.has(sCode)) {
+      stockQty = liveStockMap.get(sCode)!;
+      hasEntry = true;
+    } else if (sName && liveStockMap.has(sName)) {
+      stockQty = liveStockMap.get(sName)!;
+      hasEntry = true;
+    }
+
+    if (!hasEntry && matchedSku) {
+      if (matchedSku.presentStock !== undefined && matchedSku.presentStock !== null) {
+        stockQty = Number(matchedSku.presentStock) || 0;
+        hasEntry = true;
+      } else if (matchedSku.openingStock !== undefined && matchedSku.openingStock !== null) {
+        stockQty = Number(matchedSku.openingStock) || 0;
+        hasEntry = true;
+      }
+    }
+
+    if (stockQty === 0 && m.fifoBatchInfo?.allocatedBatches && m.fifoBatchInfo.allocatedBatches.length > 0) {
+      const batchTotal = m.fifoBatchInfo.allocatedBatches.reduce((acc, b: any) => acc + (Number(b.batchTotalRemaining) || Number(b.qty) || 0), 0);
+      if (batchTotal > 0) stockQty = batchTotal;
+    }
+
+    const uom = matchedSku?.unit || m.uom || 'PCS';
+    const reqQty = Number(m.requiredQty) || 0;
+    const isAvailable = stockQty >= reqQty;
+    const shortage = Math.max(0, reqQty - stockQty);
+
+    return {
+      stockQty,
+      uom,
+      reqQty,
+      isAvailable,
+      shortage,
+      matchedSku
+    };
+  };
+
+  // Explicit refresh of live balances
+  const handleRefreshStock = async () => {
+    if (!companyId) return;
+    setIsStockLoading(true);
+    try {
+      const balances = await getBalancesV2(companyId).catch(() => []);
+      const bMap = new Map<string, number>();
+      if (Array.isArray(balances)) {
+        balances.forEach((b: any) => {
+          const rawId = b.skuId || b.sku?._id;
+          const sId = rawId ? String((rawId as any)._id || rawId) : '';
+          const sCode = (b.sku?.skuCode || b.skuCode || '').toLowerCase().trim();
+          const sName = (b.sku?.name || b.name || '').toLowerCase().trim();
+          const qty = Number(b.onHand) || Number(b.quantity) || 0;
+          if (sId) bMap.set(sId, (bMap.get(sId) || 0) + qty);
+          if (sCode) bMap.set(sCode, (bMap.get(sCode) || 0) + qty);
+          if (sName) bMap.set(sName, (bMap.get(sName) || 0) + qty);
+        });
+      }
+      backendSkus.forEach(s => {
+        const sId = s._id ? String(s._id) : '';
+        const sCode = (s.skuCode || '').toLowerCase().trim();
+        const sName = (s.name || '').toLowerCase().trim();
+        const fallback = Number(s.presentStock !== undefined ? s.presentStock : (s.openingStock || 0));
+        if (sId && !bMap.has(sId)) bMap.set(sId, fallback);
+        if (sCode && !bMap.has(sCode)) bMap.set(sCode, fallback);
+        if (sName && !bMap.has(sName)) bMap.set(sName, fallback);
+      });
+      setLiveStockMap(bMap);
+    } catch (err) {
+      console.error('Failed to refresh stock balances:', err);
+    } finally {
+      setIsStockLoading(false);
+    }
   };
 
   // Submit Order (Planned or Draft)
@@ -2526,6 +2692,28 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                                 />
                               )}
                             </div>
+                            {/* In-line Live Stock Indicator */}
+                            {(row.component || row.code) && (() => {
+                              const { stockQty, uom, isAvailable } = getLiveStockForMaterial(row);
+                              const isZero = stockQty <= 0;
+                              return (
+                                <div className="flex items-center gap-1.5 mt-0.5 px-0.5 text-[9.5px]">
+                                  <span className="text-gray-400 font-medium">Stock:</span>
+                                  <span className={`font-mono font-bold ${
+                                    isAvailable && !isZero ? 'text-emerald-600' : !isZero ? 'text-amber-600' : 'text-rose-600'
+                                  }`}>
+                                    {formatStockQty(stockQty)} {uom}
+                                  </span>
+                                  {isAvailable && !isZero ? (
+                                    <span className="text-[8.5px] text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded font-semibold border border-emerald-200/60">Available</span>
+                                  ) : !isZero ? (
+                                    <span className="text-[8.5px] text-amber-700 bg-amber-50 px-1 py-0.2 rounded font-semibold border border-amber-200/60">Short</span>
+                                  ) : (
+                                    <span className="text-[8.5px] text-rose-700 bg-rose-50 px-1 py-0.2 rounded font-semibold border border-rose-200/60">0 On-Hand</span>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </div>
                         </td>
 
@@ -2806,13 +2994,120 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
             );
           })()}
 
-          {/* Right-aligned Materials Total */}
-          <div className="flex justify-end pt-1">
-            <div className="text-right">
-              <span className="text-xs text-gray-500 font-semibold mr-2">Materials Total:</span>
-              <span className="text-sm font-black font-mono text-gray-900">
-                ₹{formatCurrency(totalMaterialCost)}
-              </span>
+          {/* ── BOM FOOTER: LIVE STOCK OF RESPECTIVE BOM ITEMS (LEFT) & MATERIALS TOTAL (RIGHT) ── */}
+          <div className="pt-3 border-t border-gray-100 flex flex-col xl:flex-row xl:items-start justify-between gap-3">
+            {/* Left / Center: Live Material Stock Availability */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-5 h-5 rounded-md bg-indigo-50 border border-indigo-200/70 flex items-center justify-center text-indigo-600">
+                  <Package className="w-3 h-3 text-indigo-600" />
+                </div>
+                <span className="text-[11px] font-bold text-gray-800 uppercase tracking-wider">
+                  Live Stock of Respective BOM Items
+                </span>
+                <span className="text-[10px] text-gray-400 font-medium hidden sm:inline">
+                  • Real-time warehouse & ledger on-hand stock
+                </span>
+                <button
+                  type="button"
+                  onClick={handleRefreshStock}
+                  disabled={isStockLoading}
+                  className="p-1 text-gray-400 hover:text-blue-600 rounded transition-colors ml-1 cursor-pointer"
+                  title="Refresh live stock balances"
+                >
+                  <RotateCcw className={`w-3 h-3 ${isStockLoading ? 'animate-spin text-blue-600' : ''}`} />
+                </button>
+              </div>
+
+              {materials.length === 0 ? (
+                <div className="text-[11px] text-gray-400 italic bg-gray-50/60 rounded-xl px-3 py-2 border border-dashed border-gray-200">
+                  No materials in BOM yet. Items added above will display their real-time live stock availability here.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                  {materials.map((m, idx) => {
+                    const { stockQty, uom, reqQty, isAvailable, shortage } = getLiveStockForMaterial(m);
+                    const isZero = stockQty <= 0;
+                    const isShort = !isAvailable && !isZero;
+
+                    return (
+                      <div
+                        key={m.id || idx}
+                        className={`p-2.5 rounded-xl border transition-all text-xs flex flex-col justify-between shadow-3xs ${
+                          isAvailable && !isZero
+                            ? 'bg-emerald-50/50 border-emerald-200/80 hover:border-emerald-300'
+                            : isShort
+                            ? 'bg-amber-50/50 border-amber-200/80 hover:border-amber-300'
+                            : 'bg-rose-50/50 border-rose-200/80 hover:border-rose-300'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-1.5 mb-1.5">
+                          <div className="min-w-0 flex-1">
+                            <div className="font-bold text-gray-900 text-[11px] truncate" title={m.component || m.code}>
+                              {m.component || m.code || `Component ${idx + 1}`}
+                            </div>
+                            {m.code && (
+                              <div className="text-[9.5px] font-mono text-gray-500 truncate">
+                                {m.code}
+                              </div>
+                            )}
+                          </div>
+                          {/* Stock status badge */}
+                          <span className={`shrink-0 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider flex items-center gap-1 border ${
+                            isAvailable && !isZero
+                              ? 'bg-emerald-100/90 text-emerald-800 border-emerald-300'
+                              : isShort
+                              ? 'bg-amber-100/90 text-amber-800 border-amber-300'
+                              : 'bg-rose-100/90 text-rose-800 border-rose-300'
+                          }`}>
+                            {isAvailable && !isZero ? (
+                              <>
+                                <Check className="w-2.5 h-2.5 text-emerald-700" />
+                                <span>In Stock</span>
+                              </>
+                            ) : isShort ? (
+                              <span>Short: {formatStockQty(shortage)} {uom}</span>
+                            ) : (
+                              <span>Out of Stock</span>
+                            )}
+                          </span>
+                        </div>
+
+                        {/* Stock vs Req Qty numbers */}
+                        <div className="flex items-center justify-between pt-1.5 border-t border-black/5 text-[10.5px]">
+                          <div className="text-gray-500">
+                            Required: <span className="font-bold font-mono text-gray-800">{formatStockQty(reqQty)} {m.uom}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-gray-500 mr-1">Live Stock:</span>
+                            <span className={`font-mono font-black ${
+                              isAvailable && !isZero ? 'text-emerald-700' : isShort ? 'text-amber-700' : 'text-rose-700'
+                            }`}>
+                              {formatStockQty(stockQty)} {uom}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Right: Materials Total Card */}
+            <div className="shrink-0 flex flex-col justify-center items-end p-3 bg-gradient-to-br from-slate-50 to-gray-50/80 rounded-xl border border-gray-200/80 min-w-[210px] shadow-3xs self-stretch xl:self-auto">
+              <div className="text-right w-full">
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
+                  Materials Total
+                </div>
+                <div className="text-lg font-black font-mono text-gray-900 tracking-tight">
+                  ₹{formatCurrency(totalMaterialCost)}
+                </div>
+              </div>
+              <div className="text-[10px] text-gray-500 font-medium mt-1 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                <span>{materials.length} {materials.length === 1 ? 'material component' : 'material components'} in BOM</span>
+              </div>
             </div>
           </div>
         </div>
