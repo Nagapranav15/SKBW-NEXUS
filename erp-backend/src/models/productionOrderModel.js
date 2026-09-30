@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const productionOrderSchema = new mongoose.Schema({
   orderNumber: { type: String, required: true, index: true },
-  itemId: { type: mongoose.Schema.Types.ObjectId, ref: "SkuV2", required: false },
+  itemId: { type: mongoose.Schema.Types.Mixed, required: false },
   itemName: { type: String, required: true, index: true },
   itemCode: { type: String, required: false },
   itemType: { 
@@ -32,7 +32,7 @@ const productionOrderSchema = new mongoose.Schema({
   progress: { type: Number, default: 0, min: 0, max: 100 },
   department: { type: String, default: "Notebook Manufacturing", index: true },
   factory: { type: String, default: "Main Factory" },
-  factoryId: { type: mongoose.Schema.Types.ObjectId, ref: "WarehouseLocationV2", required: false },
+  factoryId: { type: mongoose.Schema.Types.Mixed, required: false },
   plannedStartDate: { type: String, required: false },
   requiredCompletionDate: { type: String, required: false },
   actualCompletionDate: { type: String, required: false },
@@ -48,11 +48,11 @@ const productionOrderSchema = new mongoose.Schema({
   referenceNo: { type: String, default: "" },
   orderDate: { type: String, default: "" },
   outputLocation: { type: String, default: "" },
-  outputLocationId: { type: mongoose.Schema.Types.ObjectId, ref: "WarehouseLocationV2", required: false },
-  locationId: { type: mongoose.Schema.Types.ObjectId, ref: "WarehouseLocationV2", required: false },
-  warehouseId: { type: mongoose.Schema.Types.ObjectId, ref: "WarehouseLocationV2", required: false },
-  floorId: { type: mongoose.Schema.Types.ObjectId, ref: "WarehouseLocationV2", required: false },
-  zoneId: { type: mongoose.Schema.Types.ObjectId, ref: "WarehouseLocationV2", required: false },
+  outputLocationId: { type: mongoose.Schema.Types.Mixed, required: false },
+  locationId: { type: mongoose.Schema.Types.Mixed, required: false },
+  warehouseId: { type: mongoose.Schema.Types.Mixed, required: false },
+  floorId: { type: mongoose.Schema.Types.Mixed, required: false },
+  zoneId: { type: mongoose.Schema.Types.Mixed, required: false },
   byProducts: { type: [mongoose.Schema.Types.Mixed], default: [] },
   additionalCosts: { type: [mongoose.Schema.Types.Mixed], default: [] },
   profitPricing: { type: mongoose.Schema.Types.Mixed, default: {} },
@@ -66,8 +66,8 @@ const productionOrderSchema = new mongoose.Schema({
   productionEntries: { type: [mongoose.Schema.Types.Mixed], default: [] },
   finishedGoodsBatch: { type: mongoose.Schema.Types.Mixed, required: false },
   stockUpdates: { type: [mongoose.Schema.Types.Mixed], default: [] },
-  company: { type: mongoose.Schema.Types.ObjectId, ref: "Company", required: true, index: true },
-  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: false }
+  company: { type: mongoose.Schema.Types.Mixed, required: true, index: true },
+  createdBy: { type: mongoose.Schema.Types.Mixed, required: false }
 }, { timestamps: true });
 
 productionOrderSchema.index({ company: 1, orderNumber: 1 }, { unique: true });

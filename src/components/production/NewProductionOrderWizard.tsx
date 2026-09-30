@@ -865,7 +865,10 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     const locObj = warehouseLocations.find(l => String(l._id) === String(locId));
     const whObj = warehouseLocations.find(l => String(l._id) === String(whId));
     const floorObj = warehouseLocations.find(l => String(l._id) === String(flId));
-    const pathStr = [whObj?.name, floorObj?.name, locObj?.name].filter(Boolean).join(' - ') || locObj?.name || 'Selected Location';
+    const zoneObj = warehouseLocations.find(l => String(l._id) === String(znId));
+    const pathStr = (locId && locId === znId)
+      ? [whObj?.name, floorObj?.name, zoneObj?.name || locObj?.name].filter(Boolean).join(' - ')
+      : [whObj?.name, floorObj?.name, zoneObj?.name, locObj?.name].filter(Boolean).join(' - ') || locObj?.name || 'Selected Location';
     setOutputLocation(pathStr);
   };
 
@@ -874,7 +877,10 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     const locObj = warehouseLocations.find(l => String(l._id) === String(locId));
     const whObj = warehouseLocations.find(l => String(l._id) === String(whId));
     const floorObj = warehouseLocations.find(l => String(l._id) === String(flId));
-    const pathStr = [whObj?.name, floorObj?.name, locObj?.name].filter(Boolean).join(' - ') || locObj?.name || 'Selected Location';
+    const zoneObj = warehouseLocations.find(l => String(l._id) === String(znId));
+    const pathStr = (locId && locId === znId)
+      ? [whObj?.name, floorObj?.name, zoneObj?.name || locObj?.name].filter(Boolean).join(' - ')
+      : [whObj?.name, floorObj?.name, zoneObj?.name, locObj?.name].filter(Boolean).join(' - ') || locObj?.name || 'Selected Location';
 
     setMaterials(prev => prev.map(m => {
       if (m.id !== rowId) return m;
@@ -3257,7 +3263,10 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                       const locObj = warehouseLocations.find(l => String(l._id) === String(loc));
                       const whObj = warehouseLocations.find(l => String(l._id) === String(wh));
                       const floorObj = warehouseLocations.find(l => String(l._id) === String(fl));
-                      const pathStr = [whObj?.name, floorObj?.name, locObj?.name].filter(Boolean).join(' - ') || locObj?.name || 'Selected Location';
+                      const zoneObj = warehouseLocations.find(l => String(l._id) === String(zn));
+                      const pathStr = (loc && loc === zn)
+                        ? [whObj?.name, floorObj?.name, zoneObj?.name || locObj?.name].filter(Boolean).join(' - ')
+                        : [whObj?.name, floorObj?.name, zoneObj?.name, locObj?.name].filter(Boolean).join(' - ') || locObj?.name || 'Selected Location';
                       setNewDeptLocation(pathStr);
                     }}
                     variant="compact"

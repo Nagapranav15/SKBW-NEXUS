@@ -292,29 +292,22 @@ export const LocationSelectPopup: React.FC<LocationSelectPopupProps> = ({
       const parentFloor = node.parentId ? locMap.get(String(node.parentId)) : undefined;
       const parentWh = parentFloor?.parentId ? locMap.get(String(parentFloor.parentId)) : undefined;
 
+      // Directly select the zone itself (allows assigning storage directly to zones)
+      setSelectedZId(nId);
+      setSelectedLId(nId);
+
+      // Auto-expand zone so child bins are visible if user wants to pick a bin
       const childBins = allLocs.filter(l => l.level === 'Storage Location' && String(l.parentId) === nId);
       if (childBins.length > 0) {
-        setExpandedNodes(prev => ({ ...prev, [nId]: !prev[nId] }));
-        setSelectedZId(nId);
-        setSelectedLId(String(childBins[0]._id));
-      } else {
-        setSelectedZId(nId);
-        setSelectedLId(nId);
+        setExpandedNodes(prev => ({ ...prev, [nId]: true }));
       }
+
       if (parentFloor?._id) setSelectedFId(String(parentFloor._id));
       if (parentWh?._id) setSelectedWhId(String(parentWh._id));
     } else if (lvl === 'Floor') {
       setExpandedNodes(prev => ({ ...prev, [nId]: !prev[nId] }));
-      const zones = allLocs.filter(l => l.level === 'Zone' && String(l.parentId) === nId);
-      if (zones.length > 0) {
-        setSelectedFId(nId);
-        const firstZone = zones[0];
-        const firstBin = allLocs.find(l => l.level === 'Storage Location' && String(l.parentId) === String(firstZone._id));
-        setSelectedZId(String(firstZone._id));
-        setSelectedLId(firstBin?._id ? String(firstBin._id) : String(firstZone._id));
-        const parentWh = node.parentId ? locMap.get(String(node.parentId)) : undefined;
-        if (parentWh?._id) setSelectedWhId(String(parentWh._id));
-      }
+      const parentWh = node.parentId ? locMap.get(String(node.parentId)) : undefined;
+      if (parentWh?._id) setSelectedWhId(String(parentWh._id));
     } else if (lvl === 'Factory' || !node.parentId) {
       setExpandedNodes(prev => ({ ...prev, [nId]: !prev[nId] }));
     }
@@ -736,6 +729,7 @@ export const LocationSelectPopup: React.FC<LocationSelectPopupProps> = ({
                                       const isZExpanded = !!expandedNodes[zId] || searchQuery.trim().length > 0;
                                       const bins = allLocs.filter(l => l.level === 'Storage Location' && String(l.parentId) === zId);
                                       const isZSelected = selectedZId === zId;
+                                      const isZoneDirectlySelected = selectedZId === zId && (selectedLId === zId || !selectedLId);
                                       const zStock = getLocationStock(zId, 'Zone');
 
                                       return (
@@ -744,8 +738,10 @@ export const LocationSelectPopup: React.FC<LocationSelectPopupProps> = ({
                                           <div
                                             onClick={() => handleSelectNode(zone)}
                                             className={`grid grid-cols-12 px-2 py-1.5 items-center rounded-xl transition-all cursor-pointer ${
-                                              isZSelected && (!bins.length || selectedLId === zId)
+                                              isZoneDirectlySelected
                                                 ? 'bg-blue-50/80 text-blue-900 font-bold border border-blue-200/70 shadow-3xs'
+                                                : isZSelected
+                                                ? 'bg-slate-50 text-slate-800'
                                                 : 'hover:bg-slate-50/80 text-slate-700'
                                             }`}
                                           >
@@ -754,7 +750,8 @@ export const LocationSelectPopup: React.FC<LocationSelectPopupProps> = ({
                                                 <button
                                                   type="button"
                                                   onClick={(e) => toggleExpand(zId, e)}
-                                                  className="p-0.5 rounded text-slate-400 hover:text-blue-600 shrink-0"
+                                                  className="p-0.5 rounded text-slate-400 hover:text-blue-600 shrink-0 cursor-pointer"
+                                                  title={isZExpanded ? "Collapse bins" : "Expand bins"}
                                                 >
                                                   <ChevronRight className={`w-3.5 h-3.5 transition-transform duration-150 ${isZExpanded ? 'rotate-90 text-blue-600' : ''}`} />
                                                 </button>
@@ -762,7 +759,7 @@ export const LocationSelectPopup: React.FC<LocationSelectPopupProps> = ({
                                                 <span className="w-3.5 inline-block shrink-0" />
                                               )}
                                               {getNodeIcon('Zone', zStock.qty > 0)}
-                                              <span className="text-xs font-semibold text-slate-800 truncate">
+                                              <span className={`text-xs truncate ${isZoneDirectlySelected ? 'font-bold text-blue-900' : 'font-semibold text-slate-800'}`}>
                                                 {zone.name}
                                               </span>
                                               {getNodeLevelBadge('Zone', zStock.qty > 0)}
@@ -778,13 +775,19 @@ export const LocationSelectPopup: React.FC<LocationSelectPopupProps> = ({
                                               )}
                                             </div>
 
-                                            <div className="col-span-3 text-right">
+                                            <div className="col-span-3 text-right flex items-center justify-end gap-1.5">
                                               {zStock.qty > 0 ? (
                                                 <span className="font-mono font-bold text-[11px] text-slate-800">
                                                   {zStock.qty} <span className="text-[9px] text-slate-400 font-normal">{unit}</span>
                                                 </span>
                                               ) : (
                                                 <span className="text-slate-300 font-mono text-[11px]">0</span>
+                                              )}
+
+                                              {isZoneDirectlySelected && (
+                                                <div className="w-3.5 h-3.5 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-3xs">
+                                                  <Check className="w-2.5 h-2.5 stroke-[2.5]" />
+                                                </div>
                                               )}
                                             </div>
                                           </div>
