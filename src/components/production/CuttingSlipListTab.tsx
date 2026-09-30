@@ -4,6 +4,7 @@ import {
   Calendar, Layers, Scale, AlertTriangle, CheckCircle2, RotateCcw, X
 } from 'lucide-react';
 import { CuttingSlipV2, getCuttingSlipsV2, cancelCuttingSlipV2 } from '../../api/mfgApiV2';
+import UniversalPrintVoucherModal from '../ui/UniversalPrintVoucherModal';
 
 interface CuttingSlipListTabProps {
   companyId: string;
@@ -306,62 +307,120 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
         </div>
       </div>
 
-      {/* Quick Print Preview Modal for Existing Slip */}
-      {selectedSlipForPrint && (
-        <div className="fixed inset-0 z-[9999] bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl border border-slate-200">
-            <div className="flex justify-between items-start border-b border-slate-200 pb-3">
+      {/* Universal Print Preview Modal for Existing Slip */}
+      {selectedSlipForPrint && (() => {
+        const slip = selectedSlipForPrint;
+        const columns = [
+          { header: '#', align: 'center' as const, width: 'w-8', render: (_: any, idx: number) => <span className="font-bold text-slate-500">{idx + 1}</span> },
+          {
+            header: 'Item / Reel Identification',
+            render: (row: any) => (
               <div>
-                <h3 className="font-bold text-base text-slate-900">Cutting Slip {selectedSlipForPrint.slipNumber}</h3>
-                <p className="text-xs text-slate-500">{new Date(selectedSlipForPrint.date).toLocaleDateString('en-GB')}</p>
+                <div className="font-bold text-slate-900">{row.name}</div>
+                <div className="text-[10px] text-slate-500 font-mono">{row.code}</div>
               </div>
-              <button 
-                type="button" 
-                onClick={() => setSelectedSlipForPrint(null)}
-                className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+            )
+          },
+          { header: 'Type / Stage', key: 'type', align: 'center' as const },
+          { header: 'Specs', key: 'specs', align: 'center' as const },
+          {
+            header: 'Quantity',
+            align: 'right' as const,
+            render: (row: any) => <span className="font-mono font-bold text-slate-900">{row.qty}</span>
+          },
+          {
+            header: 'Weight (KG)',
+            align: 'right' as const,
+            render: (row: any) => <span className="font-mono text-slate-700">{row.weight}</span>
+          },
+          { header: 'Rate (₹)', key: 'rate', align: 'right' as const },
+          {
+            header: 'Total Cost',
+            align: 'right' as const,
+            render: (row: any) => <span className="font-mono font-bold text-slate-900">{row.total}</span>
+          },
+        ];
 
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                <span className="font-bold text-slate-500 block mb-1">SOURCE REELS</span>
-                <div>SKU: <span className="font-bold">{selectedSlipForPrint.sourceSku?.name}</span></div>
-                <div>Weight: <span className="font-bold font-mono text-rose-700">{selectedSlipForPrint.totalInputWeight} kg</span></div>
-                <div>Reels: <span className="font-bold">{selectedSlipForPrint.selectedReels?.length || 1} reels</span></div>
-              </div>
-              <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-200">
-                <span className="font-bold text-emerald-800 block mb-1">CONVERTED SHEETS</span>
-                <div>SKU: <span className="font-bold">{selectedSlipForPrint.targetSku?.name}</span></div>
-                <div>Yield: <span className="font-bold font-mono text-emerald-900">{selectedSlipForPrint.actualSheets} Sheets ({selectedSlipForPrint.actualReams} Reams)</span></div>
-                {selectedSlipForPrint.cutsCount ? (
-                  <div>Meter: <span className="font-bold font-mono text-indigo-700">{selectedSlipForPrint.cutsCount} Cuts ({selectedSlipForPrint.reelsOnStand || 1} reels on stand)</span></div>
-                ) : null}
-                <div>Loss: <span className="font-bold text-rose-700">-{selectedSlipForPrint.wastePercentage}%</span></div>
-              </div>
-            </div>
+        const data = [
+          {
+            name: slip.sourceSku?.name || 'Source Paper Reel',
+            code: slip.sourceSku?.skuCode || 'RAW-REEL',
+            type: 'INPUT REEL',
+            specs: `${slip.sheetGsm || slip.sourceSku?.gsm || ''} GSM • ${slip.sheetWidth || slip.sourceSku?.width || ''}"`,
+            qty: `${slip.selectedReels?.length || 1} Reel(s)`,
+            weight: `${slip.totalInputWeight?.toLocaleString('en-IN')} KG`,
+            rate: `₹${slip.inputRatePerKg?.toFixed(2) || '0.00'}`,
+            total: `₹${slip.totalInputCost?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`
+          },
+          {
+            name: slip.targetSku?.name || 'Target Converted Sheets',
+            code: slip.targetSku?.skuCode || 'CONV-SHEET',
+            type: 'OUTPUT SHEETS',
+            specs: `${slip.sheetWidth} × ${slip.sheetLength}" (${slip.sheetGsm} GSM)`,
+            qty: `${slip.actualSheets?.toLocaleString('en-IN')} Sheets (${slip.actualReams} Reams)`,
+            weight: `${((slip.totalInputWeight || 0) - (slip.scrapWeightKg || 0)).toLocaleString('en-IN', { maximumFractionDigits: 2 })} KG`,
+            rate: `₹${slip.effectiveCostPerSheet?.toFixed(3) || '—'} / Sheet`,
+            total: `₹${slip.netProductionCost?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`
+          }
+        ];
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setSelectedSlipForPrint(null)}
-                className="px-4 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="px-4 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 cursor-pointer shadow"
-              >
-                <Printer className="w-3.5 h-3.5 text-teal-400" />
-                <span>Print Hardcopy</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+        return (
+          <UniversalPrintVoucherModal
+            isOpen={!!selectedSlipForPrint}
+            onClose={() => setSelectedSlipForPrint(null)}
+            modalTitle="Cutting Slip Print Preview"
+            modalSubtitle="Official Paper Conversion & Slitting Voucher"
+            companyName="SKBW PRODUCTION"
+            voucherSubtitle="PAPER CONVERSION SLIP • REEL TO SHEET CUTTING VOUCHER"
+            voucherNumber={slip.slipNumber}
+            status={{
+              label: 'COMPLETED / POSTED',
+              variant: 'success',
+            }}
+            metaLeft={{
+              title: 'Source Reel (Consumption)',
+              primaryTitle: slip.sourceSku?.name || 'Raw Material Reel',
+              rows: [
+                { label: 'Source SKU Code', value: slip.sourceSku?.skuCode || '—' },
+                { label: 'Reels Consumed', value: `${slip.selectedReels?.length || 1} Reel(s)` },
+                { label: 'Purchase Batch', value: slip.purchaseBatch || '—' },
+              ]
+            }}
+            metaRight={{
+              title: 'Conversion Particulars & Specs',
+              fields: [
+                { label: 'Cutting Date', value: new Date(slip.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) },
+                { label: 'Cut Dimension', value: `${slip.sheetWidth} × ${slip.sheetLength}" (${slip.sheetGsm} GSM)` },
+                { label: 'Total Cuts / Metres', value: slip.cutsCount ? `${slip.cutsCount} Cuts (${slip.reelsOnStand || 1} on stand)` : '—' },
+                { label: 'Conversion Loss', value: `${slip.wastePercentage}% (${slip.scrapWeightKg || 0} KG)` },
+              ]
+            }}
+            columns={columns}
+            data={data}
+            summaryLeft={{
+              title: 'Conversion & Yield Analysis',
+              rows: [
+                { label: 'Total Input Weight', value: `${slip.totalInputWeight?.toLocaleString('en-IN')} KG` },
+                { label: 'Actual Converted Yield', value: `${slip.actualSheets?.toLocaleString('en-IN')} Sheets (${slip.actualReams} Reams)` },
+                { label: 'Wastage / Trim Scrap', value: `${slip.scrapWeightKg || 0} KG (-${slip.wastePercentage}%)` },
+                { label: 'Recovered Core Count', value: `${slip.coreCount || 0} Cores` },
+              ]
+            }}
+            summaryRight={{
+              rows: [
+                { label: 'Total Input Cost', value: `₹${slip.totalInputCost?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}` },
+                ...(slip.totalScrapCredit ? [{ label: 'Scrap & Core Credit', value: `-₹${slip.totalScrapCredit?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }] : []),
+                { label: 'Net Production Cost', value: `₹${slip.netProductionCost?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`, isGrandTotal: true },
+              ]
+            }}
+            signatures={[
+              { title: 'Machine Operator / Slitter', subtitle: 'Conversion & Cuts Log' },
+              { title: 'Plant Supervisor', subtitle: 'Yield & Wastage Authorization' },
+              { title: 'Storekeeper / QA', subtitle: 'Finished Goods Receipt' },
+            ]}
+          />
+        );
+      })()}
     </div>
   );
 };

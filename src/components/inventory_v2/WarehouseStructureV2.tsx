@@ -25,6 +25,7 @@ import {
 import { getActivityLogs } from '../../api/activityLogApi';
 import { showToast } from '../ui/Toast';
 import Modal from '../ui/Modal';
+import UniversalPrintVoucherModal from '../ui/UniversalPrintVoucherModal';
 
 interface WarehouseStructureV2Props {
   isEmbedded?: boolean;
@@ -228,6 +229,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
 
   // Selected Location for Details Drawer / Stock Inspection
   const [selectedLocationForDetails, setSelectedLocationForDetails] = useState<WarehouseLocationV2 | null>(null);
+  const [showPrintManifest, setShowPrintManifest] = useState(false);
   const [locationDetails, setLocationDetails] = useState<{
     location: WarehouseLocationV2;
     storedSkus: { sku: SkuV2; quantity: number }[];
@@ -2093,7 +2095,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
               </button>
               <button
                 type="button"
-                onClick={() => window.print()}
+                onClick={() => setShowPrintManifest(true)}
                 className="px-2.5 py-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
                 title="Print location inventory manifest"
               >
@@ -2538,6 +2540,120 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
           )}
         </div>
       </Modal>
+
+      {/* UNIVERSAL PRINT VOUCHER MODAL: LOCATION STOCK MANIFEST */}
+      {showPrintManifest && selectedLocationForDetails && (() => {
+        const manifestColumns = [
+          { header: '#', align: 'center' as const, width: 'w-8', render: (_: any, idx: number) => <span className="font-bold text-slate-500">{idx + 1}</span> },
+          {
+            header: 'Item / SKU Specification',
+            render: (item: any) => (
+              <div>
+                <div className="font-bold text-slate-900">{item.sku.name}</div>
+                <div className="text-[10px] text-slate-500 font-mono">
+                  {item.sku.skuCode}
+                  {item.sku.gsm ? ` • ${item.sku.gsm} GSM` : ''}
+                  {(item.sku.width || item.sku.length) ? ` • ${item.sku.width || ''}${item.sku.length ? `×${item.sku.length}` : ''}"` : ''}
+                </div>
+              </div>
+            )
+          },
+          {
+            header: 'Category',
+            align: 'center' as const,
+            render: (item: any) => (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                {item.categoryType}
+              </span>
+            )
+          },
+          {
+            header: 'Stored Quantity',
+            align: 'right' as const,
+            render: (item: any) => (
+              <span className="font-mono font-bold text-slate-900">
+                {item.quantity.toLocaleString('en-IN', { maximumFractionDigits: 3 })} {item.unit}
+              </span>
+            )
+          },
+          {
+            header: 'Calculated Weight',
+            align: 'right' as const,
+            render: (item: any) => (
+              <div className="text-right">
+                <span className="font-mono font-bold text-blue-900">{item.formattedWeight}</span>
+                {item.weightNote && item.weightKg !== null && item.weightKg > 0 && (
+                  <span className="text-[9.5px] text-slate-400 block">({item.weightNote})</span>
+                )}
+              </div>
+            )
+          },
+          {
+            header: 'Physical Format',
+            align: 'center' as const,
+            render: (item: any) => (
+              <span className="text-[10px] text-slate-600">
+                {item.reels?.length ? `${item.reels.length} Reels` : item.sku.paperType || item.unit}
+              </span>
+            )
+          }
+        ];
+
+        return (
+          <UniversalPrintVoucherModal
+            isOpen={showPrintManifest}
+            onClose={() => setShowPrintManifest(false)}
+            modalTitle="Location Stock Manifest Print Preview"
+            modalSubtitle="Official Godown / Storage Location Inventory Manifest"
+            companyName="SKBW WAREHOUSE & LOGISTICS"
+            voucherSubtitle="STORAGE LOCATION STOCK MANIFEST • INVENTORY AUDIT VOUCHER"
+            voucherNumber={`LOC-${selectedLocationForDetails.name}`}
+            status={{
+              label: selectedLocationForDetails.status?.toUpperCase() || 'ACTIVE',
+              variant: selectedLocationForDetails.status === 'Active' ? 'success' : 'warning',
+            }}
+            metaLeft={{
+              title: 'Storage Location Details',
+              primaryTitle: `${selectedLocationForDetails.name} (${selectedLocationForDetails.level})`,
+              rows: [
+                { label: 'Hierarchy Path', value: locationBreadcrumb },
+                { label: 'Location Code', value: selectedLocationForDetails.code || selectedLocationForDetails.name },
+                ...(selectedLocationForDetails.capacity ? [{ label: 'Rated Capacity', value: `${selectedLocationForDetails.capacity} kg` }] : []),
+              ]
+            }}
+            metaRight={{
+              title: 'Audit & Physical Count Info',
+              fields: [
+                { label: 'Manifest Date', value: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) },
+                { label: 'Stored SKU Count', value: `${inspectedItems.length} SKUs` },
+                { label: 'Total Physical Units', value: `${inspectedTotals.totalQty.toLocaleString('en-IN')} Units` },
+                { label: 'Consolidated Weight', value: `${inspectedTotals.totalWeight.toLocaleString('en-IN')} KG` },
+              ]
+            }}
+            columns={manifestColumns}
+            data={inspectedItems}
+            summaryLeft={{
+              title: 'Location Category Breakdown',
+              rows: [
+                { label: 'Raw Materials', value: `${inspectedTotals.rawCount} items (${inspectedTotals.rawWeight.toLocaleString('en-IN')} KG)` },
+                { label: 'Semi Finished Goods', value: `${inspectedTotals.semiCount} items` },
+                { label: 'Finished Goods', value: `${inspectedTotals.fgCount} items` },
+              ]
+            }}
+            summaryRight={{
+              rows: [
+                { label: 'Total Units Stored', value: `${inspectedTotals.totalQty.toLocaleString('en-IN')} Units` },
+                { label: 'Total Net Weight', value: `${inspectedTotals.totalWeight.toLocaleString('en-IN')} KG`, isGrandTotal: true },
+              ]
+            }}
+            signatures={[
+              { title: 'Warehouse Storekeeper', subtitle: 'Physical Count Verification' },
+              { title: 'Inventory Auditor', subtitle: 'Stock Reconciliation' },
+              { title: 'Plant / Operations Head', subtitle: 'Executive Authorization' },
+            ]}
+          />
+        );
+      })()}
 
       {/* MODAL: FLOOR SUMMARY */}
       <Modal

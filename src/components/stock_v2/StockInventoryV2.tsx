@@ -69,6 +69,7 @@ import ItemStockDetailsDrawer, { ItemDrawerTab } from './ItemStockDetailsDrawer'
 import StockTransferModal from './StockTransferModal';
 import StockAdjustmentModal from './StockAdjustmentModal';
 import { ManufacturingStepsModal } from './ManufacturingStepsModal';
+import UniversalPrintVoucherModal from '../ui/UniversalPrintVoucherModal';
 
 export type StockTabType = 'overview' | 'products' | 'materials' | 'semi' | 'batches' | 'transfers' | 'adjustments' | 'warehouse';
 
@@ -268,6 +269,7 @@ export const StockInventoryV2: React.FC = () => {
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferInitialSku, setTransferInitialSku] = useState<SkuV2 | null>(null);
   const [transferInitialLocId, setTransferInitialLocId] = useState<string | undefined>(undefined);
+  const [selectedTransferForPrint, setSelectedTransferForPrint] = useState<any | null>(null);
 
   const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
   const [adjustmentInitialSku, setAdjustmentInitialSku] = useState<SkuV2 | null>(null);
@@ -1774,6 +1776,7 @@ export const StockInventoryV2: React.FC = () => {
                       <th className="px-4 py-3">To Location</th>
                       <th className="px-4 py-3 text-right">Quantity</th>
                       <th className="px-4 py-3">Remarks</th>
+                      <th className="px-4 py-3 text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody key={`transfers-${animationKey}`} className="divide-y divide-gray-100 text-xs text-gray-700">
@@ -1806,6 +1809,17 @@ export const StockInventoryV2: React.FC = () => {
                         </td>
                         <td className="px-4 py-3 text-gray-500 text-[11px] italic">
                           {entry.remarks || '—'}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedTransferForPrint(entry)}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 text-xs font-semibold"
+                            title="Print Transfer Slip"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Slip</span>
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -2351,6 +2365,107 @@ export const StockInventoryV2: React.FC = () => {
           }}
         />
       )}
+
+      {/* UNIVERSAL PRINT VOUCHER MODAL: STOCK TRANSFER SLIP */}
+      {selectedTransferForPrint && (() => {
+        const trf = selectedTransferForPrint;
+        const trfColumns = [
+          { header: '#', align: 'center' as const, width: 'w-8', render: (_: any, idx: number) => <span className="font-bold text-slate-500">{idx + 1}</span> },
+          {
+            header: 'Transferred Item / SKU Details',
+            render: (item: any) => (
+              <div>
+                <div className="font-bold text-slate-900">{item.skuName || item.skuCode || 'SKU Item'}</div>
+                <div className="text-[10px] text-slate-500 font-mono">
+                  {item.skuCode ? `Code: ${item.skuCode}` : ''}
+                </div>
+              </div>
+            )
+          },
+          {
+            header: 'From Location',
+            key: 'fromLocationName',
+            align: 'center' as const,
+          },
+          {
+            header: 'To Location',
+            key: 'toLocationName',
+            align: 'center' as const,
+          },
+          {
+            header: 'Transfer Quantity',
+            align: 'right' as const,
+            render: (item: any) => (
+              <span className="font-mono font-bold text-blue-900">
+                {Number(item.quantity || 0).toLocaleString('en-IN')} {item.unit || 'Units'}
+              </span>
+            )
+          },
+          {
+            header: 'Transfer Reference',
+            align: 'center' as const,
+            render: (item: any) => (
+              <span className="font-mono text-slate-700 font-semibold text-[10px]">
+                {item.referenceNumber || 'TRF-TRANSFER'}
+              </span>
+            )
+          },
+        ];
+
+        return (
+          <UniversalPrintVoucherModal
+            isOpen={!!selectedTransferForPrint}
+            onClose={() => setSelectedTransferForPrint(null)}
+            modalTitle="Stock Transfer Print Preview"
+            modalSubtitle="Official Inter-Location Material Transfer Voucher"
+            companyName="SKBW WAREHOUSE & LOGISTICS"
+            voucherSubtitle="INTER-LOCATION STOCK TRANSFER • MATERIAL MOVEMENT SLIP"
+            voucherNumber={trf.referenceNumber || 'ST-TRANSFER'}
+            status={{
+              label: 'TRANSFERRED / POSTED',
+              variant: 'success',
+            }}
+            metaLeft={{
+              title: 'Source (Dispatch) Location',
+              primaryTitle: trf.fromLocationName || 'Source Godown',
+              rows: [
+                { label: 'Dispatch Warehouse', value: selectedCompany?.name || 'Main Warehouse' },
+                { label: 'Handed Over By', value: trf.createdBy || 'Storekeeper' },
+              ]
+            }}
+            metaRight={{
+              title: 'Destination & Transit Particulars',
+              fields: [
+                { label: 'Transfer Date', value: trf.createdAt ? new Date(trf.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Today' },
+                { label: 'To Location', value: trf.toLocationName || trf.locationName || 'Destination Bin' },
+                { label: 'Transferred Units', value: `${Number(trf.quantity || 0).toLocaleString('en-IN')} ${trf.unit || 'Units'}` },
+                { label: 'Voucher Reference', value: trf.referenceNumber || 'TRF' },
+              ]
+            }}
+            columns={trfColumns}
+            data={[trf]}
+            summaryLeft={{
+              title: 'Movement Intake Summary',
+              rows: [
+                { label: 'Total Movement Items', value: '1 SKU Line' },
+                { label: 'Total Transferred Quantity', value: `${Number(trf.quantity || 0).toLocaleString('en-IN')} ${trf.unit || 'Units'}` },
+              ],
+              remarks: trf.remarks || undefined,
+            }}
+            summaryRight={{
+              rows: [
+                { label: 'Net Dispatched Quantity', value: `${Number(trf.quantity || 0).toLocaleString('en-IN')} ${trf.unit || 'Units'}` },
+                { label: 'Total Net Quantity', value: `${Number(trf.quantity || 0).toLocaleString('en-IN')} ${trf.unit || 'Units'}`, isGrandTotal: true },
+              ]
+            }}
+            signatures={[
+              { title: 'Dispatch Storekeeper', subtitle: 'Material Released & Handed Over' },
+              { title: 'Transit Handler / Driver', subtitle: 'Material in Transit Verification' },
+              { title: 'Receiving Storekeeper', subtitle: 'Material Checked & Binned' },
+            ]}
+          />
+        );
+      })()}
 
       {/* 5. Add Multi-Item Purchase Batch Modal */}
       {showBatchModal && (
