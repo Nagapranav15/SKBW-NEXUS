@@ -41,13 +41,18 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
   const [operatorName, setOperatorName] = useState('');
   const [notes, setNotes] = useState('');
 
-  // ── 1. AVAILABLE REELS & LEFT-SIDE SELECTION BY ITEM + PURCHASE BATCH ──
+  // ── 1. AVAILABLE REELS & SEARCHABLE REEL ITEM DROPDOWN (NO DEFAULT VALUE) ──
   const [availableReels, setAvailableReels] = useState<AvailableReelV2[]>([]);
-  const [selectedReelItemKey, setSelectedReelItemKey] = useState<string>('ALL');
+  const [selectedReelItemKey, setSelectedReelItemKey] = useState<string>(initialSkuId || '');
+  const [reelItemSearch, setReelItemSearch] = useState<string>('');
+  const [reelCategoryFilter, setReelCategoryFilter] = useState<string>('ALL');
+  const [showReelDropdown, setShowReelDropdown] = useState<boolean>(false);
+  const reelDropdownRef = useRef<HTMLDivElement>(null);
+
   const [selectedBatch, setSelectedBatch] = useState<string>(initialBatch || 'ALL');
   const [selectedReelIds, setSelectedReelIds] = useState<Set<string>>(new Set());
 
-  // ── 2. TARGET SHEETS SPEC & RICH SEARCHABLE SEMI-GOOD DROPDOWN ──
+  // ── 2. TARGET SHEETS SPEC & RICH SEARCHABLE SEMI-GOOD DROPDOWN (NO DEFAULT VALUE) ──
   const [targetSkuId, setTargetSkuId] = useState<string>('');
   const [targetSkuSearch, setTargetSkuSearch] = useState<string>('');
   const [targetCategoryFilter, setTargetCategoryFilter] = useState<string>('ALL');
@@ -62,12 +67,17 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
   const [sheetWidth, setSheetWidth] = useState<string>('57');
   const [sheetLength, setSheetLength] = useState<string>('70');
   const [sheetGsm, setSheetGsm] = useState<string>('52');
-  const [sheetsPerReam, setSheetsPerReam] = useState<number>(500);
+  const [sheetsPerReamInput, setSheetsPerReamInput] = useState<string>('500');
 
-  // ── 3. MACHINE CUTTING METER (DIRECT KNIFE CUTS ONLY) ──
+  // ── 3. MACHINE CUTTING METER (DIRECT KNIFE CUTS ONLY - FREELY EDITABLE) ──
   const [cutsCountInput, setCutsCountInput] = useState<string>('');
-  const [reelsOnStand, setReelsOnStand] = useState<number>(1);
-  const [slitsCount, setSlitsCount] = useState<number>(1);
+  const [reelsOnStandInput, setReelsOnStandInput] = useState<string>('1');
+  const [slitsCountInput, setSlitsCountInput] = useState<string>('1');
+
+  // Derived numeric properties
+  const sheetsPerReam = parseFloat(sheetsPerReamInput) || 500;
+  const reelsOnStand = Math.max(1, parseFloat(reelsOnStandInput) || 1);
+  const slitsCount = Math.max(1, parseFloat(slitsCountInput) || 1);
 
   // Simultaneous Dual Units (Sheets <-> Reams)
   const [actualSheetsInput, setActualSheetsInput] = useState<string>('');
@@ -82,11 +92,14 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
   // Print Mode State
   const [isPrintMode, setIsPrintMode] = useState(false);
 
-  // Close target dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (targetDropdownRef.current && !targetDropdownRef.current.contains(e.target as Node)) {
         setShowTargetDropdown(false);
+      }
+      if (reelDropdownRef.current && !reelDropdownRef.current.contains(e.target as Node)) {
+        setShowReelDropdown(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -213,19 +226,7 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
           }
         }
 
-        // Auto-pick first semi-finished good if none selected
-        if (semiGoodSkus.length > 0 && !targetSkuId) {
-          const first = semiGoodSkus[0];
-          setTargetSkuId(first._id || '');
-          if (first.width) setSheetWidth(String(first.width));
-          if (first.length) setSheetLength(String(first.length));
-          if (first.gsm) setSheetGsm(String(first.gsm));
-          if (first.altUnitConversion) {
-            setSheetsPerReam(Number(first.altUnitConversion));
-          } else if (first.booksGbl) {
-            setSheetsPerReam(Number(first.booksGbl));
-          }
-        }
+        // No default value for target SKU (User selects deliberately)
       } catch (err) {
         console.error('Failed to init cutting slip voucher:', err);
       } finally {
@@ -244,66 +245,168 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
     if (sku.length) setSheetLength(String(sku.length));
     if (sku.gsm) setSheetGsm(String(sku.gsm));
     if (sku.altUnitConversion) {
-      setSheetsPerReam(Number(sku.altUnitConversion));
+      setSheetsPerReamInput(String(sku.altUnitConversion));
     } else if (sku.booksGbl) {
-      setSheetsPerReam(Number(sku.booksGbl));
+      setSheetsPerReamInput(String(sku.booksGbl));
     }
     setTargetSkuSearch('');
     setShowTargetDropdown(false);
   };
 
-  // ── GROUP AVAILABLE REELS BY ITEM (PAPER REEL SKU) ──
-  const uniqueReelItems = useMemo(() => {
-    const map = new Map<string, {
-      key: string;
-      skuId: string;
-      code: string;
-      name: string;
-      category?: string;
-      reelsCount: number;
-      totalWeight: number;
-      batches: string[];
-    }>();
+  // ── PAPER REEL RAW MATERIALS LIST (STRICTLY PAPER REELS) ──
+  const paperReelSkus = useMemo(() => {
+    return skus.filter(s => {
+      if (!s || s.isDeleted) return false;
+      const type = getItemClassification(s);
+      const rawType = ((s as any).itemType || '').toLowerCase();
+      const code = (s.skuCode || '').toUpperCase();
+      const cat = (s.category || '').toLowerCase();
+      const name = (s.name || '').toLowerCase();
+      const paperType = (s.paperType || '').toLowerCase();
 
+      // Check if this SKU exists in availableReels
+      const inAvailable = availableReels.some(r => r.skuId === s._id || r.skuCode === s.skuCode);
+      if (inAvailable) return true;
+
+      // Reel classification checks
+      const isReel = paperType.includes('reel') || 
+                     name.includes('reel') || 
+                     cat.includes('reel') || 
+                     code.includes('REEL');
+      
+      const isRawOrMaterial = type === 'materials' || rawType.includes('raw') || code.startsWith('RM-');
+      return isReel || (isRawOrMaterial && (s.unit || '').toLowerCase() === 'kg');
+    });
+  }, [skus, availableReels]);
+
+  // Aggregate available stock details for each paper reel SKU
+  const reelItemsWithStock = useMemo(() => {
+    const stockMap = new Map<string, { reelsCount: number; totalWeight: number; batches: string[] }>();
     availableReels.forEach(r => {
-      const key = r.skuId || r.skuCode || r.skuName || 'unknown';
-      if (!map.has(key)) {
-        map.set(key, {
-          key,
-          skuId: r.skuId,
-          code: r.skuCode || '',
-          name: r.skuName || 'Paper Reel',
-          reelsCount: 0,
-          totalWeight: 0,
-          batches: []
-        });
+      const key = r.skuId || r.skuCode || r.skuName || '';
+      if (!stockMap.has(key)) {
+        stockMap.set(key, { reelsCount: 0, totalWeight: 0, batches: [] });
       }
-      const item = map.get(key)!;
-      item.reelsCount += 1;
-      item.totalWeight += Number(r.weight) || 0;
-      if (r.purchaseBatch && !item.batches.includes(r.purchaseBatch)) {
-        item.batches.push(r.purchaseBatch);
+      const st = stockMap.get(key)!;
+      st.reelsCount += 1;
+      st.totalWeight += Number(r.weight) || 0;
+      if (r.purchaseBatch && !st.batches.includes(r.purchaseBatch)) {
+        st.batches.push(r.purchaseBatch);
       }
     });
 
-    return Array.from(map.values()).sort((a, b) => b.reelsCount - a.reelsCount);
-  }, [availableReels]);
+    const itemsList: Array<{
+      key: string;
+      skuId: string;
+      name: string;
+      code: string;
+      category: string;
+      width?: number;
+      gsm?: number;
+      reelsCount: number;
+      totalWeight: number;
+      batches: string[];
+    }> = [];
 
-  // Default selectedReelItemKey
-  useEffect(() => {
-    if (uniqueReelItems.length > 0 && (selectedReelItemKey === 'ALL' || !uniqueReelItems.some(i => i.key === selectedReelItemKey))) {
-      if (initialSkuId && uniqueReelItems.some(i => i.skuId === initialSkuId || i.key === initialSkuId)) {
-        setSelectedReelItemKey(initialSkuId);
-      } else {
-        setSelectedReelItemKey(uniqueReelItems[0].key);
+    const processedKeys = new Set<string>();
+
+    paperReelSkus.forEach(s => {
+      const k = s._id || s.skuCode || '';
+      processedKeys.add(k);
+      const st = stockMap.get(s._id || '') || stockMap.get(s.skuCode || '') || { reelsCount: 0, totalWeight: 0, batches: [] };
+      itemsList.push({
+        key: k,
+        skuId: s._id || '',
+        name: s.name,
+        code: s.skuCode || '',
+        category: s.category || 'Paper Reels',
+        width: s.width,
+        gsm: s.gsm,
+        reelsCount: st.reelsCount,
+        totalWeight: st.totalWeight,
+        batches: st.batches
+      });
+    });
+
+    // Add any reels from availableReels that weren't caught
+    availableReels.forEach(r => {
+      const k = r.skuId || r.skuCode || '';
+      if (k && !processedKeys.has(k)) {
+        processedKeys.add(k);
+        const st = stockMap.get(k) || { reelsCount: 1, totalWeight: Number(r.weight) || 0, batches: [r.purchaseBatch] };
+        itemsList.push({
+          key: k,
+          skuId: r.skuId,
+          name: r.skuName || 'Paper Reel',
+          code: r.skuCode || '',
+          category: 'Paper Reels',
+          width: r.width,
+          gsm: r.gsm,
+          reelsCount: st.reelsCount,
+          totalWeight: st.totalWeight,
+          batches: st.batches
+        });
       }
-    }
-  }, [uniqueReelItems, initialSkuId]);
+    });
 
-  // Reels for the selected item
+    return itemsList.sort((a, b) => b.reelsCount - a.reelsCount);
+  }, [paperReelSkus, availableReels]);
+
+  // Reel category breakdown for chips
+  const reelCategoryBreakdown = useMemo(() => {
+    const catMap = new Map<string, number>();
+    reelItemsWithStock.forEach(item => {
+      const cat = item.category?.trim() || 'General';
+      catMap.set(cat, (catMap.get(cat) || 0) + 1);
+    });
+    return {
+      total: reelItemsWithStock.length,
+      categories: Array.from(catMap.entries()).sort((a, b) => b[1] - a[1])
+    };
+  }, [reelItemsWithStock]);
+
+  // Filtered reel items matching search & category
+  const filteredReelItems = useMemo(() => {
+    return reelItemsWithStock.filter(item => {
+      if (reelCategoryFilter !== 'ALL') {
+        const cat = item.category?.trim() || 'General';
+        if (cat.toLowerCase() !== reelCategoryFilter.toLowerCase()) return false;
+      }
+      if (!reelItemSearch.trim()) return true;
+      const q = reelItemSearch.toLowerCase().trim();
+      const name = (item.name || '').toLowerCase();
+      const code = (item.code || '').toLowerCase();
+      const cat = (item.category || '').toLowerCase();
+      const dims = `${item.width || ''} ${item.gsm || ''}`.toLowerCase();
+      return name.includes(q) || code.includes(q) || cat.includes(q) || dims.includes(q);
+    });
+  }, [reelItemsWithStock, reelCategoryFilter, reelItemSearch]);
+
+  const selectedReelItemDoc = useMemo(() => {
+    if (!selectedReelItemKey) return null;
+    return reelItemsWithStock.find(i => i.key === selectedReelItemKey || i.skuId === selectedReelItemKey) || null;
+  }, [reelItemsWithStock, selectedReelItemKey]);
+
+  // Reel select handler
+  const handleSelectReelItem = (itemKey: string) => {
+    setSelectedReelItemKey(itemKey);
+    setSelectedBatch('ALL');
+    setSelectedReelIds(new Set());
+    setReelItemSearch('');
+    setShowReelDropdown(false);
+  };
+
+  // Set selectedReelItemKey ONLY if initialSkuId is explicitly passed in props
+  useEffect(() => {
+    if (initialSkuId && !selectedReelItemKey) {
+      setSelectedReelItemKey(initialSkuId);
+    }
+  }, [initialSkuId]);
+
+  // Reels for the selected item (empty if no item chosen)
   const reelsForSelectedItem = useMemo(() => {
-    if (selectedReelItemKey === 'ALL') return availableReels;
-    return availableReels.filter(r => (r.skuId || r.skuCode || r.skuName) === selectedReelItemKey);
+    if (!selectedReelItemKey) return [];
+    return availableReels.filter(r => (r.skuId || r.skuCode || r.skuName) === selectedReelItemKey || r.skuId === selectedReelItemKey);
   }, [availableReels, selectedReelItemKey]);
 
   // Batches for the selected item
@@ -451,29 +554,40 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
     }
   };
 
-  const handleReelsOnStandChange = (val: number) => {
-    const r = Math.max(1, val);
-    setReelsOnStand(r);
+  const handleReelsOnStandChange = (val: string) => {
+    setReelsOnStandInput(val);
+    const r = parseFloat(val);
+    const effectiveR = !isNaN(r) && r > 0 ? r : 1;
     const cuts = parseFloat(cutsCountInput);
     if (!isNaN(cuts) && cuts > 0) {
-      const perCut = r * Math.max(1, slitsCount);
+      const perCut = effectiveR * slitsCount;
       const totalGenSheets = Math.round(cuts * perCut);
       setActualSheetsInput(String(totalGenSheets));
-      const spr = sheetsPerReam || 500;
-      setActualReamsInput(String(Math.round((totalGenSheets / spr) * 100) / 100));
+      setActualReamsInput(String(Math.round((totalGenSheets / sheetsPerReam) * 100) / 100));
     }
   };
 
-  const handleSlitsCountChange = (val: number) => {
-    const s = Math.max(1, val);
-    setSlitsCount(s);
+  const handleSlitsCountChange = (val: string) => {
+    setSlitsCountInput(val);
+    const s = parseFloat(val);
+    const effectiveS = !isNaN(s) && s > 0 ? s : 1;
     const cuts = parseFloat(cutsCountInput);
     if (!isNaN(cuts) && cuts > 0) {
-      const perCut = Math.max(1, reelsOnStand) * s;
+      const perCut = reelsOnStand * effectiveS;
       const totalGenSheets = Math.round(cuts * perCut);
       setActualSheetsInput(String(totalGenSheets));
-      const spr = sheetsPerReam || 500;
-      setActualReamsInput(String(Math.round((totalGenSheets / spr) * 100) / 100));
+      setActualReamsInput(String(Math.round((totalGenSheets / sheetsPerReam) * 100) / 100));
+    }
+  };
+
+  const handleSheetsPerReamChange = (val: string) => {
+    setSheetsPerReamInput(val);
+    const spr = parseFloat(val);
+    if (!isNaN(spr) && spr > 0) {
+      const sheets = parseFloat(actualSheetsInput);
+      if (!isNaN(sheets) && sheets > 0) {
+        setActualReamsInput(String(Math.round((sheets / spr) * 100) / 100));
+      }
     }
   };
 
@@ -645,52 +759,52 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
       hideCloseButton={true}
     >
       <div className="flex flex-col h-full bg-slate-50 overflow-hidden font-sans">
-        {/* Voucher Header (Tally Manufacturing Style) */}
-        <div className="px-5 py-3 bg-slate-900 text-white flex items-center justify-between shrink-0 shadow-md border-b border-slate-800">
+        {/* Voucher Header (Clean, Light, Modern ERP Style) */}
+        <div className="px-5 py-3.5 bg-white border-b border-slate-200/90 flex items-center justify-between shrink-0 shadow-3xs">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-teal-500/20 border border-teal-500/40 flex items-center justify-center text-teal-400">
-              <Scissors className="w-4 h-4" />
+            <div className="w-9 h-9 rounded-xl bg-teal-50 border border-teal-200 text-teal-700 flex items-center justify-center shrink-0 shadow-3xs">
+              <Scissors className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-mono font-bold text-sm tracking-wide text-teal-300">
+                <span className="font-mono font-bold text-sm tracking-wide text-teal-800 bg-teal-50 px-2 py-0.5 rounded-lg border border-teal-200">
                   {slipNumber || 'CS-2026-0001'}
                 </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 font-bold border border-teal-500/30">
+                <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold border border-slate-200">
                   CUTTING SLIP VOUCHER (STOCK CONVERSION)
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400">
+              <p className="text-[11px] text-slate-500 mt-0.5">
                 Reel → Sheet Stock Journal with Live Discrepancy & Scrap Reconciliation
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-slate-800/80 px-3 py-1 rounded-xl border border-slate-700 text-xs">
-              <span className="text-slate-400">Date:</span>
+            <div className="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-xl border border-slate-200 text-xs">
+              <span className="text-slate-500 font-semibold">Date:</span>
               <input 
                 type="date" 
                 value={date} 
                 onChange={e => setDate(e.target.value)}
-                className="bg-transparent text-white font-mono text-xs focus:outline-none cursor-pointer"
+                className="bg-transparent text-slate-800 font-mono text-xs focus:outline-none cursor-pointer font-bold"
               />
             </div>
             <button
               type="button"
               onClick={() => setIsPrintMode(!isPrintMode)}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+              className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-3xs transition-all cursor-pointer"
               title="Toggle printable machine slip view"
             >
-              <Printer className="w-3.5 h-3.5 text-teal-400" />
+              <Printer className="w-3.5 h-3.5 text-teal-600" />
               <span>{isPrintMode ? 'Voucher View' : 'Print Slip'}</span>
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
+              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -808,7 +922,7 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                   Available Stock: <span className="font-bold text-slate-900">{availableReels.length} Reels</span>
                 </div>
                 <div>
-                  Paper Items: <span className="font-bold text-slate-900">{uniqueReelItems.length} SKUs</span>
+                  Paper Items: <span className="font-bold text-slate-900">{reelItemsWithStock.length} SKUs</span>
                 </div>
               </div>
             </div>
@@ -833,175 +947,309 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                   </div>
                 </div>
 
-                {/* 1. Item Selector */}
-                <div className="p-2.5 bg-slate-50/90 border-b border-slate-200/80 space-y-1">
+                {/* 1. Paper Reel Item Searchable Dropdown Popover matching Target SKU */}
+                <div className="p-2.5 bg-slate-50/90 border-b border-slate-200/80 space-y-1 relative" ref={reelDropdownRef}>
                   <div className="flex items-center justify-between text-[10px]">
                     <span className="font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                       <Package className="w-3.5 h-3.5 text-rose-600" />
                       <span>Select Reel Item:</span>
                     </span>
                     <span className="text-slate-400 font-medium">
-                      {uniqueReelItems.length} Reel {uniqueReelItems.length === 1 ? 'Item' : 'Items'} available
+                      {reelItemsWithStock.length} Reel {reelItemsWithStock.length === 1 ? 'Item' : 'Items'} available
                     </span>
                   </div>
-                  <select
-                    value={selectedReelItemKey}
-                    onChange={e => {
-                      setSelectedReelItemKey(e.target.value);
-                      setSelectedBatch('ALL');
-                    }}
-                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500 shadow-3xs cursor-pointer"
-                  >
-                    {uniqueReelItems.map(item => (
-                      <option key={item.key} value={item.key}>
-                        {item.name} {item.code ? `(${item.code})` : ''} • {item.reelsCount} Reels ({item.totalWeight.toLocaleString()} kg)
-                      </option>
-                    ))}
-                  </select>
-                </div>
 
-                {/* 2. Purchase Batch Filter Tabs */}
-                <div className="px-3 py-2 bg-white border-b border-slate-100 flex items-center justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-thin">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
-                      Purchase Batch:
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedBatch('ALL')}
-                      className={`px-2 py-0.5 rounded-lg text-[10.5px] font-bold shrink-0 transition-all cursor-pointer ${
-                        selectedBatch === 'ALL'
-                          ? 'bg-rose-600 text-white shadow-3xs'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                      }`}
-                    >
-                      All Batches ({reelsForSelectedItem.length} Reels)
-                    </button>
-                    {batchesForSelectedItem.map(b => (
-                      <button
-                        key={b.batch}
-                        type="button"
-                        onClick={() => setSelectedBatch(b.batch)}
-                        className={`px-2 py-0.5 rounded-lg text-[10.5px] font-bold shrink-0 transition-all cursor-pointer ${
-                          selectedBatch === b.batch
-                            ? 'bg-rose-600 text-white shadow-3xs'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                        }`}
-                      >
-                        {b.batch} ({b.count} Reels • ₹{b.avgRate}/kg)
-                      </button>
-                    ))}
-                  </div>
-
-                  {displayedReels.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={handleToggleAllDisplayed}
-                      className="text-[11px] text-rose-700 hover:text-rose-900 font-bold shrink-0 cursor-pointer"
-                    >
-                      {displayedReels.every(r => selectedReelIds.has(r.id)) ? 'Deselect In View' : 'Select In View'}
-                    </button>
-                  )}
-                </div>
-
-                {/* 3. Reel Cards Grouped by Purchase Batch */}
-                <div className="flex-1 overflow-y-auto p-2.5 space-y-2.5 custom-scrollbar">
-                  {displayedReels.length === 0 ? (
-                    <div className="p-8 text-center text-slate-400 text-xs">
-                      No reels found in inventory for the selected item and batch.
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={showReelDropdown ? reelItemSearch : (selectedReelItemDoc ? `${selectedReelItemDoc.name} ${selectedReelItemDoc.code ? `(${selectedReelItemDoc.code})` : ''}` : '')}
+                      onChange={e => {
+                        setReelItemSearch(e.target.value);
+                        setShowReelDropdown(true);
+                      }}
+                      onClick={() => setShowReelDropdown(true)}
+                      onFocus={() => setShowReelDropdown(true)}
+                      placeholder="Search or select paper reel SKU..."
+                      className="w-full pl-8 pr-10 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500 shadow-3xs cursor-pointer"
+                    />
+                    <div className="absolute right-2 top-2 flex items-center gap-1 text-slate-400">
+                      {selectedReelItemKey ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedReelItemKey('');
+                            setSelectedBatch('ALL');
+                            setSelectedReelIds(new Set());
+                            setReelItemSearch('');
+                          }}
+                          className="p-0.5 hover:text-slate-600 rounded cursor-pointer"
+                          title="Clear selected reel SKU"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      ) : (
+                        <ChevronDown 
+                          className="w-4 h-4 cursor-pointer hover:text-slate-600" 
+                          onClick={() => setShowReelDropdown(!showReelDropdown)} 
+                        />
+                      )}
                     </div>
-                  ) : (
-                    (selectedBatch === 'ALL' 
-                      ? batchesForSelectedItem 
-                      : [{ batch: selectedBatch, count: displayedReels.length, totalWeight: displayedReels.reduce((s, r) => s + (Number(r.weight) || 0), 0), avgRate: displayedReels[0]?.ratePerKg || 0 }]
-                    ).map(batchInfo => {
-                      const batchReels = displayedReels.filter(r => (r.purchaseBatch || 'No Batch') === batchInfo.batch);
-                      if (batchReels.length === 0) return null;
-                      const isBatchAllSelected = batchReels.every(r => selectedReelIds.has(r.id));
+                  </div>
 
-                      return (
-                        <div key={batchInfo.batch} className="rounded-xl border border-slate-200 overflow-hidden bg-white shadow-3xs">
-                          {/* Batch Header */}
-                          <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono font-bold text-xs text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200/80 shadow-3xs">
-                                {batchInfo.batch}
-                              </span>
-                              <span className="text-[10px] text-slate-500 font-medium">
-                                {batchReels.length} {batchReels.length === 1 ? 'Reel' : 'Reels'} • {batchInfo.totalWeight.toLocaleString()} kg • ₹{batchInfo.avgRate}/kg
-                              </span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedReelIds(prev => {
-                                  const next = new Set(prev);
-                                  if (isBatchAllSelected) {
-                                    batchReels.forEach(r => next.delete(r.id));
-                                  } else {
-                                    batchReels.forEach(r => next.add(r.id));
-                                  }
-                                  return next;
-                                });
-                              }}
-                              className="text-[10px] font-bold text-rose-700 hover:text-rose-900 bg-white hover:bg-rose-50 px-2 py-0.5 rounded border border-rose-200 cursor-pointer transition-colors"
-                            >
-                              {isBatchAllSelected ? 'Deselect Batch' : `Select Batch (${batchReels.length})`}
-                            </button>
-                          </div>
-
-                          {/* Individual Reels */}
-                          <div className="p-1.5 space-y-1">
-                            {batchReels.map(r => {
-                              const isSelected = selectedReelIds.has(r.id);
-                              const reelCost = Math.round((Number(r.weight) || 0) * (Number(r.ratePerKg) || 0));
-                              return (
-                                <div
-                                  key={r.id}
-                                  onClick={() => handleToggleReel(r.id)}
-                                  className={`p-2 rounded-lg border transition-all cursor-pointer flex items-center justify-between ${
-                                    isSelected
-                                      ? 'bg-rose-50/80 border-rose-300 shadow-3xs'
-                                      : 'bg-white border-slate-200/70 hover:bg-slate-50 hover:border-slate-300'
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-2.5 min-w-0">
-                                    <input
-                                      type="checkbox"
-                                      checked={isSelected}
-                                      onChange={() => {}}
-                                      className="w-4 h-4 text-rose-600 rounded cursor-pointer pointer-events-none accent-rose-600"
-                                    />
-                                    <div className="min-w-0">
-                                      <div className="flex items-center gap-2">
-                                        <span className="font-mono font-bold text-xs text-slate-900">{r.reelNumber}</span>
-                                        <span className="text-[10px] text-slate-500 font-medium truncate">
-                                          {r.locationName || 'Godown'}
-                                        </span>
-                                      </div>
-                                      <div className="text-[10px] text-slate-400 mt-0.5">
-                                        {r.width ? `${r.width} cm` : ''} {r.gsm ? `• ${r.gsm} GSM` : ''}
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  <div className="text-right shrink-0">
-                                    <div className="font-mono font-black text-xs text-slate-900">
-                                      {r.weight} <span className="text-[10px] text-slate-500 font-normal">kg</span>
-                                    </div>
-                                    <div className="text-[10px] font-mono text-slate-500">
-                                      @₹{r.ratePerKg}/kg = <span className="font-bold text-slate-800">₹{reelCost.toLocaleString('en-IN')}</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
+                  {/* Dropdown Popover matching Target SKU 1:1 */}
+                  {showReelDropdown && (
+                    <div className="absolute left-2.5 right-2.5 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl z-[999] max-h-80 overflow-y-auto divide-y divide-slate-100 p-1">
+                      {/* Category Filter Chips Header */}
+                      <div className="sticky top-0 bg-white/95 backdrop-blur-xs p-2 border-b border-slate-100 z-10 space-y-1.5 shadow-3xs">
+                        <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
+                          <span className="flex items-center gap-1">
+                            <Tag className="w-3 h-3 text-rose-600" />
+                            <span>Filter Category:</span>
+                          </span>
+                          <span>Showing {filteredReelItems.length} of {reelCategoryBreakdown.total}</span>
                         </div>
-                      );
-                    })
+                        <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-thin">
+                          <button
+                            type="button"
+                            onClick={() => setReelCategoryFilter('ALL')}
+                            className={`px-2 py-0.5 rounded-full text-[9.5px] font-bold shrink-0 transition-all cursor-pointer ${
+                              reelCategoryFilter === 'ALL'
+                                ? 'bg-rose-600 text-white shadow-3xs'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            All ({reelCategoryBreakdown.total})
+                          </button>
+                          {reelCategoryBreakdown.categories.slice(0, 10).map(([cat, count]) => (
+                            <button
+                              key={cat}
+                              type="button"
+                              onClick={() => setReelCategoryFilter(cat)}
+                              className={`px-2 py-0.5 rounded-full text-[9.5px] font-bold shrink-0 transition-all cursor-pointer ${
+                                reelCategoryFilter === cat
+                                  ? 'bg-rose-600 text-white shadow-3xs'
+                                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                              }`}
+                            >
+                              {cat} ({count})
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* List of Paper Reel SKUs */}
+                      {filteredReelItems.length === 0 ? (
+                        <div className="p-4 text-center text-xs text-slate-400 italic">
+                          No paper reel SKUs found matching search.
+                        </div>
+                      ) : (
+                        filteredReelItems.map(item => {
+                          const isSelected = item.key === selectedReelItemKey;
+                          return (
+                            <div
+                              key={item.key}
+                              onClick={() => handleSelectReelItem(item.key)}
+                              className={`p-2.5 cursor-pointer rounded-lg transition-colors flex items-center justify-between text-xs ${
+                                isSelected ? 'bg-rose-50/90 font-bold border border-rose-200' : 'hover:bg-rose-50/50'
+                              }`}
+                            >
+                              <div className="flex-1 min-w-0 pr-3">
+                                <div className="font-bold text-slate-900 break-words leading-snug text-xs sm:text-[13px]">
+                                  {item.name}
+                                </div>
+                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                  <span className="text-[10px] text-slate-400 font-mono">{item.code}</span>
+                                  <span className="text-[10px] text-slate-300">•</span>
+                                  <span className="text-[10px] font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200/60">
+                                    {item.category || 'Paper Reels'}
+                                  </span>
+                                  {(item.width || item.gsm) && (
+                                    <>
+                                      <span className="text-[10px] text-slate-300">•</span>
+                                      <span className="text-[10px] font-semibold text-rose-700">
+                                        {item.width ? `${item.width} CM` : ''} {item.gsm ? `${item.gsm} GSM` : ''}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span className={`px-2 py-0.5 text-[9.5px] font-black rounded-full border ${
+                                  item.reelsCount > 0 
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                                    : 'bg-slate-100 text-slate-400 border-slate-200'
+                                }`}>
+                                  {item.reelsCount} {item.reelsCount === 1 ? 'Reel' : 'Reels'} ({item.totalWeight.toLocaleString()} kg)
+                                </span>
+                                <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded-full border bg-rose-50 text-rose-700 border-rose-200">
+                                  Raw Reel
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
                   )}
                 </div>
+
+                {!selectedReelItemKey ? (
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50/50 rounded-xl border border-dashed border-slate-200 m-3">
+                    <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-3 shadow-3xs">
+                      <Package className="w-6 h-6 stroke-[1.8]" />
+                    </div>
+                    <h5 className="text-xs font-bold text-slate-800 uppercase tracking-wider">No Paper Reel Selected</h5>
+                    <p className="text-[11px] text-slate-500 max-w-xs mt-1">
+                      Search and select a paper reel above to browse its available purchase batches and individual reels.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {/* 2. Purchase Batch Filter Tabs */}
+                    <div className="px-3 py-2 bg-white border-b border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-thin">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
+                          Purchase Batch:
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedBatch('ALL')}
+                          className={`px-2 py-0.5 rounded-lg text-[10.5px] font-bold shrink-0 transition-all cursor-pointer ${
+                            selectedBatch === 'ALL'
+                              ? 'bg-rose-600 text-white shadow-3xs'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          All Batches ({reelsForSelectedItem.length} Reels)
+                        </button>
+                        {batchesForSelectedItem.map(b => (
+                          <button
+                            key={b.batch}
+                            type="button"
+                            onClick={() => setSelectedBatch(b.batch)}
+                            className={`px-2 py-0.5 rounded-lg text-[10.5px] font-bold shrink-0 transition-all cursor-pointer ${
+                              selectedBatch === b.batch
+                                ? 'bg-rose-600 text-white shadow-3xs'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            {b.batch} ({b.count} Reels • ₹{b.avgRate}/kg)
+                          </button>
+                        ))}
+                      </div>
+
+                      {displayedReels.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleToggleAllDisplayed}
+                          className="text-[11px] text-rose-700 hover:text-rose-900 font-bold shrink-0 cursor-pointer"
+                        >
+                          {displayedReels.every(r => selectedReelIds.has(r.id)) ? 'Deselect In View' : 'Select In View'}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* 3. Reel Cards Grouped by Purchase Batch */}
+                    <div className="flex-1 overflow-y-auto p-2.5 space-y-2.5 custom-scrollbar">
+                      {displayedReels.length === 0 ? (
+                        <div className="p-8 text-center text-slate-400 text-xs">
+                          No reels found in inventory for the selected item and batch.
+                        </div>
+                      ) : (
+                        (selectedBatch === 'ALL' 
+                          ? batchesForSelectedItem 
+                          : [{ batch: selectedBatch, count: displayedReels.length, totalWeight: displayedReels.reduce((s, r) => s + (Number(r.weight) || 0), 0), avgRate: displayedReels[0]?.ratePerKg || 0 }]
+                        ).map(batchInfo => {
+                          const batchReels = displayedReels.filter(r => (r.purchaseBatch || 'No Batch') === batchInfo.batch);
+                          if (batchReels.length === 0) return null;
+                          const isBatchAllSelected = batchReels.every(r => selectedReelIds.has(r.id));
+
+                          return (
+                            <div key={batchInfo.batch} className="rounded-xl border border-slate-200 overflow-hidden bg-white shadow-3xs">
+                              {/* Batch Header */}
+                              <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono font-bold text-xs text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200/80 shadow-3xs">
+                                    {batchInfo.batch}
+                                  </span>
+                                  <span className="text-[10px] text-slate-500 font-medium">
+                                    {batchReels.length} {batchReels.length === 1 ? 'Reel' : 'Reels'} • {batchInfo.totalWeight.toLocaleString()} kg • ₹{batchInfo.avgRate}/kg
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedReelIds(prev => {
+                                      const next = new Set(prev);
+                                      if (isBatchAllSelected) {
+                                        batchReels.forEach(r => next.delete(r.id));
+                                      } else {
+                                        batchReels.forEach(r => next.add(r.id));
+                                      }
+                                      return next;
+                                    });
+                                  }}
+                                  className="text-[10px] font-bold text-rose-700 hover:text-rose-900 bg-white hover:bg-rose-50 px-2 py-0.5 rounded border border-rose-200 cursor-pointer transition-colors"
+                                >
+                                  {isBatchAllSelected ? 'Deselect Batch' : `Select Batch (${batchReels.length})`}
+                                </button>
+                              </div>
+
+                              {/* Individual Reels */}
+                              <div className="p-1.5 space-y-1">
+                                {batchReels.map(r => {
+                                  const isSelected = selectedReelIds.has(r.id);
+                                  const reelCost = Math.round((Number(r.weight) || 0) * (Number(r.ratePerKg) || 0));
+                                  return (
+                                    <div
+                                      key={r.id}
+                                      onClick={() => handleToggleReel(r.id)}
+                                      className={`p-2 rounded-lg border transition-all cursor-pointer flex items-center justify-between ${
+                                        isSelected
+                                          ? 'bg-rose-50/80 border-rose-300 shadow-3xs'
+                                          : 'bg-white border-slate-200/70 hover:bg-slate-50 hover:border-slate-300'
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-2.5 min-w-0">
+                                        <input
+                                          type="checkbox"
+                                          checked={isSelected}
+                                          onChange={() => {}}
+                                          className="w-4 h-4 text-rose-600 rounded cursor-pointer pointer-events-none accent-rose-600"
+                                        />
+                                        <div className="min-w-0">
+                                          <div className="flex items-center gap-2">
+                                            <span className="font-mono font-bold text-xs text-slate-900">{r.reelNumber}</span>
+                                            <span className="text-[10px] text-slate-500 font-medium truncate">
+                                              {r.locationName || 'Godown'}
+                                            </span>
+                                          </div>
+                                          <div className="text-[10px] text-slate-400 mt-0.5">
+                                            {r.width ? `${r.width} cm` : ''} {r.gsm ? `• ${r.gsm} GSM` : ''}
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <div className="text-right shrink-0">
+                                        <div className="font-mono font-black text-xs text-slate-900">
+                                          {r.weight} <span className="text-[10px] text-slate-500 font-normal">kg</span>
+                                        </div>
+                                        <div className="text-[10px] font-mono text-slate-500">
+                                          @₹{r.ratePerKg}/kg = <span className="font-bold text-slate-800">₹{reelCost.toLocaleString('en-IN')}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </>
+                )}
 
                 {/* Left Footer Summary */}
                 <div className="p-3 bg-slate-50 border-t border-slate-200 shrink-0 flex items-center justify-between text-xs">
@@ -1208,9 +1456,9 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                       <label className="text-[9.5px] font-bold text-slate-500 uppercase block mb-0.5">Sheets / Ream</label>
                       <input
                         type="number"
-                        value={sheetsPerReam}
-                        onChange={e => setSheetsPerReam(Number(e.target.value) || 500)}
-                        className="w-full px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold font-mono text-slate-900"
+                        value={sheetsPerReamInput}
+                        onChange={e => handleSheetsPerReamChange(e.target.value)}
+                        className="w-full px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                       />
                     </div>
                   </div>
@@ -1258,8 +1506,8 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                         <input
                           type="number"
                           min="1"
-                          value={reelsOnStand}
-                          onChange={e => handleReelsOnStandChange(parseInt(e.target.value) || 1)}
+                          value={reelsOnStandInput}
+                          onChange={e => handleReelsOnStandChange(e.target.value)}
                           className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold font-mono text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                         />
                       </div>
@@ -1271,8 +1519,8 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                         <input
                           type="number"
                           min="1"
-                          value={slitsCount}
-                          onChange={e => handleSlitsCountChange(parseInt(e.target.value) || 1)}
+                          value={slitsCountInput}
+                          onChange={e => handleSlitsCountChange(e.target.value)}
                           className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold font-mono text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                         />
                       </div>
