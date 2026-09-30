@@ -593,7 +593,7 @@ export const ProductionModule: React.FC = () => {
               type: b.type || 'Raw',
               qtyPerBatch: rawQty,
               totalRequired: req,
-              uom: b.uom || b.unit || 'PCS',
+              uom: (b.uom === 'GBL' && (b.auom === 'PCS' || b.altUnit === 'PCS')) ? 'PCS' : (b.uom || b.unit || 'PCS'),
               availableStock: Number(b.availableStock) || 0,
               stockStatus: (Number(b.availableStock) || 0) >= req ? 'Ready' : 'Shortage',
               rate: Number(b.rate) || 0,

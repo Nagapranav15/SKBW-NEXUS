@@ -12,6 +12,18 @@ export interface SkuUomLike {
   altUnit?: string;
   altUnitConversion?: number | string;
   altUnitDirection?: UomDirection;
+  booksGbl?: number | string;
+  pcsPerGbl?: number | string;
+  conv?: number | string;
+}
+
+/**
+ * Resolves the conversion factor from sku.altUnitConversion or alternate aliases (booksGbl, pcsPerGbl, conv).
+ */
+export function getSkuConversionFactor(sku?: SkuUomLike | null): number {
+  if (!sku) return 1;
+  const factor = sku.altUnitConversion ?? sku.booksGbl ?? sku.pcsPerGbl ?? sku.conv;
+  return parseConversionFactor(factor);
 }
 
 /**
@@ -194,8 +206,8 @@ export function parseConversionFactor(rawFactor?: number | string): number {
  *   1 GBL = 200 PCS -> 200 PCS / 200 = 1 GBL; 100 PCS / 200 = 0.5 GBL
  */
 export function convertPrimaryToAlt(primaryQty: number, sku?: SkuUomLike | null): number {
-  if (!sku || !sku.altUnit || !sku.altUnitConversion) return primaryQty;
-  const factor = parseConversionFactor(sku.altUnitConversion);
+  const factor = getSkuConversionFactor(sku);
+  if (!sku || !sku.altUnit || factor <= 0) return primaryQty;
   const direction = getUomDirection(sku.unit, sku.altUnit, sku.altUnitDirection);
 
   let result: number;
@@ -219,8 +231,8 @@ export function convertPrimaryToAlt(primaryQty: number, sku?: SkuUomLike | null)
  *   1 GBL = 200 PCS -> 1 GBL * 200 = 200 PCS; 2 GBL * 200 = 400 PCS
  */
 export function convertAltToPrimary(altQty: number, sku?: SkuUomLike | null): number {
-  if (!sku || !sku.altUnit || !sku.altUnitConversion) return altQty;
-  const factor = parseConversionFactor(sku.altUnitConversion);
+  const factor = getSkuConversionFactor(sku);
+  if (!sku || !sku.altUnit || factor <= 0) return altQty;
   const direction = getUomDirection(sku.unit, sku.altUnit, sku.altUnitDirection);
 
   let result: number;
@@ -243,7 +255,8 @@ export function convertUom(
   toUnit: string,
   sku?: SkuUomLike | null
 ): number {
-  if (!sku || !sku.altUnit || !sku.altUnitConversion) return qty;
+  const factor = getSkuConversionFactor(sku);
+  if (!sku || !sku.altUnit || factor <= 0) return qty;
   const normFrom = normalizeUnit(fromUnit);
   const normTo = normalizeUnit(toUnit);
   const normPrimary = normalizeUnit(sku.unit);
@@ -269,6 +282,35 @@ export function convertUom(
 }
 
 /**
+ * Converts a unit rate from a primary/base stocking unit to a target UOM (or vice versa).
+ * 
+ * Rate conversion is the reciprocal of quantity conversion:
+ * If 1 GBL = 400 PCS:
+ *   Quantity: 1 GBL -> 400 PCS (Qty in PCS = Qty in GBL * 400)
+ *   Rate: Rs 166.40 / GBL -> Rs 0.416 / PCS (Rate in PCS = Rate in GBL / 400)
+ * 
+ * Formula:
+ *   Rate per targetUnit = baseRate * (baseUnits per targetUnit)
+ */
+export function convertRateToUom(
+  baseRate: number,
+  baseUnit: string,
+  targetUnit: string,
+  sku?: SkuUomLike | null
+): number {
+  if (!baseRate || isNaN(baseRate) || !sku) return baseRate || 0;
+  const normBase = normalizeUnit(baseUnit);
+  const normTarget = normalizeUnit(targetUnit);
+  if (!normBase || !normTarget || normBase === normTarget) return baseRate;
+
+  // 1 targetUnit = how many baseUnits?
+  // E.g., targetUnit = PCS, baseUnit = GBL -> 1 PCS = 1/400 GBL = 0.0025 GBL.
+  // Rate in targetUnit = baseRate * 0.0025 = 166.40 * 0.0025 = 0.416.
+  const baseUnitsPerTargetUnit = convertUom(1, targetUnit, baseUnit, sku);
+  return roundUomQty(baseRate * baseUnitsPerTargetUnit, 6);
+}
+
+/**
  * Formats the business relationship formula for display in UI tables, cards, and drawers.
  * 
  * Examples:
@@ -276,11 +318,11 @@ export function convertUom(
  * - Primary = PCS, Alt = GBL, Factor = 200 -> "1 GBL = 200 PCS"
  */
 export function formatUomFormula(sku?: SkuUomLike | null): string {
-  if (!sku || !sku.altUnit || !sku.altUnitConversion) {
+  const factor = getSkuConversionFactor(sku);
+  if (!sku || !sku.altUnit || factor <= 0) {
     return '-';
   }
 
-  const factor = parseConversionFactor(sku.altUnitConversion);
   const direction = getUomDirection(sku.unit, sku.altUnit, sku.altUnitDirection);
 
   const primary = sku.unit || 'Unit';
@@ -298,11 +340,11 @@ export function formatUomFormula(sku?: SkuUomLike | null): string {
  * Example: "1 GBL = 200 PCS (1 PCS = 0.005 GBL)"
  */
 export function formatUomConversionSummary(sku?: SkuUomLike | null): string {
-  if (!sku || !sku.altUnit || !sku.altUnitConversion) {
+  const factor = getSkuConversionFactor(sku);
+  if (!sku || !sku.altUnit || factor <= 0) {
     return '';
   }
 
-  const factor = parseConversionFactor(sku.altUnitConversion);
   const formula = formatUomFormula(sku);
   const inverse = roundUomQty(1 / factor);
 

@@ -245,10 +245,16 @@ exports.createSku = async (req, res, next) => {
         : standardSheets);
     const pagesVal = rawPages !== undefined && rawPages !== null && rawPages !== '' && !isNaN(Number(rawPages)) ? Number(rawPages) : undefined;
 
+    const resolvedItemType = req.body.itemType || 
+      (skuCode.toUpperCase().startsWith('FG') ? 'products' : 
+       skuCode.toUpperCase().startsWith('RM') ? 'materials' : 
+       (skuCode.toUpperCase().startsWith('SM') || skuCode.toUpperCase().startsWith('SF')) ? 'semi' : 'products');
+
     const newSku = new SkuV2({
       skuCode,
       name,
       category,
+      itemType: resolvedItemType,
       unit,
       altUnit,
       altUnitConversion: altUnitConversion ? Number(altUnitConversion) : undefined,
@@ -439,6 +445,14 @@ exports.updateSku = async (req, res, next) => {
 
     if (req.body.name !== undefined && req.body.name !== null) sku.name = req.body.name;
     if (req.body.category !== undefined && req.body.category !== null) sku.category = req.body.category;
+    if (req.body.itemType !== undefined && req.body.itemType !== null) {
+      sku.itemType = req.body.itemType;
+    } else if (sku.skuCode) {
+      const cUp = sku.skuCode.toUpperCase();
+      if (cUp.startsWith('FG')) sku.itemType = 'products';
+      else if (cUp.startsWith('RM')) sku.itemType = 'materials';
+      else if (cUp.startsWith('SM') || cUp.startsWith('SF')) sku.itemType = 'semi';
+    }
     if (req.body.unit !== undefined && req.body.unit !== null) sku.unit = req.body.unit;
     if (req.body.altUnit !== undefined) sku.altUnit = req.body.altUnit || "";
     if (req.body.altUnitConversion !== undefined) sku.altUnitConversion = req.body.altUnitConversion ? Number(req.body.altUnitConversion) : undefined;

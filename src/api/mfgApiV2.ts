@@ -445,6 +445,10 @@ export interface MaterialRateInfo {
   lastProductionRate?: number;
   /** Production cost calculated from finished/semi-finished goods production orders */
   productionRate?: number;
+  unit?: string;
+  altUnit?: string;
+  altUnitConversion?: number | string;
+  altUnitDirection?: string;
 }
 
 export const getProductionMaterialRates = async (

@@ -16,9 +16,8 @@ import { copyBom, useCopiedBom } from '../../utils/bomClipboard';
 import { ProfitPricingState } from '../../utils/costingUtils';
 import { CuttingSlipModal } from './CuttingSlipModal';
 import Modal from '../ui/Modal';
-import { showToast } from '../ui/Toast';
-
-
+import { convertRateToUom, convertUom } from '../../utils/uomConversion';
+import { getItemClassification } from '../../utils/skuClassification';
 interface NewProductionOrderWizardProps {
   onCancel: () => void;
   onCreated: (order: ProductionOrder) => void;
@@ -564,60 +563,6 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     }
   }, [highlightedScrapPresetIdx, showQuickScrapPresetMenu]);
 
-  // Item Classification: Raw Materials vs Semi-Finished Goods vs Finished Goods
-  const getItemClassification = (sku: SkuV2): 'products' | 'materials' | 'semi' => {
-    const cat = (sku.category || '').toLowerCase().trim();
-    const code = (sku.skuCode || '').toUpperCase().trim();
-    const name = (sku.name || '').toLowerCase().trim();
-
-    // 1. Semi Finished Goods (Semi Goods)
-    if (
-      code.startsWith('SFG-') || 
-      code.startsWith('SFG') || 
-      code.startsWith('SM-') || 
-      code.startsWith('SM') || 
-      code.startsWith('SEM') ||
-      cat.includes('semi') || 
-      cat.includes('wip') || 
-      cat.includes('sub-assembly') || 
-      cat.includes('sub') || 
-      cat.includes('ruled cut') || 
-      cat.includes('sheet') || 
-      cat.includes('sheets') || 
-      cat.includes('ruling') || 
-      cat.includes('rulling') || 
-      cat.includes('title') || 
-      cat.includes('index') || 
-      name.includes('signature') || 
-      name.includes('ruled') || 
-      name.includes('book block')
-    ) {
-      return 'semi';
-    }
-
-    // 2. Raw Materials
-    if (
-      cat.includes('raw') || 
-      cat.includes('material') || 
-      cat === 'raw material' || 
-      cat.includes('reel') || 
-      cat.includes('board') || 
-      cat.includes('paper') || 
-      code.startsWith('RM-') || 
-      code.startsWith('RM') || 
-      name.includes('reel') || 
-      name.includes('gsm') || 
-      name.includes('wire') || 
-      name.includes('adhesive') || 
-      name.includes('glue')
-    ) {
-      return 'materials';
-    }
-
-    // 3. Finished Goods
-    return 'products';
-  };
-
   // Finished Goods and Semi-Finished Goods that can be manufactured
   const manufacturableSkus = useMemo(() => {
     return backendSkus.filter(s => {
@@ -971,7 +916,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           : rawQty;
         const rate = Number(raw.rate) || 0;
 
-        // Resolve matching SKU to get skuId
+        // Resolve matching SKU to get skuId and stocking unit info
         const matchedSku = backendSkus.find(s => 
           (raw.skuId && s._id === raw.skuId) ||
           (raw.skuCode && s.skuCode?.toLowerCase().trim() === raw.skuCode.toLowerCase().trim()) ||
@@ -979,12 +924,18 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           (raw.name && s.name?.toLowerCase().trim() === raw.name.toLowerCase().trim())
         );
 
+        // Determine UOM: preserve selected UOM; if corrupted to GBL when auom/altUnit is PCS, resolve as PCS
+        let resolvedUom = raw.uom || raw.unit || 'PCS';
+        if ((resolvedUom === 'GBL' || !resolvedUom) && (raw.auom === 'PCS' || raw.altUnit === 'PCS')) {
+          resolvedUom = 'PCS';
+        }
+
         return {
           id: `mat-${idx + 1}-${Date.now()}`,
           skuId: matchedSku?._id || raw.skuId,
           component: raw.name || raw.itemName || `Component ${idx + 1}`,
           code: raw.skuCode || raw.code || `RM-${String(idx + 1).padStart(3, '0')}`,
-          uom: raw.uom || raw.unit || 'PCS',
+          uom: resolvedUom,
           requiredQty,
           recipeQty: rawQty,
           sourceLocation: 'SKBW - Ground Floor',
@@ -1063,23 +1014,43 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         const rateInfo = sId ? ratesMap[sId] : null;
         if (!rateInfo) return m;
 
-        const prodRate = Number(rateInfo.productionRate) || 0;
-        const lastProdRate = Number(rateInfo.lastProductionRate) || 0;
+        const matchedSku = backendSkus.find(s => 
+          (sId && String(s._id) === String(sId)) ||
+          (m.code && s.skuCode?.toLowerCase().trim() === m.code.toLowerCase().trim()) ||
+          (m.component && s.name?.toLowerCase().trim() === m.component.toLowerCase().trim())
+        );
+
+        const skuStockingUnit = rateInfo.unit || matchedSku?.unit || 'GBL';
+        const currentUom = m.uom || 'PCS';
+
+        // Backend returns rates in skuStockingUnit (e.g. ₹166.40 / GBL)
+        const rawProdRate = Number(rateInfo.productionRate) || 0;
+        const rawLastProdRate = Number(rateInfo.lastProductionRate) || 0;
+        const rawAvgRate = Number(rateInfo.avgRate) || 0;
+        const rawFifoRate = Number(rateInfo.fifoRate) || 0;
+        const rawStandardRate = Number(rateInfo.standardRate) || 0;
+
+        // Convert rates to currentUom (e.g. ₹0.416 / PCS if 1 GBL = 400 PCS)
+        const convertedAvgRate = rawAvgRate > 0 ? convertRateToUom(rawAvgRate, skuStockingUnit, currentUom, matchedSku) : 0;
+        const convertedFifoRate = rawFifoRate > 0 ? convertRateToUom(rawFifoRate, skuStockingUnit, currentUom, matchedSku) : 0;
+        const convertedProdRate = rawProdRate > 0 ? convertRateToUom(rawProdRate, skuStockingUnit, currentUom, matchedSku) : 0;
+        const convertedLastProdRate = rawLastProdRate > 0 ? convertRateToUom(rawLastProdRate, skuStockingUnit, currentUom, matchedSku) : 0;
+        const convertedStandardRate = rawStandardRate > 0 ? convertRateToUom(rawStandardRate, skuStockingUnit, currentUom, matchedSku) : 0;
 
         const mode = modeToApply || m.rateMode || globalRateMode;
         let finalRate = m.rate;
         if (mode === 'avg_purchase') {
-          finalRate = rateInfo.avgRate > 0
-            ? rateInfo.avgRate
-            : (prodRate > 0 ? prodRate : (lastProdRate > 0 ? lastProdRate : (m.rate > 0 ? m.rate : rateInfo.standardRate)));
+          finalRate = convertedAvgRate > 0
+            ? convertedAvgRate
+            : (convertedProdRate > 0 ? convertedProdRate : (convertedLastProdRate > 0 ? convertedLastProdRate : (m.rate > 0 ? m.rate : convertedStandardRate)));
         } else if (mode === 'fifo') {
-          finalRate = rateInfo.fifoRate > 0
-            ? rateInfo.fifoRate
-            : (prodRate > 0 ? prodRate : (lastProdRate > 0 ? lastProdRate : (m.rate > 0 ? m.rate : rateInfo.standardRate)));
+          finalRate = convertedFifoRate > 0
+            ? convertedFifoRate
+            : (convertedProdRate > 0 ? convertedProdRate : (convertedLastProdRate > 0 ? convertedLastProdRate : (m.rate > 0 ? m.rate : convertedStandardRate)));
         } else if (mode === 'custom') {
           finalRate = m.rate > 0
             ? m.rate
-            : (prodRate > 0 ? prodRate : (lastProdRate > 0 ? lastProdRate : (rateInfo.avgRate || rateInfo.standardRate || 0)));
+            : (convertedProdRate > 0 ? convertedProdRate : (convertedLastProdRate > 0 ? convertedLastProdRate : (convertedAvgRate || convertedStandardRate || 0)));
         }
 
         return {
@@ -1087,10 +1058,10 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           skuId: sId || m.skuId,
           rateMode: mode,
           rate: finalRate,
-          computedAvgRate: rateInfo.avgRate,
-          computedFifoRate: rateInfo.fifoRate,
-          lastProductionRate: lastProdRate,
-          productionRate: prodRate,
+          computedAvgRate: convertedAvgRate,
+          computedFifoRate: convertedFifoRate,
+          lastProductionRate: convertedLastProdRate,
+          productionRate: convertedProdRate,
           fifoBatchInfo: rateInfo.fifoBatchInfo,
           batchCount: rateInfo.batchCount,
           amount: Math.round(m.requiredQty * finalRate * 100) / 100
@@ -1101,6 +1072,41 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     } finally {
       setLoadingMaterialRates(false);
     }
+  };
+
+  // Handle toggling/changing UOM for a material line (e.g. PCS <-> GBL)
+  const handleMaterialUomChange = (rowId: string, newUom: string) => {
+    setMaterials(prev => prev.map(m => {
+      if (m.id !== rowId) return m;
+      const oldUom = m.uom || 'PCS';
+      if (oldUom.toLowerCase() === newUom.toLowerCase()) return m;
+
+      const matched = backendSkus.find(s => 
+        (m.skuId && s._id === m.skuId) ||
+        (m.code && s.skuCode?.toLowerCase().trim() === m.code.toLowerCase().trim()) ||
+        (m.component && s.name?.toLowerCase().trim() === m.component.toLowerCase().trim())
+      );
+
+      const newRequiredQty = convertUom(m.requiredQty, oldUom, newUom, matched);
+      const newRate = convertRateToUom(m.rate, oldUom, newUom, matched);
+      const newAmount = Math.round(newRequiredQty * newRate * 100) / 100;
+      const newAvgRate = m.computedAvgRate ? convertRateToUom(m.computedAvgRate, oldUom, newUom, matched) : undefined;
+      const newFifoRate = m.computedFifoRate ? convertRateToUom(m.computedFifoRate, oldUom, newUom, matched) : undefined;
+      const newProdRate = m.productionRate ? convertRateToUom(m.productionRate, oldUom, newUom, matched) : undefined;
+      const newLastProdRate = m.lastProductionRate ? convertRateToUom(m.lastProductionRate, oldUom, newUom, matched) : undefined;
+
+      return {
+        ...m,
+        uom: newUom,
+        requiredQty: newRequiredQty,
+        rate: newRate,
+        amount: newAmount,
+        computedAvgRate: newAvgRate,
+        computedFifoRate: newFifoRate,
+        productionRate: newProdRate,
+        lastProductionRate: newLastProdRate
+      };
+    }));
   };
 
   // Switch all materials to a specific Rate Mode
@@ -2036,8 +2042,12 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                 <div className="space-y-1">
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-bold text-gray-900 text-xs leading-snug break-words line-clamp-2" title={productName}>{productName}</span>
-                    <span className="px-2 py-0.5 text-[9.5px] font-extrabold uppercase rounded-full border bg-purple-50 text-purple-700 border-purple-200 shrink-0">
-                      Finished Good
+                    <span className={`px-2 py-0.5 text-[9.5px] font-extrabold uppercase rounded-full border shrink-0 ${
+                      getItemClassification(currentSku) === 'semi'
+                        ? 'bg-purple-50 text-purple-700 border-purple-200'
+                        : 'bg-blue-50 text-blue-700 border-blue-200'
+                    }`}>
+                      {getItemClassification(currentSku) === 'semi' ? 'Semi Finished' : 'Finished Good'}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 pt-0.5 text-[10.5px]">
@@ -2458,10 +2468,46 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                         </td>
 
                         {/* UOM */}
-                        <td className="py-1.5 px-2 text-center">
-                          <span className="font-bold text-[10px] text-gray-700 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-200/60 inline-block w-full text-center">
-                            {row.uom || 'PCS'}
-                          </span>
+                        <td className="py-1.5 px-2 text-center min-w-[75px]">
+                          {(() => {
+                            const matched = backendSkus.find(s => 
+                              (row.skuId && s._id === row.skuId) ||
+                              (row.code && s.skuCode?.toLowerCase().trim() === row.code.toLowerCase().trim()) ||
+                              (row.component && s.name?.toLowerCase().trim() === row.component.toLowerCase().trim())
+                            );
+                            const primaryUom = matched?.unit || row.uom || 'PCS';
+                            const altUom = matched?.altUnit || '';
+                            const hasAlt = !!(altUom && altUom.trim() && altUom.trim().toLowerCase() !== primaryUom.trim().toLowerCase());
+
+                            if (hasAlt) {
+                              const opts = [
+                                { val: primaryUom, label: `${primaryUom}` },
+                                { val: altUom.trim(), label: `${altUom.trim()}` }
+                              ];
+                              const currentVal = opts.some(o => o.val.toLowerCase() === (row.uom || '').toLowerCase())
+                                ? opts.find(o => o.val.toLowerCase() === (row.uom || '').toLowerCase())!.val
+                                : (row.uom || primaryUom);
+
+                              return (
+                                <select
+                                  value={currentVal}
+                                  onChange={(e) => handleMaterialUomChange(row.id, e.target.value)}
+                                  className="w-full h-7 border border-gray-200 rounded-md text-[10.5px] font-bold text-gray-800 bg-white text-center cursor-pointer focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                                  title="Unit of Measurement (UOM / AUOM)"
+                                >
+                                  {opts.map(o => (
+                                    <option key={o.val} value={o.val}>{o.label}</option>
+                                  ))}
+                                </select>
+                              );
+                            }
+
+                            return (
+                              <span className="font-bold text-[10px] text-gray-700 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-200/60 inline-block w-full text-center">
+                                {row.uom || 'PCS'}
+                              </span>
+                            );
+                          })()}
                         </td>
 
                         {/* Required Qty */}

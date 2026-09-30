@@ -523,12 +523,15 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
     if (editSku) {
       const catLower = (editSku.category || '').toLowerCase().trim();
       const codeUpper = (editSku.skuCode || '').toUpperCase().trim();
+      if (codeUpper.startsWith('FG')) return 'products';
+      if (codeUpper.startsWith('RM')) return 'materials';
+      if (codeUpper.startsWith('SM') || codeUpper.startsWith('SF') || codeUpper.startsWith('SEM')) return 'semi';
       const matched = (allCategories || []).find(c => c && c.name?.toLowerCase().trim() === catLower);
       if (matched?.type) return matched.type;
-      if (catLower.includes('semi') || catLower.includes('wip') || codeUpper.startsWith('SM') || codeUpper.startsWith('SF') || codeUpper.startsWith('SEM')) {
+      if (catLower.includes('semi') || catLower.includes('wip')) {
         return 'semi';
       }
-      if (catLower.includes('raw') || catLower.includes('material') || catLower.includes('reel') || codeUpper.startsWith('RM')) {
+      if (catLower.includes('raw') || catLower.includes('material') || catLower.includes('reel')) {
         return 'materials';
       }
       return 'products';
@@ -1244,7 +1247,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
             skuCode: b.skuCode || matchedSku?.skuCode,
             name: currentName,
             qty: String(b.qty ?? b.quantity ?? ''),
-            uom: matchedSku?.unit || b.uom || b.unit || 'Kg',
+            uom: b.uom || b.unit || matchedSku?.unit || 'Kg',
             auom: b.auom || b.altUnit || matchedSku?.altUnit || '',
             altUnit: b.auom || b.altUnit || matchedSku?.altUnit || '',
             inStock: Number((matchedSku as any)?.openingStock ?? b.inStock ?? 0),
@@ -1528,6 +1531,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           skuCode: form.skuCode.trim(),
           name: form.name.trim(),
           category: form.category,
+          itemType: resolvedSection || 'products',
           paperType: form.paperType,
           unit: form.unit,
           altUnit: form.altUnit || '',

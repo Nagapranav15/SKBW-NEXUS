@@ -182,13 +182,29 @@ const syncProductionOrderLedger = async (order) => {
           const h = await getHierarchy(matLocId, companyObjId);
           const transactionNumber = await Sequence.getNextSequence("IL");
 
+          // Convert consumedQty from m.uom to matSku.unit for ledger consistency:
+          // e.g. if m.uom is PCS and matSku.unit is GBL, 23 PCS = 23 / 400 = 0.0575 GBL.
+          let ledgerQty = consumedQty;
+          const mUomNorm = (m.uom || '').trim().toLowerCase();
+          const skuUnitNorm = (matSku.unit || '').trim().toLowerCase();
+          const skuAltUnitNorm = (matSku.altUnit || '').trim().toLowerCase();
+          const convFactor = Number(matSku.altUnitConversion || matSku.conv || matSku.booksGbl || matSku.pcsPerGbl || 1);
+
+          if (mUomNorm && skuUnitNorm && mUomNorm !== skuUnitNorm && convFactor > 0) {
+            if (mUomNorm === skuAltUnitNorm || mUomNorm === 'pcs' || mUomNorm === 'pieces' || mUomNorm === 'pc') {
+              ledgerQty = Math.round((consumedQty / convFactor) * 1000000) / 1000000;
+            } else if (skuUnitNorm === 'pcs' || skuUnitNorm === 'pieces' || skuUnitNorm === 'pc') {
+              ledgerQty = Math.round((consumedQty * convFactor) * 1000000) / 1000000;
+            }
+          }
+
           if (h.locationId) {
             ledgerDocs.push({
               transactionNumber,
               transactionType: "Production Consumption",
               skuId: matSku._id,
-              quantity: consumedQty,
-              unit: m.uom || matSku.unit || "Pcs",
+              quantity: ledgerQty,
+              unit: matSku.unit || m.uom || "Pcs",
               direction: "OUT",
               referenceType: "ProductionOrder",
               referenceId: order.orderNumber,
@@ -197,7 +213,7 @@ const syncProductionOrderLedger = async (order) => {
               floorId: h.floorId,
               zoneId: h.zoneId,
               locationId: h.locationId,
-              remarks: `Consumed for Production Order ${order.orderNumber} (${order.itemName})`,
+              remarks: `Consumed for Production Order ${order.orderNumber} (${order.itemName}) [${consumedQty} ${m.uom || 'Pcs'}]`,
               createdBy: order.createdBy,
               company: companyObjId,
               status: "Posted"
@@ -847,6 +863,10 @@ exports.getMaterialRates = async (req, res) => {
         skuId: skuIdStr,
         skuCode: sku.skuCode,
         skuName: sku.name,
+        unit: sku.unit || '',
+        altUnit: sku.altUnit || '',
+        altUnitConversion: sku.altUnitConversion || sku.conv || sku.booksGbl || sku.pcsPerGbl || 1,
+        altUnitDirection: sku.altUnitDirection || 'PRIMARY_TO_ALT',
         standardRate: standardRate || productionRate,
         productionRate: productionRate > 0 ? productionRate : 0,
         avgRate: effectiveRate,

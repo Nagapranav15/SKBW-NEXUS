@@ -9,8 +9,8 @@ import { ProductionOrder, ProductionBomItem, ProductionEntry } from '../../types
 import { formatOrderNo } from './productionUtils';
 import { fetchStockCostings, resolveComponentCosting, StockCostingData } from '../../utils/inventoryCosting';
 import { getSalesOrdersV2, SalesOrderV2 } from '../../api/salesOrderApiV2';
-import { Modal } from '../ui/Modal';
 import { showToast } from '../ui/Toast';
+import { convertRateToUom, convertUom } from '../../utils/uomConversion';
 
 interface ProductionOrderDetailViewProps {
   order: ProductionOrder;
@@ -138,11 +138,13 @@ export const ProductionOrderDetailView: React.FC<ProductionOrderDetailViewProps>
       }, stockCostings);
 
       // Determine true unit:
-      // If SKU master has a unit, use it. If item.uom was erroneously saved as GBL for a raw material, fix it to SKU unit or PCS.
-      const skuUnit = costing.sku?.unit || (costing.sku as any)?.uom;
-      let effectiveUom = skuUnit || item.uom || 'PCS';
-      if (effectiveUom === 'GBL' && item.type !== 'Finished') {
-        effectiveUom = skuUnit && skuUnit !== 'GBL' ? skuUnit : 'PCS';
+      // Respect order's item.uom. If item.uom was erroneously saved as GBL when AUOM is PCS, resolve as PCS.
+      const skuUnit = costing.sku?.unit || (costing.sku as any)?.uom || 'PCS';
+      const skuAltUnit = costing.sku?.altUnit || (item as any).auom || (item as any).altUnit || '';
+
+      let effectiveUom = item.uom || skuUnit || 'PCS';
+      if (effectiveUom === 'GBL' && (skuAltUnit === 'PCS' || (item as any).auom === 'PCS' || (item as any).altUnit === 'PCS')) {
+        effectiveUom = 'PCS';
       }
 
       // Check if user has entered an inline rate edit
@@ -172,10 +174,22 @@ export const ProductionOrderDetailView: React.FC<ProductionOrderDetailViewProps>
         dynamicRate = skuMasterRate > 0 ? skuMasterRate : 0;
       }
 
+      // Convert dynamic rate from SKU's stocking unit to effectiveUom if different:
+      // e.g. if costing.rate is ₹166.40/GBL and effectiveUom is PCS (400 PCS/GBL), dynamicRate becomes ₹0.416/PCS
+      if (userEditedRate === undefined && dynamicRate > 0 && effectiveUom && skuUnit) {
+        dynamicRate = convertRateToUom(dynamicRate, skuUnit, effectiveUom, costing.sku);
+      }
+
       // Calculate dynamic amount: totalRequired * dynamicRate
       const totalReq = Number(item.totalRequired) || 0;
       const dynamicAmount = Math.round(totalReq * dynamicRate * 100) / 100;
-      const dynamicStock = costing.availableStock;
+
+      // Convert available stock to effectiveUom for accurate shortage/ready evaluation
+      const rawStock = costing.availableStock;
+      const dynamicStock = (effectiveUom && skuUnit && effectiveUom.toLowerCase() !== skuUnit.toLowerCase())
+        ? convertUom(rawStock, skuUnit, effectiveUom, costing.sku)
+        : rawStock;
+
       const reservedQty = Math.min(dynamicStock, totalReq);
       const shortageQty = Math.max(0, totalReq - dynamicStock);
 

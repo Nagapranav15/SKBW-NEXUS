@@ -10,6 +10,7 @@ import { BomCopyPasteControls, MakoroPasteIcon } from '../inventory_v2/BomCopyPa
 import { copyBom, useCopiedBom } from '../../utils/bomClipboard';
 import { AdditionalCostRow, ProfitPricingState, calculateCosting, formatInr } from '../../utils/costingUtils';
 import { showToast } from '../ui/Toast';
+import { getItemClassification } from '../../utils/skuClassification';
 import * as XLSX from 'xlsx';
 
 export interface BomRecipeItem {
@@ -103,46 +104,6 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
 
     return () => { isMounted = false; };
   }, [isOpen, companyId, initialSelectedSkuId]);
-
-  // Product classification
-  const getItemClassification = (sku: SkuV2): 'products' | 'materials' | 'semi' => {
-    const code = (sku.skuCode || '').toUpperCase();
-    const cat = (sku.category || sku.group || '').toLowerCase();
-    const name = (sku.name || '').toLowerCase();
-
-    if (
-      code.startsWith('SFG-') || 
-      code.startsWith('SFG') || 
-      code.startsWith('SM-') || 
-      code.startsWith('SM') || 
-      cat.includes('semi') || 
-      cat.includes('sub-assembly') || 
-      cat.includes('ruled cut') || 
-      cat.includes('sheets') || 
-      name.includes('signature') || 
-      name.includes('block')
-    ) {
-      return 'semi';
-    }
-
-    if (
-      cat.includes('raw') || 
-      cat.includes('material') || 
-      cat === 'raw material' || 
-      cat.includes('reel') || 
-      cat.includes('board') || 
-      code.startsWith('RM-') || 
-      code.startsWith('RM') || 
-      name.includes('reel') || 
-      name.includes('wire') || 
-      name.includes('adhesive') || 
-      name.includes('glue')
-    ) {
-      return 'materials';
-    }
-
-    return 'products';
-  };
 
   const productsList = useMemo(() => skus.filter(s => getItemClassification(s) === 'products'), [skus]);
   const materialsList = useMemo(() => skus.filter(s => getItemClassification(s) === 'materials'), [skus]);
@@ -1040,7 +1001,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                                         name: selectedName,
                                         skuId: matchedSku?._id || item.skuId,
                                         skuCode: matchedSku?.skuCode || item.skuCode,
-                                        uom: matchedSku?.unit || item.uom || 'KG',
+                                        uom: item.uom || matchedSku?.unit || 'KG',
                                         auom: matchedSku?.altUnit || item.auom || '',
                                         altUnit: matchedSku?.altUnit || item.auom || '',
                                         inStock: (matchedSku as any)?.openingStock ?? (matchedSku as any)?.currentStock ?? item.inStock ?? 0

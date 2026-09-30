@@ -91,38 +91,20 @@ import { BomCopyPasteControls, MakoroPasteIcon } from './BomCopyPasteControls';
 import { copyBom, useCopiedBom } from '../../utils/bomClipboard';
 import { BulkEditBomModal } from '../production/BulkEditBomModal';
 import { getActivityLogs, createActivityLog } from '../../api/activityLogApi';
+import { getItemClassification } from '../../utils/skuClassification';
 
 // Helper to render neat domain icon for items
 const renderItemDomainIcon = (skuItem: SkuV2, currentTab?: string) => {
-  const code = (skuItem.skuCode || '').toUpperCase();
-  const cat = (skuItem.category || skuItem.group || '').toLowerCase();
-  const nameLower = (skuItem.name || '').toLowerCase();
+  const type = getItemClassification(skuItem);
 
-  const isRaw = currentTab === 'materials' || 
-                code.startsWith('RM') || 
-                cat.includes('raw') || 
-                cat.includes('material') || 
-                nameLower.includes('reel') || 
-                nameLower.includes('wire') || 
-                nameLower.includes('adhesive') || 
-                nameLower.includes('glue') || 
-                nameLower.includes('board');
-
-  const isSemi = currentTab === 'semi' || 
-                 code.startsWith('SFG') || 
-                 cat.includes('semi') || 
-                 nameLower.includes('sheet') || 
-                 nameLower.includes('signature') || 
-                 nameLower.includes('block');
-
-  if (isRaw) {
+  if (type === 'materials') {
     return (
       <div className="w-6 h-6 rounded-md bg-amber-50 text-amber-600 border border-amber-200/70 flex items-center justify-center shrink-0 shadow-2xs" title="Raw Material">
         <Layers className="w-3.5 h-3.5" />
       </div>
     );
   }
-  if (isSemi) {
+  if (type === 'semi') {
     return (
       <div className="w-6 h-6 rounded-md bg-teal-50 text-teal-600 border border-teal-200/70 flex items-center justify-center shrink-0 shadow-2xs" title="Semi Finished">
         <Boxes className="w-3.5 h-3.5" />
@@ -1386,7 +1368,7 @@ const SkuMasterV2: React.FC = () => {
             skuCode: item.skuCode || matchedSku?.skuCode,
             name: currentName,
             qty: item.qty ?? '',
-            uom: matchedSku?.unit || item.uom || 'Pcs',
+            uom: item.uom || item.unit || matchedSku?.unit || 'Pcs',
             auom: item.auom || (item as any).altUnit || matchedSku?.altUnit || '',
             altUnit: item.auom || (item as any).altUnit || matchedSku?.altUnit || '',
             inStock: Number(item.inStock) || 0,
@@ -1701,53 +1683,9 @@ const SkuMasterV2: React.FC = () => {
 
   // Helper to determine Item Type of SKU
   const getItemType = (item: SkuV2): 'products' | 'materials' | 'semi' => {
-    const cat = (item.category || '').toLowerCase().trim();
-    const name = (item.name || '').toLowerCase();
-    const code = (item.skuCode || '').toUpperCase().trim();
-
-    // 1. Check against dynamic categories configured in Categories tab
-    const matchedCat = (categoriesData || []).find(c => c.name.toLowerCase().trim() === cat);
-    if (matchedCat) {
-      return matchedCat.type;
-    }
-
-    // 2. Semi-finished / WIP
-    if (
-      cat.includes('semi') || 
-      cat.includes('wip') || 
-      cat === 'semi finished' || 
-      cat.includes('sub') || 
-      code.startsWith('SM-') || 
-      code.startsWith('SM') || 
-      code.startsWith('SEM') || 
-      code.startsWith('SFG') || 
-      code.startsWith('SF') || 
-      name.includes('ruled cut') || 
-      name.includes('inner signature') || 
-      name.includes('book block')
-    ) {
-      return 'semi';
-    }
-
-    // 3. Raw Materials
-    if (
-      cat.includes('raw') || 
-      cat.includes('material') || 
-      cat === 'raw material' || 
-      cat.includes('reel') || 
-      cat.includes('board') || 
-      code.startsWith('RM-') || 
-      code.startsWith('RM') || 
-      name.includes('reel') || 
-      name.includes('wire') || 
-      name.includes('adhesive') || 
-      name.includes('glue')
-    ) {
-      return 'materials';
-    }
-
-    return 'products';
+    return getItemClassification(item, categoriesData);
   };
+
 
   // Products List (Only database finished products)
   const productsList = useMemo(() => {

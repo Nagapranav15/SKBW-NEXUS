@@ -8,6 +8,12 @@ const skuV2Schema = new mongoose.Schema({
     required: true, 
     index: true
   },
+  itemType: {
+    type: String,
+    enum: ['products', 'materials', 'semi'],
+    default: 'products',
+    index: true
+  },
   paperType: {
     type: String,
     enum: ["Reels", "Sheets", "None"],
