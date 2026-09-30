@@ -4,6 +4,14 @@ const SalesOrder = require("../models/salesOrderModel");
 const SkuV2 = require("../models/skuV2Model");
 const Party = require("../models/partyModel");
 const ActivityLog = require("../models/activityLogModel");
+const Transaction = require("../models/transactionModel");
+
+const generateTransactionId = (date) => {
+  const d = new Date(date || Date.now());
+  const ymd = d.toISOString().split("T")[0].replace(/-/g, "");
+  const rand = Math.floor(1000 + Math.random() * 9000);
+  return `TXN-${ymd}-${rand}`;
+};
 
 const toObjectId = (id) => {
   if (!id) return null;
@@ -260,6 +268,34 @@ exports.createSalesOrder = async (req, res, next) => {
       dispatchedQty: 0
     }));
 
+    const orderType = req.body.orderType === "Cash" ? "Cash" : "Credit";
+    const orderGrandTotal = Number(grandTotal) || 0;
+    const initialPaid = Math.max(0, Number(req.body.paidAmount) || 0);
+    const balanceDue = Math.max(0, orderGrandTotal - initialPaid);
+    const paymentStatus = balanceDue <= 0 && orderGrandTotal > 0 ? "Paid" : (initialPaid > 0 ? "Partially Paid" : "Unpaid");
+
+    const initialPayments = [];
+    if (initialPaid > 0) {
+      initialPayments.push({
+        paymentId: generateTransactionId(orderDate || new Date()),
+        amount: initialPaid,
+        paymentMethod: req.body.paymentMethod || "cash",
+        date: orderDate ? new Date(orderDate) : new Date(),
+        referenceId: req.body.referenceId || "",
+        cashLocation: req.body.cashLocation || "",
+        chequeNumber: req.body.chequeNumber || "",
+        chequeDate: req.body.chequeDate || "",
+        bankName: req.body.bankName || "",
+        bankBranch: req.body.bankBranch || "",
+        chequeStatus: req.body.chequeStatus || "Pending",
+        upiProvider: req.body.upiProvider || "",
+        accountName: req.body.accountName || "",
+        remarks: req.body.remarks || "Initial payment on order creation",
+        recordedBy: req.user?.id ? toObjectId(req.user.id) : undefined,
+        createdAt: new Date()
+      });
+    }
+
     const newOrder = new SalesOrderV2({
       orderNumber,
       company: companyObjId,
@@ -272,6 +308,11 @@ exports.createSalesOrder = async (req, res, next) => {
       customerPoDate: customerPoDate || "",
       facility: facility || "Main Factory",
       transporter: req.body.transporter || "",
+      orderType,
+      paidAmount: initialPaid,
+      balanceDue,
+      paymentStatus,
+      payments: initialPayments,
       otherCharges: Array.isArray(req.body.otherCharges) ? req.body.otherCharges : [],
       internalNotes: internalNotes || "",
       billingAddress: billingAddress || {},
@@ -284,7 +325,7 @@ exports.createSalesOrder = async (req, res, next) => {
       totalIgst: Number(totalIgst) || 0,
       freightCharges: Number(freightCharges) || 0,
       roundOff: Number(roundOff) || 0,
-      grandTotal: Number(grandTotal) || 0,
+      grandTotal: orderGrandTotal,
       materialsStatus: "Ready",
       fulfillmentStatus: "Not Started",
       status: status || "Confirmed",
@@ -294,11 +335,55 @@ exports.createSalesOrder = async (req, res, next) => {
 
     await newOrder.save();
 
+    // If Credit order (or partial payment with remaining balance): reflect unpaid balance in Customer Outstanding
+    if (orderType === "Credit" && balanceDue > 0 && (customer || customerId)) {
+      try {
+        const partyQuery = customer ? { _id: toObjectId(customer) } : { _id: toObjectId(customerId) };
+        const custParty = await Party.findOne(partyQuery);
+        if (custParty) {
+          custParty.outstanding = (custParty.outstanding || 0) + balanceDue;
+          custParty.outstandingBalance = (custParty.outstandingBalance || 0) + balanceDue;
+          await custParty.save();
+        }
+      } catch (custErr) {
+        console.error("Failed to update customer credit outstanding:", custErr);
+      }
+    }
+
+    // If initial payment received, record financial transaction
+    if (initialPaid > 0 && initialPayments.length > 0) {
+      try {
+        const pRec = initialPayments[0];
+        const financialTx = new Transaction({
+          transactionId: pRec.paymentId,
+          date: pRec.date,
+          type: "credit",
+          category: "Sales Order Payment",
+          subcategory: pRec.paymentMethod || "cash",
+          amount: initialPaid,
+          partyId: newOrder.customer ? toObjectId(newOrder.customer) : null,
+          partyName: newOrder.customerName || "Customer",
+          description: req.body.remarks || `Initial payment received for Sales Order ${newOrder.orderNumber}`,
+          paymentMethod: ["cash", "cheque", "upi", "bank_transfer"].includes(pRec.paymentMethod) ? pRec.paymentMethod : "cash",
+          referenceId: pRec.referenceId || pRec.chequeNumber || "",
+          company: companyObjId,
+          createdBy: req.user?.id ? toObjectId(req.user.id) : undefined,
+          source: "system",
+          source_type: "SALE",
+          source_id: newOrder._id,
+          payment_status: paymentStatus.toLowerCase()
+        });
+        await financialTx.save();
+      } catch (txnErr) {
+        console.error("Failed to record initial payment transaction:", txnErr.message);
+      }
+    }
+
     ActivityLog.create({
       action: "CREATE",
       entityType: "SalesOrderV2",
       entityName: newOrder.orderNumber,
-      details: `Sales Order '${newOrder.orderNumber}' for ${newOrder.customerName} (₹${newOrder.grandTotal}) was created.`,
+      details: `Sales Order '${newOrder.orderNumber}' for ${newOrder.customerName} (₹${newOrder.grandTotal}, Type: ${orderType}) was created.`,
       performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
       company: companyObjId
     }).catch(e => console.error("ActivityLog error:", e));
@@ -319,9 +404,12 @@ exports.updateSalesOrder = async (req, res, next) => {
       return res.status(404).json({ msg: "Sales Order not found" });
     }
 
+    const oldBalanceDue = order.balanceDue !== undefined ? order.balanceDue : (order.orderType === "Credit" ? Math.max(0, (order.grandTotal || 0) - (order.paidAmount || 0)) : 0);
+    const oldOrderType = order.orderType || "Credit";
+
     const fields = [
       "customerName", "orderDate", "promisedDate", "customerPoNumber", "customerPoDate",
-      "facility", "transporter", "otherCharges", "internalNotes", "billingAddress", "shippingAddress", "isInterstate",
+      "facility", "transporter", "orderType", "otherCharges", "internalNotes", "billingAddress", "shippingAddress", "isInterstate",
       "subtotal", "totalCgst", "totalSgst", "totalIgst", "freightCharges", "roundOff", "grandTotal",
       "status", "materialsStatus", "fulfillmentStatus"
     ];
@@ -329,6 +417,12 @@ exports.updateSalesOrder = async (req, res, next) => {
     fields.forEach(f => {
       if (req.body[f] !== undefined) order[f] = req.body[f];
     });
+
+    const newGrandTotal = Number(order.grandTotal) || 0;
+    const currentPaid = Number(order.paidAmount) || 0;
+    const newBalanceDue = Math.max(0, newGrandTotal - currentPaid);
+    order.balanceDue = newBalanceDue;
+    order.paymentStatus = newBalanceDue <= 0 && newGrandTotal > 0 ? "Paid" : (currentPaid > 0 ? "Partially Paid" : "Unpaid");
 
     if (req.body.customer) order.customer = toObjectId(req.body.customer);
     if (req.body.items && Array.isArray(req.body.items)) {
@@ -372,6 +466,24 @@ exports.updateSalesOrder = async (req, res, next) => {
     }
 
     await order.save();
+
+    // Adjust customer outstanding balance if balanceDue changed on a Credit order
+    if (order.orderType === "Credit" && order.customer) {
+      const balanceDiff = newBalanceDue - oldBalanceDue;
+      if (balanceDiff !== 0) {
+        try {
+          const custParty = await Party.findById(order.customer);
+          if (custParty) {
+            custParty.outstanding = Math.max(0, (custParty.outstanding || 0) + balanceDiff);
+            custParty.outstandingBalance = Math.max(0, (custParty.outstandingBalance || 0) + balanceDiff);
+            await custParty.save();
+          }
+        } catch (err2) {
+          console.error("Failed to adjust customer balance on order edit:", err2);
+        }
+      }
+    }
+
     res.json(order);
   } catch (err) {
     next(err);
@@ -389,12 +501,174 @@ exports.updateSalesOrderStatus = async (req, res, next) => {
       return res.status(404).json({ msg: "Sales Order not found" });
     }
 
+    const oldStatus = order.status;
     if (status) order.status = status;
     if (fulfillmentStatus) order.fulfillmentStatus = fulfillmentStatus;
     if (materialsStatus) order.materialsStatus = materialsStatus;
 
     await order.save();
+
+    // If order is cancelled and had unpaid credit balance, deduct from customer outstanding
+    if (oldStatus !== "Cancelled" && status === "Cancelled" && order.orderType === "Credit" && (order.balanceDue || 0) > 0 && order.customer) {
+      try {
+        const custParty = await Party.findById(order.customer);
+        if (custParty) {
+          custParty.outstanding = Math.max(0, (custParty.outstanding || 0) - (order.balanceDue || 0));
+          custParty.outstandingBalance = Math.max(0, (custParty.outstandingBalance || 0) - (order.balanceDue || 0));
+          await custParty.save();
+        }
+      } catch (cancelErr) {
+        console.error("Failed to reduce customer outstanding on order cancel:", cancelErr);
+      }
+    }
+
     res.json({ msg: "Status updated successfully", order });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Record payment against Sales Order (Full or Partial/Half payment with mode-specific fields)
+exports.recordSalesOrderPayment = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const {
+      amount,
+      paymentMethod = "cash",
+      date,
+      referenceId,
+      cashLocation,
+      chequeNumber,
+      chequeDate,
+      bankName,
+      bankBranch,
+      chequeStatus,
+      upiProvider,
+      accountName,
+      remarks
+    } = req.body;
+
+    const payAmount = Number(amount);
+    if (isNaN(payAmount) || payAmount <= 0) {
+      return res.status(400).json({ msg: "Payment amount must be a positive number" });
+    }
+
+    const order = await SalesOrderV2.findById(id);
+    if (!order) {
+      return res.status(404).json({ msg: "Sales Order not found" });
+    }
+
+    const orderTotal = Number(order.grandTotal) || 0;
+    const currentPaid = Number(order.paidAmount) || 0;
+    const newPaid = currentPaid + payAmount;
+    const newBalanceDue = Math.max(0, orderTotal - newPaid);
+
+    order.paidAmount = newPaid;
+    order.balanceDue = newBalanceDue;
+    order.paymentStatus = newBalanceDue <= 0 && orderTotal > 0 ? "Paid" : (newPaid > 0 ? "Partially Paid" : "Unpaid");
+
+    const validMethod = ["cash", "cheque", "upi", "bank_transfer"].includes(paymentMethod) ? paymentMethod : "cash";
+
+    const paymentRecord = {
+      paymentId: generateTransactionId(date || new Date()),
+      amount: payAmount,
+      paymentMethod: validMethod,
+      date: date ? new Date(date) : new Date(),
+      referenceId: referenceId || (validMethod === "cheque" ? chequeNumber : "") || "",
+      cashLocation: cashLocation || "",
+      chequeNumber: chequeNumber || "",
+      chequeDate: chequeDate || "",
+      bankName: bankName || "",
+      bankBranch: bankBranch || "",
+      chequeStatus: chequeStatus || "Pending",
+      upiProvider: upiProvider || "",
+      accountName: accountName || "",
+      remarks: remarks || "",
+      recordedBy: req.user?.id ? toObjectId(req.user.id) : undefined,
+      createdAt: new Date()
+    };
+
+    if (!order.payments) order.payments = [];
+    order.payments.push(paymentRecord);
+    await order.save();
+
+    // Deduct paid amount from Customer's outstanding balance
+    let updatedCustomer = null;
+    const partyId = order.customer || order.customerId;
+    if (partyId) {
+      const partyQuery = order.customer ? { _id: toObjectId(order.customer) } : { _id: toObjectId(order.customerId) };
+      const customerParty = await Party.findOne(partyQuery);
+      if (customerParty) {
+        const prevOutstanding = Number(customerParty.outstanding) || 0;
+        const prevOutstandingBal = Number(customerParty.outstandingBalance) || 0;
+        customerParty.outstanding = Math.max(0, prevOutstanding - payAmount);
+        customerParty.outstandingBalance = Math.max(0, prevOutstandingBal - payAmount);
+        await customerParty.save();
+        updatedCustomer = customerParty;
+      }
+    }
+
+    // Record in financial Transaction ledger
+    try {
+      const financialTx = new Transaction({
+        transactionId: paymentRecord.paymentId,
+        date: paymentRecord.date,
+        type: "credit", // Inflow / Customer receipt
+        category: "Sales Order Payment",
+        subcategory: validMethod,
+        amount: payAmount,
+        partyId: order.customer ? toObjectId(order.customer) : null,
+        partyName: order.customerName || "Customer",
+        description: remarks || `Payment received for ${order.orderNumber} via ${validMethod.toUpperCase()}${chequeNumber ? ` (Cheque: ${chequeNumber})` : ''}${referenceId ? ` (Ref: ${referenceId})` : ''}`,
+        paymentMethod: validMethod,
+        referenceId: referenceId || chequeNumber || "",
+        company: order.company,
+        createdBy: req.user?.id ? toObjectId(req.user.id) : undefined,
+        source: "system",
+        source_type: "SALE",
+        source_id: order._id,
+        payment_status: order.paymentStatus.toLowerCase()
+      });
+      await financialTx.save();
+    } catch (txnErr) {
+      console.error("Failed to create financial transaction:", txnErr.message);
+    }
+
+    // Activity log
+    ActivityLog.create({
+      action: "PAYMENT_RECORDED",
+      entityType: "SalesOrderV2",
+      entityName: order.orderNumber,
+      details: `Payment of ₹${payAmount.toLocaleString('en-IN')} recorded for ${order.orderNumber} via ${validMethod}. Remaining balance: ₹${newBalanceDue.toLocaleString('en-IN')}`,
+      performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
+      company: order.company
+    }).catch(e => console.error("ActivityLog error:", e));
+
+    res.json({
+      msg: "Payment recorded successfully",
+      order,
+      customer: updatedCustomer,
+      payment: paymentRecord
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Get payments for a Sales Order
+exports.getSalesOrderPayments = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const order = await SalesOrderV2.findById(id).select("orderNumber grandTotal paidAmount balanceDue paymentStatus payments customer customerName");
+    if (!order) return res.status(404).json({ msg: "Sales Order not found" });
+    res.json({
+      orderNumber: order.orderNumber,
+      grandTotal: order.grandTotal,
+      paidAmount: order.paidAmount || 0,
+      balanceDue: order.balanceDue !== undefined ? order.balanceDue : Math.max(0, (order.grandTotal || 0) - (order.paidAmount || 0)),
+      paymentStatus: order.paymentStatus || "Unpaid",
+      payments: order.payments || []
+    });
   } catch (err) {
     next(err);
   }

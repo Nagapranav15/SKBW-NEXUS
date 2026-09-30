@@ -75,6 +75,8 @@ router.get("/sales-orders/:id/bom-requirements", auth, rbac(view), salesOrderCtr
 router.post("/sales-orders", auth, rbac(manage), salesOrderCtrl.createSalesOrder);
 router.put("/sales-orders/:id", auth, rbac(manage), salesOrderCtrl.updateSalesOrder);
 router.patch("/sales-orders/:id/status", auth, rbac(manage), salesOrderCtrl.updateSalesOrderStatus);
+router.post("/sales-orders/:id/payments", auth, rbac(manage), salesOrderCtrl.recordSalesOrderPayment);
+router.get("/sales-orders/:id/payments", auth, rbac(view), salesOrderCtrl.getSalesOrderPayments);
 
 // Metadata routes
 router.get("/metadata", auth, ctrl.getMetadata);

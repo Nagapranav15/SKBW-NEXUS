@@ -45,10 +45,12 @@ import {
   Copy,
   GitMerge,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  Receipt
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSearchParams } from 'react-router-dom';
+import RecordPaymentModal from '../sales/RecordPaymentModal';
 import Modal from '../ui/Modal';
 import { showToast } from '../ui/Toast';
 import { 
@@ -279,6 +281,27 @@ export const BusinessDirectoryV2: React.FC = () => {
   const [page, setPage] = useState(1);
   const [limit] = useState(50);
   const [totalRecords, setTotalRecords] = useState(0);
+
+  // Customer Payment Modal
+  const [showCustomerPaymentModal, setShowCustomerPaymentModal] = useState(false);
+  const [customerPaymentParty, setCustomerPaymentParty] = useState<any>(null);
+
+  const handleCustomerPaymentSuccess = (result: any) => {
+    if (result.party) {
+      if (selectedDetails && (selectedDetails._id === result.party._id || selectedDetails.id === result.party._id)) {
+        setSelectedDetails((prev: any) => prev ? ({
+          ...prev,
+          outstandingBalance: result.party.outstandingBalance,
+          outstanding: result.party.outstanding
+        }) : prev);
+      }
+      setItems(prev => prev.map(item => item._id === result.party._id ? {
+        ...item,
+        outstandingBalance: result.party.outstandingBalance,
+        outstanding: result.party.outstanding
+      } : item));
+    }
+  };
 
   // Lazy-Loaded Dropdown Lists (Fetched on mount and kept updated)
   const [allAgents, setAllAgents] = useState<any[]>([]);
@@ -4851,11 +4874,24 @@ export const BusinessDirectoryV2: React.FC = () => {
                           {selectedDetails.city || selectedDetails.assignedMarket || 'Unassigned'}
                         </span>
                       </div>
-                      <div className="bg-rose-50/60 border border-rose-100 p-2.5 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[9px] text-rose-700 font-extrabold uppercase tracking-wider">OUTSTANDING BALANCE</span>
-                        <span className={`block text-xs font-mono font-black mt-0.5 ${bal > 0 ? 'text-rose-950' : bal < 0 ? 'text-emerald-950' : 'text-gray-900'}`}>
-                          ₹{Math.abs(bal).toLocaleString('en-IN')}
-                        </span>
+                      <div className="bg-rose-50/60 border border-rose-100 p-2.5 rounded-2xl text-center shadow-2xs flex flex-col justify-between">
+                        <div>
+                          <span className="block text-[9px] text-rose-700 font-extrabold uppercase tracking-wider">OUTSTANDING BALANCE</span>
+                          <span className={`block text-xs font-mono font-black mt-0.5 ${bal > 0 ? 'text-rose-950' : bal < 0 ? 'text-emerald-950' : 'text-gray-900'}`}>
+                            ₹{Math.abs(bal).toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCustomerPaymentParty(selectedDetails);
+                            setShowCustomerPaymentModal(true);
+                          }}
+                          className="mt-1.5 py-1 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-[10px] flex items-center justify-center gap-1 shadow-2xs transition-all cursor-pointer"
+                        >
+                          <Receipt className="w-3 h-3" />
+                          <span>Record Payment</span>
+                        </button>
                       </div>
                     </div>
 
@@ -7153,6 +7189,17 @@ export const BusinessDirectoryV2: React.FC = () => {
           </div>
         </Modal>
       )}
+
+      {/* Record Payment Modal for Customers */}
+      <RecordPaymentModal
+        isOpen={showCustomerPaymentModal}
+        onClose={() => {
+          setShowCustomerPaymentModal(false);
+          setCustomerPaymentParty(null);
+        }}
+        customer={customerPaymentParty}
+        onPaymentSuccess={handleCustomerPaymentSuccess}
+      />
 
       {/* Keyframe Animation */}
       <style>{`

@@ -3,9 +3,10 @@ import {
   Save, Plus, Trash2, Search, ChevronDown, Calendar, User, Package, 
   AlertCircle, FileText, Check, Percent, X, MoreVertical, Edit2, 
   Phone, MapPin, Receipt, Truck, Copy, ExternalLink, Eye, Building2,
-  Settings, Zap, Sparkles, RotateCcw, Layers, ChevronRight
+  Settings, Zap, Sparkles, RotateCcw, Layers, ChevronRight, CheckCircle
 } from 'lucide-react';
 import Modal from '../ui/Modal';
+import RecordPaymentModal from './RecordPaymentModal';
 import { getSkusV2, getBalancesV2, SkuV2 } from '../../api/mfgApiV2';
 import { getParties } from '../../api/partyApi';
 import { 
@@ -316,6 +317,9 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   const [transporterList, setTransporterList] = useState<string[]>([]);
   const [orderType, setOrderType] = useState<'' | 'Credit' | 'Cash'>('');
   const [orderStatus, setOrderStatus] = useState<string>('Confirmed');
+  const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
+  const [drawerPaidAmount, setDrawerPaidAmount] = useState<number>(0);
+  const [drawerPaymentData, setDrawerPaymentData] = useState<any>(null);
 
   // Addresses State (Functional & Editable)
   const [sameAddress, setSameAddress] = useState(true);
@@ -683,6 +687,8 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       setPromisedDate(editOrder.promisedDate ? (editOrder.promisedDate.includes('/') ? editOrder.promisedDate.split('/').reverse().join('-') : editOrder.promisedDate) : '');
       setTransporter(editOrder.transporter || '');
       setOrderType((editOrder as any).orderType === 'Cash' ? 'Cash' : 'Credit');
+      setDrawerPaidAmount(Number((editOrder as any).paidAmount) || 0);
+      setDrawerPaymentData(null);
       setOrderStatus(editOrder.status || 'Confirmed');
       setInternalNotes(editOrder.internalNotes || '');
 
@@ -758,6 +764,8 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       setPromisedDate('');
       setTransporter('');
       setOrderType('');
+      setDrawerPaidAmount(0);
+      setDrawerPaymentData(null);
       setOrderStatus('Confirmed');
       setInternalNotes('');
       setOverallDiscount('');
@@ -921,6 +929,21 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       row.stockGbl = stockGbl;
       row.pcsPerGbl = pcsPerGbl > 0 ? pcsPerGbl : '';
 
+      // Standard single item - NEVER auto-convert to BOM / mixed bundle
+      row.isMixedBundle = false;
+      row.components = [];
+
+      // Retrieve rate directly from Item Master sellingPrice
+      const masterPrice = Number(s.sellingPrice || (s as any).price || (s as any).rate || (s as any).unitPrice || 0);
+      if (masterPrice > 0) {
+        row.rate = masterPrice;
+      }
+
+      // Default gbl to 1 if not set yet
+      if (!row.gbl || Number(row.gbl) <= 0) {
+        row.gbl = 1;
+      }
+
       const gblNum = Number(row.gbl) || 0;
       const pcsPerGblNum = Number(pcsPerGbl) || 0;
       if (gblNum > 0 && pcsPerGblNum > 0) {
@@ -931,29 +954,6 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
         row.totalPcs = 0;
       }
       row.amount = Math.round((row.totalPcs || 0) * (Number(row.rate) || 0) * 100) / 100;
-
-      // If product has predefined recipe/BOM items, auto-initialize as a pack
-      if ((s as any).bomItems && Array.isArray((s as any).bomItems) && (s as any).bomItems.length > 0) {
-        const comps: OrderItemComponent[] = (s as any).bomItems.map((b: any, bIdx: number) => ({
-          componentId: b._id || b.id || `comp-${Date.now()}-${bIdx}`,
-          name: b.name || b.itemName || b.skuCode || '',
-          quantity: Number(b.quantity || b.qty || 0),
-          uom: b.uom || b.unit || 'Pcs',
-          rate: Number(b.rate || b.unitPrice || 0),
-          amount: Number(b.amount || (Number(b.quantity || b.qty || 0) * Number(b.rate || b.unitPrice || 0)))
-        }));
-        const packPcs = comps.reduce((sum, c) => sum + (Number(c.quantity) || 0), 0);
-        const packAmt = comps.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
-        const blendedRate = packPcs > 0 ? +(packAmt / packPcs).toFixed(2) : 0;
-
-        row.isMixedBundle = true;
-        row.components = comps;
-        row.pcsPerGbl = packPcs > 0 ? packPcs : (pcsPerGbl > 0 ? pcsPerGbl : 1);
-        row.gbl = 1;
-        row.totalPcs = Number(row.gbl) * Number(row.pcsPerGbl);
-        if (blendedRate > 0) row.rate = blendedRate;
-        row.amount = Math.round((row.totalPcs || 0) * (Number(row.rate) || 0) * 100) / 100;
-      }
 
       copy[idx] = row;
       return copy;
@@ -1119,6 +1119,23 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       const r = { ...copy[idx] };
       r.isMixedBundle = false;
       r.components = [];
+
+      const matchedSku = availableSkus.find(s =>
+        (r.skuId && s._id === r.skuId) ||
+        (r.skuCode && s.skuCode?.toLowerCase().trim() === r.skuCode.toLowerCase().trim()) ||
+        (r.itemName && s.name?.toLowerCase().trim() === r.itemName.toLowerCase().trim())
+      );
+      if (matchedSku) {
+        const { stockGbl, stockPcs, pcsPerGbl } = computeSkuStock(r.stockPcs ?? 0, matchedSku);
+        r.pcsPerGbl = pcsPerGbl > 0 ? pcsPerGbl : (r.pcsPerGbl || 100);
+        r.stockGbl = stockGbl;
+        r.stockPcs = stockPcs;
+        const masterPrice = Number(matchedSku.sellingPrice || (matchedSku as any).price || (matchedSku as any).rate || 0);
+        if (masterPrice > 0) r.rate = masterPrice;
+        r.totalPcs = (Number(r.gbl) || 1) * Number(r.pcsPerGbl);
+        r.amount = Math.round((r.totalPcs || 0) * (Number(r.rate) || 0) * 100) / 100;
+      }
+
       copy[idx] = r;
       return copy;
     });
@@ -1392,6 +1409,14 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
         facility: 'Main Factory',
         transporter,
         orderType: (orderType || 'Credit') as any,
+        paidAmount: orderType === 'Cash' ? drawerPaidAmount : (editOrder?.paidAmount || 0),
+        balanceDue: orderType === 'Cash'
+          ? Math.max(0, totals.grandTotal - drawerPaidAmount)
+          : (orderType === 'Credit' ? totals.grandTotal : 0),
+        paymentStatus: orderType === 'Cash'
+          ? (drawerPaidAmount >= totals.grandTotal && totals.grandTotal > 0 ? 'Paid' : (drawerPaidAmount > 0 ? 'Partially Paid' : 'Unpaid'))
+          : ((editOrder as any)?.paymentStatus || 'Unpaid'),
+        payments: drawerPaymentData ? [drawerPaymentData] : ((editOrder as any)?.payments || []),
         otherCharges,
         internalNotes,
         billingAddress,
@@ -1991,16 +2016,81 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                 <label className="text-[11px] font-bold text-gray-600 shrink-0 w-24">
                   Order Type
                 </label>
-                <select
-                  value={orderType}
-                  onChange={(e) => setOrderType(e.target.value as 'Credit' | 'Cash')}
-                  className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                >
-                  <option value="">Select Order Type</option>
-                  <option value="Credit">Credit</option>
-                  <option value="Cash">Cash</option>
-                </select>
+                <div className="flex-1 flex items-center gap-1.5 min-w-0">
+                  <select
+                    value={orderType}
+                    onChange={(e) => setOrderType(e.target.value as 'Credit' | 'Cash')}
+                    className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  >
+                    <option value="">Select Order Type</option>
+                    <option value="Credit">Credit</option>
+                    <option value="Cash">Cash</option>
+                  </select>
+
+                  {/* Small Record Payment Icon Button specifically when Cash is selected */}
+                  {orderType === 'Cash' && (
+                    <button
+                      type="button"
+                      title={drawerPaidAmount > 0 ? `Payment Recorded: ₹${drawerPaidAmount.toLocaleString('en-IN')}` : "Record Payment"}
+                      onClick={() => setShowPaymentModal(true)}
+                      className={`relative p-1.5 rounded-xl border transition-all duration-150 flex items-center justify-center shrink-0 cursor-pointer shadow-xs group ${
+                        drawerPaidAmount > 0
+                          ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700 shadow-emerald-200'
+                          : 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 hover:border-emerald-400'
+                      }`}
+                    >
+                      <Receipt className="w-4 h-4 transition-transform group-hover:scale-110" />
+                      {drawerPaidAmount > 0 && (
+                        <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 border border-white"></span>
+                        </span>
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
+
+              {orderType === 'Cash' && (
+                <div className="py-1 px-2.5 rounded-lg bg-emerald-50 border border-emerald-200/80 text-[10px] text-emerald-900 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>
+                      {drawerPaidAmount > 0
+                        ? `Cash Paid: ₹${drawerPaidAmount.toLocaleString('en-IN')}`
+                        : 'Cash order selected. Click the receipt icon to record payment.'}
+                    </span>
+                  </span>
+                  {totals.grandTotal > 0 ? (
+                    <span className="font-bold font-mono">
+                      {drawerPaidAmount >= totals.grandTotal ? (
+                        <span className="text-emerald-700 font-semibold">Fully Paid</span>
+                      ) : drawerPaidAmount > 0 ? (
+                        <span className="text-amber-700">Due: ₹{(totals.grandTotal - drawerPaidAmount).toLocaleString('en-IN')}</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setShowPaymentModal(true)}
+                          className="text-emerald-700 hover:text-emerald-800 underline font-semibold cursor-pointer"
+                        >
+                          Record Now
+                        </button>
+                      )}
+                    </span>
+                  ) : drawerPaidAmount > 0 ? (
+                    <span className="font-bold font-mono text-emerald-700">Advance</span>
+                  ) : null}
+                </div>
+              )}
+
+              {orderType === 'Credit' && (
+                <div className="py-1 px-2.5 rounded-lg bg-amber-50 border border-amber-200/80 text-[10px] text-amber-900 flex items-center justify-between">
+                  <span>Credit: Unpaid balance reflects in Customer Outstanding</span>
+                  {totals.grandTotal > 0 && (
+                    <span className="font-bold font-mono text-rose-700 ml-1">₹{totals.grandTotal.toLocaleString('en-IN')}</span>
+                  )}
+                </div>
+              )}
 
               {/* Order Status */}
               <div className="flex items-center justify-between gap-2">
@@ -3792,6 +3882,22 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Record Payment Modal for Cash Order */}
+      {showPaymentModal && (
+        <RecordPaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          order={editOrder}
+          totalAmountOverride={totals.grandTotal}
+          initialPaidOverride={drawerPaidAmount}
+          customer={selectedCustomer || (customerSearch?.trim() ? { firmName: customerSearch.trim() } : null)}
+          onPaymentRecordLocal={(pay) => {
+            setDrawerPaidAmount(pay.amount);
+            setDrawerPaymentData(pay);
+          }}
+        />
       )}
     </>
   );

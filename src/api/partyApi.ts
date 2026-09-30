@@ -22,5 +22,6 @@ export const mergeParties = (primaryId: string, duplicateId: string) => api.post
 export const getDeletedParties = (company: string, type?: string) => api.get('/parties/deleted', { params: { company, type } });
 export const restoreParty = (id: string) => api.post(`/parties/${id}/restore`);
 export const permanentlyDeleteParty = (id: string) => api.delete(`/parties/${id}/permanent`);
+export const recordCustomerPaymentApi = (id: string, paymentData: any) => api.post(`/parties/${id}/payment`, paymentData);
 
 

@@ -20,6 +20,7 @@ import SalesOrderDrawerV2 from './SalesOrderDrawerV2';
 import SalesOrderDetailPanelV2 from './SalesOrderDetailPanelV2';
 import SalesOrderSuccessModal from './SalesOrderSuccessModal';
 import PrintOrderEstimationModal from './PrintOrderEstimationModal';
+import RecordPaymentModal from './RecordPaymentModal';
 import { showToast } from '../ui/Toast';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -149,6 +150,19 @@ const SalesOrders: React.FC = () => {
 
   // Print Estimation launched from success page
   const [printEstimationOrder, setPrintEstimationOrder] = useState<SalesOrderV2 | null>(null);
+
+  // Record Payment Modal State
+  const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
+  const [paymentModalOrder, setPaymentModalOrder] = useState<SalesOrderV2 | null>(null);
+
+  const handlePaymentSuccessFromList = (result: any) => {
+    if (result.order) {
+      setOrders(prev => prev.map(o => o._id === result.order._id ? { ...o, ...result.order } : o));
+      if (selectedOrderDetail && selectedOrderDetail._id === result.order._id) {
+        setSelectedOrderDetail(result.order);
+      }
+    }
+  };
 
   // Toolbar menus & Activity Log states
   const [showSortMenu, setShowSortMenu] = useState(false);
@@ -1611,10 +1625,32 @@ const SalesOrders: React.FC = () => {
 
                     {/* Amount (₹) */}
                     {isColVisible('grandTotal') && (
-                      <td className="py-3.5 px-3 text-right font-black text-gray-900 font-mono whitespace-nowrap">
-                        <span className={order.status === 'Cancelled' ? 'line-through text-gray-400 font-normal' : ''}>
-                          ₹{(order.grandTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
+                      <td className="py-3.5 px-3 text-right whitespace-nowrap">
+                        <div className="font-black text-gray-900 font-mono">
+                          <span className={order.status === 'Cancelled' ? 'line-through text-gray-400 font-normal' : ''}>
+                            ₹{(order.grandTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        {order.status !== 'Cancelled' && (
+                          <div className="mt-0.5 flex items-center justify-end gap-1">
+                            {order.paymentStatus === 'Paid' ? (
+                              <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                Paid
+                              </span>
+                            ) : (order.paidAmount || 0) > 0 ? (
+                              <span 
+                                className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-blue-100 text-blue-800 border border-blue-200"
+                                title={`Paid: ₹${order.paidAmount} | Remaining Due: ₹${order.balanceDue !== undefined ? order.balanceDue : ((order.grandTotal || 0) - (order.paidAmount || 0))}`}
+                              >
+                                Due: ₹{((order.balanceDue !== undefined ? order.balanceDue : ((order.grandTotal || 0) - (order.paidAmount || 0)))).toLocaleString('en-IN')}
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-gray-100 text-gray-600 border border-gray-200">
+                                {order.orderType === 'Cash' ? 'Cash' : 'Credit'}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </td>
                     )}
 
@@ -1710,7 +1746,17 @@ const SalesOrders: React.FC = () => {
                                 <Download className="w-4 h-4" />
                               </button>
 
-                              {/* 4. WhatsApp */}
+                              {/* 4. Record Payment */}
+                              <button
+                                type="button"
+                                onClick={() => { setPaymentModalOrder(order); setShowRecordPaymentModal(true); }}
+                                className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                                title="Record Payment (Cash, Cheque, UPI)"
+                              >
+                                <Receipt className="w-4 h-4" />
+                              </button>
+
+                              {/* 5. WhatsApp */}
                               <button
                                 type="button"
                                 onClick={() => handleTriggerWhatsApp(order)}
@@ -1720,7 +1766,7 @@ const SalesOrders: React.FC = () => {
                                 <WhatsAppIcon className="w-4 h-4 text-emerald-500 hover:text-emerald-600" />
                               </button>
 
-                              {/* 5. Three-dots More Menu */}
+                              {/* 6. Three-dots More Menu */}
                               <div className="relative">
                                 <button
                                   type="button"
@@ -1744,6 +1790,15 @@ const SalesOrders: React.FC = () => {
                                     >
                                       <Eye className="w-4 h-4 text-blue-600" />
                                       <span>View Order</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => { setPaymentModalOrder(order); setShowRecordPaymentModal(true); setActiveMenuOrderId(null); }}
+                                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50 transition-colors"
+                                    >
+                                      <Receipt className="w-4 h-4 text-emerald-600" />
+                                      <span>Record Payment</span>
                                     </button>
 
                                     {order.status === 'Draft' && (
@@ -2034,6 +2089,17 @@ const SalesOrders: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Record Payment Modal */}
+      <RecordPaymentModal
+        isOpen={showRecordPaymentModal}
+        onClose={() => {
+          setShowRecordPaymentModal(false);
+          setPaymentModalOrder(null);
+        }}
+        order={paymentModalOrder}
+        onPaymentSuccess={handlePaymentSuccessFromList}
+      />
 
         </div>
       </div>

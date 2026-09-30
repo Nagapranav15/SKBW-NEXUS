@@ -6,9 +6,10 @@ import {
   User, Calendar, Truck, Tag, MapPin, Phone, Package,
   ChevronRight, Plus, Trash2, CheckCircle, Clock,
   AlertCircle, CreditCard, IndianRupee, Play, Send, Check,
-  Factory, ExternalLink, Layers
+  Factory, ExternalLink, Layers, Receipt, Wallet
 } from 'lucide-react';
 import { SalesOrderV2, updateSalesOrderV2Status } from '../../api/salesOrderApiV2';
+import { RecordPaymentModal } from './RecordPaymentModal';
 import { saveCustomSalesOrder } from '../../utils/salesOrderStorage';
 import { useAuth } from '../../context/AuthContext';
 import { getParties } from '../../api/partyApi';
@@ -51,6 +52,19 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
   const [customerDetails, setCustomerDetails] = useState<any | null>(null);
   const [stockMap, setStockMap] = useState<Map<string, number>>(new Map());
   const [isConfirming, setIsConfirming] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+
+  const handlePaymentSuccess = (result: any) => {
+    if (result.order) {
+      setLocalOrder(result.order);
+      if (onOrderUpdated) {
+        onOrderUpdated(result.order);
+      }
+    }
+    if (result.customer) {
+      setCustomerDetails(result.customer);
+    }
+  };
 
   useEffect(() => {
     setLocalOrder(order);
@@ -224,8 +238,9 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
   const sameAddr = !sa?.addressLine || sa?.addressLine === ba?.addressLine || deliveryAddrStr === billingAddrStr;
 
   // Accurate Customer Financials & Identity
-  const creditLimitVal = custObj?.creditLimit ? fmtMoney(custObj.creditLimit) : '₹50,000.00';
-  const outstandingVal = custObj?.outstandingBalance !== undefined ? fmtMoney(custObj.outstandingBalance) : '₹12,450.00';
+  const creditLimitVal = custObj?.creditLimit ? fmtMoney(custObj.creditLimit) : '—';
+  const rawCustomerOutstanding = custObj?.outstandingBalance !== undefined ? custObj.outstandingBalance : (custObj?.outstanding !== undefined ? custObj.outstanding : 0);
+  const outstandingVal = fmtMoney(rawCustomerOutstanding);
   const lastOrderVal = custObj?.lastOrderDate ? fmtDate(custObj.lastOrderDate) : fmtDate(activeOrder.orderDate);
   const customerGroup = custObj?.group || custObj?.category || 'Regular';
 
@@ -235,6 +250,11 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
   const subtotal = itemsTotal + chargesTotal;
   const discAmount = activeOrder.discountAmount || 0;
   const grandTotal = activeOrder.grandTotal || (subtotal - discAmount);
+
+  // Payment Tracking
+  const paidAmountVal = Number(activeOrder.paidAmount || 0);
+  const balanceDueVal = activeOrder.balanceDue !== undefined ? Number(activeOrder.balanceDue) : Math.max(0, grandTotal - paidAmountVal);
+  const paymentStatusVal = activeOrder.paymentStatus || (balanceDueVal <= 0 && grandTotal > 0 ? 'Paid' : (paidAmountVal > 0 ? 'Partially Paid' : 'Unpaid'));
 
   // Status badge
   const statusBadge = (status: string) => {
@@ -688,6 +708,14 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                 <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold border ${statusBadge(activeOrder.status)}`}>
                   {activeOrder.status}
                 </span>
+                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold border ${
+                  paymentStatusVal === 'Paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                  paymentStatusVal === 'Partially Paid' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                  'bg-amber-50 text-amber-700 border-amber-200'
+                }`}>
+                  <Wallet className="w-3 h-3" />
+                  {paymentStatusVal} {balanceDueVal > 0 ? `(Due: ${fmtMoney(balanceDueVal)})` : ''}
+                </span>
               </div>
               <p className="text-[11px] text-gray-400 mt-0.5">
                 Created on {fmtDate(activeOrder.orderDate)}{user?.fullName ? `, by ${user.fullName}` : ''}
@@ -697,6 +725,17 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
+            {activeOrder.status !== 'Cancelled' && (
+              <button
+                type="button"
+                onClick={() => setShowPaymentModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
+                title="Record Cash, Cheque, UPI payment"
+              >
+                <Receipt className="w-3.5 h-3.5" />
+                <span>Record Payment</span>
+              </button>
+            )}
             {activeOrder.status === 'Draft' && (
               <button
                 type="button"
@@ -1221,6 +1260,75 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                   <span className="text-sm font-black text-gray-900">Grand Total</span>
                   <span className="text-xl font-black text-blue-700">{fmtMoney(grandTotal)}</span>
                 </div>
+
+                {/* ── PAYMENT STATUS & CASH/CHEQUE/UPI BREAKDOWN ── */}
+                <div className="mt-3 p-3 bg-gray-50/90 rounded-xl border border-gray-200/90 space-y-2">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-gray-600 font-semibold">Payment Status:</span>
+                    <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] border ${
+                      paymentStatusVal === 'Paid' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
+                      paymentStatusVal === 'Partially Paid' ? 'bg-blue-100 text-blue-800 border-blue-300' :
+                      'bg-amber-100 text-amber-800 border-amber-300'
+                    }`}>
+                      {paymentStatusVal}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-gray-600">Paid Amount:</span>
+                    <span className="font-bold text-emerald-700 font-mono">{fmtMoney(paidAmountVal)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-gray-200">
+                    <span className="text-gray-800 font-bold">Balance Due:</span>
+                    <span className={`font-black font-mono text-sm ${balanceDueVal > 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                      {fmtMoney(balanceDueVal)}
+                    </span>
+                  </div>
+
+                  {activeOrder.status !== 'Cancelled' && (
+                    <button
+                      type="button"
+                      onClick={() => setShowPaymentModal(true)}
+                      className="w-full mt-1.5 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                      <Receipt className="w-3.5 h-3.5" />
+                      <span>{balanceDueVal > 0 ? `Record Payment (Due: ${fmtMoney(balanceDueVal)})` : 'Record Additional Payment'}</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* ── PAYMENT TRANSACTIONS LOG ── */}
+                {activeOrder.payments && activeOrder.payments.length > 0 && (
+                  <div className="mt-3 border border-gray-200 rounded-xl bg-white p-3 space-y-2">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-gray-800 border-b border-gray-100 pb-1.5">
+                      <span className="flex items-center gap-1">
+                        <Receipt className="w-3 h-3 text-emerald-600" />
+                        <span>Payment History ({activeOrder.payments.length})</span>
+                      </span>
+                      <span className="text-emerald-700 font-mono">{fmtMoney(paidAmountVal)}</span>
+                    </div>
+                    <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
+                      {activeOrder.payments.map((p: any, pIdx: number) => (
+                        <div key={p.paymentId || pIdx} className="p-2 bg-gray-50 rounded-lg border border-gray-100 text-[10px] flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold uppercase text-gray-700">{p.paymentMethod}</span>
+                              <span className="text-gray-300">•</span>
+                              <span className="text-gray-500 font-mono">{fmtDate(p.date)}</span>
+                            </div>
+                            {(p.referenceId || p.chequeNumber) && (
+                              <div className="text-gray-500 font-mono text-[9px] mt-0.5 truncate max-w-[150px]">
+                                Ref: {p.referenceId || p.chequeNumber} {p.bankName ? `(${p.bankName})` : ''}
+                              </div>
+                            )}
+                          </div>
+                          <span className="font-black text-emerald-700 font-mono text-xs">
+                            {fmtMoney(p.amount)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1259,6 +1367,15 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
             </button>
           </div>
         </div>
+
+        {/* ── RECORD PAYMENT MODAL ── */}
+        <RecordPaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          order={activeOrder}
+          customer={custObj}
+          onPaymentSuccess={handlePaymentSuccess}
+        />
 
       </div>
     </div>,

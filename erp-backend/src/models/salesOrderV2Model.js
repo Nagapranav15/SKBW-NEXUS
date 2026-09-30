@@ -204,6 +204,41 @@ const salesOrderV2Schema = new mongoose.Schema({
     required: true,
     default: 0
   },
+  paidAmount: {
+    type: Number,
+    default: 0
+  },
+  balanceDue: {
+    type: Number,
+    default: 0
+  },
+  paymentStatus: {
+    type: String,
+    enum: ["Unpaid", "Partially Paid", "Paid"],
+    default: "Unpaid"
+  },
+  payments: [{
+    paymentId: { type: String, default: "" },
+    amount: { type: Number, required: true },
+    paymentMethod: {
+      type: String,
+      enum: ["cash", "cheque", "upi", "bank_transfer"],
+      default: "cash"
+    },
+    date: { type: Date, default: Date.now },
+    referenceId: { type: String, default: "" },
+    cashLocation: { type: String, default: "" },
+    chequeNumber: { type: String, default: "" },
+    chequeDate: { type: String, default: "" },
+    bankName: { type: String, default: "" },
+    bankBranch: { type: String, default: "" },
+    chequeStatus: { type: String, default: "Pending" },
+    upiProvider: { type: String, default: "" },
+    accountName: { type: String, default: "" },
+    remarks: { type: String, default: "" },
+    recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    createdAt: { type: Date, default: Date.now }
+  }],
   materialsStatus: {
     type: String,
     enum: ["Ready", "Shortfall", "Done"],

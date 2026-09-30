@@ -75,6 +75,10 @@ export interface SalesOrderV2 {
   freightCharges?: number;
   roundOff?: number;
   grandTotal: number;
+  paidAmount?: number;
+  balanceDue?: number;
+  paymentStatus?: 'Unpaid' | 'Partially Paid' | 'Paid' | string;
+  payments?: SalesOrderPaymentRecord[];
   materialsStatus: 'Ready' | 'Shortfall' | 'Done';
   fulfillmentStatus?: 'Not Started' | 'Partial' | 'Fulfilled' | 'Pending' | 'Partially Dispatched' | 'Fully Dispatched' | 'In Production' | string;
   status: 'Draft' | 'Confirmed' | 'In Production' | 'Partially Delivered' | 'Delivered' | 'Invoiced' | 'Cancelled' | string;
@@ -87,6 +91,42 @@ export interface SalesOrderV2 {
   isTemplate?: boolean;
   isLegacy?: boolean;
   createdAt?: string;
+}
+
+export interface SalesOrderPaymentRecord {
+  _id?: string;
+  paymentId?: string;
+  amount: number;
+  paymentMethod: 'cash' | 'cheque' | 'upi' | 'bank_transfer' | string;
+  date: string;
+  referenceId?: string;
+  cashLocation?: string;
+  chequeNumber?: string;
+  chequeDate?: string;
+  bankName?: string;
+  bankBranch?: string;
+  chequeStatus?: string;
+  upiProvider?: string;
+  accountName?: string;
+  remarks?: string;
+  createdAt?: string;
+}
+
+export interface RecordPaymentPayload {
+  amount: number;
+  paymentMethod: 'cash' | 'cheque' | 'upi' | 'bank_transfer' | string;
+  date?: string;
+  referenceId?: string;
+  cashLocation?: string;
+  chequeNumber?: string;
+  chequeDate?: string;
+  bankName?: string;
+  bankBranch?: string;
+  chequeStatus?: string;
+  upiProvider?: string;
+  accountName?: string;
+  remarks?: string;
+  orderId?: string;
 }
 
 export interface BomRequirementResult {
@@ -163,3 +203,24 @@ export const getNextSalesOrderNumberV2 = async (companyId: string): Promise<stri
   });
   return response.data.nextOrderNumber;
 };
+
+export const recordSalesOrderPaymentV2 = async (
+  orderId: string,
+  paymentData: RecordPaymentPayload
+): Promise<{ msg: string; order: SalesOrderV2; customer?: any; payment: SalesOrderPaymentRecord }> => {
+  const response = await api.post(`/v2/sales-orders/${orderId}/payments`, paymentData);
+  return response.data;
+};
+
+export const getSalesOrderPaymentsV2 = async (orderId: string): Promise<{
+  orderNumber: string;
+  grandTotal: number;
+  paidAmount: number;
+  balanceDue: number;
+  paymentStatus: string;
+  payments: SalesOrderPaymentRecord[];
+}> => {
+  const response = await api.get(`/v2/sales-orders/${orderId}/payments`);
+  return response.data;
+};
+

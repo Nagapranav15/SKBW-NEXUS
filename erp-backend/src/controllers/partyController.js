@@ -2265,4 +2265,162 @@ exports.mergeParties = async (req, res) => {
   }
 };
 
+// Record direct payment from customer (reduces outstanding balance, logs transaction, and optionally allocates to unpaid credit orders)
+exports.recordCustomerPayment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      amount,
+      paymentMethod = "cash",
+      date,
+      referenceId,
+      cashLocation,
+      chequeNumber,
+      chequeDate,
+      bankName,
+      bankBranch,
+      chequeStatus,
+      upiProvider,
+      accountName,
+      remarks,
+      orderId
+    } = req.body;
+
+    const payAmount = Number(amount);
+    if (isNaN(payAmount) || payAmount <= 0) {
+      return res.status(400).json({ msg: "Payment amount must be a positive number" });
+    }
+
+    const party = await Party.findById(id);
+    if (!party) {
+      return res.status(404).json({ msg: "Customer / Party not found" });
+    }
+
+    // Deduct paid amount from party's outstanding
+    const prevOutstanding = Number(party.outstanding) || 0;
+    const prevOutstandingBal = Number(party.outstandingBalance) || 0;
+    party.outstanding = Math.max(0, prevOutstanding - payAmount);
+    party.outstandingBalance = Math.max(0, prevOutstandingBal - payAmount);
+    await party.save();
+
+    const validMethod = ["cash", "cheque", "upi", "bank_transfer"].includes(paymentMethod) ? paymentMethod : "cash";
+    const paymentId = `TXN-${new Date().toISOString().split("T")[0].replace(/-/g, "")}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const SalesOrderV2 = require('../models/salesOrderV2Model');
+    const Transaction = require('../models/transactionModel');
+
+    // If orderId is provided, or customer has unpaid Sales Orders, allocate payment
+    let updatedOrders = [];
+    if (orderId) {
+      const order = await SalesOrderV2.findById(orderId);
+      if (order) {
+        order.paidAmount = (Number(order.paidAmount) || 0) + payAmount;
+        order.balanceDue = Math.max(0, (Number(order.grandTotal) || 0) - order.paidAmount);
+        order.paymentStatus = order.balanceDue <= 0 && order.grandTotal > 0 ? "Paid" : (order.paidAmount > 0 ? "Partially Paid" : "Unpaid");
+        if (!order.payments) order.payments = [];
+        order.payments.push({
+          paymentId,
+          amount: payAmount,
+          paymentMethod: validMethod,
+          date: date ? new Date(date) : new Date(),
+          referenceId: referenceId || chequeNumber || "",
+          cashLocation: cashLocation || "",
+          chequeNumber: chequeNumber || "",
+          chequeDate: chequeDate || "",
+          bankName: bankName || "",
+          bankBranch: bankBranch || "",
+          chequeStatus: chequeStatus || "Pending",
+          upiProvider: upiProvider || "",
+          accountName: accountName || "",
+          remarks: remarks || "",
+          recordedBy: req.user?.id ? req.user.id : undefined,
+          createdAt: new Date()
+        });
+        await order.save();
+        updatedOrders.push(order);
+      }
+    } else {
+      // Find oldest unpaid/partially paid credit orders for this customer and allocate
+      try {
+        const unpaidOrders = await SalesOrderV2.find({
+          customer: party._id,
+          orderType: "Credit",
+          paymentStatus: { $ne: "Paid" },
+          status: { $ne: "Cancelled" },
+          isDeleted: { $ne: true }
+        }).sort({ orderDate: 1, createdAt: 1 });
+
+        let remainingToAllocate = payAmount;
+        for (const ord of unpaidOrders) {
+          if (remainingToAllocate <= 0) break;
+          const orderDue = ord.balanceDue !== undefined ? ord.balanceDue : Math.max(0, (ord.grandTotal || 0) - (ord.paidAmount || 0));
+          if (orderDue <= 0) continue;
+
+          const alloc = Math.min(orderDue, remainingToAllocate);
+          ord.paidAmount = (Number(ord.paidAmount) || 0) + alloc;
+          ord.balanceDue = Math.max(0, (Number(ord.grandTotal) || 0) - ord.paidAmount);
+          ord.paymentStatus = ord.balanceDue <= 0 && ord.grandTotal > 0 ? "Paid" : (ord.paidAmount > 0 ? "Partially Paid" : "Unpaid");
+          if (!ord.payments) ord.payments = [];
+          ord.payments.push({
+            paymentId,
+            amount: alloc,
+            paymentMethod: validMethod,
+            date: date ? new Date(date) : new Date(),
+            referenceId: referenceId || chequeNumber || "",
+            remarks: remarks || "Direct customer payment allocated",
+            createdAt: new Date()
+          });
+          await ord.save();
+          updatedOrders.push(ord);
+          remainingToAllocate -= alloc;
+        }
+      } catch (allocErr) {
+        console.warn("Auto-allocation to orders skipped:", allocErr);
+      }
+    }
+
+    // Record in Transaction ledger
+    try {
+      const financialTx = new Transaction({
+        transactionId: paymentId,
+        date: date ? new Date(date) : new Date(),
+        type: "credit",
+        category: "Customer Payment",
+        subcategory: validMethod,
+        amount: payAmount,
+        partyId: party._id,
+        partyName: party.firmName || party.ownerName || party.contactName,
+        description: remarks || `Payment received from ${party.firmName || party.ownerName} via ${validMethod.toUpperCase()}${chequeNumber ? ` (Cheque: ${chequeNumber})` : ''}`,
+        paymentMethod: validMethod,
+        referenceId: referenceId || chequeNumber || "",
+        company: party.company || (party.companies && party.companies[0]),
+        createdBy: req.user?.id ? req.user.id : undefined,
+        source: "system",
+        source_type: "SALE"
+      });
+      await financialTx.save();
+    } catch (txnErr) {
+      console.error("Failed to save transaction for party payment:", txnErr);
+    }
+
+    // Activity log
+    ActivityLog.create({
+      action: 'PAYMENT_RECORDED',
+      entityType: party.type,
+      entityName: party.firmName || party.ownerName,
+      details: `Recorded payment of ₹${payAmount.toLocaleString('en-IN')} via ${validMethod}. Outstanding balance is now ₹${party.outstandingBalance.toLocaleString('en-IN')}`,
+      performedBy: req.user ? req.user.fullName : "System",
+      company: party.company || (party.companies && party.companies[0])
+    }).catch(e => console.error("ActivityLog error:", e));
+
+    res.json({
+      msg: "Payment recorded successfully",
+      party,
+      updatedOrders
+    });
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+};
+
 exports.generateCustomerCode = generateCustomerCode;

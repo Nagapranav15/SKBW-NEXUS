@@ -17,6 +17,7 @@ router.post('/import', auth, rbac(['MANAGE_PARTIES', 'CREATE_PARTIES']), partyCo
 router.post('/', auth, rbac(['MANAGE_PARTIES', 'CREATE_PARTIES']), partyController.createParty);
 router.put('/:id', auth, rbac('MANAGE_PARTIES'), partyController.updateParty);
 router.delete('/:id', auth, rbac('MANAGE_PARTIES'), partyController.deleteParty);
+router.post('/:id/payment', auth, rbac(['MANAGE_PARTIES', 'CREATE_PARTIES', 'MANAGE_ORDERS']), partyController.recordCustomerPayment);
 router.post('/:id/link-company', auth, rbac('MANAGE_PARTIES'), partyController.linkPartyToCompany);
 router.post('/:id/unlink-company', auth, rbac('MANAGE_PARTIES'), partyController.unlinkPartyFromCompany);
 
