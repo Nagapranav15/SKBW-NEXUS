@@ -10,6 +10,7 @@ import { formatOrderNo } from './productionUtils';
 import { fetchStockCostings, resolveComponentCosting, StockCostingData } from '../../utils/inventoryCosting';
 import { getSalesOrdersV2, SalesOrderV2 } from '../../api/salesOrderApiV2';
 import { showToast } from '../ui/Toast';
+import Modal from '../ui/Modal';
 import { convertRateToUom, convertUom } from '../../utils/uomConversion';
 
 interface ProductionOrderDetailViewProps {
