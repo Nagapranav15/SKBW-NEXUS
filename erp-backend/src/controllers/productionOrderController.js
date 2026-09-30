@@ -3,6 +3,7 @@ const SkuV2 = require("../models/skuV2Model");
 const InventoryLedger = require("../models/inventoryLedgerModelV2");
 const WarehouseLocationV2 = require("../models/warehouseLocationV2Model");
 const PurchaseInvoiceV2 = require("../models/purchaseInvoiceV2Model");
+const CuttingSlip = require("../models/cuttingSlipModel");
 const Sequence = require("../models/sequenceModel");
 const mongoose = require("mongoose");
 
@@ -225,6 +226,77 @@ const syncProductionOrderLedger = async (order) => {
 
     if (ledgerDocs.length > 0) {
       await InventoryLedger.insertMany(ledgerDocs, { ordered: false });
+    }
+
+    // Update produced SKU's Weighted Average Cost using standard formula:
+    // New Avg Cost = (Existing Stock Value + New Production Value) / (Existing Qty + New Qty)
+    if (order.itemId || order.itemCode || order.itemName) {
+      const targetSku = await SkuV2.findOne({
+        company: companyObjId,
+        $or: [
+          ...(order.itemId && mongoose.Types.ObjectId.isValid(order.itemId) ? [{ _id: order.itemId }] : []),
+          ...(order.itemCode ? [{ skuCode: order.itemCode }] : []),
+          ...(order.itemName ? [{ name: order.itemName }] : [])
+        ]
+      });
+
+      if (targetSku && qtyIn > 0) {
+        const isGbl = (targetSku.unit || '').toUpperCase() === 'GBL' || (order.plannedUom || '').toUpperCase() === 'GBL';
+        let unitCost = 0;
+        const cs = order.costSummary || {};
+        if (isGbl && cs.costPerGbl && Number(cs.costPerGbl) > 0) {
+          unitCost = Number(cs.costPerGbl);
+        } else if (!isGbl && cs.costPerPiece && Number(cs.costPerPiece) > 0) {
+          unitCost = Number(cs.costPerPiece);
+        } else if (cs.totalProductionCost && Number(cs.totalProductionCost) > 0) {
+          const divisor = isGbl ? (order.plannedQty || 1) : (order.plannedPcs || order.plannedQty || 1);
+          unitCost = Number(cs.totalProductionCost) / divisor;
+        }
+
+        const effectiveTotalCost = (Number(cs.totalProductionCost) > 0 && isCompleted)
+          ? Number(cs.totalProductionCost)
+          : (qtyIn * unitCost);
+
+        if (unitCost > 0) {
+          try {
+            const onHandAgg = await InventoryLedger.aggregate([
+              {
+                $match: {
+                  company: companyObjId,
+                  skuId: targetSku._id,
+                  status: "Posted"
+                }
+              },
+              {
+                $group: {
+                  _id: "$skuId",
+                  totalIn: { $sum: { $cond: [{ $eq: ["$direction", "IN"] }, "$quantity", 0] } },
+                  totalOut: { $sum: { $cond: [{ $eq: ["$direction", "OUT"] }, "$quantity", 0] } }
+                }
+              }
+            ]);
+
+            const rawOnHand = onHandAgg.length > 0 ? (onHandAgg[0].totalIn - onHandAgg[0].totalOut) : 0;
+            const existingQty = Math.max(0, rawOnHand - qtyIn);
+            const existingRate = Number(targetSku.avgCost || targetSku.costPrice || targetSku.standardCost || 0);
+            const existingStockValue = existingQty * existingRate;
+
+            const totalQty = existingQty + qtyIn;
+            // Weighted average cost formula:
+            const newAvgCost = totalQty > 0
+              ? ((existingStockValue + effectiveTotalCost) / totalQty)
+              : unitCost;
+
+            const roundedCost = Math.round(newAvgCost * 10000) / 10000;
+            targetSku.avgCost = roundedCost;
+            targetSku.costPrice = roundedCost;
+            targetSku.standardCost = roundedCost;
+            await targetSku.save();
+          } catch (costErr) {
+            console.error("Non-critical: Failed to update SKU weighted average cost:", costErr);
+          }
+        }
+      }
     }
   } catch (err) {
     console.error("Error syncing production order stock updates to InventoryLedger:", err);
@@ -783,7 +855,34 @@ exports.getMaterialRates = async (req, res) => {
         }
       }
 
-      const standardRate = Number(sku.purchasePrice || (sku).costPrice || (sku).rate || productionRate || 0);
+      // Also check if this SKU was produced by any Cutting Slip (Reel-to-Sheet conversion)
+      let cuttingSlipRate = 0;
+      try {
+        const lastSlip = await CuttingSlip.findOne({
+          company: companyObjId,
+          targetSku: sku._id,
+          status: "Posted"
+        }).sort({ createdAt: -1 }).lean();
+        if (lastSlip && lastSlip.effectiveCostPerSheet > 0) {
+          const isReam = (sku.unit || '').toLowerCase().includes('ream');
+          cuttingSlipRate = isReam
+            ? (lastSlip.effectiveCostPerReam || lastSlip.effectiveCostPerSheet * 500)
+            : lastSlip.effectiveCostPerSheet;
+        }
+      } catch (e) {
+        // Non-critical
+      }
+
+      const standardRate = Number(
+        sku.avgCost || 
+        sku.costPrice || 
+        sku.standardCost || 
+        productionRate || 
+        cuttingSlipRate || 
+        sku.purchasePrice || 
+        sku.rate || 
+        0
+      );
 
       // FIFO: Pick the unit price of the earliest active batch
       let fifoRate = 0;

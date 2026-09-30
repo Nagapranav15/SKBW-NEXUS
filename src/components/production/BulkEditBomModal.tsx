@@ -199,9 +199,15 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
 
   // Select product
   const handleSelectBomProduct = (prod: SkuV2, currentSkus = skus) => {
-    setActiveBomProduct(prod);
-    setBuildBatchYieldQty(String((prod as any).recipeYieldQty ?? (prod as any).batchYieldQty ?? '1'));
-    setBuildBatchYieldUnit((prod as any).recipeYieldUnit || (prod as any).batchYieldUnit || prod.unit || 'Pcs');
+    const isFinished = getItemClassification(prod) === 'products';
+    const rawYieldUnit = (prod as any).recipeYieldUnit || (prod as any).batchYieldUnit || prod.unit || 'Pcs';
+    const isYieldGbl = rawYieldUnit.toUpperCase().includes('GBL');
+    const defaultYieldQty = isFinished && !isYieldGbl
+      ? '1'
+      : String((prod as any).recipeYieldQty ?? (prod as any).batchYieldQty ?? '1');
+
+    setBuildBatchYieldQty(defaultYieldQty);
+    setBuildBatchYieldUnit(rawYieldUnit);
 
     if ((prod as any).bomItems && Array.isArray((prod as any).bomItems)) {
       setActiveRecipeItems((prod as any).bomItems.map((item: any, idx: number) => {

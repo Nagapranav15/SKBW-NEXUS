@@ -385,6 +385,48 @@ exports.createCuttingSlip = async (req, res) => {
     });
     await ledgerIn.save({ session });
 
+    // Update target SKU's weighted average cost using standard formula:
+    // New Avg Cost = (Existing Stock Value + New Production Value) / (Existing Qty + New Qty)
+    try {
+      const onHandAgg = await InventoryLedger.aggregate([
+        {
+          $match: {
+            company: companyId,
+            skuId: targetSkuDoc._id,
+            status: "Posted"
+          }
+        },
+        {
+          $group: {
+            _id: "$skuId",
+            totalIn: { $sum: { $cond: [{ $eq: ["$direction", "IN"] }, "$quantity", 0] } },
+            totalOut: { $sum: { $cond: [{ $eq: ["$direction", "OUT"] }, "$quantity", 0] } }
+          }
+        }
+      ]).session(session);
+
+      const rawOnHand = onHandAgg.length > 0 ? (onHandAgg[0].totalIn - onHandAgg[0].totalOut) : 0;
+      const existingQty = Math.max(0, rawOnHand - finalOutputQty);
+      const existingRate = Number(targetSkuDoc.avgCost || targetSkuDoc.costPrice || targetSkuDoc.standardCost || 0);
+      const existingStockValue = existingQty * existingRate;
+
+      const totalQty = existingQty + finalOutputQty;
+      const unitRate = isTargetUnitReam ? Number(effectiveCostPerReam || 0) : Number(effectiveCostPerSheet || 0);
+      const newProductionValue = Number(netProductionCost || (finalOutputQty * unitRate));
+
+      const newAvgCost = totalQty > 0
+        ? ((existingStockValue + newProductionValue) / totalQty)
+        : unitRate;
+
+      const roundedAvg = Math.round(newAvgCost * 10000) / 10000;
+      targetSkuDoc.avgCost = roundedAvg;
+      targetSkuDoc.costPrice = roundedAvg;
+      targetSkuDoc.standardCost = roundedAvg;
+      await targetSkuDoc.save({ session });
+    } catch (costErr) {
+      console.error("Non-critical: Failed to update target SKU weighted average cost on cutting slip:", costErr);
+    }
+
     // Commit Transaction
     await session.commitTransaction();
     session.endSession();

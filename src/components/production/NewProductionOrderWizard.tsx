@@ -594,9 +594,10 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
   // Converts BOM "recipe makes" quantity into base PCS:
   // e.g. If recipe makes 5 GBL, and 1 GBL = 400 PCS, then recipeBasePcs = 5 * 400 = 2,000 PCS.
-  // If recipe makes 2000 PCS, recipeBasePcs = 2,000 PCS.
+  // For Finished Goods (notebooks), BOM requirements (e.g. 23 UR sheets, 1 Index, 1 Board)
+  // are already defined for 1 finished book (1 PCS). It must NOT divide by 4-UP or 2-UP again!
   const getSkuRecipeBasePcs = (sku: SkuV2, convFactor: number): number => {
-    const rawYieldQty = Number(sku.recipeYieldQty) || Number(sku.batchYieldQty) || 1;
+    const isFinished = getItemClassification(sku) === 'products';
     const yieldUnit = (
       (sku as any).recipeYieldUnit || 
       (sku as any).batchYieldUnit || 
@@ -604,6 +605,17 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       'PCS'
     ).toUpperCase().trim();
 
+    if (isFinished) {
+      if (yieldUnit === 'GBL') {
+        const rawYieldQty = Number(sku.recipeYieldQty) || Number(sku.batchYieldQty) || 1;
+        const factor = convFactor > 0 ? convFactor : 1;
+        return rawYieldQty * factor;
+      }
+      // For Finished Goods in PCS, BOM recipe lines are already expressed per 1 finished book.
+      return 1;
+    }
+
+    const rawYieldQty = Number(sku.recipeYieldQty) || Number(sku.batchYieldQty) || 1;
     if (yieldUnit === 'GBL') {
       const factor = convFactor > 0 ? convFactor : 1;
       return rawYieldQty * factor;
