@@ -1242,10 +1242,22 @@ exports.getMaterialRates = async (req, res) => {
               status: "Posted"
             }).lean();
             if (csSlip) {
-              const isReam = (sku.unit || '').toLowerCase().includes('ream');
-              const csRate = isReam
-                ? (csSlip.effectiveCostPerReam || (csSlip.effectiveCostPerSheet * (csSlip.sheetsPerReam || 500)))
-                : csSlip.effectiveCostPerSheet;
+              const skuUnitNorm = (sku.unit || '').trim().toLowerCase();
+              const isReam = skuUnitNorm.includes('ream');
+              const isPcs = skuUnitNorm === 'pcs' || skuUnitNorm === 'piece' || skuUnitNorm === 'pieces';
+              const isGbl = skuUnitNorm === 'gbl';
+              const convFactor = Number(sku.altUnitConversion || sku.conv || sku.booksGbl || sku.pcsPerGbl || 400);
+
+              let csRate = csSlip.effectiveCostPerSheet;
+              if (isReam) {
+                csRate = csSlip.effectiveCostPerReam || (csSlip.effectiveCostPerSheet * (csSlip.sheetsPerReam || 500));
+              } else if (isPcs) {
+                // 4-UP PCS cost: Parent sheet cost / 4
+                csRate = csSlip.effectiveCostPerSheet / 4;
+              } else if (isGbl) {
+                // Rate in GBL: (Parent sheet cost / 4) * convFactor
+                csRate = (csSlip.effectiveCostPerSheet / 4) * (convFactor > 0 ? convFactor : 400);
+              }
               if (csRate > 0) {
                 b.rate = Math.round(csRate * 10000) / 10000;
               }
@@ -1263,10 +1275,23 @@ exports.getMaterialRates = async (req, res) => {
           status: "Posted"
         }).sort({ createdAt: -1 }).lean();
         if (lastSlip && lastSlip.effectiveCostPerSheet > 0) {
-          const isReam = (sku.unit || '').toLowerCase().includes('ream');
-          cuttingSlipRate = isReam
-            ? (lastSlip.effectiveCostPerReam || lastSlip.effectiveCostPerSheet * 500)
-            : lastSlip.effectiveCostPerSheet;
+          const skuUnitNorm = (sku.unit || '').trim().toLowerCase();
+          const isReam = skuUnitNorm.includes('ream');
+          const isPcs = skuUnitNorm === 'pcs' || skuUnitNorm === 'piece' || skuUnitNorm === 'pieces';
+          const isGbl = skuUnitNorm === 'gbl';
+          const convFactor = Number(sku.altUnitConversion || sku.conv || sku.booksGbl || sku.pcsPerGbl || 400);
+
+          if (isReam) {
+            cuttingSlipRate = lastSlip.effectiveCostPerReam || (lastSlip.effectiveCostPerSheet * (lastSlip.sheetsPerReam || 500));
+          } else if (isPcs) {
+            // 4-UP PCS cost: Parent sheet cost / 4
+            cuttingSlipRate = Math.round((lastSlip.effectiveCostPerSheet / 4) * 10000) / 10000;
+          } else if (isGbl) {
+            // Rate in GBL: (Parent sheet cost / 4) * convFactor
+            cuttingSlipRate = Math.round(((lastSlip.effectiveCostPerSheet / 4) * (convFactor > 0 ? convFactor : 400)) * 10000) / 10000;
+          } else {
+            cuttingSlipRate = lastSlip.effectiveCostPerSheet;
+          }
         }
       } catch (e) {
         // Non-critical

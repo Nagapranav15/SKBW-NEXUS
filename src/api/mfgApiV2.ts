@@ -559,6 +559,7 @@ export interface CuttingSlipV2 {
   netProductionCost: number;
   effectiveCostPerSheet: number;
   effectiveCostPerReam: number;
+  costPer4UpPiece?: number;
   destinationLocationId: any;
   machineName?: string;
   operatorName?: string;

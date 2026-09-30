@@ -193,7 +193,16 @@ exports.getAvailableReels = async (req, res) => {
       const sku = skuMap.get(String(group.skuId));
       const loc = locMap.get(String(group.locationId));
       const invItem = invoiceItemMap.get(`${group.batchNumber}_${String(group.skuId)}`);
-      const rate = invItem?.ratePerKg || (invItem?.purchasePrice && invItem?.quantity ? invItem.purchasePrice / invItem.quantity : 0) || sku?.avgCost || sku?.purchasePrice || sku?.costPrice || 60;
+      const rate = Number(
+        invItem?.ratePerKg ||
+        invItem?.purchasePrice ||
+        (invItem?.totalPrice && invItem?.quantity ? invItem.totalPrice / invItem.quantity : 0) ||
+        sku?.avgCost ||
+        sku?.purchasePrice ||
+        sku?.costPrice ||
+        sku?.rate ||
+        80
+      );
 
       const activeReels = group.activeReels || [];
       if (activeReels.length > 0) {
@@ -355,6 +364,7 @@ exports.createCuttingSlip = async (req, res) => {
       netProductionCost: Number(netProductionCost || 0),
       effectiveCostPerSheet: Number(effectiveCostPerSheet || 0),
       effectiveCostPerReam: Number(effectiveCostPerReam || 0),
+      costPer4UpPiece: Number((Number(effectiveCostPerSheet || 0) / 4).toFixed(4)),
       destinationLocationId: toObjectId(destinationLocationId),
       machineName: machineName || "Sheeter 01",
       operatorName: operatorName || "",
@@ -395,9 +405,33 @@ exports.createCuttingSlip = async (req, res) => {
     });
     await ledgerOut.save({ session });
 
-    // Entry B: IN (Generation of Converted Sheets)
-    const isTargetUnitReam = (targetSkuDoc.unit || '').toLowerCase().includes('ream');
-    const finalOutputQty = isTargetUnitReam ? Number(actualReams) : Number(actualSheets);
+    // Entry B: IN (Generation of Converted Sheets / Semi-Finished Units)
+    const targetUnitNorm = (targetSkuDoc.unit || '').trim().toLowerCase();
+    const isTargetUnitReam = targetUnitNorm.includes('ream');
+    const isTargetUnitPcs = targetUnitNorm === 'pcs' || targetUnitNorm === 'piece' || targetUnitNorm === 'pieces';
+    const isTargetUnitGbl = targetUnitNorm === 'gbl';
+    const convFactor = Number(targetSkuDoc.altUnitConversion || targetSkuDoc.conv || targetSkuDoc.booksGbl || targetSkuDoc.pcsPerGbl || 400);
+
+    let finalOutputQty = Number(actualSheets);
+    let unitRate = Number(effectiveCostPerSheet || 0);
+
+    if (isTargetUnitReam) {
+      finalOutputQty = Number(actualReams);
+      unitRate = Number(effectiveCostPerReam || (Number(effectiveCostPerSheet) * (sheetsPerReam || 500)));
+    } else if (isTargetUnitPcs) {
+      // 4-UP: 1 parent sheet yields 4 semi-finished PCS
+      finalOutputQty = Number(actualSheets) * 4;
+      unitRate = Math.round((Number(effectiveCostPerSheet) / 4) * 10000) / 10000;
+    } else if (isTargetUnitGbl) {
+      // 4-UP converted to GBL: total PCS / convFactor
+      const totalPcs = Number(actualSheets) * 4;
+      finalOutputQty = Math.round((totalPcs / (convFactor > 0 ? convFactor : 400)) * 1000) / 1000;
+      unitRate = Math.round(((Number(effectiveCostPerSheet) / 4) * (convFactor > 0 ? convFactor : 400)) * 10000) / 10000;
+    } else {
+      // Default: Parent Sheets
+      finalOutputQty = Number(actualSheets);
+      unitRate = Number(effectiveCostPerSheet || 0);
+    }
 
     const txNumIn = await Sequence.getNextSequence("IL", session);
     const ledgerIn = new InventoryLedger({
@@ -414,7 +448,7 @@ exports.createCuttingSlip = async (req, res) => {
       floorId: destH.floorId,
       zoneId: destH.zoneId,
       locationId: destH.locationId,
-      remarks: `Output: ${actualSheets} Sheets (${actualReams} Reams) cut from reels via ${finalSlipNumber}`,
+      remarks: `Output: ${actualSheets} Sheets (${actualReams} Reams → ${finalOutputQty} ${targetSkuDoc.unit || 'Sheets'}) cut from reels via ${finalSlipNumber}`,
       createdBy: toObjectId(req.user?.id),
       company: companyId,
       status: "Posted"
@@ -447,7 +481,6 @@ exports.createCuttingSlip = async (req, res) => {
       const existingStockValue = existingQty * existingRate;
 
       const totalQty = existingQty + finalOutputQty;
-      const unitRate = isTargetUnitReam ? Number(effectiveCostPerReam || 0) : Number(effectiveCostPerSheet || 0);
       const newProductionValue = Number(netProductionCost || (finalOutputQty * unitRate));
 
       const newAvgCost = totalQty > 0

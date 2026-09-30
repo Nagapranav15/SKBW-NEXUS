@@ -11,6 +11,7 @@ import { copyBom, useCopiedBom } from '../../utils/bomClipboard';
 import { AdditionalCostRow, ProfitPricingState, calculateCosting, formatInr } from '../../utils/costingUtils';
 import { showToast } from '../ui/Toast';
 import { getItemClassification } from '../../utils/skuClassification';
+import { convertRateToUom } from '../../utils/uomConversion';
 import * as XLSX from 'xlsx';
 
 export interface BomRecipeItem {
@@ -24,6 +25,7 @@ export interface BomRecipeItem {
   altUnit?: string;
   inStock: number;
   notes?: string;
+  rate?: number;
 }
 
 export interface BulkEditBomModalProps {
@@ -276,17 +278,33 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
         (item.skuCode && s.skuCode === item.skuCode) ||
         (item.name && s.name === item.name)
       );
-      const rate = Number(
-        (matchedSku as any)?.purchasePrice ||
-        (matchedSku as any)?.ratePerKg ||
-        (matchedSku as any)?.rate ||
-        (matchedSku as any)?.avgRate ||
-        (matchedSku as any)?.cost ||
-        (matchedSku as any)?.unitPrice ||
-        (item as any)?.rate ||
-        0
-      );
-      return sum + ((Number(item.qty) || 0) * rate);
+
+      // 1. Raw rate: use item.rate if manually entered, otherwise pull from matchedSku
+      let rawRate = Number((item as any)?.rate || 0);
+      if (rawRate <= 0 && matchedSku) {
+        rawRate = Number(
+          (matchedSku as any)?.costPrice ||
+          (matchedSku as any)?.avgCost ||
+          (matchedSku as any)?.standardCost ||
+          (matchedSku as any)?.purchasePrice ||
+          (matchedSku as any)?.ratePerKg ||
+          (matchedSku as any)?.rate ||
+          (matchedSku as any)?.avgRate ||
+          (matchedSku as any)?.cost ||
+          (matchedSku as any)?.unitPrice ||
+          0
+        );
+      }
+
+      // 2. Convert rate to item.uom if matchedSku stocking unit differs
+      let effectiveRate = rawRate;
+      const skuUnit = matchedSku?.unit || '';
+      const itemUom = item.uom || '';
+      if (rawRate > 0 && skuUnit && itemUom && skuUnit.trim().toLowerCase() !== itemUom.trim().toLowerCase()) {
+        effectiveRate = convertRateToUom(rawRate, skuUnit, itemUom, matchedSku);
+      }
+
+      return sum + ((Number(item.qty) || 0) * effectiveRate);
     }, 0);
   }, [activeRecipeItems, skus]);
 
@@ -316,6 +334,8 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
     try {
       const yieldQty = Number(buildBatchYieldQty) || 1;
       const yieldUnit = buildBatchYieldUnit || (activeBomProduct as any).recipeYieldUnit || (activeBomProduct as any).batchYieldUnit || activeBomProduct.unit || 'Pcs';
+      const isYieldGbl = (yieldUnit || '').toUpperCase().includes('GBL');
+      const unitCost = isYieldGbl ? costingSummary.costPerGbl : costingSummary.costPerPcs;
 
       const updatedPayload: any = {
         bomItems: activeRecipeItems,
@@ -325,6 +345,9 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
           suggestedPricePcs: costingSummary.suggestedPricePcs,
           suggestedPriceGbl: costingSummary.suggestedPriceGbl
         },
+        costPrice: unitCost,
+        avgCost: unitCost,
+        standardCost: unitCost,
         recipeYieldQty: yieldQty,
         recipeYieldUnit: yieldUnit,
         batchYieldQty: yieldQty,
