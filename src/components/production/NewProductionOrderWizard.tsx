@@ -40,9 +40,9 @@ export interface DepartmentPreset {
 export interface PredefinedCost {
   id: string;
   name: string;
-  basis: 'Total / Batch' | 'Per GBL' | 'Per Piece' | 'Lump Sum';
+  basis: 'Per BOM' | 'Total / Batch' | 'Per Batch' | 'Per GBL' | 'Per Piece' | string;
   defaultRate: number;
-  appliedAs: 'Total Cost for this production' | 'Per Unit (GBL)' | 'Per Unit (PCS)';
+  appliedAs: 'Per BOM' | 'Total Cost for this production/batch' | 'Total Cost for this production' | 'Per Unit (GBL)' | 'Per Unit (PCS)' | 'Per Batch' | string;
 }
 
 export type BomRateMode = 'avg_purchase' | 'fifo' | 'custom';
@@ -108,9 +108,9 @@ interface ScrapRow {
 interface AdditionalCostRow {
   id: string;
   costType: string;
-  basis: 'Total / Batch' | 'Per GBL' | 'Per Piece' | 'Lump Sum';
+  basis: 'Per BOM' | 'Total / Batch' | 'Per Batch' | 'Per GBL' | 'Per Piece' | string;
   amount: number;
-  appliedAs: 'Total Cost for this production' | 'Per Unit (GBL)' | 'Per Unit (PCS)';
+  appliedAs: 'Per BOM' | 'Total Cost for this production/batch' | 'Total Cost for this production' | 'Per Unit (GBL)' | 'Per Unit (PCS)' | 'Per Batch' | string;
 }
 
 export const buildCleanDepartmentPresets = (locs: WarehouseLocationV2[]): DepartmentPreset[] => {
@@ -261,7 +261,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   const [quickCostOpenUpwards, setQuickCostOpenUpwards] = useState<boolean>(false);
   const [showManageCostModal, setShowManageCostModal] = useState<boolean>(false);
   const [newCostName, setNewCostName] = useState<string>('');
-  const [newCostBasis, setNewCostBasis] = useState<'Total / Batch' | 'Per GBL' | 'Per Piece' | 'Lump Sum'>('Per GBL');
+  const [newCostBasis, setNewCostBasis] = useState<'Per BOM' | 'Total / Batch' | 'Per Batch' | 'Per GBL' | 'Per Piece' | string>('Per BOM');
   const [newCostRate, setNewCostRate] = useState<string>('');
   const costPresetMenuRef = useRef<HTMLDivElement>(null);
   const costPresetListRef = useRef<HTMLDivElement>(null);
@@ -849,6 +849,29 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     return numPlannedQty / factor;
   }, [numPlannedQty, uom, conversionFactor]);
 
+  // Base PCS produced per 1 standard BOM recipe run:
+  const recipeBasePcs = useMemo(() => {
+    if (!currentSku) return 1;
+    return getSkuRecipeBasePcs(currentSku, conversionFactor);
+  }, [currentSku, conversionFactor]);
+
+  // Dynamic BOM Multiplier (how many parent BOM batches / sheets are consumed for this order)
+  const bomMultiplier = useMemo(() => {
+    // 1. If materials table has items loaded with recipeQty > 0 and requiredQty > 0:
+    const firstBomMat = materials.find(m => m.recipeQty && Number(m.recipeQty) > 0 && m.requiredQty !== undefined);
+    if (firstBomMat && Number(firstBomMat.recipeQty) > 0) {
+      const ratio = Number(firstBomMat.requiredQty) / Number(firstBomMat.recipeQty);
+      if (ratio > 0 && isFinite(ratio)) {
+        return Math.round(ratio * 1000) / 1000;
+      }
+    }
+    // 2. Otherwise calculate from plannedPcs / recipeBasePcs:
+    if (plannedPcs > 0 && recipeBasePcs > 0) {
+      return Math.round((plannedPcs / recipeBasePcs) * 1000) / 1000;
+    }
+    return 1;
+  }, [materials, plannedPcs, recipeBasePcs]);
+
   // Recalculate material requirements when target quantity changes
   useEffect(() => {
     if (materials.length > 0) {
@@ -958,7 +981,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       name: newCostName.trim(),
       basis: newCostBasis,
       defaultRate: rateNum,
-      appliedAs: newCostBasis === 'Per GBL' ? 'Per Unit (GBL)' : newCostBasis === 'Per Piece' ? 'Per Unit (PCS)' : 'Total Cost for this production'
+      appliedAs: newCostBasis === 'Per BOM' ? 'Per BOM' : newCostBasis === 'Per GBL' ? 'Per Unit (GBL)' : newCostBasis === 'Per Piece' ? 'Per Unit (PCS)' : 'Total Cost for this production/batch'
     };
     const updated = [...predefinedCosts, newPreset];
     setPredefinedCosts(updated);
@@ -1096,14 +1119,18 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
     // Dynamic Overheads / Additional Costs from SKU BOM (blank by default)
     if (Array.isArray((sku as any).additionalCosts) && (sku as any).additionalCosts.length > 0) {
-      setAdditionalCosts((sku as any).additionalCosts.map((c: any, i: number) => ({
-        id: c.id || `cost-${Date.now()}-${i}`,
-        costType: c.costType || '',
-        basis: (c.calcBasis || c.basis || 'Per Piece') as any,
-        amount: Number(c.amount) || 0,
-        appliedAs: (c.appliedAs || 'Per Unit (PCS)') as any,
-        totalAmount: 0
-      })));
+      setAdditionalCosts((sku as any).additionalCosts.map((c: any, i: number) => {
+        const basis = c.calcBasis || c.basis || 'Per Piece';
+        const isBatch = basis === 'Per Batch' || basis === 'Fixed' || basis === 'Total / Batch';
+        return {
+          id: c.id || `cost-${Date.now()}-${i}`,
+          costType: c.costType || '',
+          basis: basis as any,
+          amount: Number(c.amount) || 0,
+          appliedAs: (c.appliedAs || (isBatch ? 'Total Cost for this production/batch' : 'Per Unit (PCS)')) as any,
+          totalAmount: 0
+        };
+      }));
     } else {
       setAdditionalCosts([]);
     }
@@ -1534,7 +1561,37 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   const handleUpdateCost = (id: string, field: keyof AdditionalCostRow, value: any) => {
     setAdditionalCosts(prev => prev.map(c => {
       if (c.id !== id) return c;
-      return { ...c, [field]: value };
+      const updated = { ...c, [field]: value };
+      if (field === 'basis') {
+        if (value === 'Per BOM') {
+          updated.appliedAs = 'Per BOM';
+        } else if (value === 'Total / Batch') {
+          updated.appliedAs = 'Total Cost for this production/batch';
+        } else if (value === 'Per Batch') {
+          updated.appliedAs = 'Per Batch';
+        } else if (value === 'Per Piece') {
+          updated.appliedAs = 'Per Unit (PCS)';
+        } else if (value === 'Per GBL') {
+          updated.appliedAs = 'Per Unit (GBL)';
+        }
+      } else if (field === 'appliedAs') {
+        if (value === 'Per BOM') {
+          updated.basis = 'Per BOM';
+        } else if (value === 'Total Cost for this production/batch' || value === 'Total Cost for this production') {
+          if (c.basis === 'Per Piece' || c.basis === 'Per GBL') {
+            updated.basis = 'Total / Batch';
+          }
+        } else if (value === 'Per Batch') {
+          if (c.basis === 'Per Piece' || c.basis === 'Per GBL') {
+            updated.basis = 'Per Batch';
+          }
+        } else if (value === 'Per Unit (PCS)') {
+          updated.basis = 'Per Piece';
+        } else if (value === 'Per Unit (GBL)') {
+          updated.basis = 'Per GBL';
+        }
+      }
+      return updated;
     }));
   };
 
@@ -1550,15 +1607,37 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   const totalAdditionalCost = useMemo(() => {
     return additionalCosts.reduce((sum, row) => {
       const amt = Number(row.amount) || 0;
-      if (row.basis === 'Per GBL' || row.appliedAs === 'Per Unit (GBL)') {
+      const b = (row.basis || '').toLowerCase().trim();
+      const a = (row.appliedAs || '').toLowerCase().trim();
+
+      // 1. Per BOM / Per Batch (multiplied with BOM automatically!)
+      if (b === 'per bom' || a === 'per bom' || (b === 'per batch' && a === 'per batch') || (b.includes('batch') && !b.includes('total') && a.includes('batch'))) {
+        return sum + (amt * bomMultiplier);
+      }
+
+      // 2. Fixed Total / Batch (flat lump sum for the whole production order)
+      if (b.includes('total') || b === 'fixed' || b === 'lump sum' || a.includes('total') || a === 'fixed') {
+        return sum + amt;
+      }
+
+      // 3. Per GBL
+      if (b === 'per gbl' || a.includes('(gbl)')) {
         return sum + (amt * (plannedGbl || 1));
       }
-      if (row.basis === 'Per Piece' || row.appliedAs === 'Per Unit (PCS)') {
+
+      // 4. Per Piece
+      if (b === 'per piece' || a.includes('(pcs)')) {
         return sum + (amt * (plannedPcs || 1));
       }
+
+      // Default for any batch basis if not matched above
+      if (b.includes('batch') || a.includes('batch')) {
+        return sum + (amt * bomMultiplier);
+      }
+
       return sum + amt;
     }, 0);
-  }, [additionalCosts, plannedGbl, plannedPcs]);
+  }, [additionalCosts, plannedGbl, plannedPcs, bomMultiplier]);
 
   // Production Cost Ledger: Material Cost + Overheads
   const totalProductionCost = useMemo(() => {
@@ -1776,7 +1855,23 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           fifoBatchInfo: m.fifoBatchInfo
         })),
         byProducts: scrapItems,
-        additionalCosts: additionalCosts,
+        additionalCosts: additionalCosts.map(c => {
+          const amt = Number(c.amount) || 0;
+          const b = (c.basis || '').toLowerCase().trim();
+          const a = (c.appliedAs || '').toLowerCase().trim();
+          let lineTotal = amt;
+          if (b === 'per bom' || a === 'per bom' || (b === 'per batch' && a === 'per batch') || (b.includes('batch') && !b.includes('total') && a.includes('batch'))) {
+            lineTotal = Math.round(amt * bomMultiplier * 100) / 100;
+          } else if (b === 'per gbl' || a.includes('(gbl)')) {
+            lineTotal = Math.round(amt * (plannedGbl || 1) * 100) / 100;
+          } else if (b === 'per piece' || a.includes('(pcs)')) {
+            lineTotal = Math.round(amt * (plannedPcs || 1) * 100) / 100;
+          }
+          return {
+            ...c,
+            totalAmount: lineTotal
+          };
+        }),
         profitPricing: {
           pricingMethod: profitPricing.pricingMethod,
           markupPercentage: profitPricing.markupPercentage,
@@ -3272,10 +3367,11 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                             onChange={e => handleUpdateCost(cost.id, 'basis', e.target.value as any)}
                             className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer"
                           >
+                            <option value="Per BOM">Per BOM</option>
                             <option value="Total / Batch">Total / Batch</option>
-                            <option value="Per GBL">Per GBL</option>
+                            <option value="Per Batch">Per Batch</option>
                             <option value="Per Piece">Per Piece</option>
-                            <option value="Lump Sum">Lump Sum</option>
+                            <option value="Per GBL">Per GBL</option>
                           </select>
                         </td>
                         <td className="py-2 px-3 text-right">
@@ -3286,6 +3382,12 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                             onChange={e => handleUpdateCost(cost.id, 'amount', e.target.value)}
                             className="w-20 px-1.5 py-1 text-right bg-white border border-gray-200 rounded-lg font-mono text-gray-800 text-xs font-bold"
                           />
+                          {((cost.basis === 'Per BOM' || (cost.basis === 'Per Batch' && cost.appliedAs === 'Per Batch')) && bomMultiplier > 0) && (
+                            <div className="text-[10px] text-blue-600 font-mono font-bold text-right mt-0.5 whitespace-nowrap">
+                              = ₹{((Number(cost.amount) || 0) * bomMultiplier).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              <span className="text-[9px] text-gray-400 font-sans font-normal ml-0.5">({bomMultiplier} BOM{bomMultiplier === 1 ? '' : 's'})</span>
+                            </div>
+                          )}
                         </td>
                         <td className="py-2 px-3">
                           <select
@@ -3293,9 +3395,12 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                             onChange={e => handleUpdateCost(cost.id, 'appliedAs', e.target.value as any)}
                             className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer"
                           >
+                            <option value="Per BOM">Per BOM</option>
+                            <option value="Per Batch">Per Batch</option>
+                            <option value="Total Cost for this production/batch">Total Cost for this production/batch</option>
                             <option value="Total Cost for this production">Total Cost for this production</option>
-                            <option value="Per Unit (GBL)">Per Unit (GBL)</option>
                             <option value="Per Unit (PCS)">Per Unit (PCS)</option>
+                            <option value="Per Unit (GBL)">Per Unit (GBL)</option>
                           </select>
                         </td>
                         <td className="py-2 px-3 text-center">
@@ -3735,10 +3840,11 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   onChange={(e) => setNewCostBasis(e.target.value as any)}
                   className="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500 cursor-pointer"
                 >
+                  <option value="Per BOM">📦 Per BOM</option>
+                  <option value="Per Batch">Per Batch</option>
+                  <option value="Total / Batch">Total / Batch</option>
                   <option value="Per GBL">⚡ Per GBL</option>
                   <option value="Per Piece">⚡ Per Piece</option>
-                  <option value="Total / Batch">Total / Batch</option>
-                  <option value="Lump Sum">Lump Sum</option>
                 </select>
                 <div className="flex gap-1">
                   <input

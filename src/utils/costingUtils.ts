@@ -4,9 +4,9 @@
 export interface AdditionalCostRow {
   id: string;
   costType: string;
-  calcBasis: 'Per Piece' | 'Per Batch' | 'Per GBL' | 'Fixed' | string;
+  calcBasis: 'Per BOM' | 'Per Batch' | 'Total / Batch' | 'Per Piece' | 'Per GBL' | 'Fixed' | string;
   amount: number | string;
-  appliedAs: 'Per Unit (PCS)' | 'Per Unit (GBL)' | 'Per Batch' | 'Total' | string;
+  appliedAs: 'Per BOM' | 'Total Cost for this production/batch' | 'Total Cost for this production' | 'Per Unit (PCS)' | 'Per Unit (GBL)' | 'Per Batch' | 'Total' | string;
 }
 
 export interface ProfitPricingState {
@@ -22,6 +22,33 @@ export function formatInr(val: number | undefined | null): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
+}
+
+export function isBatchOrTotalCost(cost: { calcBasis?: string; basis?: string; appliedAs?: string }): boolean {
+  const basis = (cost.calcBasis || cost.basis || '').toLowerCase().trim();
+  const applied = (cost.appliedAs || '').toLowerCase().trim();
+
+  // If designated as BOM, batch, total, fixed, or lump sum
+  if (
+    basis.includes('bom') ||
+    basis.includes('batch') ||
+    basis.includes('total') ||
+    basis === 'fixed' ||
+    basis === 'lump sum'
+  ) {
+    return true;
+  }
+
+  if (
+    applied.includes('bom') ||
+    applied.includes('batch') ||
+    applied.includes('total') ||
+    applied === 'fixed'
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 export function calculateCosting({
@@ -47,11 +74,17 @@ export function calculateCosting({
 
   const totalAdditionalCost = (additionalCosts || []).reduce((sum, cost) => {
     const amt = Number(cost.amount) || 0;
-    if (cost.calcBasis === 'Per Piece' || cost.appliedAs === 'Per Unit (PCS)') {
-      return sum + (amt * batchPcs);
+    // 1. Batch / Total / Fixed: apply ONCE to the entire batch, do NOT scale by output pieces!
+    if (isBatchOrTotalCost(cost)) {
+      return sum + amt;
     }
+    // 2. Per GBL
     if (cost.calcBasis === 'Per GBL' || cost.appliedAs === 'Per Unit (GBL)') {
       return sum + (amt * batchGbl);
+    }
+    // 3. Per Piece
+    if (cost.calcBasis === 'Per Piece' || cost.appliedAs === 'Per Unit (PCS)') {
+      return sum + (amt * batchPcs);
     }
     return sum + amt;
   }, 0);

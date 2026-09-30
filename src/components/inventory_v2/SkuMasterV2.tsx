@@ -1381,13 +1381,17 @@ const SkuMasterV2: React.FC = () => {
 
       // Load Additional Costs from saved SKU
       if (Array.isArray((selectedSkuDetails as any).additionalCosts)) {
-        setBomAdditionalCosts((selectedSkuDetails as any).additionalCosts.map((c: any, i: number) => ({
-          id: c.id || `cost-${Date.now()}-${i}`,
-          costType: c.costType || '',
-          basis: c.calcBasis || c.basis || 'Per Piece',
-          amount: c.amount ?? 0,
-          appliedAs: c.appliedAs || 'Per Unit (PCS)'
-        })));
+        setBomAdditionalCosts((selectedSkuDetails as any).additionalCosts.map((c: any, i: number) => {
+          const basis = c.calcBasis || c.basis || 'Per Piece';
+          const isBatch = basis === 'Per Batch' || basis === 'Fixed' || basis === 'Total / Batch';
+          return {
+            id: c.id || `cost-${Date.now()}-${i}`,
+            costType: c.costType || '',
+            basis: basis,
+            amount: c.amount ?? 0,
+            appliedAs: c.appliedAs || (isBatch ? 'Total Cost for this production/batch' : 'Per Unit (PCS)')
+          };
+        }));
       } else {
         setBomAdditionalCosts([]);
       }
@@ -6251,13 +6255,32 @@ const SkuMasterV2: React.FC = () => {
                                   <td className="py-2 px-3 text-center">
                                     <select
                                       value={cost.basis}
-                                      onChange={e => setBomAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, basis: e.target.value } : c))}
+                                      onChange={e => {
+                                        const val = e.target.value;
+                                        setBomAdditionalCosts(prev => prev.map(c => {
+                                          if (c.id !== cost.id) return c;
+                                          const updated = { ...c, basis: val };
+                                          if (val === 'Per BOM') {
+                                            updated.appliedAs = 'Per BOM';
+                                          } else if (val === 'Total / Batch') {
+                                            updated.appliedAs = 'Total Cost for this production/batch';
+                                          } else if (val === 'Per Batch') {
+                                            updated.appliedAs = 'Per Batch';
+                                          } else if (val === 'Per Piece') {
+                                            updated.appliedAs = 'Per Unit (PCS)';
+                                          } else if (val === 'Per GBL') {
+                                            updated.appliedAs = 'Per Unit (GBL)';
+                                          }
+                                          return updated;
+                                        }));
+                                      }}
                                       className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer"
                                     >
+                                      <option value="Per BOM">Per BOM</option>
                                       <option value="Total / Batch">Total / Batch</option>
-                                      <option value="Per GBL">Per GBL</option>
+                                      <option value="Per Batch">Per Batch</option>
                                       <option value="Per Piece">Per Piece</option>
-                                      <option value="Lump Sum">Lump Sum</option>
+                                      <option value="Per GBL">Per GBL</option>
                                     </select>
                                   </td>
                                   <td className="py-2 px-3 text-right">
@@ -6272,12 +6295,37 @@ const SkuMasterV2: React.FC = () => {
                                   <td className="py-2 px-3">
                                     <select
                                       value={cost.appliedAs}
-                                      onChange={e => setBomAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, appliedAs: e.target.value } : c))}
+                                      onChange={e => {
+                                        const val = e.target.value;
+                                        setBomAdditionalCosts(prev => prev.map(c => {
+                                          if (c.id !== cost.id) return c;
+                                          const updated = { ...c, appliedAs: val };
+                                          if (val === 'Per BOM') {
+                                            updated.basis = 'Per BOM';
+                                          } else if (val === 'Total Cost for this production/batch' || val === 'Total Cost for this production') {
+                                            if (c.basis === 'Per Piece' || c.basis === 'Per GBL') {
+                                              updated.basis = 'Total / Batch';
+                                            }
+                                          } else if (val === 'Per Batch') {
+                                            if (c.basis === 'Per Piece' || c.basis === 'Per GBL') {
+                                              updated.basis = 'Per Batch';
+                                            }
+                                          } else if (val === 'Per Unit (PCS)') {
+                                            updated.basis = 'Per Piece';
+                                          } else if (val === 'Per Unit (GBL)') {
+                                            updated.basis = 'Per GBL';
+                                          }
+                                          return updated;
+                                        }));
+                                      }}
                                       className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer"
                                     >
+                                      <option value="Per BOM">Per BOM</option>
+                                      <option value="Per Batch">Per Batch</option>
+                                      <option value="Total Cost for this production/batch">Total Cost for this production/batch</option>
                                       <option value="Total Cost for this production">Total Cost for this production</option>
-                                      <option value="Per Unit (GBL)">Per Unit (GBL)</option>
                                       <option value="Per Unit (PCS)">Per Unit (PCS)</option>
+                                      <option value="Per Unit (GBL)">Per Unit (GBL)</option>
                                     </select>
                                   </td>
                                   <td className="py-2 px-3 text-center">

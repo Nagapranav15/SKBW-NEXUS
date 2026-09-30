@@ -238,13 +238,17 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
     }
 
     if (Array.isArray((prod as any).additionalCosts)) {
-      setActiveAdditionalCosts((prod as any).additionalCosts.map((c: any, i: number) => ({
-        id: c.id || `cost-${Date.now()}-${i}`,
-        costType: c.costType || '',
-        calcBasis: c.calcBasis || c.basis || 'Per Piece',
-        amount: c.amount ?? '',
-        appliedAs: c.appliedAs || 'Per Unit (PCS)'
-      })));
+      setActiveAdditionalCosts((prod as any).additionalCosts.map((c: any, i: number) => {
+        const basis = c.calcBasis || c.basis || 'Per Piece';
+        const isBatch = basis === 'Per Batch' || basis === 'Fixed' || basis === 'Total / Batch';
+        return {
+          id: c.id || `cost-${Date.now()}-${i}`,
+          costType: c.costType || '',
+          calcBasis: basis,
+          amount: c.amount ?? '',
+          appliedAs: c.appliedAs || (isBatch ? 'Total Cost for this production/batch' : 'Per Unit (PCS)')
+        };
+      }));
     } else {
       setActiveAdditionalCosts([]);
     }
@@ -800,13 +804,17 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                           if (copied.basis) setBuildBatchYieldQty(String(copied.basis));
                           if (copied.basisUnit) setBuildBatchYieldUnit(copied.basisUnit);
                           if (Array.isArray(copied.additionalCosts)) {
-                            setActiveAdditionalCosts(copied.additionalCosts.map((c, i) => ({
-                              id: `cost-paste-${Date.now()}-${i}`,
-                              costType: c.costType || '',
-                              calcBasis: c.calcBasis || 'Per Piece',
-                              amount: c.amount ?? '',
-                              appliedAs: c.appliedAs || 'Per Unit (PCS)'
-                            })));
+                            setActiveAdditionalCosts(copied.additionalCosts.map((c, i) => {
+                              const basis = c.calcBasis || 'Per Piece';
+                              const isBatch = basis === 'Per Batch' || basis === 'Fixed' || basis === 'Total / Batch';
+                              return {
+                                id: `cost-paste-${Date.now()}-${i}`,
+                                costType: c.costType || '',
+                                calcBasis: basis,
+                                amount: c.amount ?? '',
+                                appliedAs: c.appliedAs || (isBatch ? 'Total Cost for this production/batch' : 'Per Unit (PCS)')
+                              };
+                            }));
                           }
                           if (copied.profitPricing) {
                             setActiveProfitPricing({
@@ -840,13 +848,17 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                             const existingCostTypes = new Set(activeAdditionalCosts.map(c => (c.costType || '').toLowerCase().trim()));
                             const costsToAdd = copied.additionalCosts
                               .filter(c => !existingCostTypes.has((c.costType || '').toLowerCase().trim()))
-                              .map((c, i) => ({
-                                id: `cost-merge-${Date.now()}-${i}`,
-                                costType: c.costType,
-                                calcBasis: c.calcBasis || 'Per Piece',
-                                amount: c.amount,
-                                appliedAs: c.appliedAs || 'Per Unit (PCS)'
-                              }));
+                              .map((c, i) => {
+                                const basis = c.calcBasis || 'Per Piece';
+                                const isBatch = basis === 'Per Batch' || basis === 'Fixed' || basis === 'Total / Batch';
+                                return {
+                                  id: `cost-merge-${Date.now()}-${i}`,
+                                  costType: c.costType,
+                                  calcBasis: basis,
+                                  amount: c.amount,
+                                  appliedAs: c.appliedAs || (isBatch ? 'Total Cost for this production/batch' : 'Per Unit (PCS)')
+                                };
+                              });
                             setActiveAdditionalCosts(prev => [...prev, ...costsToAdd]);
                           }
                           if (copied.profitPricing && (!activeProfitPricing.markupPercentage || activeProfitPricing.markupPercentage === '')) {
@@ -1163,9 +1175,9 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                           <tr>
                             <th className="py-1.5 px-2 w-7 text-center">#</th>
                             <th className="py-1.5 px-2">COST TYPE</th>
-                            <th className="py-1.5 px-1.5 text-center w-24">CALC BASIS</th>
+                            <th className="py-1.5 px-1.5 text-center w-28">CALC BASIS</th>
                             <th className="py-1.5 px-1.5 text-right w-20">AMOUNT (₹)</th>
-                            <th className="py-1.5 px-1.5 text-center w-28">APPLIED AS</th>
+                            <th className="py-1.5 px-1.5 text-center w-48">APPLIED AS</th>
                             <th className="py-1.5 px-1.5 text-center w-10"></th>
                           </tr>
                         </thead>
@@ -1192,12 +1204,29 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                                   value={cost.calcBasis}
                                   onChange={e => {
                                     const val = e.target.value;
-                                    setActiveAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, calcBasis: val } : c));
+                                    setActiveAdditionalCosts(prev => prev.map(c => {
+                                      if (c.id !== cost.id) return c;
+                                      const updated = { ...c, calcBasis: val };
+                                      if (val === 'Per BOM') {
+                                        updated.appliedAs = 'Per BOM';
+                                      } else if (val === 'Total / Batch') {
+                                        updated.appliedAs = 'Total Cost for this production/batch';
+                                      } else if (val === 'Per Batch' || val === 'Fixed') {
+                                        updated.appliedAs = 'Per Batch';
+                                      } else if (val === 'Per Piece') {
+                                        updated.appliedAs = 'Per Unit (PCS)';
+                                      } else if (val === 'Per GBL') {
+                                        updated.appliedAs = 'Per Unit (GBL)';
+                                      }
+                                      return updated;
+                                    }));
                                   }}
                                   className="h-7 px-1.5 py-0.5 bg-white border border-slate-200 rounded-md text-[11px] font-semibold text-slate-800 cursor-pointer focus:outline-none"
                                 >
-                                  <option value="Per Piece">Per Piece</option>
+                                  <option value="Per BOM">Per BOM</option>
+                                  <option value="Total / Batch">Total / Batch</option>
                                   <option value="Per Batch">Per Batch</option>
+                                  <option value="Per Piece">Per Piece</option>
                                   <option value="Per GBL">Per GBL</option>
                                   <option value="Fixed">Fixed</option>
                                 </select>
@@ -1220,13 +1249,35 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                                   value={cost.appliedAs}
                                   onChange={e => {
                                     const val = e.target.value as any;
-                                    setActiveAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, appliedAs: val } : c));
+                                    setActiveAdditionalCosts(prev => prev.map(c => {
+                                      if (c.id !== cost.id) return c;
+                                      const updated = { ...c, appliedAs: val };
+                                      if (val === 'Per BOM') {
+                                        updated.calcBasis = 'Per BOM';
+                                      } else if (val === 'Total Cost for this production/batch' || val === 'Total Cost for this production' || val === 'Total Cost') {
+                                        if (c.calcBasis === 'Per Piece' || c.calcBasis === 'Per GBL') {
+                                          updated.calcBasis = 'Total / Batch';
+                                        }
+                                      } else if (val === 'Per Batch') {
+                                        if (c.calcBasis === 'Per Piece' || c.calcBasis === 'Per GBL') {
+                                          updated.calcBasis = 'Per Batch';
+                                        }
+                                      } else if (val === 'Per Unit (PCS)') {
+                                        updated.calcBasis = 'Per Piece';
+                                      } else if (val === 'Per Unit (GBL)') {
+                                        updated.calcBasis = 'Per GBL';
+                                      }
+                                      return updated;
+                                    }));
                                   }}
-                                  className="h-7 px-1.5 py-0.5 bg-white border border-slate-200 rounded-md text-[11px] font-semibold text-slate-800 cursor-pointer focus:outline-none"
+                                  className="h-7 w-full max-w-[210px] px-1.5 py-0.5 bg-white border border-slate-200 rounded-md text-[11px] font-semibold text-slate-800 cursor-pointer focus:outline-none text-ellipsis overflow-hidden"
                                 >
+                                  <option value="Per BOM">Per BOM</option>
+                                  <option value="Per Batch">Per Batch</option>
+                                  <option value="Total Cost for this production/batch">Total Cost for this production/batch</option>
+                                  <option value="Total Cost for this production">Total Cost for this production</option>
                                   <option value="Per Unit (PCS)">Per Unit (PCS)</option>
                                   <option value="Per Unit (GBL)">Per Unit (GBL)</option>
-                                  <option value="Per Batch">Per Batch</option>
                                   <option value="Total Cost">Total Cost</option>
                                 </select>
                               </td>

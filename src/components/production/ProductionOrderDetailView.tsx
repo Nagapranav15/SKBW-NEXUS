@@ -238,7 +238,7 @@ export const ProductionOrderDetailView: React.FC<ProductionOrderDetailViewProps>
         id: c.id || `cost-${i + 1}`,
         costType: c.costType,
         basis: c.basis,
-        amount: c.amount || c.totalAmount || 0
+        amount: (c.totalAmount !== undefined && Number(c.totalAmount) > 0) ? c.totalAmount : (c.amount || 0)
       }));
     }
     // Return empty list if order has no additional costs recorded

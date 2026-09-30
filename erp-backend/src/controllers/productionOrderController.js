@@ -832,7 +832,32 @@ exports.createProductionOrder = async (req, res) => {
     const bomItems = req.body.bomItems || [];
     const matCost = bomItems.reduce((acc, it) => acc + (Number(it.amount) || ((Number(it.totalRequired || it.qtyPerBatch || 0)) * (Number(it.rate) || 0))), 0);
     const addCosts = req.body.additionalCosts || [];
-    const addCost = addCosts.reduce((acc, it) => acc + (Number(it.amount || it.totalAmount) || 0), 0);
+    const addCost = addCosts.reduce((acc, it) => {
+      const amt = Number(it.amount) || 0;
+      if (Number(it.totalAmount) > 0) {
+        return acc + Number(it.totalAmount);
+      }
+      const basis = (it.calcBasis || it.basis || '').toLowerCase().trim();
+      const applied = (it.appliedAs || '').toLowerCase().trim();
+
+      if (basis === 'per bom' || applied === 'per bom' || (basis === 'per batch' && applied === 'per batch')) {
+        const bomYield = Number(req.body.recipeYieldQty || req.body.batchYieldQty) || 1;
+        const runs = plannedPcs > 0 && bomYield > 0 ? (plannedPcs / bomYield) : 1;
+        return acc + (amt * runs);
+      }
+
+      const isBatch = basis.includes('batch') || basis.includes('total') || basis === 'fixed' || basis === 'lump sum' || applied.includes('total') || applied.includes('batch') || applied === 'fixed';
+      if (isBatch) {
+        return acc + amt;
+      }
+      if (basis === 'per gbl' || applied.includes('(gbl)')) {
+        return acc + (amt * (plannedQty || 1));
+      }
+      if (basis === 'per piece' || applied.includes('(pcs)')) {
+        return acc + (amt * (plannedPcs || 1));
+      }
+      return acc + amt;
+    }, 0);
     const totalCost = Number(costSummary.totalProductionCost) > 0 ? Number(costSummary.totalProductionCost) : (matCost + addCost);
     const costPerGbl = plannedQty > 0 ? (totalCost / plannedQty) : 0;
     const costPerPiece = plannedPcs > 0 ? (totalCost / plannedPcs) : 0;
