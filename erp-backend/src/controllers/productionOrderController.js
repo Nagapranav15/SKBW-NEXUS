@@ -82,6 +82,266 @@ const cleanupGhostProductionLedgers = async (companyId) => {
   }
 };
 
+const toObjectId = (id) => {
+  if (!id) return null;
+  if (id instanceof mongoose.Types.ObjectId) return id;
+  if (typeof id === "string" && mongoose.Types.ObjectId.isValid(id)) {
+    return new mongoose.Types.ObjectId(id);
+  }
+  return id;
+};
+
+// Helper to calculate active purchase batches and their true remaining quantities via FIFO
+const getActiveBatchesForSku = async (sku, companyObjId) => {
+  const skuId = sku._id;
+  const skuIdStr = String(sku._id);
+
+  // 1. Inward batches from InventoryLedger
+  const inwardBatches = await InventoryLedger.aggregate([
+    {
+      $match: {
+        skuId: toObjectId(skuId),
+        company: companyObjId,
+        direction: "IN",
+        status: { $ne: "Cancelled" },
+        referenceType: { $ne: "PurchaseInvoiceAllocation" },
+        batchNumber: { $exists: true, $ne: "" }
+      }
+    },
+    {
+      $group: {
+        _id: "$batchNumber",
+        firstInDate: { $min: "$createdAt" },
+        qtyIn: { $sum: "$quantity" }
+      }
+    },
+    { $sort: { firstInDate: 1 } }
+  ]);
+
+  // 2. Fetch purchase invoices for this SKU to map batch prices and dates
+  const invoices = await PurchaseInvoiceV2.find({
+    company: companyObjId,
+    "items.skuId": toObjectId(skuId),
+    status: { $ne: "Cancelled" }
+  }).select("invoiceNumber invoiceDate partyName items createdAt").sort({ invoiceDate: 1, createdAt: 1 }).lean();
+
+  const batchPriceMap = new Map();
+  const invoiceDatesMap = new Map();
+  const allPurchasedItems = [];
+
+  invoices.forEach(inv => {
+    (inv.items || []).forEach(it => {
+      if (String(it.skuId) === skuIdStr) {
+        const price = Number(it.purchasePrice) || Number(it.ratePerKg) || 0;
+        const date = inv.invoiceDate || inv.createdAt;
+        if (it.lotNumber) { batchPriceMap.set(it.lotNumber, price); invoiceDatesMap.set(it.lotNumber, date); }
+        if (it.batchNumber) { batchPriceMap.set(it.batchNumber, price); invoiceDatesMap.set(it.batchNumber, date); }
+        if (inv.invoiceNumber) { batchPriceMap.set(inv.invoiceNumber, price); invoiceDatesMap.set(inv.invoiceNumber, date); }
+        allPurchasedItems.push({
+          price,
+          quantity: Number(it.quantity) || 0,
+          date,
+          invoiceNumber: inv.invoiceNumber,
+          vendor: inv.partyName
+        });
+      }
+    });
+  });
+
+  const fallbackPrice = Number(sku.avgCost || sku.costPrice || sku.standardCost || sku.purchasePrice || sku.rate || 0);
+
+  // 3. Construct initial batch objects
+  const batches = inwardBatches.map(b => ({
+    batchNumber: b._id,
+    date: invoiceDatesMap.get(b._id) || b.firstInDate,
+    qtyIn: Number(b.qtyIn) || 0,
+    qtyOut: 0,
+    remainingQty: Number(b.qtyIn) || 0,
+    rate: batchPriceMap.get(b._id) || (allPurchasedItems.find(it => it.invoiceNumber === b._id)?.price) || fallbackPrice
+  }));
+
+  // Also include any purchase invoices not in ledger
+  invoices.forEach(inv => {
+    (inv.items || []).forEach(it => {
+      if (String(it.skuId) === skuIdStr) {
+        const bNum = it.lotNumber || it.batchNumber || inv.invoiceNumber;
+        if (bNum && !batches.some(b => b.batchNumber === bNum)) {
+          const price = Number(it.purchasePrice) || Number(it.ratePerKg) || fallbackPrice;
+          batches.push({
+            batchNumber: bNum,
+            date: inv.invoiceDate || inv.createdAt,
+            qtyIn: Number(it.quantity) || 0,
+            qtyOut: 0,
+            remainingQty: Number(it.quantity) || 0,
+            rate: price
+          });
+        }
+      }
+    });
+  });
+
+  // Sort batches chronologically (FIFO order)
+  batches.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  // 4. Collect all OUT transactions for this SKU
+  const outRecords = await InventoryLedger.find({
+    skuId: toObjectId(skuId),
+    company: companyObjId,
+    direction: "OUT",
+    referenceType: { $ne: "PurchaseInvoiceAllocation" },
+    status: { $ne: "Cancelled" }
+  }).sort({ createdAt: 1 }).lean();
+
+  // Deduct explicit matching batches first
+  const unassignedOut = [];
+  outRecords.forEach(out => {
+    const qty = Number(out.quantity) || 0;
+    if (qty <= 0) return;
+    const targetBatch = out.batchNumber ? batches.find(b => b.batchNumber === out.batchNumber) : null;
+    if (targetBatch) {
+      targetBatch.qtyOut += qty;
+      targetBatch.remainingQty = Math.max(0, targetBatch.remainingQty - qty);
+    } else {
+      unassignedOut.push(qty);
+    }
+  });
+
+  // Deduct unassigned OUT records (e.g. legacy production orders with PO number) via FIFO
+  unassignedOut.forEach(qty => {
+    let toDeduct = qty;
+    for (const b of batches) {
+      if (b.remainingQty > 0.0001) {
+        const take = Math.min(toDeduct, b.remainingQty);
+        b.qtyOut += take;
+        b.remainingQty = Math.max(0, b.remainingQty - take);
+        toDeduct -= take;
+        if (toDeduct <= 0.0001) break;
+      }
+    }
+  });
+
+  return {
+    batches: batches.filter(b => b.remainingQty > 0.0001),
+    allBatches: batches,
+    allPurchasedItems,
+    batchPriceMap
+  };
+};
+
+// Helper to allocate batches under FIFO and compute majority batch rate
+const allocateFifoBatches = (activeBatches, reqQty, standardRate) => {
+  if (!activeBatches || activeBatches.length === 0) {
+    return {
+      fifoRate: standardRate || 0,
+      majorityBatch: null,
+      majorityRate: standardRate || 0,
+      majorityQty: 0,
+      weightedRate: standardRate || 0,
+      allocatedBatches: [],
+      fifoBatchInfo: null
+    };
+  }
+
+  // If reqQty <= 0, default to earliest batch
+  if (!reqQty || reqQty <= 0) {
+    const earliest = activeBatches[0];
+    const eRate = earliest.rate > 0 ? earliest.rate : (standardRate || 0);
+    return {
+      fifoRate: eRate,
+      majorityBatch: earliest.batchNumber,
+      majorityRate: eRate,
+      majorityQty: earliest.remainingQty,
+      weightedRate: eRate,
+      allocatedBatches: [{
+        batchNumber: earliest.batchNumber,
+        qty: earliest.remainingQty,
+        rate: eRate,
+        date: earliest.date ? new Date(earliest.date).toLocaleDateString("en-GB") : undefined,
+        batchTotalRemaining: earliest.remainingQty
+      }],
+      fifoBatchInfo: {
+        batchNumber: earliest.batchNumber,
+        rate: eRate,
+        majorityBatch: earliest.batchNumber,
+        majorityRate: eRate,
+        majorityQty: earliest.remainingQty,
+        weightedRate: eRate,
+        summary: `Earliest batch ${earliest.batchNumber} (${earliest.remainingQty} available @ ₹${eRate})`,
+        date: earliest.date ? new Date(earliest.date).toLocaleDateString("en-GB") : undefined,
+        remainingQty: earliest.remainingQty
+      }
+    };
+  }
+
+  let remainingNeeded = reqQty;
+  const allocated = [];
+
+  for (const b of activeBatches) {
+    if (remainingNeeded <= 0.0001) break;
+    const bRate = b.rate > 0 ? b.rate : (standardRate || 0);
+    const take = Math.min(remainingNeeded, b.remainingQty);
+    if (take > 0) {
+      allocated.push({
+        batchNumber: b.batchNumber,
+        qty: Math.round(take * 1000) / 1000,
+        rate: bRate,
+        date: b.date ? new Date(b.date).toLocaleDateString("en-GB") : undefined,
+        batchTotalRemaining: b.remainingQty
+      });
+      remainingNeeded -= take;
+    }
+  }
+
+  if (remainingNeeded > 0.0001) {
+    const fallbackRate = allocated.length > 0 ? allocated[allocated.length - 1].rate : (standardRate || 0);
+    allocated.push({
+      batchNumber: "Unassigned Stock",
+      qty: Math.round(remainingNeeded * 1000) / 1000,
+      rate: fallbackRate,
+      date: undefined,
+      batchTotalRemaining: 0
+    });
+  }
+
+  // Find the MAJORITY batch (highest qty used). If tie, earliest batch wins!
+  let majorityItem = allocated[0];
+  for (let i = 1; i < allocated.length; i++) {
+    if (allocated[i].qty > majorityItem.qty) {
+      majorityItem = allocated[i];
+    }
+  }
+
+  const majorityRate = majorityItem.rate || standardRate || 0;
+
+  const totalAllocated = allocated.reduce((sum, a) => sum + a.qty, 0);
+  const totalVal = allocated.reduce((sum, a) => sum + (a.qty * a.rate), 0);
+  const weightedRate = totalAllocated > 0 ? Math.round((totalVal / totalAllocated) * 100) / 100 : majorityRate;
+
+  const partsSummary = allocated.map(a => `${a.qty} from ${a.batchNumber} (@ ₹${a.rate})`).join(" + ");
+  const summaryStr = `${partsSummary} • Majority: ${majorityItem.batchNumber} (@ ₹${majorityRate})`;
+
+  return {
+    fifoRate: majorityRate, // Majority of batch of material used
+    majorityBatch: majorityItem.batchNumber,
+    majorityRate: majorityRate,
+    majorityQty: majorityItem.qty,
+    weightedRate: weightedRate,
+    allocatedBatches: allocated,
+    fifoBatchInfo: {
+      batchNumber: majorityItem.batchNumber,
+      rate: majorityRate,
+      majorityBatch: majorityItem.batchNumber,
+      majorityRate: majorityRate,
+      majorityQty: majorityItem.qty,
+      weightedRate: weightedRate,
+      allocatedBatches: allocated,
+      summary: summaryStr,
+      date: majorityItem.date,
+      remainingQty: majorityItem.batchTotalRemaining
+    }
+  };
+};
+
 // Dynamically synchronize prepared production order stock in Item Stock & Inventory (InventoryLedger).
 // Only actual PREPARED (produced) stock is recorded into on-hand inventory!
 // While planned or in-production with 0 produced, it only reserves the place (does not record directly).
@@ -200,25 +460,126 @@ const syncProductionOrderLedger = async (order) => {
           }
 
           if (h.locationId) {
-            ledgerDocs.push({
-              transactionNumber,
-              transactionType: "Production Consumption",
-              skuId: matSku._id,
-              quantity: ledgerQty,
-              unit: matSku.unit || m.uom || "Pcs",
-              direction: "OUT",
-              referenceType: "ProductionOrder",
-              referenceId: order.orderNumber,
-              batchNumber: m.batchNumber || order.orderNumber,
-              warehouseId: h.warehouseId,
-              floorId: h.floorId,
-              zoneId: h.zoneId,
-              locationId: h.locationId,
-              remarks: `Consumed for Production Order ${order.orderNumber} (${order.itemName}) [${consumedQty} ${m.uom || 'Pcs'}]`,
-              createdBy: order.createdBy,
-              company: companyObjId,
-              status: "Posted"
-            });
+            const convertToLedgerQty = (q) => {
+              if (mUomNorm && skuUnitNorm && mUomNorm !== skuUnitNorm && convFactor > 0) {
+                if (mUomNorm === skuAltUnitNorm || mUomNorm === 'pcs' || mUomNorm === 'pieces' || mUomNorm === 'pc') {
+                  return Math.round((q / convFactor) * 1000000) / 1000000;
+                } else if (skuUnitNorm === 'pcs' || skuUnitNorm === 'pieces' || skuUnitNorm === 'pc') {
+                  return Math.round((q * convFactor) * 1000000) / 1000000;
+                }
+              }
+              return q;
+            };
+
+            // Case A: Explicit batchesAllocated array was stored on BOM item
+            if (m.batchesAllocated && Array.isArray(m.batchesAllocated) && m.batchesAllocated.length > 0) {
+              for (const alloc of m.batchesAllocated) {
+                const batchAllocReq = Number(alloc.qty) || 0;
+                const batchConsumed = Math.round(batchAllocReq * progressRatio * 1000) / 1000;
+                if (batchConsumed <= 0) continue;
+                const batchLedgerQty = convertToLedgerQty(batchConsumed);
+                const transactionNumber = await Sequence.getNextSequence("IL");
+
+                ledgerDocs.push({
+                  transactionNumber,
+                  transactionType: "Production Consumption",
+                  skuId: matSku._id,
+                  quantity: batchLedgerQty,
+                  unit: matSku.unit || m.uom || "Pcs",
+                  direction: "OUT",
+                  referenceType: "ProductionOrder",
+                  referenceId: order.orderNumber,
+                  batchNumber: alloc.batchNumber || order.orderNumber,
+                  warehouseId: h.warehouseId,
+                  floorId: h.floorId,
+                  zoneId: h.zoneId,
+                  locationId: h.locationId,
+                  remarks: `Consumed from Batch ${alloc.batchNumber} for Production Order ${order.orderNumber} (${order.itemName}) [${batchConsumed} ${m.uom || 'Pcs'}]`,
+                  createdBy: order.createdBy,
+                  company: companyObjId,
+                  status: "Posted"
+                });
+              }
+            } else if (m.batchNumber && m.batchNumber !== order.orderNumber) {
+              // Case B: Explicit single batchNumber on BOM item
+              const transactionNumber = await Sequence.getNextSequence("IL");
+              ledgerDocs.push({
+                transactionNumber,
+                transactionType: "Production Consumption",
+                skuId: matSku._id,
+                quantity: convertToLedgerQty(consumedQty),
+                unit: matSku.unit || m.uom || "Pcs",
+                direction: "OUT",
+                referenceType: "ProductionOrder",
+                referenceId: order.orderNumber,
+                batchNumber: m.batchNumber,
+                warehouseId: h.warehouseId,
+                floorId: h.floorId,
+                zoneId: h.zoneId,
+                locationId: h.locationId,
+                remarks: `Consumed from Batch ${m.batchNumber} for Production Order ${order.orderNumber} (${order.itemName}) [${consumedQty} ${m.uom || 'Pcs'}]`,
+                createdBy: order.createdBy,
+                company: companyObjId,
+                status: "Posted"
+              });
+            } else {
+              // Case C: Dynamic FIFO deduction against real active purchase batches
+              const activeInfo = await getActiveBatchesForSku(matSku, companyObjId);
+              const activeBatches = activeInfo.batches || [];
+              let remainingToDeduct = convertToLedgerQty(consumedQty);
+
+              for (const ab of activeBatches) {
+                if (remainingToDeduct <= 0.0001) break;
+                const take = Math.min(remainingToDeduct, ab.remainingQty);
+                if (take > 0) {
+                  const transactionNumber = await Sequence.getNextSequence("IL");
+                  ledgerDocs.push({
+                    transactionNumber,
+                    transactionType: "Production Consumption",
+                    skuId: matSku._id,
+                    quantity: Math.round(take * 1000000) / 1000000,
+                    unit: matSku.unit || m.uom || "Pcs",
+                    direction: "OUT",
+                    referenceType: "ProductionOrder",
+                    referenceId: order.orderNumber,
+                    batchNumber: ab.batchNumber,
+                    warehouseId: h.warehouseId,
+                    floorId: h.floorId,
+                    zoneId: h.zoneId,
+                    locationId: h.locationId,
+                    remarks: `FIFO Consumed from Batch ${ab.batchNumber} for Production Order ${order.orderNumber} (${order.itemName})`,
+                    createdBy: order.createdBy,
+                    company: companyObjId,
+                    status: "Posted"
+                  });
+                  remainingToDeduct -= take;
+                }
+              }
+
+              // Any shortage remaining
+              if (remainingToDeduct > 0.0001) {
+                const transactionNumber = await Sequence.getNextSequence("IL");
+                ledgerDocs.push({
+                  transactionNumber,
+                  transactionType: "Production Consumption",
+                  skuId: matSku._id,
+                  quantity: Math.round(remainingToDeduct * 1000000) / 1000000,
+                  unit: matSku.unit || m.uom || "Pcs",
+                  direction: "OUT",
+                  referenceType: "ProductionOrder",
+                  referenceId: order.orderNumber,
+                  batchNumber: order.orderNumber,
+                  warehouseId: h.warehouseId,
+                  floorId: h.floorId,
+                  zoneId: h.zoneId,
+                  locationId: h.locationId,
+                  remarks: `Consumed (unassigned shortage) for Production Order ${order.orderNumber} (${order.itemName})`,
+                  createdBy: order.createdBy,
+                  company: companyObjId,
+                  status: "Posted"
+                });
+              }
+            }
           }
         }
       }
@@ -717,18 +1078,33 @@ exports.deleteProductionOrder = async (req, res) => {
 };
 
 // POST /api/production-orders/material-rates
-// Calculates 3 costing modes: 1. Avg of purchase batch orders, 2. FIFO (earliest active batch), 3. Custom/Standard
+// Calculates 3 costing modes: 1. Avg of purchase batch orders, 2. FIFO (majority batch of material used), 3. Custom/Standard
 exports.getMaterialRates = async (req, res) => {
   try {
-    const { companyId, skuIds } = req.body;
-    if (!companyId || !Array.isArray(skuIds) || skuIds.length === 0) {
+    const { companyId, skuIds, items } = req.body;
+    if (!companyId || (!Array.isArray(skuIds) && !Array.isArray(items))) {
       return res.json({ rates: {} });
     }
 
     const companyObjId = new mongoose.Types.ObjectId(companyId);
-    const validSkuIds = skuIds
-      .filter(id => mongoose.Types.ObjectId.isValid(id))
-      .map(id => new mongoose.Types.ObjectId(id));
+
+    // Resolve unique list of valid SKU ObjectIds
+    const idSet = new Set();
+    if (Array.isArray(skuIds)) {
+      skuIds.forEach(id => {
+        if (id && mongoose.Types.ObjectId.isValid(id)) idSet.add(String(id));
+      });
+    }
+    if (Array.isArray(items)) {
+      items.forEach(it => {
+        if (it && it.skuId && mongoose.Types.ObjectId.isValid(it.skuId)) idSet.add(String(it.skuId));
+      });
+    }
+
+    const validSkuIds = Array.from(idSet).map(id => new mongoose.Types.ObjectId(id));
+    if (validSkuIds.length === 0) {
+      return res.json({ rates: {} });
+    }
 
     const skus = await SkuV2.find({
       _id: { $in: validSkuIds },
@@ -740,57 +1116,28 @@ exports.getMaterialRates = async (req, res) => {
     for (const sku of skus) {
       const skuIdStr = String(sku._id);
 
-      // 1. Fetch active batches with onHand stock (sorted chronologically by firstInDate)
-      const batchBalances = await InventoryLedger.aggregate([
-        { $match: { skuId: sku._id, company: companyObjId, status: { $ne: "Cancelled" } } },
-        {
-          $group: {
-            _id: { batchNumber: "$batchNumber", locationId: "$locationId" },
-            qtyIn: { $sum: { $cond: [{ $eq: ["$direction", "IN"] }, "$quantity", 0] } },
-            qtyOut: { $sum: { $cond: [{ $eq: ["$direction", "OUT"] }, "$quantity", 0] } },
-            firstInDate: { $min: { $cond: [{ $eq: ["$direction", "IN"] }, "$createdAt", null] } }
-          }
-        },
-        {
-          $project: {
-            batchNumber: "$_id.batchNumber",
-            locationId: "$_id.locationId",
-            onHand: { $subtract: ["$qtyIn", "$qtyOut"] },
-            firstInDate: 1
-          }
-        },
-        { $match: { onHand: { $gt: 0.0001 } } },
-        { $sort: { firstInDate: 1 } }
-      ]);
+      // Check if requirement item was provided for this SKU
+      const itemInput = Array.isArray(items) ? items.find(it => String(it.skuId) === skuIdStr) : null;
+      let reqQty = itemInput ? (Number(itemInput.requiredQty) || 0) : 0;
 
-      // 2. Fetch purchase invoices for this SKU
-      const invoices = await PurchaseInvoiceV2.find({
-        company: companyObjId,
-        "items.skuId": sku._id,
-        status: { $ne: "Cancelled" }
-      }).select("invoiceNumber invoiceDate partyName items createdAt").sort({ invoiceDate: 1, createdAt: 1 }).lean();
+      // Convert reqQty from input UOM to SKU stocking unit if different
+      if (reqQty > 0 && itemInput && itemInput.uom && sku.unit) {
+        const inUom = itemInput.uom.trim().toLowerCase();
+        const skuUnit = sku.unit.trim().toLowerCase();
+        const altUnit = (sku.altUnit || '').trim().toLowerCase();
+        const convFactor = Number(sku.altUnitConversion || sku.conv || sku.booksGbl || sku.pcsPerGbl || 1);
 
-      const batchPriceMap = new Map();
-      const allPurchasedItems = [];
-
-      invoices.forEach(inv => {
-        (inv.items || []).forEach(it => {
-          if (String(it.skuId) === skuIdStr) {
-            const price = Number(it.purchasePrice) || Number(it.ratePerKg) || 0;
-            const qty = Number(it.quantity) || 0;
-            if (it.lotNumber) batchPriceMap.set(it.lotNumber, price);
-            if (it.batchNumber) batchPriceMap.set(it.batchNumber, price);
-            if (inv.invoiceNumber) batchPriceMap.set(inv.invoiceNumber, price);
-            allPurchasedItems.push({
-              price,
-              quantity: qty,
-              date: inv.invoiceDate || inv.createdAt,
-              invoiceNumber: inv.invoiceNumber,
-              vendor: inv.partyName
-            });
+        if (inUom !== skuUnit && convFactor > 0) {
+          if (inUom === altUnit || inUom === 'pcs' || inUom === 'pieces' || inUom === 'pc') {
+            reqQty = reqQty / convFactor;
+          } else if (skuUnit === 'pcs' || skuUnit === 'pieces' || skuUnit === 'pc') {
+            reqQty = reqQty * convFactor;
           }
-        });
-      });
+        }
+      }
+
+      // 1. Fetch active batches with true remaining onHand via FIFO
+      const { batches: activeBatches, allBatches, allPurchasedItems, batchPriceMap } = await getActiveBatchesForSku(sku, companyObjId);
 
       // Check if this SKU was produced by any Production Order (for Semi-Finished or Finished Goods)
       let productionRate = 0;
@@ -827,8 +1174,8 @@ exports.getMaterialRates = async (req, res) => {
       }
 
       // Also check if any active batches in batchBalances were generated from production orders
-      for (const b of batchBalances) {
-        if (b.batchNumber && !batchPriceMap.has(b.batchNumber)) {
+      for (const b of activeBatches) {
+        if (b.batchNumber && !b.rate) {
           const po = await ProductionOrder.findOne({
             company: companyObjId,
             $or: [
@@ -849,7 +1196,7 @@ exports.getMaterialRates = async (req, res) => {
               prodRate = Number(cs.totalProductionCost) / divisor;
             }
             if (prodRate > 0) {
-              batchPriceMap.set(b.batchNumber, Math.round(prodRate * 100) / 100);
+              b.rate = Math.round(prodRate * 100) / 100;
             }
           }
         }
@@ -884,46 +1231,38 @@ exports.getMaterialRates = async (req, res) => {
         0
       );
 
-      // FIFO: Pick the unit price of the earliest active batch
-      let fifoRate = 0;
-      let fifoBatchInfo = null;
+      // FIFO: Allocate required quantity across active batches and pick rate of majority batch used
+      const fifoResult = allocateFifoBatches(activeBatches, reqQty, standardRate);
+      let fifoRate = fifoResult.fifoRate;
+      let fifoBatchInfo = fifoResult.fifoBatchInfo;
 
-      if (batchBalances.length > 0) {
-        const earliestBatch = batchBalances[0];
-        const bNum = earliestBatch.batchNumber;
-        const bRate = (bNum && batchPriceMap.has(bNum)) ? batchPriceMap.get(bNum) : 0;
-        fifoRate = bRate > 0 ? bRate : (allPurchasedItems[0]?.price || standardRate || productionRate);
+      if (!fifoBatchInfo && allPurchasedItems.length > 0) {
+        const latestPurchase = allPurchasedItems[allPurchasedItems.length - 1];
+        fifoRate = latestPurchase.price || standardRate;
         fifoBatchInfo = {
-          batchNumber: bNum || 'LOT-01',
-          date: earliestBatch.firstInDate ? new Date(earliestBatch.firstInDate).toLocaleDateString('en-GB') : undefined,
-          remainingQty: Math.round(earliestBatch.onHand * 100) / 100,
-          rate: fifoRate
+          batchNumber: latestPurchase.invoiceNumber || 'PB-LAST',
+          rate: fifoRate,
+          majorityBatch: latestPurchase.invoiceNumber || 'PB-LAST',
+          majorityRate: fifoRate,
+          majorityQty: 0,
+          weightedRate: fifoRate,
+          summary: `Latest batch ${latestPurchase.invoiceNumber || 'PB-LAST'} (@ ₹${fifoRate})`,
+          date: latestPurchase.date ? new Date(latestPurchase.date).toLocaleDateString('en-GB') : undefined,
+          remainingQty: 0
         };
-      } else if (allPurchasedItems.length > 0) {
-        fifoRate = allPurchasedItems[0].price;
-        fifoBatchInfo = {
-          batchNumber: allPurchasedItems[0].invoiceNumber || 'PO-INV',
-          date: allPurchasedItems[0].date ? new Date(allPurchasedItems[0].date).toLocaleDateString('en-GB') : undefined,
-          remainingQty: allPurchasedItems[0].quantity,
-          rate: fifoRate
-        };
-      } else {
-        fifoRate = standardRate || productionRate;
       }
 
-      // Average of Purchase Batch Orders (Weighted Average)
+      // Average of Purchase Batch Orders (Weighted Average of active batches)
       let avgRate = 0;
       let totalBatchQty = 0;
       let totalBatchValue = 0;
 
-      if (batchBalances.length > 0) {
-        batchBalances.forEach(b => {
-          const bRate = (b.batchNumber && batchPriceMap.has(b.batchNumber)) 
-            ? batchPriceMap.get(b.batchNumber) 
-            : (allPurchasedItems.find(it => it.invoiceNumber === b.batchNumber)?.price || standardRate || productionRate);
+      if (activeBatches.length > 0) {
+        activeBatches.forEach(b => {
+          const bRate = b.rate > 0 ? b.rate : (standardRate || productionRate);
           if (bRate > 0) {
-            totalBatchQty += b.onHand;
-            totalBatchValue += (b.onHand * bRate);
+            totalBatchQty += b.remainingQty;
+            totalBatchValue += (b.remainingQty * bRate);
           }
         });
         avgRate = totalBatchQty > 0 ? Math.round((totalBatchValue / totalBatchQty) * 100) / 100 : (standardRate || productionRate);
@@ -970,8 +1309,20 @@ exports.getMaterialRates = async (req, res) => {
         productionRate: productionRate > 0 ? productionRate : 0,
         avgRate: effectiveRate,
         fifoRate: fifoRate > 0 ? fifoRate : effectiveRate,
+        majorityBatch: fifoResult.majorityBatch,
+        majorityRate: fifoResult.majorityRate,
+        majorityQty: fifoResult.majorityQty,
+        weightedRate: fifoResult.weightedRate,
         fifoBatchInfo,
-        batchCount: batchBalances.length || allPurchasedItems.length,
+        batchBalances: activeBatches.map(b => ({
+          batchNumber: b.batchNumber,
+          date: b.date ? new Date(b.date).toLocaleDateString('en-GB') : undefined,
+          qtyIn: b.qtyIn,
+          qtyOut: b.qtyOut,
+          remainingQty: Math.round(b.remainingQty * 100) / 100,
+          rate: b.rate
+        })),
+        batchCount: activeBatches.length || allPurchasedItems.length,
         lastProductionRate: lastProductionRate > 0 ? lastProductionRate : 0
       };
     }

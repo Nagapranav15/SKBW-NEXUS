@@ -427,6 +427,14 @@ export const recordStockAdjustmentV2 = async (payload: StockAdjustmentPayload): 
   return response.data;
 };
 
+export interface AllocatedBatchItem {
+  batchNumber: string;
+  qty: number;
+  rate: number;
+  date?: string;
+  batchTotalRemaining?: number;
+}
+
 export interface MaterialRateInfo {
   skuId: string;
   skuCode?: string;
@@ -434,12 +442,30 @@ export interface MaterialRateInfo {
   standardRate: number;
   avgRate: number;
   fifoRate: number;
+  majorityBatch?: string;
+  majorityRate?: number;
+  majorityQty?: number;
+  weightedRate?: number;
   fifoBatchInfo?: {
     batchNumber: string;
+    rate: number;
+    majorityBatch?: string;
+    majorityRate?: number;
+    majorityQty?: number;
+    weightedRate?: number;
+    allocatedBatches?: AllocatedBatchItem[];
+    summary?: string;
     date?: string;
+    remainingQty?: number;
+  };
+  batchBalances?: Array<{
+    batchNumber: string;
+    date?: string;
+    qtyIn: number;
+    qtyOut: number;
     remainingQty: number;
     rate: number;
-  };
+  }>;
   batchCount: number;
   /** Rate used in the most recent production order that included this SKU */
   lastProductionRate?: number;
@@ -451,13 +477,21 @@ export interface MaterialRateInfo {
   altUnitDirection?: string;
 }
 
+export interface MaterialRateItemInput {
+  skuId: string;
+  requiredQty?: number;
+  uom?: string;
+}
+
 export const getProductionMaterialRates = async (
   companyId: string,
-  skuIds: string[]
+  skuIds: string[],
+  items?: MaterialRateItemInput[]
 ): Promise<{ rates: Record<string, MaterialRateInfo> }> => {
   const response = await api.post('/production-orders/material-rates', {
     companyId,
-    skuIds
+    skuIds,
+    items
   });
   return response.data;
 };

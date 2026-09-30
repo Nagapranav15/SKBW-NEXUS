@@ -69,9 +69,26 @@ interface MaterialRow {
   fifoBatchInfo?: {
     batchNumber: string;
     date?: string;
-    remainingQty: number;
+    remainingQty?: number;
     rate: number;
+    majorityBatch?: string;
+    majorityRate?: number;
+    majorityQty?: number;
+    weightedRate?: number;
+    summary?: string;
+    allocatedBatches?: Array<{
+      batchNumber: string;
+      qty: number;
+      rate: number;
+      date?: string;
+      batchTotalRemaining?: number;
+    }>;
   };
+  batchesAllocated?: Array<{
+    batchNumber: string;
+    qty: number;
+    rate: number;
+  }>;
   batchCount?: number;
   amount: number;
   basePerPiece?: number;
@@ -1019,7 +1036,19 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
     try {
       setLoadingMaterialRates(true);
-      const res = await getProductionMaterialRates(companyId, skuIdsToFetch);
+      const itemsToFetch = mats.map(m => {
+        const sId = m.skuId || backendSkus.find(s => 
+          (m.code && s.skuCode?.toLowerCase().trim() === m.code.toLowerCase().trim()) ||
+          (m.component && s.name?.toLowerCase().trim() === m.component.toLowerCase().trim())
+        )?._id;
+        return {
+          skuId: sId || '',
+          requiredQty: Number(m.requiredQty) || 0,
+          uom: m.uom || 'PCS'
+        };
+      }).filter(i => !!i.skuId);
+
+      const res = await getProductionMaterialRates(companyId, skuIdsToFetch, itemsToFetch);
       const ratesMap = res.rates || {};
 
       setMaterialRatesCache(prev => ({ ...prev, ...ratesMap }));
@@ -1082,6 +1111,11 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           lastProductionRate: convertedLastProdRate,
           productionRate: convertedProdRate,
           fifoBatchInfo: rateInfo.fifoBatchInfo,
+          batchesAllocated: rateInfo.fifoBatchInfo?.allocatedBatches?.map(a => ({
+            batchNumber: a.batchNumber,
+            qty: a.qty,
+            rate: a.rate
+          })),
           batchCount: rateInfo.batchCount,
           amount: Math.round(m.requiredQty * finalRate * 100) / 100
         };
@@ -1208,22 +1242,36 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   };
 
   const handleUpdateMaterial = (id: string, field: keyof MaterialRow, value: any) => {
-    setMaterials(prev => prev.map(m => {
-      if (m.id !== id) return m;
-      const updated = { ...m, [field]: value };
-      if (field === 'requiredQty' || field === 'rate') {
-        const qty = field === 'requiredQty' ? Number(value) || 0 : m.requiredQty;
-        const rate = field === 'rate' ? Number(value) || 0 : m.rate;
-        updated.amount = Math.round(qty * rate * 100) / 100;
-        if (field === 'rate') {
-          updated.rateMode = 'custom';
+    setMaterials(prev => {
+      let fifoRecalcNeeded = false;
+      const updatedList = prev.map(m => {
+        if (m.id !== id) return m;
+        const updated = { ...m, [field]: value };
+        if (field === 'requiredQty' || field === 'rate') {
+          const qty = field === 'requiredQty' ? Number(value) || 0 : m.requiredQty;
+          const rate = field === 'rate' ? Number(value) || 0 : m.rate;
+          updated.amount = Math.round(qty * rate * 100) / 100;
+          if (field === 'rate') {
+            updated.rateMode = 'custom';
+          }
+          if (field === 'requiredQty' && plannedPcs > 0) {
+            updated.basePerPiece = qty / plannedPcs;
+          }
+          if (field === 'requiredQty' && (m.rateMode === 'fifo' || globalRateMode === 'fifo')) {
+            fifoRecalcNeeded = true;
+          }
         }
-        if (field === 'requiredQty' && plannedPcs > 0) {
-          updated.basePerPiece = qty / plannedPcs;
-        }
+        return updated;
+      });
+
+      if (fifoRecalcNeeded) {
+        setTimeout(() => {
+          fetchAndApplyMaterialRates(updatedList, 'fifo');
+        }, 300);
       }
-      return updated;
-    }));
+
+      return updatedList;
+    });
   };
 
   const handleSelectMaterialSku = (rowId: string, sku: SkuV2) => {
@@ -1501,7 +1549,9 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           rate: m.rate,
           amount: m.amount,
           sourceLocation: m.sourceLocation,
-          locationId: m.locationId
+          locationId: m.locationId,
+          batchesAllocated: m.batchesAllocated,
+          fifoBatchInfo: m.fifoBatchInfo
         })),
         byProducts: scrapItems,
         additionalCosts: additionalCosts,
@@ -2595,13 +2645,22 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                                 }`}
                                 title={
                                   row.rateMode === 'fifo'
-                                    ? `FIFO Rate from earliest batch (${row.fifoBatchInfo?.batchNumber || 'Batch'})`
+                                    ? (row.fifoBatchInfo?.summary || `FIFO Rate from earliest batch (${row.fifoBatchInfo?.batchNumber || 'Batch'})`)
                                     : row.rateMode === 'avg_purchase'
                                     ? 'Weighted average rate of purchase batches'
                                     : 'Custom manual rate'
                                 }
                               />
                             </div>
+                            {/* FIFO Allocation & Majority Batch Badge */}
+                            {row.rateMode === 'fifo' && row.fifoBatchInfo && (
+                              <span
+                                className="text-[9px] text-emerald-700 font-semibold leading-tight text-right cursor-help max-w-[140px] truncate block"
+                                title={row.fifoBatchInfo.summary || `FIFO: ${row.fifoBatchInfo.batchNumber} (₹${row.rate}/${row.uom || 'Unit'})`}
+                              >
+                                {row.fifoBatchInfo.majorityBatch ? `Majority: ${row.fifoBatchInfo.majorityBatch}` : `Lot: ${row.fifoBatchInfo.batchNumber}`}
+                              </span>
+                            )}
                             {/* Cost origin badges: shown to clarify where the rate came from */}
                             {row.productionRate != null && row.productionRate > 0 && (
                               <span
