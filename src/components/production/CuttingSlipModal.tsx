@@ -460,12 +460,6 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
     return availableReels.filter(r => selectedReelIds.has(r.id));
   }, [availableReels, selectedReelIds]);
 
-  // Sync reels on stand with selected reels count
-  useEffect(() => {
-    if (selectedReels.length > 0) {
-      setReelsOnStand(selectedReels.length);
-    }
-  }, [selectedReels.length]);
 
   // Source consumption metrics & accurate cost calculation
   const totalInputWeight = useMemo(() => {
