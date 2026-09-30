@@ -177,7 +177,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
     return filtered;
   }, [activeList, buildBomsSearch, onlyNoRecipeFilter, buildBomsTitleFilter, buildBomsRulingFilter, buildBomsSortBy]);
 
-  // Auto-switch selection when tab changes if current item not in active list
+  // Auto-switch selection when tab changes or products load if current item not in active list
   useEffect(() => {
     if (filteredBuildProducts.length > 0) {
       if (!activeBomProduct || !filteredBuildProducts.some(p => p._id === activeBomProduct._id)) {
@@ -187,7 +187,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
       setActiveBomProduct(null);
       setActiveRecipeItems([]);
     }
-  }, [activeDomainTab]);
+  }, [activeDomainTab, filteredBuildProducts]);
 
   const filteredRawCatalog = useMemo(() => {
     return materialsList.filter(m => (m.name || '').toLowerCase().includes(catalogSearch.toLowerCase()));
@@ -199,6 +199,8 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
 
   // Select product
   const handleSelectBomProduct = (prod: SkuV2, currentSkus = skus) => {
+    if (!prod) return;
+    setActiveBomProduct(prod);
     const isFinished = getItemClassification(prod) === 'products';
     const rawYieldUnit = (prod as any).recipeYieldUnit || (prod as any).batchYieldUnit || prod.unit || 'Pcs';
     const isYieldGbl = rawYieldUnit.toUpperCase().includes('GBL');

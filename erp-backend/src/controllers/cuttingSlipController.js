@@ -39,15 +39,53 @@ const getHierarchy = async (locId, companyId, session) => {
   return { warehouseId, floorId, zoneId, locationId };
 };
 
-// 1. Get next slip number (e.g. CS-2026-0001)
+// Helper: Generate next slip number dynamically (CS-001, CS-002, ..., CS-999, CS-1000...)
+const generateNextCuttingSlipNumber = async (companyId, session = null) => {
+  const compId = toObjectId(companyId);
+  const query = CuttingSlip.find({ company: compId }).select('slipNumber').lean();
+  if (session) query.session(session);
+  const slips = await query;
+
+  let maxSeq = 0;
+  for (const slip of slips) {
+    if (!slip.slipNumber) continue;
+    // Match CS-001, CS-999, CS-1000, and legacy CS-2026-0001
+    const match = slip.slipNumber.match(/^CS-(?:(?:\d{4})-)?(\d+)$/i);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (!isNaN(num) && num > maxSeq) {
+        maxSeq = num;
+      }
+    }
+  }
+
+  let candidateSeq = maxSeq + 1;
+  let padLen = Math.max(3, String(candidateSeq).length);
+  let candidateNumber = `CS-${String(candidateSeq).padStart(padLen, '0')}`;
+
+  // Collision safety check
+  let checkQuery = CuttingSlip.findOne({ company: compId, slipNumber: candidateNumber });
+  if (session) checkQuery.session(session);
+  let exists = await checkQuery;
+  while (exists) {
+    candidateSeq++;
+    padLen = Math.max(3, String(candidateSeq).length);
+    candidateNumber = `CS-${String(candidateSeq).padStart(padLen, '0')}`;
+    checkQuery = CuttingSlip.findOne({ company: compId, slipNumber: candidateNumber });
+    if (session) checkQuery.session(session);
+    exists = await checkQuery;
+  }
+
+  return candidateNumber;
+};
+
+// 1. Get next slip number (e.g. CS-001, CS-002, ... dynamically infinite)
 exports.getNextSlipNumber = async (req, res) => {
   try {
     const companyId = req.companyId || req.query.companyId;
     if (!companyId) return res.status(400).json({ msg: "companyId is required" });
 
-    const currentYear = new Date().getFullYear();
-    const count = await CuttingSlip.countDocuments({ company: toObjectId(companyId) });
-    const formatted = `CS-${currentYear}-${String(count + 1).padStart(4, "0")}`;
+    const formatted = await generateNextCuttingSlipNumber(companyId);
     return res.json({ slipNumber: formatted });
   } catch (error) {
     console.error("Error generating cutting slip number:", error);
@@ -258,9 +296,7 @@ exports.createCuttingSlip = async (req, res) => {
     // Auto-generate slip number if missing
     let finalSlipNumber = reqSlipNumber;
     if (!finalSlipNumber) {
-      const currentYear = new Date().getFullYear();
-      const count = await CuttingSlip.countDocuments({ company: companyId }).session(session);
-      finalSlipNumber = `CS-${currentYear}-${String(count + 1).padStart(4, "0")}`;
+      finalSlipNumber = await generateNextCuttingSlipNumber(companyId, session);
     }
 
     // Check duplicate
